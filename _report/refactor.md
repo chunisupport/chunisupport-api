@@ -37,7 +37,6 @@
 |---|---|---|---|
 | **SEC-01** | **High** | CSRF対策不足 | Double Submit Cookie または Synchronizer Token を導入。SameSite=Lax/Strict と Origin/Referer 検証を併用。 |
 | **SEC-011** | **High** | パスワード複雑性要件の欠如 | 長さチェックのみ。`zxcvbn-go` 等の導入または正規表現による文字種チェックを追加。 |
-| **SEC-02** | **Medium** | ボディサイズ制限がなく巨大入力によるDoSが可能 | Echoの `BodyLimit` を導入し、必要に応じて `io.LimitedReader` を併用。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー未実施 | `gosec` などで抑制箇所を洗い出し、根拠を明記。不必要な抑制は削除。 |
 | **SEC-008** | **Medium** | Cookie Domain属性の未設定 | サブドメイン間のセッション共有が必要な場合に備え、Domain属性の設定可否を追加。 |
 
@@ -98,22 +97,6 @@
   - 状態変更系ルート（`/internal/me/*`, `/internal/auth/*`）で必須。
 - **追加で確認したい点**:
   - `CookieSameSite` がどの環境で `None` になっているか。実運用値の確認が必要（`internal/config/config.go`, `internal/app/router.go`）。
-
----
-
-### SEC-02: ボディサイズ制限がなく巨大入力によるDoSが可能
-- **根拠**:
-  - ルータ設定で `BodyLimit` や `MaxBytesReader` に相当する制御が入っていません（`internal/app/router.go`）。
-- **影響範囲**:
-  - 巨大なJSON入力によりメモリ消費やCPU負荷が急増し、リクエストスレッド/ゴルーチン枯渇やOOMにつながる可能性。
-- **再現手順**:
-  1. `curl --data-binary @huge.json /internal/me/register-data` のように数十〜数百MBのJSONを送信。
-  2. サーバー側で読み込みが完了するまでリソースを占有。
-- **修正案**:
-  - Echoの `middleware.BodyLimit("1M")` などで上限を設定。
-  - 大きな入力が想定される場合は `io.LimitedReader` 等で段階的に処理。
-- **追加で確認したい点**:
-  - 正常系で必要な最大リクエストサイズ（プレイヤーデータの想定最大サイズ）。
 
 ---
 
