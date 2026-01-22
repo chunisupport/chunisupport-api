@@ -36,4 +36,7 @@ const (
 	// パスワード設定
 	PasswordMinLength = 8
 	PasswordMaxLength = 128
+
+	// リクエストボディサイズ上限
+	RequestBodyLimit = "5M"
 )
