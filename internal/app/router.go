@@ -84,6 +84,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	}
 
 	e.Use(echoMiddleware.Recover())
+	e.Use(echoMiddleware.BodyLimit(info.RequestBodyLimit))
 
 	// CORS設定を適用
 	e.Use(echoMiddleware.CORSWithConfig(echoMiddleware.CORSConfig{
