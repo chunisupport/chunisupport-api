@@ -120,7 +120,7 @@ go mod tidy
 
 **ツールのインストール（未導入の場合）:**
 ```bash
-go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
 **マイグレーションの実行:**
@@ -131,6 +131,8 @@ DB接続情報は `.env` の設定値に合わせて変更してください。
 ```bash
 migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
 ```
+
+SQLiteはまだ利用していないため、コマンドの記載はありません。
 
 ### 6. アプリケーションの起動
 
