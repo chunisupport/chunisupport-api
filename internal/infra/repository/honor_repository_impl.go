@@ -1,0 +1,62 @@
+package repository
+
+import (
+	"context"
+	"strings"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/jmoiron/sqlx"
+)
+
+// honorRepository は HonorRepository の実装です。
+type honorRepository struct {
+	db *sqlx.DB
+}
+
+// NewHonorRepository は HonorRepository の実装を生成します。
+func NewHonorRepository(db *sqlx.DB) repository.HonorRepository {
+	return &honorRepository{db: db}
+}
+
+// EnsureHonor は称号を登録または既存のIDを取得します。
+// 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
+// imageURL が指定されている場合は更新します。
+func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
+	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), image_url = VALUES(image_url)`
+	result, err := exec.ExecContext(ctx, query, title, honorTypeID, imageURL)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
+}
+
+// DeletePlayerHonors はプレイヤーの称号割り当てを全て削除します。
+func (r *honorRepository) DeletePlayerHonors(ctx context.Context, exec repository.Executor, playerID int) error {
+	query := `DELETE FROM player_honors WHERE player_id = ?`
+	_, err := exec.ExecContext(ctx, query, playerID)
+	return err
+}
+
+// BulkAssignHonors はプレイヤーに称号を一括で割り当てます。
+func (r *honorRepository) BulkAssignHonors(ctx context.Context, exec repository.Executor, assignments []repository.HonorAssignment) error {
+	if len(assignments) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO player_honors (player_id, honor_id, slot) VALUES `
+	values := make([]any, 0, len(assignments)*3)
+	placeholders := make([]string, 0, len(assignments))
+
+	for _, a := range assignments {
+		placeholders = append(placeholders, "(?, ?, ?)")
+		values = append(values, a.PlayerID, a.HonorID, a.Slot)
+	}
+
+	query += strings.Join(placeholders, ", ")
+	_, err := exec.ExecContext(ctx, query, values...)
+	return err
+}

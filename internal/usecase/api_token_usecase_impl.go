@@ -1,0 +1,97 @@
+package usecase
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+)
+
+const tokenByteLength = 32
+
+var ErrInvalidAPIToken = errors.New("invalid API token")
+
+// apiTokenUsecase は APITokenUsecase の実装です。
+type apiTokenUsecase struct {
+	db        repository.Executor
+	tokenRepo repository.APITokenRepository
+	userRepo  repository.UserRepository
+}
+
+// NewAPITokenService はAPITokenUsecaseを生成します。
+func NewAPITokenService(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
+	return &apiTokenUsecase{
+		db:        db,
+		tokenRepo: tokenRepo,
+		userRepo:  userRepo,
+	}
+}
+
+// Generate はユーザーに紐づくAPIトークンを新しく発行します。既存のトークンは置き換えられます。
+func (us *apiTokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
+	buf := make([]byte, tokenByteLength)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+
+	plain := base64.RawURLEncoding.EncodeToString(buf)
+	hashed := hashToken(plain)
+
+	token := &entity.APIToken{
+		UserID:      userID,
+		HashedToken: hashed,
+	}
+
+	if err := us.tokenRepo.CreateOrReplace(ctx, us.db, token); err != nil {
+		return "", err
+	}
+
+	return plain, nil
+}
+
+// Validate はAPIトークンを検証し、有効な場合はユーザーとトークン情報を返します。
+func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
+	if rawToken == "" {
+		return nil, nil, ErrInvalidAPIToken
+	}
+
+	hashed := hashToken(rawToken)
+	token, err := us.tokenRepo.FindByHashedToken(ctx, us.db, hashed)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, ErrInvalidAPIToken
+		}
+		return nil, nil, err
+	}
+
+	user, err := us.userRepo.FindByID(ctx, us.db, token.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, ErrInvalidAPIToken
+		}
+		return nil, nil, err
+	}
+
+	if !user.IsActive() {
+		return nil, nil, ErrInvalidAPIToken
+	}
+
+	return user, token, nil
+}
+
+// Delete はユーザーに紐づくAPIトークンを削除します。
+func (us *apiTokenUsecase) Delete(ctx context.Context, userID int) error {
+	return us.tokenRepo.DeleteByUserID(ctx, us.db, userID)
+}
+
+// hashToken は生のトークン文字列をSHA-256でハッシュ化します。
+func hashToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}

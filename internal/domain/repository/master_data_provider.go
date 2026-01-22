@@ -1,0 +1,15 @@
+package repository
+
+import "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
+
+// PlayerDataMasterProvider は、プレイヤーデータ登録時に必要なマスタデータを提供します。
+// Interface Segregation Principleに従い、PlayerDataUsecaseが必要とするメソッドのみを定義します。
+type PlayerDataMasterProvider interface {
+	PlayerDataMasters() *masterdata.PlayerDataMasters
+}
+
+// SongMasterProvider は、楽曲検索時に必要なマスタデータを提供します。
+// Interface Segregation Principleに従い、SongUsecaseが必要とするメソッドのみを定義します。
+type SongMasterProvider interface {
+	SongMasters() *masterdata.SongMasters
+}

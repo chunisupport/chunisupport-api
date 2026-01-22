@@ -1,0 +1,55 @@
+package apierror
+
+// エラーコード定数
+// クライアント側で機械処理しやすい一意のコードを定義
+const (
+	// 汎用エラー
+	CodeBadRequest    = "bad_request"
+	CodeInternalError = "internal_error"
+
+	// 認証・認可エラー
+	CodeUnauthorized       = "unauthorized"
+	CodeInvalidCredentials = "invalid_credentials" // #nosec G101
+	CodeInvalidToken       = "invalid_token"       // #nosec G101
+	CodeTokenExpired       = "token_expired"       // #nosec G101
+	CodeMissingToken       = "missing_token"       // #nosec G101
+	CodeInvalidSession     = "invalid_session"     // セッション無効/期限切れを統一
+	CodeInvalidRecovery    = "invalid_recovery_credentials"
+	CodeForbidden          = "forbidden"
+
+	// ユーザー関連エラー
+	CodeRegistrationFailed = "registration_failed" // ユーザー登録失敗（詳細を隠蔽）
+	CodeUserNotFound       = "user_not_found"      // ユーザーが見つからない（private含む）
+	CodeOperationFailed    = "operation_failed"    // 操作失敗（詳細を隠蔽）
+
+	// プレイヤー関連エラー
+	CodePlayerNotLinked = "player_not_linked"
+	CodePlayerNotFound  = "player_not_found"
+
+	// 楽曲・譜面関連エラー
+	CodeSongNotFound        = "song_not_found"
+	CodeChartNotFound       = "chart_not_found"
+	CodeInvalidGenreID      = "invalid_genre_id"
+	CodeInvalidDifficultyID = "invalid_difficulty_id"
+
+	// データ関連エラー
+	CodeValidationFailed   = "validation_failed"
+	CodeResourceNotFound   = "resource_not_found"
+	CodeConflict           = "conflict"
+	CodeAPITokenNotFound   = "api_token_not_found" // #nosec G101
+	CodePayloadTooLarge    = "payload_too_large"
+	CodeUnsupportedMedia   = "unsupported_media_type"
+	CodeMethodNotAllowed   = "method_not_allowed"
+	CodeNotFound           = "not_found"
+	CodeTooManyRequests    = "too_many_requests"
+	CodeServiceUnavailable = "service_unavailable"
+
+	// 入力バリデーション詳細エラー
+	CodeUsernameEmpty       = "username_empty"
+	CodeUsernameTooShort    = "username_too_short"
+	CodeUsernameTooLong     = "username_too_long"
+	CodeUsernameInvalidChar = "username_invalid_char"
+	CodePasswordTooShort    = "password_too_short"
+	CodePasswordTooLong     = "password_too_long"
+	CodeInvalidPassword     = "invalid_password" // パスワードが無効（詳細を隠蔽）
+)

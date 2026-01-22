@@ -1,0 +1,17 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+)
+
+// APITokenRepository はAPIトークンの永続化を扱います。
+type APITokenRepository interface {
+	// CreateOrReplace はユーザーに紐づくトークンを保存し、既存のトークンがあれば置き換えます。
+	CreateOrReplace(ctx context.Context, exec Executor, token *entity.APIToken) error
+	// FindByHashedToken はハッシュ化トークンで検索します。
+	FindByHashedToken(ctx context.Context, exec Executor, hashedToken string) (*entity.APIToken, error)
+	// DeleteByUserID はユーザーIDに紐づくAPIトークンを削除します。
+	DeleteByUserID(ctx context.Context, exec Executor, userID int) error
+}

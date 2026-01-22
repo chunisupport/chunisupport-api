@@ -1,0 +1,267 @@
+@startuml ER図
+
+!theme vibrant
+
+' hide the spot
+hide circle
+
+' avoid problems with angled crows feet
+skinparam linetype ortho
+
+' entities
+
+entity "users" as users {
+  + id: INT [PK]
+  --
+  username: VARCHAR(50) NOT NULL UNIQUE
+  password_hash: VARCHAR(255) NOT NULL
+  account_type_id: TINYINT NOT NULL
+  player_id: MEDIUMINT UNSIGNED [UNIQUE]
+  is_deleted: BOOLEAN NOT NULL
+  is_private: BOOLEAN NOT NULL
+  created_at: TIMESTAMP
+  updated_at: TIMESTAMP
+}
+
+entity "sessions" as sessions {
+  + id: VARCHAR(255) [PK]
+  --
+  user_id: INT NOT NULL
+  expires_at: TIMESTAMP NOT NULL
+  created_at: TIMESTAMP
+}
+
+entity "api_tokens" as api_tokens {
+  + id: BIGINT [PK]
+  --
+  user_id: INT NOT NULL [UNIQUE]
+  hashed_token: CHAR(64) NOT NULL [UNIQUE]
+  created_at: TIMESTAMP
+}
+
+entity "players" as players {
+  + id: MEDIUMINT UNSIGNED [PK]
+  --
+  user_id: INT NOT NULL [UNIQUE]
+  player_name: VARCHAR(20) NOT NULL
+  player_level: INT NOT NULL
+  official_player_rating: DECIMAL(4, 2)
+  calculated_player_rating: DECIMAL(6, 4)
+  new_average_rating: DECIMAL(6, 4)
+  best_average_rating: DECIMAL(6, 4)
+  class_emblem_id: TINYINT
+  class_emblem_base_id: TINYINT
+  last_played_at: DATETIME
+  overpower_value: DECIMAL(8, 2)
+  overpower_percentage: DECIMAL(5, 2)
+  team_name: VARCHAR(50)
+  team_color: VARCHAR(20)
+  created_at: TIMESTAMP
+  updated_at: TIMESTAMP
+}
+
+entity "player_honors" as player_honors {
+  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + honor_id: INT [PK, FK]
+  --
+  slot: TINYINT NOT NULL
+  created_at: TIMESTAMP
+}
+
+entity "honors" as honors {
+    + id: INT [PK]
+    --
+    name: VARCHAR(500) NOT NULL
+    honor_type_id: TINYINT NOT NULL
+    image_url: VARCHAR(255)
+    created_at: TIMESTAMP
+}
+
+entity "player_records" as player_records {
+  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + chart_id: MEDIUMINT UNSIGNED [PK, FK]
+  --
+  score: MEDIUMINT UNSIGNED NOT NULL
+  clear_lamp_id: TINYINT NOT NULL
+  combo_lamp_id: TINYINT NOT NULL
+  full_chain_id: TINYINT NOT NULL
+  slot_id: TINYINT NOT NULL
+  slot_order: TINYINT NULL
+  updated_at: TIMESTAMP
+}
+
+entity "player_worldsend_records" as player_worldsend_records {
+  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + worldsend_chart_id: MEDIUMINT UNSIGNED [PK, FK]
+  --
+  score: MEDIUMINT UNSIGNED NOT NULL
+  clear_lamp_id: TINYINT NOT NULL
+  combo_lamp_id: TINYINT NOT NULL
+  full_chain_id: TINYINT NOT NULL
+  updated_at: TIMESTAMP
+}
+
+entity "songs" as songs {
+  + id: INT [PK]
+  --
+  display_id: CHAR(16) UNIQUE NOT NULL
+  title: VARCHAR(300) NOT NULL
+  artist: VARCHAR(300) NOT NULL
+  genre_id: TINYINT NOT NULL
+  bpm: INT
+  release_date: DATE
+  official_idx: VARCHAR(10) UNIQUE
+  img: VARCHAR(20)
+  is_worldsend: BOOLEAN NOT NULL
+  is_deleted: TINYINT(1) NOT NULL
+}
+
+entity "charts" as charts {
+  + id: MEDIUMINT UNSIGNED [PK]
+  --
+  song_id: INT NOT NULL
+  difficulty_id: TINYINT NOT NULL
+  const: DECIMAL(3, 1) NOT NULL
+  is_const_unknown: BOOLEAN NOT NULL
+  notes: INT
+}
+
+entity "chart_statistics" as chart_statistics {
+  + chart_id: MEDIUMINT UNSIGNED [PK, FK]
+  + rating_tier: SMALLINT [PK]
+  --
+  rank_s_count: INT UNSIGNED NOT NULL
+  rank_s_plus_count: INT UNSIGNED NOT NULL
+  rank_ss_count: INT UNSIGNED NOT NULL
+  rank_ss_plus_count: INT UNSIGNED NOT NULL
+  rank_sss_count: INT UNSIGNED NOT NULL
+  rank_sss_plus_count: INT UNSIGNED NOT NULL
+  lamp_aj_count: INT UNSIGNED NOT NULL
+  lamp_fc_count: INT UNSIGNED NOT NULL
+  lamp_other_count: INT UNSIGNED NOT NULL
+  total_count: INT UNSIGNED NOT NULL
+  updated_at: TIMESTAMP
+}
+
+entity "worldsend_charts" as worldsend_charts {
+  + id: MEDIUMINT UNSIGNED [PK]
+  --
+  song_id: INT NOT NULL [UNIQUE]
+  we_star: TINYINT
+  we_kanji: CHAR(1)
+  notes: INT
+}
+
+' master tables
+entity "genres" as genres {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(30) NOT NULL UNIQUE
+}
+
+entity "difficulties" as difficulties {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(30) NOT NULL UNIQUE
+}
+
+entity "class_emblems" as class_emblems {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(10) NOT NULL UNIQUE
+}
+
+entity "class_emblem_bases" as class_emblem_bases {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(10) NOT NULL UNIQUE
+}
+
+entity "clear_lamp_types" as clear_lamp_types {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(20) NOT NULL UNIQUE
+}
+
+entity "combo_lamp_types" as combo_lamp_types {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(20) NOT NULL UNIQUE
+}
+
+entity "slots" as slots {
+  + id: TINYINT UNSIGNED [PK]
+  --
+  name: VARCHAR(30) NOT NULL UNIQUE
+}
+
+entity "full_chain_types" as full_chain_types {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(20) NOT NULL UNIQUE
+}
+
+entity "honor_types" as honor_types {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(50) NOT NULL UNIQUE
+}
+
+entity "account_types" as account_types {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(20) NOT NULL UNIQUE
+}
+
+entity "versions" as versions {
+  + id: TINYINT [PK]
+  --
+  name: VARCHAR(50) NOT NULL UNIQUE
+  released_at: DATE NOT NULL
+}
+
+entity "user_recovery_codes" as user_recovery_codes {
+  + id: INT UNSIGNED [PK]
+  --
+  user_id: INT NOT NULL
+  code_hash: BINARY(32) NOT NULL [UNIQUE]
+  created_at: TIMESTAMP
+}
+
+
+' relationships
+users ||--o{ sessions
+users ||--|o players
+users ||--|o api_tokens
+users ||--o{ user_recovery_codes
+users }o--|| account_types
+
+players ||--o{ player_records
+players ||--o{ player_worldsend_records
+players ||--o{ player_honors
+players }o--|| class_emblems
+players }o--|| class_emblem_bases
+
+honors ||--o{ player_honors
+honors }o--|| honor_types
+
+player_records }|--|| charts
+player_records }o--|| clear_lamp_types
+player_records }o--|| combo_lamp_types
+player_records }o--|| full_chain_types
+player_records }o--|| slots
+
+player_worldsend_records }|--|| worldsend_charts
+player_worldsend_records }o--|| clear_lamp_types
+player_worldsend_records }o--|| combo_lamp_types
+player_worldsend_records }o--|| full_chain_types
+
+charts }|--|| songs
+charts }o--|| difficulties
+charts ||--o{ chart_statistics
+
+songs ||--|o worldsend_charts
+
+songs }o--|| genres
+
+@enduml

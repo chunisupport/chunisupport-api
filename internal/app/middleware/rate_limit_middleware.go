@@ -1,0 +1,215 @@
+package middleware
+
+import (
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/labstack/echo/v4"
+)
+
+// RateLimitConfig はレートリミットの設定を保持します
+type RateLimitConfig struct {
+	// Requests は時間枠内に許可されるリクエスト数です
+	Requests int
+	// Window は時間枠です
+	Window time.Duration
+}
+
+// rateLimitEntry はFixed Window方式のレートリミット情報を保持します
+type rateLimitEntry struct {
+	Count       int       // 現在のウィンドウ内でのリクエスト数
+	WindowStart time.Time // 現在のウィンドウの開始時刻
+	Limit       int       // このエントリの制限数（ADMINは150000、その他は150）
+}
+
+// FixedWindowStore はFixed Window方式のレートリミットストアです
+type FixedWindowStore struct {
+	mu      sync.RWMutex
+	entries map[string]*rateLimitEntry
+	window  time.Duration
+}
+
+// NewFixedWindowStore は新しいFixedWindowStoreを作成します
+func NewFixedWindowStore(window time.Duration) *FixedWindowStore {
+	return &FixedWindowStore{
+		entries: make(map[string]*rateLimitEntry),
+		window:  window,
+	}
+}
+
+// Allow はリクエストを許可するか判定し、残り回数とリセット時刻を返します
+func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, remaining int, resetTime time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	entry, exists := s.entries[identifier]
+
+	// エントリが存在しない、またはウィンドウが終了している場合は新規作成
+	if !exists || now.Sub(entry.WindowStart) >= s.window {
+		entry = &rateLimitEntry{
+			Count:       0,
+			WindowStart: now,
+			Limit:       limit,
+		}
+		s.entries[identifier] = entry
+	}
+
+	// リセット時刻を計算
+	resetTime = entry.WindowStart.Add(s.window)
+
+	// 制限チェック
+	if entry.Count >= entry.Limit {
+		return false, 0, resetTime
+	}
+
+	// リクエストを許可
+	entry.Count++
+	remaining = entry.Limit - entry.Count
+
+	return true, remaining, resetTime
+}
+
+// Cleanup は期限切れのエントリを削除します（メモリリーク防止）
+func (s *FixedWindowStore) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for key, entry := range s.entries {
+		if now.Sub(entry.WindowStart) >= s.window*2 {
+			delete(s.entries, key)
+		}
+	}
+}
+
+// denyHandler はレートリミット超過時に呼び出されるハンドラーです
+func denyHandler(_ echo.Context, _ string, _ error) error {
+	return apierror.ErrTooManyRequests
+}
+
+// APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
+// ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
+// レスポンスにX-RateLimit-*ヘッダーを追加します。
+// このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
+func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
+	store := NewFixedWindowStore(window)
+
+	// バックグラウンドで定期的にクリーンアップ
+	go func() {
+		ticker := time.NewTicker(window)
+		defer ticker.Stop()
+		for range ticker.C {
+			store.Cleanup()
+		}
+	}()
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// ユーザーエンティティを取得
+			userObj := c.Get("userEntity")
+			if userObj == nil {
+				return apierror.ErrUnauthorized
+			}
+			user, ok := userObj.(*entity.User)
+			if !ok {
+				return apierror.ErrUnauthorized
+			}
+
+			// ユーザーIDを識別子として使用
+			identifier := strconv.Itoa(user.ID)
+
+			// ADMINかどうかで制限数を変更
+			limit := normalLimit
+			if user.AccountTypeID == AccountTypeAdmin {
+				limit = adminLimit
+			}
+
+			// レートリミットチェック
+			allowed, remaining, resetTime := store.Allow(identifier, limit)
+
+			// ヘッダーを設定
+			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
+			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}
+
+// IPRateLimitMiddleware はIPアドレスベースのレートリミットミドルウェアを提供します。
+// 未認証ユーザーのエンドポイント保護などに使用します。
+// このミドルウェアはヘッダーを追加しません（外部APIのみヘッダー追加）。
+func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
+	store := NewFixedWindowStore(config.Window)
+
+	// バックグラウンドで定期的にクリーンアップ
+	go func() {
+		ticker := time.NewTicker(config.Window)
+		defer ticker.Stop()
+		for range ticker.C {
+			store.Cleanup()
+		}
+	}()
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// IPアドレスを識別子として使用
+			identifier := c.RealIP()
+
+			// レートリミットチェック
+			allowed, _, _ := store.Allow(identifier, config.Requests)
+
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}
+
+// AnonymousIPRateLimitMiddleware は未認証ユーザーにのみIPベースのレートリミットを適用します。
+func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
+	store := NewFixedWindowStore(config.Window)
+
+	// バックグラウンドで定期的にクリーンアップ
+	go func() {
+		ticker := time.NewTicker(config.Window)
+		defer ticker.Stop()
+		for range ticker.C {
+			store.Cleanup()
+		}
+	}()
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			userObj := c.Get("userEntity")
+			if userObj != nil {
+				if _, ok := userObj.(*entity.User); !ok {
+					return apierror.ErrUnauthorized
+				}
+				return next(c)
+			}
+
+			// IPアドレスを識別子として使用
+			identifier := c.RealIP()
+
+			// レートリミットチェック
+			allowed, _, _ := store.Allow(identifier, config.Requests)
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}

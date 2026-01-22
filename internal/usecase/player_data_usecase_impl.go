@@ -1,0 +1,1095 @@
+package usecase
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"log/slog"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
+	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/domain/service"
+	"github.com/Qman110101/chunisupport-api/internal/domain/vo/playername"
+	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+)
+
+const (
+	maxScoreValue     = 1010000
+	minScoreValue     = 1
+	tokyoLayout       = "2006/01/02 15:04"
+	defaultSlotName   = "none"
+	worldsendDiffName = "WORLD'S END"
+)
+
+var (
+	difficultyCodeToName = map[string]string{
+		"BAS":      "BASIC",
+		"BASIC":    "BASIC",
+		"ADV":      "ADVANCED",
+		"ADVANCED": "ADVANCED",
+		"EXP":      "EXPERT",
+		"EXPERT":   "EXPERT",
+		"MAS":      "MASTER",
+		"MASTER":   "MASTER",
+		"ULT":      "ULTIMA",
+		"ULTIMA":   "ULTIMA",
+	}
+
+	clearLampAlias = map[string]string{
+		"":            "FAILED",
+		"failed":      "FAILED",
+		"clear":       "CLEAR",
+		"hard":        "HARD",
+		"brave":       "BRAVE",
+		"absolute":    "ABSOLUTE",
+		"catastrophy": "CATASTROPHY",
+	}
+)
+
+// validatePlayerDataPayload はプレイヤーデータの事前検証を行い、明らかに不正なデータを検知します。
+// トランザクションに入る前に実行し、改ざんや異常なデータを早期に検出します。
+func validatePlayerDataPayload(payload *PlayerDataPayload) error {
+	if payload == nil {
+		return &PlayerDataValidationError{
+			Field:   "payload",
+			Message: "payload cannot be nil",
+		}
+	}
+
+	// スコアデータの整合性検証
+	errorCount := 0
+	maxErrorsToReport := 10
+	errorMessages := make([]string, 0, maxErrorsToReport)
+
+	// 通常譜面のスコア検証
+	for i, entry := range payload.Scores.Full {
+		if errorCount >= maxErrorsToReport {
+			break
+		}
+		if err := validateScoreEntry(&entry, "full", i); err != nil {
+			errorCount++
+			errorMessages = append(errorMessages, err.Error())
+		}
+	}
+
+	// WORLD'S END譜面のスコア検証
+	for i, entry := range payload.Scores.Worldsend {
+		if errorCount >= maxErrorsToReport {
+			break
+		}
+		if err := validateScoreEntry(&entry, "worldsend", i); err != nil {
+			errorCount++
+			errorMessages = append(errorMessages, err.Error())
+		}
+	}
+
+	if errorCount > 0 {
+		msg := fmt.Sprintf("detected %d invalid score entries: %s", errorCount, strings.Join(errorMessages, "; "))
+		if errorCount >= maxErrorsToReport {
+			msg += " (and more...)"
+		}
+		return &PlayerDataValidationError{
+			Field:   "scores",
+			Message: msg,
+		}
+	}
+
+	return nil
+}
+
+// validateScoreEntry は個別のスコアエントリーを検証します。
+// AJ（All Justice: cmb_lv=2）である場合、必ず1,000,000点以上でなければならないという整合性をチェックします。
+func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index int) error {
+	// AJかつ100万点未満は矛盾している
+	if entry.ComboLv != nil && *entry.ComboLv == 2 {
+		if entry.Score < 1000000 {
+			return fmt.Errorf("%s[%d]: inconsistent data - AJ (cmb_lv=2) with score=%d (must be >= 1,000,000, idx=%s)",
+				recordType, index, entry.Score, entry.Idx)
+		}
+	}
+
+	return nil
+}
+
+// isNoneValue は、「存在しない」を表す便宜上のマスタ値かどうかを判定します。
+func isNoneValue(name string) bool {
+	return name == "NONE" || name == "none"
+}
+
+// toMasterNamePtrFromMap はマスタ名MapからIDで値を取得し、NONE/noneの場合はnilを返します。
+func toMasterNamePtrFromMap(m map[int]string, id int) *string {
+	name := m[id]
+	if name == "" || isNoneValue(name) {
+		return nil
+	}
+	return &name
+}
+
+type playerRecordState struct {
+	Score       int
+	ClearLampID int
+	ComboLampID int
+	FullChainID int
+	SlotID      int
+	SlotOrder   *int
+	UpdatedAt   time.Time
+}
+
+type worldsendRecordState struct {
+	Score       int
+	ClearLampID int
+	ComboLampID int
+	FullChainID int
+	UpdatedAt   time.Time
+}
+
+// playerDataMaster はプレイヤーデータ登録時に使用するマスターデータのキャッシュを保持します。
+type playerDataMaster struct {
+	*masterdata.PlayerDataMasters
+	songs             map[string]entity.PlayerDataSong
+	chartsByKey       map[string]entity.PlayerDataChart
+	chartsByID        map[int]entity.PlayerDataChart
+	worldsendBySongID map[int]entity.PlayerDataWorldsendChart
+}
+
+// playerDataUsecase は PlayerDataUsecase の実装です。
+type playerDataUsecase struct {
+	tm               TransactionManager
+	userRepo         repository.UserRepository
+	playerRepo       repository.PlayerRepository
+	playerRecRepo    repository.PlayerRecordRepository
+	worldsendRecRepo repository.WorldsendRecordRepository
+	honorRepo        repository.HonorRepository
+	playerDataRepo   repository.PlayerDataRepository
+	masterCache      repository.PlayerDataMasterProvider
+}
+
+// NewPlayerDataService は PlayerDataUsecase の実装を生成します。
+func NewPlayerDataService(
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRepo repository.PlayerRepository,
+	playerRecRepo repository.PlayerRecordRepository,
+	worldsendRecRepo repository.WorldsendRecordRepository,
+	honorRepo repository.HonorRepository,
+	playerDataRepo repository.PlayerDataRepository,
+	masterCache repository.PlayerDataMasterProvider,
+) PlayerDataUsecase {
+	return &playerDataUsecase{
+		tm:               tm,
+		userRepo:         userRepo,
+		playerRepo:       playerRepo,
+		playerRecRepo:    playerRecRepo,
+		worldsendRecRepo: worldsendRecRepo,
+		honorRepo:        honorRepo,
+		playerDataRepo:   playerDataRepo,
+		masterCache:      masterCache,
+	}
+}
+
+// Register はCHUNITHMプレイヤーデータをトランザクション内で登録・更新します。
+// プレイヤー情報、称号、スコアの各種データを処理し、結果をPlayerDataResultで返します。
+func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, payload *PlayerDataPayload, bodyHash string) (*api_internal.PlayerDataResult, error) {
+	if user == nil {
+		return nil, errors.New("invalid request: user is nil")
+	}
+
+	nameVO, err := playername.NewPlayerName(payload.Name)
+	if err != nil {
+		return nil, errors.New("invalid player data")
+	}
+
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		loc = time.FixedZone("Asia/Tokyo", 9*60*60)
+	}
+
+	var lastPlayedAt *time.Time
+	if strings.TrimSpace(payload.LastPlayed) != "" {
+		parsed, parseErr := time.ParseInLocation(tokyoLayout, payload.LastPlayed, loc)
+		if parseErr != nil {
+			return nil, errors.New("invalid player data")
+		}
+		lastPlayedAt = &parsed
+	}
+
+	updatedAt, err := time.Parse(time.RFC3339, payload.UpdatedAt)
+	if err != nil {
+		return nil, errors.New("invalid player data")
+	}
+
+	// トランザクション開始前にペイロードの事前検証を実行
+	// 明らかに不正なデータがある場合はここで拒否する
+	if err := validatePlayerDataPayload(payload); err != nil {
+		slog.Warn("player data validation failed", "user_id", user.ID, "error", err.Error())
+		return nil, fmt.Errorf("invalid player data: %w", err)
+	}
+
+	overpowerValue := payload.Overpower.Value
+	overpowerPercent := payload.Overpower.Percentage
+
+	teamName := strings.TrimSpace(payload.Team.Name)
+	teamColor := strings.TrimSpace(payload.Team.Color)
+
+	summaryInput := &PlayerDataSummaryInput{
+		Name:             nameVO.String(),
+		Level:            payload.Level,
+		OfficialRating:   payload.Rating,
+		LastPlayedAt:     lastPlayedAt,
+		OverpowerValue:   &overpowerValue,
+		OverpowerPercent: &overpowerPercent,
+	}
+	if teamName != "" {
+		summaryInput.TeamName = &teamName
+	}
+	if teamColor != "" {
+		summaryInput.TeamColor = &teamColor
+	}
+
+	result := &api_internal.PlayerDataResult{
+		AppVersion: payload.AppVersion,
+		ImportedAt: time.Now().UTC(),
+		DiffRecords: api_internal.PlayerDataDiffSet{
+			Full:      make([]api_internal.PlayerDataDiff, 0, 4),
+			Worldsend: make([]api_internal.PlayerDataDiff, 0, 4),
+		},
+	}
+
+	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
+		masters, loadErr := us.loadMasterData(ctx, tx, payload)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		classID, baseID, classErr := resolveClassEmblemIDs(payload.ClassEmblem, masters)
+		if classErr != nil {
+			return classErr
+		}
+		summaryInput.ClassEmblemID = classID
+		summaryInput.ClassBaseID = baseID
+
+		playerID, ensureErr := us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		if ensureErr != nil {
+			return ensureErr
+		}
+		result.PlayerID = playerID
+		result.Summary = api_internal.PlayerDataSummary{
+			Name:             summaryInput.Name,
+			Level:            summaryInput.Level,
+			Rating:           summaryInput.OfficialRating,
+			LastPlayedAt:     summaryInput.LastPlayedAt,
+			OverpowerValue:   summaryInput.OverpowerValue,
+			OverpowerPercent: summaryInput.OverpowerPercent,
+		}
+
+		skippedRecords := make([]api_internal.SkippedRecord, 0, 4)
+
+		honorSkipped, honorErr := us.applyHonors(ctx, tx, playerID, payload.Honors, masters)
+		if honorErr != nil {
+			return honorErr
+		}
+		skippedRecords = append(skippedRecords, honorSkipped...)
+
+		counts, diffs, scoreSkipped, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		if scoreErr != nil {
+			return scoreErr
+		}
+		skippedRecords = append(skippedRecords, scoreSkipped...)
+
+		// レーティングを再計算して更新
+		ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
+		if ratingErr != nil {
+			return ratingErr
+		}
+
+		result.Counts = counts
+		result.Counts.HonorsSkipped = len(honorSkipped)
+		result.DiffRecords = diffs
+		if len(skippedRecords) > 0 {
+			result.SkippedRecords = skippedRecords
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
+	return result, nil
+}
+
+// loadMasterData はプレイヤーデータ登録に必要なマスターデータをキャッシュおよびDBから読み込みます。
+func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.Executor, payload *PlayerDataPayload) (*playerDataMaster, error) {
+	if us.masterCache == nil {
+		return nil, errors.New("master cache is not initialized")
+	}
+
+	baseMasters := us.masterCache.PlayerDataMasters()
+	if baseMasters == nil {
+		return nil, errors.New("master cache is not initialized")
+	}
+
+	masters := &playerDataMaster{
+		PlayerDataMasters: baseMasters,
+		songs:             make(map[string]entity.PlayerDataSong),
+		chartsByKey:       make(map[string]entity.PlayerDataChart),
+		chartsByID:        make(map[int]entity.PlayerDataChart),
+		worldsendBySongID: make(map[int]entity.PlayerDataWorldsendChart),
+	}
+
+	idxSet := make(map[string]struct{})
+	for _, entry := range payload.Scores.Full {
+		idx := strings.TrimSpace(entry.Idx)
+		if idx != "" {
+			idxSet[idx] = struct{}{}
+		}
+	}
+	for _, entry := range payload.Scores.Worldsend {
+		idx := strings.TrimSpace(entry.Idx)
+		if idx != "" {
+			idxSet[idx] = struct{}{}
+		}
+	}
+	if len(idxSet) == 0 {
+		return masters, nil
+	}
+
+	idxList := make([]string, 0, len(idxSet))
+	for idx := range idxSet {
+		idxList = append(idxList, idx)
+	}
+	sort.Strings(idxList)
+
+	loaded, err := us.playerDataRepo.LoadMasterData(ctx, tx, idxList)
+	if err != nil {
+		return nil, err
+	}
+
+	masters.songs = loaded.Songs
+	masters.chartsByKey = loaded.ChartsByKey
+	masters.chartsByID = loaded.ChartsByID
+	masters.worldsendBySongID = loaded.WorldsendBySongID
+
+	return masters, nil
+}
+
+func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMaster) (*int, *int, error) {
+	var classID *int
+	var baseID *int
+
+	medalKey := strings.TrimSpace(payload.MedalClass)
+	if medalKey != "" {
+		medalKey = strings.TrimLeft(medalKey, "0")
+		if medalKey == "" {
+			medalKey = "0"
+		}
+		medalKey = strings.ToLower(medalKey)
+		if item, ok := masters.ClassEmblems[medalKey]; ok {
+			v := item.ID
+			classID = &v
+		}
+		// 見つからなくてもエラーにしない（classIDはnilのまま）
+	}
+
+	baseKey := strings.TrimSpace(payload.BaseClass)
+	if baseKey != "" {
+		baseKey = strings.TrimLeft(baseKey, "0")
+		if baseKey == "" {
+			baseKey = "0"
+		}
+		baseKey = strings.ToLower(baseKey)
+		if item, ok := masters.ClassEmblemBases[baseKey]; ok {
+			v := item.ID
+			baseID = &v
+		}
+		// 見つからなくてもエラーにしない（baseIDはnilのまま）
+	}
+
+	return classID, baseID, nil
+}
+
+// ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。
+// プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDを返します。
+func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, error) {
+	// ユーザーに紐づくプレイヤーを検索
+	existingPlayer, err := us.playerRepo.FindByUserID(ctx, tx, user.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	// PlayerNameのバリデーション
+	playerName, err := playername.NewPlayerName(summary.Name)
+	if err != nil {
+		return 0, fmt.Errorf("invalid player name: %w", err)
+	}
+
+	// エンティティを作成または更新
+	player := &entity.Player{
+		UserID:            user.ID,
+		Name:              playerName,
+		Level:             summary.Level,
+		OfficialRating:    summary.OfficialRating,
+		ClassEmblemID:     summary.ClassEmblemID,
+		ClassEmblemBaseID: summary.ClassBaseID,
+		LastPlayedAt:      summary.LastPlayedAt,
+		OverpowerValue:    summary.OverpowerValue,
+		OverpowerPercent:  summary.OverpowerPercent,
+		TeamName:          summary.TeamName,
+		TeamColor:         summary.TeamColor,
+		UpdatedAt:         updatedAt,
+	}
+
+	if existingPlayer != nil {
+		// 既存のプレイヤーを更新
+		player.ID = existingPlayer.ID
+		// 計算レーティング等は既存の値を維持
+		player.CalculatedRating = existingPlayer.CalculatedRating
+		player.NewAverageRating = existingPlayer.NewAverageRating
+		player.BestAverageRating = existingPlayer.BestAverageRating
+	}
+
+	// 保存（IDがなければINSERT、それ以外はUPDATE）
+	if err := us.playerRepo.Save(ctx, tx, player); err != nil {
+		return 0, err
+	}
+
+	// ユーザーとプレイヤーのリンク
+	if user.PlayerID == nil || *user.PlayerID != player.ID {
+		user.LinkPlayer(player.ID)
+		if err := us.userRepo.Save(ctx, tx, user); err != nil {
+			return 0, err
+		}
+	}
+
+	return player.ID, nil
+}
+
+// applyHonors はプレイヤーの称号情報を更新します。
+// 既存の称号を削除し、新しい称号をバルクインサートします。
+// 称号は最大3つであるため、EnsureHonorのループ内呼び出しによるN+1問題を許容します。
+func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Executor, playerID int, honors map[string]PlayerDataHonorPayload, masters *playerDataMaster) ([]api_internal.SkippedRecord, error) {
+	skipped := make([]api_internal.SkippedRecord, 0, 4)
+	if honors == nil {
+		return skipped, nil
+	}
+	if err := us.honorRepo.DeletePlayerHonors(ctx, tx, playerID); err != nil {
+		return skipped, err
+	}
+
+	// バリデーション済みの称号情報を収集
+	assignments := make([]repository.HonorAssignment, 0, len(honors))
+
+	for slotKey, honor := range honors {
+		slotKey = strings.TrimSpace(slotKey)
+		if slotKey == "" {
+			continue
+		}
+		slot, convErr := strconv.Atoi(slotKey)
+		if convErr != nil {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("invalid slot %s", slotKey),
+				Details:    convErr.Error(),
+			})
+			continue
+		}
+		if slot < 1 || slot > 3 {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("slot out of range: %d", slot),
+				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
+			})
+			continue
+		}
+
+		honorTypeKey := strings.ToLower(strings.TrimSpace(honor.Class))
+		typeItem, ok := masters.HonorTypes[honorTypeKey]
+		if !ok {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("honor_type not found: %s", honorTypeKey),
+				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
+			})
+			continue
+		}
+
+		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honor.Title, typeItem.ID, honor.Img)
+		if err != nil {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     "failed to create honor",
+				Details:    fmt.Sprintf("slot=%d, title=%s, error=%s", slot, honor.Title, err.Error()),
+			})
+			continue
+		}
+
+		assignments = append(assignments, repository.HonorAssignment{
+			PlayerID: playerID,
+			HonorID:  honorID,
+			Slot:     slot,
+		})
+	}
+
+	// player_honors への一括挿入（Repository経由で実行）
+	if len(assignments) > 0 {
+		if err := us.honorRepo.BulkAssignHonors(ctx, tx, assignments); err != nil {
+			// バルクINSERTが失敗した場合、すべての称号をスキップ扱いにする
+			for _, a := range assignments {
+				skipped = append(skipped, api_internal.SkippedRecord{
+					RecordType: "honor",
+					Reason:     "failed to insert player_honor (bulk)",
+					Details:    fmt.Sprintf("slot=%d, honor_id=%d, error=%s", a.Slot, a.HonorID, err.Error()),
+				})
+			}
+		}
+	}
+
+	return skipped, nil
+}
+
+// applyScores はプレイヤーのスコア情報を更新します。
+// 通常譜面とWORLD'S END譜面のスコアをUPSERTし、変更差分を返します。
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, api_internal.PlayerDataDiffSet, []api_internal.SkippedRecord, error) {
+	counts := api_internal.PlayerDataCounts{}
+	diffs := api_internal.PlayerDataDiffSet{
+		Full:      make([]api_internal.PlayerDataDiff, 0, 4),
+		Worldsend: make([]api_internal.PlayerDataDiff, 0, 4),
+	}
+	skipped := make([]api_internal.SkippedRecord, 0, 4)
+
+	// 既存のレコードをRepository経由で取得
+	existingFullRows, err := us.playerRecRepo.FindExistingByPlayerID(ctx, tx, playerID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return counts, diffs, skipped, err
+	}
+	existingFull := make(map[int]playerRecordState, len(existingFullRows))
+	for _, row := range existingFullRows {
+		existingFull[row.ChartID] = playerRecordState{
+			Score:       row.Score,
+			ClearLampID: row.ClearLampID,
+			ComboLampID: row.ComboLampID,
+			FullChainID: row.FullChainID,
+			SlotID:      row.SlotID,
+			SlotOrder:   row.SlotOrder,
+			UpdatedAt:   row.UpdatedAt,
+		}
+	}
+
+	existingWorldsendRows, err := us.worldsendRecRepo.FindExistingByPlayerID(ctx, tx, playerID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return counts, diffs, skipped, err
+	}
+	existingWorldsend := make(map[int]worldsendRecordState, len(existingWorldsendRows))
+	for _, row := range existingWorldsendRows {
+		existingWorldsend[row.WorldsendChartID] = worldsendRecordState{
+			Score:       row.Score,
+			ClearLampID: row.ClearLampID,
+			ComboLampID: row.ComboLampID,
+			FullChainID: row.FullChainID,
+			UpdatedAt:   row.UpdatedAt,
+		}
+	}
+
+	// バルクインサート用のバッファ
+	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(scores.Full))
+
+	for _, entry := range scores.Full {
+		counts.FullRecordsUpserted++
+
+		chart, song, diffName, err := resolveChart(entry, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve chart",
+				Details:    fmt.Sprintf("idx=%s, diff=%s, error=%s", entry.Idx, entry.Diff, err.Error()),
+			})
+			continue
+		}
+
+		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			clearLampStr := "nil"
+			if entry.ClearLamp != nil {
+				clearLampStr = *entry.ClearLamp
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve clear_lamp",
+				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
+			})
+			continue
+		}
+		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			comboLvStr := "nil"
+			if entry.ComboLv != nil {
+				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve combo_lamp",
+				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
+			})
+			continue
+		}
+		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			fullChainStr := "nil"
+			if entry.FullChain != nil {
+				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve full_chain",
+				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
+			})
+			continue
+		}
+		slotID, err := resolveSlotID(entry.Slot, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			slotStr := "nil"
+			if entry.Slot != nil {
+				slotStr = *entry.Slot
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve slot",
+				Details:    fmt.Sprintf("idx=%s (%s), slot=%s, error=%s", entry.Idx, song.Title, slotStr, err.Error()),
+			})
+			continue
+		}
+
+		state := playerRecordState{
+			Score:       entry.Score,
+			ClearLampID: clearLampID,
+			ComboLampID: comboLampID,
+			FullChainID: fullChainID,
+			SlotID:      slotID,
+			SlotOrder:   entry.Order,
+			UpdatedAt:   updatedAt,
+		}
+
+		before, exists := existingFull[chart.ID]
+		changed := computeFullRecordDiff(before, state)
+		if exists && len(changed) > 0 {
+			counts.FullRecordsChanged++
+		}
+		if !exists || len(changed) > 0 {
+			diff := api_internal.PlayerDataDiff{
+				ChangedFields: changed,
+				After:         buildPlayerRecordDTO(playerID, state, chart, song, diffName, masters),
+			}
+			if exists {
+				diff.Before = buildPlayerRecordDTO(playerID, before, chart, song, diffName, masters)
+			}
+			diffs.Full = append(diffs.Full, diff)
+		}
+
+		// バルクインサート用のバッファに追加
+		fullRecordsToUpsert = append(fullRecordsToUpsert, repository.PlayerRecordForUpsert{
+			PlayerID: playerID,
+			ChartID:  chart.ID,
+			State: repository.PlayerRecordState{
+				Score:       state.Score,
+				ClearLampID: state.ClearLampID,
+				ComboLampID: state.ComboLampID,
+				FullChainID: state.FullChainID,
+				SlotID:      state.SlotID,
+				SlotOrder:   state.SlotOrder,
+				UpdatedAt:   state.UpdatedAt,
+			},
+		})
+
+		existingFull[chart.ID] = state
+	}
+
+	// バルクインサート用のバッファ
+	worldsendRecordsToUpsert := make([]repository.WorldsendRecordForUpsert, 0, len(scores.Worldsend))
+
+	for _, entry := range scores.Worldsend {
+		counts.WorldsendRecordsUpserted++
+
+		chart, song, err := resolveWorldsendChart(entry, masters)
+		if err != nil {
+			counts.WorldsendRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     "failed to resolve worldsend chart",
+				Details:    fmt.Sprintf("idx=%s, error=%s", entry.Idx, err.Error()),
+			})
+			continue
+		}
+
+		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
+			counts.WorldsendRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
+				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
+			})
+			continue
+		}
+
+		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
+		if err != nil {
+			counts.WorldsendRecordsSkipped++
+			clearLampStr := "nil"
+			if entry.ClearLamp != nil {
+				clearLampStr = *entry.ClearLamp
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     "failed to resolve clear_lamp",
+				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
+			})
+			continue
+		}
+		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
+		if err != nil {
+			counts.WorldsendRecordsSkipped++
+			comboLvStr := "nil"
+			if entry.ComboLv != nil {
+				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     "failed to resolve combo_lamp",
+				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
+			})
+			continue
+		}
+		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
+		if err != nil {
+			counts.WorldsendRecordsSkipped++
+			fullChainStr := "nil"
+			if entry.FullChain != nil {
+				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
+			}
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     "failed to resolve full_chain",
+				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
+			})
+			continue
+		}
+
+		state := worldsendRecordState{
+			Score:       entry.Score,
+			ClearLampID: clearLampID,
+			ComboLampID: comboLampID,
+			FullChainID: fullChainID,
+			UpdatedAt:   updatedAt,
+		}
+
+		before, exists := existingWorldsend[chart.ID]
+		changed := computeWorldsendDiff(before, state)
+		if exists && len(changed) > 0 {
+			counts.WorldsendRecordsChanged++
+		}
+		if !exists || len(changed) > 0 {
+			diff := api_internal.PlayerDataDiff{
+				ChangedFields: changed,
+				After:         buildWorldsendRecordDTO(playerID, state, chart, song, masters),
+			}
+			if exists {
+				diff.Before = buildWorldsendRecordDTO(playerID, before, chart, song, masters)
+			}
+			diffs.Worldsend = append(diffs.Worldsend, diff)
+		}
+
+		// バルクインサート用のバッファに追加
+		worldsendRecordsToUpsert = append(worldsendRecordsToUpsert, repository.WorldsendRecordForUpsert{
+			PlayerID: playerID,
+			ChartID:  chart.ID,
+			State: repository.WorldsendRecordState{
+				Score:       state.Score,
+				ClearLampID: state.ClearLampID,
+				ComboLampID: state.ComboLampID,
+				FullChainID: state.FullChainID,
+				UpdatedAt:   state.UpdatedAt,
+			},
+		})
+
+		existingWorldsend[chart.ID] = state
+	}
+
+	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
+		FullRecords:      fullRecordsToUpsert,
+		WorldsendRecords: worldsendRecordsToUpsert,
+	}); err != nil {
+		return counts, diffs, skipped, err
+	}
+
+	return counts, diffs, skipped, nil
+}
+
+func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {
+	diffCode := strings.ToUpper(strings.TrimSpace(entry.Diff))
+	diffName, ok := difficultyCodeToName[diffCode]
+	if !ok {
+		diffName = diffCode
+	}
+	diffItem, ok := masters.Difficulties[strings.ToUpper(diffName)]
+	if !ok {
+		return entity.PlayerDataChart{}, entity.PlayerDataSong{}, "", &PlayerDataNotFoundError{Resource: "difficulty", Key: diffName}
+	}
+
+	songKey := strings.TrimSpace(entry.Idx)
+	song, ok := masters.songs[songKey]
+	if !ok {
+		return entity.PlayerDataChart{}, entity.PlayerDataSong{}, "", &PlayerDataNotFoundError{Resource: "song", Key: songKey}
+	}
+
+	key := fmt.Sprintf("%d:%d", song.ID, diffItem.ID)
+	chart, ok := masters.chartsByKey[key]
+	if !ok {
+		return entity.PlayerDataChart{}, entity.PlayerDataSong{}, "", &PlayerDataNotFoundError{Resource: "chart", Key: fmt.Sprintf("%s-%s", songKey, diffName)}
+	}
+
+	return chart, song, diffName, nil
+}
+
+func resolveWorldsendChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataWorldsendChart, entity.PlayerDataSong, error) {
+	songKey := strings.TrimSpace(entry.Idx)
+	song, ok := masters.songs[songKey]
+	if !ok {
+		return entity.PlayerDataWorldsendChart{}, entity.PlayerDataSong{}, &PlayerDataNotFoundError{Resource: "song", Key: songKey}
+	}
+
+	ws, ok := masters.worldsendBySongID[song.ID]
+	if !ok {
+		return entity.PlayerDataWorldsendChart{}, entity.PlayerDataSong{}, &PlayerDataNotFoundError{Resource: "worldsend_chart", Key: songKey}
+	}
+
+	return ws, song, nil
+}
+
+func resolveClearLampID(clearLamp *string, masters *playerDataMaster) (int, error) {
+	key := ""
+	if clearLamp != nil {
+		key = strings.ToLower(strings.TrimSpace(*clearLamp))
+	}
+	mapped, ok := clearLampAlias[key]
+	if !ok {
+		mapped = strings.ToUpper(key)
+	}
+	item, ok := masters.ClearLamps[strings.ToLower(mapped)]
+	if !ok {
+		return 0, &PlayerDataNotFoundError{Resource: "clear_lamp", Key: mapped}
+	}
+	return item.ID, nil
+}
+
+func resolveComboLampID(combo *int, masters *playerDataMaster) (int, error) {
+	value := 0
+	if combo != nil {
+		value = *combo
+	}
+	var name string
+	switch value {
+	case 0:
+		name = "none"
+	case 1:
+		name = "full combo"
+	case 2:
+		name = "all justice"
+	default:
+		return 0, &PlayerDataValidationError{Field: "cmb_lv", Message: fmt.Sprintf("unknown combo level: %d", value)}
+	}
+	item, ok := masters.ComboLamps[name]
+	if !ok {
+		return 0, &PlayerDataNotFoundError{Resource: "combo_lamp", Key: name}
+	}
+	return item.ID, nil
+}
+
+func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) {
+	value := 0
+	if fullChain != nil {
+		value = *fullChain
+	}
+	var name string
+	switch value {
+	case 0:
+		name = "none"
+	case 1:
+		name = "full chain gold"
+	case 2:
+		name = "full chain platinum"
+	default:
+		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
+	}
+	item, ok := masters.FullChains[name]
+	if !ok {
+		return 0, &PlayerDataNotFoundError{Resource: "full_chain", Key: name}
+	}
+	return item.ID, nil
+}
+
+func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
+	name := defaultSlotName
+	if slot != nil {
+		trimmed := strings.TrimSpace(*slot)
+		if trimmed != "" {
+			name = trimmed
+		}
+	}
+	item, ok := masters.Slots[strings.ToLower(name)]
+	if !ok {
+		return 0, &PlayerDataNotFoundError{Resource: "slot", Key: name}
+	}
+	return item.ID, nil
+}
+
+// computeFullRecordDiff は通常譜面のレコードの変更差分を計算し、変更されたフィールド名のスライスを返します。
+// slot/slot_order はレスポンス差分には含めないため、比較対象外としています。
+func computeFullRecordDiff(before, after playerRecordState) []string {
+	changes := make([]string, 0, 4)
+	if before.Score != after.Score {
+		changes = append(changes, "score")
+	}
+	if before.ClearLampID != after.ClearLampID {
+		changes = append(changes, "clear_lamp")
+	}
+	if before.ComboLampID != after.ComboLampID {
+		changes = append(changes, "combo_lamp")
+	}
+	if before.FullChainID != after.FullChainID {
+		changes = append(changes, "full_chain")
+	}
+	return changes
+}
+
+// computeWorldsendDiff はWORLD'S END譜面のレコードの変更差分を計算し、変更されたフィールド名のスライスを返します。
+func computeWorldsendDiff(before, after worldsendRecordState) []string {
+	changes := make([]string, 0, 4)
+	if before.Score != after.Score {
+		changes = append(changes, "score")
+	}
+	if before.ClearLampID != after.ClearLampID {
+		changes = append(changes, "clear_lamp")
+	}
+	if before.ComboLampID != after.ComboLampID {
+		changes = append(changes, "combo_lamp")
+	}
+	if before.FullChainID != after.FullChainID {
+		changes = append(changes, "full_chain")
+	}
+	return changes
+}
+
+// buildPlayerRecordDTO は通常譜面のレコードDTOを構築します。
+func buildPlayerRecordDTO(playerID int, state playerRecordState, chart entity.PlayerDataChart, song entity.PlayerDataSong, diffName string, masters *playerDataMaster) *api_internal.PlayerDataDiffRecord {
+	score := uint32(state.Score) // #nosec G115
+	return &api_internal.PlayerDataDiffRecord{
+		Difficulty:     diffName,
+		Title:          song.Title,
+		Const:          chart.Const,
+		IsConstUnknown: chart.IsConstUnknown,
+		Score:          score,
+		ClearLamp:      masters.ClearLampNamesByID[state.ClearLampID],
+		ComboLamp:      toMasterNamePtrFromMap(masters.ComboLampNamesByID, state.ComboLampID),
+		FullChain:      toMasterNamePtrFromMap(masters.FullChainNamesByID, state.FullChainID),
+	}
+}
+
+// buildWorldsendRecordDTO はWORLD'S END譜面のレコードDTOを構築します。
+func buildWorldsendRecordDTO(playerID int, state worldsendRecordState, chart entity.PlayerDataWorldsendChart, song entity.PlayerDataSong, masters *playerDataMaster) *api_internal.PlayerDataDiffRecord {
+	score := uint32(state.Score) // #nosec G115
+	return &api_internal.PlayerDataDiffRecord{
+		Difficulty:     worldsendDiffName,
+		Title:          song.Title,
+		Const:          0,
+		IsConstUnknown: true,
+		Score:          score,
+		ClearLamp:      masters.ClearLampNamesByID[state.ClearLampID],
+		ComboLamp:      toMasterNamePtrFromMap(masters.ComboLampNamesByID, state.ComboLampID),
+		FullChain:      toMasterNamePtrFromMap(masters.FullChainNamesByID, state.FullChainID),
+	}
+}
+
+// equalIntPointer は2つのintポインタが等しいかを比較します。
+func equalIntPointer(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
+// ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
+func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) error {
+	// プレイヤーレコードを全件取得
+	records, err := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch player records: %w", err)
+	}
+
+	// レーティング計算用のレコードに変換
+	ratingRecords := make([]service.RatingRecord, 0, len(records))
+	for _, rec := range records {
+		// スロット名が"new"または"new_candidate"の場合は新曲として扱う
+		isNew := false
+		if rec.Slot != nil {
+			slotName := strings.ToLower(rec.Slot.Name)
+			isNew = slotName == "new" || slotName == "new_candidate"
+		}
+
+		// スコアと譜面定数を取得
+		score := uint32(rec.Score) // #nosec G115
+		chartConst := 0.0
+		if rec.Chart != nil {
+			chartConst = float64(rec.Chart.Const)
+		}
+
+		ratingRecords = append(ratingRecords, service.RatingRecord{
+			Score:      score,
+			ChartConst: chartConst,
+			IsNew:      isNew,
+		})
+	}
+
+	// レーティング計算
+	stats := service.CalcRatingStats(ratingRecords)
+
+	// データベースに保存
+	return us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage)
+}
+
+func (us *playerDataUsecase) Delete(ctx context.Context, user *entity.User) error {
+	if user == nil {
+		return errors.New("invalid request")
+	}
+
+	return us.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := us.playerRepo.DeleteByUserID(ctx, tx, user.ID); err != nil {
+			return fmt.Errorf("failed to delete player data: %w", err)
+		}
+
+		if !user.HasLinkedPlayer() {
+			return nil
+		}
+
+		user.UnlinkPlayer()
+		if err := us.userRepo.Save(ctx, tx, user); err != nil {
+			return fmt.Errorf("failed to unlink player from user: %w", err)
+		}
+
+		return nil
+	})
+}
