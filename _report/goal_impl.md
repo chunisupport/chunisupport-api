@@ -61,8 +61,8 @@
   "attributes": [
     {
       "type": "const",
-      "lower": "15.5",
-      "upper": "15.5"
+      "lower": 15.5,
+      "upper": 15.5
     }
   ],
   "achievement": {
@@ -87,12 +87,12 @@
 
 | type | 形式 | 説明 |
 | --- | --- | --- |
-| const | string lower/upper | 譜面定数（"X.X"形式必須） |
+| const | number lower/upper | 譜面定数（小数1桁の数値） |
 | diff | int lower/upper | 難易度マスタ ID の範囲 |
 | genre | int lower/upper | ジャンルマスタ ID の範囲 |
 | ver | int lower/upper | バージョンマスタ ID の範囲 |
 
-- const は必ず "X.X" 形式の文字列。
+- const は小数1桁の数値のみ許容する。
 - API 側で丸めはしない。
 - lower > upper はエラー。
 - WE は対象外（diff に含めない）。
