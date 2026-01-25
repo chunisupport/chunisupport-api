@@ -243,8 +243,9 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 	}
 
 	// updated_atの検証
-	if !result.Records.UpdatedAt.Equal(playerUpdatedAt) {
-		t.Fatalf("expected updated_at to be %v, got %v", playerUpdatedAt, result.Records.UpdatedAt)
+	expectedRecordUpdatedAt := now
+	if !result.Records.UpdatedAt.Equal(expectedRecordUpdatedAt) {
+		t.Fatalf("expected updated_at to be %v, got %v", expectedRecordUpdatedAt, result.Records.UpdatedAt)
 	}
 
 	// 各スロットの長さを検証

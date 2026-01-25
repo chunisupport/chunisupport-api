@@ -910,7 +910,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
+| `updated_at` | string | player_records の updated_at の最大値（ISO8601）。レコードが存在しない場合は player.updated_at |
 | `best` | PlayerRecordDTO[] | ベスト枠レコード |
 | `best_candidate` | PlayerRecordDTO[] | ベスト候補枠レコード |
 | `new` | PlayerRecordDTO[] | 新曲枠レコード |

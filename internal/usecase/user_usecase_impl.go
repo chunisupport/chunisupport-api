@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
@@ -93,6 +94,7 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 
 	// スロット別にグルーピング
 	slotMap := initializeSlotMap()
+	var latestRecordUpdatedAt time.Time
 	for _, record := range records {
 		dtoRecord := dto.ToPlayerRecordDTO(record)
 		slotMap["all"] = append(slotMap["all"], dtoRecord)
@@ -100,6 +102,9 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		slotKey := record.SlotKey()
 		if slotKey != "" {
 			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
+		}
+		if record.UpdatedAt.After(latestRecordUpdatedAt) {
+			latestRecordUpdatedAt = record.UpdatedAt
 		}
 	}
 
@@ -125,8 +130,12 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		worldsendRecords = []*dto.WorldsendRecordDTO{}
 	}
 
+	recordsUpdatedAt := latestRecordUpdatedAt
+	if recordsUpdatedAt.IsZero() {
+		recordsUpdatedAt = player.UpdatedAt
+	}
 	recordsDTO := &dto.UserRecordResponseDTO{
-		UpdatedAt:     player.UpdatedAt,
+		UpdatedAt:     recordsUpdatedAt,
 		Best:          slotMap["best"],
 		BestCandidate: slotMap["best_candidate"],
 		New:           slotMap["new"],
