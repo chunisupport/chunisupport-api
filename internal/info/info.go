@@ -11,6 +11,8 @@ const (
 	BulkInsertChunkSize  = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
 	DefaultUserListLimit = 100
 	DefaultSongListLimit = 100
+	// CHUNITHMの理論値スコア（score_sumのinvert表示で使用）
+	TheoreticalMaxScore = 1010000
 
 	// レートリミット設定: 外部API v1
 	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）

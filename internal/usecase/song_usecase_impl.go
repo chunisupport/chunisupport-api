@@ -76,10 +76,10 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
 	// マスターデータ検証
- 	masters := s.masterCache.SongMasters()
- 	if masters == nil {
- 		return fmt.Errorf("master cache is not initialized")
- 	}
+	masters := s.masterCache.SongMasters()
+	if masters == nil {
+		return fmt.Errorf("master cache is not initialized")
+	}
 
 	for _, req := range requests {
 		// GenreID の検証

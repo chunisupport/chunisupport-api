@@ -108,7 +108,7 @@
 
 - skill は今回未実装（将来追加予定）。
 - count は必須キー。`null` の場合は対象譜面数を目標値として扱う。
-- score_sum の invert 表示は「総失点」表示とし、理論値は 1,010,000 固定。
+- score_sum の invert 表示は「総失点」表示とし、理論値は info.TheoreticalMaxScore（1,010,000）を使用する。
 
 ## バリデーション方針
 
