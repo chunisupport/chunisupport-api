@@ -2,12 +2,15 @@ package api_internal_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Qman110101/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	dto_internal "github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +46,83 @@ func (m *mockUserService) DeleteUser(ctx context.Context, username string) error
 func (m *mockUserService) RestoreUser(ctx context.Context, username string) error {
 	args := m.Called(ctx, username)
 	return args.Error(0)
+}
+
+func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewUserHandler(mockService)
+	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	player := &dto.PlayerDTO{
+		Name:      "player",
+		Level:     10,
+		Honors:    []*dto.HonorDTO{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	records := &dto.UserRecordResponseDTO{
+		UpdatedAt:     now,
+		Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
+		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
+		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
+		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
+		All:           []*dto.PlayerRecordDTO{{ID: "all1"}},
+		WorldsEnd:     []*dto.WorldsendRecordDTO{{ID: "we1"}},
+	}
+	result := &dto_internal.UserProfileWithRecordsDTO{
+		Username:  "testuser",
+		Player:    player,
+		Records:   records,
+		UpdatedAt: &now,
+	}
+
+	t.Run("viewなしは全レコードを返す", func(t *testing.T) {
+		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserProfileWithRecords(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		recordsBody, ok := body["records"].(map[string]any)
+		assert.True(t, ok)
+		_, hasAll := recordsBody["all"]
+		_, hasWorldsend := recordsBody["worldsend"]
+		assert.True(t, hasAll)
+		assert.True(t, hasWorldsend)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("view=ratingはレーティング枠のみ返す", func(t *testing.T) {
+		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserProfileWithRecords(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		recordsBody, ok := body["records"].(map[string]any)
+		assert.True(t, ok)
+		_, hasAll := recordsBody["all"]
+		_, hasWorldsend := recordsBody["worldsend"]
+		assert.False(t, hasAll)
+		assert.False(t, hasWorldsend)
+		mockService.AssertExpectations(t)
+	})
 }
 
 func TestUserHandler_DeleteUser(t *testing.T) {

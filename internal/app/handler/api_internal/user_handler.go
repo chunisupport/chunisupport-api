@@ -5,9 +5,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -15,6 +17,21 @@ import (
 // UserHandler はユーザー関連のHTTPリクエストを処理します。
 type UserHandler struct {
 	userUsecase usecase.UserUsecase
+}
+
+type userRatingRecordResponse struct {
+	UpdatedAt     time.Time              `json:"updated_at"`
+	Best          []*dto.PlayerRecordDTO `json:"best"`
+	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
+	New           []*dto.PlayerRecordDTO `json:"new"`
+	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
+}
+
+type userProfileRatingViewResponse struct {
+	Username  string                    `json:"username"`
+	Player    *dto.PlayerDTO            `json:"player"`
+	Records   *userRatingRecordResponse `json:"records"`
+	UpdatedAt *time.Time                `json:"updated_at"`
 }
 
 // NewUserHandler は新しいUserHandlerを生成します。
@@ -25,6 +42,7 @@ func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
 func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	username := c.Param("username")
+	view := c.QueryParam("view")
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
@@ -48,6 +66,26 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 			}
 			return apierror.ErrInternalError.WithInternal(err)
 		}
+	}
+
+	if view == "rating" {
+		var records *userRatingRecordResponse
+		if result.Records != nil {
+			records = &userRatingRecordResponse{
+				UpdatedAt:     result.Records.UpdatedAt,
+				Best:          result.Records.Best,
+				BestCandidate: result.Records.BestCandidate,
+				New:           result.Records.New,
+				NewCandidate:  result.Records.NewCandidate,
+			}
+		}
+		response := &userProfileRatingViewResponse{
+			Username:  result.Username,
+			Player:    result.Player,
+			Records:   records,
+			UpdatedAt: result.UpdatedAt,
+		}
+		return c.JSON(http.StatusOK, response)
 	}
 
 	return c.JSON(http.StatusOK, result)
