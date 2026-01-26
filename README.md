@@ -11,8 +11,7 @@
 
 ## ドキュメント
 
-- [内部API仕様書](docs/API.md)
-- [公開API仕様書（暫定）](docs/public_api.md)
+- [API仕様書（内部/公開）](docs/API.md)
 - [リカバリーコード仕様](docs/recovery_code_spec.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 

@@ -1,6 +1,6 @@
 # chunisupport-api API仕様書
 
-このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と関連ユースケースの挙動をまとめたものです。
+このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
 **最終更新日**: 2026年01月17日
 
