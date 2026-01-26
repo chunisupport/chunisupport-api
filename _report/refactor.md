@@ -48,7 +48,6 @@
 | **PERF-003** | **Medium** | 巨大レスポンスの生成 | `GetUserProfileWithRecords` が全件返却。レスポンス簡素化またはページネーション導入。 |
 | **PERF-004** | **Medium** | スコア差分計算時の全件スキャン | `player_records` を全件取得。`chart_id` 絞り込みや差分計算のオプション化で負荷削減。 |
 | **PERF-006** | **Medium** | IN句クエリのリスト肥大化 | 大量IDをチャンク分割して複数回取得。後続の取得も同様に分割。 |
-| **PERF-007** | **High** | プレースホルダ数の制限超過リスク | `chartStatisticsRepository` の `FindByChartIDs` や `BulkSave` で大量データを扱う際、MySQLの制限（65,535）を超える可能性がある。チャンク分割処理を導入。 |
 
 ### 信頼性・運用 (OPS)
 
@@ -146,15 +145,6 @@
   - 本番DBの接続上限値と想定ピークトラフィック。
 
 ---
-
-### PERF-007: プレースホルダ数の制限超過リスク
-- **根拠**:
-  - `chartStatisticsRepository.FindByChartIDs` で `strings.Join(placeholders, ",")` を使用。
-  - `chartStatisticsRepository.BulkSave` で大量の `statsList` を一度に `NamedExecContext` に渡している。
-- **影響範囲**:
-  - 大量データの操作時に `Error 1390: Prepared statement contains too many placeholders` が発生し、機能が停止する。
-- **修正案**:
-  - `internal/info/info.go` 等で定義された適切なチャンクサイズ（例: 1000）ごとに分割して実行する。
 
 ### QUAL-004: レイヤー間の依存性違反 (UC -> Infra)
 - **根拠**:
