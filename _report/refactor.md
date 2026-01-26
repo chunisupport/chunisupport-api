@@ -15,7 +15,7 @@
 - CI: `.github/workflows/ci.yml`
 - 依存関係: `go.mod`, `go.sum`
 - DB: `migration/mysql/*.sql`
-- ドキュメント: `docs/API.md`, `docs/public_api.md`
+- ドキュメント: `docs/API.md`
 - アーキテクチャ: `ARCHITECTURE.md`
 
 ## 解析手順
@@ -220,7 +220,7 @@
 - **JWTの運用ポリシー**: `issuer`/`audience` の運用があるか（必要なら `ValidateToken` に追加）。
 - **CORS設定値**: `AllowOrigins` と `AllowCredentials` の組み合わせが安全か（`*` の禁止など）。
 - **DB接続のTLS**: MySQL接続にTLSが必要な環境か（必要ならDSNで設定）。
-- **APIドキュメント反映**: 入力制約やセキュリティ要件を `docs/API.md` / `docs/public_api.md` に追記する必要性。
+- **APIドキュメント反映**: 入力制約やセキュリティ要件を `docs/API.md` に追記する必要性。
 
 ---
 
