@@ -49,7 +49,6 @@
 | **PERF-004** | **Medium** | スコア差分計算時の全件スキャン | `player_records` を全件取得。`chart_id` 絞り込みや差分計算のオプション化で負荷削減。 |
 | **PERF-006** | **Medium** | IN句クエリのリスト肥大化 | 大量IDをチャンク分割して複数回取得。後続の取得も同様に分割。 |
 | **PERF-007** | **High** | プレースホルダ数の制限超過リスク | `chartStatisticsRepository` の `FindByChartIDs` や `BulkSave` で大量データを扱う際、MySQLの制限（65,535）を超える可能性がある。チャンク分割処理を導入。 |
-| **PERF-008** | **High** | 更新処理におけるN+1問題 | `songRepository.UpdateSongs` でループ内で `SELECT EXISTS` や `UPDATE` を発行している。一括更新用のテンポラリテーブル活用や、クエリの集約を検討。 |
 
 ### 信頼性・運用 (OPS)
 
@@ -70,7 +69,6 @@
 | **QUAL-002** | **Medium** | セキュリティヘッダーの欠如 | Echoの `Secure` ミドルウェア導入でHSTS等を設定。 |
 | **DB-003** | **Low** | 手動マッピングの冗長性 | `sqlx.StructScan` 等の活用で構造体タグベースに移行。 |
 | **QUAL-001** | **Low** | TODOコメントの残置 | 解消またはIssue化。 |
-| **QUAL-003** | **Medium** | レイヤー間の依存性違反 (Repo -> DTO) | `songRepository.UpdateSongs` が本来プレゼンテーション層に属すべき DTO に依存している。 |
 | **QUAL-004** | **Medium** | レイヤー間の依存性違反 (UC -> Infra) | `AuthUsecase` がインフラ層の `masterdata` パッケージを直接インポートしている。DIPを適用。 |
 | **QUAL-005** | **Medium** | ドメイン集約の配置不備 | `SongWithCharts` が `repository` パッケージに定義されている。本来は `entity` パッケージに配置すべき集約の概念。 |
 | **QUAL-006** | **Medium** | コンストラクタのエラー無視 | `toChartEntity` 等で値オブジェクトの生成エラーを無視している。不整合なエンティティが生成されるリスク。 |
@@ -157,22 +155,6 @@
   - 大量データの操作時に `Error 1390: Prepared statement contains too many placeholders` が発生し、機能が停止する。
 - **修正案**:
   - `internal/info/info.go` 等で定義された適切なチャンクサイズ（例: 1000）ごとに分割して実行する。
-
-### PERF-008: 更新処理におけるN+1問題
-- **根拠**:
-  - `songRepository.UpdateSongs` (internal/infra/repository/song_repository_impl.go) のループ内で `SELECT EXISTS` と `UPDATE` を繰り返し発行している。
-- **影響範囲**:
-  - 管理画面からの楽曲一括更新時、楽曲数×(1 + 譜面数) 回のクエリが発行され、DB負荷が増大しタイムアウトの原因となる。
-- **修正案**:
-  - `ON DUPLICATE KEY UPDATE` を活用した一括更新クエリの構築、または一時テーブルへの一括挿入後の結合更新への変更。
-
-### QUAL-003: レイヤー間の依存性違反 (Repo -> DTO)
-- **根拠**:
-  - `songRepository.UpdateSongs` の引数に `api_internal.UpdateSongRequest` が使用されている。
-- **影響範囲**:
-  - リポジトリ（インフラ層）がプレゼンテーション層の変更に左右されるようになり、保守性が低下する。
-- **修正案**:
-  - ユースケース層でDTOからドメインエンティティのリストに変換し、リポジトリにはエンティティを渡す。
 
 ### QUAL-004: レイヤー間の依存性違反 (UC -> Infra)
 - **根拠**:

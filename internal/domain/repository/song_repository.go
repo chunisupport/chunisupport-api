@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 )
 
 // SongWithCharts は楽曲とその譜面情報を保持する構造体です。
@@ -38,5 +37,6 @@ type SongRepository interface {
 
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// トランザクション管理はUseCase層（TransactionManager経由）で行います。
-	UpdateSongs(ctx context.Context, exec Executor, requests []*api_internal.UpdateSongRequest) error
+	// 存在しない楽曲・譜面がある場合はエラーを返します。
+	UpdateSongs(ctx context.Context, exec Executor, songsWithCharts []*SongWithCharts) error
 }

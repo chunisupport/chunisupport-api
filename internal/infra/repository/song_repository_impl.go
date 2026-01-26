@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
-	api_internal "github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -246,26 +246,27 @@ func (r *songRepository) RestoreSong(ctx context.Context, exec repository.Execut
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 // トランザクション管理はUseCase層（TransactionManager経由）で行います。
-func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, requests []*api_internal.UpdateSongRequest) error {
-	if len(requests) == 0 {
+// PERF-008対策: N+1問題を解消するため、一括更新クエリを使用します。
+func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts) error {
+	if len(songsWithCharts) == 0 {
 		return nil
 	}
 
 	// 1. 全DisplayIDを収集
-	displayIDs := make([]string, len(requests))
-	for i, req := range requests {
-		displayIDs[i] = req.DisplayID
+	displayIDs := make([]string, len(songsWithCharts))
+	for i, swc := range songsWithCharts {
+		displayIDs[i] = swc.Song.DisplayID
 	}
 
-	// 2. 存在確認（Batch Read）
-	songs, err := r.FindByDisplayIDs(ctx, exec, displayIDs)
+	// 2. 既存楽曲を一括取得（存在確認とID取得）
+	existingSongs, err := r.FindByDisplayIDs(ctx, exec, displayIDs)
 	if err != nil {
 		return fmt.Errorf("failed to find songs by display IDs: %w", err)
 	}
 
 	// 3. DisplayID → SongID のマッピング作成
-	displayIDToSongID := make(map[string]int, len(songs))
-	for _, song := range songs {
+	displayIDToSongID := make(map[string]int, len(existingSongs))
+	for _, song := range existingSongs {
 		displayIDToSongID[song.DisplayID] = song.ID
 	}
 
@@ -276,65 +277,218 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		}
 	}
 
-	// 5. 楽曲と譜面を更新
-	for _, req := range requests {
-		songID := displayIDToSongID[req.DisplayID]
+	// 5. 既存譜面を一括取得して存在確認
+	songIDs := make([]int, 0, len(displayIDToSongID))
+	for _, id := range displayIDToSongID {
+		songIDs = append(songIDs, id)
+	}
+	existingCharts, err := r.findChartsBySongIDs(ctx, exec, songIDs)
+	if err != nil {
+		return fmt.Errorf("failed to find charts by song IDs: %w", err)
+	}
 
-		// 楽曲情報を更新
-		updateSongQuery := `
-			UPDATE songs
-			SET title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, jacket = ?
-			WHERE id = ?
-		`
-		_, err := exec.ExecContext(ctx, updateSongQuery,
-			req.Title,
-			req.Artist,
-			req.GenreID,
-			req.BPM,
-			req.ReleasedAt,
-			req.Jacket,
-			songID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update song (display_id=%s): %w", req.DisplayID, err)
-		}
+	// 譜面の存在確認用マップ: "songID-difficultyID" -> true
+	chartExistsMap := make(map[string]bool)
+	for _, chart := range existingCharts {
+		key := fmt.Sprintf("%d-%d", chart.SongID, chart.DifficultyID)
+		chartExistsMap[key] = true
+	}
 
-		// 譜面情報を更新
-		for _, chart := range req.Charts {
-			// 譜面が存在するか確認
-			var exists bool
-			checkChartQuery := `SELECT EXISTS(SELECT 1 FROM charts WHERE song_id = ? AND difficulty_id = ?)`
-			err := exec.GetContext(ctx, &exists, checkChartQuery, songID, chart.DifficultyID)
-			if err != nil {
-				return fmt.Errorf("failed to check chart existence (song_id=%d, difficulty_id=%d): %w", songID, chart.DifficultyID, err)
-			}
-			if !exists {
+	// 6. 更新対象の譜面が全て存在するか確認
+	for _, swc := range songsWithCharts {
+		songID := displayIDToSongID[swc.Song.DisplayID]
+		for _, chart := range swc.Charts {
+			key := fmt.Sprintf("%d-%d", songID, chart.DifficultyID)
+			if !chartExistsMap[key] {
 				return fmt.Errorf("chart not found (song_id=%d, difficulty_id=%d)", songID, chart.DifficultyID)
-			}
-
-			// Notes のポインタをint型ポインタに変換
-			var notesPtr *int
-			if chart.Notes != nil {
-				notesPtr = chart.Notes
-			}
-
-			updateChartQuery := `
-				UPDATE charts
-				SET const = ?, is_const_unknown = ?, notes = ?
-				WHERE song_id = ? AND difficulty_id = ?
-			`
-			_, err = exec.ExecContext(ctx, updateChartQuery,
-				chart.Const,
-				chart.IsConstUnknown,
-				notesPtr,
-				songID,
-				chart.DifficultyID,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to update chart (song_id=%d, difficulty_id=%d): %w", songID, chart.DifficultyID, err)
 			}
 		}
 	}
 
+	// 7. 楽曲を一括更新（CASE式を使用）
+	if err := r.bulkUpdateSongs(ctx, exec, songsWithCharts, displayIDToSongID); err != nil {
+		return fmt.Errorf("failed to bulk update songs: %w", err)
+	}
+
+	// 8. 譜面を一括更新（CASE式を使用）
+	if err := r.bulkUpdateCharts(ctx, exec, songsWithCharts, displayIDToSongID); err != nil {
+		return fmt.Errorf("failed to bulk update charts: %w", err)
+	}
+
 	return nil
+}
+
+// findChartsBySongIDs は指定されたsongIDリストの譜面を一括取得します。
+func (r *songRepository) findChartsBySongIDs(ctx context.Context, exec repository.Executor, songIDs []int) ([]*entity.Chart, error) {
+	if len(songIDs) == 0 {
+		return []*entity.Chart{}, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		FROM charts
+		WHERE song_id IN (?)
+	`, songIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = exec.Rebind(query)
+
+	var chartRows []chartRow
+	if err := exec.SelectContext(ctx, &chartRows, query, args...); err != nil {
+		return nil, err
+	}
+
+	charts := make([]*entity.Chart, len(chartRows))
+	for i, cr := range chartRows {
+		charts[i] = r.toChartEntity(&cr)
+	}
+
+	return charts, nil
+}
+
+// bulkUpdateSongs は楽曲情報をCASE式で一括更新します。
+func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts, displayIDToSongID map[string]int) error {
+	if len(songsWithCharts) == 0 {
+		return nil
+	}
+
+	// 更新対象のsongIDリストを作成
+	songIDs := make([]int, 0, len(songsWithCharts))
+	for _, swc := range songsWithCharts {
+		songIDs = append(songIDs, displayIDToSongID[swc.Song.DisplayID])
+	}
+
+	// CASE式を構築
+	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
+	args := make([]any, 0)
+
+	for _, swc := range songsWithCharts {
+		songID := displayIDToSongID[swc.Song.DisplayID]
+		song := swc.Song
+
+		titleCases = append(titleCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.Title)
+
+		artistCases = append(artistCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.Artist)
+
+		genreCases = append(genreCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.GenreID)
+
+		bpmCases = append(bpmCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.BPM)
+
+		releasedCases = append(releasedCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.ReleasedAt)
+
+		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
+		args = append(args, songID, song.Jacket)
+	}
+
+	// IN句用の引数を追加
+	for _, id := range songIDs {
+		args = append(args, id)
+	}
+
+	placeholders := make([]string, len(songIDs))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE songs SET
+			title = CASE %s END,
+			artist = CASE %s END,
+			genre_id = CASE %s END,
+			bpm = CASE %s END,
+			released_at = CASE %s END,
+			jacket = CASE %s END
+		WHERE id IN (%s)
+	`,
+		strings.Join(titleCases, " "),
+		strings.Join(artistCases, " "),
+		strings.Join(genreCases, " "),
+		strings.Join(bpmCases, " "),
+		strings.Join(releasedCases, " "),
+		strings.Join(jacketCases, " "),
+		strings.Join(placeholders, ","),
+	)
+
+	_, err := exec.ExecContext(ctx, query, args...)
+	return err
+}
+
+// bulkUpdateCharts は譜面情報をCASE式で一括更新します。
+func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts, displayIDToSongID map[string]int) error {
+	// 全譜面データを収集
+	type chartUpdate struct {
+		SongID         int
+		DifficultyID   int
+		Const          float64
+		IsConstUnknown bool
+		Notes          *int
+	}
+
+	var updates []chartUpdate
+	for _, swc := range songsWithCharts {
+		songID := displayIDToSongID[swc.Song.DisplayID]
+		for _, chart := range swc.Charts {
+			var notesPtr *int
+			if chart.Notes != nil {
+				n := int(*chart.Notes)
+				notesPtr = &n
+			}
+			updates = append(updates, chartUpdate{
+				SongID:         songID,
+				DifficultyID:   chart.DifficultyID,
+				Const:          float64(chart.Const),
+				IsConstUnknown: chart.IsConstUnknown,
+				Notes:          notesPtr,
+			})
+		}
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// CASE式を構築
+	// 複合キー(song_id, difficulty_id)でマッチングするため、条件式を使用
+	var constCases, unknownCases, notesCases []string
+	args := make([]any, 0)
+
+	for _, u := range updates {
+		constCases = append(constCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
+		args = append(args, u.SongID, u.DifficultyID, u.Const)
+
+		unknownCases = append(unknownCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
+		args = append(args, u.SongID, u.DifficultyID, u.IsConstUnknown)
+
+		notesCases = append(notesCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
+		args = append(args, u.SongID, u.DifficultyID, u.Notes)
+	}
+
+	// WHERE句用: (song_id, difficulty_id) の組み合わせ
+	var wherePairs []string
+	for _, u := range updates {
+		wherePairs = append(wherePairs, "(song_id = ? AND difficulty_id = ?)")
+		args = append(args, u.SongID, u.DifficultyID)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE charts SET
+			const = CASE %s END,
+			is_const_unknown = CASE %s END,
+			notes = CASE %s END
+		WHERE %s
+	`,
+		strings.Join(constCases, " "),
+		strings.Join(unknownCases, " "),
+		strings.Join(notesCases, " "),
+		strings.Join(wherePairs, " OR "),
+	)
+
+	_, err := exec.ExecContext(ctx, query, args...)
+	return err
 }

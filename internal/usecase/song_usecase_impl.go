@@ -6,6 +6,8 @@ import (
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 )
 
@@ -75,11 +77,15 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+	if len(requests) == 0 {
+		return nil
+	}
+
 	// マスターデータ検証
- 	masters := s.masterCache.SongMasters()
- 	if masters == nil {
- 		return fmt.Errorf("master cache is not initialized")
- 	}
+	masters := s.masterCache.SongMasters()
+	if masters == nil {
+		return fmt.Errorf("master cache is not initialized")
+	}
 
 	for _, req := range requests {
 		// GenreID の検証
@@ -97,10 +103,66 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 		}
 	}
 
+	// DTOからエンティティへ変換
+	songsWithCharts, err := s.convertRequestsToEntities(requests)
+	if err != nil {
+		return fmt.Errorf("failed to convert requests to entities: %w", err)
+	}
+
 	// トランザクション内でリポジトリに委譲
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.songRepo.UpdateSongs(ctx, tx, requests)
+		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
 	})
+}
+
+// convertRequestsToEntities はDTOリストからエンティティリストに変換します。
+// IDフィールドは既存データの参照に使用されないため、0のままです。
+func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest) ([]*repository.SongWithCharts, error) {
+	result := make([]*repository.SongWithCharts, 0, len(requests))
+
+	for _, req := range requests {
+		song := &entity.Song{
+			DisplayID:  req.DisplayID,
+			Title:      req.Title,
+			Artist:     req.Artist,
+			GenreID:    req.GenreID,
+			BPM:        req.BPM,
+			ReleasedAt: req.ReleasedAt,
+			Jacket:     req.Jacket,
+		}
+
+		charts := make([]*entity.Chart, 0, len(req.Charts))
+		for _, chartReq := range req.Charts {
+			cc, err := chartconstant.NewChartConstant(chartReq.Const)
+			if err != nil {
+				return nil, fmt.Errorf("invalid chart constant (song: %s, difficulty: %d): %w", req.DisplayID, chartReq.DifficultyID, err)
+			}
+
+			var notesVO *notes.Notes
+			if chartReq.Notes != nil {
+				n, err := notes.NewNotes(*chartReq.Notes)
+				if err != nil {
+					return nil, fmt.Errorf("invalid notes (song: %s, difficulty: %d): %w", req.DisplayID, chartReq.DifficultyID, err)
+				}
+				notesVO = &n
+			}
+
+			chart := &entity.Chart{
+				DifficultyID:   chartReq.DifficultyID,
+				Const:          cc,
+				IsConstUnknown: chartReq.IsConstUnknown,
+				Notes:          notesVO,
+			}
+			charts = append(charts, chart)
+		}
+
+		result = append(result, &repository.SongWithCharts{
+			Song:   song,
+			Charts: charts,
+		})
+	}
+
+	return result, nil
 }
 
 // GetChartStatisticsByChartIDs は指定された譜面IDリストの統計を一括取得します。
