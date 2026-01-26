@@ -9,6 +9,7 @@ const (
 	ResourceDir          = ".resources/"
 	MigrationDir         = "migration/mysql/"
 	BulkInsertChunkSize  = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
+	BulkSelectChunkSize  = 1000 // IN句のプレースホルダ上限を避けるための分割数
 	DefaultUserListLimit = 100
 	DefaultSongListLimit = 100
 
