@@ -165,42 +165,6 @@ func (r *playerRecordRepository) FindByPlayerID(ctx context.Context, exec reposi
 	return records, nil
 }
 
-// FindExistingByPlayerID はプレイヤーIDをキーに既存のレコード状態を取得します。
-func (r *playerRecordRepository) FindExistingByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]repository.ExistingPlayerRecord, error) {
-	query := `SELECT chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, slot_order, updated_at FROM player_records WHERE player_id = ?`
-
-	var rows []struct {
-		ChartID     int       `db:"chart_id"`
-		Score       int       `db:"score"`
-		ClearLampID int       `db:"clear_lamp_id"`
-		ComboLampID int       `db:"combo_lamp_id"`
-		FullChainID int       `db:"full_chain_id"`
-		SlotID      int       `db:"slot_id"`
-		SlotOrder   *int      `db:"slot_order"`
-		UpdatedAt   time.Time `db:"updated_at"`
-	}
-
-	if err := exec.SelectContext(ctx, &rows, query, playerID); err != nil {
-		return nil, err
-	}
-
-	result := make([]repository.ExistingPlayerRecord, len(rows))
-	for i, row := range rows {
-		result[i] = repository.ExistingPlayerRecord{
-			ChartID:     row.ChartID,
-			Score:       row.Score,
-			ClearLampID: row.ClearLampID,
-			ComboLampID: row.ComboLampID,
-			FullChainID: row.FullChainID,
-			SlotID:      row.SlotID,
-			SlotOrder:   row.SlotOrder,
-			UpdatedAt:   row.UpdatedAt,
-		}
-	}
-
-	return result, nil
-}
-
 // GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
 func (r *playerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
 	const query = `

@@ -670,21 +670,9 @@ curl -X POST \
   "counts": {
     "full_records_upserted": 1185,
     "worldsend_records_upserted": 120,
-    "full_records_changed": 42,
-    "worldsend_records_changed": 3,
     "full_records_skipped": 0,
     "worldsend_records_skipped": 0,
     "honors_skipped": 0
-  },
-  "diff_records": {
-    "full": [
-      {
-        "before": { "difficulty": "MASTER", "title": "赤い果実", "const": 14.2, "is_const_unknown": false, "score": 1000000, "clear_lamp": "CLEAR", "combo_lamp": null, "full_chain": null },
-        "after": { "difficulty": "MASTER", "title": "赤い果実", "const": 14.2, "is_const_unknown": false, "score": 1002345, "clear_lamp": "CLEAR", "combo_lamp": "FULL COMBO", "full_chain": null },
-        "changed_fields": ["score", "combo_lamp"]
-      }
-    ],
-    "worldsend": []
   },
   "skipped_records": [
     {
@@ -705,31 +693,9 @@ curl -X POST \
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `summary` | object | プレイヤーサマリー情報 |
 | `counts` | object | 各種レコードの処理件数 |
-| `diff_records` | object | 変更があったレコードの差分情報 |
 | `skipped_records` | array | スキップされたレコード情報（存在する場合） |
 
-**diff_records の要素 (PlayerDataDiffRecord)**:
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `before` | PlayerDataDiffRecord \| null | 更新前のレコード（新規追加時は `null`） |
-| `after` | PlayerDataDiffRecord | 更新後のレコード |
-| `changed_fields` | string[] | 変更されたフィールド名の配列 |
-
-**PlayerDataDiffRecord スキーマ**:
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `difficulty` | string | 難易度名称 |
-| `title` | string | 楽曲タイトル |
-| `const` | number | 譜面定数 |
-| `is_const_unknown` | boolean | 譜面定数が不明か |
-| `score` | number | スコア |
-| `clear_lamp` | string | クリアランプ名称 |
-| `combo_lamp` | string \| null | コンボランプ名称（「NONE」の場合は `null`） |
-| `full_chain` | string \| null | フルチェイン名称（「NONE」の場合は `null`） |
-
-`changed_fields` に含まれる可能性のある値: `score`, `clear_lamp`, `combo_lamp`, `full_chain`
+> **Note**: 差分情報（変更前後の比較）は返却されません。差分を取得する場合は、登録前後でスコア一覧API（`GET /internal/users/:username`）を呼び出し、クライアント側で比較してください。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・未知フィールド・楽曲マスタ未登録など

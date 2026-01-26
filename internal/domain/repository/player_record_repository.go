@@ -25,25 +25,10 @@ type PlayerRecordForUpsert struct {
 	State    PlayerRecordState
 }
 
-// ExistingPlayerRecord は既存のプレイヤーレコードの状態を表す構造体です。
-type ExistingPlayerRecord struct {
-	ChartID     int
-	Score       int
-	ClearLampID int
-	ComboLampID int
-	FullChainID int
-	SlotID      int
-	SlotOrder   *int
-	UpdatedAt   time.Time
-}
-
 // PlayerRecordRepository はプレイヤーレコードに関する永続化を扱うリポジトリです。
 type PlayerRecordRepository interface {
 	// FindByPlayerID はプレイヤーIDをキーにレコード一覧を取得します。
 	FindByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
-
-	// FindExistingByPlayerID はプレイヤーIDをキーに既存のレコード状態を取得します。
-	FindExistingByPlayerID(ctx context.Context, exec Executor, playerID int) ([]ExistingPlayerRecord, error)
 
 	// GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
 	// player_records と player_worldsend_records の両テーブルから最新の updated_at を返します。

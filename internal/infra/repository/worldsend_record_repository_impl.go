@@ -144,35 +144,3 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 
 	return records, nil
 }
-
-// FindExistingByPlayerID はプレイヤーIDをキーに既存のWorldsendレコード状態を取得します。
-func (r *worldsendRecordRepository) FindExistingByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]repository.ExistingWorldsendRecord, error) {
-	query := `SELECT worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at FROM player_worldsend_records WHERE player_id = ?`
-
-	var rows []struct {
-		WorldsendChartID int       `db:"worldsend_chart_id"`
-		Score            int       `db:"score"`
-		ClearLampID      int       `db:"clear_lamp_id"`
-		ComboLampID      int       `db:"combo_lamp_id"`
-		FullChainID      int       `db:"full_chain_id"`
-		UpdatedAt        time.Time `db:"updated_at"`
-	}
-
-	if err := exec.SelectContext(ctx, &rows, query, playerID); err != nil {
-		return nil, err
-	}
-
-	result := make([]repository.ExistingWorldsendRecord, len(rows))
-	for i, row := range rows {
-		result[i] = repository.ExistingWorldsendRecord{
-			WorldsendChartID: row.WorldsendChartID,
-			Score:            row.Score,
-			ClearLampID:      row.ClearLampID,
-			ComboLampID:      row.ComboLampID,
-			FullChainID:      row.FullChainID,
-			UpdatedAt:        row.UpdatedAt,
-		}
-	}
-
-	return result, nil
-}

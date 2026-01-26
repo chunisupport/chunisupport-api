@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -122,33 +121,6 @@ func isNoneValue(name string) bool {
 	return name == "NONE" || name == "none"
 }
 
-// toMasterNamePtrFromMap はマスタ名MapからIDで値を取得し、NONE/noneの場合はnilを返します。
-func toMasterNamePtrFromMap(m map[int]string, id int) *string {
-	name := m[id]
-	if name == "" || isNoneValue(name) {
-		return nil
-	}
-	return &name
-}
-
-type playerRecordState struct {
-	Score       int
-	ClearLampID int
-	ComboLampID int
-	FullChainID int
-	SlotID      int
-	SlotOrder   *int
-	UpdatedAt   time.Time
-}
-
-type worldsendRecordState struct {
-	Score       int
-	ClearLampID int
-	ComboLampID int
-	FullChainID int
-	UpdatedAt   time.Time
-}
-
 // playerDataMaster はプレイヤーデータ登録時に使用するマスターデータのキャッシュを保持します。
 type playerDataMaster struct {
 	*masterdata.PlayerDataMasters
@@ -255,10 +227,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	result := &api_internal.PlayerDataResult{
 		AppVersion: payload.AppVersion,
 		ImportedAt: time.Now().UTC(),
-		DiffRecords: api_internal.PlayerDataDiffSet{
-			Full:      make([]api_internal.PlayerDataDiff, 0, 4),
-			Worldsend: make([]api_internal.PlayerDataDiff, 0, 4),
-		},
 	}
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
@@ -296,7 +264,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, diffs, scoreSkipped, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
 		if scoreErr != nil {
 			return scoreErr
 		}
@@ -310,7 +278,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
-		result.DiffRecords = diffs
 		if len(skippedRecords) > 0 {
 			result.SkippedRecords = skippedRecords
 		}
@@ -555,47 +522,10 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 }
 
 // applyScores はプレイヤーのスコア情報を更新します。
-// 通常譜面とWORLD'S END譜面のスコアをUPSERTし、変更差分を返します。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, api_internal.PlayerDataDiffSet, []api_internal.SkippedRecord, error) {
+// 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, error) {
 	counts := api_internal.PlayerDataCounts{}
-	diffs := api_internal.PlayerDataDiffSet{
-		Full:      make([]api_internal.PlayerDataDiff, 0, 4),
-		Worldsend: make([]api_internal.PlayerDataDiff, 0, 4),
-	}
 	skipped := make([]api_internal.SkippedRecord, 0, 4)
-
-	// 既存のレコードをRepository経由で取得
-	existingFullRows, err := us.playerRecRepo.FindExistingByPlayerID(ctx, tx, playerID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return counts, diffs, skipped, err
-	}
-	existingFull := make(map[int]playerRecordState, len(existingFullRows))
-	for _, row := range existingFullRows {
-		existingFull[row.ChartID] = playerRecordState{
-			Score:       row.Score,
-			ClearLampID: row.ClearLampID,
-			ComboLampID: row.ComboLampID,
-			FullChainID: row.FullChainID,
-			SlotID:      row.SlotID,
-			SlotOrder:   row.SlotOrder,
-			UpdatedAt:   row.UpdatedAt,
-		}
-	}
-
-	existingWorldsendRows, err := us.worldsendRecRepo.FindExistingByPlayerID(ctx, tx, playerID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return counts, diffs, skipped, err
-	}
-	existingWorldsend := make(map[int]worldsendRecordState, len(existingWorldsendRows))
-	for _, row := range existingWorldsendRows {
-		existingWorldsend[row.WorldsendChartID] = worldsendRecordState{
-			Score:       row.Score,
-			ClearLampID: row.ClearLampID,
-			ComboLampID: row.ComboLampID,
-			FullChainID: row.FullChainID,
-			UpdatedAt:   row.UpdatedAt,
-		}
-	}
 
 	// バルクインサート用のバッファ
 	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(scores.Full))
@@ -603,7 +533,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	for _, entry := range scores.Full {
 		counts.FullRecordsUpserted++
 
-		chart, song, diffName, err := resolveChart(entry, masters)
+		chart, song, _, err := resolveChart(entry, masters)
 		if err != nil {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, api_internal.SkippedRecord{
@@ -671,48 +601,20 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		state := playerRecordState{
-			Score:       entry.Score,
-			ClearLampID: clearLampID,
-			ComboLampID: comboLampID,
-			FullChainID: fullChainID,
-			SlotID:      slotID,
-			SlotOrder:   entry.Order,
-			UpdatedAt:   updatedAt,
-		}
-
-		before, exists := existingFull[chart.ID]
-		changed := computeFullRecordDiff(before, state)
-		if exists && len(changed) > 0 {
-			counts.FullRecordsChanged++
-		}
-		if !exists || len(changed) > 0 {
-			diff := api_internal.PlayerDataDiff{
-				ChangedFields: changed,
-				After:         buildPlayerRecordDTO(playerID, state, chart, song, diffName, masters),
-			}
-			if exists {
-				diff.Before = buildPlayerRecordDTO(playerID, before, chart, song, diffName, masters)
-			}
-			diffs.Full = append(diffs.Full, diff)
-		}
-
 		// バルクインサート用のバッファに追加
 		fullRecordsToUpsert = append(fullRecordsToUpsert, repository.PlayerRecordForUpsert{
 			PlayerID: playerID,
 			ChartID:  chart.ID,
 			State: repository.PlayerRecordState{
-				Score:       state.Score,
-				ClearLampID: state.ClearLampID,
-				ComboLampID: state.ComboLampID,
-				FullChainID: state.FullChainID,
-				SlotID:      state.SlotID,
-				SlotOrder:   state.SlotOrder,
-				UpdatedAt:   state.UpdatedAt,
+				Score:       entry.Score,
+				ClearLampID: clearLampID,
+				ComboLampID: comboLampID,
+				FullChainID: fullChainID,
+				SlotID:      slotID,
+				SlotOrder:   entry.Order,
+				UpdatedAt:   updatedAt,
 			},
 		})
-
-		existingFull[chart.ID] = state
 	}
 
 	// バルクインサート用のバッファ
@@ -785,54 +687,28 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		state := worldsendRecordState{
-			Score:       entry.Score,
-			ClearLampID: clearLampID,
-			ComboLampID: comboLampID,
-			FullChainID: fullChainID,
-			UpdatedAt:   updatedAt,
-		}
-
-		before, exists := existingWorldsend[chart.ID]
-		changed := computeWorldsendDiff(before, state)
-		if exists && len(changed) > 0 {
-			counts.WorldsendRecordsChanged++
-		}
-		if !exists || len(changed) > 0 {
-			diff := api_internal.PlayerDataDiff{
-				ChangedFields: changed,
-				After:         buildWorldsendRecordDTO(playerID, state, chart, song, masters),
-			}
-			if exists {
-				diff.Before = buildWorldsendRecordDTO(playerID, before, chart, song, masters)
-			}
-			diffs.Worldsend = append(diffs.Worldsend, diff)
-		}
-
 		// バルクインサート用のバッファに追加
 		worldsendRecordsToUpsert = append(worldsendRecordsToUpsert, repository.WorldsendRecordForUpsert{
 			PlayerID: playerID,
 			ChartID:  chart.ID,
 			State: repository.WorldsendRecordState{
-				Score:       state.Score,
-				ClearLampID: state.ClearLampID,
-				ComboLampID: state.ComboLampID,
-				FullChainID: state.FullChainID,
-				UpdatedAt:   state.UpdatedAt,
+				Score:       entry.Score,
+				ClearLampID: clearLampID,
+				ComboLampID: comboLampID,
+				FullChainID: fullChainID,
+				UpdatedAt:   updatedAt,
 			},
 		})
-
-		existingWorldsend[chart.ID] = state
 	}
 
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
 	}); err != nil {
-		return counts, diffs, skipped, err
+		return counts, skipped, err
 	}
 
-	return counts, diffs, skipped, nil
+	return counts, skipped, nil
 }
 
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {
@@ -951,84 +827,6 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 		return 0, &PlayerDataNotFoundError{Resource: "slot", Key: name}
 	}
 	return item.ID, nil
-}
-
-// computeFullRecordDiff は通常譜面のレコードの変更差分を計算し、変更されたフィールド名のスライスを返します。
-// slot/slot_order はレスポンス差分には含めないため、比較対象外としています。
-func computeFullRecordDiff(before, after playerRecordState) []string {
-	changes := make([]string, 0, 4)
-	if before.Score != after.Score {
-		changes = append(changes, "score")
-	}
-	if before.ClearLampID != after.ClearLampID {
-		changes = append(changes, "clear_lamp")
-	}
-	if before.ComboLampID != after.ComboLampID {
-		changes = append(changes, "combo_lamp")
-	}
-	if before.FullChainID != after.FullChainID {
-		changes = append(changes, "full_chain")
-	}
-	return changes
-}
-
-// computeWorldsendDiff はWORLD'S END譜面のレコードの変更差分を計算し、変更されたフィールド名のスライスを返します。
-func computeWorldsendDiff(before, after worldsendRecordState) []string {
-	changes := make([]string, 0, 4)
-	if before.Score != after.Score {
-		changes = append(changes, "score")
-	}
-	if before.ClearLampID != after.ClearLampID {
-		changes = append(changes, "clear_lamp")
-	}
-	if before.ComboLampID != after.ComboLampID {
-		changes = append(changes, "combo_lamp")
-	}
-	if before.FullChainID != after.FullChainID {
-		changes = append(changes, "full_chain")
-	}
-	return changes
-}
-
-// buildPlayerRecordDTO は通常譜面のレコードDTOを構築します。
-func buildPlayerRecordDTO(playerID int, state playerRecordState, chart entity.PlayerDataChart, song entity.PlayerDataSong, diffName string, masters *playerDataMaster) *api_internal.PlayerDataDiffRecord {
-	score := uint32(state.Score) // #nosec G115
-	return &api_internal.PlayerDataDiffRecord{
-		Difficulty:     diffName,
-		Title:          song.Title,
-		Const:          chart.Const,
-		IsConstUnknown: chart.IsConstUnknown,
-		Score:          score,
-		ClearLamp:      masters.ClearLampNamesByID[state.ClearLampID],
-		ComboLamp:      toMasterNamePtrFromMap(masters.ComboLampNamesByID, state.ComboLampID),
-		FullChain:      toMasterNamePtrFromMap(masters.FullChainNamesByID, state.FullChainID),
-	}
-}
-
-// buildWorldsendRecordDTO はWORLD'S END譜面のレコードDTOを構築します。
-func buildWorldsendRecordDTO(playerID int, state worldsendRecordState, chart entity.PlayerDataWorldsendChart, song entity.PlayerDataSong, masters *playerDataMaster) *api_internal.PlayerDataDiffRecord {
-	score := uint32(state.Score) // #nosec G115
-	return &api_internal.PlayerDataDiffRecord{
-		Difficulty:     worldsendDiffName,
-		Title:          song.Title,
-		Const:          0,
-		IsConstUnknown: true,
-		Score:          score,
-		ClearLamp:      masters.ClearLampNamesByID[state.ClearLampID],
-		ComboLamp:      toMasterNamePtrFromMap(masters.ComboLampNamesByID, state.ComboLampID),
-		FullChain:      toMasterNamePtrFromMap(masters.FullChainNamesByID, state.FullChainID),
-	}
-}
-
-// equalIntPointer は2つのintポインタが等しいかを比較します。
-func equalIntPointer(a, b *int) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
 }
 
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。

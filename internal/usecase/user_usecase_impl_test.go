@@ -96,10 +96,6 @@ func (s *stubPlayerRecordRepository) FindByPlayerID(ctx context.Context, exec re
 	return s.records, nil
 }
 
-func (s *stubPlayerRecordRepository) FindExistingByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]repository.ExistingPlayerRecord, error) {
-	return nil, nil
-}
-
 func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
 	return nil, nil
 }
