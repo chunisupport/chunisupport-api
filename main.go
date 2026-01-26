@@ -31,14 +31,15 @@ func main() {
 	}
 
 	// アプリのロガーを設定
+	logLevel := logger.ParseLogLevel(cfg.LogLevel)
 	var appLogger *slog.Logger
-	var loggerHandler *logger.CustomHandler
-	if appLoggerWithFile, err := logger.NewCustomHandlerWithFile(cfg.LogPaths.App); err == nil {
+	var loggerHandler *logger.Handler
+	if appLoggerWithFile, err := logger.NewHandlerWithFile(cfg.LogPaths.App, logLevel); err == nil {
 		loggerHandler = appLoggerWithFile
 		appLogger = slog.New(loggerHandler)
 	} else {
 		slog.Error("Failed to create app logger with file", "error", err)
-		loggerHandler = logger.NewCustomHandler()
+		loggerHandler = logger.NewHandler(logLevel)
 		appLogger = slog.New(loggerHandler)
 	}
 	slog.SetDefault(appLogger)
