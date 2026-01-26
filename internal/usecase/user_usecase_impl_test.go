@@ -100,6 +100,10 @@ func (s *stubPlayerRecordRepository) FindExistingByPlayerID(ctx context.Context,
 	return nil, nil
 }
 
+func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
+	return nil, nil
+}
+
 type stubPlayerService struct {
 	player *dto.PlayerDTO
 	err    error

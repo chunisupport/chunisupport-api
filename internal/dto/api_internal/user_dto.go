@@ -19,26 +19,22 @@ type UserProfileWithRecordsDTO struct {
 // UserDTO はユーザー情報を外部に公開するためのDTOです。
 // パスワードハッシュなどの機密情報は含まれません。
 type UserDTO struct {
-	Username    string         `json:"username"`
-	AccountType string         `json:"account_type"`
-	Player      *dto.PlayerDTO `json:"player"` // 関連するプレイヤー情報
+	Username        string     `json:"username"`
+	AccountType     string     `json:"account_type"`
+	LastScoreUpdate *time.Time `json:"last_score_update"` // プレイヤースコアの最終更新日時
 }
 
 // ToUserDTO はエンティティからDTOへ変換します。
-func ToUserDTO(user *entity.User, masterCache *masterdata.Cache) *UserDTO {
+func ToUserDTO(user *entity.User, masterCache *masterdata.Cache, lastScoreUpdate *time.Time) *UserDTO {
 	if user == nil {
 		return nil
 	}
 
-	dto := &UserDTO{
-		Username:    user.Username.String(),
-		AccountType: getAccountTypeName(user.AccountTypeID, masterCache),
+	return &UserDTO{
+		Username:        user.Username.String(),
+		AccountType:     getAccountTypeName(user.AccountTypeID, masterCache),
+		LastScoreUpdate: lastScoreUpdate,
 	}
-
-	// 今後、プレイヤー情報を含める場合はここで設定
-	// 現在のユーザーエンティティにはプレイヤー情報は含まれていない
-
-	return dto
 }
 
 // getAccountTypeName はアカウントタイプIDから名前を取得します。

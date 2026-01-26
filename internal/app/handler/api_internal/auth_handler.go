@@ -9,7 +9,6 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
 	"github.com/Qman110101/chunisupport-api/internal/auth"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	dto_internal "github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
@@ -127,7 +126,12 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, dto_internal.ToUserDTO(user, h.masterCache))
+	userDTO, err := h.authUsecase.GetUser(c.Request().Context(), user.ID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, userDTO)
 }
 
 // updatePrivacyRequest はプライバシー設定更新リクエストのボディの構造です。

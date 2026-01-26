@@ -123,7 +123,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	chartStatisticsRepo := infra.NewChartStatisticsRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
+	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	playerUsecase := usecase.NewPlayerService(db, playerRepo)
 	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase)

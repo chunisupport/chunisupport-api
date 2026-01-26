@@ -183,7 +183,7 @@ func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx re
 func TestAuthService_Register(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	mockSessionRepo := new(MockSessionRepository) // 使わないがNewAuthServiceに必要
-	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 	t.Run("正常系: ユーザー登録が成功する", func(t *testing.T) {
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, sql.ErrNoRows).Once()
@@ -305,7 +305,7 @@ func TestAuthService_ChangePassword(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockUserRepo := new(MockUserRepository)
 			mockSessionRepo := new(MockSessionRepository)
-			authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, pepper, newMockMasterCache())
+			authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, pepper, newMockMasterCache())
 
 			tc.setupMock(mockUserRepo)
 
@@ -332,7 +332,7 @@ func TestAuthService_Login(t *testing.T) {
 	t.Run("正常系: ログインが成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(mockUser, nil).Once()
 		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
@@ -347,7 +347,7 @@ func TestAuthService_Login(t *testing.T) {
 	t.Run("異常系: 論理削除されたユーザーはログインできない", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		deletedUser := &entity.User{ID: 2, Username: un, PasswordHash: ph, IsDeleted: true}
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(deletedUser, nil).Once()
@@ -364,7 +364,7 @@ func TestAuthService_Login(t *testing.T) {
 func TestAuthService_Logout(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	mockSessionRepo := new(MockSessionRepository)
-	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 	t.Run("正常系: ログアウトが成功する", func(t *testing.T) {
 		sessionID := uuid.New().String()
@@ -390,7 +390,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("正常系: 認証が成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, sessionID).Return(mockSession, nil).Once()
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, mockUser.ID).Return(mockUser, nil).Once()
@@ -406,7 +406,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("異常系: セッションが見つからない", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, "invalidsession").Return(nil, sql.ErrNoRows).Once()
 
@@ -418,7 +418,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("異常系: セッションのユーザーIDが不一致", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 		invalidUserID := 999
 
 		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, sessionID).Return(mockSession, nil).Once()
@@ -431,7 +431,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("異常系: セッションが期限切れ", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 		expiredSession := &entity.Session{
 			ID:        sessionID,
 			UserID:    mockUser.ID,
@@ -448,7 +448,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("異常系: 論理削除されたユーザー", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 		deletedUser := &entity.User{ID: mockUser.ID, Username: un, IsDeleted: true}
 
 		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, sessionID).Return(mockSession, nil).Once()
@@ -466,7 +466,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 func TestAuthService_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	mockSessionRepo := new(MockSessionRepository)
-	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 	t.Run("正常系: ユーザー取得が成功する", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
@@ -489,7 +489,7 @@ func TestAuthService_DeleteUser(t *testing.T) {
 	t.Run("正常系: 論理削除が成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -502,7 +502,7 @@ func TestAuthService_DeleteUser(t *testing.T) {
 	t.Run("異常系: リポジトリエラー", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(mockUser, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("db error")).Once()
@@ -521,7 +521,7 @@ func TestAuthService_IssueRecoveryCodes(t *testing.T) {
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
@@ -551,7 +551,7 @@ func TestAuthService_IssueRecoveryCodes(t *testing.T) {
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, sql.ErrNoRows).Once()
 
@@ -565,7 +565,7 @@ func TestAuthService_IssueRecoveryCodes(t *testing.T) {
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
@@ -688,7 +688,7 @@ func TestAuthService_RecoverWithRecoveryCode(t *testing.T) {
 			mockSessionRepo := new(MockSessionRepository)
 			mockRecoveryRepo := new(MockRecoveryCodeRepository)
 			tm := &mockTransactionManager{}
-			authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, "test-secret", 24, 24, pepper, newMockMasterCache())
+			authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, pepper, newMockMasterCache())
 
 			tc.setupMock(mockUserRepo, mockRecoveryRepo)
 

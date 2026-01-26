@@ -44,4 +44,9 @@ type PlayerRecordRepository interface {
 
 	// FindExistingByPlayerID はプレイヤーIDをキーに既存のレコード状態を取得します。
 	FindExistingByPlayerID(ctx context.Context, exec Executor, playerID int) ([]ExistingPlayerRecord, error)
+
+	// GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
+	// player_records と player_worldsend_records の両テーブルから最新の updated_at を返します。
+	// レコードが存在しない場合は nil を返します。
+	GetLastScoreUpdate(ctx context.Context, exec Executor, playerID int) (*time.Time, error)
 }

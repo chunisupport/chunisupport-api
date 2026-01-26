@@ -322,25 +322,8 @@ fetch('http://localhost:3002/v1/songs', {
 ```json
 {
   "username": "sample_user",
-  "player": {
-    "name": "プレイヤー名",
-    "level": 217,
-    "rating": 17.29,
-    "class_emblem_id": 6,
-    "class_emblem_base_id": 4,
-    "last_played_at": "2025-11-02T16:42:00+09:00",
-    "overpower_value": 96123.91,
-    "overpower_percent": 76.27,
-    "team_name": "チーム名",
-    "team_color": "green",
-    "honors": [
-      { "slot": 1, "name": "称号名（上段）", "type_name": "gold", "image_url": "https://..." },
-      { "slot": 2, "name": "称号名（中段）", "type_name": "platina", "image_url": "https://..." },
-      { "slot": 3, "name": "称号名（下段）", "type_name": "rainbow", "image_url": null }
-    ],
-    "created_at": "2025-11-27T12:00:00+09:00",
-    "updated_at": "2025-11-27T12:00:00+09:00"
-  }
+  "account_type": "PLAYER",
+  "last_score_update": "2025-11-27T12:00:00+09:00"
 }
 ```
 
@@ -349,34 +332,8 @@ fetch('http://localhost:3002/v1/songs', {
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
-| `player` | PlayerDTO \| null | プレイヤー情報（存在する場合） |
-
-**PlayerDTO スキーマ**:
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `name` | string | プレイヤー名 |
-| `level` | number | レベル |
-| `rating` | number | レーティング |
-| `class_emblem_id` | number \| null | クラスエンブレムID |
-| `class_emblem_base_id` | number \| null | クラスエンブレムベースID |
-| `last_played_at` | string \| null | 最終プレイ日時 (ISO8601) |
-| `overpower_value` | number \| null | オーバーパワー値 |
-| `overpower_percent` | number \| null | オーバーパワー割合 (%) |
-| `team_name` | string \| null | 所属チーム名 |
-| `team_color` | string \| null | 所属チームカラー |
-| `honors` | HonorDTO[] | 称号情報（スロット順、空配列の場合あり） |
-| `created_at` | string | 作成日時 (ISO8601) |
-| `updated_at` | string | 更新日時 (ISO8601) |
-
-**HonorDTO スキーマ**:
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `slot` | number | 称号スロット (1=上段, 2=中段, 3=下段) |
-| `name` | string | 称号名 |
-| `type_name` | string | 称号タイプ名 (normal, copper, silver, gold, platina, rainbow, staff, ongeki, maimai, sp, phoenix_g, phoenix_p, phoenix_r) |
-| `image_url` | string \| null | 称号画像URL |
+| `account_type` | string | アカウントタイプ (PLAYER, EDITOR, ADMIN) |
+| `last_score_update` | string \| null | プレイヤースコアの最終更新日時 (ISO8601)。プレイヤーが紐付いていない場合やレコードが存在しない場合は null |
 
 ### PUT `/internal/me/privacy`
 - **認証**: Cookie 必須

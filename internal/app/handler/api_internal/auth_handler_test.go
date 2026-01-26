@@ -425,6 +425,12 @@ func TestAuthHandler_Me(t *testing.T) {
 	t.Run("正常系: ユーザー情報取得", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
+		mockUserDTO := &dto_internal.UserDTO{
+			Username:    un.String(),
+			AccountType: "PLAYER",
+		}
+
+		mockService.On("GetUser", mock.Anything, mockUser.ID).Return(mockUserDTO, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -439,6 +445,8 @@ func TestAuthHandler_Me(t *testing.T) {
 		err = json.Unmarshal(rec.Body.Bytes(), &userDTO)
 		assert.NoError(t, err)
 		assert.Equal(t, un.String(), userDTO.Username)
+
+		mockService.AssertExpectations(t)
 	})
 }
 

@@ -200,3 +200,21 @@ func (r *playerRecordRepository) FindExistingByPlayerID(ctx context.Context, exe
 
 	return result, nil
 }
+
+// GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
+func (r *playerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
+	const query = `
+SELECT MAX(updated_at) AS last_update FROM (
+    SELECT updated_at FROM player_records WHERE player_id = ?
+    UNION ALL
+    SELECT updated_at FROM player_worldsend_records WHERE player_id = ?
+) AS combined
+`
+
+	var lastUpdate *time.Time
+	if err := exec.GetContext(ctx, &lastUpdate, query, playerID, playerID); err != nil {
+		return nil, err
+	}
+
+	return lastUpdate, nil
+}

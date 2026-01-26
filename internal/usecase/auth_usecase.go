@@ -54,6 +54,7 @@ type authService struct {
 	userRepo              repository.UserRepository
 	sessionRepo           repository.SessionRepository
 	recoveryCodeRepo      repository.RecoveryCodeRepository
+	playerRecordRepo      repository.PlayerRecordRepository
 	jwtSecret             string
 	jwtExpirationHour     int
 	sessionExpirationHour int
@@ -62,13 +63,14 @@ type authService struct {
 }
 
 // NewAuthService は新しいAuthUsecaseを生成します。
-func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache *masterdata.Cache) AuthUsecase {
+func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, playerRecordRepo repository.PlayerRecordRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache *masterdata.Cache) AuthUsecase {
 	return &authService{
 		db:                    db,
 		tm:                    tm,
 		userRepo:              userRepo,
 		sessionRepo:           sessionRepo,
 		recoveryCodeRepo:      recoveryCodeRepo,
+		playerRecordRepo:      playerRecordRepo,
 		jwtSecret:             jwtSecret,
 		jwtExpirationHour:     jwtExpirationHour,
 		sessionExpirationHour: sessionExpirationHour,
@@ -126,7 +128,8 @@ func (s *authService) Register(ctx context.Context, usernameStr, password string
 		return nil, "", err
 	}
 
-	return api_internal.ToUserDTO(user, s.masterCache), token, nil
+	// 登録直後はレコードが存在しないため、last_score_updateはnil
+	return api_internal.ToUserDTO(user, s.masterCache, nil), token, nil
 }
 
 // UpdatePrivacy はユーザーの非公開設定を更新します。
@@ -449,7 +452,18 @@ func (s *authService) GetUser(ctx context.Context, id int) (*api_internal.UserDT
 	if err != nil {
 		return nil, err
 	}
-	return api_internal.ToUserDTO(user, s.masterCache), nil
+
+	// プレイヤーが紐付いている場合のみ、スコア最終更新日を取得
+	var lastScoreUpdate *time.Time
+	if user.PlayerID != nil {
+		lastScoreUpdate, err = s.playerRecordRepo.GetLastScoreUpdate(ctx, s.db, *user.PlayerID)
+		if err != nil {
+			slog.Error("failed to get last score update", "player_id", *user.PlayerID, "error", err)
+			// エラーがあっても処理は継続（last_score_updateがnilになるだけ）
+		}
+	}
+
+	return api_internal.ToUserDTO(user, s.masterCache, lastScoreUpdate), nil
 }
 
 // convertUsernameError はユーザー名のバリデーションエラーを適切なエラーに変換します。
