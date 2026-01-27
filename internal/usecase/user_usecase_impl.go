@@ -144,7 +144,7 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		dtoRecord := dto.ToPlayerRecordDTO(record)
 
 		slotKey := record.SlotKey()
-		if _, ok := slotMap[slotKey]; ok {
+		if slotKey != "" {
 			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
 		}
 		if record.UpdatedAt.After(latestRecordUpdatedAt) {
