@@ -33,49 +33,37 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	if view == "rating" {
 		result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 		if err != nil {
-			switch {
-			case errors.Is(err, usecase.ErrUserNotFound):
-				return apierror.ErrUserNotFound
-			case errors.Is(err, usecase.ErrUserPrivate):
-				// セキュリティ: 非公開と未発見を区別しない
-				return apierror.ErrUserNotFound
-			case errors.Is(err, usecase.ErrPlayerNotLinked):
-				// セキュリティ: プレイヤー未紐付も404で隠蔽
-				return apierror.ErrUserNotFound
-			default:
-				if errors.Is(err, context.Canceled) {
-					slog.Warn("failed to get user profile rating view due to context canceled", "username", username, "error", err)
-				} else {
-					slog.Error("failed to get user profile rating view", "username", username, "error", err)
-				}
-				return apierror.ErrInternalError.WithInternal(err)
-			}
+			return h.handleUserProfileError(err, username, "user profile rating view")
 		}
 		return c.JSON(http.StatusOK, result)
 	}
 
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
-		switch {
-		case errors.Is(err, usecase.ErrUserNotFound):
-			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrUserPrivate):
-			// セキュリティ: 非公開と未発見を区別しない
-			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrPlayerNotLinked):
-			// セキュリティ: プレイヤー未紐付も404で隠蔽
-			return apierror.ErrUserNotFound
-		default:
-			if errors.Is(err, context.Canceled) {
-				slog.Warn("failed to get user profile with records due to context canceled", "username", username, "error", err)
-			} else {
-				slog.Error("failed to get user profile with records", "username", username, "error", err)
-			}
-			return apierror.ErrInternalError.WithInternal(err)
-		}
+		return h.handleUserProfileError(err, username, "user profile with records")
 	}
 
 	return c.JSON(http.StatusOK, result)
+}
+
+func (h *UserHandler) handleUserProfileError(err error, username string, contextDescription string) error {
+	switch {
+	case errors.Is(err, usecase.ErrUserNotFound):
+		return apierror.ErrUserNotFound
+	case errors.Is(err, usecase.ErrUserPrivate):
+		// セキュリティ: 非公開と未発見を区別しない
+		return apierror.ErrUserNotFound
+	case errors.Is(err, usecase.ErrPlayerNotLinked):
+		// セキュリティ: プレイヤー未紐付も404で隠蔽
+		return apierror.ErrUserNotFound
+	default:
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to get "+contextDescription+" due to context canceled", "username", username, "error", err)
+		} else {
+			slog.Error("failed to get "+contextDescription, "username", username, "error", err)
+		}
+		return apierror.ErrInternalError.WithInternal(err)
+	}
 }
 
 // DeleteUser はユーザーを論理削除するハンドラです（ADMIN権限必須）。
