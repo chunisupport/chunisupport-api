@@ -6,19 +6,9 @@
 
 ## ベースURLと環境
 
-アプリケーションは `.config/<environment>.settings.json` の `app_port` で待ち受けポートを決定します。ローカル開発で `app_port` に `3002` を設定した場合のベースURLは `http://localhost:3002` になります。
+アプリケーションは `.config/<environment>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。
 
-想定している環境名は以下の3種類です。
-
-| 環境名 | 設定ファイル | 例示ポート |
-| ------ | ------------ | ---------- |
-| develop | `.config/develop.settings.json` | `http://localhost:<app_port>` |
-| staging | `.config/staging.settings.json` | `https://staging.example.com:<app_port>` |
-| production | `.config/production.settings.json` | `https://api.example.com:<app_port>` |
-
-`APP_ENV=<name> go run main.go` で設定ファイルを切り替えます（環境変数は必須です）。
-
-以降のリクエスト例では `${APP_PORT}` を設定済みポート番号のプレースホルダーとして使用します。
+ローカル開発の例: `http://localhost:${APP_PORT}`
 
 主要なパス構成:
 
@@ -28,58 +18,20 @@
 
 ## CORS
 
-すべてのエンドポイントでCORSが有効化されています。設定は環境ごとの設定ファイルで管理されます。
-
-| 設定項目 | 説明 |
-| -------- | ---- |
-| `cors.allow_origins` | 許可するオリジンの配列 |
-| `cors.allow_credentials` | Cookie送信を許可するか (内部APIでは `true` 必須) |
-| `cors.max_age` | プリフライトキャッシュ秒数 |
-
-**許可メソッド**: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`
-
-**許可ヘッダー**: `Origin`, `Content-Type`, `Accept`, `Authorization`
-
-**公開ヘッダー**: `Content-Length`
-
-フロントエンドからのリクエストでは、Cookie認証を使用する場合 `credentials: 'include'` を必ず設定してください。
-
-```javascript
-// fetch の例
-fetch('http://localhost:3002/internal/me', {
-  credentials: 'include'
-});
-```
+すべてのエンドポイントでCORSが有効です。設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
 
 ## 認証
 
 ### 内部API (`/internal`)
 
 - ログイン成功時に `token` という名前の HTTPOnly Cookie を発行します。
-- Cookie属性は以下の通りです。
-  - `Path=/`
-  - `HttpOnly` は常に付与
-  - `Secure` は `auth.cookie_secure` 設定値に追従 (開発環境では `false`, HTTPS運用時は `true` を推奨)
-  - `SameSite` は `auth.cookie_same_site` の値 (`lax`/`strict`/`none`)
-- セッションはサーバー側 (`sessions` テーブル) に保存され、JWTにはセッションIDが含まれます。
-- すべての認証必須エンドポイントでは `JWTMiddleware` が Cookie を検証し、`userEntity`（`entity.User`）をリクエストコンテキストに格納します。
-- `/internal/users/:username` `/internal/songs` `/internal/songs/:displayid` `/internal/songs/worldsend` `/internal/songs/worldsend/:displayid` は Cookie 任意です。未認証時は1分10回/IPのレートリミットが適用されます。
+- 認証必須エンドポイントでは Cookie を検証し、ユーザー情報をリクエストコンテキストに格納します。
+- Cookie 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
 
 ### 公開API (`/v1`)
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
-- ミドルウェアがトークンを検証し、認証済みユーザーとトークン情報をコンテキストに格納します。
-- トークンは `/internal/auth/api-tokens` で発行します。1ユーザーにつき1件のみ保持され、再発行すると旧トークンは無効化されます。
-- **レートリミット**: ADMINアカウントは無制限、その他のアカウントは15分間に150リクエストまでに制限されます。
-
-```javascript
-// fetch の例
-fetch('http://localhost:3002/v1/songs', {
-  headers: {
-    'Authorization': 'Bearer your-api-token-here'
-  }
-});
-```
+- トークンは `/internal/auth/api-tokens` で発行します。
 
 ## 共通レスポンス仕様
 
@@ -97,51 +49,9 @@ fetch('http://localhost:3002/v1/songs', {
 
 `error` オブジェクト内の `code` フィールドには機械処理しやすいスネークケースのエラーコードが入ります。`status` フィールドにはHTTPステータスコードが入ります。詳細なエラーメッセージはサーバーログにのみ記録され、クライアントには返却されません。
 
-### エラーコード一覧
-
-| カテゴリ | コード | HTTPステータス | 発生条件 |
-| -------- | ------ | -------------- | -------- |
-| 汎用 | `bad_request` | 400 | リクエスト形式不正、JSON構文エラー |
-| 汎用 | `internal_error` | 500 | サーバー内部エラー |
-| 認証 | `unauthorized` | 401 | 認証が必要 |
-| 認証 | `invalid_credentials` | 401 | ユーザー名またはパスワードが不正 |
-| 認証 | `invalid_token` | 401 | トークンが無効 |
-| 認証 | `token_expired` | 401 | トークン期限切れ |
-| 認証 | `missing_token` | 401 | トークン未指定 |
-| 認証 | `invalid_session` | 401 | セッション無効/期限切れ（詳細隠蔽） |
-| 認証 | `invalid_recovery_credentials` | 401 | リカバリーコードが無効/使用済み/ユーザー不在 |
-| 権限 | `forbidden` | 403 | アクセス権限なし |
-| ユーザー | `registration_failed` | 400 | ユーザー登録失敗（詳細隠蔽） |
-| ユーザー | `user_not_found` | 404 | ユーザーが見つからない（非公開含む） |
-| ユーザー | `operation_failed` | 400 | 操作失敗（詳細隠蔽） |
-| プレイヤー | `player_not_found` | 404 | プレイヤーが見つからない |
-| データ | `validation_failed` | 422 | 入力値バリデーションエラー |
-| データ | `resource_not_found` | 400 | マスターデータが見つからない |
-| データ | `conflict` | 409 | データ競合（例: 別ユーザーのプレイヤーデータと衝突） |
-| データ | `api_token_not_found` | 404 | APIトークンが見つからない |
-| データ | `payload_too_large` | 413 | リクエストボディサイズ超過 |
-| 入力検証 | `username_empty` | 400 | ユーザー名が空 |
-| 入力検証 | `username_too_short` | 400 | ユーザー名が短すぎる（5文字未満） |
-| 入力検証 | `username_too_long` | 400 | ユーザー名が長すぎる（50文字超過） |
-| 入力検証 | `username_invalid_char` | 400 | ユーザー名に使用できない文字が含まれている（小文字英数字のみ可） |
-| 入力検証 | `password_too_short` | 400 | パスワードが短すぎる（8文字未満） |
-| 入力検証 | `password_too_long` | 400 | パスワードが長すぎる（128文字超過） |
-| 入力検証 | `invalid_password` | 400 | パスワードが無効（詳細隠蔽） |
-| その他 | `not_found` | 404 | リソースが存在しない |
-| その他 | `method_not_allowed` | 405 | HTTPメソッドが許可されていない |
-| その他 | `unsupported_media_type` | 415 | サポートされていないメディアタイプ |
-| その他 | `too_many_requests` | 429 | リクエスト制限超過 |
-| その他 | `service_unavailable` | 503 | サービス利用不可 |
-
 ## マスターデータ概要
 
 主なマスタ定義は `migration/mysql/000001_init_schema.up.sql` に記載されています。
-
-- アカウント種別: `PLAYER`, `EDITOR`, `ADMIN`
-- クリアランプ: `FAILED`, `CLEAR`, `HARD`, `BRAVE`, `ABSOLUTE`, `CATASTROPHY`
-- コンボランプ: `NONE`, `FULL COMBO`, `ALL JUSTICE`
-- フルチェイン: `NONE`, `FULL CHAIN GOLD`, `FULL CHAIN PLATINUM`
-- スロット: `none`, `best`, `best_candidate`, `new`, `new_candidate`
 
 ## エンドポイント一覧
 
