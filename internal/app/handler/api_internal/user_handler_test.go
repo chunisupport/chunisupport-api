@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
 	"github.com/Qman110101/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/dto"
@@ -143,6 +144,47 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.False(t, hasAll)
 		assert.False(t, hasWorldsend)
 		mockService.AssertExpectations(t)
+	})
+
+	t.Run("view=ratingの異常系", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			usecaseError  error
+			expectedError error
+		}{
+			{
+				name:          "ユーザーが存在しない",
+				usecaseError:  usecase.ErrUserNotFound,
+				expectedError: apierror.ErrUserNotFound,
+			},
+			{
+				name:          "ユーザーが非公開",
+				usecaseError:  usecase.ErrUserPrivate,
+				expectedError: apierror.ErrUserNotFound,
+			},
+			{
+				name:          "プレイヤー未紐付け",
+				usecaseError:  usecase.ErrPlayerNotLinked,
+				expectedError: apierror.ErrUserNotFound,
+			},
+		}
+
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), testCase.usecaseError).Once()
+
+				req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				c.SetParamNames("username")
+				c.SetParamValues("testuser")
+
+				err := h.GetUserProfileWithRecords(c)
+
+				assert.ErrorIs(t, err, testCase.expectedError)
+				mockService.AssertExpectations(t)
+			})
+		}
 	})
 }
 
