@@ -49,6 +49,33 @@
 
 `error` オブジェクト内の `code` フィールドには機械処理しやすいスネークケースのエラーコードが入ります。`status` フィールドにはHTTPステータスコードが入ります。詳細なエラーメッセージはサーバーログにのみ記録され、クライアントには返却されません。
 
+## エラーコード一覧（主要）
+
+主要なエラーコードは以下の通りです。全一覧は `internal/app/apierror/codes.go` を参照してください。
+
+| エラーコード | 説明 |
+| --- | --- |
+| `bad_request` | リクエスト形式不正（JSONパースエラーなど） |
+| `validation_failed` | 入力バリデーション失敗 |
+| `unauthorized` | 認証が必要 |
+| `invalid_token` | トークンが不正 |
+| `token_expired` | トークン期限切れ |
+| `missing_token` | トークン未指定 |
+| `forbidden` | 権限不足 |
+| `invalid_credentials` | ユーザー名またはパスワード不正 |
+| `invalid_recovery_credentials` | リカバリーコード不正/使用済み |
+| `username_empty` | ユーザー名が空 |
+| `username_too_short` | ユーザー名が短すぎる |
+| `username_too_long` | ユーザー名が長すぎる |
+| `username_invalid_char` | ユーザー名に使用できない文字が含まれる |
+| `password_too_short` | パスワードが短すぎる |
+| `password_too_long` | パスワードが長すぎる |
+| `invalid_password` | パスワードが無効 |
+| `not_found` | エンドポイントが見つからない |
+| `too_many_requests` | レートリミット超過 |
+| `service_unavailable` | サービス利用不可（DB接続失敗など） |
+| `internal_error` | 予期しないサーバーエラー |
+
 ## マスターデータ概要
 
 主なマスタ定義は `migration/mysql/000001_init_schema.up.sql` に記載されています。

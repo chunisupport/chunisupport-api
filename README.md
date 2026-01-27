@@ -33,7 +33,11 @@
    git clone https://github.com/Qman110101/chunisupport-api.git
    cd chunisupport-api
    ```
-2. 設定ファイルを用意する（詳細は `docs/configuration.md` を参照）。
+2. 依存関係を取得する。
+   ```bash
+   go mod tidy
+   ```
+3. 設定ファイルを用意する（詳細は `docs/configuration.md` を参照）。
    ```bash
    mkdir -p .config
    ```
@@ -68,12 +72,15 @@
      }
    }
    ```
-3. データベースを用意してマイグレーションする。
+4. データベースを作成してマイグレーションする。
+   ```bash
+   mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
+   ```
    ```bash
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    ```
-4. 起動する。
+5. 起動する。
    ```bash
    APP_ENV=develop go run main.go
    ```
