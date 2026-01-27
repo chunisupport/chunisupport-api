@@ -14,6 +14,11 @@ type UserUsecase interface {
 	// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileWithRecordsDTO, error)
 
+	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
+	// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
+	// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
+	GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error)
+
 	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します（ADMIN権限必須）。
 	// ページングと検索条件（ユーザー名またはプレイヤー名の前方一致）をサポートします。
 	// プライベート・削除済み・プレイヤー未紐付けアカウントも含みます。

@@ -45,39 +45,8 @@ func (s *userUsecase) SetWorldsendRecordRepository(repo repository.WorldsendReco
 // TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。
 // PlayerRepository.FindByIDWithHonors() のようなJOINクエリを作成して3回に削減できる可能性がある。
 func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileWithRecordsDTO, error) {
-	// 1. ユーザーを取得
-	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
+	user, player, err := s.getUserAndPlayer(ctx, username, requester)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrUserNotFound
-		}
-		slog.Error("failed to find user by username", "username", username, "error", err)
-		return nil, err
-	}
-
-	if user == nil || !user.IsActive() {
-		return nil, ErrUserNotFound
-	}
-
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
-		return nil, ErrUserPrivate
-	}
-
-	if !user.HasLinkedPlayer() {
-		return nil, ErrPlayerNotLinked
-	}
-
-	// 2. プレイヤー情報を取得
-	player, err := s.playerUsecase.GetPlayerByID(ctx, *user.PlayerID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrPlayerNotLinked
-		}
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
-			slog.Error("failed to find player", "player_id", *user.PlayerID, "error", err)
-		}
 		return nil, err
 	}
 
@@ -145,6 +114,57 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 	}
 
 	return &api_internal.UserProfileWithRecordsDTO{
+		Username:  user.Username.String(),
+		Player:    player,
+		Records:   recordsDTO,
+		UpdatedAt: &player.UpdatedAt,
+	}, nil
+}
+
+// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
+func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error) {
+	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := s.playerRecordRepo.FindByPlayerIDForRating(ctx, s.db, *user.PlayerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find player rating records due to context canceled", "player_id", *user.PlayerID, "error", err)
+		} else {
+			slog.Error("failed to find player rating records", "player_id", *user.PlayerID, "error", err)
+		}
+		return nil, err
+	}
+
+	slotMap := initializeRatingSlotMap()
+	var latestRecordUpdatedAt time.Time
+	for _, record := range records {
+		dtoRecord := dto.ToPlayerRecordDTO(record)
+
+		slotKey := record.SlotKey()
+		if slotKey != "" {
+			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
+		}
+		if record.UpdatedAt.After(latestRecordUpdatedAt) {
+			latestRecordUpdatedAt = record.UpdatedAt
+		}
+	}
+
+	recordsUpdatedAt := latestRecordUpdatedAt
+	if recordsUpdatedAt.IsZero() {
+		recordsUpdatedAt = player.UpdatedAt
+	}
+	recordsDTO := &api_internal.UserRatingRecordResponseDTO{
+		UpdatedAt:     recordsUpdatedAt,
+		Best:          slotMap["best"],
+		BestCandidate: slotMap["best_candidate"],
+		New:           slotMap["new"],
+		NewCandidate:  slotMap["new_candidate"],
+	}
+
+	return &api_internal.UserProfileRatingViewDTO{
 		Username:  user.Username.String(),
 		Player:    player,
 		Records:   recordsDTO,
@@ -250,4 +270,51 @@ func initializeSlotMap() map[string][]*dto.PlayerRecordDTO {
 	}
 	result["all"] = []*dto.PlayerRecordDTO{}
 	return result
+}
+
+func initializeRatingSlotMap() map[string][]*dto.PlayerRecordDTO {
+	slots := []string{"best", "best_candidate", "new", "new_candidate"}
+	result := make(map[string][]*dto.PlayerRecordDTO, len(slots))
+	for _, slot := range slots {
+		result[slot] = []*dto.PlayerRecordDTO{}
+	}
+	return result
+}
+
+func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, requester *entity.User) (*entity.User, *dto.PlayerDTO, error) {
+	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, ErrUserNotFound
+		}
+		slog.Error("failed to find user by username", "username", username, "error", err)
+		return nil, nil, err
+	}
+
+	if user == nil || !user.IsActive() {
+		return nil, nil, ErrUserNotFound
+	}
+
+	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+		return nil, nil, ErrUserPrivate
+	}
+
+	if !user.HasLinkedPlayer() {
+		return nil, nil, ErrPlayerNotLinked
+	}
+
+	player, err := s.playerUsecase.GetPlayerByID(ctx, *user.PlayerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, ErrPlayerNotLinked
+		}
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find player due to context canceled", "player_id", *user.PlayerID, "error", err)
+		} else {
+			slog.Error("failed to find player", "player_id", *user.PlayerID, "error", err)
+		}
+		return nil, nil, err
+	}
+
+	return user, player, nil
 }

@@ -30,6 +30,9 @@ type PlayerRecordRepository interface {
 	// FindByPlayerID はプレイヤーIDをキーにレコード一覧を取得します。
 	FindByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
 
+	// FindByPlayerIDForRating はレーティング対象のレコードのみを取得します。
+	FindByPlayerIDForRating(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
+
 	// GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
 	// player_records と player_worldsend_records の両テーブルから最新の updated_at を返します。
 	// レコードが存在しない場合は nil を返します。
