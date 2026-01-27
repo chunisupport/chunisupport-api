@@ -30,6 +30,14 @@ func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, usernam
 	return args.Get(0).(*dto_internal.UserProfileWithRecordsDTO), args.Error(1)
 }
 
+func (m *mockUserService) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
+	args := m.Called(ctx, username, requester)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto_internal.UserProfileRatingViewDTO), args.Error(1)
+}
+
 func (m *mockUserService) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
 	args := m.Called(ctx, page, limit, name)
 	if args.Get(0) == nil {
@@ -75,6 +83,19 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		Records:   records,
 		UpdatedAt: &now,
 	}
+	ratingRecords := &dto_internal.UserRatingRecordResponseDTO{
+		UpdatedAt:     now,
+		Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
+		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
+		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
+		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
+	}
+	ratingResult := &dto_internal.UserProfileRatingViewDTO{
+		Username:  "testuser",
+		Player:    player,
+		Records:   ratingRecords,
+		UpdatedAt: &now,
+	}
 
 	t.Run("viewなしは全レコードを返す", func(t *testing.T) {
 		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
@@ -101,7 +122,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	})
 
 	t.Run("view=ratingはレーティング枠のみ返す", func(t *testing.T) {
-		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 		rec := httptest.NewRecorder()

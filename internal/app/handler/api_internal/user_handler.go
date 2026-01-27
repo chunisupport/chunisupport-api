@@ -5,11 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -17,21 +15,6 @@ import (
 // UserHandler はユーザー関連のHTTPリクエストを処理します。
 type UserHandler struct {
 	userUsecase usecase.UserUsecase
-}
-
-type userRatingRecordResponse struct {
-	UpdatedAt     time.Time              `json:"updated_at"`
-	Best          []*dto.PlayerRecordDTO `json:"best"`
-	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
-	New           []*dto.PlayerRecordDTO `json:"new"`
-	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
-}
-
-type userProfileRatingViewResponse struct {
-	Username  string                    `json:"username"`
-	Player    *dto.PlayerDTO            `json:"player"`
-	Records   *userRatingRecordResponse `json:"records"`
-	UpdatedAt *time.Time                `json:"updated_at"`
 }
 
 // NewUserHandler は新しいUserHandlerを生成します。
@@ -47,6 +30,30 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
+	if view == "rating" {
+		result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
+		if err != nil {
+			switch {
+			case errors.Is(err, usecase.ErrUserNotFound):
+				return apierror.ErrUserNotFound
+			case errors.Is(err, usecase.ErrUserPrivate):
+				// セキュリティ: 非公開と未発見を区別しない
+				return apierror.ErrUserNotFound
+			case errors.Is(err, usecase.ErrPlayerNotLinked):
+				// セキュリティ: プレイヤー未紐付も404で隠蔽
+				return apierror.ErrUserNotFound
+			default:
+				if errors.Is(err, context.Canceled) {
+					slog.Warn("failed to get user profile rating view due to context canceled", "username", username, "error", err)
+				} else {
+					slog.Error("failed to get user profile rating view", "username", username, "error", err)
+				}
+				return apierror.ErrInternalError.WithInternal(err)
+			}
+		}
+		return c.JSON(http.StatusOK, result)
+	}
+
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
 		switch {
@@ -66,26 +73,6 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 			}
 			return apierror.ErrInternalError.WithInternal(err)
 		}
-	}
-
-	if view == "rating" {
-		var records *userRatingRecordResponse
-		if result.Records != nil {
-			records = &userRatingRecordResponse{
-				UpdatedAt:     result.Records.UpdatedAt,
-				Best:          result.Records.Best,
-				BestCandidate: result.Records.BestCandidate,
-				New:           result.Records.New,
-				NewCandidate:  result.Records.NewCandidate,
-			}
-		}
-		response := &userProfileRatingViewResponse{
-			Username:  result.Username,
-			Player:    result.Player,
-			Records:   records,
-			UpdatedAt: result.UpdatedAt,
-		}
-		return c.JSON(http.StatusOK, response)
 	}
 
 	return c.JSON(http.StatusOK, result)
