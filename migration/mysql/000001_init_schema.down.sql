@@ -1,6 +1,11 @@
 -- テーブルを逆順で削除(外部キー制約を考慮)
 -- インデックスは自動的に削除されるため明示的な削除は不要
 
+-- バージョンマスタを削除
+DROP TABLE IF EXISTS versions;
+
+DROP TABLE IF EXISTS user_recovery_codes;
+
 DROP TABLE IF EXISTS player_worldsend_records;
 DROP TABLE IF EXISTS player_records;
 DROP TABLE IF EXISTS api_tokens;

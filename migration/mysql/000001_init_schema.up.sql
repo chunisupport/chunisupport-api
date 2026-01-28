@@ -117,6 +117,8 @@ INSERT INTO honor_types (name) VALUES
     ('staff'),
     ('ongeki'),
     ('maimai'),
+    ('expert'),
+    ('master'),
     ('ultima'),
     ('sp'),
     ('phoenix_g'),
@@ -305,13 +307,59 @@ CREATE TABLE IF NOT EXISTS player_worldsend_records (
     CHECK (score BETWEEN 0 AND 1010000)
 );
 
+CREATE TABLE IF NOT EXISTS user_recovery_codes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    code_hash BINARY(32) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_recovery_codes_user_id (user_id),
+    UNIQUE KEY uq_user_recovery_codes_code_hash (code_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- バージョンマスタ
+CREATE TABLE IF NOT EXISTS versions (
+    id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    released_at DATE NOT NULL
+);
+
+INSERT INTO versions (name, released_at) VALUES
+    ('CHUNITHM', '2015-07-16'),
+    ('CHUNITHM PLUS', '2016-02-04'),
+    ('CHUNITHM AIR', '2016-08-25'),
+    ('CHUNITHM AIR PLUS', '2017-02-09'),
+    ('CHUNITHM STAR', '2017-08-24'),
+    ('CHUNITHM STAR PLUS', '2018-03-08'),
+    ('CHUNITHM AMAZON', '2018-10-25'),
+    ('CHUNITHM AMAZON PLUS', '2019-04-11'),
+    ('CHUNITHM CRYSTAL', '2019-10-24'),
+    ('CHUNITHM CRYSTAL PLUS', '2020-07-16'),
+    ('CHUNITHM PARADISE', '2021-01-21'),
+    ('CHUNITHM PARADISE LOST', '2021-05-13'),
+    ('CHUNITHM NEW', '2021-11-04'),
+    ('CHUNITHM NEW PLUS', '2022-04-14'),
+    ('CHUNITHM SUN', '2022-10-13'),
+    ('CHUNITHM SUN PLUS', '2023-05-11'),
+    ('CHUNITHM LUMINOUS', '2023-12-14'),
+    ('CHUNITHM LUMINOUS PLUS', '2024-06-20'),
+    ('CHUNITHM VERSE', '2024-12-12'),
+    ('CHUNITHM X-VERSE', '2025-07-16'),
+    ('CHUNITHM X-VERSE-X', '2025-12-11')
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    released_at = VALUES(released_at);
+
 -- インデックス（必要に応じて追加）
 CREATE INDEX idx_songs_title ON songs(title); -- 楽曲タイトル検索を高速化
+CREATE INDEX idx_songs_worldsend_deleted ON songs(is_worldsend, is_deleted); -- 楽曲一覧取得（WHERE is_worldsend = 0 AND is_deleted = 0）を高速化
 CREATE INDEX idx_charts_song_id ON charts(song_id); -- 楽曲から紐づく譜面一覧を取得するJOINを高速化
 CREATE INDEX idx_worldsend_charts_song_id ON worldsend_charts(song_id); -- WORLD'S END楽曲から譜面を取得するJOINを高速化
+CREATE INDEX idx_users_deleted_private ON users(is_deleted, is_private, player_id); -- ユーザー一覧取得（WHERE is_deleted = FALSE AND is_private = FALSE AND player_id IS NOT NULL）を高速化
 CREATE INDEX idx_players_player_name ON players(player_name); -- プレイヤー名検索やソートを高速化
 CREATE INDEX idx_sessions_user_id ON sessions(user_id); -- ユーザー単位でのセッション失効処理を高速化
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at); -- 期限切れセッションの清掃ジョブ用
+CREATE INDEX idx_sessions_user_expires ON sessions(user_id, expires_at); -- セッション数カウント（WHERE user_id = ? AND expires_at > NOW()）を高速化
 CREATE INDEX idx_player_records_chart_id ON player_records(chart_id); -- 譜面別ランキングや自己ベスト比較を高速化
 CREATE INDEX idx_player_records_updated_at ON player_records(updated_at); -- 最新更新順に並べる取得処理を高速化
 CREATE INDEX idx_player_worldsend_records_worldsend_chart_id ON player_worldsend_records(worldsend_chart_id); -- WORLD'S END譜面別ランキングを高速化
