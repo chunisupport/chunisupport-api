@@ -120,7 +120,6 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
-	chartStatisticsRepo := infra.NewChartStatisticsRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
 	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
@@ -134,7 +133,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 		uu.SetWorldsendRecordRepository(worldsendRecordRepo)
 	}
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
-	songUsecase := usecase.NewSongService(songRepo, chartStatisticsRepo, masterCache, tm, db)
+	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 

@@ -126,23 +126,6 @@ entity "charts" as charts {
   notes: INT
 }
 
-entity "chart_statistics" as chart_statistics {
-  + chart_id: MEDIUMINT UNSIGNED [PK, FK]
-  + rating_tier: SMALLINT [PK]
-  --
-  rank_s_count: INT UNSIGNED NOT NULL
-  rank_s_plus_count: INT UNSIGNED NOT NULL
-  rank_ss_count: INT UNSIGNED NOT NULL
-  rank_ss_plus_count: INT UNSIGNED NOT NULL
-  rank_sss_count: INT UNSIGNED NOT NULL
-  rank_sss_plus_count: INT UNSIGNED NOT NULL
-  lamp_aj_count: INT UNSIGNED NOT NULL
-  lamp_fc_count: INT UNSIGNED NOT NULL
-  lamp_other_count: INT UNSIGNED NOT NULL
-  total_count: INT UNSIGNED NOT NULL
-  updated_at: TIMESTAMP
-}
-
 entity "worldsend_charts" as worldsend_charts {
   + id: MEDIUMINT UNSIGNED [PK]
   --
@@ -258,7 +241,6 @@ player_worldsend_records }o--|| full_chain_types
 
 charts }|--|| songs
 charts }o--|| difficulties
-charts ||--o{ chart_statistics
 
 songs ||--|o worldsend_charts
 

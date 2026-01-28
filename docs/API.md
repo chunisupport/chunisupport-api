@@ -898,24 +898,6 @@ curl -X POST \
 | `const` | float | 譜面定数（小数点以下1桁表記） |
 | `is_const_unknown` | bool | 譜面定数が未確定かどうか |
 | `notes` | int \| null | ノーツ数（未設定の場合null/省略） |
-| `statistics` | ChartStatisticsDTO \| null | 統計データは GET `/internal/songs/:displayid` の `content=full` 指定時のみ返却されます（譜面定数10.0未満はnull/省略）。 |
-
-**ChartStatisticsDTO**:
-
-`ChartStatisticsDTO` はレーティング帯をキーとするマップです。キーは "15.0", "15.1", ..., "17.6", "17.7+" の全てが含まれます（データがないレーティング帯は0で埋められます）。
-
-**Map<string, ChartStatisticsByRatingDTO>**: キーはレーティング帯（"15.0" ~ "17.7+"）
-
-**ChartStatisticsByRatingDTO**:
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `rank` | ChartRankStatisticsDTO | ランク別人数統計 |
-| `lamp` | ChartLampStatisticsDTO | ランプ別人数統計 |
-
-**ChartRankStatisticsDTO**: `{"s": int, "s_plus": int, "ss": int, "ss_plus": int, "sss": int, "sss_plus": int}`
-
-**ChartLampStatisticsDTO**: `{"aj": int, "fc": int, "other": int}`
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -925,8 +907,6 @@ curl -X POST \
 - **認証**: Cookie (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **クエリパラメータ**:
-  - `content` (string, optional): `full` を指定すると統計データを含めます
 - **概要**: 指定されたDisplayIDの楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
 
@@ -954,7 +934,7 @@ curl -X POST \
 }
 ```
 
-レスポンスフィールドの詳細は GET `/internal/songs` と同様です。`content=full` 指定時のみ統計データを含めます。
+レスポンスフィールドの詳細は GET `/internal/songs` と同様です。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要

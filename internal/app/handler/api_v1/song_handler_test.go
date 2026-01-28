@@ -1,7 +1,6 @@
 package api_v1
 
 import (
-	"context"
 	"testing"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
@@ -77,7 +76,7 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	}
 
 	// 変換実行
-	dto := handler.convertToV1SongDTO(context.Background(), swc, false)
+	dto := handler.convertToV1SongDTO(swc)
 
 	// アサーション
 	if dto == nil {

@@ -14,7 +14,6 @@ import (
 // songUsecaseImpl は SongUsecase の実装です。
 type songUsecaseImpl struct {
 	songRepo        repository.SongRepository
-	statsRepo       repository.ChartStatisticsRepository
 	masterCache     repository.SongMasterProvider
 	tm              TransactionManager
 	defaultExecutor repository.Executor
@@ -23,14 +22,12 @@ type songUsecaseImpl struct {
 // NewSongService は新しい SongUsecase を生成します。
 func NewSongService(
 	songRepo repository.SongRepository,
-	statsRepo repository.ChartStatisticsRepository,
 	masterCache repository.SongMasterProvider,
 	tm TransactionManager,
 	defaultExecutor repository.Executor,
 ) SongUsecase {
 	return &songUsecaseImpl{
 		songRepo:        songRepo,
-		statsRepo:       statsRepo,
 		masterCache:     masterCache,
 		tm:              tm,
 		defaultExecutor: defaultExecutor,
@@ -163,26 +160,4 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 	}
 
 	return result, nil
-}
-
-// GetChartStatisticsByChartIDs は指定された譜面IDリストの統計を一括取得します。
-// 譜面IDをキーとするマップで返します（統計が存在しない譜面は空のスライス）。
-func (s *songUsecaseImpl) GetChartStatisticsByChartIDs(ctx context.Context, chartIDs []int) (map[int][]*entity.ChartStatistics, error) {
-	if len(chartIDs) == 0 {
-		return make(map[int][]*entity.ChartStatistics), nil
-	}
-
-	// 統計データを一括取得（N+1問題回避）
-	statsList, err := s.statsRepo.FindByChartIDs(ctx, nil, chartIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chart statistics: %w", err)
-	}
-
-	// 譜面IDをキーとするマップに変換
-	statsMap := make(map[int][]*entity.ChartStatistics)
-	for _, stats := range statsList {
-		statsMap[stats.ChartID] = append(statsMap[stats.ChartID], stats)
-	}
-
-	return statsMap, nil
 }

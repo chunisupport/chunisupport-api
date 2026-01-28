@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 )
@@ -26,8 +25,4 @@ type SongUsecase interface {
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// マスタデータの検証およびリポジトリへの委譲を行います。
 	UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
-
-	// GetChartStatisticsByChartIDs は指定された譜面IDリストの統計を一括取得します。
-	// 譜面IDをキーとするマップで返します（統計が存在しない譜面は空のスライス）。
-	GetChartStatisticsByChartIDs(ctx context.Context, chartIDs []int) (map[int][]*entity.ChartStatistics, error)
 }

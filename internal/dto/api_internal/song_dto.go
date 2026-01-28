@@ -13,7 +13,6 @@ type ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
-	Statistics     ChartStatisticsDTO          `json:"statistics,omitempty"` // 譜面統計（content=fullの場合のみ）
 }
 
 // OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。

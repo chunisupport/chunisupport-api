@@ -82,7 +82,7 @@ func TestConvertToSongDTO(t *testing.T) {
 	}
 
 	// 変換実行
-	dto := handler.convertToSongDTO(context.Background(), swc, false)
+	dto := handler.convertToSongDTO(swc)
 
 	// アサーション
 	if dto == nil {
@@ -164,10 +164,6 @@ func (m *mockSongUsecase) RestoreSong(ctx context.Context, displayID string) err
 
 func (m *mockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
 	return nil
-}
-
-func (m *mockSongUsecase) GetChartStatisticsByChartIDs(ctx context.Context, chartIDs []int) (map[int][]*entity.ChartStatistics, error) {
-	return make(map[int][]*entity.ChartStatistics), nil
 }
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。

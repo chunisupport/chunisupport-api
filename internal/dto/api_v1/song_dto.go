@@ -12,7 +12,6 @@ type V1ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
-	Statistics     ChartStatisticsDTO          `json:"statistics,omitempty"` // 統計情報（譜面定数10.0未満ではnull）
 }
 
 // V1OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
