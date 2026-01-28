@@ -61,17 +61,24 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	}
 	sortMasterItemsByID(accountTypes)
 
-	// IsConstUnknown の静的な選択肢
-	isConstUnknown := []*dto.BooleanChoiceDTO{
-		{Value: false, Label: "確定"},
-		{Value: true, Label: "調査中"},
+	// Versions をID順にソートして配列化
+	versions := make([]*dto.VersionDTO, 0, len(h.masterCache.Versions))
+	for _, item := range h.masterCache.Versions {
+		versions = append(versions, &dto.VersionDTO{
+			ID:         int(item.ID),
+			Name:       item.Name,
+			ReleasedAt: item.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
 	}
+	slices.SortFunc(versions, func(a, b *dto.VersionDTO) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
 
 	response := &dto.MasterDataResponse{
-		Genres:         genres,
-		Difficulties:   difficulties,
-		IsConstUnknown: isConstUnknown,
-		AccountTypes:   accountTypes,
+		Genres:       genres,
+		Difficulties: difficulties,
+		AccountTypes: accountTypes,
+		Versions:     versions,
 	}
 
 	return c.JSON(http.StatusOK, response)

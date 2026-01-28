@@ -6,16 +6,17 @@ type MasterItemDTO struct {
 	Name string `json:"name"`
 }
 
-// BooleanChoiceDTO は真偽値選択肢を表します。
-type BooleanChoiceDTO struct {
-	Value bool   `json:"value"`
-	Label string `json:"label"`
+// VersionDTO はバージョンマスタを表します。
+type VersionDTO struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	ReleasedAt string `json:"released_at"`
 }
 
 // MasterDataResponse はマスタデータ取得APIのレスポンスを表します。
 type MasterDataResponse struct {
-	Genres         []*MasterItemDTO    `json:"genres"`
-	Difficulties   []*MasterItemDTO    `json:"difficulties"`
-	IsConstUnknown []*BooleanChoiceDTO `json:"is_const_unknown"`
-	AccountTypes   []*MasterItemDTO    `json:"account_types"`
+	Genres       []*MasterItemDTO `json:"genres"`
+	Difficulties []*MasterItemDTO `json:"difficulties"`
+	AccountTypes []*MasterItemDTO `json:"account_types"`
+	Versions     []*VersionDTO    `json:"versions"`
 }

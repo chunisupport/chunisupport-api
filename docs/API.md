@@ -1156,7 +1156,7 @@ curl -X POST \
 
 ### GET `/internal/master`
 - **認証**: Cookie 必須
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、定数不明選択肢、アカウント種別）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン）を返却します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -1173,14 +1173,15 @@ curl -X POST \
     { "id": 4, "name": "MASTER" },
     { "id": 5, "name": "ULTIMA" }
   ],
-  "is_const_unknown": [
-    { "value": false, "label": "確定" },
-    { "value": true, "label": "調査中" }
-  ],
   "account_types": [
     { "id": 1, "name": "PLAYER" },
     { "id": 2, "name": "EDITOR" },
     { "id": 3, "name": "ADMIN" }
+  ],
+  "versions": [
+    { "id": 1, "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
+    { "id": 2, "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
+    { "id": 3, "name": "CHUNITHM AIR", "released_at": "2016-08-25T00:00:00+09:00" }
   ]
 }
 ```
@@ -1191,8 +1192,8 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `genres` | MasterItemDTO[] | ジャンル一覧（ID順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（ID順） |
-| `is_const_unknown` | BooleanChoiceDTO[] | 定数不明の選択肢 |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
+| `versions` | VersionDTO[] | バージョン一覧（ID順） |
 
 **MasterItemDTO**:
 
@@ -1201,12 +1202,13 @@ curl -X POST \
 | `id` | int | マスタID |
 | `name` | string | マスタ名称 |
 
-**BooleanChoiceDTO**:
+**VersionDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `value` | bool | 真偽値 |
-| `label` | string | 表示ラベル |
+| `id` | int | バージョンID |
+| `name` | string | バージョン名称 |
+| `released_at` | string | リリース日時（ISO8601形式） |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
