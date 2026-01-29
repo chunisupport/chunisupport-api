@@ -302,6 +302,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	// chunirec互換APIルートの登録
 	// api.chunisupport.net/compat/chunirec/v2.0
 	chunirecGroup := e.Group("/compat/chunirec/v2.0")
+	// chunirec専用エラーハンドリング（最初に適用）
+	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミットはv1と同じ設定を適用
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
@@ -311,6 +313,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	))
 	{
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
+		chunirecGroup.GET("/music/show", handlers.Chunirec.GetMusicShow)
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
 	}
 }

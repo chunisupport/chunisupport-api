@@ -55,63 +55,79 @@ func ToMusicShowAllResponse(songs []*repository.SongWithCharts, masters *domainm
 	}
 
 	for _, s := range songs {
-		item := &MusicItemDTO{
-			Meta: MusicMetaDTO{
-				ID:      s.Song.DisplayID,
-				Title:   s.Song.Title,
-				Artist:  s.Song.Artist,
-				Release: nil,
-				BPM:     nil,
-			},
-			Data: MusicDataDTO{},
-		}
-
-		// Nullable fields handling
-		if s.Song.GenreID != nil {
-			if genreName, ok := genres[*s.Song.GenreID]; ok {
-				item.Meta.Genre = &genreName
-			}
-		}
-		if s.Song.ReleasedAt != nil {
-			dateStr := s.Song.ReleasedAt.Format("2006-01-02")
-			item.Meta.Release = &dateStr
-		}
-		if s.Song.BPM != nil {
-			bpmVal := float64(*s.Song.BPM)
-			item.Meta.BPM = &bpmVal
-		}
-
-		// Charts handling
-		for _, c := range s.Charts {
-			chartDTO := &ChartDataDTO{
-				Const:          float64(c.Const),
-				IsConstUnknown: c.IsConstUnknown,
-				Level:          calculateLevel(float64(c.Const)),
-			}
-
-			if c.Notes != nil {
-				maxCombo := int(*c.Notes)
-				chartDTO.MaxCombo = &maxCombo
-			}
-
-			switch c.DifficultyID {
-			case 1: // Basic
-				item.Data.BAS = chartDTO
-			case 2: // Advanced
-				item.Data.ADV = chartDTO
-			case 3: // Expert
-				item.Data.EXP = chartDTO
-			case 4: // Master
-				item.Data.MAS = chartDTO
-			case 5: // Ultima
-				item.Data.ULT = chartDTO
-			}
-		}
-
+		item := toMusicItemDTO(s, genres)
 		response = append(response, item)
 	}
 
 	return response
+}
+
+// ToMusicShowResponse は単一のドメインエンティティをDTOに変換します（配列ではなくオブジェクトを返す）
+func ToMusicShowResponse(song *repository.SongWithCharts, masters *domainmasterdata.SongMasters) *MusicItemDTO {
+	var genres map[int]string
+	if masters != nil {
+		genres = masters.GenreNamesByID
+	}
+
+	return toMusicItemDTO(song, genres)
+}
+
+// toMusicItemDTO は1曲のSongWithChartsをMusicItemDTOに変換する内部ヘルパー関数です
+func toMusicItemDTO(s *repository.SongWithCharts, genres map[int]string) *MusicItemDTO {
+	item := &MusicItemDTO{
+		Meta: MusicMetaDTO{
+			ID:      s.Song.DisplayID,
+			Title:   s.Song.Title,
+			Artist:  s.Song.Artist,
+			Release: nil,
+			BPM:     nil,
+		},
+		Data: MusicDataDTO{},
+	}
+
+	// Nullable fields handling
+	if s.Song.GenreID != nil {
+		if genreName, ok := genres[*s.Song.GenreID]; ok {
+			item.Meta.Genre = &genreName
+		}
+	}
+	if s.Song.ReleasedAt != nil {
+		dateStr := s.Song.ReleasedAt.Format("2006-01-02")
+		item.Meta.Release = &dateStr
+	}
+	if s.Song.BPM != nil {
+		bpmVal := float64(*s.Song.BPM)
+		item.Meta.BPM = &bpmVal
+	}
+
+	// Charts handling
+	for _, c := range s.Charts {
+		chartDTO := &ChartDataDTO{
+			Const:          float64(c.Const),
+			IsConstUnknown: c.IsConstUnknown,
+			Level:          calculateLevel(float64(c.Const)),
+		}
+
+		if c.Notes != nil {
+			maxCombo := int(*c.Notes)
+			chartDTO.MaxCombo = &maxCombo
+		}
+
+		switch c.DifficultyID {
+		case 1: // Basic
+			item.Data.BAS = chartDTO
+		case 2: // Advanced
+			item.Data.ADV = chartDTO
+		case 3: // Expert
+			item.Data.EXP = chartDTO
+		case 4: // Master
+			item.Data.MAS = chartDTO
+		case 5: // Ultima
+			item.Data.ULT = chartDTO
+		}
+	}
+
+	return item
 }
 
 // calculateLevel は定数から表記レベルを計算します

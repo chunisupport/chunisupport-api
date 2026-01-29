@@ -52,6 +52,34 @@ func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
+// GetMusicShow は指定されたDisplay IDの楽曲情報をchunirec互換形式で返します
+// GET /compat/chunirec/v2.0/music/show?id=xxx
+func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// クエリパラメータ id を取得
+	displayID := c.QueryParam("id")
+	if displayID == "" {
+		return apierror.ErrValidationFailed
+	}
+
+	// 楽曲を取得
+	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSongNotFound) {
+			return apierror.ErrSongNotFound
+		}
+		slog.Error("failed to get song", "displayID", displayID, "error", err)
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+
+	// DTOに変換
+	masters := h.masterCache.SongMasters()
+	response := ToMusicShowResponse(song, masters)
+
+	return c.JSON(http.StatusOK, response)
+}
+
 // GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
 // GET /compat/chunirec/v2.0/users/show
 func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
