@@ -154,7 +154,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
 		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, masterCache),
+		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, userRepo, db, masterCache),
 	}
 
 	// ルートの設定
@@ -311,6 +311,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	))
 	{
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
+		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
 	}
 }
 

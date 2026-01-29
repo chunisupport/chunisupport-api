@@ -112,6 +112,8 @@
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:songId` | GET | APIトークン | 楽曲詳細取得。 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
+| `/compat/chunirec/v2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
+| `/compat/chunirec/v2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得。 |
 
 ---
 
@@ -1455,6 +1457,114 @@ curl -X POST \
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
+
+## chunirec互換API `/compat/chunirec/v2.0`
+
+chunirec互換APIはchunirecとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
+
+### GET `/compat/chunirec/v2.0/music/showall`
+- **認証**: APIトークン必須
+- **概要**: WORLD'S END以外の全楽曲をchunirec互換形式で取得します（削除済み楽曲は除外）。
+- **レスポンス**: 200 OK
+
+```json
+[
+  {
+    "meta": {
+      "id": "0000000000000001",
+      "title": "楽曲名",
+      "genre": "POPS & ANIME",
+      "artist": "アーティスト名",
+      "release": "2015-07-16",
+      "bpm": 180.0
+    },
+    "data": {
+      "MAS": {
+        "level": 14.5,
+        "const": 14.5,
+        "maxcombo": 1234,
+        "is_const_unknown": false
+      },
+      "BAS": {
+        "level": 8.0,
+        "const": 8.5,
+        "maxcombo": 456,
+        "is_const_unknown": false
+      }
+    }
+  }
+]
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `meta.id` | string | 楽曲の識別ID（16桁） |
+| `meta.title` | string | 楽曲名 |
+| `meta.genre` | string\|null | ジャンル名 |
+| `meta.artist` | string | アーティスト名 |
+| `meta.release` | string\|null | リリース日（YYYY-MM-DD形式） |
+| `meta.bpm` | number\|null | BPM |
+| `data.BAS` | object\|null | BASIC譜面データ |
+| `data.ADV` | object\|null | ADVANCED譜面データ |
+| `data.EXP` | object\|null | EXPERT譜面データ |
+| `data.MAS` | object\|null | MASTER譜面データ |
+| `data.ULT` | object\|null | ULTIMA譜面データ |
+| `data.*.level` | number | 表記レベル（.0または.5） |
+| `data.*.const` | number | 譜面定数 |
+| `data.*.maxcombo` | number\|null | ノーツ数 |
+| `data.*.is_const_unknown` | boolean | 定数が推定値の場合true |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/compat/chunirec/v2.0/users/show`
+- **認証**: APIトークン必須
+- **概要**: 指定されたユーザーのプロフィールをchunirec互換形式で取得します。
+- **クエリパラメータ**:
+  - `user_name` (string, optional): 取得対象のユーザー名。未指定の場合はAPIトークン所有者のプロフィールを返します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "user_id": 283,
+  "player_name": "Ｕ＋ＦＦ３１",
+  "title": "邪気眼",
+  "title_rarity": "platinum",
+  "level": 229,
+  "rating": "17.23",
+  "rating_max": "17.23",
+  "classemblem": "inf",
+  "classemblem_base": null,
+  "is_joined_team": null,
+  "updated_at": "2026-01-24T18:39:52+09:00"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `user_id` | number | 内部ユーザーID |
+| `player_name` | string | プレイヤー名 |
+| `title` | string\|null | 1番目の称号（スロット1） |
+| `title_rarity` | string\|null | 1番目の称号のレアリティ（normal, copper, silver, gold, platinum, rainbow等）。ChuniSupport内部では"platina"を"platinum"に変換 |
+| `level` | number | プレイヤーレベル |
+| `rating` | string\|null | レーティング（小数点以下2桁の文字列） |
+| `rating_max` | string\|null | 最大レーティング（現在はratingと同じ値） |
+| `classemblem` | string\|null | クラスエンブレム（"1", "2", "3", "4", "5", "inf"） |
+| `classemblem_base` | string\|null | クラスエンブレムベース（"1", "2", "3", "4", "5", "inf"） |
+| `is_joined_team` | null | チーム参加状態（ChuniSupportでは保持しないため常にnull） |
+| `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー・プレイヤー未紐付けを含む）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
 
 フロントエンド開発の参考として、主要なDTO型をTypeScriptで定義した例を示します。
 

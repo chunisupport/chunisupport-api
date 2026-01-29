@@ -1,10 +1,13 @@
 package chunirec
 
 import (
+	"fmt"
 	"math"
 
 	domainmasterdata "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 )
 
 // MusicShowAllResponse は全楽曲情報のレスポンスを表します
@@ -122,4 +125,86 @@ func calculateLevel(constant float64) float64 {
 		return intPart + 0.5
 	}
 	return intPart
+}
+
+// ChunirecUserDTO はchunirec互換のユーザープロフィールを表します
+type ChunirecUserDTO struct {
+	UserID          int     `json:"user_id"`
+	PlayerName      string  `json:"player_name"`
+	Title           *string `json:"title"`
+	TitleRarity     *string `json:"title_rarity"`
+	Level           int     `json:"level"`
+	Rating          *string `json:"rating"`
+	RatingMax       *string `json:"rating_max"`
+	ClassEmblem     *string `json:"classemblem"`
+	ClassEmblemBase *string `json:"classemblem_base"`
+	IsJoinedTeam    *bool   `json:"is_joined_team"` // 常にnil（ChuniSupportでは保持しない）
+	UpdatedAt       string  `json:"updated_at"`
+}
+
+// ToChunirecUserDTO は内部APIのUserProfileWithRecordsDTOをchunirec互換形式に変換します
+func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, userID int, masterCache *masterdata.Cache) *ChunirecUserDTO {
+	if profile == nil || profile.Player == nil {
+		return nil
+	}
+
+	dto := &ChunirecUserDTO{
+		UserID:       userID,
+		PlayerName:   profile.Player.Name,
+		Level:        profile.Player.Level,
+		IsJoinedTeam: nil, // ChuniSupportでは保持しないデータ
+		UpdatedAt:    profile.Player.UpdatedAt.Format("2006-01-02T15:04:05-07:00"),
+	}
+
+	// Rating を文字列化（nullならnullのまま）
+	if profile.Player.Rating != nil {
+		ratingStr := formatRating(*profile.Player.Rating)
+		dto.Rating = &ratingStr
+		dto.RatingMax = &ratingStr // rating_max は rating と同じ
+	}
+
+	// ClassEmblem の名前を取得
+	if profile.Player.ClassEmblemID != nil && masterCache != nil {
+		emblemName := masterCache.GetClassEmblemNameByID(*profile.Player.ClassEmblemID)
+		if emblemName != "" {
+			dto.ClassEmblem = &emblemName
+		}
+	}
+
+	// ClassEmblemBase の名前を取得
+	if profile.Player.ClassEmblemBaseID != nil && masterCache != nil {
+		emblemBaseName := masterCache.GetClassEmblemBaseNameByID(*profile.Player.ClassEmblemBaseID)
+		if emblemBaseName != "" {
+			dto.ClassEmblemBase = &emblemBaseName
+		}
+	}
+
+	// 1番目の称号（スロット1）を取得
+	if len(profile.Player.Honors) > 0 {
+		for _, honor := range profile.Player.Honors {
+			if honor.Slot == 1 {
+				dto.Title = &honor.Name
+				// "platina" のみ "platinum" に変換
+				rarity := honor.TypeName
+				if rarity == "platina" {
+					rarity = "platinum"
+				}
+				dto.TitleRarity = &rarity
+				break
+			}
+		}
+	}
+
+	return dto
+}
+
+// formatRating はレーティングを小数点以下2桁の文字列にフォーマットします
+func formatRating(rating float64) string {
+	return formatFloat(rating, 2)
+}
+
+// formatFloat は浮動小数点数を指定した小数点以下の桁数で文字列にフォーマットします
+func formatFloat(value float64, precision int) string {
+	format := "%." + string(rune('0'+precision)) + "f"
+	return fmt.Sprintf(format, value)
 }

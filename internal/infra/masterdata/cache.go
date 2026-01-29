@@ -222,3 +222,31 @@ func (c *Cache) SongMasters() *domainmasterdata.SongMasters {
 		GenreNamesByID: maps.Clone(c.GenreNamesByID),
 	}
 }
+
+// GetClassEmblemNameByID はIDからClassEmblem名を取得します。
+// 見つからない場合は空文字列を返します。
+func (c *Cache) GetClassEmblemNameByID(id int) string {
+	if c == nil {
+		return ""
+	}
+	for _, item := range c.ClassEmblems {
+		if item.ID == id {
+			return item.Name
+		}
+	}
+	return ""
+}
+
+// GetClassEmblemBaseNameByID はIDからClassEmblemBase名を取得します。
+// 見つからない場合は空文字列を返します。
+func (c *Cache) GetClassEmblemBaseNameByID(id int) string {
+	if c == nil {
+		return ""
+	}
+	for _, item := range c.ClassEmblemBases {
+		if item.ID == id {
+			return item.Name
+		}
+	}
+	return ""
+}
