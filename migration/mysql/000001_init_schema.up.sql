@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS player_honors (
 
 -- セッションテーブル
 CREATE TABLE IF NOT EXISTS sessions (
-    id VARCHAR(255) PRIMARY KEY, -- セッションID (例: UUID)
+    id BINARY(16) PRIMARY KEY, -- セッションID (UUID BINARY(16)形式)
     user_id INT UNSIGNED NOT NULL, -- ユーザーID
     expires_at TIMESTAMP NOT NULL, -- セッションの有効期限
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- 作成日時
