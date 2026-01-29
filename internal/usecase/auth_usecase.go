@@ -365,6 +365,7 @@ func (s *authService) Login(ctx context.Context, usernameStr, password string) (
 }
 
 // createSessionAndToken はセッションを作成しJWTトークンを生成して返します。
+// セッション数が上限（info.MaxSessionsPerUser）を超える場合、最も古いセッションから削除します。
 func (s *authService) createSessionAndToken(ctx context.Context, user *entity.User) (string, error) {
 	sessionID, err := uuid.NewRandom()
 	if err != nil {
@@ -377,6 +378,12 @@ func (s *authService) createSessionAndToken(ctx context.Context, user *entity.Us
 	}
 	if err := s.sessionRepo.Create(ctx, s.db, session); err != nil {
 		return "", err
+	}
+
+	// セッション数制限: 上限を超えたら古いセッションを削除
+	if err := s.sessionRepo.DeleteOldestSessionsOverLimit(ctx, s.db, user.ID, info.MaxSessionsPerUser); err != nil {
+		slog.Error("Failed to delete oldest sessions", "user_id", user.ID, "error", err)
+		// セッション削除の失敗は致命的ではないため、処理を続行
 	}
 
 	// SessionIDを含むJWTを生成

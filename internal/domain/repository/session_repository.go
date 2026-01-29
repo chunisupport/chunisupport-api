@@ -18,4 +18,6 @@ type SessionRepository interface {
 	CountByUserID(ctx context.Context, exec Executor, userID int) (int, error)
 	// DeleteByUserIDExcept は指定されたセッションID以外のユーザーのセッションを全て削除します。
 	DeleteByUserIDExcept(ctx context.Context, exec Executor, userID int, excludeSessionID string) error
+	// DeleteOldestSessionsOverLimit は指定されたユーザーのセッション数が上限を超えている場合、古い順に削除します。
+	DeleteOldestSessionsOverLimit(ctx context.Context, exec Executor, userID int, maxCount int) error
 }

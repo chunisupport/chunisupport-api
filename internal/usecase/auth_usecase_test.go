@@ -135,6 +135,11 @@ func (m *MockSessionRepository) DeleteByUserIDExcept(ctx context.Context, exec r
 	return args.Error(0)
 }
 
+func (m *MockSessionRepository) DeleteOldestSessionsOverLimit(ctx context.Context, exec repository.Executor, userID int, maxCount int) error {
+	args := m.Called(ctx, exec, userID, maxCount)
+	return args.Error(0)
+}
+
 // MockRecoveryCodeRepository はRecoveryCodeRepositoryのモックです。
 type MockRecoveryCodeRepository struct {
 	mock.Mock
@@ -189,6 +194,7 @@ func TestAuthService_Register(t *testing.T) {
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, sql.ErrNoRows).Once()
 		mockUserRepo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
+		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
 
 		userDTO, token, err := authService.Register(context.Background(), "testuser", "password")
 		assert.NoError(t, err)
@@ -205,6 +211,22 @@ func TestAuthService_Register(t *testing.T) {
 		_, _, err := authService.Register(context.Background(), "existinguser", "password")
 		assert.ErrorIs(t, err, ErrUsernameTaken)
 		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("正常系: セッション数制限が機能する", func(t *testing.T) {
+		// ユーザー登録時にセッション作成を行い、上限を超えた場合に古いセッションが削除されることを確認
+		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "sessionlimituser").Return(nil, sql.ErrNoRows).Once()
+		mockUserRepo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
+		// DeleteOldestSessionsOverLimitが呼ばれ、MaxSessionsPerUserが渡されることを確認
+		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
+
+		userDTO, token, err := authService.Register(context.Background(), "sessionlimituser", "password")
+		assert.NoError(t, err)
+		assert.NotNil(t, userDTO)
+		assert.NotEmpty(t, token)
+		mockUserRepo.AssertExpectations(t)
+		mockSessionRepo.AssertExpectations(t)
 	})
 }
 
@@ -336,6 +358,7 @@ func TestAuthService_Login(t *testing.T) {
 
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(mockUser, nil).Once()
 		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
+		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
 
 		token, err := authService.Login(context.Background(), "testuser", "password")
 		assert.NoError(t, err)

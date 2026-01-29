@@ -58,3 +58,23 @@ func (r *sessionRepository) DeleteByUserIDExcept(ctx context.Context, exec repos
 	_, err := exec.ExecContext(ctx, query, userID, excludeSessionID)
 	return err
 }
+
+// DeleteOldestSessionsOverLimit は指定されたユーザーのセッション数が上限を超えている場合、古い順に削除します。
+// maxCountより新しいセッションを残し、それより古いセッションをcreated_atの昇順で削除します。
+func (r *sessionRepository) DeleteOldestSessionsOverLimit(ctx context.Context, exec repository.Executor, userID int, maxCount int) error {
+	// 有効なセッションのみを対象とし、created_atで降順ソートして最新maxCount件を残すサブクエリを作成
+	query := `
+		DELETE FROM sessions 
+		WHERE user_id = ? 
+		  AND expires_at > NOW()
+		  AND id NOT IN (
+			SELECT id FROM (
+			  SELECT id FROM sessions 
+			  WHERE user_id = ? AND expires_at > NOW() 
+			  ORDER BY created_at DESC 
+			  LIMIT ?
+			) AS keep_sessions
+		  )`
+	_, err := exec.ExecContext(ctx, query, userID, userID, maxCount)
+	return err
+}
