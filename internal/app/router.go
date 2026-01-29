@@ -300,8 +300,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	}
 
 	// chunirec互換APIルートの登録
-	// api.chunisupport.net/compat/chunirec/v2.0
-	chunirecGroup := e.Group("/compat/chunirec/v2.0")
+	// api.chunisupport.net/compat/chunirec/2.0
+	chunirecGroup := e.Group("/compat/chunirec/2.0")
 	// chunirec専用エラーハンドリング（最初に適用）
 	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))

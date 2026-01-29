@@ -55,8 +55,8 @@ func handleChunirecError(err error, c echo.Context) {
 	logChunirecError(httpStatus, err, c)
 
 	// chunirec互換形式でエラーレスポンスを送信
-	// 注意: chunirec API v2.0の仕様に準拠するため、以下の6パターンのステータスコードのみをサポートします。
-	// chunirec API v2.0は既に更新が終了しており、仕様変更の可能性はありません。
+	// 注意: chunirec API 2.0の仕様に準拠するため、以下の6パターンのステータスコードのみをサポートします。
+	// chunirec API 2.0は既に更新が終了しており、仕様変更の可能性はありません。
 	// 対応するHTTPステータスコード: 400, 404, 405, 429, 503
 	// それ以外のステータスコードは503として処理されます。
 	var errorResponse ChunirecErrorResponse

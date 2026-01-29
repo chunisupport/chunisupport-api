@@ -27,9 +27,9 @@ func NewChunirecErrorResponse(statusCode int, additionalMessage string) Chunirec
 
 // getMessageForStatusCode はHTTPステータスコードに対応するメッセージを返します
 //
-// 注意: chunirec API v2.0の仕様に準拠するため、以下のメッセージはハードコードされています。
-// chunirec API v2.0は既に更新が終了しており、仕様変更の可能性はありません。
-// 将来的にchunirec側で仕様が変更された場合は、新しいバージョン（v3.0等）として実装します。
+// 注意: chunirec API 2.0の仕様に準拠するため、以下のメッセージはハードコードされています。
+// chunirec API 2.0は既に更新が終了しており、仕様変更の可能性はありません。
+// 将来的にchunirec側で仕様が変更された場合は、新しいバージョン（3.0等）として実装します。
 // 対応するHTTPステータスコード: 400, 404, 405, 429, 503
 func getMessageForStatusCode(statusCode int) string {
 	switch statusCode {

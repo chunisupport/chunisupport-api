@@ -35,7 +35,7 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 }
 
 // GetMusicShowAll は全楽曲情報をchunirec互換形式で返します
-// GET /compat/chunirec/v2.0/music/showall
+// GET /compat/chunirec/2.0/music/showall
 func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -53,7 +53,7 @@ func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 }
 
 // GetMusicShow は指定されたDisplay IDの楽曲情報をchunirec互換形式で返します
-// GET /compat/chunirec/v2.0/music/show?id=xxx
+// GET /compat/chunirec/2.0/music/show?id=xxx
 func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -81,7 +81,7 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 }
 
 // GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
-// GET /compat/chunirec/v2.0/users/show
+// GET /compat/chunirec/2.0/users/show
 func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 	ctx := c.Request().Context()
 
