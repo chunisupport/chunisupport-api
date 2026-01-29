@@ -41,7 +41,7 @@ func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, overpower_percentage, team_name, team_color,
+			overpower_value, overpower_percentage,
 			created_at, updated_at
 		FROM players
 		WHERE id = ?
@@ -115,7 +115,7 @@ func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Exe
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, overpower_percentage, team_name, team_color,
+			overpower_value, overpower_percentage,
 			created_at, updated_at
 		FROM players
 		WHERE user_id = ?
