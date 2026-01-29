@@ -81,7 +81,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 -- 楽曲枠マスタ
 CREATE TABLE IF NOT EXISTS slots (
     id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(30) NOT NULL UNIQUE
+    name VARCHAR(25) NOT NULL UNIQUE
 );
 INSERT INTO slots (name) VALUES
     ('none'),
@@ -94,7 +94,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 -- フルチェインランプマスタ
 CREATE TABLE IF NOT EXISTS full_chain_types (
     id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(20) NOT NULL UNIQUE
+    name VARCHAR(25) NOT NULL UNIQUE
 );
 INSERT INTO full_chain_types (name) VALUES
     ('NONE'),
@@ -105,7 +105,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 -- 称号種類マスタ
 CREATE TABLE IF NOT EXISTS honor_types (
     id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL UNIQUE
+    name VARCHAR(20) NOT NULL UNIQUE
 );
 INSERT INTO honor_types (name) VALUES
     ('normal'),
@@ -129,7 +129,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 -- アカウントタイプマスタ
 CREATE TABLE IF NOT EXISTS account_types (
     id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(20) NOT NULL UNIQUE
+    name VARCHAR(15) NOT NULL UNIQUE
 );
 INSERT INTO account_types (name) VALUES
     ('PLAYER'),
@@ -224,8 +224,6 @@ CREATE TABLE IF NOT EXISTS players (
     last_played_at DATETIME NULL,
     overpower_value DECIMAL(8, 2) NULL,
     overpower_percentage DECIMAL(5, 2) NULL,
-    team_name VARCHAR(50) NULL,
-    team_color VARCHAR(20) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (class_emblem_id) REFERENCES class_emblems(id),

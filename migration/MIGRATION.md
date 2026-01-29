@@ -70,7 +70,6 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`, `overpower_percentage`: オーバーパワー関連の値。
-    - `team_name`, `team_color`: チーム情報。
     - `created_at`, `updated_at`: 作成日時、更新日時。
 
 #### `player_records`

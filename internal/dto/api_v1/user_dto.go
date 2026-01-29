@@ -27,8 +27,6 @@ type V1PlayerDTO struct {
 	LastPlayedAt      *time.Time    `json:"last_played_at"`
 	OverpowerValue    *float64      `json:"overpower_value"`
 	OverpowerPercent  *float64      `json:"overpower_percent"`
-	TeamName          *string       `json:"team_name"`
-	TeamColor         *string       `json:"team_color"`
 	Honors            []*V1HonorDTO `json:"honors"`
 	CreatedAt         time.Time     `json:"created_at"`
 	UpdatedAt         time.Time     `json:"updated_at"`
@@ -104,8 +102,6 @@ func ToV1PlayerDTO(player *entity.Player) *V1PlayerDTO {
 		LastPlayedAt:      player.LastPlayedAt,
 		OverpowerValue:    player.OverpowerValue,
 		OverpowerPercent:  player.OverpowerPercent,
-		TeamName:          player.TeamName,
-		TeamColor:         player.TeamColor,
 		Honors:            []*V1HonorDTO{},
 		CreatedAt:         player.CreatedAt,
 		UpdatedAt:         player.UpdatedAt,
@@ -220,8 +216,6 @@ func ToV1UserProfileDTO(profile *api_internal.UserProfileWithRecordsDTO) *V1User
 			LastPlayedAt:      profile.Player.LastPlayedAt,
 			OverpowerValue:    profile.Player.OverpowerValue,
 			OverpowerPercent:  profile.Player.OverpowerPercent,
-			TeamName:          profile.Player.TeamName,
-			TeamColor:         profile.Player.TeamColor,
 			Honors:            make([]*V1HonorDTO, len(profile.Player.Honors)),
 			CreatedAt:         profile.Player.CreatedAt,
 			UpdatedAt:         profile.Player.UpdatedAt,

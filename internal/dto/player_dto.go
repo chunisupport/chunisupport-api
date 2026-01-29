@@ -24,8 +24,6 @@ type PlayerDTO struct {
 	LastPlayedAt      *time.Time  `json:"last_played_at"`
 	OverpowerValue    *float64    `json:"overpower_value"`
 	OverpowerPercent  *float64    `json:"overpower_percent"`
-	TeamName          *string     `json:"team_name"`
-	TeamColor         *string     `json:"team_color"`
 	Honors            []*HonorDTO `json:"honors"` // 称号情報（スロット順）
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
@@ -47,8 +45,6 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 		LastPlayedAt:      player.LastPlayedAt,
 		OverpowerValue:    player.OverpowerValue,
 		OverpowerPercent:  player.OverpowerPercent,
-		TeamName:          player.TeamName,
-		TeamColor:         player.TeamColor,
 		Honors:            []*HonorDTO{}, // 空のスライスで初期化（nullを避ける）
 		CreatedAt:         player.CreatedAt,
 		UpdatedAt:         player.UpdatedAt,

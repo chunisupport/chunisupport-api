@@ -113,8 +113,6 @@ type PlayerDataSummaryInput struct {
 	LastPlayedAt     *time.Time
 	OverpowerValue   *float64
 	OverpowerPercent *float64
-	TeamName         *string
-	TeamColor        *string
 	ClassEmblemID    *int
 	ClassBaseID      *int
 }

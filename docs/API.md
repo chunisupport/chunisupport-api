@@ -722,8 +722,6 @@ curl -X POST \
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27,
-    "team_name": "チーム名",
-    "team_color": "green",
     "honors": [
       { "slot": 1, "name": "称号名（上段）", "type_name": "gold", "image_url": "https://..." },
       { "slot": 2, "name": "称号名（中段）", "type_name": "platina", "image_url": "https://..." },
@@ -1411,8 +1409,6 @@ curl -X POST \
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
-    "team_name": "チーム名",
-    "team_color": "#FF5500",
     "honors": [
       {
         "slot": 1,
@@ -1496,8 +1492,6 @@ interface PlayerDTO {
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
-  team_name: string | null;
-  team_color: string | null;
   honors: HonorDTO[];
   created_at: string;
   updated_at: string;

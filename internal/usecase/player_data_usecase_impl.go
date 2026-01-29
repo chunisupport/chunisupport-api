@@ -206,9 +206,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	overpowerValue := payload.Overpower.Value
 	overpowerPercent := payload.Overpower.Percentage
 
-	teamName := strings.TrimSpace(payload.Team.Name)
-	teamColor := strings.TrimSpace(payload.Team.Color)
-
 	summaryInput := &PlayerDataSummaryInput{
 		Name:             nameVO.String(),
 		Level:            payload.Level,
@@ -216,12 +213,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		LastPlayedAt:     lastPlayedAt,
 		OverpowerValue:   &overpowerValue,
 		OverpowerPercent: &overpowerPercent,
-	}
-	if teamName != "" {
-		summaryInput.TeamName = &teamName
-	}
-	if teamColor != "" {
-		summaryInput.TeamColor = &teamColor
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -408,8 +399,6 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		LastPlayedAt:      summary.LastPlayedAt,
 		OverpowerValue:    summary.OverpowerValue,
 		OverpowerPercent:  summary.OverpowerPercent,
-		TeamName:          summary.TeamName,
-		TeamColor:         summary.TeamColor,
 		UpdatedAt:         updatedAt,
 	}
 

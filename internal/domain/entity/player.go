@@ -22,8 +22,6 @@ type Player struct {
 	LastPlayedAt      *time.Time            // 最終プレイ日時
 	OverpowerValue    *float64              // オーバーパワー値
 	OverpowerPercent  *float64              // オーバーパワー割合
-	TeamName          *string               // 所属チーム名
-	TeamColor         *string               // 所属チームカラー
 	CreatedAt         time.Time             // 作成日時
 	UpdatedAt         time.Time             // 更新日時
 	Users             *User                 // このプレイヤーに紐づくユーザー

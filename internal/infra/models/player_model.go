@@ -22,8 +22,6 @@ type PlayerModel struct {
 	LastPlayedAt      *time.Time `db:"last_played_at"`
 	OverpowerValue    *float64   `db:"overpower_value"`
 	OverpowerPercent  *float64   `db:"overpower_percentage"`
-	TeamName          *string    `db:"team_name"`
-	TeamColor         *string    `db:"team_color"`
 	CreatedAt         time.Time  `db:"created_at"`
 	UpdatedAt         time.Time  `db:"updated_at"`
 }
@@ -49,8 +47,6 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		LastPlayedAt:      m.LastPlayedAt,
 		OverpowerValue:    m.OverpowerValue,
 		OverpowerPercent:  m.OverpowerPercent,
-		TeamName:          m.TeamName,
-		TeamColor:         m.TeamColor,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}, nil
@@ -72,8 +68,6 @@ func FromPlayerEntity(e *entity.Player) *PlayerModel {
 		LastPlayedAt:      e.LastPlayedAt,
 		OverpowerValue:    e.OverpowerValue,
 		OverpowerPercent:  e.OverpowerPercent,
-		TeamName:          e.TeamName,
-		TeamColor:         e.TeamColor,
 		CreatedAt:         e.CreatedAt,
 		UpdatedAt:         e.UpdatedAt,
 	}

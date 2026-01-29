@@ -145,13 +145,13 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 		INSERT INTO players (
 			user_id, player_name, player_level, official_player_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, overpower_percentage, team_name, team_color, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			overpower_value, overpower_percentage, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	result, err := exec.ExecContext(ctx, query,
 		player.UserID, player.Name.String(), player.Level, player.OfficialRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
-		player.OverpowerValue, player.OverpowerPercent, player.TeamName, player.TeamColor, player.UpdatedAt,
+		player.OverpowerValue, player.OverpowerPercent, player.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -176,15 +176,13 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		    last_played_at = ?,
 		    overpower_value = ?,
 		    overpower_percentage = ?,
-		    team_name = ?,
-		    team_color = ?,
 		    updated_at = ?
 		WHERE id = ?
 	`
 	_, err := exec.ExecContext(ctx, query,
 		player.Name.String(), player.Level, player.OfficialRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
-		player.OverpowerValue, player.OverpowerPercent, player.TeamName, player.TeamColor, player.UpdatedAt,
+		player.OverpowerValue, player.OverpowerPercent, player.UpdatedAt,
 		player.ID,
 	)
 	return err
