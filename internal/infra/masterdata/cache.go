@@ -250,3 +250,17 @@ func (c *Cache) GetClassEmblemBaseNameByID(id int) string {
 	}
 	return ""
 }
+
+// GetAccountTypeNameByID はIDからAccountType名を取得します。
+// 見つからない場合は"UNKNOWN"を返します。
+func (c *Cache) GetAccountTypeNameByID(id int) string {
+	if c == nil {
+		return "UNKNOWN"
+	}
+	for _, item := range c.AccountTypes {
+		if item.ID == id {
+			return item.Name
+		}
+	}
+	return "UNKNOWN"
+}

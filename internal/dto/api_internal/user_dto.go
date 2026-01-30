@@ -5,7 +5,6 @@ import (
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/dto"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 )
 
 // UserProfileWithRecordsDTO はユーザープロファイルとレコードを統合したDTOです。
@@ -42,27 +41,15 @@ type UserDTO struct {
 }
 
 // ToUserDTO はエンティティからDTOへ変換します。
-func ToUserDTO(user *entity.User, masterCache *masterdata.Cache, lastScoreUpdate *time.Time) *UserDTO {
+// accountTypeNameはUsecase層で解決された値を受け取ります。
+func ToUserDTO(user *entity.User, accountTypeName string, lastScoreUpdate *time.Time) *UserDTO {
 	if user == nil {
 		return nil
 	}
 
 	return &UserDTO{
 		Username:        user.Username.String(),
-		AccountType:     getAccountTypeName(user.AccountTypeID, masterCache),
+		AccountType:     accountTypeName,
 		LastScoreUpdate: lastScoreUpdate,
 	}
-}
-
-// getAccountTypeName はアカウントタイプIDから名前を取得します。
-func getAccountTypeName(accountTypeID int, masterCache *masterdata.Cache) string {
-	if masterCache == nil {
-		return "UNKNOWN"
-	}
-	for _, item := range masterCache.AccountTypes {
-		if item.ID == accountTypeID {
-			return item.Name
-		}
-	}
-	return "UNKNOWN"
 }

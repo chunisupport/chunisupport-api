@@ -19,7 +19,6 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/username"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/info"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 	"github.com/Qman110101/chunisupport-api/internal/utils"
 	"github.com/google/uuid"
 )
@@ -59,11 +58,11 @@ type authService struct {
 	jwtExpirationHour     int
 	sessionExpirationHour int
 	pepper                string
-	masterCache           *masterdata.Cache
+	masterCache           repository.AccountTypeMasterProvider
 }
 
 // NewAuthService は新しいAuthUsecaseを生成します。
-func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, playerRecordRepo repository.PlayerRecordRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache *masterdata.Cache) AuthUsecase {
+func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, playerRecordRepo repository.PlayerRecordRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache repository.AccountTypeMasterProvider) AuthUsecase {
 	return &authService{
 		db:                    db,
 		tm:                    tm,
@@ -129,7 +128,8 @@ func (s *authService) Register(ctx context.Context, usernameStr, password string
 	}
 
 	// 登録直後はレコードが存在しないため、last_score_updateはnil
-	return api_internal.ToUserDTO(user, s.masterCache, nil), token, nil
+	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
+	return api_internal.ToUserDTO(user, accountTypeName, nil), token, nil
 }
 
 // UpdatePrivacy はユーザーの非公開設定を更新します。
@@ -470,7 +470,8 @@ func (s *authService) GetUser(ctx context.Context, id int) (*api_internal.UserDT
 		}
 	}
 
-	return api_internal.ToUserDTO(user, s.masterCache, lastScoreUpdate), nil
+	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
+	return api_internal.ToUserDTO(user, accountTypeName, lastScoreUpdate), nil
 }
 
 // convertUsernameError はユーザー名のバリデーションエラーを適切なエラーに変換します。

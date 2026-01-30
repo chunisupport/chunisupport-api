@@ -13,3 +13,9 @@ type PlayerDataMasterProvider interface {
 type SongMasterProvider interface {
 	SongMasters() *masterdata.SongMasters
 }
+
+// AccountTypeMasterProvider は、アカウントタイプ情報を提供します。
+// Interface Segregation Principleに従い、AuthUsecaseが必要とするメソッドのみを定義します。
+type AccountTypeMasterProvider interface {
+	GetAccountTypeNameByID(id int) string
+}
