@@ -54,6 +54,8 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **OPS-002** | **Medium** | セッション期限切れの定期クリーンアップがない | `expires_at < NOW()` の定期削除ジョブ、またはメンテナンスAPIを導入。 |
+| **OPS-003** | **Low** | リクエストIDの欠如 | ログにリクエストを一意に識別するID（X-Request-ID等）が付与されておらず、分散環境でのトレーサビリティが低い。 |
+| **OPS-004** | **Low** | DBクエリタイムアウトの未設定 | リクエストContextはDB操作に渡されているが、明示的なクエリタイムアウト設定がない。 |
 
 ### API設計・入力検証 (API)
 
@@ -73,6 +75,11 @@
 | **QUAL-006** | **Medium** | コンストラクタのエラー無視 | `toChartEntity` 等で値オブジェクトの生成エラーを無視している。不整合なエンティティが生成されるリスク。 |
 | **QUAL-007** | **Medium** | 論理削除の連動ロジック不足 | ユーザーの論理削除時に、DB制約（CASCADE）が効かない関連データ（将来的なフレンド等）を無効化する仕組みが未整備。 |
 | **QUAL-008** | **Low** | 自明なコードに対する冗長なコメント | `toSongEntity` 等、コードから明らかな変換処理を日本語で説明しているコメントが散見される。 |
+| **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
+| **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
+| **QUAL-011** | **Medium** | Value Objectの `Must` 系関数の実装でpanic使用 | `MustNewUserName`, `MustNewPasswordHash` 等がテスト以外でも呼ばれる可能性がある箇所で `panic` を使用。 |
+| **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
+| **QUAL-013** | **Low** | goroutineのgraceful shutdown未対応 | `rate_limit_middleware.go` 内のクリーンアップgoroutineが永続的に動作し、アプリ終了時に停止する仕組みがない。 |
 
 ---
 
@@ -200,6 +207,70 @@
 
 ---
 
+### QUAL-009: Usecase層でのインフラ層エラー直接参照
+- **根拠**:
+  - `internal/usecase/worldsend_usecase.go`, `internal/usecase/auth_usecase.go` 等で `database/sql` パッケージの `sql.ErrNoRows` を直接 `errors.Is()` で判定している。
+  - 例: `if errors.Is(err, sql.ErrNoRows) { return repository.ErrSongNotFound }`
+- **影響範囲**:
+  - Usecase層がインフラ層の実装詳細（SQLドライバーのエラー型）に依存しており、クリーンアーキテクチャの依存方向に違反。
+  - リポジトリ実装を別のストレージ（NoSQL等）に変更した場合、Usecase層も修正が必要になる。
+- **修正案**:
+  - リポジトリ層で `sql.ErrNoRows` をドメイン層で定義されたエラー（例: `repository.ErrNotFound`）に変換して返す。
+  - Usecase層では `sql.ErrNoRows` をインポートせず、ドメインエラーのみを扱う。
+
+---
+
+### QUAL-010: Domain層のExecutorインターフェースがsqlxに依存
+- **根拠**:
+  - `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を戻り値の型として使用している。
+  - ドメイン層が `github.com/jmoiron/sqlx` をインポートしている。
+- **影響範囲**:
+  - Clean Architectureの原則に反し、ドメイン層がインフラ層の実装詳細に依存。
+  - リポジトリのモックを作成する際にsqlxの型に依存することになり、テスタビリティが低下。
+- **修正案**:
+  - `Executor` インターフェースをインフラ層に移動するか、戻り値を抽象化してドメイン層からsqlx依存を排除。
+  - ただし影響範囲が大きいため、現状の妥協として許容し、将来的なリファクタリング対象とする選択肢もある。
+
+---
+
+### QUAL-011: Value Objectの `Must` 系関数でのpanic使用
+- **根拠**:
+  - `internal/domain/vo/username/username.go`, `internal/domain/vo/playername/playername.go`, `internal/domain/vo/passwordhash/passwordhash.go` の `Must` 系関数が `panic` を使用。
+- **影響範囲**:
+  - これらの関数がテスト以外の実行パスで誤って使用された場合、アプリケーションがクラッシュする。
+  - 現状テストコードでのみ使用されているが、将来的な誤用リスクがある。
+- **修正案**:
+  - `Must` 系関数に `// テストコード専用。本番コードでは使用禁止。` などのコメントを明記。
+  - lintルールで `Must` 関数の本番コードでの使用を検出することも検討。
+
+---
+
+### QUAL-012: ハンドラーでのValidate呼び出し漏れ
+- **根拠**:
+  - `internal/app/handler/api_internal/auth_handler.go` の `authRequest`, `changePasswordRequest`, `recoveryCodeRecoverRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。
+  - 他のハンドラー（`song_handler.go`, `player_handler.go`）では `c.Validate()` が呼ばれている。
+- **影響範囲**:
+  - 入力検証のアプローチが統一されておらず、バリデーション漏れのリスクがある。
+  - 例えば `authRequest` ではユーザー名やパスワードの長さチェックをUsecase層で個別に行っているが、これはHandler/DTO層で統一的に行うべき。
+- **修正案**:
+  - 全リクエスト構造体に適切な `validate` タグを追加。
+  - Bindの直後に `c.Validate()` を呼ぶパターンを全ハンドラーで統一。
+
+---
+
+### QUAL-013: goroutineのgraceful shutdown未対応
+- **根拠**:
+  - `internal/app/middleware/rate_limit_middleware.go` の `APIRateLimitMiddleware`, `IPRateLimitMiddleware`, `AnonymousIPRateLimitMiddleware` でバックグラウンドgoroutineを起動し、`time.Ticker` で定期クリーンアップを実行している。
+  - これらのgoroutineにはコンテキストキャンセルやシャットダウン通知の仕組みがない。
+- **影響範囲**:
+  - アプリケーション終了時にgoroutineが適切に停止せず、リソースリークやgraceful shutdownの完了遅延の原因となる可能性。
+  - 現状は軽微な問題だが、より厳密なリソース管理が求められる環境では問題になりうる。
+- **修正案**:
+  - `context.Context` または `chan struct{}` を使ってgoroutineに終了シグナルを送る仕組みを追加。
+  - `Server.Shutdown` 時にこれらのgoroutineも停止させる。
+
+---
+
 ## 実装簡素化・ライブラリ活用提案 (LIB)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
@@ -207,6 +278,7 @@
 | **LIB-002** | **Low** | 設定読み込みの自動化 | 手動での環境変数読み込み・型変換を廃止し、`kelseyhightower/envconfig` による構造体タグベースの宣言的な設定読み込みに移行する。 |
 | **LIB-003** | **Low** | コレクション操作の効率化 | 冗長なループ処理（Map, Filter, Uniq 等）を `samber/lo` で置き換え、コードを簡潔にする。 |
 | **LIB-004** | **Low** | ログファイルローテーション | 現状は起動毎に新ファイルを作成する形式だが、日付ベースのローテーションやサイズ制限がない。運用期間が長くなるとログファイルが肥大化する可能性がある。`lumberjack` などのライブラリ導入、または日付ベースのファイル切り替えロジックを実装する。 |
+| **LIB-005** | **Low** | レスポンス圧縮ミドルウェアの導入検討 | 現状はリクエストのgzip解凍は実装されているが、レスポンスの圧縮は行われていない。大量のレコードを返すエンドポイントでは、gzip圧縮ミドルウェアの導入で帯域削減が期待できる。 |
 
 ---
 
@@ -226,5 +298,7 @@
 
 ## まとめ
 - 主要なリスクは **CSRF対策不足** と **DBコネクションプール設定欠如**。
+- アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
 - パフォーマンス面では **セッション肥大化** が運用事故につながる可能性がある。
-- 入力検証の統一方針とAPI仕様の整合性は、バグ防止・運用事故防止に直結する。
+- 入力検証の統一方針（`c.Validate()` の呼び出し漏れ解消）とAPI仕様の整合性は、バグ防止・運用事故防止に直結する。
+- goroutineの終了処理は現状軽微だが、より堅牢なgraceful shutdownのために対応が望ましい。
