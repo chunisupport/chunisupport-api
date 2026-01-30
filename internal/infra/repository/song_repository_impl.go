@@ -122,7 +122,6 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	return results, nil
 }
 
-// toSongEntity は songRow を entity.Song に変換します。
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	return &entity.Song{
 		ID:          row.ID,
@@ -139,7 +138,6 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	}
 }
 
-// toChartEntity は chartRow を entity.Chart に変換します。
 func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 	constVal, _ := chartconstant.NewChartConstant(row.Const)
 

@@ -14,7 +14,6 @@ type RecoveryCodeModel struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
-// ToEntity はRecoveryCodeModelをentity.RecoveryCodeに変換します。
 func (m *RecoveryCodeModel) ToEntity() *entity.RecoveryCode {
 	return &entity.RecoveryCode{
 		ID:        m.ID,
@@ -24,7 +23,6 @@ func (m *RecoveryCodeModel) ToEntity() *entity.RecoveryCode {
 	}
 }
 
-// FromRecoveryCodeEntity はentity.RecoveryCodeをRecoveryCodeModelに変換します。
 func FromRecoveryCodeEntity(e *entity.RecoveryCode) *RecoveryCodeModel {
 	return &RecoveryCodeModel{
 		ID:        e.ID,

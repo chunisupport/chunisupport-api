@@ -20,7 +20,6 @@ type PlayerRecordModel struct {
 	UpdatedAt   time.Time `db:"updated_at"`
 }
 
-// ToEntity はPlayerRecordModelをentity.PlayerRecordに変換します。
 func (m *PlayerRecordModel) ToEntity() (*entity.PlayerRecord, error) {
 	s, err := score.NewScore(m.Score)
 	if err != nil {

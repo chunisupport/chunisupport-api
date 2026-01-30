@@ -99,6 +99,14 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `honor_id`: `honors`テーブルへの外部キー。
     - `created_at`: 作成日時。
 
+#### `user_recovery_codes`
+- **役割**: アカウント回復用のワンタイムコードを格納します。
+- **主なカラム**:
+    - `id`: レコードID。
+    - `user_id`: `users`テーブルへの外部キー（`ON DELETE CASCADE`設定）。
+    - `code_hash`: リカバリコードのハッシュ値（BINARY(32)、ユニーク制約）。
+    - `created_at`: 作成日時。
+
 ### 楽曲・譜面関連
 
 #### `songs`
@@ -135,18 +143,6 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `we_kanji`: カテゴリ漢字（光、蔵、改、狂など、CHAR(1)）。
     - `notes`: ノーツ数（NULL可）。
 
-#### `chart_statistics`
-- **役割**: 譜面ごと・レーティング帯ごとの統計情報を格納します（マイグレーション000002で追加）。
-- **対象**: 譜面定数10.0以上の譜面のみ。
-- **主なカラム**:
-    - `chart_id`: `charts`テーブルへの外部キー（`ON DELETE CASCADE`設定）。
-    - `rating_tier`: レーティング帯（10倍した整数、150-176は15.0-17.6、177は17.7+を表す）。
-    - `rank_s_count`, `rank_s_plus_count`, `rank_ss_count`, `rank_ss_plus_count`, `rank_sss_count`, `rank_sss_plus_count`: ランク別人数。
-    - `lamp_aj_count`, `lamp_fc_count`, `lamp_other_count`: ランプ別人数（ALL JUSTICE、FULL COMBO、その他）。
-    - `total_count`: 合計人数（検算用）。
-    - `updated_at`: 更新日時。
-    - 主キー: `(chart_id, rating_tier)`の複合キー。
-
 ### マスタテーブル
 
 #### ゲームデータマスタ
@@ -160,7 +156,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
-- `versions`: バージョンマスタ（マイグレーション000005で追加）。CHUNITHMの各バージョン情報とリリース日を格納。
+- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からX-VERSE-Xまで）の情報とリリース日を格納。
 
 #### ゲームコンテンツマスタ
 - `honors`: 称号マスタ。称号名、称号種別、画像URL等を格納。
@@ -173,8 +169,5 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 楽曲データの構築・更新は、このリポジトリとは別のバッチ処理用リポジトリで行われています。バッチ処理により、外部データソース（公式サイト、Chunirecなど）から取得した情報が、このAPIサーバーが使用する主要テーブル群（`songs`, `charts`など）に反映されます。
 
 ### マイグレーション履歴
-- **000001**: 初期スキーマ（全マスタテーブル、楽曲・譜面・プレイヤー関連テーブル）。
-- **000002**: 譜面統計テーブル（`chart_statistics`）の追加。
-- **000003**: リカバリコードテーブル（`user_recovery_codes`）の追加。
-- **000004**: 称号種類マスタへの`expert`と`master`の追加。
-- **000005**: バージョンマスタテーブル（`versions`）の追加。
+- **000001**: 初期スキーマ。全マスタテーブル（genres, difficulties, class_emblems, clear_lamp_types, combo_lamp_types, slots, full_chain_types, honor_types, account_types, versions等）、楽曲・譜面関連テーブル（songs, charts, worldsend_charts）、ユーザー・認証関連テーブル（users, sessions, api_tokens, user_recovery_codes）、プレイヤー関連テーブル（players, player_records, player_worldsend_records, player_honors）、および各種インデックスを含む。
+- **000002**: セッション自動クリーンアップイベントの追加。1時間ごとに期限切れのセッション（`expires_at < NOW()`）を削除するMySQLイベントスケジューラー（`cleanup_expired_sessions`）を設定。運用時は `event_scheduler = ON` の設定が必要。

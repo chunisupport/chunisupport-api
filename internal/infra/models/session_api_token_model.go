@@ -16,7 +16,6 @@ type SessionModel struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
-// ToEntity はSessionModelをentity.Sessionに変換します。
 // UUIDのパースに失敗した場合はエラーを返します。
 func (m *SessionModel) ToEntity() (*entity.Session, error) {
 	if len(m.ID) != 16 {
@@ -34,7 +33,6 @@ func (m *SessionModel) ToEntity() (*entity.Session, error) {
 	}, nil
 }
 
-// FromSessionEntity はentity.SessionをSessionModelに変換します。
 // UUIDのパースに失敗した場合はエラーを返します。
 func FromSessionEntity(e *entity.Session) (*SessionModel, error) {
 	uuidObj, err := uuid.Parse(e.ID)
@@ -58,7 +56,6 @@ type APITokenModel struct {
 	CreatedAt   time.Time `db:"created_at"`
 }
 
-// ToEntity はAPITokenModelをentity.APITokenに変換します。
 func (m *APITokenModel) ToEntity() *entity.APIToken {
 	return &entity.APIToken{
 		ID:          m.ID,
@@ -68,7 +65,6 @@ func (m *APITokenModel) ToEntity() *entity.APIToken {
 	}
 }
 
-// FromAPITokenEntity はentity.APITokenをAPITokenModelに変換します。
 func FromAPITokenEntity(e *entity.APIToken) *APITokenModel {
 	return &APITokenModel{
 		ID:          e.ID,

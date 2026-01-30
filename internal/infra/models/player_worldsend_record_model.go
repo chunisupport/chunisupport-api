@@ -18,7 +18,6 @@ type PlayerWorldsendRecordModel struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
-// ToEntity は PlayerWorldsendRecordModel を entity.PlayerWorldsendRecord に変換します。
 func (m *PlayerWorldsendRecordModel) ToEntity() (*entity.PlayerWorldsendRecord, error) {
 	s, err := score.NewScore(m.Score)
 	if err != nil {
@@ -36,7 +35,6 @@ func (m *PlayerWorldsendRecordModel) ToEntity() (*entity.PlayerWorldsendRecord, 
 	}, nil
 }
 
-// FromPlayerWorldsendRecordEntity は entity.PlayerWorldsendRecord を PlayerWorldsendRecordModel に変換します。
 func FromPlayerWorldsendRecordEntity(e *entity.PlayerWorldsendRecord) *PlayerWorldsendRecordModel {
 	scoreVal, _ := e.Score.Value()
 	return &PlayerWorldsendRecordModel{

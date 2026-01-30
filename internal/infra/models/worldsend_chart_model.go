@@ -14,7 +14,6 @@ type WorldsendChartModel struct {
 	Notes   *notes.Notes `db:"notes"`
 }
 
-// ToEntity は WorldsendChartModel を entity.WorldsendChart に変換します。
 func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {
 	return &entity.WorldsendChart{
 		ID:      m.ID,
@@ -25,7 +24,6 @@ func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {
 	}
 }
 
-// FromWorldsendChartEntity は entity.WorldsendChart を WorldsendChartModel に変換します。
 func FromWorldsendChartEntity(e *entity.WorldsendChart) *WorldsendChartModel {
 	return &WorldsendChartModel{
 		ID:      e.ID,

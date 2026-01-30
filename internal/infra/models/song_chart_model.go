@@ -68,7 +68,6 @@ type ChartModel struct {
 	Notes          *int    `db:"notes"`
 }
 
-// ToEntity はChartModelをentity.Chartに変換します。
 func (m *ChartModel) ToEntity() (*entity.Chart, error) {
 	chartConst, err := chartconstant.NewChartConstant(m.Const)
 	if err != nil {

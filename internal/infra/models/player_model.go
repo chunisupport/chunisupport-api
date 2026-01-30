@@ -26,7 +26,6 @@ type PlayerModel struct {
 	UpdatedAt         time.Time  `db:"updated_at"`
 }
 
-// ToEntity はPlayerModelをentity.Playerに変換します。
 func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 	name, err := playername.NewPlayerName(m.Name)
 	if err != nil {
@@ -52,7 +51,6 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 	}, nil
 }
 
-// FromPlayerEntity はentity.PlayerをPlayerModelに変換します。
 func FromPlayerEntity(e *entity.Player) *PlayerModel {
 	return &PlayerModel{
 		ID:                e.ID,

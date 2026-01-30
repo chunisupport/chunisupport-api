@@ -19,6 +19,7 @@ func NewPasswordHash(value string) (PasswordHash, error) {
 }
 
 // MustNewPasswordHash はテストや固定値用のヘルパーです。
+// 警告: テストコード専用。本番コードでは使用禁止。
 func MustNewPasswordHash(value string) PasswordHash {
 	ph, err := NewPasswordHash(value)
 	if err != nil {

@@ -37,7 +37,6 @@ func (m *PlayerDataSongModel) ToEntity() *entity.PlayerDataSong {
 	}
 }
 
-// FromPlayerDataSongEntity は entity.PlayerDataSong を PlayerDataSongModel に変換します。
 func FromPlayerDataSongEntity(e *entity.PlayerDataSong) *PlayerDataSongModel {
 	return &PlayerDataSongModel{
 		ID:          e.ID,
@@ -75,7 +74,6 @@ func (m *PlayerDataChartModel) ToEntity() *entity.PlayerDataChart {
 	}
 }
 
-// FromPlayerDataChartEntity は entity.PlayerDataChart を PlayerDataChartModel に変換します。
 func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel {
 	return &PlayerDataChartModel{
 		ID:             e.ID,
@@ -101,7 +99,6 @@ func (m *PlayerDataWorldsendChartModel) ToEntity() *entity.PlayerDataWorldsendCh
 	}
 }
 
-// FromPlayerDataWorldsendChartEntity は entity.PlayerDataWorldsendChart を PlayerDataWorldsendChartModel に変換します。
 func FromPlayerDataWorldsendChartEntity(e *entity.PlayerDataWorldsendChart) *PlayerDataWorldsendChartModel {
 	return &PlayerDataWorldsendChartModel{
 		ID:     e.ID,

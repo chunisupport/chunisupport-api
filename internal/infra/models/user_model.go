@@ -21,7 +21,6 @@ type UserModel struct {
 	IsPrivate     bool      `db:"is_private"`
 }
 
-// ToEntity はUserModelをentity.Userに変換します。
 func (m *UserModel) ToEntity() (*entity.User, error) {
 	uname, err := username.NewUserName(m.Username)
 	if err != nil {

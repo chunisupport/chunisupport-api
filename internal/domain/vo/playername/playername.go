@@ -24,6 +24,7 @@ func NewPlayerName(value string) (PlayerName, error) {
 
 // MustNewPlayerName はバリデーションなしで新しいPlayerNameを作成します
 // バリデーションエラーが発生した場合はパニックします
+// 警告: テストコード専用。本番コードでは使用禁止。
 // 既にバリデーション済みの値を使用する場合にのみ使用してください
 func MustNewPlayerName(value string) PlayerName {
 	playerName, err := NewPlayerName(value)

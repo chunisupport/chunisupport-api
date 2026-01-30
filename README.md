@@ -80,6 +80,17 @@
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    ```
+   
+   **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
+   ```bash
+   mysql -u <DB_USER> -p -e "SET GLOBAL event_scheduler = ON;"
+   ```
+   または、MySQL設定ファイル（`my.cnf`/`my.ini`）に以下を追加して永続化してください：
+   ```ini
+   [mysqld]
+   event_scheduler = ON
+   ```
+   
 5. 起動する。
    ```bash
    APP_ENV=develop go run main.go
