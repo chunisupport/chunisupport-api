@@ -23,6 +23,8 @@ const (
 	LoginRateLimitWindow            = 1 * time.Minute // ログインレートリミットのウィンドウ期間
 	RegisterRateLimitRequests       = 5               // 登録エンドポイントのリクエスト制限（1分間）
 	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
+	RegisterDataRateLimitRequests   = 2               // プレイヤーデータ登録エンドポイントのリクエスト制限（1分間）
+	RegisterDataRateLimitWindow     = 1 * time.Minute // プレイヤーデータ登録レートリミットのウィンドウ期間
 	InternalPublicRateLimitRequests = 10
 	InternalPublicRateLimitWindow   = 1 * time.Minute
 

@@ -222,7 +222,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 		meGroup.PUT("/password", handlers.Auth.ChangePassword)
 		meGroup.POST("/recovery-codes", handlers.Auth.IssueRecoveryCodes)
 		meGroup.DELETE("", handlers.Auth.DeleteAccount)
-		meGroup.POST("/register-data", handlers.Me.RegisterData)
+		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.RegisterDataRateLimitRequests,
+			Window:   info.RegisterDataRateLimitWindow,
+		}))
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
 		// セッション管理
 		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
