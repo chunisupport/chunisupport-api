@@ -12,8 +12,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// setupFixedWindowStoreCleanup はFixedWindowStoreのクリーンアップgoroutineを停止できるようにします
+func setupFixedWindowStoreCleanup(t *testing.T) {
+	t.Helper()
+
+	fixedWindowStoreCleanupHookMu.Lock()
+	previousHook := fixedWindowStoreCleanupHook
+	fixedWindowStoreCleanupHook = func(stop func()) {
+		t.Cleanup(stop)
+	}
+	fixedWindowStoreCleanupHookMu.Unlock()
+
+	t.Cleanup(func() {
+		fixedWindowStoreCleanupHookMu.Lock()
+		fixedWindowStoreCleanupHook = previousHook
+		fixedWindowStoreCleanupHookMu.Unlock()
+	})
+}
+
 // setupEchoWithErrorHandler はテスト用にエラーハンドラーを設定したEchoインスタンスを作成します
-func setupEchoWithErrorHandler() *echo.Echo {
+func setupEchoWithErrorHandler(t *testing.T) *echo.Echo {
+	t.Helper()
+	setupFixedWindowStoreCleanup(t)
+
 	e := echo.New()
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
@@ -37,7 +58,7 @@ func setupEchoWithErrorHandler() *echo.Echo {
 func setupUserRateLimitTest(t *testing.T) (*echo.Echo, echo.HandlerFunc) {
 	t.Helper()
 
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 	config := RateLimitConfig{
 		Requests: 1,
 		Window:   1 * time.Second,
@@ -69,7 +90,7 @@ func performUserRateLimitRequest(t *testing.T, e *echo.Echo, handler echo.Handle
 
 func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 	// ADMINユーザーはレートリミットを受けない
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	// normalLimit=2, adminLimit=10000
 	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
@@ -105,7 +126,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 
 func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	// ADMIN以外のユーザーはレートリミットを受ける
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	middleware := APIRateLimitMiddleware(3, 10000, 1*time.Minute)
 
@@ -157,7 +178,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 	// EDITORユーザーもレートリミットを受ける
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
 
@@ -199,7 +220,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 
 func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	// 異なるユーザーは別々のレートリミットを持つ
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
 
@@ -257,7 +278,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 
 func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 	// ユーザー情報がない場合は認証エラー
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
 
@@ -279,7 +300,7 @@ func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 
 func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 	// ユーザー情報が不正な型の場合は認証エラー
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
 
@@ -351,7 +372,7 @@ func TestUserRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 }
 
 func TestIPRateLimitMiddleware(t *testing.T) {
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	// 1秒間に3回までのリクエストを許可する設定
 	config := RateLimitConfig{
@@ -423,7 +444,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 }
 
 func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	// 1秒間に1回までのリクエストを許可する設定
 	config := RateLimitConfig{
@@ -461,7 +482,7 @@ func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
 }
 
 func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	config := RateLimitConfig{
 		Requests: 2,
@@ -498,7 +519,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 }
 
 func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
-	e := setupEchoWithErrorHandler()
+	e := setupEchoWithErrorHandler(t)
 
 	config := RateLimitConfig{
 		Requests: 1,

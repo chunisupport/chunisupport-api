@@ -32,6 +32,11 @@ type FixedWindowStore struct {
 	window  time.Duration
 }
 
+var (
+	fixedWindowStoreCleanupHook   = func(func()) {}
+	fixedWindowStoreCleanupHookMu sync.RWMutex
+)
+
 // NewFixedWindowStore は新しいFixedWindowStoreを作成します
 func NewFixedWindowStore(window time.Duration) *FixedWindowStore {
 	return &FixedWindowStore{
@@ -43,14 +48,32 @@ func NewFixedWindowStore(window time.Duration) *FixedWindowStore {
 // newFixedWindowStoreWithCleanup はストア作成とクリーンアップgoroutineの起動をまとめます
 func newFixedWindowStoreWithCleanup(window time.Duration) *FixedWindowStore {
 	store := NewFixedWindowStore(window)
+	ticker := time.NewTicker(window)
+	done := make(chan struct{})
+	var once sync.Once
+
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			ticker.Stop()
+		})
+	}
 
 	go func() {
-		ticker := time.NewTicker(window)
-		defer ticker.Stop()
-		for range ticker.C {
-			store.Cleanup()
+		for {
+			select {
+			case <-ticker.C:
+				store.Cleanup()
+			case <-done:
+				return
+			}
 		}
 	}()
+
+	fixedWindowStoreCleanupHookMu.RLock()
+	hook := fixedWindowStoreCleanupHook
+	fixedWindowStoreCleanupHookMu.RUnlock()
+	hook(stop)
 
 	return store
 }
