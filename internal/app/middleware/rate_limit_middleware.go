@@ -177,6 +177,45 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	}
 }
 
+// UserRateLimitMiddleware はユーザーIDベースのレートリミットミドルウェアを提供します。
+// 認証済みユーザー向けエンドポイントの保護に使用します。
+func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
+	store := NewFixedWindowStore(config.Window)
+
+	// バックグラウンドで定期的にクリーンアップ
+	go func() {
+		ticker := time.NewTicker(config.Window)
+		defer ticker.Stop()
+		for range ticker.C {
+			store.Cleanup()
+		}
+	}()
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			userObj := c.Get("userEntity")
+			if userObj == nil {
+				return apierror.ErrUnauthorized
+			}
+			user, ok := userObj.(*entity.User)
+			if !ok {
+				return apierror.ErrUnauthorized
+			}
+
+			// ユーザーIDを識別子として使用
+			identifier := strconv.Itoa(user.ID)
+
+			// レートリミットチェック
+			allowed, _, _ := store.Allow(identifier, config.Requests)
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}
+
 // AnonymousIPRateLimitMiddleware は未認証ユーザーにのみIPベースのレートリミットを適用します。
 func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	store := NewFixedWindowStore(config.Window)

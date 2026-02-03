@@ -265,6 +265,141 @@ func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
+func TestUserRateLimitMiddleware_SameUserLimited(t *testing.T) {
+	e := setupEchoWithErrorHandler()
+
+	config := RateLimitConfig{
+		Requests: 1,
+		Window:   1 * time.Second,
+	}
+	middleware := UserRateLimitMiddleware(config)
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	user := &entity.User{
+		ID:            500,
+		AccountTypeID: AccountTypePlayer,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", user)
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	req = httptest.NewRequest(http.MethodPost, "/", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set("userEntity", user)
+	err = handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestUserRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
+	e := setupEchoWithErrorHandler()
+
+	config := RateLimitConfig{
+		Requests: 1,
+		Window:   1 * time.Second,
+	}
+	middleware := UserRateLimitMiddleware(config)
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	user1 := &entity.User{
+		ID:            600,
+		AccountTypeID: AccountTypePlayer,
+	}
+	user2 := &entity.User{
+		ID:            700,
+		AccountTypeID: AccountTypePlayer,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", user1)
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	req = httptest.NewRequest(http.MethodPost, "/", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set("userEntity", user1)
+	err = handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+
+	req = httptest.NewRequest(http.MethodPost, "/", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set("userEntity", user2)
+	err = handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestUserRateLimitMiddleware_NoUserEntity(t *testing.T) {
+	e := setupEchoWithErrorHandler()
+
+	config := RateLimitConfig{
+		Requests: 1,
+		Window:   1 * time.Second,
+	}
+	middleware := UserRateLimitMiddleware(config)
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestUserRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
+	e := setupEchoWithErrorHandler()
+
+	config := RateLimitConfig{
+		Requests: 1,
+		Window:   1 * time.Second,
+	}
+	middleware := UserRateLimitMiddleware(config)
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", "invalid")
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
 func TestIPRateLimitMiddleware(t *testing.T) {
 	e := setupEchoWithErrorHandler()
 
