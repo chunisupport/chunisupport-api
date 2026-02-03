@@ -32,12 +32,50 @@ type FixedWindowStore struct {
 	window  time.Duration
 }
 
+var (
+	fixedWindowStoreCleanupHook   = func(func()) {}
+	fixedWindowStoreCleanupHookMu sync.RWMutex
+)
+
 // NewFixedWindowStore は新しいFixedWindowStoreを作成します
 func NewFixedWindowStore(window time.Duration) *FixedWindowStore {
 	return &FixedWindowStore{
 		entries: make(map[string]*rateLimitEntry),
 		window:  window,
 	}
+}
+
+// newFixedWindowStoreWithCleanup はストア作成とクリーンアップgoroutineの起動をまとめます
+func newFixedWindowStoreWithCleanup(window time.Duration) *FixedWindowStore {
+	store := NewFixedWindowStore(window)
+	ticker := time.NewTicker(window)
+	done := make(chan struct{})
+	var once sync.Once
+
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			ticker.Stop()
+		})
+	}
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				store.Cleanup()
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	fixedWindowStoreCleanupHookMu.RLock()
+	hook := fixedWindowStoreCleanupHook
+	fixedWindowStoreCleanupHookMu.RUnlock()
+	hook(stop)
+
+	return store
 }
 
 // Allow はリクエストを許可するか判定し、残り回数とリセット時刻を返します
@@ -96,16 +134,7 @@ func denyHandler(_ echo.Context, _ string, _ error) error {
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
 // このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
 func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
-	store := NewFixedWindowStore(window)
-
-	// バックグラウンドで定期的にクリーンアップ
-	go func() {
-		ticker := time.NewTicker(window)
-		defer ticker.Stop()
-		for range ticker.C {
-			store.Cleanup()
-		}
-	}()
+	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -149,16 +178,7 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 // 未認証ユーザーのエンドポイント保護などに使用します。
 // このミドルウェアはヘッダーを追加しません（外部APIのみヘッダー追加）。
 func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
-	store := NewFixedWindowStore(config.Window)
-
-	// バックグラウンドで定期的にクリーンアップ
-	go func() {
-		ticker := time.NewTicker(config.Window)
-		defer ticker.Stop()
-		for range ticker.C {
-			store.Cleanup()
-		}
-	}()
+	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -177,18 +197,35 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	}
 }
 
+// UserRateLimitMiddleware はユーザーIDベースのレートリミットミドルウェアを提供します。
+// 認証済みユーザー向けエンドポイントの保護に使用します。
+func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
+	store := newFixedWindowStoreWithCleanup(config.Window)
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			user, ok := c.Get("userEntity").(*entity.User)
+			if !ok || user == nil {
+				return apierror.ErrUnauthorized
+			}
+
+			// ユーザーIDを識別子として使用
+			identifier := strconv.Itoa(user.ID)
+
+			// レートリミットチェック
+			allowed, _, _ := store.Allow(identifier, config.Requests)
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}
+
 // AnonymousIPRateLimitMiddleware は未認証ユーザーにのみIPベースのレートリミットを適用します。
 func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
-	store := NewFixedWindowStore(config.Window)
-
-	// バックグラウンドで定期的にクリーンアップ
-	go func() {
-		ticker := time.NewTicker(config.Window)
-		defer ticker.Stop()
-		for range ticker.C {
-			store.Cleanup()
-		}
-	}()
+	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

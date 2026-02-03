@@ -25,6 +25,8 @@ const (
 	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
 	InternalPublicRateLimitRequests = 10
 	InternalPublicRateLimitWindow   = 1 * time.Minute
+	RegisterDataRateLimitRequests   = 1
+	RegisterDataRateLimitWindow     = 30 * time.Second
 
 	// セッション設定
 	MaxSessionsPerUser = 10 // ユーザーあたりの最大セッション数
