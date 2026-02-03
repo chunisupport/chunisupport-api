@@ -22,10 +22,18 @@ type Server struct {
 	masterCache    *masterdata.Cache
 	echoLogWriter  io.WriteCloser
 	shutdownCancel context.CancelFunc
-}
+	serverCtx, cancel := context.WithCancel(context.Background())
 
-// NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache) *Server {
+		echo:           NewRouter(serverCtx, db, cfg, masterCache, echoLogWriter),
+		db:             db,
+		cfg:            cfg,
+		masterCache:    masterCache,
+		echoLogWriter:  echoLogWriter,
+		shutdownCancel: cancel,
+	if s.shutdownCancel != nil {
+		s.shutdownCancel()
+	}
+
 	// Echoのロガーを設定
 	var echoLogWriter io.WriteCloser
 	echoLogWriterResult, err := SetupEchoLogger(cfg)
