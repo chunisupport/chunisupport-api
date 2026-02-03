@@ -33,6 +33,24 @@ func setupEchoWithErrorHandler() *echo.Echo {
 	return e
 }
 
+// performUserRateLimitRequest はユーザーIDベースのレートリミット用にリクエストを実行します
+func performUserRateLimitRequest(t *testing.T, e *echo.Echo, handler echo.HandlerFunc, user *entity.User) *httptest.ResponseRecorder {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if user != nil {
+		c.Set("userEntity", user)
+	}
+
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	return rec
+}
+
 func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 	// ADMINユーザーはレートリミットを受けない
 	e := setupEchoWithErrorHandler()
@@ -282,24 +300,10 @@ func TestUserRateLimitMiddleware_SameUserLimited(t *testing.T) {
 		AccountTypeID: AccountTypePlayer,
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set("userEntity", user)
-	err := handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec := performUserRateLimitRequest(t, e, handler, user)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	req = httptest.NewRequest(http.MethodPost, "/", nil)
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
-	c.Set("userEntity", user)
-	err = handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec = performUserRateLimitRequest(t, e, handler, user)
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
 
@@ -324,34 +328,13 @@ func TestUserRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) 
 		AccountTypeID: AccountTypePlayer,
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set("userEntity", user1)
-	err := handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec := performUserRateLimitRequest(t, e, handler, user1)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	req = httptest.NewRequest(http.MethodPost, "/", nil)
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
-	c.Set("userEntity", user1)
-	err = handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec = performUserRateLimitRequest(t, e, handler, user1)
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
-	req = httptest.NewRequest(http.MethodPost, "/", nil)
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
-	c.Set("userEntity", user2)
-	err = handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec = performUserRateLimitRequest(t, e, handler, user2)
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
@@ -367,13 +350,7 @@ func TestUserRateLimitMiddleware_NoUserEntity(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	err := handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
+	rec := performUserRateLimitRequest(t, e, handler, nil)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
