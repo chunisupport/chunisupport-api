@@ -16,11 +16,12 @@ import (
 
 // Server はアプリケーションサーバーを表します
 type Server struct {
-	echo          *echo.Echo
-	db            *sqlx.DB
-	cfg           config.Config
-	masterCache   *masterdata.Cache
-	echoLogWriter io.WriteCloser
+	echo           *echo.Echo
+	db             *sqlx.DB
+	cfg            config.Config
+	masterCache    *masterdata.Cache
+	echoLogWriter  io.WriteCloser
+	shutdownCancel context.CancelFunc
 }
 
 // NewServer は新しいServerインスタンスを作成します
@@ -34,12 +35,15 @@ func NewServer(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache) *S
 		echoLogWriter = echoLogWriterResult
 	}
 
+	serverCtx, cancel := context.WithCancel(context.Background())
+
 	return &Server{
-		echo:          NewRouter(db, cfg, masterCache, echoLogWriter),
-		db:            db,
-		cfg:           cfg,
-		masterCache:   masterCache,
-		echoLogWriter: echoLogWriter,
+		echo:           NewRouter(serverCtx, db, cfg, masterCache, echoLogWriter),
+		db:             db,
+		cfg:            cfg,
+		masterCache:    masterCache,
+		echoLogWriter:  echoLogWriter,
+		shutdownCancel: cancel,
 	}
 }
 
@@ -59,6 +63,10 @@ func (s *Server) Start() error {
 // Shutdown はサーバーを正常に終了します
 func (s *Server) Shutdown(ctx context.Context) error {
 	var shutdownErrs []error
+
+	if s.shutdownCancel != nil {
+		s.shutdownCancel()
+	}
 
 	if s.echo != nil {
 		if err := s.echo.Shutdown(ctx); err != nil {

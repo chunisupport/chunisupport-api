@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -68,7 +69,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -167,20 +168,20 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(middleware.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
+	registerRoutes(ctx, e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
 
 	return e
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUsecase, apiTokenUsecase usecase.APITokenUsecase, secret string) {
+func registerRoutes(ctx context.Context, e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUsecase, apiTokenUsecase usecase.APITokenUsecase, secret string) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
 	// JWT認証ミドルウェア
 	jwtAuth := middleware.JWTMiddleware(secret, authUsecase)
 	optionalJWTAuth := middleware.OptionalJWTMiddleware(secret, authUsecase)
-	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
+	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
 	})
@@ -195,17 +196,17 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	authGroup := internal.Group("/auth")
 	{
 		// ログイン: 1分間に10回まで
-		authGroup.POST("/login", handlers.Auth.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		authGroup.POST("/login", handlers.Auth.Login, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
 			Requests: info.LoginRateLimitRequests,
 			Window:   info.LoginRateLimitWindow,
 		}))
 		authGroup.POST("/logout", handlers.Auth.Logout, jwtAuth)
 		// 登録: 1分間に5回まで
-		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.POST("/recovery-codes", handlers.Auth.RecoverPassword, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		authGroup.POST("/recovery-codes", handlers.Auth.RecoverPassword, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
 			Requests: info.RecoveryCodeRateLimitRequests,
 			Window:   info.RecoveryCodeRateLimitWindow,
 		}))
@@ -222,7 +223,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 		meGroup.PUT("/password", handlers.Auth.ChangePassword)
 		meGroup.POST("/recovery-codes", handlers.Auth.IssueRecoveryCodes)
 		meGroup.DELETE("", handlers.Auth.DeleteAccount)
-		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(ctx, middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
@@ -290,6 +291,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミット: ADMINは15分150,000回、その他は15分150回
 	apiV1.Use(middleware.APIRateLimitMiddleware(
+		ctx,
 		info.APIRateLimitRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
@@ -310,6 +312,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミットはv1と同じ設定を適用
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
+		ctx,
 		info.APIRateLimitRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +39,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 	e := setupEchoWithErrorHandler()
 
 	// normalLimit=2, adminLimit=10000
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
 
 	adminUser := &entity.User{
 		ID:            1,
@@ -73,7 +74,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	// ADMIN以外のユーザーはレートリミットを受ける
 	e := setupEchoWithErrorHandler()
 
-	middleware := APIRateLimitMiddleware(3, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 3, 10000, 1*time.Minute)
 
 	playerUser := &entity.User{
 		ID:            100, // 他のテストと衝突しないIDを使用
@@ -125,7 +126,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 	// EDITORユーザーもレートリミットを受ける
 	e := setupEchoWithErrorHandler()
 
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
 
 	editorUser := &entity.User{
 		ID:            200, // 他のテストと衝突しないIDを使用
@@ -167,7 +168,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	// 異なるユーザーは別々のレートリミットを持つ
 	e := setupEchoWithErrorHandler()
 
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
 
 	user1 := &entity.User{
 		ID:            300, // 他のテストと衝突しないIDを使用
@@ -225,7 +226,7 @@ func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 	// ユーザー情報がない場合は認証エラー
 	e := setupEchoWithErrorHandler()
 
-	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 10, 10000, 1*time.Minute)
 
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
@@ -247,7 +248,7 @@ func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 	// ユーザー情報が不正な型の場合は認証エラー
 	e := setupEchoWithErrorHandler()
 
-	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(context.Background(), 10, 10000, 1*time.Minute)
 
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
@@ -273,7 +274,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 		Requests: 3,
 		Window:   1 * time.Second,
 	}
-	middleware := IPRateLimitMiddleware(config)
+	middleware := IPRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -345,7 +346,7 @@ func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
 		Requests: 1,
 		Window:   1 * time.Second,
 	}
-	middleware := IPRateLimitMiddleware(config)
+	middleware := IPRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -382,7 +383,7 @@ func TestUserRateLimitMiddleware_Limited(t *testing.T) {
 		Requests: 2,
 		Window:   1 * time.Minute,
 	}
-	middleware := UserRateLimitMiddleware(config)
+	middleware := UserRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -424,7 +425,7 @@ func TestUserRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) 
 		Requests: 1,
 		Window:   1 * time.Minute,
 	}
-	middleware := UserRateLimitMiddleware(config)
+	middleware := UserRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -476,7 +477,7 @@ func TestUserRateLimitMiddleware_NoUserEntity(t *testing.T) {
 		Requests: 1,
 		Window:   1 * time.Minute,
 	}
-	middleware := UserRateLimitMiddleware(config)
+	middleware := UserRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -499,7 +500,7 @@ func TestUserRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 		Requests: 1,
 		Window:   1 * time.Minute,
 	}
-	middleware := UserRateLimitMiddleware(config)
+	middleware := UserRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -523,7 +524,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 		Requests: 2,
 		Window:   1 * time.Minute,
 	}
-	middleware := AnonymousIPRateLimitMiddleware(config)
+	middleware := AnonymousIPRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -560,7 +561,7 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 		Requests: 1,
 		Window:   1 * time.Minute,
 	}
-	middleware := AnonymousIPRateLimitMiddleware(config)
+	middleware := AnonymousIPRateLimitMiddleware(context.Background(), config)
 	handler := middleware(func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
