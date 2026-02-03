@@ -193,12 +193,8 @@ func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			userObj := c.Get("userEntity")
-			if userObj == nil {
-				return apierror.ErrUnauthorized
-			}
-			user, ok := userObj.(*entity.User)
-			if !ok {
+			user, ok := c.Get("userEntity").(*entity.User)
+			if !ok || user == nil {
 				return apierror.ErrUnauthorized
 			}
 
