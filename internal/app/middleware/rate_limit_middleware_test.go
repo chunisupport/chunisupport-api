@@ -100,6 +100,8 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 		// ヘッダーが設定されていることを確認
 		assert.Equal(t, "3", rec.Header().Get("X-RateLimit-Limit"))
+		assert.NotEmpty(t, rec.Header().Get("X-RateLimit-Remaining"))
+		assert.NotEmpty(t, rec.Header().Get("X-RateLimit-Reset"))
 	}
 
 	// 制限を超えると429エラー
