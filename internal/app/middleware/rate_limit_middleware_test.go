@@ -2,8 +2,7 @@ package middleware
 
 import (
 	"context"
-	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
-	middleware := APIRateLimitMiddleware(context.Background(), 3, 10000, 1*time.Minute)
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -22,8 +21,8 @@ func setupEchoWithErrorHandler() *echo.Echo {
 			return
 		}
 		if apiErr, ok := err.(*apierror.APIError); ok {
-			c.JSON(apiErr.HTTPStatus, map[string]interface{}{
-				"error": map[string]interface{}{
+			c.JSON(apiErr.HTTPStatus, map[string]any{
+				"error": map[string]any{
 					"status": apiErr.HTTPStatus,
 					"code":   apiErr.Code,
 				},
@@ -101,8 +100,6 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 		// ヘッダーが設定されていることを確認
 		assert.Equal(t, "3", rec.Header().Get("X-RateLimit-Limit"))
-	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
-	middleware := APIRateLimitMiddleware(context.Background(), 2, 10000, 1*time.Minute)
 	}
 
 	// 制限を超えると429エラー
@@ -201,14 +198,14 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	// ユーザー1は制限超過
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware := APIRateLimitMiddleware(context.Background(), 10, 10000, 1*time.Minute)
-	middleware := APIRateLimitMiddleware(context.Background(), 10, 10000, 1*time.Minute)
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", user1)
 
 	err := handler(c)
 	if err != nil {
 		e.HTTPErrorHandler(err, c)
 	}
-	middleware := IPRateLimitMiddleware(context.Background(), config)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
 	// ユーザー2はまだリクエスト可能
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
@@ -321,22 +318,22 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	req.RemoteAddr = testIP
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
-	middleware := IPRateLimitMiddleware(context.Background(), config)
+	err = handler(c)
 	if err != nil {
 		e.HTTPErrorHandler(err, c)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
-	middleware := UserRateLimitMiddleware(context.Background(), config)
-	middleware := UserRateLimitMiddleware(context.Background(), config)
-	req2.RemoteAddr = "192.0.2.200:1234"
-	rec2 := httptest.NewRecorder()
-	c2 := e.NewContext(req2, rec2)
-	err = handler(c2)
+	// 別IPは制限されない
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "192.0.2.200:1234"
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c2)
+		e.HTTPErrorHandler(err, c)
 	}
-	assert.Equal(t, http.StatusOK, rec2.Code)
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
 func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
@@ -453,14 +450,14 @@ func TestUserRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) 
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
-	middleware := UserRateLimitMiddleware(context.Background(), config)
-	middleware := UserRateLimitMiddleware(context.Background(), config)
+	c.Set("userEntity", user1)
+	err = handler(c)
 	if err != nil {
 		e.HTTPErrorHandler(err, c)
 	}
-	middleware := AnonymousIPRateLimitMiddleware(context.Background(), config)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
-	middleware := AnonymousIPRateLimitMiddleware(context.Background(), config)
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
 	c.Set("userEntity", user2)

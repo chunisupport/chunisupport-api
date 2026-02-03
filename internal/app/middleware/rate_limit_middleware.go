@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -60,6 +59,8 @@ func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, re
 		s.entries[identifier] = entry
 	}
 
+	entry.Limit = limit
+
 	// リセット時刻を計算
 	resetTime = entry.WindowStart.Add(s.window)
 
@@ -68,11 +69,34 @@ func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, re
 		return false, 0, resetTime
 	}
 
+	entry.Count++
+	remaining = entry.Limit - entry.Count
+	return true, remaining, resetTime
+}
+
+// Cleanup は期限切れのエントリを削除します
+func (s *FixedWindowStore) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for key, entry := range s.entries {
+		if now.Sub(entry.WindowStart) >= s.window {
+			delete(s.entries, key)
+		}
+	}
+}
+
 // newRateLimitStoreWithCleanup はクリーンアップ用のgoroutine付きストアを生成します
 func newRateLimitStoreWithCleanup(ctx context.Context, window time.Duration) *FixedWindowStore {
+	store := NewFixedWindowStore(window)
 	if ctx == nil {
 		return store
 	}
+
+	go func() {
+		ticker := time.NewTicker(window)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
@@ -80,6 +104,9 @@ func newRateLimitStoreWithCleanup(ctx context.Context, window time.Duration) *Fi
 			case <-ctx.Done():
 				return
 			}
+		}
+	}()
+
 	return store
 }
 
@@ -91,31 +118,6 @@ func getUserFromContext(c echo.Context) (*entity.User, error) {
 	}
 	user, ok := userObj.(*entity.User)
 	if !ok {
-		return nil, apierror.ErrUnauthorized
-	}
-	return user, nil
-}
-
-// APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
-// ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
-// レスポンスにX-RateLimit-*ヘッダーを追加します。
-// このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
-func APIRateLimitMiddleware(ctx context.Context, normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
-	store := newRateLimitStoreWithCleanup(ctx, window)
-
-			user, err := getUserFromContext(c)
-			if err != nil {
-				return err
-func IPRateLimitMiddleware(ctx context.Context, config RateLimitConfig) echo.MiddlewareFunc {
-	store := newRateLimitStoreWithCleanup(ctx, config.Window)
-func UserRateLimitMiddleware(ctx context.Context, config RateLimitConfig) echo.MiddlewareFunc {
-	store := newRateLimitStoreWithCleanup(ctx, config.Window)
-			user, err := getUserFromContext(c)
-			if err != nil {
-				return err
-
-func AnonymousIPRateLimitMiddleware(ctx context.Context, config RateLimitConfig) echo.MiddlewareFunc {
-	store := newRateLimitStoreWithCleanup(ctx, config.Window)
 		return nil, apierror.ErrUnauthorized
 	}
 	return user, nil

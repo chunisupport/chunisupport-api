@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -44,7 +43,7 @@ func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		// 詳細なエラーはログに出力し、クライアントには汎用的なエラーコードを返す
 		slog.Warn("Validation error", "error", err.Error())
-func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
+		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 	return nil
 }
@@ -143,13 +142,13 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	handlers := &Handlers{
 		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
-	registerRoutes(ctx, e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
-func registerRoutes(ctx context.Context, e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUsecase, apiTokenUsecase usecase.APITokenUsecase, secret string) {
-	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
-		authGroup.POST("/login", handlers.Auth.Login, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
-		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
-		authGroup.POST("/recovery-codes", handlers.Auth.RecoverPassword, middleware.IPRateLimitMiddleware(ctx, middleware.RateLimitConfig{
-		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(ctx, middleware.RateLimitConfig{
+		User:       api_internal.NewUserHandler(userUsecase),
+		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
+		Song:       api_internal.NewSongHandler(songUsecase, masterCache),
+		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase),
+		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:         api_internal.NewMeHandler(playerDataUsecase),
+		MasterData: api_internal.NewMasterDataHandler(masterCache),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, masterCache),
@@ -267,8 +266,6 @@ func registerRoutes(ctx context.Context, e *echo.Echo, handlers *Handlers, authU
 	songsGroup := internal.Group("/songs")
 	songsGroup.Use(jwtAuth)
 	{
-		ctx,
-		ctx,
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
 		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireEditor)
 		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
