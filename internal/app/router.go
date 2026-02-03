@@ -222,7 +222,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 		meGroup.PUT("/password", handlers.Auth.ChangePassword)
 		meGroup.POST("/recovery-codes", handlers.Auth.IssueRecoveryCodes)
 		meGroup.DELETE("", handlers.Auth.DeleteAccount)
-		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
