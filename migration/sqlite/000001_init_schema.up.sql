@@ -26,5 +26,6 @@ CREATE TABLE IF NOT EXISTS chart_stats_by_rating_band (
     clear_brave INTEGER NOT NULL,
     clear_absolute INTEGER NOT NULL,
     clear_catastrophy INTEGER NOT NULL,
-    PRIMARY KEY (chart_id, rating_band_id)
+    PRIMARY KEY (chart_id, rating_band_id),
+    FOREIGN KEY (rating_band_id) REFERENCES rating_band (id)
 );
