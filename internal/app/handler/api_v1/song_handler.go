@@ -7,6 +7,7 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/app/handler"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_v1"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
@@ -15,15 +16,17 @@ import (
 
 // V1SongHandler は外部API v1 の楽曲関連エンドポイントを処理します。
 type V1SongHandler struct {
-	songUsecase usecase.SongUsecase
-	masterCache *masterdata.Cache
+	songUsecase  usecase.SongUsecase
+	statsUsecase usecase.ChartStatsUsecase
+	masterCache  *masterdata.Cache
 }
 
 // NewV1SongHandler は新しい V1SongHandler を生成します。
-func NewV1SongHandler(songUsecase usecase.SongUsecase, masterCache *masterdata.Cache) *V1SongHandler {
+func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache) *V1SongHandler {
 	return &V1SongHandler{
-		songUsecase: songUsecase,
-		masterCache: masterCache,
+		songUsecase:  songUsecase,
+		statsUsecase: statsUsecase,
+		masterCache:  masterCache,
 	}
 }
 
@@ -56,6 +59,17 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 	v1SongDTO := h.convertToV1SongDTO(swc)
 
 	return c.JSON(http.StatusOK, v1SongDTO)
+}
+
+// GetSongStats は指定されたDisplayIDの譜面統計を取得します。
+func (h *V1SongHandler) GetSongStats(c echo.Context) error {
+	displayID := c.Param("songDisplayId")
+	stats, err := h.statsUsecase.GetSongStatsByDisplayID(c.Request().Context(), displayID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats))
 }
 
 // convertToV1SongDTOs は SongWithCharts のスライスを V1SongDTO のスライスに変換します。

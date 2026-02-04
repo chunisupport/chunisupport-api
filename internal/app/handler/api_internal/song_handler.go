@@ -7,6 +7,7 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/app/handler"
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 	"github.com/Qman110101/chunisupport-api/internal/usecase"
@@ -15,15 +16,17 @@ import (
 
 // SongHandler は曲関連のHTTPリクエストを処理します。
 type SongHandler struct {
-	songUsecase usecase.SongUsecase
-	masterCache *masterdata.Cache
+	songUsecase  usecase.SongUsecase
+	statsUsecase usecase.ChartStatsUsecase
+	masterCache  *masterdata.Cache
 }
 
 // NewSongHandler は新しいSongHandlerを生成します。
-func NewSongHandler(songUsecase usecase.SongUsecase, masterCache *masterdata.Cache) *SongHandler {
+func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache) *SongHandler {
 	return &SongHandler{
-		songUsecase: songUsecase,
-		masterCache: masterCache,
+		songUsecase:  songUsecase,
+		statsUsecase: statsUsecase,
+		masterCache:  masterCache,
 	}
 }
 
@@ -59,6 +62,17 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 	songDTO := h.convertToSongDTO(swc)
 
 	return c.JSON(http.StatusOK, songDTO)
+}
+
+// GetSongStats は指定されたDisplayIDの譜面統計を取得します。
+func (h *SongHandler) GetSongStats(c echo.Context) error {
+	displayID := c.Param("displayid")
+	stats, err := h.statsUsecase.GetSongStatsByDisplayID(c.Request().Context(), displayID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats))
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

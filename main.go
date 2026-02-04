@@ -62,6 +62,19 @@ func main() {
 
 	slog.Info("Connected to the database")
 
+	staticDatabase, err := db.ConnectStatic(cfg.StaticDatabase.Path)
+	if err != nil {
+		slog.Error("Failed to connect to static database", "error", err)
+		return
+	}
+
+	if err := staticDatabase.Ping(); err != nil {
+		slog.Error("Failed to ping static database", "error", err)
+		return
+	}
+
+	slog.Info("Connected to the static database")
+
 	// 必須データの存在チェック
 	// if err := db.ValidateRequiredData(database); err != nil {
 	// 	slog.Error("Required data validation failed", "error", err)
@@ -80,7 +93,7 @@ func main() {
 	slog.Info("Master data preloaded")
 
 	// サーバーの作成と起動
-	server := app.NewServer(database, cfg, masterCache)
+	server := app.NewServer(database, staticDatabase, cfg, masterCache)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

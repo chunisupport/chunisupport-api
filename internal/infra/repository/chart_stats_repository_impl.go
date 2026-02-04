@@ -1,0 +1,153 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/Qman110101/chunisupport-api/internal/info"
+	"github.com/jmoiron/sqlx"
+)
+
+// chartStatsRepository は ChartStatsRepository の実装です。
+type chartStatsRepository struct {
+	db *sqlx.DB
+}
+
+// NewChartStatsRepository は ChartStatsRepository の実装を生成します。
+func NewChartStatsRepository(db *sqlx.DB) repository.ChartStatsRepository {
+	return &chartStatsRepository{db: db}
+}
+
+type ratingBandRow struct {
+	ID           int      `db:"id"`
+	Label        string   `db:"label"`
+	MinInclusive *float64 `db:"min_inclusive"`
+	MaxExclusive *float64 `db:"max_exclusive"`
+	SortOrder    int      `db:"sort_order"`
+}
+
+type chartStatsRow struct {
+	ChartID          int `db:"chart_id"`
+	RatingBandID     int `db:"rating_band_id"`
+	RankAAAL         int `db:"rank_aaal"`
+	RankS            int `db:"rank_s"`
+	RankSP           int `db:"rank_sp"`
+	RankSS           int `db:"rank_ss"`
+	RankSSP          int `db:"rank_ssp"`
+	RankSSS          int `db:"rank_sss"`
+	RankSSSP         int `db:"rank_sssp"`
+	RankMax          int `db:"rank_max"`
+	ComboNone        int `db:"combo_none"`
+	ComboFC          int `db:"combo_fc"`
+	ComboAJ          int `db:"combo_aj"`
+	ClearFailed      int `db:"clear_failed"`
+	ClearClear       int `db:"clear_clear"`
+	ClearHard        int `db:"clear_hard"`
+	ClearBrave       int `db:"clear_brave"`
+	ClearAbsolute    int `db:"clear_absolute"`
+	ClearCatastrophy int `db:"clear_catastrophy"`
+}
+
+// FindRatingBands はレーティング帯マスタ一覧を返します。
+func (r *chartStatsRepository) FindRatingBands(ctx context.Context) ([]*entity.RatingBand, error) {
+	const query = `
+		SELECT id, label, min_inclusive, max_exclusive, sort_order
+		FROM rating_band
+		ORDER BY sort_order
+	`
+
+	var rows []ratingBandRow
+	if err := r.db.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+
+	results := make([]*entity.RatingBand, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, &entity.RatingBand{
+			ID:           row.ID,
+			Label:        row.Label,
+			MinInclusive: row.MinInclusive,
+			MaxExclusive: row.MaxExclusive,
+			SortOrder:    row.SortOrder,
+		})
+	}
+	return results, nil
+}
+
+// FindChartStatsByChartIDs は譜面ID一覧に対する統計を返します。
+func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+	if len(chartIDs) == 0 {
+		return []*entity.ChartStatsByRatingBand{}, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT
+			chart_id,
+			rating_band_id,
+			rank_aaal,
+			rank_s,
+			rank_sp,
+			rank_ss,
+			rank_ssp,
+			rank_sss,
+			rank_sssp,
+			rank_max,
+			combo_none,
+			combo_fc,
+			combo_aj,
+			clear_failed,
+			clear_clear,
+			clear_hard,
+			clear_brave,
+			clear_absolute,
+			clear_catastrophy
+		FROM chart_stats_by_rating_band
+		WHERE chart_id IN (?)
+		ORDER BY chart_id, rating_band_id
+	`, chartIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = r.db.Rebind(query)
+
+	var rows []chartStatsRow
+	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+
+	results := make([]*entity.ChartStatsByRatingBand, 0, len(rows))
+	for _, row := range rows {
+		clearStats := map[string]int{
+			info.StatsClearFailed:      row.ClearFailed,
+			info.StatsClearClear:       row.ClearClear,
+			info.StatsClearHard:        row.ClearHard,
+			info.StatsClearBrave:       row.ClearBrave,
+			info.StatsClearAbsolute:    row.ClearAbsolute,
+			info.StatsClearCatastrophy: row.ClearCatastrophy,
+		}
+
+		results = append(results, &entity.ChartStatsByRatingBand{
+			ChartID:      row.ChartID,
+			RatingBandID: row.RatingBandID,
+			Rank: entity.ChartRankStats{
+				AAAL: row.RankAAAL,
+				S:    row.RankS,
+				SP:   row.RankSP,
+				SS:   row.RankSS,
+				SSP:  row.RankSSP,
+				SSS:  row.RankSSS,
+				SSSP: row.RankSSSP,
+				Max:  row.RankMax,
+			},
+			Combo: entity.ChartComboStats{
+				None: row.ComboNone,
+				FC:   row.ComboFC,
+				AJ:   row.ComboAJ,
+			},
+			Clear: clearStats,
+		})
+	}
+
+	return results, nil
+}

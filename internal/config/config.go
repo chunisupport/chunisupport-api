@@ -41,6 +41,7 @@ type Config struct {
 	Auth                   Auth     `json:"auth"`
 	CORS                   CORS     `json:"cors"`
 	Database               Database // 環境変数から読み込み
+	StaticDatabase         StaticDatabase
 }
 
 type DbConfig struct {
@@ -53,6 +54,10 @@ type DbConfig struct {
 
 type Database struct {
 	DbConfig DbConfig
+}
+
+type StaticDatabase struct {
+	Path string `json:"path"`
 }
 
 // LoadConfig は環境変数から環境を読み取り、対応する設定を読み込みます
@@ -86,6 +91,10 @@ func LoadConfig() (Config, error) {
 
 	if config.ShutdownTimeoutSeconds <= 0 {
 		return config, fmt.Errorf("shutdown_timeout_seconds must be greater than 0")
+	}
+
+	if config.StaticDatabase.Path == "" {
+		return config, fmt.Errorf("static_database.path is required")
 	}
 
 	// 環境変数から秘密情報を取得

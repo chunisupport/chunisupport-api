@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年01月29日
+**最終更新日**: 2026年02月04日
 
 ## ベースURLと環境
 
@@ -107,10 +107,12 @@
 | `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活。 |
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得（ページネーション対応）。 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
+| `/internal/songs/:displayid/stat` | GET | Cookie (任意) | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:songId` | GET | APIトークン | 楽曲詳細取得。 |
+| `/v1/songs/:songDisplayId/stat` | GET | APIトークン | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得。 |
@@ -945,6 +947,110 @@ curl -X POST \
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
+### GET `/internal/songs/:displayid/stat`
+- **認証**: Cookie (任意)
+- **レートリミット**: 認証なしは1分10回/IP
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 指定楽曲の譜面ごとのレーティング帯別統計を取得します（WORLD'S ENDを含む）。削除済みの譜面は集計対象外です。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "song_id": "0000000000000001",
+  "rating_bands": [
+    {
+      "id": 1,
+      "label": "15.0",
+      "min_inclusive": 15.0,
+      "max_exclusive": 15.1,
+      "sort_order": 1
+    },
+    {
+      "id": 99,
+      "label": "17.6+",
+      "min_inclusive": 17.6,
+      "max_exclusive": null,
+      "sort_order": 99
+    }
+  ],
+  "charts": {
+    "MASTER": {
+      "stats": [
+        {
+          "rating_band_id": 1,
+          "rank": {
+            "aaal": 12,
+            "s": 5,
+            "sp": 2,
+            "ss": 1,
+            "ssp": 0,
+            "sss": 0,
+            "sssp": 0,
+            "max": 0
+          },
+          "combo": {
+            "none": 3,
+            "fc": 10,
+            "aj": 5
+          },
+          "clear": {
+            "failed": 1,
+            "clear": 10,
+            "hard": 3,
+            "brave": 1,
+            "absolute": 0,
+            "catastrophy": 0
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `song_id` | string | 楽曲の識別ID（16桁） |
+| `rating_bands` | array | レーティング帯マスタ一覧（`sort_order` 昇順） |
+| `rating_bands[].id` | number | レーティング帯ID |
+| `rating_bands[].label` | string | 表示ラベル（例: "15.0", "17.6+"） |
+| `rating_bands[].min_inclusive` | number\|null | 下限（未設定の場合は下限なし） |
+| `rating_bands[].max_exclusive` | number\|null | 上限（未設定の場合は上限なし） |
+| `rating_bands[].sort_order` | number | 表示順 |
+| `charts` | Map<string, object> | 譜面別統計。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END（大文字） |
+| `charts[key].stats` | array | レーティング帯別の統計配列 |
+| `charts[key].stats[].rating_band_id` | number | レーティング帯ID |
+| `charts[key].stats[].rank` | object | ランク別人数統計 |
+| `charts[key].stats[].rank.aaal` | number | AAA以下人数 |
+| `charts[key].stats[].rank.s` | number | S人数 |
+| `charts[key].stats[].rank.sp` | number | S+人数 |
+| `charts[key].stats[].rank.ss` | number | SS人数 |
+| `charts[key].stats[].rank.ssp` | number | SS+人数 |
+| `charts[key].stats[].rank.sss` | number | SSS人数 |
+| `charts[key].stats[].rank.sssp` | number | SSS+人数 |
+| `charts[key].stats[].rank.max` | number | 理論値人数 |
+| `charts[key].stats[].combo` | object | コンボランプ別人数統計 |
+| `charts[key].stats[].combo.none` | number | コンボランプなし人数 |
+| `charts[key].stats[].combo.fc` | number | FULL COMBO人数 |
+| `charts[key].stats[].combo.aj` | number | ALL JUSTICE人数 |
+| `charts[key].stats[].clear` | object | クリアランプ別人数統計（将来的にキー追加の可能性あり） |
+| `charts[key].stats[].clear.failed` | number | FAILED人数 |
+| `charts[key].stats[].clear.clear` | number | CLEAR人数 |
+| `charts[key].stats[].clear.hard` | number | HARD人数 |
+| `charts[key].stats[].clear.brave` | number | BRAVE人数 |
+| `charts[key].stats[].clear.absolute` | number | ABSOLUTE人数 |
+| `charts[key].stats[].clear.catastrophy` | number | CATASTROPHY人数 |
+
+**統計情報について**:
+- 統計データは定期バッチで更新され、過去データは保持しません
+- レーティング帯は「ベスト枠平均レーティング」を小数点1桁で切り捨てた値で判定します
+- レーティング帯は `min_inclusive <= rating < max_exclusive` で判定し、片側が `null` の場合は無限区間として扱います
+- クリアランプは将来の追加に備え、未知のキーは無視できる実装を推奨します
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+
 ### DELETE `/internal/songs/:displayid`
 - **認証**: Cookie 必須
 - **権限**: EDITOR (2) または ADMIN (3) 以上が必要
@@ -1252,25 +1358,6 @@ curl -X POST \
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |
 | `songs[].charts[key].notes` | number\|null | ノーツ数 |
-| `songs[].charts[key].statistics` | Map<string, object>\|null | 統計データは GET `/v1/songs/:songId` の `content=full` 指定時のみ返却されます（譜面定数10.0未満はnull/省略）。 |
-| `songs[].charts[key].statistics[tier]` | object | レーティング帯別の統計情報。キーは "15.0", "15.1", ..., "17.6", "17.7+" です（15.0未満のプレイヤーは集計対象外） |
-| `songs[].charts[key].statistics[tier].rank` | object | ランク別人数統計 |
-| `songs[].charts[key].statistics[tier].rank.s` | number | Sランク人数 (975,000-989,999) |
-| `songs[].charts[key].statistics[tier].rank.s_plus` | number | S+ランク人数 (990,000-999,999) |
-| `songs[].charts[key].statistics[tier].rank.ss` | number | SSランク人数 (1,000,000-1,004,999) |
-| `songs[].charts[key].statistics[tier].rank.ss_plus` | number | SS+ランク人数 (1,005,000-1,007,499) |
-| `songs[].charts[key].statistics[tier].rank.sss` | number | SSSランク人数 (1,007,500-1,008,999) |
-| `songs[].charts[key].statistics[tier].rank.sss_plus` | number | SSS+ランク人数 (1,009,000+) |
-| `songs[].charts[key].statistics[tier].lamp` | object | ランプ別人数統計 |
-| `songs[].charts[key].statistics[tier].lamp.aj` | number | ALL JUSTICE人数 |
-| `songs[].charts[key].statistics[tier].lamp.fc` | number | FULL COMBO人数 |
-| `songs[].charts[key].statistics[tier].lamp.other` | number | その他ランプ人数 |
-
-**統計情報について（GET `/v1/songs/:songId` の `content=full` 指定時のみ）**:
-- 統計データは定期的なバッチ処理によって更新されます（リアルタイムではありません）
-- レーティング帯は、プレイヤーの「ベスト枠平均レーティング」を基準に分類されます
-- 集計対象: 譜面定数10.0以上の譜面 × ベスト枠平均15.0以上のプレイヤー
-- レーティング帯17.7以上は "17.7+" として一括集計されます
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
@@ -1362,7 +1449,7 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `songId` | string | 楽曲の識別ID（16桁） |
 
-- **????????**: `content=full` ?????????????????
+- **概要**: 指定楽曲の詳細を取得します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -1383,6 +1470,25 @@ curl -X POST \
   }
 }
 ```
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/v1/songs/:songDisplayId/stat`
+- **認証**: APIトークン必須
+- **概要**: 指定楽曲の譜面ごとのレーティング帯別統計を取得します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `songDisplayId` | string | 楽曲の表示用ID |
+
+- **レスポンス**: 200 OK
+
+レスポンス形式は GET `/internal/songs/:displayid/stat` と同様です。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定

@@ -1,12 +1,18 @@
 package api_v1
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/labstack/echo/v4"
 )
 
 // TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
@@ -129,5 +135,51 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Error("ultima key not found in map")
 	} else if ultimaChart != nil {
 		t.Error("ultima chart should be nil")
+	}
+}
+
+type mockChartStatsUsecase struct {
+	stats *entity.SongChartStats
+	err   error
+}
+
+func (m *mockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error) {
+	return m.stats, m.err
+}
+
+func TestGetSongStats(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/v1/songs/test123456789012/stat", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("songDisplayId")
+	c.SetParamValues("test123456789012")
+
+	handler := &V1SongHandler{
+		statsUsecase: &mockChartStatsUsecase{
+			stats: &entity.SongChartStats{
+				SongID: "test123456789012",
+				Charts: map[string][]*entity.ChartStatsByRatingBand{
+					"MASTER": {},
+				},
+			},
+		},
+	}
+
+	if err := handler.GetSongStats(c); err != nil {
+		t.Fatalf("GetSongStats returned error: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response dto.ChartStatsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response.SongID != "test123456789012" {
+		t.Errorf("SongID = %v, want %v", response.SongID, "test123456789012")
 	}
 }

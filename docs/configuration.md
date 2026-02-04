@@ -29,3 +29,4 @@
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
+- `static_database.path` (SQLiteファイルパス)
