@@ -1049,7 +1049,8 @@ curl -X POST \
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### DELETE `/internal/songs/:displayid`
 - **認証**: Cookie 必須
