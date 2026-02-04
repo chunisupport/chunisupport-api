@@ -79,10 +79,7 @@
    ```bash
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
-   ```
-   ```bash
    migrate -database "sqlite3://./static.db" -path migration/sqlite up
-   ```
    
    **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
    ```bash
