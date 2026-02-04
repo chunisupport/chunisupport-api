@@ -74,7 +74,7 @@
   }
   ```
 4. データベースを作成してマイグレーションする。
-   - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。
+   - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。マイグレーションを実行する際は、コマンド内のパスをこの設定値と一致させてください。
    ```bash
    mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
    ```
