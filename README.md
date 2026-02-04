@@ -73,6 +73,8 @@
   }
   ```
 4. データベースを作成してマイグレーションする。
+   - `static.db` は実行バイナリと同じディレクトリに配置する運用です。
+     - `go run` の場合はカレントディレクトリが実行バイナリ相当になるため、`static.db` も同じ場所に作成してください。
    ```bash
    mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
    ```
