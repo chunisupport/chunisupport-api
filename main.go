@@ -62,7 +62,7 @@ func main() {
 
 	slog.Info("Connected to the database")
 
-	staticDatabase, err := db.ConnectStatic()
+	staticDatabase, err := db.ConnectStatic(cfg.StaticDBPath)
 	if err != nil {
 		slog.Error("Failed to connect to static database", "error", err)
 		return

@@ -58,6 +58,7 @@
      "app_port": 3002,
      "log_level": "debug",
      "log_paths": { "app": "log", "echo": "log" },
+     "static_db_path": "./static.db",
      "shutdown_timeout_seconds": 20,
     "auth": {
       "jwt_expiration_hour": 24,
@@ -73,8 +74,7 @@
   }
   ```
 4. データベースを作成してマイグレーションする。
-   - `static.db` は実行バイナリと同じディレクトリに配置する運用です。
-     - `go run` の場合はカレントディレクトリが実行バイナリ相当になるため、`static.db` も同じ場所に作成してください。
+   - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。
    ```bash
    mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
    ```

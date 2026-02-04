@@ -1,0 +1,23 @@
+{
+  "app_port": 3002,
+  "log_level": "debug",
+  "log_paths": {
+    "app": "log",
+    "echo": "log"
+  },
+  "static_db_path": "./static.db",
+  "shutdown_timeout_seconds": 20,
+  "auth": {
+    "jwt_expiration_hour": 24,
+    "session_expiration_hour": 24,
+    "cookie_secure": false,
+    "cookie_same_site": "lax"
+  },
+  "cors": {
+    "allow_origins": [
+      "http://localhost:3000"
+    ],
+    "allow_credentials": true,
+    "max_age": 3600
+  }
+}
