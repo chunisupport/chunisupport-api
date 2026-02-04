@@ -357,6 +357,9 @@ func TestGetSongStats(t *testing.T) {
 	if len(chartStats.Stats) != 1 {
 		t.Fatalf("stats length = %d, want 1", len(chartStats.Stats))
 	}
+	if chartStats.Stats[0].RatingBand != "15.0" {
+		t.Errorf("rating_band = %s, want %s", chartStats.Stats[0].RatingBand, "15.0")
+	}
 	if chartStats.Stats[0].Rank.Max != 8 {
 		t.Errorf("rank.max = %d, want 8", chartStats.Stats[0].Rank.Max)
 	}

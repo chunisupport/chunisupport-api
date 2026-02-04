@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/Qman110101/chunisupport-api/internal/domain/entity"
+import (
+	"strconv"
+
+	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+)
 
 // ChartStatsResponse は譜面統計APIのレスポンスです。
 type ChartStatsResponse struct {
@@ -25,10 +29,10 @@ type ChartStatsChartDTO struct {
 
 // ChartStatsByRatingBandDTO はレーティング帯別統計のDTOです。
 type ChartStatsByRatingBandDTO struct {
-	RatingBandID int                `json:"rating_band_id"`
-	Rank         ChartRankStatsDTO  `json:"rank"`
-	Combo        ChartComboStatsDTO `json:"combo"`
-	Clear        map[string]int     `json:"clear"`
+	RatingBand string             `json:"rating_band"`
+	Rank       ChartRankStatsDTO  `json:"rank"`
+	Combo      ChartComboStatsDTO `json:"combo"`
+	Clear      map[string]int     `json:"clear"`
 }
 
 // ChartRankStatsDTO はランク別人数のDTOです。
@@ -67,17 +71,26 @@ func ToChartStatsResponse(stats *entity.SongChartStats) *ChartStatsResponse {
 		})
 	}
 
+	ratingBandLabels := make(map[int]string, len(stats.RatingBands))
+	for _, band := range stats.RatingBands {
+		ratingBandLabels[band.ID] = band.Label
+	}
+
 	charts := make(map[string]*ChartStatsChartDTO, len(stats.Charts))
 	for key, chartStats := range stats.Charts {
 		statsDTO := make([]*ChartStatsByRatingBandDTO, 0, len(chartStats))
 		for _, stat := range chartStats {
+			label, ok := ratingBandLabels[stat.RatingBandID]
+			if !ok {
+				label = strconv.Itoa(stat.RatingBandID)
+			}
 			clearStats := make(map[string]int, len(stat.Clear))
 			for clearKey, value := range stat.Clear {
 				clearStats[clearKey] = value
 			}
 
 			statsDTO = append(statsDTO, &ChartStatsByRatingBandDTO{
-				RatingBandID: stat.RatingBandID,
+				RatingBand: label,
 				Rank: ChartRankStatsDTO{
 					AAAL: stat.Rank.AAAL,
 					S:    stat.Rank.S,

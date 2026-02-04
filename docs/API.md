@@ -111,8 +111,8 @@
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
-| `/v1/songs/:songId` | GET | APIトークン | 楽曲詳細取得。 |
-| `/v1/songs/:songDisplayId/stat` | GET | APIトークン | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
+| `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
+| `/v1/songs/:displayid/stat` | GET | APIトークン | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得。 |
@@ -977,7 +977,7 @@ curl -X POST \
     "MASTER": {
       "stats": [
         {
-          "rating_band_id": 1,
+          "rating_band": "15.0",
           "rank": {
             "aaal": 12,
             "s": 5,
@@ -1019,7 +1019,7 @@ curl -X POST \
 | `rating_bands[].sort_order` | number | 表示順 |
 | `charts` | Map<string, object> | 譜面別統計。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END（大文字） |
 | `charts[key].stats` | array | レーティング帯別の統計配列 |
-| `charts[key].stats[].rating_band_id` | number | レーティング帯ID |
+| `charts[key].stats[].rating_band` | string | レーティング帯ラベル（例: "15.0", "17.6+"） |
 | `charts[key].stats[].rank` | object | ランク別人数統計 |
 | `charts[key].stats[].rank.aaal` | number | AAA以下人数 |
 | `charts[key].stats[].rank.s` | number | S人数 |
@@ -1442,13 +1442,13 @@ curl -X POST \
   - 404 Not Found (`internal_error`): 楽曲が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:songId`
+### GET `/v1/songs/:displayid`
 - **認証**: APIトークン必須
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `songId` | string | 楽曲の識別ID（16桁） |
+| `displayid` | string | 楽曲の表示用ID |
 
 - **概要**: 指定楽曲の詳細を取得します。
 - **レスポンス**: 200 OK
@@ -1478,14 +1478,14 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:songDisplayId/stat`
+### GET `/v1/songs/:displayid/stat`
 - **認証**: APIトークン必須
 - **概要**: 指定楽曲の譜面ごとのレーティング帯別統計を取得します。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `songDisplayId` | string | 楽曲の表示用ID |
+| `displayid` | string | 楽曲の表示用ID |
 
 - **レスポンス**: 200 OK
 
