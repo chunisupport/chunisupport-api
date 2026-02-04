@@ -59,27 +59,29 @@
      "log_level": "debug",
      "log_paths": { "app": "log", "echo": "log" },
      "shutdown_timeout_seconds": 20,
-     "auth": {
-       "jwt_expiration_hour": 24,
-       "session_expiration_hour": 24,
-       "cookie_secure": false,
-       "cookie_same_site": "lax"
-     },
-     "cors": {
-       "allow_origins": ["http://localhost:3000"],
-       "allow_credentials": true,
-       "max_age": 3600
-     }
-   }
-   ```
+    "auth": {
+      "jwt_expiration_hour": 24,
+      "session_expiration_hour": 24,
+      "cookie_secure": false,
+      "cookie_same_site": "lax"
+    },
+    "cors": {
+      "allow_origins": ["http://localhost:3000"],
+      "allow_credentials": true,
+      "max_age": 3600
+    }
+  }
+  ```
 4. データベースを作成してマイグレーションする。
+   - `static.db` は実行バイナリと同じディレクトリに配置する運用です。
+     - `go run` の場合はカレントディレクトリが実行バイナリ相当になるため、`static.db` も同じ場所に作成してください。
    ```bash
    mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
    ```
    ```bash
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
-   ```
+   migrate -database "sqlite3://./static.db" -path migration/sqlite up
    
    **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
    ```bash

@@ -68,7 +68,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -116,6 +116,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	worldsendRecordRepo := infra.NewWorldsendRecordRepository(db)
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
+	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
 	sessionRepo := infra.NewSessionRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
@@ -134,7 +135,8 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 	}
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
-	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo)
+	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, db, staticDB)
+	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 
 	// DI - Handlers
@@ -143,14 +145,14 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, ec
 		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
 		User:       api_internal.NewUserHandler(userUsecase),
 		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
-		Song:       api_internal.NewSongHandler(songUsecase, masterCache),
+		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache),
 		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase),
 		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:         api_internal.NewMeHandler(playerDataUsecase),
 		MasterData: api_internal.NewMasterDataHandler(masterCache),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
 		// 外部API v1 用ハンドラ
-		V1Song:      api_v1.NewV1SongHandler(songUsecase, masterCache),
+		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
 		// chunirec互換APIハンドラ
@@ -253,6 +255,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	{
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
+		publicSongsGroup.GET("/:displayid/stat", handlers.Song.GetSongStats)
 
 		// WORLD'S END 楽曲エンドポイント
 		publicWorldsendGroup := publicSongsGroup.Group("/worldsend")
@@ -296,7 +299,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	))
 	{
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
-		apiV1.GET("/songs/:songId", handlers.V1Song.GetSong)
+		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
+		apiV1.GET("/songs/:displayid/stat", handlers.V1Song.GetSongStats)
 		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)

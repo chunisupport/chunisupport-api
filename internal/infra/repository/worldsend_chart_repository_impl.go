@@ -29,7 +29,7 @@ type worldsendSongChartRow struct {
 }
 
 // FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
-func (r *worldsendChartRepository) FindAll(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
@@ -46,7 +46,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, includeDeleted b
 	}
 	query += ` ORDER BY s.id`
 
-	rows, err := r.db.QueryxContext(ctx, query)
+	rows, err := exec.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, includeDeleted b
 }
 
 // FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, displayID string) (*repository.WorldsendSongWithChart, error) {
+func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
@@ -93,7 +93,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, displayI
 	var songModel models.SongModel
 	var chartModel models.WorldsendChartModel
 
-	err := r.db.QueryRowxContext(ctx, query, displayID).Scan(
+	err := exec.QueryRowxContext(ctx, query, displayID).Scan(
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 		&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
@@ -113,9 +113,9 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, displayI
 }
 
 // DeleteSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
-func (r *worldsendChartRepository) DeleteSong(ctx context.Context, displayID string) error {
+func (r *worldsendChartRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
 	query := `UPDATE songs SET is_deleted = 1 WHERE display_id = ? AND is_worldsend = 1`
-	result, err := r.db.ExecContext(ctx, query, displayID)
+	result, err := exec.ExecContext(ctx, query, displayID)
 	if err != nil {
 		return err
 	}
@@ -132,9 +132,9 @@ func (r *worldsendChartRepository) DeleteSong(ctx context.Context, displayID str
 }
 
 // RestoreSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
-func (r *worldsendChartRepository) RestoreSong(ctx context.Context, displayID string) error {
+func (r *worldsendChartRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
 	query := `UPDATE songs SET is_deleted = 0 WHERE display_id = ? AND is_worldsend = 1`
-	result, err := r.db.ExecContext(ctx, query, displayID)
+	result, err := exec.ExecContext(ctx, query, displayID)
 	if err != nil {
 		return err
 	}
@@ -152,20 +152,10 @@ func (r *worldsendChartRepository) RestoreSong(ctx context.Context, displayID st
 
 // UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 // トランザクション管理は呼び出し元で行う必要があります。
-func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error {
+func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
 	if len(songs) != len(charts) {
 		return fmt.Errorf("songs and charts length mismatch: %d != %d", len(songs), len(charts))
 	}
-
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
 
 	// 楽曲情報を更新
 	songQuery := `
@@ -173,7 +163,7 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, songs []*ent
 		SET title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?
 		WHERE id = ? AND is_worldsend = 1`
 	for _, song := range songs {
-		_, err = tx.ExecContext(ctx, songQuery,
+		_, err := exec.ExecContext(ctx, songQuery,
 			song.Title, song.Artist, song.GenreID, song.BPM, song.ReleasedAt, song.OfficialIdx, song.Jacket, song.ID)
 		if err != nil {
 			return err
@@ -186,12 +176,12 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, songs []*ent
 		SET we_star = ?, we_kanji = ?, notes = ?
 		WHERE id = ?`
 	for _, chart := range charts {
-		_, err = tx.ExecContext(ctx, chartQuery,
+		_, err := exec.ExecContext(ctx, chartQuery,
 			chart.WeStar, chart.WeKanji, chart.Notes, chart.ID)
 		if err != nil {
 			return err
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }

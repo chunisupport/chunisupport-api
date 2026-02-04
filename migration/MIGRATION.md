@@ -10,6 +10,8 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 
 マイグレーションファイルは `migration/mysql` ディレクトリに格納されており、`*.up.sql` ファイルがスキーマの追加・変更、`*.down.sql` ファイルが変更のロールバックを定義します。
 
+静的データ用のSQLiteスキーマは `migration/sqlite` ディレクトリに配置しています。
+
 ## 主要テーブルの概要
 
 以下は、アプリケーションのコア機能に関連する主要なテーブルの概要です。

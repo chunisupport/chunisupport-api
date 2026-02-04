@@ -10,8 +10,10 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/Qman110101/chunisupport-api/internal/testutil"
 	"github.com/labstack/echo/v4"
 )
 
@@ -213,7 +215,7 @@ func TestGetSongs(t *testing.T) {
 	}
 
 	// ハンドラーの準備
-	handler := NewSongHandler(mockUsecase, masterCache)
+	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache)
 
 	// リクエストの作成
 	e := echo.New()
@@ -273,5 +275,92 @@ func TestGetSongs(t *testing.T) {
 		if advChart := song.Charts["ADVANCED"]; advChart != nil {
 			t.Error("ADVANCED chart should be nil")
 		}
+	}
+}
+
+func TestGetSongStats(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/songs/test123456789012/stat", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("displayid")
+	c.SetParamValues("test123456789012")
+
+	ratingBands := []*entity.RatingBand{
+		{
+			ID:        1,
+			Label:     "15.0",
+			SortOrder: 1,
+		},
+	}
+	stats := []*entity.ChartStatsByRatingBand{
+		{
+			RatingBandID: 1,
+			Rank: entity.ChartRankStats{
+				AAAL: 1,
+				S:    2,
+				SP:   3,
+				SS:   4,
+				SSP:  5,
+				SSS:  6,
+				SSSP: 7,
+				Max:  8,
+			},
+			Combo: entity.ChartComboStats{
+				None: 9,
+				FC:   10,
+				AJ:   11,
+			},
+			Clear: map[string]int{
+				"failed": 1,
+			},
+		},
+	}
+
+	handler := &SongHandler{
+		statsUsecase: &testutil.MockChartStatsUsecase{
+			Stats: &entity.SongChartStats{
+				SongID:      "test123456789012",
+				RatingBands: ratingBands,
+				Charts: map[string][]*entity.ChartStatsByRatingBand{
+					"MASTER": stats,
+				},
+			},
+		},
+	}
+
+	if err := handler.GetSongStats(c); err != nil {
+		t.Fatalf("GetSongStats returned error: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response dto.ChartStatsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response.SongID != "test123456789012" {
+		t.Errorf("SongID = %v, want %v", response.SongID, "test123456789012")
+	}
+
+	if len(response.RatingBands) != 1 {
+		t.Errorf("rating_bands length = %d, want 1", len(response.RatingBands))
+	}
+
+	chartStats, ok := response.Charts["MASTER"]
+	if !ok {
+		t.Fatal("MASTER chart not found")
+	}
+	if len(chartStats.Stats) != 1 {
+		t.Fatalf("stats length = %d, want 1", len(chartStats.Stats))
+	}
+	if chartStats.Stats[0].RatingBand != "15.0" {
+		t.Errorf("rating_band = %s, want %s", chartStats.Stats[0].RatingBand, "15.0")
+	}
+	if chartStats.Stats[0].Rank.Max != 8 {
+		t.Errorf("rank.max = %d, want 8", chartStats.Stats[0].Rank.Max)
 	}
 }
