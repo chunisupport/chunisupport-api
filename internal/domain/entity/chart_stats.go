@@ -35,6 +35,8 @@ type ChartStatsByRatingBand struct {
 	Rank         ChartRankStats
 	Combo        ChartComboStats
 	Clear        map[string]int
+	AverageScore *float64 // レート帯別平均スコア（レコードが0件の場合はnil）
+	PlayerCount  int      // レート帯別プレイヤー数
 }
 
 // SongChartStats は楽曲の譜面統計レスポンス用エンティティです。

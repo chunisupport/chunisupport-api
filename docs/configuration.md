@@ -21,7 +21,7 @@
 - `log_level`
 - `log_paths.app`
 - `log_paths.echo`
-- `static_db_path`
+- `static_db_path` (統計データ用SQLiteデータベースのパス)
 - `shutdown_timeout_seconds` (1以上)
 - `auth.jwt_expiration_hour`
 - `auth.session_expiration_hour`

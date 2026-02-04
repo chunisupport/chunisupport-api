@@ -30,10 +30,12 @@ type ChartStatsChartDTO struct {
 
 // ChartStatsByRatingBandDTO はレーティング帯別統計のDTOです。
 type ChartStatsByRatingBandDTO struct {
-	RatingBand string             `json:"rating_band"`
-	Rank       ChartRankStatsDTO  `json:"rank"`
-	Combo      ChartComboStatsDTO `json:"combo"`
-	Clear      map[string]int     `json:"clear"`
+	RatingBand   string             `json:"rating_band"`
+	Rank         ChartRankStatsDTO  `json:"rank"`
+	Combo        ChartComboStatsDTO `json:"combo"`
+	Clear        map[string]int     `json:"clear"`
+	AverageScore *float64           `json:"average_score"`
+	PlayerCount  int                `json:"player_count"`
 }
 
 // ChartRankStatsDTO はランク別人数のDTOです。
@@ -108,7 +110,9 @@ func ToChartStatsResponse(stats *entity.SongChartStats) *ChartStatsResponse {
 					FC:   stat.Combo.FC,
 					AJ:   stat.Combo.AJ,
 				},
-				Clear: clearStats,
+				Clear:        clearStats,
+				AverageScore: stat.AverageScore,
+				PlayerCount:  stat.PlayerCount,
 			})
 		}
 

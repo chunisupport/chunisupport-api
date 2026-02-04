@@ -28,32 +28,34 @@ type ratingBandRow struct {
 }
 
 type chartStatsRow struct {
-	ChartID          int `db:"chart_id"`
-	RatingBandID     int `db:"rating_band_id"`
-	RankAAAL         int `db:"rank_aaal"`
-	RankS            int `db:"rank_s"`
-	RankSP           int `db:"rank_sp"`
-	RankSS           int `db:"rank_ss"`
-	RankSSP          int `db:"rank_ssp"`
-	RankSSS          int `db:"rank_sss"`
-	RankSSSP         int `db:"rank_sssp"`
-	RankMax          int `db:"rank_max"`
-	ComboNone        int `db:"combo_none"`
-	ComboFC          int `db:"combo_fc"`
-	ComboAJ          int `db:"combo_aj"`
-	ClearFailed      int `db:"clear_failed"`
-	ClearClear       int `db:"clear_clear"`
-	ClearHard        int `db:"clear_hard"`
-	ClearBrave       int `db:"clear_brave"`
-	ClearAbsolute    int `db:"clear_absolute"`
-	ClearCatastrophy int `db:"clear_catastrophy"`
+	ChartID          int      `db:"chart_id"`
+	RatingBandID     int      `db:"rating_band_id"`
+	RankAAAL         int      `db:"rank_aaal"`
+	RankS            int      `db:"rank_s"`
+	RankSP           int      `db:"rank_sp"`
+	RankSS           int      `db:"rank_ss"`
+	RankSSP          int      `db:"rank_ssp"`
+	RankSSS          int      `db:"rank_sss"`
+	RankSSSP         int      `db:"rank_sssp"`
+	RankMax          int      `db:"rank_max"`
+	ComboNone        int      `db:"combo_none"`
+	ComboFC          int      `db:"combo_fc"`
+	ComboAJ          int      `db:"combo_aj"`
+	ClearFailed      int      `db:"clear_failed"`
+	ClearClear       int      `db:"clear_clear"`
+	ClearHard        int      `db:"clear_hard"`
+	ClearBrave       int      `db:"clear_brave"`
+	ClearAbsolute    int      `db:"clear_absolute"`
+	ClearCatastrophy int      `db:"clear_catastrophy"`
+	AverageScore     *float64 `db:"average_score"`
+	PlayerCount      int      `db:"player_count"`
 }
 
 // FindRatingBands はレーティング帯マスタ一覧を返します。
 func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*entity.RatingBand, error) {
 	const query = `
 		SELECT id, label, min_inclusive, max_exclusive, sort_order
-		FROM rating_band
+		FROM rating_bands
 		ORDER BY sort_order
 	`
 
@@ -101,7 +103,9 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 			clear_hard,
 			clear_brave,
 			clear_absolute,
-			clear_catastrophy
+			clear_catastrophy,
+			average_score,
+			player_count
 		FROM chart_stats_by_rating_band
 		WHERE chart_id IN (?)
 		ORDER BY chart_id, rating_band_id
@@ -145,7 +149,9 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 				FC:   row.ComboFC,
 				AJ:   row.ComboAJ,
 			},
-			Clear: clearStats,
+			Clear:        clearStats,
+			AverageScore: row.AverageScore,
+			PlayerCount:  row.PlayerCount,
 		})
 	}
 

@@ -1,10 +1,41 @@
-CREATE TABLE IF NOT EXISTS rating_band (
+CREATE TABLE IF NOT EXISTS rating_bands (
     id INTEGER PRIMARY KEY,
     label TEXT NOT NULL,
     min_inclusive REAL,
     max_exclusive REAL,
     sort_order INTEGER NOT NULL
 );
+
+-- レーティング帯マスタデータ
+INSERT INTO rating_bands (id, label, min_inclusive, max_exclusive, sort_order) VALUES
+(1, '～14.9', NULL, 15.0, 1),
+(2, '15.0', 15.0, 15.1, 2),
+(3, '15.1', 15.1, 15.2, 3),
+(4, '15.2', 15.2, 15.3, 4),
+(5, '15.3', 15.3, 15.4, 5),
+(6, '15.4', 15.4, 15.5, 6),
+(7, '15.5', 15.5, 15.6, 7),
+(8, '15.6', 15.6, 15.7, 8),
+(9, '15.7', 15.7, 15.8, 9),
+(10, '15.8', 15.8, 15.9, 10),
+(11, '15.9', 15.9, 16.0, 11),
+(12, '16.0', 16.0, 16.1, 12),
+(13, '16.1', 16.1, 16.2, 13),
+(14, '16.2', 16.2, 16.3, 14),
+(15, '16.3', 16.3, 16.4, 15),
+(16, '16.4', 16.4, 16.5, 16),
+(17, '16.5', 16.5, 16.6, 17),
+(18, '16.6', 16.6, 16.7, 18),
+(19, '16.7', 16.7, 16.8, 19),
+(20, '16.8', 16.8, 16.9, 20),
+(21, '16.9', 16.9, 17.0, 21),
+(22, '17.0', 17.0, 17.1, 22),
+(23, '17.1', 17.1, 17.2, 23),
+(24, '17.2', 17.2, 17.3, 24),
+(25, '17.3', 17.3, 17.4, 25),
+(26, '17.4', 17.4, 17.5, 26),
+(27, '17.5', 17.5, 17.6, 27),
+(28, '17.6+', 17.6, NULL, 28);
 
 CREATE TABLE IF NOT EXISTS chart_stats_by_rating_band (
     chart_id INTEGER NOT NULL,
@@ -26,6 +57,8 @@ CREATE TABLE IF NOT EXISTS chart_stats_by_rating_band (
     clear_brave INTEGER NOT NULL,
     clear_absolute INTEGER NOT NULL,
     clear_catastrophy INTEGER NOT NULL,
+    average_score REAL,
+    player_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (chart_id, rating_band_id),
-    FOREIGN KEY (rating_band_id) REFERENCES rating_band (id)
+    FOREIGN KEY (rating_band_id) REFERENCES rating_bands (id)
 );

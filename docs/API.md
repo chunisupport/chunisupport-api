@@ -1040,6 +1040,8 @@ curl -X POST \
 | `charts[key].stats[].clear.brave` | number | BRAVE人数 |
 | `charts[key].stats[].clear.absolute` | number | ABSOLUTE人数 |
 | `charts[key].stats[].clear.catastrophy` | number | CATASTROPHY人数 |
+| `charts[key].stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
+| `charts[key].stats[].player_count` | number | レーティング帯別プレイヤー数 |
 
 **統計情報について**:
 - 統計データは定期バッチで更新され、過去データは保持しません
