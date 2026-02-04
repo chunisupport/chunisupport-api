@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/Qman110101/chunisupport-api/internal/info"
 	"github.com/joho/godotenv"
@@ -34,6 +35,8 @@ type Config struct {
 	AppPort  int      `json:"app_port"`
 	LogLevel string   `json:"log_level"`
 	LogPaths LogPaths `json:"log_paths"`
+	// StaticDBPath は静的データ用SQLiteのファイルパスです
+	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
 	PwPepper               string   // 環境変数から読み込み
@@ -86,6 +89,10 @@ func LoadConfig() (Config, error) {
 
 	if config.ShutdownTimeoutSeconds <= 0 {
 		return config, fmt.Errorf("shutdown_timeout_seconds must be greater than 0")
+	}
+
+	if strings.TrimSpace(config.StaticDBPath) == "" {
+		return config, fmt.Errorf("static_db_path is required")
 	}
 
 	// 環境変数から秘密情報を取得
