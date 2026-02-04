@@ -299,8 +299,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	))
 	{
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
-		apiV1.GET("/songs/:songId", handlers.V1Song.GetSong)
-		apiV1.GET("/songs/:songDisplayId/stat", handlers.V1Song.GetSongStats)
+		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
+		apiV1.GET("/songs/:displayid/stat", handlers.V1Song.GetSongStats)
 		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)

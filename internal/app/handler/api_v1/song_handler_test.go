@@ -143,7 +143,7 @@ func TestGetSongStats(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/songs/test123456789012/stat", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("songDisplayId")
+	c.SetParamNames("displayid")
 	c.SetParamValues("test123456789012")
 
 	handler := &V1SongHandler{

@@ -46,10 +46,10 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 	})
 }
 
-// GetSong は指定された songId の楽曲を取得します。
+// GetSong は指定された displayid の楽曲を取得します。
 func (h *V1SongHandler) GetSong(c echo.Context) error {
-	songID := c.Param("songId")
-	swc, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), songID)
+	displayID := c.Param("displayid")
+	swc, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
 	if err != nil {
 		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
@@ -63,7 +63,7 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 
 // GetSongStats は指定されたDisplayIDの譜面統計を取得します。
 func (h *V1SongHandler) GetSongStats(c echo.Context) error {
-	displayID := c.Param("songDisplayId")
+	displayID := c.Param("displayid")
 	stats, err := h.statsUsecase.GetSongStatsByDisplayID(c.Request().Context(), displayID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
