@@ -13,6 +13,7 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/Qman110101/chunisupport-api/internal/testutil"
 	"github.com/labstack/echo/v4"
 )
 
@@ -167,15 +168,6 @@ func (m *mockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_inter
 	return nil
 }
 
-type mockChartStatsUsecase struct {
-	stats *entity.SongChartStats
-	err   error
-}
-
-func (m *mockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error) {
-	return m.stats, m.err
-}
-
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。
 func TestGetSongs(t *testing.T) {
 	// マスタデータキャッシュの準備
@@ -223,7 +215,7 @@ func TestGetSongs(t *testing.T) {
 	}
 
 	// ハンドラーの準備
-	handler := NewSongHandler(mockUsecase, &mockChartStatsUsecase{}, masterCache)
+	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache)
 
 	// リクエストの作成
 	e := echo.New()
@@ -326,8 +318,8 @@ func TestGetSongStats(t *testing.T) {
 	}
 
 	handler := &SongHandler{
-		statsUsecase: &mockChartStatsUsecase{
-			stats: &entity.SongChartStats{
+		statsUsecase: &testutil.MockChartStatsUsecase{
+			Stats: &entity.SongChartStats{
 				SongID:      "test123456789012",
 				RatingBands: ratingBands,
 				Charts: map[string][]*entity.ChartStatsByRatingBand{

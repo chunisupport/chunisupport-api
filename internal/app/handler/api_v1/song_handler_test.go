@@ -1,7 +1,6 @@
 package api_v1
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
 	"github.com/Qman110101/chunisupport-api/internal/dto"
 	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/Qman110101/chunisupport-api/internal/testutil"
 	"github.com/labstack/echo/v4"
 )
 
@@ -138,15 +138,6 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	}
 }
 
-type mockChartStatsUsecase struct {
-	stats *entity.SongChartStats
-	err   error
-}
-
-func (m *mockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error) {
-	return m.stats, m.err
-}
-
 func TestGetSongStats(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/v1/songs/test123456789012/stat", nil)
@@ -156,8 +147,8 @@ func TestGetSongStats(t *testing.T) {
 	c.SetParamValues("test123456789012")
 
 	handler := &V1SongHandler{
-		statsUsecase: &mockChartStatsUsecase{
-			stats: &entity.SongChartStats{
+		statsUsecase: &testutil.MockChartStatsUsecase{
+			Stats: &entity.SongChartStats{
 				SongID: "test123456789012",
 				Charts: map[string][]*entity.ChartStatsByRatingBand{
 					"MASTER": {},
