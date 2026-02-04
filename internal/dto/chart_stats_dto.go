@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"log/slog"
 	"strconv"
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
@@ -82,6 +83,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats) *ChartStatsResponse {
 		for _, stat := range chartStats {
 			label, ok := ratingBandLabels[stat.RatingBandID]
 			if !ok {
+				slog.Warn("レーティング帯ラベルが見つかりません", "rating_band_id", stat.RatingBandID)
 				label = strconv.Itoa(stat.RatingBandID)
 			}
 			clearStats := make(map[string]int, len(stat.Clear))
