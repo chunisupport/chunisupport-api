@@ -24,6 +24,7 @@ type chartStatsUsecaseImpl struct {
 	statsRepo          repository.ChartStatsRepository
 	masterCache        repository.SongMasterProvider
 	defaultExecutor    repository.Executor
+	statsExecutor      repository.Executor
 }
 
 // NewChartStatsUsecase は ChartStatsUsecase の実装を生成します。
@@ -33,6 +34,7 @@ func NewChartStatsUsecase(
 	statsRepo repository.ChartStatsRepository,
 	masterCache repository.SongMasterProvider,
 	defaultExecutor repository.Executor,
+	statsExecutor repository.Executor,
 ) ChartStatsUsecase {
 	return &chartStatsUsecaseImpl{
 		songRepo:           songRepo,
@@ -40,6 +42,7 @@ func NewChartStatsUsecase(
 		statsRepo:          statsRepo,
 		masterCache:        masterCache,
 		defaultExecutor:    defaultExecutor,
+		statsExecutor:      statsExecutor,
 	}
 }
 
@@ -55,7 +58,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		return nil, err
 	}
 
-	ratingBands, err := u.statsRepo.FindRatingBands(ctx)
+	ratingBands, err := u.statsRepo.FindRatingBands(ctx, u.statsExecutor)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +73,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		chartIDs = append(chartIDs, entry.id)
 	}
 
-	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, chartIDs)
+	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +106,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 
 func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, songWithCharts *repository.SongWithCharts) ([]chartEntry, error) {
 	if songWithCharts.Song.IsWorldsend {
-		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, songWithCharts.Song.DisplayID)
+		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, songWithCharts.Song.DisplayID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, repository.ErrSongNotFound

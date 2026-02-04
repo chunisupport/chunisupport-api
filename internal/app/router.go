@@ -135,8 +135,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
-	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, db)
-	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo)
+	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, db, staticDB)
+	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 
 	// DI - Handlers

@@ -33,18 +33,22 @@ type WorldsendUsecase interface {
 // worldsendUsecase は WorldsendUsecase の実装です。
 type worldsendUsecase struct {
 	worldsendChartRepo repository.WorldsendChartRepository
+	defaultExecutor    repository.Executor
+	tm                 TransactionManager
 }
 
 // NewWorldsendUsecase は WorldsendUsecase の実装を生成します。
-func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository) WorldsendUsecase {
+func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository, tm TransactionManager, defaultExecutor repository.Executor) WorldsendUsecase {
 	return &worldsendUsecase{
 		worldsendChartRepo: worldsendChartRepo,
+		defaultExecutor:    defaultExecutor,
+		tm:                 tm,
 	}
 }
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*dto.WorldsendSongDTO, error) {
-	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, includeDeleted)
+	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)
 		return nil, err
@@ -60,7 +64,7 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
 func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*dto.WorldsendSongDTO, error) {
-	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, displayID)
+	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrSongNotFound
@@ -74,7 +78,7 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.DeleteSong(ctx, displayID)
+	err := s.worldsendChartRepo.DeleteSong(ctx, s.defaultExecutor, displayID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return repository.ErrSongNotFound
@@ -87,7 +91,7 @@ func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID st
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.RestoreSong(ctx, displayID)
+	err := s.worldsendChartRepo.RestoreSong(ctx, s.defaultExecutor, displayID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return repository.ErrSongNotFound
@@ -109,8 +113,9 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*en
 	}
 
 	// リポジトリに委譲
-	err := s.worldsendChartRepo.UpdateSongs(ctx, songs, charts)
-	if err != nil {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		return s.worldsendChartRepo.UpdateSongs(ctx, tx, songs, charts)
+	}); err != nil {
 		slog.Error("failed to update worldsend songs", "error", err)
 		return err
 	}

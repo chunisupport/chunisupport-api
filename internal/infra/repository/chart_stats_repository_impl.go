@@ -50,7 +50,7 @@ type chartStatsRow struct {
 }
 
 // FindRatingBands はレーティング帯マスタ一覧を返します。
-func (r *chartStatsRepository) FindRatingBands(ctx context.Context) ([]*entity.RatingBand, error) {
+func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*entity.RatingBand, error) {
 	const query = `
 		SELECT id, label, min_inclusive, max_exclusive, sort_order
 		FROM rating_band
@@ -58,7 +58,7 @@ func (r *chartStatsRepository) FindRatingBands(ctx context.Context) ([]*entity.R
 	`
 
 	var rows []ratingBandRow
-	if err := r.db.SelectContext(ctx, &rows, query); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +76,7 @@ func (r *chartStatsRepository) FindRatingBands(ctx context.Context) ([]*entity.R
 }
 
 // FindChartStatsByChartIDs は譜面ID一覧に対する統計を返します。
-func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
 	if len(chartIDs) == 0 {
 		return []*entity.ChartStatsByRatingBand{}, nil
 	}
@@ -109,10 +109,10 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, cha
 	if err != nil {
 		return nil, err
 	}
-	query = r.db.Rebind(query)
+	query = exec.Rebind(query)
 
 	var rows []chartStatsRow
-	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
 
