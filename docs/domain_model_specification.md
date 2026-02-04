@@ -293,7 +293,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | RatingBandID | int | ✓ | レーティング帯ID（複合主キー） |
 | Rank | ChartRankStats | ✓ | ランク別人数統計 |
 | Combo | ChartComboStats | ✓ | コンボランプ別人数統計 |
-| Clear | map[string]int | ✓ | クリアランプ別人数統計 |
+| Clear | ChartClearStats | ✓ | クリアランプ別人数統計 |
 | AverageScore | *float64 | - | レーティング帯別平均スコア（レコード数0件の場合はnil） |
 | PlayerCount | int | ✓ | レーティング帯別プレイヤー数 |
 
@@ -344,6 +344,24 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | None | int | コンボランプなし人数 |
 | FC | int | FULL COMBO人数 |
 | AJ | int | ALL JUSTICE人数 |
+
+---
+
+### ChartClearStats（クリアランプ別人数統計）
+
+#### 概要
+譜面のクリアランプ別人数を表す値オブジェクト。
+
+#### フィールド
+
+| フィールド名 | 型 | 説明 |
+|------------|-----|------|
+| Failed | int | FAILED人数 |
+| Clear | int | CLEAR人数 |
+| Hard | int | HARD人数 |
+| Brave | int | BRAVE人数 |
+| Absolute | int | ABSOLUTE人数 |
+| Catastrophy | int | CATASTROPHY人数 |
 
 ---
 

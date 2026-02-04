@@ -21,3 +21,12 @@ type MasterDataResponse struct {
 	Versions     []*VersionDTO    `json:"versions"`
 	RatingBands  []*RatingBandDTO `json:"rating_bands"`
 }
+
+// RatingBandDTO はレーティング帯マスタのDTOです。
+type RatingBandDTO struct {
+	ID           int      `json:"id"`
+	Label        string   `json:"label"`
+	MinInclusive *float64 `json:"min_inclusive"`
+	MaxExclusive *float64 `json:"max_exclusive"`
+	SortOrder    int      `json:"sort_order"`
+}

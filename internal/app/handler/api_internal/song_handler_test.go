@@ -314,8 +314,8 @@ func TestGetSongStats(t *testing.T) {
 				FC:   10,
 				AJ:   11,
 			},
-			Clear: map[string]int{
-				"failed": 1,
+			Clear: entity.ChartClearStats{
+				Failed: 1,
 			},
 		},
 	}

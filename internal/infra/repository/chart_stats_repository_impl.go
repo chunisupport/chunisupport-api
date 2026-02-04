@@ -5,7 +5,6 @@ import (
 
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -122,15 +121,6 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 
 	results := make([]*entity.ChartStatsByRatingBand, 0, len(rows))
 	for _, row := range rows {
-		clearStats := map[string]int{
-			info.StatsClearFailed:      row.ClearFailed,
-			info.StatsClearClear:       row.ClearClear,
-			info.StatsClearHard:        row.ClearHard,
-			info.StatsClearBrave:       row.ClearBrave,
-			info.StatsClearAbsolute:    row.ClearAbsolute,
-			info.StatsClearCatastrophy: row.ClearCatastrophy,
-		}
-
 		results = append(results, &entity.ChartStatsByRatingBand{
 			ChartID:      row.ChartID,
 			RatingBandID: row.RatingBandID,
@@ -149,7 +139,14 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 				FC:   row.ComboFC,
 				AJ:   row.ComboAJ,
 			},
-			Clear:        clearStats,
+			Clear: entity.ChartClearStats{
+				Failed:      row.ClearFailed,
+				Clear:       row.ClearClear,
+				Hard:        row.ClearHard,
+				Brave:       row.ClearBrave,
+				Absolute:    row.ClearAbsolute,
+				Catastrophy: row.ClearCatastrophy,
+			},
 			AverageScore: row.AverageScore,
 			PlayerCount:  row.PlayerCount,
 		})

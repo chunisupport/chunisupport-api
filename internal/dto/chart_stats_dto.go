@@ -13,15 +13,6 @@ type ChartStatsResponse struct {
 	Charts map[string]*ChartStatsChartDTO `json:"charts"`
 }
 
-// RatingBandDTO はレーティング帯マスタのDTOです。
-type RatingBandDTO struct {
-	ID           int      `json:"id"`
-	Label        string   `json:"label"`
-	MinInclusive *float64 `json:"min_inclusive"`
-	MaxExclusive *float64 `json:"max_exclusive"`
-	SortOrder    int      `json:"sort_order"`
-}
-
 // ChartStatsChartDTO は譜面ごとの統計情報です。
 type ChartStatsChartDTO struct {
 	Stats []*ChartStatsByRatingBandDTO `json:"stats"`
@@ -32,7 +23,7 @@ type ChartStatsByRatingBandDTO struct {
 	RatingBand   string             `json:"rating_band"`
 	Rank         ChartRankStatsDTO  `json:"rank"`
 	Combo        ChartComboStatsDTO `json:"combo"`
-	Clear        map[string]int     `json:"clear"`
+	Clear        ChartClearStatsDTO `json:"clear"`
 	AverageScore *float64           `json:"average_score"`
 	PlayerCount  int                `json:"player_count"`
 }
@@ -56,6 +47,16 @@ type ChartComboStatsDTO struct {
 	AJ   int `json:"aj"`
 }
 
+// ChartClearStatsDTO はクリアランプ別人数のDTOです。
+type ChartClearStatsDTO struct {
+	Failed      int `json:"failed"`
+	Clear       int `json:"clear"`
+	Hard        int `json:"hard"`
+	Brave       int `json:"brave"`
+	Absolute    int `json:"absolute"`
+	Catastrophy int `json:"catastrophy"`
+}
+
 // ToChartStatsResponse は SongChartStats を ChartStatsResponse に変換します。
 func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.RatingBand) *ChartStatsResponse {
 	if stats == nil {
@@ -76,10 +77,6 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.Ra
 				slog.Warn("Rating band label not found", "rating_band_id", stat.RatingBandID)
 				label = strconv.Itoa(stat.RatingBandID)
 			}
-			clearStats := make(map[string]int, len(stat.Clear))
-			for clearKey, value := range stat.Clear {
-				clearStats[clearKey] = value
-			}
 
 			statsDTO = append(statsDTO, &ChartStatsByRatingBandDTO{
 				RatingBand: label,
@@ -98,7 +95,14 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.Ra
 					FC:   stat.Combo.FC,
 					AJ:   stat.Combo.AJ,
 				},
-				Clear:        clearStats,
+				Clear: ChartClearStatsDTO{
+					Failed:      stat.Clear.Failed,
+					Clear:       stat.Clear.Clear,
+					Hard:        stat.Clear.Hard,
+					Brave:       stat.Clear.Brave,
+					Absolute:    stat.Clear.Absolute,
+					Catastrophy: stat.Clear.Catastrophy,
+				},
 				AverageScore: stat.AverageScore,
 				PlayerCount:  stat.PlayerCount,
 			})

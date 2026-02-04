@@ -1011,7 +1011,7 @@ curl -X POST \
 | `charts[key].stats[].combo.none` | number | コンボランプなし人数 |
 | `charts[key].stats[].combo.fc` | number | FULL COMBO人数 |
 | `charts[key].stats[].combo.aj` | number | ALL JUSTICE人数 |
-| `charts[key].stats[].clear` | object | クリアランプ別人数統計（将来的にキー追加の可能性あり） |
+| `charts[key].stats[].clear` | object | クリアランプ別人数統計 |
 | `charts[key].stats[].clear.failed` | number | FAILED人数 |
 | `charts[key].stats[].clear.clear` | number | CLEAR人数 |
 | `charts[key].stats[].clear.hard` | number | HARD人数 |
@@ -1025,7 +1025,7 @@ curl -X POST \
 - 統計データは定期バッチで更新され、過去データは保持しません
 - レーティング帯は「ベスト枠平均レーティング」を小数点1桁で切り捨てた値で判定します
 - レーティング帯は `min_inclusive <= rating < max_exclusive` で判定し、片側が `null` の場合は無限区間として扱います
-- クリアランプは将来の追加に備え、未知のキーは無視できる実装を推奨します
+- `player_count` が0のレーティング帯も含めて返却します
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
