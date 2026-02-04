@@ -10,6 +10,7 @@ import (
 	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
 	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
 	"github.com/Qman110101/chunisupport-api/internal/info"
+	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
 )
 
 // ChartStatsUsecase は譜面統計の取得ユースケースを提供します。
@@ -23,6 +24,7 @@ type chartStatsUsecaseImpl struct {
 	worldsendChartRepo repository.WorldsendChartRepository
 	statsRepo          repository.ChartStatsRepository
 	masterCache        repository.SongMasterProvider
+	staticMasterCache  *masterdata.StaticCache
 	defaultExecutor    repository.Executor
 	statsExecutor      repository.Executor
 }
@@ -33,6 +35,7 @@ func NewChartStatsUsecase(
 	worldsendChartRepo repository.WorldsendChartRepository,
 	statsRepo repository.ChartStatsRepository,
 	masterCache repository.SongMasterProvider,
+	staticMasterCache *masterdata.StaticCache,
 	defaultExecutor repository.Executor,
 	statsExecutor repository.Executor,
 ) ChartStatsUsecase {
@@ -41,6 +44,7 @@ func NewChartStatsUsecase(
 		worldsendChartRepo: worldsendChartRepo,
 		statsRepo:          statsRepo,
 		masterCache:        masterCache,
+		staticMasterCache:  staticMasterCache,
 		defaultExecutor:    defaultExecutor,
 		statsExecutor:      statsExecutor,
 	}
@@ -58,10 +62,8 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		return nil, err
 	}
 
-	ratingBands, err := u.statsRepo.FindRatingBands(ctx, u.statsExecutor)
-	if err != nil {
-		return nil, err
-	}
+	// rating_bandsはキャッシュから取得
+	ratingBands := u.staticMasterCache.RatingBands
 
 	entries, err := u.buildChartEntries(ctx, songWithCharts)
 	if err != nil {
@@ -98,9 +100,8 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 	}
 
 	return &entity.SongChartStats{
-		SongID:      songWithCharts.Song.DisplayID,
-		RatingBands: ratingBands,
-		Charts:      charts,
+		SongID: songWithCharts.Song.DisplayID,
+		Charts: charts,
 	}, nil
 }
 

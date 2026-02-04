@@ -41,7 +41,6 @@ type ChartStatsByRatingBand struct {
 
 // SongChartStats は楽曲の譜面統計レスポンス用エンティティです。
 type SongChartStats struct {
-	SongID      string
-	RatingBands []*RatingBand
-	Charts      map[string][]*ChartStatsByRatingBand
+	SongID string
+	Charts map[string][]*ChartStatsByRatingBand
 }

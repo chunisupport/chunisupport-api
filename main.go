@@ -92,8 +92,16 @@ func main() {
 
 	slog.Info("Master data preloaded")
 
+	staticMasterCache, err := masterdata.PreloadStatic(ctx, staticDatabase)
+	if err != nil {
+		slog.Error("Failed to preload static master data", "error", err)
+		return
+	}
+
+	slog.Info("Static master data preloaded")
+
 	// サーバーの作成と起動
-	server := app.NewServer(database, staticDatabase, cfg, masterCache)
+	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

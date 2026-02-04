@@ -16,16 +16,17 @@ import (
 
 // Server はアプリケーションサーバーを表します
 type Server struct {
-	echo          *echo.Echo
-	db            *sqlx.DB
-	staticDB      *sqlx.DB
-	cfg           config.Config
-	masterCache   *masterdata.Cache
-	echoLogWriter io.WriteCloser
+	echo              *echo.Echo
+	db                *sqlx.DB
+	staticDB          *sqlx.DB
+	cfg               config.Config
+	masterCache       *masterdata.Cache
+	staticMasterCache *masterdata.StaticCache
+	echoLogWriter     io.WriteCloser
 }
 
 // NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache) *Server {
+func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *Server {
 	// Echoのロガーを設定
 	var echoLogWriter io.WriteCloser
 	echoLogWriterResult, err := SetupEchoLogger(cfg)
@@ -36,12 +37,13 @@ func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 
 	return &Server{
-		echo:          NewRouter(db, staticDB, cfg, masterCache, echoLogWriter),
-		db:            db,
-		staticDB:      staticDB,
-		cfg:           cfg,
-		masterCache:   masterCache,
-		echoLogWriter: echoLogWriter,
+		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, echoLogWriter),
+		db:                db,
+		staticDB:          staticDB,
+		cfg:               cfg,
+		masterCache:       masterCache,
+		staticMasterCache: staticMasterCache,
+		echoLogWriter:     echoLogWriter,
 	}
 }
 

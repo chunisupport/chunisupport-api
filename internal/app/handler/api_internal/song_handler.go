@@ -16,17 +16,19 @@ import (
 
 // SongHandler は曲関連のHTTPリクエストを処理します。
 type SongHandler struct {
-	songUsecase  usecase.SongUsecase
-	statsUsecase usecase.ChartStatsUsecase
-	masterCache  *masterdata.Cache
+	songUsecase       usecase.SongUsecase
+	statsUsecase      usecase.ChartStatsUsecase
+	masterCache       *masterdata.Cache
+	staticMasterCache *masterdata.StaticCache
 }
 
 // NewSongHandler は新しいSongHandlerを生成します。
-func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache) *SongHandler {
+func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *SongHandler {
 	return &SongHandler{
-		songUsecase:  songUsecase,
-		statsUsecase: statsUsecase,
-		masterCache:  masterCache,
+		songUsecase:       songUsecase,
+		statsUsecase:      statsUsecase,
+		masterCache:       masterCache,
+		staticMasterCache: staticMasterCache,
 	}
 }
 
@@ -72,7 +74,10 @@ func (h *SongHandler) GetSongStats(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats))
+	// rating_bandsはキャッシュから取得
+	ratingBands := h.staticMasterCache.RatingBands
+
+	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats, ratingBands))
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

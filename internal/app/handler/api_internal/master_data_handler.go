@@ -12,13 +12,15 @@ import (
 
 // MasterDataHandler はマスタデータ関連のハンドラです。
 type MasterDataHandler struct {
-	masterCache *masterdata.Cache
+	masterCache       *masterdata.Cache
+	staticMasterCache *masterdata.StaticCache
 }
 
 // NewMasterDataHandler は新しい MasterDataHandler を生成します。
-func NewMasterDataHandler(masterCache *masterdata.Cache) *MasterDataHandler {
+func NewMasterDataHandler(masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *MasterDataHandler {
 	return &MasterDataHandler{
-		masterCache: masterCache,
+		masterCache:       masterCache,
+		staticMasterCache: staticMasterCache,
 	}
 }
 
@@ -74,11 +76,24 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		return cmp.Compare(a.ID, b.ID)
 	})
 
+	// RatingBands をソート順に配列化
+	ratingBands := make([]*dto.RatingBandDTO, 0, len(h.staticMasterCache.RatingBands))
+	for _, band := range h.staticMasterCache.RatingBands {
+		ratingBands = append(ratingBands, &dto.RatingBandDTO{
+			ID:           band.ID,
+			Label:        band.Label,
+			MinInclusive: band.MinInclusive,
+			MaxExclusive: band.MaxExclusive,
+			SortOrder:    band.SortOrder,
+		})
+	}
+
 	response := &dto.MasterDataResponse{
 		Genres:       genres,
 		Difficulties: difficulties,
 		AccountTypes: accountTypes,
 		Versions:     versions,
+		RatingBands:  ratingBands,
 	}
 
 	return c.JSON(http.StatusOK, response)

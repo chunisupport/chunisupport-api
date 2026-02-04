@@ -957,22 +957,6 @@ curl -X POST \
 ```json
 {
   "song_id": "0000000000000001",
-  "rating_bands": [
-    {
-      "id": 1,
-      "label": "15.0",
-      "min_inclusive": 15.0,
-      "max_exclusive": 15.1,
-      "sort_order": 1
-    },
-    {
-      "id": 99,
-      "label": "17.6+",
-      "min_inclusive": 17.6,
-      "max_exclusive": null,
-      "sort_order": 99
-    }
-  ],
   "charts": {
     "MASTER": {
       "stats": [
@@ -1011,12 +995,6 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `song_id` | string | 楽曲の識別ID（16桁） |
-| `rating_bands` | array | レーティング帯マスタ一覧（`sort_order` 昇順） |
-| `rating_bands[].id` | number | レーティング帯ID |
-| `rating_bands[].label` | string | 表示ラベル（例: "15.0", "17.6+"） |
-| `rating_bands[].min_inclusive` | number\|null | 下限（未設定の場合は下限なし） |
-| `rating_bands[].max_exclusive` | number\|null | 上限（未設定の場合は上限なし） |
-| `rating_bands[].sort_order` | number | 表示順 |
 | `charts` | Map<string, object> | 譜面別統計。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END（大文字） |
 | `charts[key].stats` | array | レーティング帯別の統計配列 |
 | `charts[key].stats[].rating_band` | string | レーティング帯ラベル（例: "15.0", "17.6+"） |
@@ -1276,6 +1254,11 @@ curl -X POST \
     { "id": 1, "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
     { "id": 2, "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
     { "id": 3, "name": "CHUNITHM AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+  ],
+  "rating_bands": [
+    { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
+    { "id": 2, "label": "15.0", "min_inclusive": 15.0, "max_exclusive": 15.1, "sort_order": 2 },
+    { "id": 28, "label": "17.6+", "min_inclusive": 17.6, "max_exclusive": null, "sort_order": 28 }
   ]
 }
 ```
@@ -1288,6 +1271,7 @@ curl -X POST \
 | `difficulties` | MasterItemDTO[] | 難易度一覧（ID順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
 | `versions` | VersionDTO[] | バージョン一覧（ID順） |
+| `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 
 **MasterItemDTO**:
 
@@ -1303,6 +1287,16 @@ curl -X POST \
 | `id` | int | バージョンID |
 | `name` | string | バージョン名称 |
 | `released_at` | string | リリース日時（ISO8601形式） |
+
+**RatingBandDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | int | レーティング帯ID |
+| `label` | string | 表示ラベル（例: "15.0", "17.6+"） |
+| `min_inclusive` | number\|null | 下限（未設定の場合は下限なし） |
+| `max_exclusive` | number\|null | 上限（未設定の場合は上限なし） |
+| `sort_order` | int | 表示順 |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要

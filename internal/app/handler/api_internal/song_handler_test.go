@@ -215,7 +215,10 @@ func TestGetSongs(t *testing.T) {
 	}
 
 	// ハンドラーの準備
-	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache)
+	staticMasterCache := &masterdata.StaticCache{
+		RatingBands: []*entity.RatingBand{},
+	}
+	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
 	// リクエストの作成
 	e := echo.New()
@@ -317,16 +320,20 @@ func TestGetSongStats(t *testing.T) {
 		},
 	}
 
+	staticMasterCache := &masterdata.StaticCache{
+		RatingBands: ratingBands,
+	}
+
 	handler := &SongHandler{
 		statsUsecase: &testutil.MockChartStatsUsecase{
 			Stats: &entity.SongChartStats{
-				SongID:      "test123456789012",
-				RatingBands: ratingBands,
+				SongID: "test123456789012",
 				Charts: map[string][]*entity.ChartStatsByRatingBand{
 					"MASTER": stats,
 				},
 			},
 		},
+		staticMasterCache: staticMasterCache,
 	}
 
 	if err := handler.GetSongStats(c); err != nil {
@@ -344,10 +351,6 @@ func TestGetSongStats(t *testing.T) {
 
 	if response.SongID != "test123456789012" {
 		t.Errorf("SongID = %v, want %v", response.SongID, "test123456789012")
-	}
-
-	if len(response.RatingBands) != 1 {
-		t.Errorf("rating_bands length = %d, want 1", len(response.RatingBands))
 	}
 
 	chartStats, ok := response.Charts["MASTER"]

@@ -19,4 +19,5 @@ type MasterDataResponse struct {
 	Difficulties []*MasterItemDTO `json:"difficulties"`
 	AccountTypes []*MasterItemDTO `json:"account_types"`
 	Versions     []*VersionDTO    `json:"versions"`
+	RatingBands  []*RatingBandDTO `json:"rating_bands"`
 }

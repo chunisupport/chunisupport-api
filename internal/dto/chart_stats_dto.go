@@ -9,9 +9,8 @@ import (
 
 // ChartStatsResponse は譜面統計APIのレスポンスです。
 type ChartStatsResponse struct {
-	SongID      string                         `json:"song_id"`
-	RatingBands []*RatingBandDTO               `json:"rating_bands"`
-	Charts      map[string]*ChartStatsChartDTO `json:"charts"`
+	SongID string                         `json:"song_id"`
+	Charts map[string]*ChartStatsChartDTO `json:"charts"`
 }
 
 // RatingBandDTO はレーティング帯マスタのDTOです。
@@ -58,24 +57,13 @@ type ChartComboStatsDTO struct {
 }
 
 // ToChartStatsResponse は SongChartStats を ChartStatsResponse に変換します。
-func ToChartStatsResponse(stats *entity.SongChartStats) *ChartStatsResponse {
+func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.RatingBand) *ChartStatsResponse {
 	if stats == nil {
 		return nil
 	}
 
-	ratingBands := make([]*RatingBandDTO, 0, len(stats.RatingBands))
-	for _, band := range stats.RatingBands {
-		ratingBands = append(ratingBands, &RatingBandDTO{
-			ID:           band.ID,
-			Label:        band.Label,
-			MinInclusive: band.MinInclusive,
-			MaxExclusive: band.MaxExclusive,
-			SortOrder:    band.SortOrder,
-		})
-	}
-
-	ratingBandLabels := make(map[int]string, len(stats.RatingBands))
-	for _, band := range stats.RatingBands {
+	ratingBandLabels := make(map[int]string, len(ratingBands))
+	for _, band := range ratingBands {
 		ratingBandLabels[band.ID] = band.Label
 	}
 
@@ -122,8 +110,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats) *ChartStatsResponse {
 	}
 
 	return &ChartStatsResponse{
-		SongID:      stats.SongID,
-		RatingBands: ratingBands,
-		Charts:      charts,
+		SongID: stats.SongID,
+		Charts: charts,
 	}
 }

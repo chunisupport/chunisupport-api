@@ -68,7 +68,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -135,7 +135,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
-	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, db, staticDB)
+	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, staticMasterCache, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 
@@ -145,14 +145,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
 		User:       api_internal.NewUserHandler(userUsecase),
 		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
-		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache),
+		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase),
 		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:         api_internal.NewMeHandler(playerDataUsecase),
-		MasterData: api_internal.NewMasterDataHandler(masterCache),
+		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
 		// 外部API v1 用ハンドラ
-		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache),
+		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
 		// chunirec互換APIハンドラ

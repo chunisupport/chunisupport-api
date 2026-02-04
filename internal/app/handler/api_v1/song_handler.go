@@ -16,17 +16,19 @@ import (
 
 // V1SongHandler は外部API v1 の楽曲関連エンドポイントを処理します。
 type V1SongHandler struct {
-	songUsecase  usecase.SongUsecase
-	statsUsecase usecase.ChartStatsUsecase
-	masterCache  *masterdata.Cache
+	songUsecase       usecase.SongUsecase
+	statsUsecase      usecase.ChartStatsUsecase
+	masterCache       *masterdata.Cache
+	staticMasterCache *masterdata.StaticCache
 }
 
 // NewV1SongHandler は新しい V1SongHandler を生成します。
-func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache) *V1SongHandler {
+func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartStatsUsecase, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *V1SongHandler {
 	return &V1SongHandler{
-		songUsecase:  songUsecase,
-		statsUsecase: statsUsecase,
-		masterCache:  masterCache,
+		songUsecase:       songUsecase,
+		statsUsecase:      statsUsecase,
+		masterCache:       masterCache,
+		staticMasterCache: staticMasterCache,
 	}
 }
 
@@ -69,7 +71,10 @@ func (h *V1SongHandler) GetSongStats(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats))
+	// rating_bandsはキャッシュから取得
+	ratingBands := h.staticMasterCache.RatingBands
+
+	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats, ratingBands))
 }
 
 // convertToV1SongDTOs は SongWithCharts のスライスを V1SongDTO のスライスに変換します。

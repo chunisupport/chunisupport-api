@@ -146,6 +146,10 @@ func TestGetSongStats(t *testing.T) {
 	c.SetParamNames("displayid")
 	c.SetParamValues("test123456789012")
 
+	staticMasterCache := &masterdata.StaticCache{
+		RatingBands: []*entity.RatingBand{},
+	}
+
 	handler := &V1SongHandler{
 		statsUsecase: &testutil.MockChartStatsUsecase{
 			Stats: &entity.SongChartStats{
@@ -155,6 +159,7 @@ func TestGetSongStats(t *testing.T) {
 				},
 			},
 		},
+		staticMasterCache: staticMasterCache,
 	}
 
 	if err := handler.GetSongStats(c); err != nil {
