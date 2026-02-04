@@ -69,9 +69,6 @@
       "allow_origins": ["http://localhost:3000"],
       "allow_credentials": true,
       "max_age": 3600
-    },
-    "static_database": {
-      "path": ".resources/static.db"
     }
   }
   ```
@@ -84,7 +81,7 @@
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    ```
    ```bash
-   migrate -database "sqlite3://.resources/static.db" -path migration/sqlite up
+   migrate -database "sqlite3://./static.db" -path migration/sqlite up
    ```
    
    **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
