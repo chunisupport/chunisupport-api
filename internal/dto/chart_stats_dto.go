@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // ChartStatsResponse は譜面統計APIのレスポンスです。

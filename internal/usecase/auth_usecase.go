@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/auth"
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/passwordhash"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/username"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
-	"github.com/Qman110101/chunisupport-api/internal/info"
-	"github.com/Qman110101/chunisupport-api/internal/utils"
+	"github.com/chunisupport/chunisupport-api/internal/auth"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/utils"
 	"github.com/google/uuid"
 )
 

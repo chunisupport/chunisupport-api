@@ -3,8 +3,8 @@ package models
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/score"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 )
 
 // PlayerWorldsendRecordModel はデータベース用のプレイヤー WORLD'S END レコードモデルです。

@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_v1"
-	"github.com/Qman110101/chunisupport-api/internal/usecase"
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 

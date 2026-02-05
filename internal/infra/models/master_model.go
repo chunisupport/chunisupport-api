@@ -1,6 +1,6 @@
 package models
 
-import "github.com/Qman110101/chunisupport-api/internal/domain/entity"
+import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
 
 // MasterModel は全てのマスタテーブルで共通のモデル構造です。
 type MasterModel struct {

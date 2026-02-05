@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // UserRepository はユーザーに関する永続化を扱うリポジトリです。

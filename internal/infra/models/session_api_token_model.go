@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/google/uuid"
 )
 

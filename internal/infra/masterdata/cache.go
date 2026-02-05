@@ -6,7 +6,7 @@ import (
 	"maps"
 	"strings"
 
-	domainmasterdata "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/jmoiron/sqlx"
 )
 

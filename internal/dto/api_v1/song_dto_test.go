@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
 // TestToV1SongDTO はToV1SongDTO関数の基本的な変換をテストします。

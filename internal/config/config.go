@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Qman110101/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/joho/godotenv"
 )
 

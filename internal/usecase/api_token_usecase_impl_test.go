@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 )
 
 type stubAPITokenRepository struct {

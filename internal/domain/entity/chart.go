@@ -1,8 +1,8 @@
 package entity
 
 import (
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
 // Chart は譜面エンティティを表します

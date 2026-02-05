@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/playername"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // playerUsecase は PlayerUsecase の実装です。

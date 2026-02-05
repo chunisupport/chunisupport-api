@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/playername"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/username"
-	"github.com/Qman110101/chunisupport-api/internal/infra/models"
-	"github.com/Qman110101/chunisupport-api/internal/utils"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/infra/models"
+	"github.com/chunisupport/chunisupport-api/internal/utils"
 	"github.com/jmoiron/sqlx"
 )
 

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/info"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 // ChartStatsUsecase は譜面統計の取得ユースケースを提供します。

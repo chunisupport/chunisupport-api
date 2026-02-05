@@ -8,12 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/app"
-	"github.com/Qman110101/chunisupport-api/internal/config"
-	"github.com/Qman110101/chunisupport-api/internal/info"
-	"github.com/Qman110101/chunisupport-api/internal/infra/db"
-	"github.com/Qman110101/chunisupport-api/internal/infra/logger"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/app"
+	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/db"
+	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 func main() {

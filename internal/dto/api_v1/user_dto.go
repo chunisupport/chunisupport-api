@@ -3,10 +3,10 @@ package api_v1
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // V1HonorDTO は外部API v1 用の称号情報DTOです。

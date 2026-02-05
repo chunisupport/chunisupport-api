@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 )
 
 type sessionUsecaseImpl struct {

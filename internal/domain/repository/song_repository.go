@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // SongWithCharts は楽曲とその譜面情報を保持する構造体です。

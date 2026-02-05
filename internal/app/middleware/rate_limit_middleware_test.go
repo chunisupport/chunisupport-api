@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 )

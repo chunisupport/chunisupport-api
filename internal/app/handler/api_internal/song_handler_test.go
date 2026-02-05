@@ -7,13 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
-	"github.com/Qman110101/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/labstack/echo/v4"
 )
 

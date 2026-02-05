@@ -1,4 +1,4 @@
-module github.com/Qman110101/chunisupport-api
+module github.com/chunisupport/chunisupport-api
 
 go 1.25.7
 

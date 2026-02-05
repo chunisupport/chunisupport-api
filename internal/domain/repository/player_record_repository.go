@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // PlayerRecordState はプレイヤーレコードの状態を表す構造体です。

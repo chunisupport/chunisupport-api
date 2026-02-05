@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // HonorDTO は称号情報を外部に公開するためのDTOです。

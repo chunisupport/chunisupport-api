@@ -3,9 +3,9 @@ package models
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/passwordhash"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
 // UserModel はデータベース用のUserモデルです。

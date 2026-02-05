@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // PlayerDataMaster はプレイヤーデータ登録に必要なマスタ情報を保持します。

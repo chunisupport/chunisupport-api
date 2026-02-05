@@ -6,7 +6,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo"
 )
 
 type UserName struct {

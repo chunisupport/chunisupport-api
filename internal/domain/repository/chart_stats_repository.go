@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // ChartStatsRepository は統計データの参照を扱うリポジトリです。

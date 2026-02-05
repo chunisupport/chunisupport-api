@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/playername"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/score"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/username"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 type stubUserRepository struct {

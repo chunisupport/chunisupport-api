@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
-	"github.com/Qman110101/chunisupport-api/internal/usecase"
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 

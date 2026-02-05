@@ -3,7 +3,7 @@ package entity
 import (
 	"fmt"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
 // WorldsendChart は WORLD'S END 譜面エンティティを表します。

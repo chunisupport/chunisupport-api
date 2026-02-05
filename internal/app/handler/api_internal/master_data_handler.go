@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/Qman110101/chunisupport-api/internal/dto"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/labstack/echo/v4"
 )
 

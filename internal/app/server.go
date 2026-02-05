@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Qman110101/chunisupport-api/internal/config"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 )

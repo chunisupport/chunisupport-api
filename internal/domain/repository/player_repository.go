@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // PlayerHonor はプレイヤーの称号情報を表す構造体です。

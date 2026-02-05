@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
+import "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 
 // PlayerDataMasterProvider は、プレイヤーデータ登録時に必要なマスタデータを提供します。
 // Interface Segregation Principleに従い、PlayerDataUsecaseが必要とするメソッドのみを定義します。

@@ -3,8 +3,8 @@ package api_v1
 import (
 	"encoding/json"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
 // V1ChartDTO は外部API v1 用の譜面情報DTOです。

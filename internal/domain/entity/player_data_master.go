@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
 // PlayerDataSong はプレイヤーデータ登録に必要な楽曲マスタ情報です。

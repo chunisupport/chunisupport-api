@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 )
 
 // Player はプレイヤーのエンティティを表します。

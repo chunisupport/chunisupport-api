@@ -6,11 +6,11 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
-	"github.com/Qman110101/chunisupport-api/internal/auth"
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
-	"github.com/Qman110101/chunisupport-api/internal/usecase"
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/auth"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 

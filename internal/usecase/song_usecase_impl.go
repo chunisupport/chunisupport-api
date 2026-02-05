@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/chartconstant"
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/notes"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // songUsecaseImpl は SongUsecase の実装です。

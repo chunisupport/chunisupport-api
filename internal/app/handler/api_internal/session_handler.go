@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Qman110101/chunisupport-api/internal/app/apierror"
-	"github.com/Qman110101/chunisupport-api/internal/auth"
-	dto_internal "github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
-	"github.com/Qman110101/chunisupport-api/internal/usecase"
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/auth"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 

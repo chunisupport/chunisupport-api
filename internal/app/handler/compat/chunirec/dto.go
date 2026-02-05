@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math"
 
-	domainmasterdata "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
-	"github.com/Qman110101/chunisupport-api/internal/infra/masterdata"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 // MusicShowAllResponse は全楽曲情報のレスポンスを表します

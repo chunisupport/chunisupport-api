@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // SongUsecase は楽曲に関するユースケースを提供します。

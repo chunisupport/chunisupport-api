@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo/score"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 )
 
 // PlayerRecord はプレイヤーの譜面記録エンティティを表します

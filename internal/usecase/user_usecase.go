@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // UserUsecase はユーザー関連のユースケースを提供します。

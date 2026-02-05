@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/Qman110101/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // PlayerUsecase はプレイヤーに関するビジネスロジックを扱うユースケースです。

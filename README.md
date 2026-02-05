@@ -30,7 +30,7 @@
 
 1. リポジトリをクローンする。
    ```bash
-   git clone https://github.com/Qman110101/chunisupport-api.git
+   git clone https://github.com/chunisupport/chunisupport-api.git
    cd chunisupport-api
    ```
 2. 依存関係を取得する。

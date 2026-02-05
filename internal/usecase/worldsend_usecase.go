@@ -6,9 +6,9 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/entity"
-	"github.com/Qman110101/chunisupport-api/internal/domain/repository"
-	"github.com/Qman110101/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。

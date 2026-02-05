@@ -3,7 +3,7 @@ package masterdata
 import (
 	"time"
 
-	domainmasterdata "github.com/Qman110101/chunisupport-api/internal/domain/masterdata"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 )
 
 // Item は単一のマスタ項目を表します。

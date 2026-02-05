@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 
-	"github.com/Qman110101/chunisupport-api/internal/domain/vo"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo"
 )
 
 // PasswordHash はパスワードハッシュの値オブジェクトです。
