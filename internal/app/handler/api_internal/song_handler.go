@@ -66,10 +66,18 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
-// GetSongStats は指定されたDisplayIDの譜面統計を取得します。
-func (h *SongHandler) GetSongStats(c echo.Context) error {
+// GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
+func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	displayID := c.Param("displayid")
-	stats, err := h.statsUsecase.GetSongStatsByDisplayID(c.Request().Context(), displayID)
+	difficultyPath := c.Param("difficulty")
+
+	// パスパラメータを内部難易度名に変換
+	difficultyName, ok := handler.ParseDifficultyPath(difficultyPath)
+	if !ok {
+		return apierror.ErrInvalidDifficulty
+	}
+
+	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -77,7 +85,7 @@ func (h *SongHandler) GetSongStats(c echo.Context) error {
 	// rating_bandsはキャッシュから取得
 	ratingBands := h.staticMasterCache.RatingBands
 
-	return c.JSON(http.StatusOK, dto.ToChartStatsResponse(stats, ratingBands))
+	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

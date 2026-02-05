@@ -17,6 +17,11 @@ import (
 type ChartStatsUsecase interface {
 	// GetSongStatsByDisplayID は指定されたDisplayIDの譜面統計を取得します。
 	GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error)
+
+	// GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
+	// difficultyNameは大文字の難易度名（"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"）
+	// または "WORLD'S END" である必要があります。
+	GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string) (*entity.SingleChartStats, error)
 }
 
 type chartStatsUsecaseImpl struct {
@@ -141,4 +146,101 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, songWithC
 	}
 
 	return entries, nil
+}
+
+// GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
+func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string) (*entity.SingleChartStats, error) {
+	songWithCharts, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	if err != nil {
+		return nil, err
+	}
+
+	// rating_bandsはキャッシュから取得
+	ratingBands := u.staticMasterCache.RatingBands
+
+	// 指定難易度の譜面を検索
+	entry, err := u.findChartEntryByDifficulty(ctx, songWithCharts, difficultyName)
+	if err != nil {
+		return nil, err
+	}
+
+	// 譜面統計を取得
+	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, []int{entry.id})
+	if err != nil {
+		return nil, err
+	}
+
+	// レーティング帯順でソート
+	bandOrder := make(map[int]int, len(ratingBands))
+	for _, band := range ratingBands {
+		bandOrder[band.ID] = band.SortOrder
+	}
+
+	sort.Slice(statsRows, func(i, j int) bool {
+		return bandOrder[statsRows[i].RatingBandID] < bandOrder[statsRows[j].RatingBandID]
+	})
+
+	return &entity.SingleChartStats{
+		SongID:     songWithCharts.Song.DisplayID,
+		Difficulty: entry.key,
+		Stats:      statsRows,
+	}, nil
+}
+
+// findChartEntryByDifficulty は指定難易度の譜面エントリを検索します。
+func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, songWithCharts *repository.SongWithCharts, difficultyName string) (*chartEntry, error) {
+	// WORLD'S END楽曲の場合
+	if difficultyName == info.StatsDifficultyWorldsend {
+		if !songWithCharts.Song.IsWorldsend {
+			return nil, ErrChartNotFound
+		}
+		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, songWithCharts.Song.DisplayID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrChartNotFound
+			}
+			return nil, err
+		}
+		return &chartEntry{
+			id:  worldsend.Chart.ID,
+			key: info.StatsDifficultyWorldsend,
+		}, nil
+	}
+
+	// 通常楽曲の場合、WORLD'S ENDリクエストは無効
+	if songWithCharts.Song.IsWorldsend {
+		return nil, ErrChartNotFound
+	}
+
+	masters := u.masterCache.SongMasters()
+	if masters == nil {
+		return nil, fmt.Errorf("master cache is not initialized")
+	}
+
+	// 該当する難易度の譜面を検索
+	// DifficultyNamesByIDを逆引きして、難易度名に一致する譜面を探す
+	for _, chart := range songWithCharts.Charts {
+		name, ok := masters.DifficultyNamesByID[chart.DifficultyID]
+		if ok && name == difficultyName {
+			return &chartEntry{
+				id:  chart.ID,
+				key: difficultyName,
+			}, nil
+		}
+	}
+
+	// 指定された難易度の譜面が存在しない
+	// 難易度名が有効かどうかをチェック
+	validDifficulty := false
+	for _, name := range masters.DifficultyNamesByID {
+		if name == difficultyName {
+			validDifficulty = true
+			break
+		}
+	}
+	if !validDifficulty {
+		return nil, ErrInvalidDifficulty
+	}
+
+	return nil, ErrChartNotFound
 }

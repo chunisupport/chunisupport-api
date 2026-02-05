@@ -59,3 +59,11 @@ type SongChartStats struct {
 	SongID string
 	Charts map[string][]*ChartStatsByRatingBand
 }
+
+// SingleChartStats は単一難易度の譜面統計レスポンス用エンティティです。
+// 難易度別APIで使用されます。
+type SingleChartStats struct {
+	SongID     string
+	Difficulty string
+	Stats      []*ChartStatsByRatingBand
+}

@@ -107,12 +107,12 @@
 | `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活。 |
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得（ページネーション対応）。 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
-| `/internal/songs/:displayid/stat` | GET | Cookie (任意) | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
+| `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
-| `/v1/songs/:displayid/stat` | GET | APIトークン | 楽曲統計取得（譜面ごとのレーティング帯別統計）。 |
+| `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得。 |
@@ -947,89 +947,69 @@ curl -X POST \
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
-### GET `/internal/songs/:displayid/stat`
+### GET `/internal/songs/:displayid/stats/:difficulty`
 - **認証**: Cookie (任意)
 - **レートリミット**: 認証なしは1分10回/IP
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **概要**: 指定楽曲の譜面ごとのレーティング帯別統計を取得します（WORLD'S ENDを含む）。削除済みの譜面は集計対象外です。
+- **パスパラメータ**: 
+  - `displayid` - 楽曲の表示用ID
+  - `difficulty` - 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
+- **概要**: 指定楽曲の特定難易度のレーティング帯別統計を取得します。削除済みの譜面は集計対象外です。
 - **レスポンス**: 200 OK
 
 ```json
 {
   "song_id": "0000000000000001",
-  "charts": {
-    "MASTER": {
-      "stats": [
-        {
-          "rating_band": "15.0",
-          "rank": {
-            "aaal": 12,
-            "s": 5,
-            "sp": 2,
-            "ss": 1,
-            "ssp": 0,
-            "sss": 0,
-            "sssp": 0,
-            "max": 0
-          },
-          "combo": {
-            "none": 3,
-            "fc": 10,
-            "aj": 5
-          },
-          "clear": {
-            "failed": 1,
-            "clear": 10,
-            "hard": 3,
-            "brave": 1,
-            "absolute": 0,
-            "catastrophy": 0
-          }
-        }
-      ]
+  "stats": [
+    {
+      "rating_band": "15.0",
+      "rank": {
+        "aaal": 12,
+        "s": 5,
+        "sp": 2,
+        "ss": 1,
+        "ssp": 0,
+        "sss": 0,
+        "sssp": 0,
+        "max": 0
+      },
+      "combo": {
+        "none": 3,
+        "fc": 10,
+        "aj": 5
+      },
+      "clear": {
+        "failed": 1,
+        "clear": 10,
+        "hard": 3,
+        "brave": 1,
+        "absolute": 0,
+        "catastrophy": 0
+      },
+      "average_score": 1007500.5,
+      "player_count": 18
     }
-  }
+  ]
 }
 ```
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `song_id` | string | 楽曲の識別ID（16桁） |
-| `charts` | Map<string, object> | 譜面別統計。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END（大文字） |
-| `charts[key].stats` | array | レーティング帯別の統計配列 |
-| `charts[key].stats[].rating_band` | string | レーティング帯ラベル（例: "15.0", "17.6+"） |
-| `charts[key].stats[].rank` | object | ランク別人数統計 |
-| `charts[key].stats[].rank.aaal` | number | AAA以下人数 |
-| `charts[key].stats[].rank.s` | number | S人数 |
-| `charts[key].stats[].rank.sp` | number | S+人数 |
-| `charts[key].stats[].rank.ss` | number | SS人数 |
-| `charts[key].stats[].rank.ssp` | number | SS+人数 |
-| `charts[key].stats[].rank.sss` | number | SSS人数 |
-| `charts[key].stats[].rank.sssp` | number | SSS+人数 |
-| `charts[key].stats[].rank.max` | number | 理論値人数 |
-| `charts[key].stats[].combo` | object | コンボランプ別人数統計 |
-| `charts[key].stats[].combo.none` | number | コンボランプなし人数 |
-| `charts[key].stats[].combo.fc` | number | FULL COMBO人数 |
-| `charts[key].stats[].combo.aj` | number | ALL JUSTICE人数 |
-| `charts[key].stats[].clear` | object | クリアランプ別人数統計 |
-| `charts[key].stats[].clear.failed` | number | FAILED人数 |
-| `charts[key].stats[].clear.clear` | number | CLEAR人数 |
-| `charts[key].stats[].clear.hard` | number | HARD人数 |
-| `charts[key].stats[].clear.brave` | number | BRAVE人数 |
-| `charts[key].stats[].clear.absolute` | number | ABSOLUTE人数 |
-| `charts[key].stats[].clear.catastrophy` | number | CATASTROPHY人数 |
-| `charts[key].stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
-| `charts[key].stats[].player_count` | number | レーティング帯別プレイヤー数 |
+| `stats` | array | レーティング帯別の統計配列 |
+| `stats[].rating_band` | string | レーティング帯ラベル（例: "15.0", "17.6+"） |
+| `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
+| `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj） |
+| `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
+| `stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
+| `stats[].player_count` | number | レーティング帯別プレイヤー数 |
 
-**統計情報について**:
-- 統計データは定期バッチで更新され、過去データは保持しません
-- レーティング帯は「ベスト枠平均レーティング」を小数点1桁で切り捨てた値で判定します
-- レーティング帯は `min_inclusive <= rating < max_exclusive` で判定し、片側が `null` の場合は無限区間として扱います
-- `player_count` が0のレーティング帯も含めて返却します
+**難易度パラメータについて**:
+- パス内では小文字で指定: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### DELETE `/internal/songs/:displayid`
@@ -1474,23 +1454,26 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:displayid/stat`
+### GET `/v1/songs/:displayid/stats/:difficulty`
 - **認証**: APIトークン必須
-- **概要**: 指定楽曲の譜面ごとのレーティング帯別統計を取得します。
+- **概要**: 指定楽曲の特定難易度のレーティング帯別統計を取得します。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `displayid` | string | 楽曲の表示用ID |
+| `difficulty` | string | 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend` |
 
 - **レスポンス**: 200 OK
 
-レスポンス形式は GET `/internal/songs/:displayid/stat` と同様です。
+レスポンス形式は GET `/internal/songs/:displayid/stats/:difficulty` と同様です。
 
 - **主なエラー**:
+  - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/v1/users/:username`

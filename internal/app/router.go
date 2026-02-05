@@ -255,7 +255,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	{
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
-		publicSongsGroup.GET("/:displayid/stat", handlers.Song.GetSongStats)
+		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
 
 		// WORLD'S END 楽曲エンドポイント
 		publicWorldsendGroup := publicSongsGroup.Group("/worldsend")
@@ -300,7 +300,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	{
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
 		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
-		apiV1.GET("/songs/:displayid/stat", handlers.V1Song.GetSongStats)
+		apiV1.GET("/songs/:displayid/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
 		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)

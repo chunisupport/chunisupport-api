@@ -78,7 +78,9 @@ var (
 	ErrPlayerNotFound  = New(CodePlayerNotFound, http.StatusNotFound)
 
 	// 楽曲・譜面関連エラー
-	ErrSongNotFound = New(CodeSongNotFound, http.StatusNotFound)
+	ErrSongNotFound      = New(CodeSongNotFound, http.StatusNotFound)
+	ErrChartNotFound     = New(CodeChartNotFound, http.StatusNotFound)
+	ErrInvalidDifficulty = New(CodeInvalidDifficulty, http.StatusBadRequest)
 
 	// データ関連エラー
 	ErrValidationFailed   = New(CodeValidationFailed, http.StatusUnprocessableEntity)

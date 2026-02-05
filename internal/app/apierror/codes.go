@@ -31,6 +31,7 @@ const (
 	CodeChartNotFound       = "chart_not_found"
 	CodeInvalidGenreID      = "invalid_genre_id"
 	CodeInvalidDifficultyID = "invalid_difficulty_id"
+	CodeInvalidDifficulty   = "invalid_difficulty" // 無効な難易度パラメータ
 
 	// データ関連エラー
 	CodeValidationFailed   = "validation_failed"

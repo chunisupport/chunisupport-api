@@ -57,6 +57,13 @@ type ChartClearStatsDTO struct {
 	Catastrophy int `json:"catastrophy"`
 }
 
+// SingleChartStatsResponse は単一難易度の譜面統計APIのレスポンスです。
+// 難易度別統計取得エンドポイント用のDTOです。
+type SingleChartStatsResponse struct {
+	SongID string                       `json:"song_id"`
+	Stats  []*ChartStatsByRatingBandDTO `json:"stats"`
+}
+
 // ToChartStatsResponse は SongChartStats を ChartStatsResponse に変換します。
 func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.RatingBand) *ChartStatsResponse {
 	if stats == nil {
@@ -116,5 +123,60 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.Ra
 	return &ChartStatsResponse{
 		SongID: stats.SongID,
 		Charts: charts,
+	}
+}
+
+// ToSingleChartStatsResponse は SingleChartStats を SingleChartStatsResponse に変換します。
+func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*entity.RatingBand) *SingleChartStatsResponse {
+	if stats == nil {
+		return nil
+	}
+
+	ratingBandLabels := make(map[int]string, len(ratingBands))
+	for _, band := range ratingBands {
+		ratingBandLabels[band.ID] = band.Label
+	}
+
+	statsDTO := make([]*ChartStatsByRatingBandDTO, 0, len(stats.Stats))
+	for _, stat := range stats.Stats {
+		label, ok := ratingBandLabels[stat.RatingBandID]
+		if !ok {
+			slog.Warn("Rating band label not found", "rating_band_id", stat.RatingBandID)
+			label = strconv.Itoa(stat.RatingBandID)
+		}
+
+		statsDTO = append(statsDTO, &ChartStatsByRatingBandDTO{
+			RatingBand: label,
+			Rank: ChartRankStatsDTO{
+				AAAL: stat.Rank.AAAL,
+				S:    stat.Rank.S,
+				SP:   stat.Rank.SP,
+				SS:   stat.Rank.SS,
+				SSP:  stat.Rank.SSP,
+				SSS:  stat.Rank.SSS,
+				SSSP: stat.Rank.SSSP,
+				Max:  stat.Rank.Max,
+			},
+			Combo: ChartComboStatsDTO{
+				None: stat.Combo.None,
+				FC:   stat.Combo.FC,
+				AJ:   stat.Combo.AJ,
+			},
+			Clear: ChartClearStatsDTO{
+				Failed:      stat.Clear.Failed,
+				Clear:       stat.Clear.Clear,
+				Hard:        stat.Clear.Hard,
+				Brave:       stat.Clear.Brave,
+				Absolute:    stat.Clear.Absolute,
+				Catastrophy: stat.Clear.Catastrophy,
+			},
+			AverageScore: stat.AverageScore,
+			PlayerCount:  stat.PlayerCount,
+		})
+	}
+
+	return &SingleChartStatsResponse{
+		SongID: stats.SongID,
+		Stats:  statsDTO,
 	}
 }

@@ -49,6 +49,11 @@ func FromUsecaseError(err error) *APIError {
 	// 楽曲関連エラー
 	case errors.Is(err, repository.ErrSongNotFound):
 		return ErrSongNotFound.WithInternal(err)
+	// 難易度関連エラー
+	case errors.Is(err, usecase.ErrInvalidDifficulty):
+		return ErrInvalidDifficulty.WithInternal(err)
+	case errors.Is(err, usecase.ErrChartNotFound):
+		return ErrChartNotFound.WithInternal(err)
 	// ユーザー名バリデーションエラー
 	case errors.Is(err, usecase.ErrUsernameEmpty):
 		return ErrUsernameEmpty.WithInternal(err)

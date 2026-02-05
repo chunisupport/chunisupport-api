@@ -8,10 +8,15 @@ import (
 
 // MockChartStatsUsecase は譜面統計ユースケースのテスト用モックです。
 type MockChartStatsUsecase struct {
-	Stats *entity.SongChartStats
-	Err   error
+	Stats       *entity.SongChartStats
+	SingleStats *entity.SingleChartStats
+	Err         error
 }
 
 func (m *MockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error) {
 	return m.Stats, m.Err
+}
+
+func (m *MockChartStatsUsecase) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string) (*entity.SingleChartStats, error) {
+	return m.SingleStats, m.Err
 }

@@ -27,4 +27,8 @@ var (
 	// パスワードバリデーションエラー
 	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
 	ErrPasswordTooLong  = errors.New("password must be 128 characters or less")
+
+	// 難易度関連エラー
+	ErrInvalidDifficulty = errors.New("invalid difficulty") // 無効な難易度パラメータ
+	ErrChartNotFound     = errors.New("chart not found")    // 指定された難易度の譜面が存在しない
 )

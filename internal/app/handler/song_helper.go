@@ -2,12 +2,20 @@ package handler
 
 import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 const (
 	MinDifficultyID = 1
 	MaxDifficultyID = 5
 )
+
+// ParseDifficultyPath はパスパラメータを内部難易度名に変換します。
+// 無効なパラメータの場合は空文字とfalseを返します。
+// info.ParseDifficultyPathのラッパー関数です。
+func ParseDifficultyPath(path string) (difficultyName string, ok bool) {
+	return info.ParseDifficultyPath(path)
+}
 
 // BuildChartsMap creates a map of charts keyed by difficulty name.
 // T is the type of the Chart DTO (e.g., *dto.ChartDTO or *dto.V1ChartDTO).
