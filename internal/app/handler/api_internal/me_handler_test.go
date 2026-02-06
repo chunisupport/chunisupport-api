@@ -140,6 +140,42 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		assert.Equal(t, expectedResult.AppVersion, result.AppVersion)
 	})
 
+	t.Run("ハッピーパス: 未知のフィールドを含むJSON（エラーにならず無視される）", func(t *testing.T) {
+		// 既知のフィールドと未知のフィールドを含むJSONを作成
+		payloadWithUnknownFields := map[string]interface{}{
+			"app_ver":     "1.0.0",
+			"name":        "テストプレイヤー",
+			"level":       100,
+			"extra_field": "この値は無視される",
+			"debug_info":  map[string]interface{}{"timestamp": "2024-01-01", "version": "1.0"},
+			"bookmarklet": true,
+		}
+
+		jsonData, err := json.Marshal(payloadWithUnknownFields)
+		assert.NoError(t, err)
+
+		// リクエスト作成（format=json形式）
+		req := httptest.NewRequest(http.MethodPost, "/internal/me/register-data?format=json", bytes.NewBuffer(jsonData))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		// ユーザー情報をコンテキストにセット
+		c.Set("userEntity", testUser)
+
+		// ハンドラ実行（エラーにならないことを確認）
+		err = h.RegisterData(c)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		// レスポンス確認（正常に処理されている）
+		var result dto_internal.PlayerDataResult
+		err = json.Unmarshal(rec.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedResult.PlayerID, result.PlayerID)
+		assert.Equal(t, expectedResult.AppVersion, result.AppVersion)
+	})
+
 	t.Run("アンハッピーパス: 認証なし", func(t *testing.T) {
 		jsonData, err := json.Marshal(testPayload)
 		assert.NoError(t, err)

@@ -404,6 +404,7 @@
 - **リクエストボディ**: 
   - **デフォルト形式（推奨）**: JSONデータをgzip圧縮後、base64エンコードした文字列
   - **デバッグ形式（`?format=json`）**: `PlayerDataPayload` 構造に準拠した生JSON。公式アプリのエクスポートJSONをそのまま送信する想定。
+  - **未知のフィールドの扱い**: 構造体に定義されていないフィールドは無視されます。将来の互換性のため、クライアント側で追加情報を含めることができます。未知のフィールドが含まれていた場合、サーバーログに警告が記録されますが、エラーにはなりません。
 
 #### リクエスト形式
 
@@ -644,7 +645,7 @@ curl -X POST \
 > **Note**: 差分情報（変更前後の比較）は返却されません。差分を取得する場合は、登録前後でスコア一覧API（`GET /internal/users/:username`）を呼び出し、クライアント側で比較してください。
 
 - **主なエラー**:
-  - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・未知フィールド・楽曲マスタ未登録など
+  - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・楽曲マスタ未登録など
   - 401 Unauthorized (`missing_token` / `invalid_token`): Cookie欠如
   - 409 Conflict (`conflict`): 別ユーザーのプレイヤーデータと競合
   - 413 Request Entity Too Large (`payload_too_large`): ボディサイズ5MB超過
@@ -961,6 +962,34 @@ curl -X POST \
   "song_id": "0000000000000001",
   "stats": [
     {
+      "rating_band": "ALL",
+      "rank": {
+        "aaal": 45,
+        "s": 28,
+        "sp": 15,
+        "ss": 8,
+        "ssp": 3,
+        "sss": 1,
+        "sssp": 0,
+        "max": 0
+      },
+      "combo": {
+        "none": 20,
+        "fc": 52,
+        "aj": 28
+      },
+      "clear": {
+        "failed": 5,
+        "clear": 60,
+        "hard": 18,
+        "brave": 10,
+        "absolute": 5,
+        "catastrophy": 2
+      },
+      "average_score": 1006234.8,
+      "player_count": 100
+    },
+    {
       "rating_band": "15.0",
       "rank": {
         "aaal": 12,
@@ -995,8 +1024,8 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `song_id` | string | 楽曲の識別ID（16桁） |
-| `stats` | array | レーティング帯別の統計配列 |
-| `stats[].rating_band` | string | レーティング帯ラベル（例: "15.0", "17.6+"） |
+| `stats` | array | レーティング帯別の統計配列。**先頭要素は必ず `rating_band: "ALL"`（全プレイヤー統計）** |
+| `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.6+"） |
 | `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
 | `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj） |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |

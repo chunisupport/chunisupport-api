@@ -275,6 +275,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 - `Label` は非空
 - `MinInclusive` と `MaxExclusive` の両方がnilであってはならない
+  - **例外**: `ID = 0` (ラベル "ALL") は全プレイヤー統計を表す特殊行であり、レーティング帯範囲を持たないため、両方nilを許容します
 - レーティング帯は 0.1刻みで定義（15.00未満、15.00～17.50、17.60+）
 - 判定式: `MinInclusive <= rating < MaxExclusive`
 

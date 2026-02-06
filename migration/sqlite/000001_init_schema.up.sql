@@ -7,8 +7,10 @@ CREATE TABLE IF NOT EXISTS rating_bands (
 );
 
 -- レーティング帯マスタデータ
+-- ID=0は全プレイヤー統計（レート帯フィルタなし）を表す特殊行
 INSERT INTO rating_bands (id, label, min_inclusive, max_exclusive, sort_order) VALUES
-(1, '～14.9', NULL, 15.0, 1),
+(0, 'ALL', NULL, NULL, 0),
+(1, '-14.9', NULL, 15.0, 1),
 (2, '15.0', 15.0, 15.1, 2),
 (3, '15.1', 15.1, 15.2, 3),
 (4, '15.2', 15.2, 15.3, 4),

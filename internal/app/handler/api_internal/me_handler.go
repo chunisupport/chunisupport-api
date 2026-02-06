@@ -79,15 +79,44 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 
 	hashText := hex.EncodeToString(hash[:])
 
-	decoder := json.NewDecoder(bytes.NewReader(jsonData))
-	decoder.DisallowUnknownFields()
-
-	var payload usecase.PlayerDataPayload
-	if err := decoder.Decode(&payload); err != nil {
+	// 未知のフィールドを検出するため、まずmapにデコード
+	var rawMap map[string]interface{}
+	if err := json.Unmarshal(jsonData, &rawMap); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if decoder.More() {
-		return apierror.ErrBadRequest
+
+	// PlayerDataPayloadの既知のフィールド（jsonタグ）
+	knownFields := map[string]bool{
+		"app_ver":      true,
+		"name":         true,
+		"level":        true,
+		"rating":       true,
+		"last_played":  true,
+		"overpower":    true,
+		"class_emblem": true,
+		"team":         true,
+		"honors":       true,
+		"scores":       true,
+		"updated_at":   true,
+	}
+
+	// 未知のフィールドを検出
+	var unknownFields []string
+	for key := range rawMap {
+		if !knownFields[key] {
+			unknownFields = append(unknownFields, key)
+		}
+	}
+
+	// 未知のフィールドがあれば警告ログを出力
+	if len(unknownFields) > 0 {
+		c.Logger().Warnf("unknown fields in player data payload: %v (user: %s)", unknownFields, user.ID)
+	}
+
+	// 正式な構造体にデコード（未知フィールドは無視される）
+	var payload usecase.PlayerDataPayload
+	if err := json.Unmarshal(jsonData, &payload); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
 	result, err := h.playerDataUsecase.Register(c.Request().Context(), user, &payload, hashText)
