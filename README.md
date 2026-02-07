@@ -53,25 +53,30 @@
    DB_PASS=your_password
    ```
    ```json
-   // .config/develop.settings.json
    {
-     "app_port": 3002,
-     "log_level": "debug",
-     "log_paths": { "app": "log", "echo": "log" },
-     "static_db_path": "./static.db",
-     "shutdown_timeout_seconds": 20,
-    "auth": {
-      "jwt_expiration_hour": 24,
-      "session_expiration_hour": 24,
-      "cookie_secure": false,
-      "cookie_same_site": "lax"
-    },
-    "cors": {
-      "allow_origins": ["http://localhost:3000"],
-      "allow_credentials": true,
-      "max_age": 3600
-    }
-  }
+      "app_port": 3000,
+      "log_level": "debug",
+      "log_paths": {
+         "app": ".log/app",
+         "echo": ".log/echo"
+      },
+      "auth": {
+         "jwt_expiration_hour": 24,
+         "session_expiration_hour": 24,
+         "cookie_secure": false,
+         "cookie_same_site": "lax"
+      },
+      "shutdown_timeout_seconds": 20,
+      "cors": {
+         "allow_origins": [
+               "http://localhost:3000",
+               "http://localhost:5173"
+         ],
+         "allow_credentials": true,
+         "max_age": 3600
+      },
+      "static_db_path": "./static.db"
+   }
   ```
 4. データベースを作成してマイグレーションする。
    - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。マイグレーションを実行する際は、コマンド内のパスをこの設定値と一致させてください。
