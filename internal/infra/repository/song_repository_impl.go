@@ -156,11 +156,14 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 }
 
 // FindByDisplayIDs は指定されたDisplayIDのリストに該当する楽曲を取得します。
+// 各楽曲には関連する譜面情報が含まれます。
+// N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
 func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) ([]*entity.Song, error) {
 	if len(displayIDs) == 0 {
 		return []*entity.Song{}, nil
 	}
 
+	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
@@ -176,9 +179,51 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		return nil, err
 	}
 
+	if len(songRows) == 0 {
+		return []*entity.Song{}, nil
+	}
+
+	// 2. 取得した楽曲のIDを収集
+	songIDs := make([]int, len(songRows))
+	songIDToIndex := make(map[int]int, len(songRows))
+	for i, s := range songRows {
+		songIDs[i] = s.ID
+		songIDToIndex[s.ID] = i
+	}
+
+	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
+	chartsQuery, chartArgs, err := sqlx.In(`
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		FROM charts
+		WHERE song_id IN (?)
+		ORDER BY song_id, difficulty_id
+	`, songIDs)
+	if err != nil {
+		return nil, err
+	}
+	chartsQuery = exec.Rebind(chartsQuery)
+
+	var chartRows []chartRow
+	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, chartArgs...); err != nil {
+		return nil, err
+	}
+
+	// 4. 結果を構築
 	songs := make([]*entity.Song, len(songRows))
 	for i, sr := range songRows {
-		songs[i] = r.toSongEntity(&sr)
+		song := r.toSongEntity(&sr)
+		song.Charts = []*entity.Chart{}
+		songs[i] = song
+	}
+
+	// 5. 譜面を楽曲に紐付け
+	for _, cr := range chartRows {
+		idx, ok := songIDToIndex[cr.SongID]
+		if !ok {
+			continue
+		}
+		chart := r.toChartEntity(&cr)
+		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
 	return songs, nil
@@ -253,7 +298,7 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		displayIDs[i] = song.DisplayID
 	}
 
-	// 2. 既存楽曲を一括取得（存在確認とID取得）
+	// 2. 既存楽曲を一括取得（存在確認とID取得、譜面情報も含む）
 	existingSongs, err := r.FindByDisplayIDs(ctx, exec, displayIDs)
 	if err != nil {
 		return fmt.Errorf("failed to find songs by display IDs: %w", err)
@@ -272,21 +317,14 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		}
 	}
 
-	// 5. 既存譜面を一括取得して存在確認
-	songIDs := make([]int, 0, len(displayIDToSongID))
-	for _, id := range displayIDToSongID {
-		songIDs = append(songIDs, id)
-	}
-	existingCharts, err := r.findChartsBySongIDs(ctx, exec, songIDs)
-	if err != nil {
-		return fmt.Errorf("failed to find charts by song IDs: %w", err)
-	}
-
-	// 譜面の存在確認用マップ: "songID-difficultyID" -> true
+	// 5. 既存譜面の存在確認用マップを作成: "songID-difficultyID" -> true
+	// FindByDisplayIDsで既にChartsが含まれているので、そこから取得する
 	chartExistsMap := make(map[string]bool)
-	for _, chart := range existingCharts {
-		key := fmt.Sprintf("%d-%d", chart.SongID, chart.DifficultyID)
-		chartExistsMap[key] = true
+	for _, song := range existingSongs {
+		for _, chart := range song.Charts {
+			key := fmt.Sprintf("%d-%d", chart.SongID, chart.DifficultyID)
+			chartExistsMap[key] = true
+		}
 	}
 
 	// 6. 更新対象の譜面が全て存在するか確認
@@ -311,35 +349,6 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	}
 
 	return nil
-}
-
-// findChartsBySongIDs は指定されたsongIDリストの譜面を一括取得します。
-func (r *songRepository) findChartsBySongIDs(ctx context.Context, exec repository.Executor, songIDs []int) ([]*entity.Chart, error) {
-	if len(songIDs) == 0 {
-		return []*entity.Chart{}, nil
-	}
-
-	query, args, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
-		FROM charts
-		WHERE song_id IN (?)
-	`, songIDs)
-	if err != nil {
-		return nil, err
-	}
-	query = exec.Rebind(query)
-
-	var chartRows []chartRow
-	if err := exec.SelectContext(ctx, &chartRows, query, args...); err != nil {
-		return nil, err
-	}
-
-	charts := make([]*entity.Chart, len(chartRows))
-	for i, cr := range chartRows {
-		charts[i] = r.toChartEntity(&cr)
-	}
-
-	return charts, nil
 }
 
 // bulkUpdateSongs は楽曲情報をCASE式で一括更新します。

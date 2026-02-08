@@ -17,10 +17,12 @@ type SongRepository interface {
 
 	// FindByDisplayID は指定されたDisplayIDの楽曲を取得します。
 	// 削除済み楽曲も取得します。
+	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
 
 	// FindByDisplayIDs は指定されたDisplayIDのリストに該当する楽曲を取得します。
 	// 存在しないDisplayIDがある場合でもエラーにはせず、存在する楽曲のみを返します。
+	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayIDs(ctx context.Context, exec Executor, displayIDs []string) ([]*entity.Song, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
