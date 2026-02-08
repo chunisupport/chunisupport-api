@@ -134,7 +134,7 @@ func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.So
 	return songDTOs
 }
 
-// convertToSongDTO は SongWithCharts を SongDTO に変換します。
+// convertToSongDTO は Song を SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
 func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO {
