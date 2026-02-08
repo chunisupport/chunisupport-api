@@ -36,6 +36,7 @@ func (m *SongModel) ToEntity() *entity.Song {
 		ReleasedAt:  m.ReleasedAt,
 		OfficialIdx: m.OfficialIdx,
 		Jacket:      m.Jacket,
+		Charts:      []*entity.Chart{},
 		IsWorldsend: m.IsWorldsend,
 		IsDeleted:   m.IsDeleted,
 	}

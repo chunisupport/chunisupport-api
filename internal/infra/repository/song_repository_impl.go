@@ -131,6 +131,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 		ReleasedAt:  row.ReleasedAt,
 		OfficialIdx: row.OfficialIdx,
 		Jacket:      row.Jacket,
+		Charts:      []*entity.Chart{},
 		IsWorldsend: row.IsWorldsend,
 		IsDeleted:   row.IsDeleted,
 	}
