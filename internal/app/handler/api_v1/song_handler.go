@@ -84,7 +84,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
 }
 
-// convertToV1SongDTOs は SongWithCharts のスライスを V1SongDTO のスライスに変換します。
+// convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。
 func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1SongDTO {
 	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songs))
 	for _, song := range songs {
