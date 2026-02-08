@@ -201,6 +201,8 @@ func buildPlayerRecords(rows []playerRecordRow) []*entity.PlayerRecord {
 				IsConstUnknown: row.ChartIsConstUnknown,
 				Notes:          row.ChartNotes,
 			},
+			// PlayerRecord内のSongは楽曲メタデータの参照であり、完全な集約ではない。
+			// 個別の譜面情報はPlayerRecord.Chartで保持するため、Chartsは空スライスで初期化する。
 			Song: &entity.Song{
 				ID:          row.SongID,
 				DisplayID:   row.SongDisplayID,
@@ -211,6 +213,7 @@ func buildPlayerRecords(rows []playerRecordRow) []*entity.PlayerRecord {
 				ReleasedAt:  row.SongReleasedAt,
 				OfficialIdx: row.SongOfficialIdx,
 				Jacket:      row.SongJacket,
+				Charts:      []*entity.Chart{},
 				IsDeleted:   row.SongIsDeleted,
 			},
 			ClearLamp: &entity.ClearLampType{

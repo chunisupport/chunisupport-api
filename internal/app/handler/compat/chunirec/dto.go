@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
@@ -47,7 +47,7 @@ type ChartDataDTO struct {
 }
 
 // ToMusicShowAllResponse はドメインエンティティのリストをDTOに変換します
-func ToMusicShowAllResponse(songs []*repository.SongWithCharts, masters *domainmasterdata.SongMasters) MusicShowAllResponse {
+func ToMusicShowAllResponse(songs []*entity.Song, masters *domainmasterdata.SongMasters) MusicShowAllResponse {
 	response := make(MusicShowAllResponse, 0, len(songs))
 	var genres map[int]string
 	if masters != nil {
@@ -63,7 +63,7 @@ func ToMusicShowAllResponse(songs []*repository.SongWithCharts, masters *domainm
 }
 
 // ToMusicShowResponse は単一のドメインエンティティをDTOに変換します（配列ではなくオブジェクトを返す）
-func ToMusicShowResponse(song *repository.SongWithCharts, masters *domainmasterdata.SongMasters) *MusicItemDTO {
+func ToMusicShowResponse(song *entity.Song, masters *domainmasterdata.SongMasters) *MusicItemDTO {
 	var genres map[int]string
 	if masters != nil {
 		genres = masters.GenreNamesByID
@@ -72,13 +72,13 @@ func ToMusicShowResponse(song *repository.SongWithCharts, masters *domainmasterd
 	return toMusicItemDTO(song, genres)
 }
 
-// toMusicItemDTO は1曲のSongWithChartsをMusicItemDTOに変換する内部ヘルパー関数です
-func toMusicItemDTO(s *repository.SongWithCharts, genres map[int]string) *MusicItemDTO {
+// toMusicItemDTO は1曲のSongをMusicItemDTOに変換する内部ヘルパー関数です
+func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 	item := &MusicItemDTO{
 		Meta: MusicMetaDTO{
-			ID:      s.Song.DisplayID,
-			Title:   s.Song.Title,
-			Artist:  s.Song.Artist,
+			ID:      s.DisplayID,
+			Title:   s.Title,
+			Artist:  s.Artist,
 			Release: nil,
 			BPM:     nil,
 		},
@@ -86,17 +86,17 @@ func toMusicItemDTO(s *repository.SongWithCharts, genres map[int]string) *MusicI
 	}
 
 	// Nullable fields handling
-	if s.Song.GenreID != nil {
-		if genreName, ok := genres[*s.Song.GenreID]; ok {
+	if s.GenreID != nil {
+		if genreName, ok := genres[*s.GenreID]; ok {
 			item.Meta.Genre = &genreName
 		}
 	}
-	if s.Song.ReleasedAt != nil {
-		dateStr := s.Song.ReleasedAt.Format("2006-01-02")
+	if s.ReleasedAt != nil {
+		dateStr := s.ReleasedAt.Format("2006-01-02")
 		item.Meta.Release = &dateStr
 	}
-	if s.Song.BPM != nil {
-		bpmVal := float64(*s.Song.BPM)
+	if s.BPM != nil {
+		bpmVal := float64(*s.BPM)
 		item.Meta.BPM = &bpmVal
 	}
 

@@ -114,6 +114,8 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 				WeKanji: row.ChartWeKanji,
 				Notes:   row.ChartNotes,
 			},
+			// PlayerWorldsendRecord内のSongは楽曲メタデータの参照であり、完全な集約ではない。
+			// WORLD'S ENDの譜面情報はWorldsendChartで保持するため、Chartsは空スライスで初期化する。
 			Song: &entity.Song{
 				ID:          row.SongID,
 				DisplayID:   row.SongDisplayID,
@@ -124,6 +126,7 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 				ReleasedAt:  row.SongReleasedAt,
 				OfficialIdx: row.SongOfficialIdx,
 				Jacket:      row.SongJacket,
+				Charts:      []*entity.Chart{},
 				IsDeleted:   row.SongIsDeleted,
 			},
 			ClearLamp: &entity.ClearLampType{

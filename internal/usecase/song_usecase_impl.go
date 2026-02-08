@@ -36,12 +36,12 @@ func NewSongService(
 
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
-func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*repository.SongWithCharts, error) {
+func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
 	return s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
 }
 
 // GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID string) (*repository.SongWithCharts, error) {
+func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
 	// リポジトリ側で既にErrSongNotFoundに変換済み
 	return s.songRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 }
@@ -114,8 +114,8 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 
 // convertRequestsToEntities はDTOリストからエンティティリストに変換します。
 // IDフィールドは既存データの参照に使用されないため、0のままです。
-func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest) ([]*repository.SongWithCharts, error) {
-	result := make([]*repository.SongWithCharts, 0, len(requests))
+func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest) ([]*entity.Song, error) {
+	result := make([]*entity.Song, 0, len(requests))
 
 	for _, req := range requests {
 		song := &entity.Song{
@@ -153,10 +153,8 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 			charts = append(charts, chart)
 		}
 
-		result = append(result, &repository.SongWithCharts{
-			Song:   song,
-			Charts: charts,
-		})
+		song.Charts = charts
+		result = append(result, song)
 	}
 
 	return result, nil
