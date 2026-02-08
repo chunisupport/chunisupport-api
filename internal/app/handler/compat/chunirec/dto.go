@@ -72,7 +72,7 @@ func ToMusicShowResponse(song *entity.Song, masters *domainmasterdata.SongMaster
 	return toMusicItemDTO(song, genres)
 }
 
-// toMusicItemDTO は1曲のSongWithChartsをMusicItemDTOに変換する内部ヘルパー関数です
+// toMusicItemDTO は1曲のSongをMusicItemDTOに変換する内部ヘルパー関数です
 func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 	item := &MusicItemDTO{
 		Meta: MusicMetaDTO{
