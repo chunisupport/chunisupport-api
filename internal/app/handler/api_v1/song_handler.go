@@ -93,7 +93,7 @@ func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1So
 	return v1Songs
 }
 
-// convertToV1SongDTO は SongWithCharts を V1SongDTO に変換します。
+// convertToV1SongDTO は Song を V1SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"basic", 2->"advanced", 3->"expert", 4->"master", 5->"ultima"
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
