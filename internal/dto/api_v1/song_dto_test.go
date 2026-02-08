@@ -26,6 +26,7 @@ func TestToV1SongDTO(t *testing.T) {
 		BPM:        &bpm,
 		ReleasedAt: &releaseDate,
 		Jacket:     &imgURL,
+		Charts:     []*entity.Chart{},
 	}
 
 	genreNamesByID := map[int]string{
