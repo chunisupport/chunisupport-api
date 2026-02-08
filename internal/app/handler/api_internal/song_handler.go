@@ -6,7 +6,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -55,13 +54,13 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 // GetSong は指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	swc, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
 	// DTOに変換
-	songDTO := h.convertToSongDTO(swc)
+	songDTO := h.convertToSongDTO(song)
 
 	return c.JSON(http.StatusOK, songDTO)
 }
@@ -127,10 +126,10 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 }
 
 // convertToSongDTOs は SongWithCharts のスライスを SongDTO のスライスに変換します。
-func (h *SongHandler) convertToSongDTOs(songsWithCharts []*repository.SongWithCharts) []*api_internal.SongDTO {
-	songDTOs := make([]*api_internal.SongDTO, 0, len(songsWithCharts))
-	for _, swc := range songsWithCharts {
-		songDTOs = append(songDTOs, h.convertToSongDTO(swc))
+func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.SongDTO {
+	songDTOs := make([]*api_internal.SongDTO, 0, len(songs))
+	for _, song := range songs {
+		songDTOs = append(songDTOs, h.convertToSongDTO(song))
 	}
 	return songDTOs
 }
@@ -138,13 +137,13 @@ func (h *SongHandler) convertToSongDTOs(songsWithCharts []*repository.SongWithCh
 // convertToSongDTO は SongWithCharts を SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
-func (h *SongHandler) convertToSongDTO(swc *repository.SongWithCharts) *api_internal.SongDTO {
-	songDTO := api_internal.ToSongDTO(swc.Song, h.masterCache.GenreNamesByID)
+func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO {
+	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID)
 
 	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
-	songDTO.Charts = handler.BuildChartsMap(swc.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {
+	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {
 		return api_internal.ToChartDTO(chart)
 	})
 	return songDTO

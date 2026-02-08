@@ -15,6 +15,7 @@ type Song struct {
 	ReleasedAt  *time.Time
 	OfficialIdx string
 	Jacket      *string
+	Charts      []*Chart
 	IsWorldsend bool
 	IsDeleted   bool
 }

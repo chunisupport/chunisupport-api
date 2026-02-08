@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
@@ -70,13 +69,10 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		},
 	}
 
-	swc := &repository.SongWithCharts{
-		Song:   song,
-		Charts: charts,
-	}
+	song.Charts = charts
 
 	// 変換実行
-	dto := handler.convertToV1SongDTO(swc)
+	dto := handler.convertToV1SongDTO(song)
 
 	// アサーション
 	if dto == nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -51,14 +50,14 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 // GetSong は指定された displayid の楽曲を取得します。
 func (h *V1SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	swc, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
 	if err != nil {
 		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 
 	// V1DTOに変換
-	v1SongDTO := h.convertToV1SongDTO(swc)
+	v1SongDTO := h.convertToV1SongDTO(song)
 
 	return c.JSON(http.StatusOK, v1SongDTO)
 }
@@ -86,10 +85,10 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 }
 
 // convertToV1SongDTOs は SongWithCharts のスライスを V1SongDTO のスライスに変換します。
-func (h *V1SongHandler) convertToV1SongDTOs(songsWithCharts []*repository.SongWithCharts) []*api_v1.V1SongDTO {
-	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songsWithCharts))
-	for _, swc := range songsWithCharts {
-		v1Songs = append(v1Songs, h.convertToV1SongDTO(swc))
+func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1SongDTO {
+	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songs))
+	for _, song := range songs {
+		v1Songs = append(v1Songs, h.convertToV1SongDTO(song))
 	}
 	return v1Songs
 }
@@ -97,13 +96,13 @@ func (h *V1SongHandler) convertToV1SongDTOs(songsWithCharts []*repository.SongWi
 // convertToV1SongDTO は SongWithCharts を V1SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"basic", 2->"advanced", 3->"expert", 4->"master", 5->"ultima"
-func (h *V1SongHandler) convertToV1SongDTO(swc *repository.SongWithCharts) *api_v1.V1SongDTO {
-	v1SongDTO := api_v1.ToV1SongDTO(swc.Song, h.masterCache.GenreNamesByID)
+func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
+	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID)
 
 	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
-	v1SongDTO.Charts = handler.BuildChartsMap(swc.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {
+	v1SongDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {
 		return api_v1.ToV1ChartDTO(chart)
 	})
 	return v1SongDTO

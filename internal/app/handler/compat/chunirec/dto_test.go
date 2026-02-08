@@ -6,7 +6,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/stretchr/testify/assert"
@@ -41,20 +40,18 @@ func TestToMusicShowResponse(t *testing.T) {
 	chartConstBAS, _ := chartconstant.NewChartConstant(8.0)
 	chartConstMAS, _ := chartconstant.NewChartConstant(13.7)
 
-	song := &repository.SongWithCharts{
-		Song: &entity.Song{
-			ID:          1,
-			DisplayID:   "test-song-001",
-			Title:       "テスト楽曲",
-			Artist:      "テストアーティスト",
-			GenreID:     &genreID,
-			BPM:         &bpm,
-			ReleasedAt:  &releaseDate,
-			OfficialIdx: "001",
-			Jacket:      nil,
-			IsWorldsend: false,
-			IsDeleted:   false,
-		},
+	song := &entity.Song{
+		ID:          1,
+		DisplayID:   "test-song-001",
+		Title:       "テスト楽曲",
+		Artist:      "テストアーティスト",
+		GenreID:     &genreID,
+		BPM:         &bpm,
+		ReleasedAt:  &releaseDate,
+		OfficialIdx: "001",
+		Jacket:      nil,
+		IsWorldsend: false,
+		IsDeleted:   false,
 		Charts: []*entity.Chart{
 			{
 				ID:             1,

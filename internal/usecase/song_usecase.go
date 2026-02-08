@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
@@ -11,10 +11,10 @@ import (
 type SongUsecase interface {
 	// GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 	// includeDeletedがfalseの場合、削除済み楽曲は除外されます。
-	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*repository.SongWithCharts, error)
+	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
 
 	// GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-	GetSongByDisplayID(ctx context.Context, displayID string) (*repository.SongWithCharts, error)
+	GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 	DeleteSong(ctx context.Context, displayID string) error

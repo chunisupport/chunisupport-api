@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -77,13 +76,10 @@ func TestConvertToSongDTO(t *testing.T) {
 		},
 	}
 
-	swc := &repository.SongWithCharts{
-		Song:   song,
-		Charts: charts,
-	}
+	song.Charts = charts
 
 	// 変換実行
-	dto := handler.convertToSongDTO(swc)
+	dto := handler.convertToSongDTO(song)
 
 	// アサーション
 	if dto == nil {
@@ -141,17 +137,17 @@ func TestConvertToSongDTO(t *testing.T) {
 
 // mockSongUsecase はSongUsecaseのモック実装です。
 type mockSongUsecase struct {
-	getAllSongsFunc func(ctx context.Context, includeDeleted bool) ([]*repository.SongWithCharts, error)
+	getAllSongsFunc func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
 }
 
-func (m *mockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*repository.SongWithCharts, error) {
+func (m *mockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
 	if m.getAllSongsFunc != nil {
 		return m.getAllSongsFunc(ctx, includeDeleted)
 	}
 	return nil, nil
 }
 
-func (m *mockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string) (*repository.SongWithCharts, error) {
+func (m *mockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
 	return nil, nil
 }
 
@@ -186,15 +182,13 @@ func TestGetSongs(t *testing.T) {
 	notes1Value := 500
 	notes1, _ := notes.NewNotes(notes1Value)
 
-	testSongs := []*repository.SongWithCharts{
+	testSongs := []*entity.Song{
 		{
-			Song: &entity.Song{
-				DisplayID: "test123456789012",
-				Title:     "テスト楽曲",
-				Artist:    "テストアーティスト",
-				GenreID:   &genreID,
-				BPM:       &bpm,
-			},
+			DisplayID: "test123456789012",
+			Title:     "テスト楽曲",
+			Artist:    "テストアーティスト",
+			GenreID:   &genreID,
+			BPM:       &bpm,
 			Charts: []*entity.Chart{
 				{
 					DifficultyID:   1,
@@ -208,7 +202,7 @@ func TestGetSongs(t *testing.T) {
 
 	// モックUsecaseの準備
 	mockUsecase := &mockSongUsecase{
-		getAllSongsFunc: func(ctx context.Context, includeDeleted bool) ([]*repository.SongWithCharts, error) {
+		getAllSongsFunc: func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
 	}

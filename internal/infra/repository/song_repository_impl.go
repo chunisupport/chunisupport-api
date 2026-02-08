@@ -53,7 +53,7 @@ type chartRow struct {
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
-func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.SongWithCharts, error) {
+func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
@@ -71,7 +71,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	}
 
 	if len(songRows) == 0 {
-		return []*repository.SongWithCharts{}, nil
+		return []*entity.Song{}, nil
 	}
 
 	// 2. 取得した楽曲のIDを収集
@@ -100,13 +100,11 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	}
 
 	// 4. 結果を構築
-	results := make([]*repository.SongWithCharts, len(songRows))
+	results := make([]*entity.Song, len(songRows))
 	for i, sr := range songRows {
 		song := r.toSongEntity(&sr)
-		results[i] = &repository.SongWithCharts{
-			Song:   song,
-			Charts: []*entity.Chart{},
-		}
+		song.Charts = []*entity.Chart{}
+		results[i] = song
 	}
 
 	// 5. 譜面を楽曲に紐付け
@@ -188,7 +186,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 // FindByDisplayID は指定されたDisplayIDの楽曲を取得します。
 // 削除済み楽曲も取得します。
-func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.SongWithCharts, error) {
+func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
@@ -222,10 +220,9 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 		charts[i] = r.toChartEntity(&cr)
 	}
 
-	return &repository.SongWithCharts{
-		Song:   song,
-		Charts: charts,
-	}, nil
+	song.Charts = charts
+
+	return song, nil
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
@@ -245,15 +242,15 @@ func (r *songRepository) RestoreSong(ctx context.Context, exec repository.Execut
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 // トランザクション管理はUseCase層（TransactionManager経由）で行います。
 // PERF-008対策: N+1問題を解消するため、一括更新クエリを使用します。
-func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts) error {
-	if len(songsWithCharts) == 0 {
+func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
+	if len(songs) == 0 {
 		return nil
 	}
 
 	// 1. 全DisplayIDを収集
-	displayIDs := make([]string, len(songsWithCharts))
-	for i, swc := range songsWithCharts {
-		displayIDs[i] = swc.Song.DisplayID
+	displayIDs := make([]string, len(songs))
+	for i, song := range songs {
+		displayIDs[i] = song.DisplayID
 	}
 
 	// 2. 既存楽曲を一括取得（存在確認とID取得）
@@ -293,9 +290,9 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	}
 
 	// 6. 更新対象の譜面が全て存在するか確認
-	for _, swc := range songsWithCharts {
-		songID := displayIDToSongID[swc.Song.DisplayID]
-		for _, chart := range swc.Charts {
+	for _, song := range songs {
+		songID := displayIDToSongID[song.DisplayID]
+		for _, chart := range song.Charts {
 			key := fmt.Sprintf("%d-%d", songID, chart.DifficultyID)
 			if !chartExistsMap[key] {
 				return fmt.Errorf("chart not found (song_id=%d, difficulty_id=%d)", songID, chart.DifficultyID)
@@ -304,12 +301,12 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	}
 
 	// 7. 楽曲を一括更新（CASE式を使用）
-	if err := r.bulkUpdateSongs(ctx, exec, songsWithCharts, displayIDToSongID); err != nil {
+	if err := r.bulkUpdateSongs(ctx, exec, songs, displayIDToSongID); err != nil {
 		return fmt.Errorf("failed to bulk update songs: %w", err)
 	}
 
 	// 8. 譜面を一括更新（CASE式を使用）
-	if err := r.bulkUpdateCharts(ctx, exec, songsWithCharts, displayIDToSongID); err != nil {
+	if err := r.bulkUpdateCharts(ctx, exec, songs, displayIDToSongID); err != nil {
 		return fmt.Errorf("failed to bulk update charts: %w", err)
 	}
 
@@ -346,24 +343,23 @@ func (r *songRepository) findChartsBySongIDs(ctx context.Context, exec repositor
 }
 
 // bulkUpdateSongs は楽曲情報をCASE式で一括更新します。
-func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts, displayIDToSongID map[string]int) error {
-	if len(songsWithCharts) == 0 {
+func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, displayIDToSongID map[string]int) error {
+	if len(songs) == 0 {
 		return nil
 	}
 
 	// 更新対象のsongIDリストを作成
-	songIDs := make([]int, 0, len(songsWithCharts))
-	for _, swc := range songsWithCharts {
-		songIDs = append(songIDs, displayIDToSongID[swc.Song.DisplayID])
+	songIDs := make([]int, 0, len(songs))
+	for _, song := range songs {
+		songIDs = append(songIDs, displayIDToSongID[song.DisplayID])
 	}
 
 	// CASE式を構築
 	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
 	args := make([]any, 0)
 
-	for _, swc := range songsWithCharts {
-		songID := displayIDToSongID[swc.Song.DisplayID]
-		song := swc.Song
+	for _, song := range songs {
+		songID := displayIDToSongID[song.DisplayID]
 
 		titleCases = append(titleCases, "WHEN id = ? THEN ?")
 		args = append(args, songID, song.Title)
@@ -418,7 +414,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 }
 
 // bulkUpdateCharts は譜面情報をCASE式で一括更新します。
-func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songsWithCharts []*repository.SongWithCharts, displayIDToSongID map[string]int) error {
+func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, displayIDToSongID map[string]int) error {
 	// 全譜面データを収集
 	type chartUpdate struct {
 		SongID         int
@@ -429,9 +425,9 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 	}
 
 	var updates []chartUpdate
-	for _, swc := range songsWithCharts {
-		songID := displayIDToSongID[swc.Song.DisplayID]
-		for _, chart := range swc.Charts {
+	for _, song := range songs {
+		songID := displayIDToSongID[song.DisplayID]
+		for _, chart := range song.Charts {
 			var notesPtr *int
 			if chart.Notes != nil {
 				n := int(*chart.Notes)
