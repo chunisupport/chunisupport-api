@@ -355,30 +355,41 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	}
 
 	// CASE式を構築
+	// 注意: SQLの引数順序はCASE式の出現順（title→artist→genre→...→IN句）であるため、
+	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
 	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
-	args := make([]any, 0)
+	var titleArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
 
 	for _, song := range songs {
 		songID := displayIDToSongID[song.DisplayID]
 
 		titleCases = append(titleCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.Title)
+		titleArgs = append(titleArgs, songID, song.Title)
 
 		artistCases = append(artistCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.Artist)
+		artistArgs = append(artistArgs, songID, song.Artist)
 
 		genreCases = append(genreCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.GenreID)
+		genreArgs = append(genreArgs, songID, song.GenreID)
 
 		bpmCases = append(bpmCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.BPM)
+		bpmArgs = append(bpmArgs, songID, song.BPM)
 
 		releasedCases = append(releasedCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.ReleasedAt)
+		releasedArgs = append(releasedArgs, songID, song.ReleasedAt)
 
 		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
-		args = append(args, songID, song.Jacket)
+		jacketArgs = append(jacketArgs, songID, song.Jacket)
 	}
+
+	// SQLの引数順序に合わせて結合: title→artist→genre→bpm→released→jacket→IN句
+	args := make([]any, 0)
+	args = append(args, titleArgs...)
+	args = append(args, artistArgs...)
+	args = append(args, genreArgs...)
+	args = append(args, bpmArgs...)
+	args = append(args, releasedArgs...)
+	args = append(args, jacketArgs...)
 
 	// IN句用の引数を追加
 	for _, id := range songIDs {
@@ -448,27 +459,35 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 	}
 
 	// CASE式を構築
-	// 複合キー(song_id, difficulty_id)でマッチングするため、条件式を使用
+	// 注意: SQLの引数順序はCASE式の出現順（const→is_const_unknown→notes→WHERE）であるため、
+	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
 	var constCases, unknownCases, notesCases []string
-	args := make([]any, 0)
+	var constArgs, unknownArgs, notesArgs, whereArgs []any
 
 	for _, u := range updates {
 		constCases = append(constCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
-		args = append(args, u.SongID, u.DifficultyID, u.Const)
+		constArgs = append(constArgs, u.SongID, u.DifficultyID, u.Const)
 
 		unknownCases = append(unknownCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
-		args = append(args, u.SongID, u.DifficultyID, u.IsConstUnknown)
+		unknownArgs = append(unknownArgs, u.SongID, u.DifficultyID, u.IsConstUnknown)
 
 		notesCases = append(notesCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
-		args = append(args, u.SongID, u.DifficultyID, u.Notes)
+		notesArgs = append(notesArgs, u.SongID, u.DifficultyID, u.Notes)
 	}
 
 	// WHERE句用: (song_id, difficulty_id) の組み合わせ
 	var wherePairs []string
 	for _, u := range updates {
 		wherePairs = append(wherePairs, "(song_id = ? AND difficulty_id = ?)")
-		args = append(args, u.SongID, u.DifficultyID)
+		whereArgs = append(whereArgs, u.SongID, u.DifficultyID)
 	}
+
+	// SQLの引数順序に合わせて結合: const→is_const_unknown→notes→WHERE
+	args := make([]any, 0)
+	args = append(args, constArgs...)
+	args = append(args, unknownArgs...)
+	args = append(args, notesArgs...)
+	args = append(args, whereArgs...)
 
 	query := fmt.Sprintf(`
 		UPDATE charts SET
