@@ -125,7 +125,7 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// convertToSongDTOs は SongWithCharts のスライスを SongDTO のスライスに変換します。
+// convertToSongDTOs は Song のスライスを SongDTO のスライスに変換します。
 func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.SongDTO {
 	songDTOs := make([]*api_internal.SongDTO, 0, len(songs))
 	for _, song := range songs {
