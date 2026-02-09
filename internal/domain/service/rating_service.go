@@ -139,8 +139,11 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 		overPower = 0
 	}
 
-	// コンボランプ補正（AJC以外）
-	if score < 1010000 {
+	// コンボランプ補正
+	if score == 1010000 {
+		// AJC（理論値）: +1.25
+		overPower += 1.25
+	} else {
 		switch comboLampID {
 		case 3: // ALL JUSTICE
 			overPower += 1.0
