@@ -41,6 +41,7 @@
 | **SEC-01** | **High** | CSRF対策不足 | Double Submit Cookie または Synchronizer Token を導入。SameSite=Lax/Strict と Origin/Referer 検証を併用。 |
 | **SEC-011** | **High** | パスワード複雑性要件の欠如 | 長さチェックのみ。`zxcvbn-go` 等の導入または正規表現による文字種チェックを追加。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー未実施 | `gosec` などで抑制箇所を洗い出し、根拠を明記。不必要な抑制は削除。 |
+| **SEC-012** | **Medium** | gzip解凍の無制限読み取りによるDoS | `io.ReadAll` が解凍後サイズの上限なしで読み続ける。`io.LimitReader` で解凍後サイズ上限を強制。 |
 | **SEC-008** | **Medium** | Cookie Domain属性の未設定 | サブドメイン間のセッション共有が必要な場合に備え、Domain属性の設定可否を追加。 |
 
 ### パフォーマンス (PERF)
@@ -128,6 +129,23 @@
   - その他の箇所は適切な根拠コメントあり
 - **追加で確認したい点**:
   - 利用中の静的解析ツールとCI連携の有無。
+
+---
+
+### SEC-012: gzip解凍の無制限読み取りによるDoS
+- **根拠**:
+  - `/internal/me/register-data` のbase64+gzip経路で、`decodeAndDecompressGzipBase64` 内の `io.ReadAll(gzipReader)` が解凍後サイズの上限なしで読み続ける。
+  - 解凍後のサイズチェックはあるが、読み込み自体が無制限のため圧縮爆弾でメモリ枯渇が起こり得る。
+- **影響範囲**:
+  - 認証済みユーザーが `/internal/me/register-data` にアクセスできるため、悪意ある入力でサーバーの可用性が低下する可能性。
+- **再現手順**:
+  1. JWT認証済みで `/internal/me/register-data` にbase64+gzip形式のデータを送信。
+  2. 送信データが極端に高圧縮率の場合、解凍時にメモリ使用量が急増。
+- **修正案**:
+  - `io.ReadAll(io.LimitReader(gzipReader, max+1))` のように解凍後サイズ上限を強制し、超過時は `PayloadTooLarge` を返す。
+  - 解凍後サイズの上限値は既存の `maxPlayerDataPayloadSize` を利用する。
+- **追加で確認したい点**:
+  - なし（コード修正のみで対応可能）。
 
 ---
 
