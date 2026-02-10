@@ -713,6 +713,7 @@ curl -X POST \
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。
+    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。
 
 #### レスポンス例
@@ -745,6 +746,7 @@ curl -X POST \
     "new_candidate": [...],
     "all": [
       {
+        "is_played": true,
         "updated_at": "2025-11-28T22:23:32+09:00",
         "difficulty": "MASTER",
         "id": "d3b6f3dd66b06bf4",
@@ -791,7 +793,8 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `updated_at` | string | 更新日時 (ISO8601) |
+| `is_played` | boolean | プレイ済みかどうか（未プレイ補完データは `false`） |
+| `updated_at` | string \\| null | 更新日時 (ISO8601)。未プレイ補完データは `null` |
 | `difficulty` | string | 難易度名称 |
 | `id` | string | 楽曲表示用ID |
 | `title` | string | 楽曲タイトル |
@@ -802,10 +805,28 @@ curl -X POST \
 | `rating` | number | 単曲レーティング（譜面定数とスコアから計算） |
 | `overpower` | number | 単曲OVER POWER（譜面定数・スコア・コンボランプから計算） |
 | `img` | string | 楽曲画像ID |
-| `clear_lamp` | string | クリアランプ名称 |
+| `clear_lamp` | string \\| null | クリアランプ名称。未プレイ補完データは `null` |
 | `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
 | `full_chain` | string \| null | フルチェイン名称（マスタ値が「NONE」の場合は `null`） |
 | `slot` | string \| null | スロット名称（マスタ値が「none」の場合は `null`） |
+
+#### WorldsendRecordDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `is_played` | boolean | プレイ済みかどうか（未プレイ補完データは `false`） |
+| `updated_at` | string \| null | 更新日時 (ISO8601)。未プレイ補完データは `null` |
+| `id` | string | 楽曲表示用ID |
+| `title` | string | 楽曲タイトル |
+| `artist` | string | アーティスト名 |
+| `we_star` | number \| null | WORLD'S END 星の数 |
+| `we_kanji` | string \| null | WORLD'S END カテゴリ漢字 |
+| `notes` | number \| null | ノーツ数 |
+| `score` | number | スコア |
+| `img` | string | 楽曲画像ID |
+| `clear_lamp` | string \| null | クリアランプ名称。未プレイ補完データは `null` |
+| `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
+| `full_chain` | string \| null | フルチェイン名称（マスタ値が「NONE」の場合は `null`） |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -1792,7 +1813,8 @@ interface HonorDTO {
 
 // レコード関連
 interface PlayerRecordDTO {
-  updated_at: string;
+  is_played: boolean;
+  updated_at: string | null;
   difficulty: string;
   id: string;
   title: string;
@@ -1803,7 +1825,7 @@ interface PlayerRecordDTO {
   rating: number;
   overpower: number;
   img: string;
-  clear_lamp: string;
+  clear_lamp: string | null;
   combo_lamp: string | null;  // マスタ値が「NONE」の場合はnull
   full_chain: string | null;  // マスタ値が「NONE」の場合はnull
   slot: string | null;        // マスタ値が「none」の場合はnull
@@ -1821,7 +1843,8 @@ interface UserRecordResponseDTO {
 
 // WORLD'S END レコード（スロット分類なし、レーティング計算なし）
 interface WorldsendRecordDTO {
-  updated_at: string;
+  is_played: boolean;
+  updated_at: string | null;
   id: string;
   title: string;
   artist: string;
@@ -1830,7 +1853,7 @@ interface WorldsendRecordDTO {
   notes: number | null;
   score: number;
   img: string;
-  clear_lamp: string;
+  clear_lamp: string | null;
   combo_lamp: string | null;      // マスタ値が「NONE」の場合はnull
   full_chain: string | null;      // マスタ値が「NONE」の場合はnull
 }
