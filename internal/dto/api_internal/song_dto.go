@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
@@ -70,6 +71,7 @@ type SongDTO struct {
 	BPM       *int             `json:"bpm"`
 	Release   *string          `json:"release"`
 	Jacket    *string          `json:"jacket"`
+	MaxOP     float64          `json:"maxop"`
 	Charts    OrderedChartsMap `json:"charts"`
 }
 
@@ -146,6 +148,23 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string) *SongDTO {
 		BPM:       song.BPM,
 		Release:   releaseDateStr,
 		Jacket:    song.Jacket,
+		MaxOP:     calcSongMaxOP(song.Charts),
 		Charts:    make(OrderedChartsMap),
 	}
+}
+
+// calcSongMaxOP は楽曲に紐づく全譜面のうち、最も定数が高い譜面で理論値(AJC)を取った際のOPを返します。
+func calcSongMaxOP(charts []*entity.Chart) float64 {
+	if len(charts) == 0 {
+		return 0
+	}
+
+	maxChartConst := float64(charts[0].Const)
+	for _, chart := range charts[1:] {
+		maxChartConst = max(maxChartConst, float64(chart.Const))
+	}
+
+	const theoreticalScore = uint32(1010000)
+	const allJusticeComboLampID = 3
+	return service.CalcSingleOverpower(theoreticalScore, maxChartConst, allJusticeComboLampID)
 }
