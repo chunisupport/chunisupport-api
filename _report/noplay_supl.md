@@ -24,6 +24,31 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
 
 ---
 
+## 設計方針（レビュー反映）
+未プレイ補完ロジックは複数リポジトリを横断するため、`UserUsecase` に直接ロジックを寄せず、専用のドメインサービスへ責務を分離する。
+
+- 新設候補: `internal/domain/service/record_completion_service.go`
+- 役割:
+  - 通常譜面 / WORLD'S END の未プレイ補完判定
+  - 補完レコードの組み立て
+  - ソート済み結果の返却
+- `UserUsecase` は以下に専念:
+  - 認可/公開範囲チェック
+  - 必要データの取得と引数整形
+  - ドメインサービス呼び出し
+  - DTO組み立てのオーケストレーション
+
+### 依存関係の整理
+クリーンアーキテクチャの依存方向を守るため、ドメインサービス自体は具体リポジトリ実装に依存させない。
+
+- ドメインサービスは「入力として渡されたデータ集合」を処理する純粋ロジックにする。
+- I/O（DB取得）は Usecase で行う。
+- 必要なら `internal/domain/repository` に最小限の読み取りインターフェースを追加し、Usecase経由で注入する。
+
+> 注: ドメインサービスが `internal/infra` に直接依存する構造は採用しない。
+
+---
+
 ## 対象API
 - `GET /internal/users/:username`
   - 追加クエリ: `include_noplay` (boolean, 任意)
@@ -70,19 +95,21 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
 - `internal/dto/worldsend_dto.go` を更新。
 - 既存レコード変換時は `is_played=true` を設定。
 
-### 3. 未プレイ補完ロジック（通常譜面）
-1. 既存 `player_records` を取得。
-2. 削除済み除外で通常譜面母集団（songs/charts）を一括取得。
-3. `chart_id` をキーに既存レコード存在判定。
-4. 欠損分を未プレイDTOとして生成。
-5. 既存 + 補完を `songs.id ASC, difficulty_id ASC` で返却。
+### 3. ドメインサービス導入
+- `RecordCompletionService`（仮）を新設。
+- 入力:
+  - 既存プレイヤーレコード集合
+  - 補完対象マスタ集合（通常譜面 / WORLD'S END）
+- 出力:
+  - 補完済み通常譜面DTO列
+  - 補完済みWORLD'S ENDDTO列
+- キー判定・補完値設定・ソートをサービス内部に集約。
 
-### 4. 未プレイ補完ロジック（WORLD'S END）
-1. 既存 `player_worldsend_records` を取得。
-2. 削除済み除外で WORLD'S END 母集団（songs/worldsend_charts）を一括取得。
-3. `worldsend_chart_id` をキーに既存レコード存在判定。
-4. 欠損分を未プレイDTOとして生成。
-5. 既存 + 補完を `songs.id ASC, worldsend_charts.id ASC` で返却。
+### 4. Usecase からの呼び出し
+1. 既存 `player_records` / `player_worldsend_records` を取得。
+2. 削除済み除外で通常譜面・WORLD'S END母集団を一括取得。
+3. `RecordCompletionService` を呼び出して補完済み配列を得る。
+4. `records.all` / `records.worldsend` に反映。
 
 ### 5. APIドキュメント更新（`docs/API.md`）
 - `include_noplay` クエリを追加。
@@ -99,6 +126,10 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
 4. 既存レコード `is_played=true` / 補完レコード `is_played=false` を検証。
 5. 補完レコードで `clear_lamp=null` / `updated_at=null` を検証。
 6. `view=rating&include_noplay=true` で include_noplay が無視されることを検証。
+7. ドメインサービス単体テストで以下を検証:
+   - キー重複判定（`chart_id` / `worldsend_chart_id`）
+   - 補完件数
+   - ソート順
 
 ---
 
@@ -109,6 +140,8 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
 - Usecase:
   - `internal/usecase/user_usecase.go`
   - `internal/usecase/user_usecase_impl.go`
+- Domain Service:
+  - `internal/domain/service/record_completion_service.go`（新規）
 - DTO:
   - `internal/dto/player_record_dto.go`
   - `internal/dto/worldsend_dto.go`
@@ -120,3 +153,4 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
 ## 実装上の注意
 - N+1を避けるため、母集団取得は必ず一括取得で行う。
 - 既存DBスキーマの NOT NULL は変更せず、未プレイ補完時のみアプリ側で `null` を組み立てる。
+- 依存関係は「外側 → 内側」を維持し、Usecase から Infra 実装への直接依存を増やさない。
