@@ -101,9 +101,11 @@ API互換性は不要とし、`is_played` 追加や一部フィールドの `nul
   - 既存プレイヤーレコード集合
   - 補完対象マスタ集合（通常譜面 / WORLD'S END）
 - 出力:
-  - 補完済み通常譜面DTO列
-  - 補完済みWORLD'S ENDDTO列
+  - 補完済み通常譜面エンティティ列（`[]*entity.PlayerRecord`）
+  - 補完済みWORLD'S ENDエンティティ列（`[]*entity.PlayerWorldsendRecord`）
 - キー判定・補完値設定・ソートをサービス内部に集約。
+
+※ DTO への変換は Usecase 層で実施し、ドメインサービスは DTO に依存しない。
 
 ### 4. Usecase からの呼び出し
 1. 既存 `player_records` / `player_worldsend_records` を取得。
