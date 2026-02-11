@@ -33,7 +33,7 @@ func TestConvertToSongDTO(t *testing.T) {
 	}
 
 	handler := &SongHandler{
-		songUsecase: &mockSongUsecase{},
+		songUsecase: &testutil.MockSongUsecase{},
 		masterCache: masterCache,
 	}
 
@@ -136,41 +136,6 @@ func TestConvertToSongDTO(t *testing.T) {
 	}
 }
 
-// mockSongUsecase はSongUsecaseのモック実装です。
-type mockSongUsecase struct {
-	getAllSongsFunc func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
-}
-
-func (m *mockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
-	if m.getAllSongsFunc != nil {
-		return m.getAllSongsFunc(ctx, includeDeleted)
-	}
-	return nil, nil
-}
-
-func (m *mockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
-	return nil, nil
-}
-
-func (m *mockSongUsecase) DeleteSong(ctx context.Context, displayID string) error {
-	return nil
-}
-
-func (m *mockSongUsecase) RestoreSong(ctx context.Context, displayID string) error {
-	return nil
-}
-
-func (m *mockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
-	return nil
-}
-
-func (m *mockSongUsecase) CalcSongMaxOP(song *entity.Song) float64 {
-	if song == nil {
-		return 0
-	}
-	return 90
-}
-
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。
 func TestGetSongs(t *testing.T) {
 	// マスタデータキャッシュの準備
@@ -209,8 +174,8 @@ func TestGetSongs(t *testing.T) {
 	}
 
 	// モックUsecaseの準備
-	mockUsecase := &mockSongUsecase{
-		getAllSongsFunc: func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+	mockUsecase := &testutil.MockSongUsecase{
+		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
 	}
