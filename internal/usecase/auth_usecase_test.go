@@ -493,13 +493,15 @@ func TestAuthService_GetUser(t *testing.T) {
 
 	t.Run("正常系: ユーザー取得が成功する", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
-		mockUser := &entity.User{ID: 1, Username: un}
+		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false, AccountTypeID: 1}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
 
 		userDTO, err := authService.GetUser(context.Background(), 1)
 		assert.NoError(t, err)
 		assert.NotNil(t, userDTO)
 		assert.Equal(t, "testuser", userDTO.Username)
+		assert.Equal(t, "PLAYER", userDTO.AccountType)
+		assert.False(t, userDTO.IsPrivate)
 		mockUserRepo.AssertExpectations(t)
 	})
 }

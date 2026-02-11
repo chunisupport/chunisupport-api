@@ -129,7 +129,7 @@ func (s *authService) Register(ctx context.Context, usernameStr, password string
 
 	// 登録直後はレコードが存在しないため、last_score_updateはnil
 	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
-	return api_internal.ToUserDTO(user, accountTypeName, nil), token, nil
+	return api_internal.ToUserDTO(user, accountTypeName, user.IsPrivate, nil), token, nil
 }
 
 // UpdatePrivacy はユーザーの非公開設定を更新します。
@@ -471,7 +471,7 @@ func (s *authService) GetUser(ctx context.Context, id int) (*api_internal.UserDT
 	}
 
 	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
-	return api_internal.ToUserDTO(user, accountTypeName, lastScoreUpdate), nil
+	return api_internal.ToUserDTO(user, accountTypeName, user.IsPrivate, lastScoreUpdate), nil
 }
 
 // convertUsernameError はユーザー名のバリデーションエラーを適切なエラーに変換します。

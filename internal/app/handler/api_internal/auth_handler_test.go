@@ -115,7 +115,10 @@ func TestAuthHandler_Register(t *testing.T) {
 	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: ユーザー登録", func(t *testing.T) {
-		expectedUser := &dto_internal.UserDTO{Username: "testuser"}
+		expectedUser := &dto_internal.UserDTO{
+			Username:  "testuser",
+			IsPrivate: false,
+		}
 		mockService.On("Register", mock.Anything, "testuser", "password123").Return(expectedUser, "test_token", nil).Once()
 
 		body := `{"username": "testuser", "password": "password123"}`
@@ -424,10 +427,11 @@ func TestAuthHandler_Me(t *testing.T) {
 
 	t.Run("正常系: ユーザー情報取得", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
-		mockUser := &entity.User{ID: 1, Username: un}
+		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false}
 		mockUserDTO := &dto_internal.UserDTO{
 			Username:    un.String(),
 			AccountType: "PLAYER",
+			IsPrivate:   false,
 		}
 
 		mockService.On("GetUser", mock.Anything, mockUser.ID).Return(mockUserDTO, nil).Once()
@@ -445,6 +449,8 @@ func TestAuthHandler_Me(t *testing.T) {
 		err = json.Unmarshal(rec.Body.Bytes(), &userDTO)
 		assert.NoError(t, err)
 		assert.Equal(t, un.String(), userDTO.Username)
+		assert.Equal(t, "PLAYER", userDTO.AccountType)
+		assert.False(t, userDTO.IsPrivate)
 
 		mockService.AssertExpectations(t)
 	})

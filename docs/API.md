@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年02月04日
+**最終更新日**: 2026年02月12日
 
 ## ベースURLと環境
 
@@ -267,6 +267,7 @@
 {
   "username": "sample_user",
   "account_type": "PLAYER",
+  "is_private": false,
   "last_score_update": "2025-11-27T12:00:00+09:00"
 }
 ```
@@ -277,6 +278,7 @@
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 | `account_type` | string | アカウントタイプ (PLAYER, EDITOR, ADMIN) |
+| `is_private` | bool | 非公開設定 (true: 非公開, false: 公開) |
 | `last_score_update` | string \| null | プレイヤースコアの最終更新日時 (ISO8601)。プレイヤーが紐付いていない場合やレコードが存在しない場合は null |
 
 ### PUT `/internal/me/privacy`

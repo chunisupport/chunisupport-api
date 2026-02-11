@@ -37,12 +37,13 @@ type UserProfileRatingViewDTO struct {
 type UserDTO struct {
 	Username        string     `json:"username"`
 	AccountType     string     `json:"account_type"`
+	IsPrivate       bool       `json:"is_private"`        // 非公開設定
 	LastScoreUpdate *time.Time `json:"last_score_update"` // プレイヤースコアの最終更新日時
 }
 
 // ToUserDTO はエンティティからDTOへ変換します。
 // accountTypeNameはUsecase層で解決された値を受け取ります。
-func ToUserDTO(user *entity.User, accountTypeName string, lastScoreUpdate *time.Time) *UserDTO {
+func ToUserDTO(user *entity.User, accountTypeName string, isPrivate bool, lastScoreUpdate *time.Time) *UserDTO {
 	if user == nil {
 		return nil
 	}
@@ -50,6 +51,7 @@ func ToUserDTO(user *entity.User, accountTypeName string, lastScoreUpdate *time.
 	return &UserDTO{
 		Username:        user.Username.String(),
 		AccountType:     accountTypeName,
+		IsPrivate:       isPrivate,
 		LastScoreUpdate: lastScoreUpdate,
 	}
 }
