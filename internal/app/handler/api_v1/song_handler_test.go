@@ -1,12 +1,44 @@
 package api_v1
 
 import (
+	"context"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
+
+// mockSongUsecase はSongUsecaseのモック実装です。
+type mockSongUsecase struct{}
+
+func (m *mockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+	return nil, nil
+}
+
+func (m *mockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
+	return nil, nil
+}
+
+func (m *mockSongUsecase) DeleteSong(ctx context.Context, displayID string) error {
+	return nil
+}
+
+func (m *mockSongUsecase) RestoreSong(ctx context.Context, displayID string) error {
+	return nil
+}
+
+func (m *mockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+	return nil
+}
+
+func (m *mockSongUsecase) CalcSongMaxOP(song *entity.Song) float64 {
+	if song == nil {
+		return 0
+	}
+	return 90
+}
 
 // TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
 func TestConvertToV1SongDTO(t *testing.T) {
@@ -26,6 +58,7 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	}
 
 	handler := &V1SongHandler{
+		songUsecase: &mockSongUsecase{},
 		masterCache: masterCache,
 	}
 

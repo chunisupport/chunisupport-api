@@ -33,6 +33,7 @@ func TestConvertToSongDTO(t *testing.T) {
 	}
 
 	handler := &SongHandler{
+		songUsecase: &mockSongUsecase{},
 		masterCache: masterCache,
 	}
 
@@ -161,6 +162,13 @@ func (m *mockSongUsecase) RestoreSong(ctx context.Context, displayID string) err
 
 func (m *mockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
 	return nil
+}
+
+func (m *mockSongUsecase) CalcSongMaxOP(song *entity.Song) float64 {
+	if song == nil {
+		return 0
+	}
+	return 90
 }
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。

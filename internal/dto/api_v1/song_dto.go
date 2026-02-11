@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
@@ -99,8 +98,9 @@ func ToV1ChartDTO(chart *entity.Chart) *V1ChartDTO {
 }
 
 // ToV1SongDTO はSongエンティティから V1SongDTO へ変換します。
+// maxOP は呼び出し元で計算済みの値を受け取ります。
 // Charts フィールドは空のmapで初期化されます。ハンドラー層で別途設定してください。
-func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string) *V1SongDTO {
+func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) *V1SongDTO {
 	if song == nil {
 		return nil
 	}
@@ -126,7 +126,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string) *V1SongDTO {
 		BPM:       song.BPM,
 		Release:   releaseDateStr,
 		Jacket:    song.Jacket,
-		MaxOP:     service.CalcSongMaxOP(song.Charts),
+		MaxOP:     maxOP,
 		Charts:    make(V1OrderedChartsMap),
 	}
 }

@@ -40,7 +40,7 @@ func TestToSongDTO(t *testing.T) {
 	}
 
 	// 変換実行
-	dto := ToSongDTO(song, genreNamesByID)
+	dto := ToSongDTO(song, genreNamesByID, 90)
 
 	// アサーション
 	if dto == nil {

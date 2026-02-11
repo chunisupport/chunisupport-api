@@ -25,4 +25,7 @@ type SongUsecase interface {
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// マスタデータの検証およびリポジトリへの委譲を行います。
 	UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
+
+	// CalcSongMaxOP は楽曲の譜面から理論値の最大OPを計算します。
+	CalcSongMaxOP(song *entity.Song) float64
 }

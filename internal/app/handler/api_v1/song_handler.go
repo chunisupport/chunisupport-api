@@ -97,7 +97,8 @@ func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1So
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"basic", 2->"advanced", 3->"expert", 4->"master", 5->"ultima"
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
-	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID)
+	maxOP := h.songUsecase.CalcSongMaxOP(song)
+	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
 	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
