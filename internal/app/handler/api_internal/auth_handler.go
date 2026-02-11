@@ -63,7 +63,7 @@ func (h *AuthHandler) getUserEntity(c echo.Context) (*entity.User, error) {
 // authRequest は認証リクエストのボディの構造です。
 type authRequest struct {
 	Username string `json:"username"`
-	Password string `json:"password"`
+	Password string `json:"password"` // #nosec G117 API入力仕様として必要
 }
 
 // Register はユーザー登録リクエストを処理します。

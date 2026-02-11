@@ -19,11 +19,6 @@ import (
 func main() {
 	slog.Info(info.Name + " v" + info.Version)
 
-	env := os.Getenv("APP_ENV")
-	if env != "" {
-		slog.Debug("Environment: " + env)
-	}
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		slog.Error("Failed to load config", "error", err)

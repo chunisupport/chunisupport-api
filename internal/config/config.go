@@ -38,12 +38,14 @@ type Config struct {
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
-	PwPepper               string   // 環境変数から読み込み
-	JWTSecret              string   // 環境変数から読み込み
-	Auth                   Auth     `json:"auth"`
-	CORS                   CORS     `json:"cors"`
-	Database               Database // 環境変数から読み込み
+	ShutdownTimeoutSeconds int    `json:"shutdown_timeout_seconds"`
+	PwPepper               string // 環境変数から読み込み
+	// JWTSecret は環境変数から読み込む機密値であり、命名は役割明示のため維持する。
+	// #nosec G117
+	JWTSecret string
+	Auth      Auth     `json:"auth"`
+	CORS      CORS     `json:"cors"`
+	Database  Database // 環境変数から読み込み
 }
 
 type DbConfig struct {
@@ -77,7 +79,7 @@ func LoadConfig() (Config, error) {
 
 	// JSONファイルから基本設定を読み込み
 	path := filepath.Join(info.ConfigDir, env+".settings.json")
-	configFile, err := os.Open(path) // #nosec G304
+	configFile, err := os.Open(path) // #nosec G703 G304 APP_ENVはvalidateEnvで許可値に限定済み
 	if err != nil {
 		return config, fmt.Errorf("failed to open config file for environment '%s': %w", env, err)
 	}

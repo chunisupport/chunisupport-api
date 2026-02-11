@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/labstack/echo/v4"
@@ -78,42 +79,40 @@ func handleChunirecError(err error, c echo.Context) {
 	}
 
 	if err := c.JSON(httpStatus, errorResponse); err != nil {
-		slog.Error("Failed to send chunirec error response", "error", err.Error())
+		slog.Error("Failed to send chunirec error response", "error", err)
 	}
 }
 
 // logChunirecError はエラーをログに出力します（詳細情報を含む）
 func logChunirecError(status int, err error, c echo.Context) {
+	errorMessage := sanitizeLogValue(err.Error())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
 	if errors.Is(err, context.Canceled) {
-		slog.Warn("Chunirec HTTP request canceled by client",
+		logger.Warn("Chunirec HTTP request canceled by client",
 			"status", status,
-			"error", err.Error(),
-			"method", c.Request().Method,
-			"path", c.Request().URL.Path,
-			"remote_addr", c.RealIP(),
+			"error", errorMessage,
 		)
 		return
 	}
 
 	// 5xx系エラーはERRORログ
 	if status >= 500 {
-		slog.Error("Chunirec HTTP error",
+		logger.Error("Chunirec HTTP error",
 			"status", status,
-			"error", err.Error(),
-			"method", c.Request().Method,
-			"path", c.Request().URL.Path,
-			"remote_addr", c.RealIP(),
+			"error", errorMessage,
 		)
 		return
 	}
 
 	// 4xx系エラーはWARNログ
-	slog.Warn("Chunirec HTTP client error",
+	logger.Warn("Chunirec HTTP client error",
 		"status", status,
-		"error", err.Error(),
-		"method", c.Request().Method,
-		"path", c.Request().URL.Path,
-		"remote_addr", c.RealIP(),
+		"error", errorMessage,
 	)
+}
+
+func sanitizeLogValue(value string) string {
+	replacer := strings.NewReplacer("\n", " ", "\r", " ")
+	return replacer.Replace(value)
 }
