@@ -142,14 +142,14 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 	}
 
 	// コンボランプ補正
-	if score == 1010000 {
+	if score == theoreticalScore {
 		// AJC（理論値）: +1.25
 		overPower += 1.25
 	} else {
 		switch comboLampID {
-		case 3: // ALL JUSTICE
+		case comboLampAllJustice: // ALL JUSTICE
 			overPower += 1.0
-		case 2: // FULL COMBO
+		case comboLampFullCombo: // FULL COMBO
 			overPower += 0.5
 		}
 	}
@@ -175,9 +175,7 @@ func CalcSongMaxOP(charts []*entity.Chart) float64 {
 		maxChartConst = max(maxChartConst, float64(chart.Const))
 	}
 
-	const theoreticalScore = uint32(1010000)
-	const allJusticeComboLampID = 3
-	return CalcSingleOverpower(theoreticalScore, maxChartConst, allJusticeComboLampID)
+	return CalcSingleOverpower(theoreticalScore, maxChartConst, comboLampAllJustice)
 }
 
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。
