@@ -31,4 +31,7 @@ var (
 	// 難易度関連エラー
 	ErrInvalidDifficulty = errors.New("invalid difficulty") // 無効な難易度パラメータ
 	ErrChartNotFound     = errors.New("chart not found")    // 指定された難易度の譜面が存在しない
+
+	// アプリバージョン関連エラー
+	ErrAppVersionUnsupported = errors.New("unsupported app version") // 対応していないアプリバージョン
 )

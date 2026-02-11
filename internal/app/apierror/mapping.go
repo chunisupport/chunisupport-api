@@ -68,6 +68,9 @@ func FromUsecaseError(err error) *APIError {
 		return ErrPasswordTooShort.WithInternal(err)
 	case errors.Is(err, usecase.ErrPasswordTooLong):
 		return ErrPasswordTooLong.WithInternal(err)
+	// アプリバージョンバリデーションエラー
+	case errors.Is(err, usecase.ErrAppVersionUnsupported):
+		return ErrAppVersionUnsupported.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

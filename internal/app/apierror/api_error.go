@@ -95,13 +95,14 @@ var (
 	ErrServiceUnavailable = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
-	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)
-	ErrUsernameTooShort    = New(CodeUsernameTooShort, http.StatusBadRequest)
-	ErrUsernameTooLong     = New(CodeUsernameTooLong, http.StatusBadRequest)
-	ErrUsernameInvalidChar = New(CodeUsernameInvalidChar, http.StatusBadRequest)
-	ErrPasswordTooShort    = New(CodePasswordTooShort, http.StatusBadRequest)
-	ErrPasswordTooLong     = New(CodePasswordTooLong, http.StatusBadRequest)
-	ErrInvalidPassword     = New(CodeInvalidPassword, http.StatusBadRequest) // パスワード無効（詳細隠蔽）
+	ErrUsernameEmpty         = New(CodeUsernameEmpty, http.StatusBadRequest)
+	ErrUsernameTooShort      = New(CodeUsernameTooShort, http.StatusBadRequest)
+	ErrUsernameTooLong       = New(CodeUsernameTooLong, http.StatusBadRequest)
+	ErrUsernameInvalidChar   = New(CodeUsernameInvalidChar, http.StatusBadRequest)
+	ErrPasswordTooShort      = New(CodePasswordTooShort, http.StatusBadRequest)
+	ErrPasswordTooLong       = New(CodePasswordTooLong, http.StatusBadRequest)
+	ErrInvalidPassword       = New(CodeInvalidPassword, http.StatusBadRequest)       // パスワード無効（詳細隠蔽）
+	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 const (
@@ -59,6 +61,11 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 			Field:   "payload",
 			Message: "payload cannot be nil",
 		}
+	}
+
+	// アプリバージョンのバリデーション
+	if !slices.Contains(info.SupportedAppVersions, payload.AppVersion) {
+		return ErrAppVersionUnsupported
 	}
 
 	// スコアデータの整合性検証

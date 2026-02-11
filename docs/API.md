@@ -568,7 +568,7 @@ curl -X POST \
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| `app_ver` | string | ✓ | インポートアプリのバージョン |
+| `app_ver` | string | ✓ | インポートアプリのバージョン。対応バージョン: `0.0.2` |
 | `name` | string | ✓ | プレイヤー名（最大20文字） |
 | `level` | number | ✓ | プレイヤーレベル |
 | `rating` | number | ✓ | レーティング |
@@ -645,7 +645,7 @@ curl -X POST \
 > **Note**: 差分情報（変更前後の比較）は返却されません。差分を取得する場合は、登録前後でスコア一覧API（`GET /internal/users/:username`）を呼び出し、クライアント側で比較してください。
 
 - **主なエラー**:
-  - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・楽曲マスタ未登録など
+  - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
   - 401 Unauthorized (`missing_token` / `invalid_token`): Cookie欠如
   - 409 Conflict (`conflict`): 別ユーザーのプレイヤーデータと競合
   - 413 Request Entity Too Large (`payload_too_large`): ボディサイズ5MB超過

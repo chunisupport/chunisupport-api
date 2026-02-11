@@ -47,3 +47,8 @@ const (
 	// リクエストボディサイズ上限
 	RequestBodyLimit = "5M"
 )
+
+// 対応アプリバージョン設定
+// プレイヤーデータ登録時に、このリストに含まれるバージョンのみ受け付ける
+// NOTE: ユーザーが設定ファイルで変更できるようにする必要があれば、example.setting.jsonに追加してください
+var SupportedAppVersions = []string{"0.0.2"}
