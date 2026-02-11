@@ -17,11 +17,11 @@ func TestConvertToV1SongDTO(t *testing.T) {
 			2: "niconico",
 		},
 		DifficultyNamesByID: map[int]string{
-			1: "basic",
-			2: "advanced",
-			3: "expert",
-			4: "master",
-			5: "ultima",
+			1: "BASIC",
+			2: "ADVANCED",
+			3: "EXPERT",
+			4: "MASTER",
+			5: "ULTIMA",
 		},
 	}
 
@@ -89,41 +89,41 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	}
 
 	// advanced 譜面が存在することを確認
-	if advancedChart, ok := dto.Charts["advanced"]; !ok || advancedChart == nil {
-		t.Error("advanced chart not found")
+	if advancedChart, ok := dto.Charts["ADVANCED"]; !ok || advancedChart == nil {
+		t.Error("ADVANCED chart not found")
 	} else {
 		if advancedChart.Const != 9.0 {
-			t.Errorf("advanced chart Const = %v, want %v", advancedChart.Const, 9.0)
+			t.Errorf("ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
 		}
 	}
 
 	// master 譜面が存在することを確認
-	if masterChart, ok := dto.Charts["master"]; !ok || masterChart == nil {
-		t.Error("master chart not found")
+	if masterChart, ok := dto.Charts["MASTER"]; !ok || masterChart == nil {
+		t.Error("MASTER chart not found")
 	} else {
 		if masterChart.Const != 13.7 {
-			t.Errorf("master chart Const = %v, want %v", masterChart.Const, 13.7)
+			t.Errorf("MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
 		}
 	}
 
 	// basic 譜面は存在しないので nil であることを確認
-	if basicChart, ok := dto.Charts["basic"]; !ok {
-		t.Error("basic key not found in map")
+	if basicChart, ok := dto.Charts["BASIC"]; !ok {
+		t.Error("BASIC key not found in map")
 	} else if basicChart != nil {
-		t.Error("basic chart should be nil")
+		t.Error("BASIC chart should be nil")
 	}
 
 	// expert 譜面は存在しないので nil であることを確認
-	if expertChart, ok := dto.Charts["expert"]; !ok {
-		t.Error("expert key not found in map")
+	if expertChart, ok := dto.Charts["EXPERT"]; !ok {
+		t.Error("EXPERT key not found in map")
 	} else if expertChart != nil {
-		t.Error("expert chart should be nil")
+		t.Error("EXPERT chart should be nil")
 	}
 
 	// ultima 譜面は存在しないので nil であることを確認
-	if ultimaChart, ok := dto.Charts["ultima"]; !ok {
-		t.Error("ultima key not found in map")
+	if ultimaChart, ok := dto.Charts["ULTIMA"]; !ok {
+		t.Error("ULTIMA key not found in map")
 	} else if ultimaChart != nil {
-		t.Error("ultima chart should be nil")
+		t.Error("ULTIMA chart should be nil")
 	}
 }
