@@ -69,6 +69,7 @@ type V1SongDTO struct {
 	BPM       *int               `json:"bpm"`
 	Release   *string            `json:"release"`
 	Jacket    *string            `json:"jacket"`
+	MaxOP     float64            `json:"maxop"`
 	Charts    V1OrderedChartsMap `json:"charts"`
 }
 
@@ -97,8 +98,9 @@ func ToV1ChartDTO(chart *entity.Chart) *V1ChartDTO {
 }
 
 // ToV1SongDTO はSongエンティティから V1SongDTO へ変換します。
+// maxOP は呼び出し元で計算済みの値を受け取ります。
 // Charts フィールドは空のmapで初期化されます。ハンドラー層で別途設定してください。
-func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string) *V1SongDTO {
+func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) *V1SongDTO {
 	if song == nil {
 		return nil
 	}
@@ -124,6 +126,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string) *V1SongDTO {
 		BPM:       song.BPM,
 		Release:   releaseDateStr,
 		Jacket:    song.Jacket,
+		MaxOP:     maxOP,
 		Charts:    make(V1OrderedChartsMap),
 	}
 }

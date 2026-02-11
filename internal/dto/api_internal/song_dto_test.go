@@ -17,6 +17,8 @@ func TestToSongDTO(t *testing.T) {
 	bpm := 180
 	imgURL := "https://example.com/jacket.jpg"
 	releaseDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
+	masterConst, _ := chartconstant.NewChartConstant(13.0)
+	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
 
 	song := &entity.Song{
 		DisplayID:  "test123456789012",
@@ -26,7 +28,10 @@ func TestToSongDTO(t *testing.T) {
 		BPM:        &bpm,
 		ReleasedAt: &releaseDate,
 		Jacket:     &imgURL,
-		Charts:     []*entity.Chart{},
+		Charts: []*entity.Chart{
+			{DifficultyID: 4, Const: masterConst},
+			{DifficultyID: 5, Const: ultimaConst},
+		},
 	}
 
 	genreNamesByID := map[int]string{
@@ -35,7 +40,7 @@ func TestToSongDTO(t *testing.T) {
 	}
 
 	// 変換実行
-	dto := ToSongDTO(song, genreNamesByID)
+	dto := ToSongDTO(song, genreNamesByID, 90)
 
 	// アサーション
 	if dto == nil {
@@ -77,6 +82,10 @@ func TestToSongDTO(t *testing.T) {
 		t.Error("Jacket is nil")
 	} else if *dto.Jacket != "https://example.com/jacket.jpg" {
 		t.Errorf("Jacket = %v, want %v", *dto.Jacket, "https://example.com/jacket.jpg")
+	}
+
+	if dto.MaxOP != 90 {
+		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90.0)
 	}
 
 	// Charts は空の map として初期化される
@@ -152,6 +161,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		BPM:       &bpm,
 		Release:   &releaseDate,
 		Jacket:    &jacket,
+		MaxOP:     85,
 		Charts: OrderedChartsMap{
 			"BASIC":    &ChartDTO{Const: chartBasic, IsConstUnknown: false, Notes: nil},
 			"ADVANCED": &ChartDTO{Const: chartAdvanced, IsConstUnknown: false, Notes: nil},
@@ -167,6 +177,10 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	}
 
 	jsonString := string(jsonBytes)
+
+	if !containsString(jsonString, `"maxop":85`) {
+		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
+	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
 	if !containsString(jsonString, `"release":"2024-01-15"`) {

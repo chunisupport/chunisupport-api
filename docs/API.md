@@ -884,6 +884,7 @@ curl -X POST \
       "bpm": 180,
       "release": "2024-01-15T00:00:00Z",
       "jacket": "img_filename",
+      "maxop": 82.5,
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -918,6 +919,7 @@ curl -X POST \
 | `bpm` | int \| null | BPM（未設定の場合null） |
 | `release` | string \| null | リリース日（ISO8601形式、未設定の場合null） |
 | `jacket` | string \| null | ジャケット画像ファイル名（未設定の場合null） |
+| `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -948,6 +950,7 @@ curl -X POST \
   "bpm": 180,
   "release": "2024-01-15T00:00:00Z",
   "jacket": "img_filename",
+  "maxop": 82.5,
   "charts": {
     "BASIC": {
       "const": 3.0,
@@ -1354,6 +1357,7 @@ curl -X POST \
       "bpm": 180,
       "release": "2024-01-15",
       "jacket": "jacket_001.png",
+      "maxop": 86.25,
       "charts": {
         "MASTER": {
           "const": 14.5,
@@ -1381,6 +1385,7 @@ curl -X POST \
 | `songs[].bpm` | number\|null | BPM |
 | `songs[].release` | string\|null | リリース日（YYYY-MM-DD形式） |
 | `songs[].jacket` | string\|null | ジャケット画像ファイル名 |
+| `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |

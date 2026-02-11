@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/testutil"
 )
 
 // TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
@@ -26,6 +27,7 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	}
 
 	handler := &V1SongHandler{
+		songUsecase: &testutil.MockSongUsecase{},
 		masterCache: masterCache,
 	}
 
@@ -81,6 +83,10 @@ func TestConvertToV1SongDTO(t *testing.T) {
 
 	if dto.DisplayID != "v1test1234567890" {
 		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "v1test1234567890")
+	}
+
+	if dto.MaxOP != 90 {
+		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
 
 	// Charts マップのキーが存在するか確認

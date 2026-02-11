@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -110,6 +111,15 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
 	})
+}
+
+// CalcSongMaxOP は楽曲の譜面から理論値の最大OPを計算します。
+func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
+	if song == nil {
+		return 0
+	}
+
+	return service.CalcSongMaxOP(song.Charts)
 }
 
 // convertRequestsToEntities はDTOリストからエンティティリストに変換します。

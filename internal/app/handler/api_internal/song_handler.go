@@ -138,7 +138,8 @@ func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.So
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
 func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO {
-	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID)
+	maxOP := h.songUsecase.CalcSongMaxOP(song)
+	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
 	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
