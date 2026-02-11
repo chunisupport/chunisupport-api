@@ -126,23 +126,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string) *V1SongDTO {
 		BPM:       song.BPM,
 		Release:   releaseDateStr,
 		Jacket:    song.Jacket,
-		MaxOP:     calcSongMaxOP(song.Charts),
+		MaxOP:     service.CalcSongMaxOP(song.Charts),
 		Charts:    make(V1OrderedChartsMap),
 	}
-}
-
-// calcSongMaxOP は楽曲に紐づく全譜面のうち、最も定数が高い譜面で理論値(AJC)を取った際のOPを返します。
-func calcSongMaxOP(charts []*entity.Chart) float64 {
-	if len(charts) == 0 {
-		return 0
-	}
-
-	maxChartConst := float64(charts[0].Const)
-	for _, chart := range charts[1:] {
-		maxChartConst = max(maxChartConst, float64(chart.Const))
-	}
-
-	const theoreticalScore = uint32(1010000)
-	const allJusticeComboLampID = 3
-	return service.CalcSingleOverpower(theoreticalScore, maxChartConst, allJusticeComboLampID)
 }

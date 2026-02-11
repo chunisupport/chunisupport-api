@@ -6,6 +6,8 @@ import (
 	"cmp"
 	"math"
 	"slices"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // CalcSingleRating は指定されたスコアと譜面定数から単曲レーティングを計算します。
@@ -160,6 +162,22 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 	}
 
 	return max(overPower, 0)
+}
+
+// CalcSongMaxOP は楽曲に紐づく全譜面のうち、最も定数が高い譜面で理論値(AJC)を取った際のOPを返します。
+func CalcSongMaxOP(charts []*entity.Chart) float64 {
+	if len(charts) == 0 {
+		return 0
+	}
+
+	maxChartConst := 0.0
+	for _, chart := range charts {
+		maxChartConst = max(maxChartConst, float64(chart.Const))
+	}
+
+	const theoreticalScore = uint32(1010000)
+	const allJusticeComboLampID = 3
+	return CalcSingleOverpower(theoreticalScore, maxChartConst, allJusticeComboLampID)
 }
 
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。

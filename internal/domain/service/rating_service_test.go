@@ -3,6 +3,9 @@ package service
 import (
 	"math"
 	"testing"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
 // floatEquals は浮動小数点数の比較を行います（許容誤差: 1e-9）
@@ -264,6 +267,41 @@ func TestCalcSingleOverpower_WikiExample(t *testing.T) {
 
 	if !floatEquals(got, want) {
 		t.Errorf("Wiki example: CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", score, chartConst, comboLampID, got, want)
+	}
+}
+
+func TestCalcSongMaxOP(t *testing.T) {
+	tests := []struct {
+		name   string
+		charts []*entity.Chart
+		want   float64
+	}{
+		{
+			name:   "譜面なし",
+			charts: []*entity.Chart{},
+			want:   0,
+		},
+		{
+			name: "最大定数の譜面で理論値を計算",
+			charts: func() []*entity.Chart {
+				masterConst, _ := chartconstant.NewChartConstant(13.0)
+				ultimaConst, _ := chartconstant.NewChartConstant(15.0)
+				return []*entity.Chart{
+					{DifficultyID: 4, Const: masterConst},
+					{DifficultyID: 5, Const: ultimaConst},
+				}
+			}(),
+			want: 90,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CalcSongMaxOP(tt.charts)
+			if !floatEquals(got, tt.want) {
+				t.Errorf("CalcSongMaxOP() = %.6f, want %.6f", got, tt.want)
+			}
+		})
 	}
 }
 
