@@ -105,7 +105,7 @@
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得。 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除。 |
 | `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活。 |
-| `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得（ページネーション対応）。 |
+| `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得。 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
@@ -543,8 +543,8 @@ curl -X POST \
         "idx": "2849",
         "score": 1002345,
         "clear_lamp": "brave",
-        "cmb_lv": 1,
-        "fch_lv": 0,
+        "cmb_lv": 2,
+        "fch_lv": 1,
         "slot": "best",
         "order": 1
       }
@@ -555,8 +555,8 @@ curl -X POST \
         "idx": "8001",
         "score": 990000,
         "clear_lamp": "clear",
-        "cmb_lv": 0,
-        "fch_lv": 0
+        "cmb_lv": 1,
+        "fch_lv": 1
       }
     ]
   },
@@ -592,8 +592,8 @@ curl -X POST \
 | `idx` | string | ✓ | 楽曲の公式インデックス |
 | `score` | number | ✓ | スコア (0〜1,010,000) |
 | `clear_lamp` | string \| null | | クリアランプ (`clear`, `hard`, `brave`, `absolute`, `catastrophy`, `null`=FAILED) |
-| `cmb_lv` | number \| null | | コンボランプ (0=NONE, 1=FULL COMBO, 2=ALL JUSTICE) |
-| `fch_lv` | number \| null | | フルチェイン (0=NONE, 1=GOLD, 2=PLATINUM) |
+| `cmb_lv` | number \| null | | コンボランプ (1=NONE, 2=FULL COMBO, 3=ALL JUSTICE) |
+| `fch_lv` | number \| null | | フルチェイン (1=NONE, 2=GOLD, 3=PLATINUM) |
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
 

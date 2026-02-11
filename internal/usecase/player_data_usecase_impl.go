@@ -110,12 +110,12 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 }
 
 // validateScoreEntry は個別のスコアエントリーを検証します。
-// AJ（All Justice: cmb_lv=2）である場合、必ず1,000,000点以上でなければならないという整合性をチェックします。
+// AJ（All Justice: cmb_lv=3）である場合、必ず1,000,000点以上でなければならないという整合性をチェックします。
 func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index int) error {
 	// AJかつ100万点未満は矛盾している
-	if entry.ComboLv != nil && *entry.ComboLv == 2 {
+	if entry.ComboLv != nil && *entry.ComboLv == 3 {
 		if entry.Score < 1000000 {
-			return fmt.Errorf("%s[%d]: inconsistent data - AJ (cmb_lv=2) with score=%d (must be >= 1,000,000, idx=%s)",
+			return fmt.Errorf("%s[%d]: inconsistent data - AJ (cmb_lv=3) with score=%d (must be >= 1,000,000, idx=%s)",
 				recordType, index, entry.Score, entry.Idx)
 		}
 	}
@@ -765,17 +765,17 @@ func resolveClearLampID(clearLamp *string, masters *playerDataMaster) (int, erro
 }
 
 func resolveComboLampID(combo *int, masters *playerDataMaster) (int, error) {
-	value := 0
+	value := 1
 	if combo != nil {
 		value = *combo
 	}
 	var name string
 	switch value {
-	case 0:
-		name = "none"
 	case 1:
-		name = "full combo"
+		name = "none"
 	case 2:
+		name = "full combo"
+	case 3:
 		name = "all justice"
 	default:
 		return 0, &PlayerDataValidationError{Field: "cmb_lv", Message: fmt.Sprintf("unknown combo level: %d", value)}
@@ -788,17 +788,17 @@ func resolveComboLampID(combo *int, masters *playerDataMaster) (int, error) {
 }
 
 func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) {
-	value := 0
+	value := 1
 	if fullChain != nil {
 		value = *fullChain
 	}
 	var name string
 	switch value {
-	case 0:
-		name = "none"
 	case 1:
-		name = "full chain gold"
+		name = "none"
 	case 2:
+		name = "full chain gold"
+	case 3:
 		name = "full chain platinum"
 	default:
 		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
