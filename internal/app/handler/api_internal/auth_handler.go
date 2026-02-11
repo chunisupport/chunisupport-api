@@ -110,7 +110,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 
 	if err := h.authUsecase.Logout(c.Request().Context(), claims.SessionID); err != nil {
-		slog.Error("Failed to logout", "session_id", claims.SessionID, "error", err.Error())
+		slog.Error("Failed to logout", "session_id", claims.SessionID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
@@ -152,7 +152,7 @@ func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
 	}
 
 	if err := h.authUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
-		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err.Error())
+		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
@@ -194,7 +194,7 @@ func (h *AuthHandler) ChangePassword(c echo.Context) error {
 	}
 
 	if err := h.authUsecase.ChangePassword(c.Request().Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
-		slog.Error("Failed to change password", "user_id", user.ID, "error", err.Error())
+		slog.Error("Failed to change password", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
 	}
 
@@ -210,7 +210,7 @@ func (h *AuthHandler) IssueRecoveryCodes(c echo.Context) error {
 
 	codes, err := h.authUsecase.IssueRecoveryCodes(c.Request().Context(), user.ID)
 	if err != nil {
-		slog.Error("Failed to issue recovery codes", "user_id", user.ID, "error", err.Error())
+		slog.Error("Failed to issue recovery codes", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
 	}
 
@@ -230,7 +230,7 @@ func (h *AuthHandler) RecoverPassword(c echo.Context) error {
 	}
 
 	if err := h.authUsecase.RecoverWithRecoveryCode(c.Request().Context(), req.RecoveryCode, req.NewPassword); err != nil {
-		slog.Error("Failed to recover password with recovery code", "error", err.Error(), "ip_address", c.RealIP())
+		slog.Error("Failed to recover password with recovery code", "error", err, "ip_address", c.RealIP())
 		return apierror.FromUsecaseError(err)
 	}
 
@@ -245,13 +245,13 @@ func (h *AuthHandler) DeleteAccount(c echo.Context) error {
 	}
 
 	if err := h.authUsecase.DeleteUser(c.Request().Context(), user.ID); err != nil {
-		slog.Error("Failed to delete user", "user_id", user.ID, "error", err.Error())
+		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
 	if claims, ok := c.Get("user").(*auth.Claims); ok && claims != nil {
 		if err := h.authUsecase.Logout(c.Request().Context(), claims.SessionID); err != nil {
-			slog.Error("Failed to invalidate session after deletion", "session_id", claims.SessionID, "error", err.Error())
+			slog.Error("Failed to invalidate session after deletion", "session_id", claims.SessionID, "error", err)
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}
