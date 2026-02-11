@@ -91,6 +91,10 @@ func TestConvertToSongDTO(t *testing.T) {
 		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
 	}
 
+	if dto.MaxOP != 90 {
+		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
+	}
+
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
