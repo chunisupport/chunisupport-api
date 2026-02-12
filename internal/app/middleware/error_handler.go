@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/labstack/echo/v4"
@@ -45,7 +46,7 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 			Code   string `json:"code"`
 		}{Status: httpStatus, Code: errorCode},
 	}); err != nil {
-		slog.Error("Failed to send error response", "error", err.Error())
+		slog.Error("Failed to send error response", "error", err)
 	}
 }
 
@@ -85,37 +86,35 @@ func httpStatusToErrorCode(status int) string {
 
 // logError はエラーをログに出力します（詳細情報を含む）
 func logError(status int, code string, err error, c echo.Context) {
+	errorMessage := sanitizeLogValue(err.Error())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
 	if errors.Is(err, context.Canceled) {
-		slog.Warn("HTTP request canceled by client",
+		logger.Warn("HTTP request canceled by client",
 			"status", status,
 			"code", code,
-			"error", err.Error(),
-			"method", c.Request().Method,
-			"path", c.Request().URL.Path,
-			"remote_addr", c.RealIP(),
+			"error", errorMessage,
 		)
 		return
 	}
 
 	// 4xx系は警告、5xx系はエラーとして出力
 	if status >= 500 {
-		slog.Error("HTTP error occurred",
+		logger.Error("HTTP error occurred",
 			"status", status,
 			"code", code,
-			"error", err.Error(),
-			"method", c.Request().Method,
-			"path", c.Request().URL.Path,
-			"remote_addr", c.RealIP(),
+			"error", errorMessage,
 		)
 	} else if status >= 400 {
-		slog.Warn("HTTP client error",
+		logger.Warn("HTTP client error",
 			"status", status,
 			"code", code,
-			"error", err.Error(),
-			"method", c.Request().Method,
-			"path", c.Request().URL.Path,
-			"remote_addr", c.RealIP(),
+			"error", errorMessage,
 		)
 	}
+}
+
+func sanitizeLogValue(value string) string {
+	replacer := strings.NewReplacer("\n", " ", "\r", " ")
+	return replacer.Replace(value)
 }

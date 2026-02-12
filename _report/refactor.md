@@ -57,8 +57,8 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **OPS-003** | **Low** | リクエストIDの欠如 | ログにリクエストを一意に識別するID（X-Request-ID等）が付与されておらず、分散環境でのトレーサビリティが低い。 |
-| **OPS-004** | **Low** | DBクエリタイムアウトの未設定 | リクエストContextはDB操作に渡されているが、明示的なクエリタイムアウト設定がない。 |
+| **OPS-001** | **Low** | リクエストIDの欠如 | ログにリクエストを一意に識別するID（X-Request-ID等）が付与されておらず、分散環境でのトレーサビリティが低い。 |
+| **OPS-002** | **Low** | DBクエリタイムアウトの未設定 | リクエストContextはDB操作に渡されているが、明示的なクエリタイムアウト設定がない。 |
 
 ### API設計・入力検証 (API)
 
@@ -78,7 +78,6 @@
 | **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
 | **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
-| **QUAL-013** | **Low** | goroutineのgraceful shutdown未対応 | `rate_limit_middleware.go` 内のクリーンアップgoroutineが永続的に動作し、アプリ終了時に停止する仕組みがない。 |
 | **QUAL-014** | **High** | Usecase層がInfra層をimport | `chart_stats_usecase.go` が `internal/infra/masterdata` をimport。AGENTS.mdで厳禁とされているクリーンアーキテクチャ違反。 |
 | **QUAL-015** | **Medium** | 部分更新メソッドの残存 | `UserRepository` に `UpdatePrivacy`, `UpdatePassword`, `SoftDelete`, `Restore`, `LinkPlayer` が残存。AGENTS.mdでは `Save(ctx, exec, user)` パターンへの統一が推奨されている。 |
 | **QUAL-016** | **Low** | `interface{}` の残存 | AGENTS.mdでは `any` の使用を推奨しているが、5箇所で `map[string]interface{}` が残存。コーディング規約との不整合。 |
@@ -255,25 +254,6 @@
 - **修正案**:
   - 全リクエスト構造体に適切な `validate` タグを追加。
   - Bindの直後に `c.Validate()` を呼ぶパターンを全ハンドラーで統一。
-
----
-
-### QUAL-013: goroutineのgraceful shutdown未対応
-- **根拠**:
-  - `internal/app/middleware/rate_limit_middleware.go` の `APIRateLimitMiddleware`, `IPRateLimitMiddleware`, `AnonymousIPRateLimitMiddleware` でバックグラウンドgoroutineを起動し、`time.Ticker` で定期クリーンアップを実行している。
-  - これらのgoroutineにはコンテキストキャンセルやシャットダウン通知の仕組みがない。
-- **現状のgoroutine起動箇所**:
-  | 行 | 関数名 |
-  |---|---|
-  | 102 | `APIRateLimitMiddleware` 内の `go func()` |
-  | 155 | `IPRateLimitMiddleware` 内の `go func()` |
-  | 185 | `AnonymousIPRateLimitMiddleware` 内の `go func()` |
-- **影響範囲**:
-  - アプリケーション終了時にgoroutineが適切に停止せず、リソースリークやgraceful shutdownの完了遅延の原因となる可能性。
-  - 現状は軽微な問題だが、より厳密なリソース管理が求められる環境では問題になりうる。
-- **修正案**:
-  - `context.Context` または `chan struct{}` を使ってgoroutineに終了シグナルを送る仕組みを追加。
-  - `Server.Shutdown` 時にこれらのgoroutineも停止させる。
 
 ---
 

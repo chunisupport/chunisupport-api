@@ -221,6 +221,5 @@ func formatRating(rating float64) string {
 
 // formatFloat は浮動小数点数を指定した小数点以下の桁数で文字列にフォーマットします
 func formatFloat(value float64, precision int) string {
-	format := "%." + string(rune('0'+precision)) + "f"
-	return fmt.Sprintf(format, value)
+	return fmt.Sprintf("%.*f", precision, value)
 }
