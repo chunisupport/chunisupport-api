@@ -206,7 +206,8 @@ CREATE TABLE IF NOT EXISTS users (
     is_suspicious BOOLEAN NOT NULL DEFAULT 0, -- 不審アカウントフラグ: 0=正常, 1=不審
 
     UNIQUE KEY uq_users_player_id (player_id),
-    FOREIGN KEY (account_type_id) REFERENCES account_types(id)
+    FOREIGN KEY (account_type_id) REFERENCES account_types(id),
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE SET NULL
 );
 
 -- プレイヤーテーブル（CHUNITHMプレイヤー情報）
@@ -228,6 +229,7 @@ CREATE TABLE IF NOT EXISTS players (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (class_emblem_id) REFERENCES class_emblems(id),
     FOREIGN KEY (class_emblem_base_id) REFERENCES class_emblem_bases(id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY uq_players_user_id (user_id),
     CHECK (player_level >= 1)
 );
