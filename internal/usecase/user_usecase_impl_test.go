@@ -452,10 +452,11 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 		Username:  un,
 		IsDeleted: false,
 	}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.DeleteUser(context.Background(), "testuser")
+	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -470,10 +471,11 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 }
 
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: sql.ErrNoRows}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.DeleteUser(context.Background(), "missing")
+	err := service.DeleteUser(context.Background(), adminRequester, "missing")
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
@@ -486,12 +488,32 @@ func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
 		Username:  un,
 		IsDeleted: true,
 	}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.DeleteUser(context.Background(), "deleteduser")
+	err := service.DeleteUser(context.Background(), adminRequester, "deleteduser")
 	if !errors.Is(err, ErrUserAlreadyDeleted) {
 		t.Fatalf("expected ErrUserAlreadyDeleted, got %v", err)
+	}
+}
+
+func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
+	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+
+	err := service.DeleteUser(context.Background(), normalUser, "testuser")
+	if !errors.Is(err, ErrAdminRequired) {
+		t.Fatalf("expected ErrAdminRequired, got %v", err)
+	}
+}
+
+func TestUserService_DeleteUser_NilRequester(t *testing.T) {
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+
+	err := service.DeleteUser(context.Background(), nil, "testuser")
+	if !errors.Is(err, ErrAdminRequired) {
+		t.Fatalf("expected ErrAdminRequired, got %v", err)
 	}
 }
 
@@ -502,10 +524,11 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 		Username:  un,
 		IsDeleted: true,
 	}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.RestoreUser(context.Background(), "deleteduser")
+	err := service.RestoreUser(context.Background(), adminRequester, "deleteduser")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -520,10 +543,11 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 }
 
 func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: sql.ErrNoRows}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.RestoreUser(context.Background(), "missing")
+	err := service.RestoreUser(context.Background(), adminRequester, "missing")
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
@@ -536,11 +560,31 @@ func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
 		Username:  un,
 		IsDeleted: false,
 	}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
 
-	err := service.RestoreUser(context.Background(), "activeuser")
+	err := service.RestoreUser(context.Background(), adminRequester, "activeuser")
 	if !errors.Is(err, ErrUserNotDeleted) {
 		t.Fatalf("expected ErrUserNotDeleted, got %v", err)
+	}
+}
+
+func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
+	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+
+	err := service.RestoreUser(context.Background(), normalUser, "deleteduser")
+	if !errors.Is(err, ErrAdminRequired) {
+		t.Fatalf("expected ErrAdminRequired, got %v", err)
+	}
+}
+
+func TestUserService_RestoreUser_NilRequester(t *testing.T) {
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+
+	err := service.RestoreUser(context.Background(), nil, "deleteduser")
+	if !errors.Is(err, ErrAdminRequired) {
+		t.Fatalf("expected ErrAdminRequired, got %v", err)
 	}
 }

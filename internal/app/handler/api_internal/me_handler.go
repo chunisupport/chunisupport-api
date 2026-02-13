@@ -151,14 +151,16 @@ func decodeAndDecompressGzipBase64(data []byte) ([]byte, error) {
 	}
 	decoded = decoded[:n]
 
-	// Gzip解凍
+	// Gzip解凍（Gzip Bomb対策: 解凍後サイズに上限を設定）
 	gzipReader, err := gzip.NewReader(bytes.NewReader(decoded))
 	if err != nil {
 		return nil, err
 	}
 	defer gzipReader.Close()
 
-	decompressed, err := io.ReadAll(gzipReader)
+	// io.LimitReaderで解凍後サイズを制限し、圧縮爆弾によるメモリ枯渇を防止
+	limitedReader := io.LimitReader(gzipReader, int64(maxPlayerDataPayloadSize)+1)
+	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // userUsecase は UserUsecase の実装です。
@@ -208,7 +209,13 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 }
 
 // DeleteUser はユーザーを論理削除します。
-func (s *userUsecase) DeleteUser(ctx context.Context, username string) error {
+// 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
+func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
+	// 認可チェック: ADMIN権限が必要
+	if requester == nil || requester.AccountTypeID < info.AccountTypeAdmin {
+		return ErrAdminRequired
+	}
+
 	// 1. ユーザーを取得
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
@@ -236,7 +243,13 @@ func (s *userUsecase) DeleteUser(ctx context.Context, username string) error {
 }
 
 // RestoreUser はユーザーを復活させます。
-func (s *userUsecase) RestoreUser(ctx context.Context, username string) error {
+// 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
+func (s *userUsecase) RestoreUser(ctx context.Context, requester *entity.User, username string) error {
+	// 認可チェック: ADMIN権限が必要
+	if requester == nil || requester.AccountTypeID < info.AccountTypeAdmin {
+		return ErrAdminRequired
+	}
+
 	// 1. ユーザーを取得
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {

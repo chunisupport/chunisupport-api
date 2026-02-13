@@ -69,9 +69,12 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 // DeleteUser はユーザーを論理削除するハンドラです（ADMIN権限必須）。
 func (h *UserHandler) DeleteUser(c echo.Context) error {
 	username := c.Param("username")
+	requester, _ := c.Get("userEntity").(*entity.User)
 
-	if err := h.userUsecase.DeleteUser(c.Request().Context(), username); err != nil {
+	if err := h.userUsecase.DeleteUser(c.Request().Context(), requester, username); err != nil {
 		switch {
+		case errors.Is(err, usecase.ErrAdminRequired):
+			return apierror.ErrForbidden
 		case errors.Is(err, usecase.ErrUserNotFound):
 			return apierror.ErrUserNotFound
 		case errors.Is(err, usecase.ErrUserAlreadyDeleted):
@@ -89,9 +92,12 @@ func (h *UserHandler) DeleteUser(c echo.Context) error {
 // RestoreUser はユーザーを復活させるハンドラです（ADMIN権限必須）。
 func (h *UserHandler) RestoreUser(c echo.Context) error {
 	username := c.Param("username")
+	requester, _ := c.Get("userEntity").(*entity.User)
 
-	if err := h.userUsecase.RestoreUser(c.Request().Context(), username); err != nil {
+	if err := h.userUsecase.RestoreUser(c.Request().Context(), requester, username); err != nil {
 		switch {
+		case errors.Is(err, usecase.ErrAdminRequired):
+			return apierror.ErrForbidden
 		case errors.Is(err, usecase.ErrUserNotFound):
 			return apierror.ErrUserNotFound
 		case errors.Is(err, usecase.ErrUserNotDeleted):

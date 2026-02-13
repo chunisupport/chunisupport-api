@@ -40,6 +40,11 @@ const (
 	RecoveryCodeRateLimitWindow   = 1 * time.Minute
 	RecoveryCodeCharset           = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+	// アカウントタイプ定数
+	AccountTypePlayer = 1 // 一般ユーザー
+	AccountTypeEditor = 2 // 編集者
+	AccountTypeAdmin  = 3 // 管理者
+
 	// パスワード設定
 	PasswordMinLength = 8
 	PasswordMaxLength = 128

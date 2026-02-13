@@ -3,14 +3,15 @@ package middleware
 import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v4"
 )
 
-// AccountType の定数定義
+// AccountType の定数定義（info パッケージの定数を再公開）
 const (
-	AccountTypePlayer = 1
-	AccountTypeEditor = 2
-	AccountTypeAdmin  = 3
+	AccountTypePlayer = info.AccountTypePlayer
+	AccountTypeEditor = info.AccountTypeEditor
+	AccountTypeAdmin  = info.AccountTypeAdmin
 )
 
 // RequireRole は指定された権限レベル以上を要求するミドルウェアを返します。
