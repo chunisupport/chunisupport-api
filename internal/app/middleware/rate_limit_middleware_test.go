@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/info"
+
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/labstack/echo/v4"
@@ -97,7 +99,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 
 	adminUser := &entity.User{
 		ID:            1,
-		AccountTypeID: AccountTypeAdmin,
+		AccountTypeID: info.AccountTypeAdmin,
 	}
 
 	handler := middleware(func(c echo.Context) error {
@@ -132,7 +134,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 	playerUser := &entity.User{
 		ID:            100, // 他のテストと衝突しないIDを使用
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 
 	handler := middleware(func(c echo.Context) error {
@@ -184,7 +186,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 
 	editorUser := &entity.User{
 		ID:            200, // 他のテストと衝突しないIDを使用
-		AccountTypeID: AccountTypeEditor,
+		AccountTypeID: info.AccountTypeEditor,
 	}
 
 	handler := middleware(func(c echo.Context) error {
@@ -226,11 +228,11 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 
 	user1 := &entity.User{
 		ID:            300, // 他のテストと衝突しないIDを使用
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 	user2 := &entity.User{
 		ID:            400, // 他のテストと衝突しないIDを使用
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 
 	handler := middleware(func(c echo.Context) error {
@@ -325,7 +327,7 @@ func TestUserRateLimitMiddleware_SameUserLimited(t *testing.T) {
 
 	user := &entity.User{
 		ID:            500,
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 
 	rec := performUserRateLimitRequest(t, e, handler, user)
@@ -340,11 +342,11 @@ func TestUserRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) 
 
 	user1 := &entity.User{
 		ID:            600,
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 	user2 := &entity.User{
 		ID:            700,
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 
 	rec := performUserRateLimitRequest(t, e, handler, user1)
@@ -532,7 +534,7 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 
 	user := &entity.User{
 		ID:            1,
-		AccountTypeID: AccountTypePlayer,
+		AccountTypeID: info.AccountTypePlayer,
 	}
 
 	for i := 0; i < 3; i++ {
