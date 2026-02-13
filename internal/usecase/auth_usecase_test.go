@@ -73,30 +73,6 @@ func (m *MockUserRepository) Create(ctx context.Context, exec repository.Executo
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	args := m.Called(ctx, exec, userID, isPrivate)
-	return args.Error(0)
-}
-
-func (m *MockUserRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	args := m.Called(ctx, exec, userID)
-	return args.Error(0)
-}
-
-func (m *MockUserRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	args := m.Called(ctx, exec, userID)
-	return args.Error(0)
-}
-
-func (m *MockUserRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	return nil
-}
-
-func (m *MockUserRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	args := m.Called(ctx, exec, userID, passwordHash)
-	return args.Error(0)
-}
-
 func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	args := m.Called(ctx, exec, user)
 	return args.Error(0)

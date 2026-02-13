@@ -26,9 +26,11 @@ type UserUsecase interface {
 
 	// DeleteUser はユーザーを論理削除します（ADMIN権限必須）。
 	// 既に削除済みのユーザーの場合は ErrUserAlreadyDeleted を返します。
-	DeleteUser(ctx context.Context, username string) error
+	// requester に ADMIN 権限がない場合は ErrAdminRequired を返します。
+	DeleteUser(ctx context.Context, requester *entity.User, username string) error
 
 	// RestoreUser はユーザーを復活させます（ADMIN権限必須）。
 	// 削除されていないユーザーの場合は ErrUserNotDeleted を返します。
-	RestoreUser(ctx context.Context, username string) error
+	// requester に ADMIN 権限がない場合は ErrAdminRequired を返します。
+	RestoreUser(ctx context.Context, requester *entity.User, username string) error
 }

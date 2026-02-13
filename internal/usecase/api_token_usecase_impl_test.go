@@ -82,26 +82,6 @@ func (s *tokenStubUserRepository) Create(ctx context.Context, exec repository.Ex
 	return errors.New("not implemented")
 }
 
-func (s *tokenStubUserRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	return nil
-}
-
-func (s *tokenStubUserRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	return errors.New("not implemented")
-}
-
 func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	return errors.New("not implemented")
 }

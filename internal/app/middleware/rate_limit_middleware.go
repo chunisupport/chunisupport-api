@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/info"
+
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/labstack/echo/v4"
@@ -153,7 +155,7 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 
 			// ADMINかどうかで制限数を変更
 			limit := normalLimit
-			if user.AccountTypeID == AccountTypeAdmin {
+			if user.AccountTypeID == info.AccountTypeAdmin {
 				limit = adminLimit
 			}
 

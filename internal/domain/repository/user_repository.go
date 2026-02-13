@@ -22,14 +22,4 @@ type UserRepository interface {
 	Create(ctx context.Context, exec Executor, user *entity.User) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 	Save(ctx context.Context, exec Executor, user *entity.User) error
-	// UpdatePrivacy はユーザーの非公開設定を更新します。
-	UpdatePrivacy(ctx context.Context, exec Executor, userID int, isPrivate bool) error
-	// UpdatePassword はユーザーのパスワードハッシュを更新します。
-	UpdatePassword(ctx context.Context, exec Executor, userID int, passwordHash string) error
-	// SoftDelete はユーザーの論理削除フラグを立てます。
-	SoftDelete(ctx context.Context, exec Executor, userID int) error
-	// Restore はユーザーの論理削除フラグを解除します。
-	Restore(ctx context.Context, exec Executor, userID int) error
-	// LinkPlayer はユーザーにプレイヤーIDを紐付けます。
-	LinkPlayer(ctx context.Context, exec Executor, userID int, playerID int) error
 }

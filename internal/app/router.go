@@ -166,7 +166,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 			"app_name": "chunisupport-api",
 		})
 	})
-	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(middleware.AccountTypeAdmin))
+	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
 	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
@@ -188,10 +188,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	})
 
 	// EDITOR以上の権限を要求するミドルウェア
-	requireEditor := middleware.RequireRole(middleware.AccountTypeEditor)
+	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
 
 	// ADMIN以上の権限を要求するミドルウェア
-	requireAdmin := middleware.RequireRole(middleware.AccountTypeAdmin)
+	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
 
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
