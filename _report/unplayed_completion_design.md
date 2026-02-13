@@ -40,7 +40,7 @@
 
 ## 3.2 追加クエリパラメータ
 
-- `include_unplayed`（optional, bool, default: `false`）
+- `include_noplay`（optional, bool, default: `false`）
 
 ### 解釈ルール
 
@@ -53,9 +53,8 @@
 
 ## 4.1 基本方針
 
-- `records.all` のみを補完対象とする。
+- `records.all` と `records.worldsend` を補完対象とする。
 - `records.best` / `best_candidate` / `new` / `new_candidate` は従来どおり「プレイ済み由来」のままとする。
-- WORLD'S END は既存仕様に合わせ、`records.worldsend` は補完対象外とする。
 
 ## 4.2 レコード要素への追加フィールド
 
@@ -65,7 +64,7 @@
   - `true`: 実際にユーザー記録が存在する譜面
   - `false`: APIが補完した未プレイ譜面
 
-> 既存クライアント互換性を最大化するため、`include_unplayed=false` 時も `is_played` を返す案を推奨（常に `true`）。
+> 既存クライアント互換性を最大化するため、`include_noplay=false` 時も `is_played` を返す案を推奨（常に `true`）。
 > ただしレスポンス差分最小化を優先する場合は「補完時のみ返す」案も選択可能。
 
 ## 4.3 未プレイ譜面の初期値
@@ -73,7 +72,7 @@
 `is_played=false` の要素に対しては、以下の初期値を返却する。
 
 - `score`: `0`
-- `clear_lamp`: `"NONE"`
+- `clear_lamp`: `null`
 - `combo_lamp`: `"NONE"`
 - `chain_lamp`: `"NONE"`
 - `ajc_lamp`: `"NONE"`
@@ -92,8 +91,8 @@
 `view=rating` は軽量レスポンス用途であり、`records.all` 自体を返却しません。
 そのため、以下のいずれかで統一します。
 
-- **推奨案A（シンプル）**: `view=rating` 指定時は `include_unplayed` を無視する。
-- 代替案B（厳格）: `view=rating&include_unplayed=true` は `400 validation_failed`。
+- **推奨案A（シンプル）**: `view=rating` 指定時は `include_noplay` を無視する。
+- 代替案B（厳格）: `view=rating&include_noplay=true` は `400 validation_failed`。
 
 本設計では互換性を重視し、**推奨案A** を採用します。
 
@@ -111,8 +110,8 @@
 ## 6.2 合成アルゴリズム
 
 1. プレイ済みレコード一覧を取得
-2. `include_unplayed=false` なら従来レスポンスを返却
-3. 対象譜面マスタ一覧（WORLD'S END除外）を一括取得
+2. `include_noplay=false` なら従来レスポンスを返却
+3. 対象譜面マスタ一覧を一括取得
 4. プレイ済みをキー（`song_id + difficulty`）でマップ化
 5. マスタ譜面を走査し、存在すれば既存レコード（`is_played=true`）、なければ補完レコード（`is_played=false`）を生成
 6. 既存の並び順ルールに従って整列し、`records.all` として返却
@@ -128,12 +127,12 @@
 
 ## 7.1 ユースケーステスト
 
-- `include_unplayed=false`: 従来件数・内容と一致
-- `include_unplayed=true`: 未プレイ譜面が追加される
+- `include_noplay=false`: 従来件数・内容と一致
+- `include_noplay=true`: 未プレイ譜面が追加される（`records.all` と `records.worldsend`）
 - 補完レコードに `is_played=false` と初期値が設定される
 - プレイ済みレコードは `is_played=true` で既存値が保持される
 - 難易度が大文字で返る
-- `view=rating` 時に `include_unplayed` が無視される
+- `view=rating` 時に `include_noplay` が無視される
 
 ## 7.2 ハンドラテスト
 
@@ -151,10 +150,11 @@
 
 実装時に `docs/API.md` の以下を更新する。
 
-- `GET /internal/users/:username` のクエリパラメータに `include_unplayed` を追加
+- `GET /internal/users/:username` のクエリパラメータに `include_noplay` を追加
 - `GET /v1/users/:username` 側の同等説明を追加
 - `records.all[*].is_played` フィールド説明を追加
-- `view=rating` 時の `include_unplayed` 扱いを明記
+- `records.worldsend[*].is_played` フィールド説明を追加
+- `view=rating` 時の `include_noplay` 扱いを明記
 
 ---
 
@@ -172,9 +172,9 @@
 
 ## 10. 意思決定メモ（推奨）
 
-- 採用: `include_unplayed` の opt-in 方式
-- 補完範囲: `records.all` のみ
+- 採用: `include_noplay` の opt-in 方式
+- 補完範囲: `records.all` と `records.worldsend`
 - 判別子: `is_played` を追加
-- `view=rating` との併用: `include_unplayed` 無視
+- `view=rating` との併用: `include_noplay` 無視
 
 上記により、既存互換性を維持しつつ、フロントエンド実装コストを削減できます。
