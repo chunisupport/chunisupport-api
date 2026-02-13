@@ -79,8 +79,6 @@
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
 | **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
 | **QUAL-014** | **High** | Usecase層がInfra層をimport | `chart_stats_usecase.go` が `internal/infra/masterdata` をimport。AGENTS.mdで厳禁とされているクリーンアーキテクチャ違反。 |
-| **QUAL-015** | **Medium** | 部分更新メソッドの残存 | `UserRepository` に `UpdatePrivacy`, `UpdatePassword`, `SoftDelete`, `Restore`, `LinkPlayer` が残存。AGENTS.mdでは `Save(ctx, exec, user)` パターンへの統一が推奨されている。 |
-| **QUAL-016** | **Low** | `interface{}` の残存 | AGENTS.mdでは `any` の使用を推奨しているが、5箇所で `map[string]interface{}` が残存。コーディング規約との不整合。 |
 | **QUAL-017** | **Low** | ARCHITECTURE.mdのディレクトリ表記不整合 | `domain/rating` と記載されているが、実際は `domain/service`。参照ドキュメントとの不整合。 |
 
 ---
@@ -272,54 +270,6 @@
   - Infra層の実装（`masterdata.StaticCache`）はDI経由でUsecaseに注入する。
 - **追加で確認したい点**:
   - `internal/domain/masterdata` パッケージが既に存在するため、このパッケージとの関係を整理する必要がある。
-
----
-
-### QUAL-015: 部分更新メソッドの残存
-- **根拠**:
-  - `internal/domain/repository/user_repository.go` に以下の部分更新メソッドが残存:
-    - `UpdatePrivacy(ctx, exec, userID, isPublic)` (L26)
-    - `UpdatePassword(ctx, exec, userID, newPasswordHash)` (L28)
-    - `SoftDelete(ctx, exec, userID)` (L30)
-    - `Restore(ctx, exec, userID)` (L32)
-    - `LinkPlayer(ctx, exec, userID, playerID)` (L34)
-  - AGENTS.mdおよびARCHITECTURE.mdでは「部分更新メソッドは廃止し、エンティティのコマンドメソッド + `Save(ctx, entity)` パターンに統一する」と明記されている。
-- **現状の使用状況**:
-  - これらのメソッドは実装層・テストコード・ハンドラーで広く使用されている。
-  - `Save()` メソッドも既に存在しており、並行して2つのパターンが混在している状態。
-- **影響範囲**:
-  - ドメイン駆動設計の原則から逸脱。エンティティがビジネスルールを持たない「貧血症モデル」になる。
-  - 実装とAGENTS.mdのルールが乖離しており、新規コードでどちらのパターンを使うべきか判断が困難。
-- **修正案**:
-  - ユーザーエンティティにコマンドメソッドを追加:
-    - `User.ChangePrivacy(isPublic)`
-    - `User.ChangePassword(newPasswordHash)`
-    - `User.Delete()` (論理削除)
-    - `User.Restore()`
-    - `User.LinkPlayer(playerID)`
-  - これらのメソッド内で `UpdatedAt` の更新などのドメインルールを強制。
-  - 既存の部分更新メソッドを使用している箇所をすべて新パターンに書き換え。
-  - 影響範囲が大きいため、段階的なリファクタリングが必要。
-- **追加で確認したい点**:
-  - 現在の `Save()` メソッドがINSERT/UPDATE判定を行っているか確認。
-  - テストの修正範囲と影響度の見積もり。
-
----
-
-### QUAL-016: `interface{}` の残存
-- **根拠**:
-  - AGENTS.mdでは「`interface{}` ではなく `any` を使う」とコーディング規約で明記されているが、以下の箇所で `interface{}` が残存:
-    - `internal/app/handler/api_internal/me_handler.go:83` - `map[string]interface{}`
-    - `internal/app/handler/api_internal/me_handler_test.go:145, 146` - `map[string]interface{}` (2箇所)
-    - `internal/app/middleware/rate_limit_middleware_test.go:44, 45` - `map[string]interface{}` (2箇所)
-- **影響範囲**:
-  - コーディング規約との不整合。軽微ではあるが、プロジェクト全体での一貫性が損なわれる。
-  - 新規コードで参照された場合、古い書き方が伝播する可能性。
-- **修正案**:
-  - 全ての `map[string]interface{}` を `map[string]any` に置換。
-  - Go 1.18以降では `any` は `interface{}` の型エイリアスであり、機能的な違いはないため、単純な置換で済む。
-- **追加で確認したい点**:
-  - プロジェクト全体で `interface{}` が他にも残存していないか、`grep` で確認。
 
 ---
 

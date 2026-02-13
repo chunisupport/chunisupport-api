@@ -258,38 +258,3 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
 	return err
 }
-
-// UpdatePrivacy はユーザーの非公開設定を更新します。
-func (r *userRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	query := `UPDATE users SET is_private = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, isPrivate, userID)
-	return err
-}
-
-// UpdatePassword はユーザーのパスワードハッシュを更新します。
-func (r *userRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	query := `UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, passwordHash, userID)
-	return err
-}
-
-// SoftDelete はユーザーを論理削除（is_deletedフラグをtrueに設定）します。
-func (r *userRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	query := `UPDATE users SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userID)
-	return err
-}
-
-// Restore はユーザーを復活（is_deletedフラグをfalseに設定）します。
-func (r *userRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	query := `UPDATE users SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userID)
-	return err
-}
-
-// LinkPlayer はユーザーとプレイヤーを紐づけます。
-func (r *userRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	query := `UPDATE users SET player_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, playerID, userID)
-	return err
-}

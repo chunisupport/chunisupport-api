@@ -80,7 +80,7 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 	hashText := hex.EncodeToString(hash[:])
 
 	// 未知のフィールドを検出するため、まずmapにデコード
-	var rawMap map[string]interface{}
+	var rawMap map[string]any
 	if err := json.Unmarshal(jsonData, &rawMap); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}

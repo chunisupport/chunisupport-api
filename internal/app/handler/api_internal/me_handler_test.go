@@ -142,12 +142,12 @@ func TestMeHandler_RegisterData(t *testing.T) {
 
 	t.Run("ハッピーパス: 未知のフィールドを含むJSON（エラーにならず無視される）", func(t *testing.T) {
 		// 既知のフィールドと未知のフィールドを含むJSONを作成
-		payloadWithUnknownFields := map[string]interface{}{
+		payloadWithUnknownFields := map[string]any{
 			"app_ver":     "1.0.0",
 			"name":        "テストプレイヤー",
 			"level":       100,
 			"extra_field": "この値は無視される",
-			"debug_info":  map[string]interface{}{"timestamp": "2024-01-01", "version": "1.0"},
+			"debug_info":  map[string]any{"timestamp": "2024-01-01", "version": "1.0"},
 			"bookmarklet": true,
 		}
 

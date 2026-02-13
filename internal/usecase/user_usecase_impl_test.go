@@ -21,8 +21,7 @@ type stubUserRepository struct {
 	user            *entity.User
 	usersWithPlayer []entity.UserWithPlayer
 	err             error
-	softDeleteErr   error
-	restoreErr      error
+	saveErr         error
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -54,34 +53,11 @@ func (s *stubUserRepository) Create(ctx context.Context, exec repository.Executo
 	return errors.New("not implemented")
 }
 
-func (s *stubUserRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	return errors.New("not implemented")
-}
-
-func (s *stubUserRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	if s.softDeleteErr != nil {
-		return s.softDeleteErr
-	}
-	return nil
-}
-
-func (s *stubUserRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	if s.restoreErr != nil {
-		return s.restoreErr
-	}
-	return nil
-}
-
-func (s *stubUserRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	return nil
-}
-
-func (s *stubUserRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	return errors.New("not implemented")
-}
-
 func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	return errors.New("not implemented")
+	if s.saveErr != nil {
+		return s.saveErr
+	}
+	return nil
 }
 
 type stubPlayerRecordRepository struct {

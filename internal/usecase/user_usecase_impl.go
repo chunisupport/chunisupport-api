@@ -225,7 +225,8 @@ func (s *userUsecase) DeleteUser(ctx context.Context, username string) error {
 	}
 
 	// 3. 論理削除を実行
-	if err := s.userRepo.SoftDelete(ctx, s.db, user.ID); err != nil {
+	user.Delete()
+	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
 		slog.Error("failed to delete user", "user_id", user.ID, "error", err)
 		return err
 	}
@@ -252,7 +253,8 @@ func (s *userUsecase) RestoreUser(ctx context.Context, username string) error {
 	}
 
 	// 3. 復活を実行
-	if err := s.userRepo.Restore(ctx, s.db, user.ID); err != nil {
+	user.Restore()
+	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
 		slog.Error("failed to restore user", "user_id", user.ID, "error", err)
 		return err
 	}

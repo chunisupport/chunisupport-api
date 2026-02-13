@@ -41,8 +41,8 @@ func setupEchoWithErrorHandler(t *testing.T) *echo.Echo {
 			return
 		}
 		if apiErr, ok := err.(*apierror.APIError); ok {
-			c.JSON(apiErr.HTTPStatus, map[string]interface{}{
-				"error": map[string]interface{}{
+			c.JSON(apiErr.HTTPStatus, map[string]any{
+				"error": map[string]any{
 					"status": apiErr.HTTPStatus,
 					"code":   apiErr.Code,
 				},
