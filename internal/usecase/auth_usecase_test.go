@@ -78,6 +78,11 @@ func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor,
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) SaveDeleteStatus(ctx context.Context, exec repository.Executor, user *entity.User) error {
+	args := m.Called(ctx, exec, user)
+	return args.Error(0)
+}
+
 // MockSessionRepository はSessionRepositoryのモックです。
 type MockSessionRepository struct {
 	mock.Mock

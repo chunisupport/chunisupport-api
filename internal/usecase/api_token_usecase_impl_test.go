@@ -86,6 +86,10 @@ func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Exec
 	return errors.New("not implemented")
 }
 
+func (s *tokenStubUserRepository) SaveDeleteStatus(ctx context.Context, exec repository.Executor, user *entity.User) error {
+	return errors.New("not implemented")
+}
+
 func TestAPITokenService_Generate(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}

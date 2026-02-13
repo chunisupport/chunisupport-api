@@ -258,3 +258,11 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
 	return err
 }
+
+// SaveDeleteStatus はユーザーの削除状態のみをデータベースに反映します。
+// 集約全体ではなく is_deleted と updated_at のみを更新するため、並行更新との競合を防ぎます。
+func (r *userRepository) SaveDeleteStatus(ctx context.Context, exec repository.Executor, user *entity.User) error {
+	query := `UPDATE users SET is_deleted = ?, updated_at = ? WHERE id = ?`
+	_, err := exec.ExecContext(ctx, query, user.IsDeleted, user.UpdatedAt, user.ID)
+	return err
+}

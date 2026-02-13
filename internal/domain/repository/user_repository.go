@@ -22,4 +22,7 @@ type UserRepository interface {
 	Create(ctx context.Context, exec Executor, user *entity.User) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 	Save(ctx context.Context, exec Executor, user *entity.User) error
+	// SaveDeleteStatus はユーザーの削除状態のみをデータベースに反映します。
+	// 集約全体ではなく is_deleted と updated_at のみを更新するため、並行更新との競合を防ぎます。
+	SaveDeleteStatus(ctx context.Context, exec Executor, user *entity.User) error
 }

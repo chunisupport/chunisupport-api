@@ -18,10 +18,12 @@ import (
 )
 
 type stubUserRepository struct {
-	user            *entity.User
-	usersWithPlayer []entity.UserWithPlayer
-	err             error
-	saveErr         error
+	user                *entity.User
+	usersWithPlayer     []entity.UserWithPlayer
+	err                 error
+	saveErr             error
+	saveDeleteStatusErr error
+	savedUser           *entity.User
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -57,6 +59,15 @@ func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor,
 	if s.saveErr != nil {
 		return s.saveErr
 	}
+	s.savedUser = user
+	return nil
+}
+
+func (s *stubUserRepository) SaveDeleteStatus(ctx context.Context, exec repository.Executor, user *entity.User) error {
+	if s.saveDeleteStatusErr != nil {
+		return s.saveDeleteStatusErr
+	}
+	s.savedUser = user
 	return nil
 }
 
@@ -457,6 +468,14 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	// SaveDeleteStatusに渡されたエンティティの状態を検証
+	if repo.savedUser == nil {
+		t.Fatal("expected user to be saved")
+	}
+	if !repo.savedUser.IsDeleted {
+		t.Error("expected user to be marked as deleted")
+	}
 }
 
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
@@ -498,6 +517,14 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 	err := service.RestoreUser(context.Background(), "deleteduser")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// SaveDeleteStatusに渡されたエンティティの状態を検証
+	if repo.savedUser == nil {
+		t.Fatal("expected user to be saved")
+	}
+	if repo.savedUser.IsDeleted {
+		t.Error("expected user to be restored (not deleted)")
 	}
 }
 
