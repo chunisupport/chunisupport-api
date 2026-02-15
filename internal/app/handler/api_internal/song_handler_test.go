@@ -156,6 +156,16 @@ func TestUpdateSongs(t *testing.T) {
 	masterCache := &masterdata.Cache{}
 	staticMasterCache := &masterdata.StaticCache{}
 
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+
+	newPutSongsContext := func(body string) echo.Context {
+		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		return e.NewContext(req, rec)
+	}
+
 	t.Run("正常な配列で204が返る", func(t *testing.T) {
 		called := false
 		mockUsecase := &testutil.MockSongUsecase{
@@ -176,14 +186,9 @@ func TestUpdateSongs(t *testing.T) {
 
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
-		e := echo.New()
-		e.Validator = &testValidator{validator: validator.New()}
-
 		body := `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト"}]`
-		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := newPutSongsContext(body)
+		rec := c.Response().Writer.(*httptest.ResponseRecorder)
 
 		err := handler.UpdateSongs(c)
 		if err != nil {
@@ -201,14 +206,8 @@ func TestUpdateSongs(t *testing.T) {
 		mockUsecase := &testutil.MockSongUsecase{}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
-		e := echo.New()
-		e.Validator = &testValidator{validator: validator.New()}
-
 		body := `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`
-		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := newPutSongsContext(body)
 
 		err := handler.UpdateSongs(c)
 		if err == nil {
@@ -237,14 +236,8 @@ func TestUpdateSongs(t *testing.T) {
 		}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
-		e := echo.New()
-		e.Validator = &testValidator{validator: validator.New()}
-
 		body := `[null]`
-		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
+		c := newPutSongsContext(body)
 
 		err := handler.UpdateSongs(c)
 		if err == nil {
