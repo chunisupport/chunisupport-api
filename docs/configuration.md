@@ -34,3 +34,6 @@
 - `database.pool.max_idle_conns` (省略時はデフォルト値: 25)
 - `database.pool.conn_max_lifetime_sec` (省略時はデフォルト値: 300)
 - `database.pool.conn_max_idle_time_sec` (省略時はデフォルト値: 60)
+
+`database.pool.*` は **省略時のみ** デフォルト値が補完されます。`0` を明示した場合は `sql.DB` と同様に「無制限/無効」として扱います。
+また、`max_open_conns` が 1 以上で `max_idle_conns` がそれを上回る場合は、`max_idle_conns` は `max_open_conns` へ丸められます。

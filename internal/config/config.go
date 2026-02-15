@@ -61,10 +61,10 @@ type DbConfig struct {
 }
 
 type DatabasePoolConfig struct {
-	MaxOpenConns       int `json:"max_open_conns"`
-	MaxIdleConns       int `json:"max_idle_conns"`
-	ConnMaxLifetimeSec int `json:"conn_max_lifetime_sec"`
-	ConnMaxIdleTimeSec int `json:"conn_max_idle_time_sec"`
+	MaxOpenConns       *int `json:"max_open_conns"`
+	MaxIdleConns       *int `json:"max_idle_conns"`
+	ConnMaxLifetimeSec *int `json:"conn_max_lifetime_sec"`
+	ConnMaxIdleTimeSec *int `json:"conn_max_idle_time_sec"`
 }
 
 type Database struct {
@@ -160,45 +160,57 @@ func LoadConfig() (Config, error) {
 		DbPort:             dbPort,
 		DbUser:             dbUser,
 		DbPass:             dbPass,
-		MaxOpenConns:       config.Database.Pool.MaxOpenConns,
-		MaxIdleConns:       config.Database.Pool.MaxIdleConns,
-		ConnMaxLifetimeSec: config.Database.Pool.ConnMaxLifetimeSec,
-		ConnMaxIdleTimeSec: config.Database.Pool.ConnMaxIdleTimeSec,
+		MaxOpenConns:       *config.Database.Pool.MaxOpenConns,
+		MaxIdleConns:       *config.Database.Pool.MaxIdleConns,
+		ConnMaxLifetimeSec: *config.Database.Pool.ConnMaxLifetimeSec,
+		ConnMaxIdleTimeSec: *config.Database.Pool.ConnMaxIdleTimeSec,
 	}
 
 	return config, nil
 }
 
 func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
-	if pool.MaxOpenConns < 0 {
+	maxOpenConns := info.DefaultDBMaxOpenConns
+	if pool.MaxOpenConns != nil {
+		maxOpenConns = *pool.MaxOpenConns
+	}
+
+	maxIdleConns := info.DefaultDBMaxIdleConns
+	if pool.MaxIdleConns != nil {
+		maxIdleConns = *pool.MaxIdleConns
+	}
+
+	connMaxLifetimeSec := info.DefaultDBConnMaxLifetimeSec
+	if pool.ConnMaxLifetimeSec != nil {
+		connMaxLifetimeSec = *pool.ConnMaxLifetimeSec
+	}
+
+	connMaxIdleTimeSec := info.DefaultDBConnMaxIdleTimeSec
+	if pool.ConnMaxIdleTimeSec != nil {
+		connMaxIdleTimeSec = *pool.ConnMaxIdleTimeSec
+	}
+
+	if maxOpenConns < 0 {
 		return fmt.Errorf("database.pool.max_open_conns must be 0 or greater")
 	}
-	if pool.MaxIdleConns < 0 {
+	if maxIdleConns < 0 {
 		return fmt.Errorf("database.pool.max_idle_conns must be 0 or greater")
 	}
-	if pool.ConnMaxLifetimeSec < 0 {
+	if connMaxLifetimeSec < 0 {
 		return fmt.Errorf("database.pool.conn_max_lifetime_sec must be 0 or greater")
 	}
-	if pool.ConnMaxIdleTimeSec < 0 {
+	if connMaxIdleTimeSec < 0 {
 		return fmt.Errorf("database.pool.conn_max_idle_time_sec must be 0 or greater")
 	}
 
-	if pool.MaxOpenConns == 0 {
-		pool.MaxOpenConns = info.DefaultDBMaxOpenConns
-	}
-	if pool.MaxIdleConns == 0 {
-		pool.MaxIdleConns = info.DefaultDBMaxIdleConns
-	}
-	if pool.ConnMaxLifetimeSec == 0 {
-		pool.ConnMaxLifetimeSec = info.DefaultDBConnMaxLifetimeSec
-	}
-	if pool.ConnMaxIdleTimeSec == 0 {
-		pool.ConnMaxIdleTimeSec = info.DefaultDBConnMaxIdleTimeSec
+	if maxOpenConns > 0 && maxIdleConns > maxOpenConns {
+		maxIdleConns = maxOpenConns
 	}
 
-if pool.MaxIdleConns > pool.MaxOpenConns {
-		pool.MaxIdleConns = pool.MaxOpenConns
-	}
+	pool.MaxOpenConns = &maxOpenConns
+	pool.MaxIdleConns = &maxIdleConns
+	pool.ConnMaxLifetimeSec = &connMaxLifetimeSec
+	pool.ConnMaxIdleTimeSec = &connMaxIdleTimeSec
 
 	return nil
 }
