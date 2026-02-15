@@ -36,7 +36,11 @@ func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
 func TestNormalizeAndValidateDatabasePoolConfig_IdleGreaterThanOpen(t *testing.T) {
 	pool := DatabasePoolConfig{MaxOpenConns: 10, MaxIdleConns: 11}
 
-	if err := normalizeAndValidateDatabasePoolConfig(&pool); err == nil {
-		t.Fatal("expected error, got nil")
+	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if pool.MaxIdleConns != 10 {
+		t.Fatalf("MaxIdleConns = %d, want 10", pool.MaxIdleConns)
 	}
 }
