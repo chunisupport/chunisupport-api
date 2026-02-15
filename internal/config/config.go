@@ -170,25 +170,17 @@ func LoadConfig() (Config, error) {
 }
 
 func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
-	maxOpenConns := info.DefaultDBMaxOpenConns
-	if pool.MaxOpenConns != nil {
-		maxOpenConns = *pool.MaxOpenConns
+	getIntOrDefault := func(p *int, def int) int {
+		if p != nil {
+			return *p
+		}
+		return def
 	}
 
-	maxIdleConns := info.DefaultDBMaxIdleConns
-	if pool.MaxIdleConns != nil {
-		maxIdleConns = *pool.MaxIdleConns
-	}
-
-	connMaxLifetimeSec := info.DefaultDBConnMaxLifetimeSec
-	if pool.ConnMaxLifetimeSec != nil {
-		connMaxLifetimeSec = *pool.ConnMaxLifetimeSec
-	}
-
-	connMaxIdleTimeSec := info.DefaultDBConnMaxIdleTimeSec
-	if pool.ConnMaxIdleTimeSec != nil {
-		connMaxIdleTimeSec = *pool.ConnMaxIdleTimeSec
-	}
+	maxOpenConns := getIntOrDefault(pool.MaxOpenConns, info.DefaultDBMaxOpenConns)
+	maxIdleConns := getIntOrDefault(pool.MaxIdleConns, info.DefaultDBMaxIdleConns)
+	connMaxLifetimeSec := getIntOrDefault(pool.ConnMaxLifetimeSec, info.DefaultDBConnMaxLifetimeSec)
+	connMaxIdleTimeSec := getIntOrDefault(pool.ConnMaxIdleTimeSec, info.DefaultDBConnMaxIdleTimeSec)
 
 	if maxOpenConns < 0 {
 		return fmt.Errorf("database.pool.max_open_conns must be 0 or greater")
