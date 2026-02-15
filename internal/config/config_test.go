@@ -2,30 +2,20 @@ package config
 
 import "testing"
 
-import "github.com/chunisupport/chunisupport-api/internal/info"
-
 func intPtr(v int) *int {
 	return &v
 }
 
-func TestNormalizeAndValidateDatabasePoolConfig_DefaultValues(t *testing.T) {
-	pool := DatabasePoolConfig{}
+func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
+	pool := DatabasePoolConfig{
+		MaxOpenConns:       intPtr(25),
+		MaxIdleConns:       intPtr(25),
+		ConnMaxLifetimeSec: intPtr(300),
+		ConnMaxIdleTimeSec: intPtr(60),
+	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if *pool.MaxOpenConns != info.DefaultDBMaxOpenConns {
-		t.Fatalf("MaxOpenConns = %d, want %d", *pool.MaxOpenConns, info.DefaultDBMaxOpenConns)
-	}
-	if *pool.MaxIdleConns != info.DefaultDBMaxIdleConns {
-		t.Fatalf("MaxIdleConns = %d, want %d", *pool.MaxIdleConns, info.DefaultDBMaxIdleConns)
-	}
-	if *pool.ConnMaxLifetimeSec != info.DefaultDBConnMaxLifetimeSec {
-		t.Fatalf("ConnMaxLifetimeSec = %d, want %d", *pool.ConnMaxLifetimeSec, info.DefaultDBConnMaxLifetimeSec)
-	}
-	if *pool.ConnMaxIdleTimeSec != info.DefaultDBConnMaxIdleTimeSec {
-		t.Fatalf("ConnMaxIdleTimeSec = %d, want %d", *pool.ConnMaxIdleTimeSec, info.DefaultDBConnMaxIdleTimeSec)
 	}
 }
 
@@ -56,7 +46,12 @@ func TestNormalizeAndValidateDatabasePoolConfig_ZeroValues(t *testing.T) {
 }
 
 func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
-	pool := DatabasePoolConfig{MaxOpenConns: intPtr(-1)}
+	pool := DatabasePoolConfig{
+		MaxOpenConns:       intPtr(-1),
+		MaxIdleConns:       intPtr(1),
+		ConnMaxLifetimeSec: intPtr(1),
+		ConnMaxIdleTimeSec: intPtr(1),
+	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err == nil {
 		t.Fatal("expected error, got nil")
@@ -64,7 +59,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
 }
 
 func TestNormalizeAndValidateDatabasePoolConfig_IdleGreaterThanOpen(t *testing.T) {
-	pool := DatabasePoolConfig{MaxOpenConns: intPtr(10), MaxIdleConns: intPtr(11)}
+	pool := DatabasePoolConfig{MaxOpenConns: intPtr(10), MaxIdleConns: intPtr(11), ConnMaxLifetimeSec: intPtr(300), ConnMaxIdleTimeSec: intPtr(60)}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -75,14 +70,22 @@ func TestNormalizeAndValidateDatabasePoolConfig_IdleGreaterThanOpen(t *testing.T
 	}
 }
 
-func TestNormalizeAndValidateDatabasePoolConfig_IdleDefaultCappedByOpen(t *testing.T) {
-	pool := DatabasePoolConfig{MaxOpenConns: intPtr(10)}
-
-	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestNormalizeAndValidateDatabasePoolConfig_MissingValues(t *testing.T) {
+	tests := []struct {
+		name string
+		pool DatabasePoolConfig
+	}{
+		{name: "max_open_conns", pool: DatabasePoolConfig{MaxIdleConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
+		{name: "max_idle_conns", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
+		{name: "conn_max_lifetime_sec", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), MaxIdleConns: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
+		{name: "conn_max_idle_time_sec", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), MaxIdleConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1)}},
 	}
 
-	if *pool.MaxIdleConns != 10 {
-		t.Fatalf("MaxIdleConns = %d, want 10", *pool.MaxIdleConns)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := normalizeAndValidateDatabasePoolConfig(&tc.pool); err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
 	}
 }
