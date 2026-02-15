@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
 
@@ -25,6 +26,11 @@ func Connect(dbConfig config.DbConfig) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open MySQL database: %w", err)
 	}
+
+	db.SetMaxOpenConns(dbConfig.MaxOpenConns)
+	db.SetMaxIdleConns(dbConfig.MaxIdleConns)
+	db.SetConnMaxLifetime(time.Duration(dbConfig.ConnMaxLifetimeSec) * time.Second)
+	db.SetConnMaxIdleTime(time.Duration(dbConfig.ConnMaxIdleTimeSec) * time.Second)
 
 	if err := db.Ping(); err != nil {
 		if closeErr := db.Close(); closeErr != nil {
