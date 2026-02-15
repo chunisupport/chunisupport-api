@@ -196,8 +196,8 @@ func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 		pool.ConnMaxIdleTimeSec = info.DefaultDBConnMaxIdleTimeSec
 	}
 
-	if pool.MaxIdleConns > pool.MaxOpenConns {
-		return fmt.Errorf("database.pool.max_idle_conns must be less than or equal to max_open_conns")
+if pool.MaxIdleConns > pool.MaxOpenConns {
+		pool.MaxIdleConns = pool.MaxOpenConns
 	}
 
 	return nil
