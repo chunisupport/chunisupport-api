@@ -51,6 +51,12 @@ const (
 
 	// リクエストボディサイズ上限
 	RequestBodyLimit = "5M"
+
+	// DBコネクションプールのデフォルト設定
+	DefaultDBMaxOpenConns       = 25
+	DefaultDBMaxIdleConns       = 25
+	DefaultDBConnMaxLifetimeSec = 300
+	DefaultDBConnMaxIdleTimeSec = 60
 )
 
 // 対応アプリバージョン設定

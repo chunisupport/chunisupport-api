@@ -19,5 +19,13 @@
     ],
     "allow_credentials": true,
     "max_age": 3600
+  },
+  "database": {
+    "pool": {
+      "max_open_conns": 25,
+      "max_idle_conns": 25,
+      "conn_max_lifetime_sec": 300,
+      "conn_max_idle_time_sec": 60
+    }
   }
 }

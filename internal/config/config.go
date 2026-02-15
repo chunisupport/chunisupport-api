@@ -49,14 +49,26 @@ type Config struct {
 }
 
 type DbConfig struct {
-	DbName string
-	DbHost string
-	DbPort int
-	DbUser string
-	DbPass string
+	DbName             string
+	DbHost             string
+	DbPort             int
+	DbUser             string
+	DbPass             string
+	MaxOpenConns       int
+	MaxIdleConns       int
+	ConnMaxLifetimeSec int
+	ConnMaxIdleTimeSec int
+}
+
+type DatabasePoolConfig struct {
+	MaxOpenConns       int `json:"max_open_conns"`
+	MaxIdleConns       int `json:"max_idle_conns"`
+	ConnMaxLifetimeSec int `json:"conn_max_lifetime_sec"`
+	ConnMaxIdleTimeSec int `json:"conn_max_idle_time_sec"`
 }
 
 type Database struct {
+	Pool     DatabasePoolConfig `json:"pool"`
 	DbConfig DbConfig
 }
 
@@ -95,6 +107,10 @@ func LoadConfig() (Config, error) {
 
 	if strings.TrimSpace(config.StaticDBPath) == "" {
 		return config, fmt.Errorf("static_db_path is required")
+	}
+
+	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
+		return config, err
 	}
 
 	// 環境変数から秘密情報を取得
@@ -139,14 +155,52 @@ func LoadConfig() (Config, error) {
 	}
 
 	config.Database.DbConfig = DbConfig{
-		DbName: dbName,
-		DbHost: dbHost,
-		DbPort: dbPort,
-		DbUser: dbUser,
-		DbPass: dbPass,
+		DbName:             dbName,
+		DbHost:             dbHost,
+		DbPort:             dbPort,
+		DbUser:             dbUser,
+		DbPass:             dbPass,
+		MaxOpenConns:       config.Database.Pool.MaxOpenConns,
+		MaxIdleConns:       config.Database.Pool.MaxIdleConns,
+		ConnMaxLifetimeSec: config.Database.Pool.ConnMaxLifetimeSec,
+		ConnMaxIdleTimeSec: config.Database.Pool.ConnMaxIdleTimeSec,
 	}
 
 	return config, nil
+}
+
+func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
+	if pool.MaxOpenConns < 0 {
+		return fmt.Errorf("database.pool.max_open_conns must be 0 or greater")
+	}
+	if pool.MaxIdleConns < 0 {
+		return fmt.Errorf("database.pool.max_idle_conns must be 0 or greater")
+	}
+	if pool.ConnMaxLifetimeSec < 0 {
+		return fmt.Errorf("database.pool.conn_max_lifetime_sec must be 0 or greater")
+	}
+	if pool.ConnMaxIdleTimeSec < 0 {
+		return fmt.Errorf("database.pool.conn_max_idle_time_sec must be 0 or greater")
+	}
+
+	if pool.MaxOpenConns == 0 {
+		pool.MaxOpenConns = info.DefaultDBMaxOpenConns
+	}
+	if pool.MaxIdleConns == 0 {
+		pool.MaxIdleConns = info.DefaultDBMaxIdleConns
+	}
+	if pool.ConnMaxLifetimeSec == 0 {
+		pool.ConnMaxLifetimeSec = info.DefaultDBConnMaxLifetimeSec
+	}
+	if pool.ConnMaxIdleTimeSec == 0 {
+		pool.ConnMaxIdleTimeSec = info.DefaultDBConnMaxIdleTimeSec
+	}
+
+	if pool.MaxIdleConns > pool.MaxOpenConns {
+		return fmt.Errorf("database.pool.max_idle_conns must be less than or equal to max_open_conns")
+	}
+
+	return nil
 }
 
 func validateEnv(env string) error {

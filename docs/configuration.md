@@ -30,3 +30,7 @@
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
+- `database.pool.max_open_conns` (省略時はデフォルト値: 25)
+- `database.pool.max_idle_conns` (省略時はデフォルト値: 25)
+- `database.pool.conn_max_lifetime_sec` (省略時はデフォルト値: 300)
+- `database.pool.conn_max_idle_time_sec` (省略時はデフォルト値: 60)
