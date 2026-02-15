@@ -1,19 +1,30 @@
 package api_internal
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
+
+type testValidator struct {
+	validator *validator.Validate
+}
+
+func (tv *testValidator) Validate(i any) error {
+	return tv.validator.Struct(i)
+}
 
 // TestConvertToSongDTO はSongHandlerのconvertToSongDTOメソッドをテストします。
 func TestConvertToSongDTO(t *testing.T) {
@@ -138,6 +149,122 @@ func TestConvertToSongDTO(t *testing.T) {
 	} else if ultimaChart != nil {
 		t.Error("ultima chart should be nil")
 	}
+}
+
+// TestUpdateSongs はUpdateSongsハンドラーの入力バリデーションをテストします。
+func TestUpdateSongs(t *testing.T) {
+	masterCache := &masterdata.Cache{}
+	staticMasterCache := &masterdata.StaticCache{}
+
+	t.Run("正常な配列で204が返る", func(t *testing.T) {
+		called := false
+		mockUsecase := &testutil.MockSongUsecase{
+			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				called = true
+				if len(requests) != 1 {
+					t.Fatalf("requests len = %d, want 1", len(requests))
+				}
+				if requests[0] == nil {
+					t.Fatal("requests[0] should not be nil")
+				}
+				if requests[0].DisplayID != "1234567890123456" {
+					t.Fatalf("DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
+				}
+				return nil
+			},
+		}
+
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+
+		e := echo.New()
+		e.Validator = &testValidator{validator: validator.New()}
+
+		body := `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト"}]`
+		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := handler.UpdateSongs(c)
+		if err != nil {
+			t.Fatalf("UpdateSongs returned error: %v", err)
+		}
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("Status code = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+		if !called {
+			t.Fatal("UpdateSongs usecase should be called")
+		}
+	})
+
+	t.Run("不正要素を含む配列でvalidation_failedが返る", func(t *testing.T) {
+		mockUsecase := &testutil.MockSongUsecase{}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+
+		e := echo.New()
+		e.Validator = &testValidator{validator: validator.New()}
+
+		body := `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`
+		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := handler.UpdateSongs(c)
+		if err == nil {
+			t.Fatal("UpdateSongs should return error")
+		}
+
+		apiErr, ok := err.(*apierror.APIError)
+		if !ok {
+			t.Fatalf("error type = %T, want *apierror.APIError", err)
+		}
+		if apiErr.Code != apierror.CodeValidationFailed {
+			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
+		}
+		if apiErr.Internal == nil {
+			t.Fatal("internal error should not be nil")
+		}
+	})
+
+	t.Run("null要素を含む配列でvalidation_failedが返る", func(t *testing.T) {
+		called := false
+		mockUsecase := &testutil.MockSongUsecase{
+			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				called = true
+				return nil
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+
+		e := echo.New()
+		e.Validator = &testValidator{validator: validator.New()}
+
+		body := `[null]`
+		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := handler.UpdateSongs(c)
+		if err == nil {
+			t.Fatal("UpdateSongs should return error")
+		}
+
+		apiErr, ok := err.(*apierror.APIError)
+		if !ok {
+			t.Fatalf("error type = %T, want *apierror.APIError", err)
+		}
+		if apiErr.Code != apierror.CodeValidationFailed {
+			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
+		}
+		if apiErr.Internal == nil {
+			t.Fatal("internal error should not be nil")
+		}
+		if called {
+			t.Fatal("UpdateSongs usecase should not be called")
+		}
+	})
 }
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。

@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -113,8 +114,14 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 	}
 
 	// バリデーション
-	if err := c.Validate(requests); err != nil {
-		return apierror.ErrValidationFailed.WithInternal(err)
+	for idx, req := range requests {
+		if req == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
+		}
+
+		if err := c.Validate(req); err != nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
+		}
 	}
 
 	// サービス層での更新処理
