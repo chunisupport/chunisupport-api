@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,41 +220,41 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 	jsonString := string(jsonBytes)
 
 	// maxop が null であることを確認
-	if !containsString(jsonString, `"maxop":null`) {
+	if !strings.Contains(jsonString, `"maxop":null`) {
 		t.Errorf("JSON should contain \"maxop\":null, got: %s", jsonString)
 	}
 
 	// release フィールド名であることを確認（released_at ではない）
-	if !containsString(jsonString, `"release":"2024-01-15"`) {
+	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
 	}
 
 	// genre がジャンル名であることを確認（genre_id ではない）
 	// Goの json.Marshal は & を \u0026 にエスケープするため、エスケープ後の文字列で検証
-	if !containsString(jsonString, `"genre":"POPS \u0026 ANIME"`) {
+	if !strings.Contains(jsonString, `"genre":"POPS \u0026 ANIME"`) {
 		t.Errorf("JSON should contain genre name, got: %s", jsonString)
 	}
 
 	// official_idx が含まれること
-	if !containsString(jsonString, `"official_idx":"123"`) {
+	if !strings.Contains(jsonString, `"official_idx":"123"`) {
 		t.Errorf("JSON should contain official_idx, got: %s", jsonString)
 	}
 
 	// charts.WORLDSEND が含まれること
-	if !containsString(jsonString, `"WORLDSEND"`) {
+	if !strings.Contains(jsonString, `"WORLDSEND"`) {
 		t.Errorf("JSON should contain 'WORLDSEND' key, got: %s", jsonString)
 	}
 
 	// we_kanji, we_star, notes が charts 内に含まれること
-	if !containsString(jsonString, `"we_kanji":"狂"`) {
+	if !strings.Contains(jsonString, `"we_kanji":"狂"`) {
 		t.Errorf("JSON should contain we_kanji, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"we_star":5`) {
+	if !strings.Contains(jsonString, `"we_star":5`) {
 		t.Errorf("JSON should contain we_star, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"notes":1500`) {
+	if !strings.Contains(jsonString, `"notes":1500`) {
 		t.Errorf("JSON should contain notes, got: %s", jsonString)
 	}
 }

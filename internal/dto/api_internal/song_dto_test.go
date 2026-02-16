@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,31 +179,31 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 
 	jsonString := string(jsonBytes)
 
-	if !containsString(jsonString, `"maxop":85`) {
+	if !strings.Contains(jsonString, `"maxop":85`) {
 		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
-	if !containsString(jsonString, `"release":"2024-01-15"`) {
+	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
 	}
 
 	// constが小数点以下1桁表記であることを確認
-	if !containsString(jsonString, `"const":3.0`) && !containsString(jsonString, `"const":3`) {
+	if !strings.Contains(jsonString, `"const":3.0`) && !strings.Contains(jsonString, `"const":3`) {
 		t.Errorf("JSON should contain const:3.0, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"const":11.3`) {
+	if !strings.Contains(jsonString, `"const":11.3`) {
 		t.Errorf("JSON should contain const:11.3, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"const":14.0`) && !containsString(jsonString, `"const":14`) {
+	if !strings.Contains(jsonString, `"const":14.0`) && !strings.Contains(jsonString, `"const":14`) {
 		t.Errorf("JSON should contain const:14.0, got: %s", jsonString)
 	}
 
 	// charts内のキー順序を確認（BASIC→ADVANCED→EXPERT→MASTER の順）
-	basicIdx := indexOfString(jsonString, `"BASIC"`)
-	advancedIdx := indexOfString(jsonString, `"ADVANCED"`)
-	expertIdx := indexOfString(jsonString, `"EXPERT"`)
-	masterIdx := indexOfString(jsonString, `"MASTER"`)
+	basicIdx := strings.Index(jsonString, `"BASIC"`)
+	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
+	expertIdx := strings.Index(jsonString, `"EXPERT"`)
+	masterIdx := strings.Index(jsonString, `"MASTER"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 {
 		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)
@@ -233,39 +234,39 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 	jsonString := string(jsonBytes)
 
 	// 全ての難易度キーが含まれることを確認
-	if !containsString(jsonString, `"BASIC"`) {
+	if !strings.Contains(jsonString, `"BASIC"`) {
 		t.Errorf("JSON should contain 'BASIC' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ADVANCED"`) {
+	if !strings.Contains(jsonString, `"ADVANCED"`) {
 		t.Errorf("JSON should contain 'ADVANCED' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"EXPERT"`) {
+	if !strings.Contains(jsonString, `"EXPERT"`) {
 		t.Errorf("JSON should contain 'EXPERT' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"MASTER"`) {
+	if !strings.Contains(jsonString, `"MASTER"`) {
 		t.Errorf("JSON should contain 'MASTER' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA"`) {
+	if !strings.Contains(jsonString, `"ULTIMA"`) {
 		t.Errorf("JSON should contain 'ULTIMA' key, got: %s", jsonString)
 	}
 
 	// 譜面がない難易度はnullになることを確認
-	if !containsString(jsonString, `"ADVANCED":null`) {
+	if !strings.Contains(jsonString, `"ADVANCED":null`) {
 		t.Errorf("JSON should contain 'ADVANCED':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"EXPERT":null`) {
+	if !strings.Contains(jsonString, `"EXPERT":null`) {
 		t.Errorf("JSON should contain 'EXPERT':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA":null`) {
+	if !strings.Contains(jsonString, `"ULTIMA":null`) {
 		t.Errorf("JSON should contain 'ULTIMA':null, got: %s", jsonString)
 	}
 
 	// BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順で出力されることを確認
-	basicIdx := indexOfString(jsonString, `"BASIC"`)
-	advancedIdx := indexOfString(jsonString, `"ADVANCED"`)
-	expertIdx := indexOfString(jsonString, `"EXPERT"`)
-	masterIdx := indexOfString(jsonString, `"MASTER"`)
-	ultimaIdx := indexOfString(jsonString, `"ULTIMA"`)
+	basicIdx := strings.Index(jsonString, `"BASIC"`)
+	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
+	expertIdx := strings.Index(jsonString, `"EXPERT"`)
+	masterIdx := strings.Index(jsonString, `"MASTER"`)
+	ultimaIdx := strings.Index(jsonString, `"ULTIMA"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 || ultimaIdx == -1 {
 		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)
