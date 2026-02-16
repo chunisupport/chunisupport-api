@@ -23,6 +23,9 @@ type testValidator struct {
 }
 
 func (tv *testValidator) Validate(i any) error {
+	// validator.v10のStruct()はスライスを直接サポートしないため、
+	// このテスト用バリデータは構造体のみを対象とします。
+	// スライスのバリデーションはハンドラ側でループ処理する必要があります。
 	return tv.validator.Struct(i)
 }
 
