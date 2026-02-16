@@ -126,9 +126,14 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%d]: chart is null", idx, chartIdx))
 			}
 		}
-		if err := c.Validate(req); err != nil {
-			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
-		}
+            internalErr := err
+			if apiErr, ok := err.(*apierror.APIError); ok {
+				// *apierror.APIErrorから内部エラーを取り出す
+				if apiErr.Internal != nil {
+					internalErr = apiErr.Internal
+				}
+			}
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, internalErr))
 	}
 
 	// ユースケース層での更新処理
