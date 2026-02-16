@@ -33,8 +33,8 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
 func (h *V1SongHandler) GetSongs(c echo.Context) error {
-	// 外部APIでは削除済み楽曲は含めない
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false)
+	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}

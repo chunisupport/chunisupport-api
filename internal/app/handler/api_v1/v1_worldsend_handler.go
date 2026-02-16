@@ -30,7 +30,8 @@ func NewV1WorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCach
 // GetWorldsendSongs は全 WORLD'S END 楽曲を取得します（公開 API）。
 // 削除済み楽曲は含まれません。
 func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
-	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false)
+	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
+	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false, nil)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

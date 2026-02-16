@@ -40,8 +40,8 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	// 楽曲を取得 (削除済みを含まない)
-	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false)
+	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}

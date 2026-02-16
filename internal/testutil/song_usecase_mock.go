@@ -9,7 +9,7 @@ import (
 
 // MockSongUsecase は楽曲ユースケースのテスト用モックです。
 type MockSongUsecase struct {
-	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
+	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
 	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
@@ -17,9 +17,9 @@ type MockSongUsecase struct {
 	CalcSongMaxOPFunc                 func(song *entity.Song) float64
 }
 
-func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 	if m.GetAllSongsExcludingWorldsendFunc != nil {
-		return m.GetAllSongsExcludingWorldsendFunc(ctx, includeDeleted)
+		return m.GetAllSongsExcludingWorldsendFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}
 	return nil, nil
 }

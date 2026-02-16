@@ -34,10 +34,12 @@ func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartS
 
 // GetSongs はWORLD'S END以外の全楽曲を取得します。
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
+// ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
 func (h *SongHandler) GetSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted)
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}

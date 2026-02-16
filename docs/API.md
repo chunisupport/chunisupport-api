@@ -877,7 +877,7 @@ curl -X POST \
 - **レートリミット**: 認証なしは1分10回/IP
 - **概要**: WORLD'S END以外の全楽曲を譜面情報付きで取得します。デフォルトでは削除済み楽曲は除外されます。
 - **クエリパラメータ**:
-  - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。デフォルト: `false`
+  - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
 - **レスポンス**: 200 OK
 
 **レスポンス例**:
@@ -1163,7 +1163,8 @@ curl -X POST \
 ### GET `/internal/songs/worldsend`
 - **認証**: Cookie (任意)
 - **レートリミット**: 認証なしは1分10回/IP
-- **クエリパラメータ**: `include_deleted` - `true` を指定すると削除済み楽曲も含めて取得（オプション、デフォルト: `false`）
+- **クエリパラメータ**: 
+  - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
 - **概要**: 全 WORLD'S END 楽曲を譜面情報付きで取得します。WORLD'S END は1曲1譜面が保証されています。
 - **レスポンス**: 200 OK
 

@@ -13,8 +13,8 @@ import (
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-	// includeDeleted が false の場合、削除済み楽曲は除外されます。
-	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error)
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
 
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
 	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
@@ -47,7 +47,15 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 }
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
+	// 削除済み楽曲を含める場合はEDITOR権限が必要
+	if includeDeleted {
+		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+			includeDeleted = false
+		}
+	}
+
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)

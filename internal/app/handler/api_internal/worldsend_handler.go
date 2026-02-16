@@ -29,9 +29,11 @@ func NewWorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCache 
 
 // GetWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
+// ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
 func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
-	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

@@ -39,8 +39,15 @@ func NewSongService(
 }
 
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
-// includeDeletedがfalseの場合、削除済み楽曲は除外されます。
-func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+	// 削除済み楽曲を含める場合はEDITOR権限が必要
+	if includeDeleted {
+		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+			includeDeleted = false
+		}
+	}
+
 	return s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
 }
 
