@@ -47,7 +47,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **PERF-001** | **Medium** | DBコネクションプール設定が未設定 | `SetMaxOpenConns` / `SetMaxIdleConns` / `SetConnMaxLifetime` を設定値として管理。 |
 | **PERF-003** | **Medium** | 巨大レスポンスの生成 | `GetUserProfileWithRecords` が全件返却。レスポンス簡素化またはページネーション導入。 |
 | **PERF-004** | **Medium** | スコア差分計算時の全件スキャン | `player_records` を全件取得。`chart_id` 絞り込みや差分計算のオプション化で負荷削減。 |
 | **PERF-006** | **Medium** | IN句クエリのリスト肥大化 | 大量IDをチャンク分割して複数回取得。後続の取得も同様に分割。 |
@@ -127,23 +126,6 @@
   - 利用中の静的解析ツールとCI連携の有無。
 
 ---
-
----
-
-### PERF-001: DBコネクションプール設定が未設定
-- **根拠**:
-  - `sqlx.Open` 後に `SetMaxOpenConns` / `SetMaxIdleConns` / `SetConnMaxLifetime` が未設定（`internal/infra/db/connection.go`）。
-- **影響範囲**:
-  - 高負荷時にコネクション数が増えすぎ、DB側の上限到達で接続エラー。
-  - 低負荷時でも接続が閉じず、無駄なリソース消費。
-- **再現手順**:
-  1. 多数の並行リクエストを送信。
-  2. DBの接続数上限に到達し失敗が発生。
-- **修正案**:
-  - 設定値を `internal/config` に追加し、接続数/ライフタイムを制御。
-  - 例: `db.SetMaxOpenConns(25)`, `db.SetMaxIdleConns(25)`, `db.SetConnMaxLifetime(5 * time.Minute)`。
-- **追加で確認したい点**:
-  - 本番DBの接続上限値と想定ピークトラフィック。
 
 ---
 
