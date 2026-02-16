@@ -33,10 +33,11 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
 func (h *V1SongHandler) GetSongs(c echo.Context) error {
-	// 外部APIでは削除済み楽曲は含めない
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false)
+	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		// usecaseからのエラーをAPIエラーに変換
+		return apierror.FromUsecaseError(err)
 	}
 
 	// V1DTOに変換
@@ -50,7 +51,8 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 // GetSong は指定された displayid の楽曲を取得します。
 func (h *V1SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
 		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
@@ -73,8 +75,10 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 		return apierror.ErrInvalidDifficulty
 	}
 
-	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName, requesterAccountTypeID)
 	if err != nil {
+		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 

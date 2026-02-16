@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -39,8 +40,8 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	// 楽曲を取得 (削除済みを含まない)
-	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false)
+	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,8 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	}
 
 	// 楽曲を取得
-	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID, requesterAccountTypeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return apierror.ErrSongNotFound

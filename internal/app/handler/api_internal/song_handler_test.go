@@ -312,7 +312,7 @@ func TestGetSongs(t *testing.T) {
 
 	// モックUsecaseの準備
 	mockUsecase := &testutil.MockSongUsecase{
-		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
 	}
