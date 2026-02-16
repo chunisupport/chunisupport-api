@@ -123,6 +123,12 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
 		}
 
+		for cIdx, chart := range req.Charts {
+			if chart == nil {
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%d]: chart is null", idx, cIdx))
+			}
+		}
+
 		if err := c.Validate(req); err != nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
 		}
