@@ -36,7 +36,8 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		// usecaseからのエラーをAPIエラーに変換
+		return apierror.FromUsecaseError(err)
 	}
 
 	// V1DTOに変換
@@ -77,6 +78,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName, requesterAccountTypeID)
 	if err != nil {
+		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 
