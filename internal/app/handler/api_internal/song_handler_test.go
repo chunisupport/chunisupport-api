@@ -258,6 +258,39 @@ func TestUpdateSongs(t *testing.T) {
 			t.Fatal("UpdateSongs usecase should not be called")
 		}
 	})
+	t.Run("トップレベルnullでvalidation_failedが返る", func(t *testing.T) {
+		called := false
+		mockUsecase := &testutil.MockSongUsecase{
+			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				called = true
+				return nil
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+
+		body := `null`
+		c := newPutSongsContext(body)
+
+		err := handler.UpdateSongs(c)
+		if err == nil {
+			t.Fatal("UpdateSongs should return error")
+		}
+
+		apiErr, ok := err.(*apierror.APIError)
+		if !ok {
+			t.Fatalf("error type = %T, want *apierror.APIError", err)
+		}
+		if apiErr.Code != apierror.CodeValidationFailed {
+			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
+		}
+		if apiErr.Internal == nil {
+			t.Fatal("internal error should not be nil")
+		}
+		if called {
+			t.Fatal("UpdateSongs usecase should not be called")
+		}
+	})
+
 }
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。

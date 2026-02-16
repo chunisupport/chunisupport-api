@@ -113,6 +113,10 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
+	if requests == nil {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests must be array, not null"))
+	}
+
 	// バリデーション
 	for idx, req := range requests {
 		if req == nil {
