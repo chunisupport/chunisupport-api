@@ -143,9 +143,9 @@ func (h *AuthHandler) Me(c echo.Context) error {
 }
 
 // updatePrivacyRequest はプライバシー設定更新リクエストのボディの構造です。
-// boolのゼロ値はfalseのため、requiredタグは使用しない（falseを送信できなくなるため）。
+// *boolを使用することで、フィールドの欠落と明示的なfalseを区別できる。
 type updatePrivacyRequest struct {
-	IsPrivate bool `json:"is_private"`
+	IsPrivate *bool `json:"is_private" validate:"required"`
 }
 
 // UpdatePrivacy は認証済みユーザーの非公開設定を更新するリクエストを処理します。
@@ -163,16 +163,16 @@ func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
 		return err
 	}
 
-	if err := h.authUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
+	if err := h.authUsecase.UpdatePrivacy(c.Request().Context(), user.ID, *req.IsPrivate); err != nil {
 		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
 	// 更新された設定を反映
-	user.IsPrivate = req.IsPrivate
+	user.IsPrivate = *req.IsPrivate
 
 	return c.JSON(http.StatusOK, map[string]any{
-		"is_private": req.IsPrivate,
+		"is_private": *req.IsPrivate,
 	})
 }
 
