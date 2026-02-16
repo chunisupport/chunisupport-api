@@ -32,7 +32,7 @@ func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
 	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	songDTOs := h.convertToWorldsendSongDTOs(songsWithCharts)

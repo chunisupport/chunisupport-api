@@ -31,7 +31,7 @@ func NewV1WorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCach
 func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	songDTOs := h.convertToV1WorldsendSongDTOs(songsWithCharts)
