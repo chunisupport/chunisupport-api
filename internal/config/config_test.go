@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func intPtr(v int) *int {
 	return &v
@@ -87,5 +90,62 @@ func TestNormalizeAndValidateDatabasePoolConfig_MissingValues(t *testing.T) {
 				t.Fatal("expected error, got nil")
 			}
 		})
+	}
+}
+
+func TestNormalizeAndValidateDatabasePoolConfig_MultipleErrors(t *testing.T) {
+	// 複数のフィールドが欠けている場合、すべてのエラーが報告されることを検証
+	pool := DatabasePoolConfig{}
+
+	err := normalizeAndValidateDatabasePoolConfig(&pool)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	errMsg := err.Error()
+
+	// すべての必須フィールドのエラーメッセージが含まれているか確認
+	expectedErrors := []string{
+		"max_open_conns is required",
+		"max_idle_conns is required",
+		"conn_max_lifetime_sec is required",
+		"conn_max_idle_time_sec is required",
+	}
+
+	for _, expected := range expectedErrors {
+		if !strings.Contains(errMsg, expected) {
+			t.Errorf("error message should contain %q, but got: %s", expected, errMsg)
+		}
+	}
+}
+
+func TestNormalizeAndValidateDatabasePoolConfig_MultipleInvalidValues(t *testing.T) {
+	// 複数のフィールドが無効な値の場合、すべてのエラーが報告されることを検証
+	pool := DatabasePoolConfig{
+		MaxOpenConns:       intPtr(-1),
+		MaxIdleConns:       intPtr(-2),
+		ConnMaxLifetimeSec: intPtr(-3),
+		ConnMaxIdleTimeSec: intPtr(-4),
+	}
+
+	err := normalizeAndValidateDatabasePoolConfig(&pool)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	errMsg := err.Error()
+
+	// すべてのバリデーションエラーが含まれているか確認
+	expectedErrors := []string{
+		"max_open_conns must be 0 or greater",
+		"max_idle_conns must be 0 or greater",
+		"conn_max_lifetime_sec must be 0 or greater",
+		"conn_max_idle_time_sec must be 0 or greater",
+	}
+
+	for _, expected := range expectedErrors {
+		if !strings.Contains(errMsg, expected) {
+			t.Errorf("error message should contain %q, but got: %s", expected, errMsg)
+		}
 	}
 }

@@ -101,57 +101,79 @@ func LoadConfig() (Config, error) {
 		return config, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
+	var errors []string
+
+	// 設定ファイルの検証
 	if config.ShutdownTimeoutSeconds <= 0 {
-		return config, fmt.Errorf("shutdown_timeout_seconds must be greater than 0")
+		errors = append(errors, "shutdown_timeout_seconds must be greater than 0")
 	}
 
 	if strings.TrimSpace(config.StaticDBPath) == "" {
-		return config, fmt.Errorf("static_db_path is required")
+		errors = append(errors, "static_db_path is required")
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
-		return config, err
+		// normalizeAndValidateDatabasePoolConfigが返すエラーからプレフィックスを削除して個別のエラーとして追加
+		errMsg := err.Error()
+		prefix := "configuration validation failed: "
+		if strings.HasPrefix(errMsg, prefix) {
+			errMsg = strings.TrimPrefix(errMsg, prefix)
+			// セミコロンで分割して個別のエラーとして追加
+			for _, msg := range strings.Split(errMsg, "; ") {
+				errors = append(errors, strings.TrimSpace(msg))
+			}
+		} else {
+			errors = append(errors, errMsg)
+		}
 	}
 
 	// 環境変数から秘密情報を取得
 	config.JWTSecret = os.Getenv("JWT_SECRET")
 	if config.JWTSecret == "" {
-		return config, fmt.Errorf("JWT_SECRET environment variable is required")
+		errors = append(errors, "JWT_SECRET environment variable is required")
 	}
 
 	config.PwPepper = os.Getenv("PW_PEPPER")
 	if config.PwPepper == "" {
-		return config, fmt.Errorf("PW_PEPPER environment variable is required")
+		errors = append(errors, "PW_PEPPER environment variable is required")
 	}
 
 	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
-		return config, fmt.Errorf("DB_NAME environment variable is required")
+		errors = append(errors, "DB_NAME environment variable is required")
 	}
 
 	dbHost := os.Getenv("DB_HOST")
 	if dbHost == "" {
-		return config, fmt.Errorf("DB_HOST environment variable is required")
+		errors = append(errors, "DB_HOST environment variable is required")
 	}
 
 	dbPortStr := os.Getenv("DB_PORT")
+	var dbPort int
 	if dbPortStr == "" {
-		return config, fmt.Errorf("DB_PORT environment variable is required")
-	}
-	dbPort, err := strconv.Atoi(dbPortStr)
-	if err != nil {
-		return config, fmt.Errorf("DB_PORT must be a valid integer: %w", err)
+		errors = append(errors, "DB_PORT environment variable is required")
+	} else {
+		var err error
+		dbPort, err = strconv.Atoi(dbPortStr)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("DB_PORT must be a valid integer: %v", err))
+		}
 	}
 
 	dbUser := os.Getenv("DB_USER")
 	if dbUser == "" {
-		return config, fmt.Errorf("DB_USER environment variable is required")
+		errors = append(errors, "DB_USER environment variable is required")
 	}
 
 	dbPass := os.Getenv("DB_PASS")
 	if dbPass == "" {
-		return config, fmt.Errorf("DB_PASS environment variable is required")
+		errors = append(errors, "DB_PASS environment variable is required")
+	}
+
+	// すべてのエラーをまとめて返す
+	if len(errors) > 0 {
+		return config, fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
 
 	config.Database.DbConfig = DbConfig{
@@ -169,18 +191,28 @@ func LoadConfig() (Config, error) {
 	return config, nil
 }
 
+// normalizeAndValidateDatabasePoolConfig はデータベースプール設定の検証と正規化を行います。
+// エラーがある場合は、すべてのエラーをまとめて返します。
 func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
+	var errors []string
+
+	// 必須フィールドのチェック
 	if pool.MaxOpenConns == nil {
-		return fmt.Errorf("database.pool.max_open_conns is required")
+		errors = append(errors, "database.pool.max_open_conns is required")
 	}
 	if pool.MaxIdleConns == nil {
-		return fmt.Errorf("database.pool.max_idle_conns is required")
+		errors = append(errors, "database.pool.max_idle_conns is required")
 	}
 	if pool.ConnMaxLifetimeSec == nil {
-		return fmt.Errorf("database.pool.conn_max_lifetime_sec is required")
+		errors = append(errors, "database.pool.conn_max_lifetime_sec is required")
 	}
 	if pool.ConnMaxIdleTimeSec == nil {
-		return fmt.Errorf("database.pool.conn_max_idle_time_sec is required")
+		errors = append(errors, "database.pool.conn_max_idle_time_sec is required")
+	}
+
+	// 必須フィールドが欠けている場合はここで返す
+	if len(errors) > 0 {
+		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
 
 	maxOpenConns := *pool.MaxOpenConns
@@ -188,19 +220,25 @@ func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 	connMaxLifetimeSec := *pool.ConnMaxLifetimeSec
 	connMaxIdleTimeSec := *pool.ConnMaxIdleTimeSec
 
+	// 値の範囲チェック
 	if maxOpenConns < 0 {
-		return fmt.Errorf("database.pool.max_open_conns must be 0 or greater")
+		errors = append(errors, "database.pool.max_open_conns must be 0 or greater")
 	}
 	if maxIdleConns < 0 {
-		return fmt.Errorf("database.pool.max_idle_conns must be 0 or greater")
+		errors = append(errors, "database.pool.max_idle_conns must be 0 or greater")
 	}
 	if connMaxLifetimeSec < 0 {
-		return fmt.Errorf("database.pool.conn_max_lifetime_sec must be 0 or greater")
+		errors = append(errors, "database.pool.conn_max_lifetime_sec must be 0 or greater")
 	}
 	if connMaxIdleTimeSec < 0 {
-		return fmt.Errorf("database.pool.conn_max_idle_time_sec must be 0 or greater")
+		errors = append(errors, "database.pool.conn_max_idle_time_sec must be 0 or greater")
 	}
 
+	if len(errors) > 0 {
+		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
+	}
+
+	// MaxIdleがMaxOpenより大きい場合の調整
 	if maxOpenConns > 0 && maxIdleConns > maxOpenConns {
 		maxIdleConns = maxOpenConns
 	}
