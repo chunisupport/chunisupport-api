@@ -62,5 +62,10 @@ func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(songsWithCharts []*rep
 
 // convertToV1WorldsendSongDTO は WorldsendSongWithChart を V1WorldsendSongDTO に変換します。
 func (h *V1WorldsendHandler) convertToV1WorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_v1.V1WorldsendSongDTO {
+	if swc.Song != nil && swc.Song.GenreID != nil {
+		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
+			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
+		}
+	}
 	return api_v1.ToV1WorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
 }
