@@ -7,174 +7,143 @@
 
 本設計書では、APIが未プレイ譜面を補完して返却する仕様を、後方互換性を維持しながら導入する方針を定義します。
 
----
+## 2. 仕様確定事項
 
-## 2. 設計方針
+API互換性は不要（一部仕様変更あり）とし、`is_played` 追加や一部フィールドの `null` 許容を含めて仕様変更する。
 
-### 2.1 後方互換性
+### 2.1 基本ルール
+1. `view=rating` と `include_noplay=true` 併用時は **include_noplay を無視**する（エラーにはしない）。
+2. `records.updated_at` は **従来どおり**（レコード最大更新日時。レコードがない場合は `player.updated_at`）。
+3. 未プレイ補完データの `score` / `rating` / `overpower` は **固定値 0** を返す。
+4. 重複判定キーは以下で統一する。
+   - 通常譜面: `chart_id`
+   - WORLD'S END: `worldsend_chart_id`
+5. 並び順は以下で固定する。
+   - 通常譜面: `songs.id ASC, charts.difficulty_id ASC`
+   - WORLD'S END: `songs.id ASC, worldsend_charts.id ASC`
+6. `is_played` は `all` / `worldsend` だけでなく、同DTOを使う配列（best/new系）にも付与する。
+7. `clear_lamp` / `updated_at` は **未プレイ補完データのみ `null`**。DB 側の NOT NULL 制約は維持する。
+8. 補完対象から削除済み楽曲は除外する。
+9. レスポンスサイズ増加は現時点では許容する（gzip 圧縮前提）。
 
-- デフォルト挙動は変更しない（従来どおり「プレイ済みのみ返却」）。
-- クエリパラメータによる **opt-in** 方式で未プレイ補完を有効化する。
-
-### 2.2 責務分離（Clean Architecture / DDD）
-
-- **Domain**: 未プレイ補完そのもののHTTP知識を持たせない。
-- **Usecase**: 「プレイ済みレコード集合」と「対象譜面集合」を合成して返却モデルを構築する。
-- **Handler**: クエリパラメータを解釈し、Usecaseにフラグを渡す。
-- **Infra**: マスタ譜面取得は既存Repository・MasterCacheを利用し、N+1を発生させない。
-
-### 2.3 パフォーマンス
-
-- 補完時は「譜面マスタの一括取得 + プレイ済みレコードのマップ化」で合成する。
-- 曲ごと・譜面ごとの逐次問い合わせ（N+1）は禁止する。
-- 必要に応じてレスポンス増加を抑えるため、`view=rating` と未プレイ補完は排他または補完対象外とする（詳細は後述）。
-
----
-
-## 3. 対象APIとインターフェース
-
-## 3.1 対象エンドポイント
-
+### 2.2 対象API
 - `GET /internal/users/:username`
-- `GET /v1/users/:username`
+- `GET /v1/users/:username` (および互換エンドポイント)
 
-## 3.2 追加クエリパラメータ
+**追加クエリパラメータ**
+- `include_noplay` (boolean, optional)
+  - `true` の場合、通常譜面 (`records.all`) と WORLD'S END (`records.worldsend`) に未プレイ譜面を補完して返却する。
+  - デフォルトは `false` (未プレイを含めない)。
 
-- `include_noplay`（optional, bool, default: `false`）
+### 2.3 データ設計
+#### DTO変更
+- `PlayerRecordDTO`
+  - 追加: `is_played: boolean`
+  - 変更: `clear_lamp: string | null`
+  - 変更: `updated_at: string | null`
 
-### 解釈ルール
+- `WorldsendRecordDTO`
+  - 追加: `is_played: boolean`
+  - 変更: `clear_lamp: string | null`
+  - 変更: `updated_at: string | null`
 
-- `true` の場合のみ補完を有効化。
-- それ以外（未指定含む）は `false` 扱い。
-
----
-
-## 4. レスポンス仕様
-
-## 4.1 基本方針
-
-- `records.all` と `records.worldsend` を補完対象とする。
-- `records.best` / `best_candidate` / `new` / `new_candidate` は従来どおり「プレイ済み由来」のままとする。
-
-## 4.2 レコード要素への追加フィールド
-
-補完時にクライアントが「実プレイ済み」かどうかを判別できるよう、`records.all[*]` に以下フィールドを追加する。
-
-- `is_played: boolean`
-  - `true`: 実際にユーザー記録が存在する譜面
-  - `false`: APIが補完した未プレイ譜面
-
-> 既存クライアント互換性を最大化するため、`include_noplay=false` 時も `is_played` を返す案を推奨（常に `true`）。
-> ただしレスポンス差分最小化を優先する場合は「補完時のみ返す」案も選択可能。
-
-## 4.3 未プレイ譜面の初期値
-
-`is_played=false` の要素に対しては、以下の初期値を返却する。
-
+#### 未プレイ補完時のフィールド値
+- `is_played`: `false`
 - `score`: `0`
-- `clear_lamp`: `null`
-- `combo_lamp`: `"NONE"`
-- `chain_lamp`: `"NONE"`
-- `ajc_lamp`: `"NONE"`
 - `rating`: `0`
 - `overpower`: `0`
+- `clear_lamp`: `null`
+- `updated_at`: `null`
+- `combo_lamp` / `full_chain` / `slot`: 既存ルールに従って `null`
 - `is_const_unknown`: 譜面マスタ値を採用
 - `const` / `title` / `artist` / `difficulty` / `img`: 譜面・楽曲マスタ値を採用
-- `updated_at`: `null`
 
-> 難易度文字列は既存方針どおり **大文字**（`BASIC`/`ADVANCED`/`EXPERT`/`MASTER`/`ULTIMA`）で返却する。
+#### 既存プレイデータ
+- `is_played`: `true`
+- `clear_lamp` / `updated_at`: 既存DB値を返却
 
----
+## 3. アーキテクチャ・設計
 
-## 5. `view=rating` との関係
+未プレイ補完ロジックは複数リポジトリを横断するため、`UserUsecase` に直接ロジックを寄せず、専用のドメインサービスへ責務を分離する。
 
-`view=rating` は軽量レスポンス用途であり、`records.all` 自体を返却しません。
-そのため、以下のいずれかで統一します。
+- **新設**: `internal/domain/service/record_completion_service.go`
+- **役割**:
+  - 通常譜面 / WORLD'S END の未プレイ補完判定
+  - 補完レコードの組み立て
+  - ソート済み結果の返却
+- **UserUsecase の役割**:
+  - 認可/公開範囲チェック
+  - 必要データの取得と引数整形
+  - ドメインサービス呼び出し
+  - DTO組み立てのオーケストレーション
 
-- **推奨案A（シンプル）**: `view=rating` 指定時は `include_noplay` を無視する。
-- 代替案B（厳格）: `view=rating&include_noplay=true` は `400 validation_failed`。
+### 依存関係の整理
+クリーンアーキテクチャの依存方向を守るため、ドメインサービス自体は具体リポジトリ実装に依存させない。
 
-本設計では互換性を重視し、**推奨案A** を採用します。
+- ドメインサービスは「入力として渡されたデータ集合」を処理する純粋ロジックにする。
+- I/O（DB取得）は Usecase で行う。
+- 必要なら `internal/domain/repository` に最小限の読み取りインターフェースを追加し、Usecase経由で注入する。
 
----
+> 注: ドメインサービスが `internal/infra` に直接依存する構造は採用しない。
 
-## 6. 実装イメージ
+## 4. 実装計画
 
-## 6.1 Usecase入力
+### 4.1 実装ステップ
+1. **Handler / Usecase のパラメータ伝播**
+   - `include_noplay` をハンドラで受け取り、Usecase に伝播する。
+   - `view=rating` 時は `include_noplay` を無視する（レスポンスは既存rating表示仕様）。
 
-`GetUserProfileWithRecords` にオプション構造体を追加。
+2. **DTO型と変換関数の更新**
+   - `internal/dto/player_record_dto.go` を更新。
+   - `internal/dto/worldsend_dto.go` を更新。
+   - 既存レコード変換時は `is_played=true` を設定。
 
-- `IncludeUnplayed bool`
-- `View string`（既存）
+3. **ドメインサービス導入**
+   - `RecordCompletionService` を新設。
+   - 入力:
+     - 既存プレイヤーレコード集合
+     - 補完対象マスタ集合（通常譜面 / WORLD'S END）
+   - 出力:
+     - 補完済み通常譜面エンティティ列（`[]*entity.PlayerRecord`）
+     - 補完済みWORLD'S ENDエンティティ列（`[]*entity.PlayerWorldsendRecord`）
+   - キー判定・補完値設定・ソートをサービス内部に集約。
 
-## 6.2 合成アルゴリズム
+4. **Usecase からの呼び出し**
+   - 既存 `player_records` / `player_worldsend_records` を取得。
+   - 削除済み除外で通常譜面・WORLD'S END母集団を一括取得。
+   - `RecordCompletionService` を呼び出して補完済み配列を得る。
+   - `records.all` / `records.worldsend` に反映。
 
-1. プレイ済みレコード一覧を取得
-2. `include_noplay=false` なら従来レスポンスを返却
-3. 対象譜面マスタ一覧を一括取得
-4. プレイ済みをキー（`song_id + difficulty`）でマップ化
-5. マスタ譜面を走査し、存在すれば既存レコード（`is_played=true`）、なければ補完レコード（`is_played=false`）を生成
-6. 既存の並び順ルールに従って整列し、`records.all` として返却
+5. **APIドキュメント更新（`docs/API.md`）**
+   - `include_noplay` クエリを追加。
+   - `view=rating` 併用時は `include_noplay` 無視と明記。
+   - `PlayerRecordDTO` / `WorldsendRecordDTO` に `is_played` を追記。
+   - 未プレイ補完時に `clear_lamp` / `updated_at` が `null` となることを明記。
 
-## 6.3 データソース
+### 4.2 テスト計画
+1. `include_noplay=false` で既存挙動が維持される。
+2. `include_noplay=true` で通常譜面の未プレイ補完が入る。
+3. `include_noplay=true` で WORLD'S END の未プレイ補完が入る。
+4. 既存レコード `is_played=true` / 補完レコード `is_played=false` を検証。
+5. 補完レコードで `clear_lamp=null` / `updated_at=null` を検証。
+6. `view=rating&include_noplay=true` で include_noplay が無視されることを検証。
+7. ドメインサービス単体テストで以下を検証:
+   - キー重複判定（`chart_id` / `worldsend_chart_id`）
+   - 補完件数
+   - ソート順
 
-- 曲・譜面: 既存 master cache / repository
-- ユーザーレコード: 既存 user record repository
+### 4.3 影響範囲
+- Handler: `internal/app/handler/api_internal/user_handler.go` 等
+- Usecase: `internal/usecase/user_usecase.go`
+- Domain Service: `internal/domain/service/record_completion_service.go`（新規）
+- DTO: `internal/dto/player_record_dto.go`, `internal/dto/worldsend_dto.go`
+- Document: `docs/API.md`
 
----
+## 5. 意思決定メモ
 
-## 7. テスト戦略（TDD）
-
-## 7.1 ユースケーステスト
-
-- `include_noplay=false`: 従来件数・内容と一致
-- `include_noplay=true`: 未プレイ譜面が追加される（`records.all` と `records.worldsend`）
-- 補完レコードに `is_played=false` と初期値が設定される
-- プレイ済みレコードは `is_played=true` で既存値が保持される
-- 難易度が大文字で返る
-- `view=rating` 時に `include_noplay` が無視される
-
-## 7.2 ハンドラテスト
-
-- クエリパラメータ解釈（`true` / 未指定 / 不正値）
-- Usecaseへ正しいオプションが渡る
-
-## 7.3 回帰テスト
-
-- 既存の `GET /internal/users/:username` と `GET /v1/users/:username` のレスポンス互換性
-- 既存ランキング・レーティング計算への影響なし
-
----
-
-## 8. APIドキュメント更新方針
-
-実装時に `docs/API.md` の以下を更新する。
-
-- `GET /internal/users/:username` のクエリパラメータに `include_noplay` を追加
-- `GET /v1/users/:username` 側の同等説明を追加
-- `records.all[*].is_played` フィールド説明を追加
-- `records.worldsend[*].is_played` フィールド説明を追加
-- `view=rating` 時の `include_noplay` 扱いを明記
-
----
-
-## 9. リリース計画
-
-1. 設計確定（本書）
-2. Usecaseテスト追加（Red）
-3. 最小実装（Green）
-4. リファクタリング（Refactor）
-5. Handler/API.md 更新
-6. ステージングでレスポンスサイズ・レイテンシ確認
-7. 本番リリース
-
----
-
-## 10. 意思決定メモ（推奨）
-
-- 採用: `include_noplay` の opt-in 方式
-- 補完範囲: `records.all` と `records.worldsend`
-- 判別子: `is_played` を追加
-- `view=rating` との併用: `include_noplay` 無視
+- **採用**: `include_noplay` の opt-in 方式
+- **補完範囲**: `records.all` と `records.worldsend`
+- **判別子**: `is_played` を追加
+- **`view=rating` との併用**: `include_noplay` 無視
 
 上記により、既存互換性を維持しつつ、フロントエンド実装コストを削減できます。
