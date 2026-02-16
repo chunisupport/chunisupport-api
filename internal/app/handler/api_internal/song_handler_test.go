@@ -165,12 +165,21 @@ func TestUpdateSongs(t *testing.T) {
 		rec := httptest.NewRecorder()
 		return e.NewContext(req, rec)
 	}
-
-	t.Run("正常な配列で204が返る", func(t *testing.T) {
-		called := false
-		mockUsecase := &testutil.MockSongUsecase{
-			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
-				called = true
+	testCases := []struct {
+		name             string
+		body             string
+		expectedStatus   int
+		expectedErrCode  string
+		expectUsecaseHit bool
+		assertUsecaseReq func(t *testing.T, requests []*api_internal.UpdateSongRequest)
+	}{
+		{
+			name:             "正常な配列で204が返る",
+			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト"}]`,
+			expectedStatus:   http.StatusNoContent,
+			expectUsecaseHit: true,
+			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
+				t.Helper()
 				if len(requests) != 1 {
 					t.Fatalf("requests len = %d, want 1", len(requests))
 				}
@@ -180,116 +189,73 @@ func TestUpdateSongs(t *testing.T) {
 				if requests[0].DisplayID != "1234567890123456" {
 					t.Fatalf("DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
 				}
-				return nil
 			},
-		}
+		},
+		{
+			name:            "不正要素を含む配列でvalidation_failedが返る",
+			body:            `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "null要素を含む配列でvalidation_failedが返る",
+			body:            `[null]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "トップレベルnullでvalidation_failedが返る",
+			body:            `null`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+	}
 
-		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			mockUsecase := &testutil.MockSongUsecase{
+				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+					called = true
+					if tc.assertUsecaseReq != nil {
+						tc.assertUsecaseReq(t, requests)
+					}
+					return nil
+				},
+			}
+			handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
-		body := `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト"}]`
-		c := newPutSongsContext(body)
-		rec := c.Response().Writer.(*httptest.ResponseRecorder)
+			c := newPutSongsContext(tc.body)
+			rec := c.Response().Writer.(*httptest.ResponseRecorder)
 
-		err := handler.UpdateSongs(c)
-		if err != nil {
-			t.Fatalf("UpdateSongs returned error: %v", err)
-		}
-		if rec.Code != http.StatusNoContent {
-			t.Fatalf("Status code = %d, want %d", rec.Code, http.StatusNoContent)
-		}
-		if !called {
-			t.Fatal("UpdateSongs usecase should be called")
-		}
-	})
+			err := handler.UpdateSongs(c)
 
-	t.Run("不正要素を含む配列でvalidation_failedが返る", func(t *testing.T) {
-		mockUsecase := &testutil.MockSongUsecase{}
-		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+			if tc.expectedErrCode == "" {
+				if err != nil {
+					t.Fatalf("UpdateSongs returned error: %v", err)
+				}
+				if rec.Code != tc.expectedStatus {
+					t.Fatalf("Status code = %d, want %d", rec.Code, tc.expectedStatus)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("UpdateSongs should return error")
+				}
 
-		body := `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`
-		c := newPutSongsContext(body)
+				apiErr, ok := err.(*apierror.APIError)
+				if !ok {
+					t.Fatalf("error type = %T, want *apierror.APIError", err)
+				}
+				if apiErr.Code != tc.expectedErrCode {
+					t.Fatalf("api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
+				}
+				if apiErr.Internal == nil {
+					t.Fatal("internal error should not be nil")
+				}
+			}
 
-		err := handler.UpdateSongs(c)
-		if err == nil {
-			t.Fatal("UpdateSongs should return error")
-		}
-
-		apiErr, ok := err.(*apierror.APIError)
-		if !ok {
-			t.Fatalf("error type = %T, want *apierror.APIError", err)
-		}
-		if apiErr.Code != apierror.CodeValidationFailed {
-			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
-		}
-		if apiErr.Internal == nil {
-			t.Fatal("internal error should not be nil")
-		}
-	})
-
-	t.Run("null要素を含む配列でvalidation_failedが返る", func(t *testing.T) {
-		called := false
-		mockUsecase := &testutil.MockSongUsecase{
-			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
-				called = true
-				return nil
-			},
-		}
-		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-
-		body := `[null]`
-		c := newPutSongsContext(body)
-
-		err := handler.UpdateSongs(c)
-		if err == nil {
-			t.Fatal("UpdateSongs should return error")
-		}
-
-		apiErr, ok := err.(*apierror.APIError)
-		if !ok {
-			t.Fatalf("error type = %T, want *apierror.APIError", err)
-		}
-		if apiErr.Code != apierror.CodeValidationFailed {
-			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
-		}
-		if apiErr.Internal == nil {
-			t.Fatal("internal error should not be nil")
-		}
-		if called {
-			t.Fatal("UpdateSongs usecase should not be called")
-		}
-	})
-	t.Run("トップレベルnullでvalidation_failedが返る", func(t *testing.T) {
-		called := false
-		mockUsecase := &testutil.MockSongUsecase{
-			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
-				called = true
-				return nil
-			},
-		}
-		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-
-		body := `null`
-		c := newPutSongsContext(body)
-
-		err := handler.UpdateSongs(c)
-		if err == nil {
-			t.Fatal("UpdateSongs should return error")
-		}
-
-		apiErr, ok := err.(*apierror.APIError)
-		if !ok {
-			t.Fatalf("error type = %T, want *apierror.APIError", err)
-		}
-		if apiErr.Code != apierror.CodeValidationFailed {
-			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeValidationFailed)
-		}
-		if apiErr.Internal == nil {
-			t.Fatal("internal error should not be nil")
-		}
-		if called {
-			t.Fatal("UpdateSongs usecase should not be called")
-		}
-	})
+			if called != tc.expectUsecaseHit {
+				t.Fatalf("UpdateSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
+			}
+		})
+	}
 
 }
 
