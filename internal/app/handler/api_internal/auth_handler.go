@@ -61,8 +61,9 @@ func (h *AuthHandler) getUserEntity(c echo.Context) (*entity.User, error) {
 }
 
 // authRequest は認証リクエストのボディの構造です。
-// TODO: 将来的にRegister用(registerRequest)とLogin用(loginRequest)に分離し、
-// Register側ではユーザー名形式のバリデーション(validate:"required,min=5,max=50,alphanum")をHandler層で完結させることを検討する。
+// バリデーションはClean Architectureの原則に従いUsecaseレイヤーで行うため、
+// Handler層では c.Validate() を呼ばず、Bind後に直接Usecaseに渡します。
+// validate タグは将来的にHandler層バリデーションを導入する場合の準備として残しています。
 type authRequest struct {
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"` // #nosec G117 API入力仕様として必要
@@ -75,9 +76,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if err := c.Validate(req); err != nil {
-		return err
-	}
+	// バリデーションはUsecaseレイヤーで行い、個別エラーコード（username_empty, password_too_short等）を返す
 
 	user, token, err := h.authUsecase.Register(c.Request().Context(), req.Username, req.Password)
 	if err != nil {
@@ -95,9 +94,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if err := c.Validate(req); err != nil {
-		return err
-	}
+	// バリデーションはUsecaseレイヤーで行い、全エラーを invalid_credentials に統一（セキュリティ強化）
 
 	token, err := h.authUsecase.Login(c.Request().Context(), req.Username, req.Password)
 	if err != nil {
