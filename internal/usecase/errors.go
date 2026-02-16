@@ -38,23 +38,3 @@ var (
 	// アプリバージョン関連エラー
 	ErrAppVersionUnsupported = errors.New("unsupported app version") // 対応していないアプリバージョン
 )
-
-// SongValidationError は楽曲更新リクエストのバリデーションエラーを表します。
-type SongValidationError struct {
-	Field   string
-	Message string
-}
-
-// Error はエラーメッセージを返します。
-func (e *SongValidationError) Error() string {
-	if e == nil {
-		return "song validation error"
-	}
-	if e.Field == "" {
-		return e.Message
-	}
-	if e.Message == "" {
-		return e.Field
-	}
-	return e.Field + ": " + e.Message
-}
