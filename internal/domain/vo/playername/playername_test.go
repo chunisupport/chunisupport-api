@@ -50,14 +50,12 @@ func TestNewPlayerName(t *testing.T) {
 			value:   "太郎12AB",
 			want:    PlayerName{},
 			wantErr: assert.Error,
-			skip:    true,
 		},
 		{
 			name:    "無効な半角カタカナを含む",
-			value:   "ﾀﾛｳ",
+			value:   "ﾞﾛｳ",
 			want:    PlayerName{},
 			wantErr: assert.Error,
-			skip:    true,
 		},
 	}
 	for _, tt := range tests {
@@ -135,7 +133,6 @@ func TestPlayerName_Scan(t *testing.T) {
 			},
 			want:    PlayerName{},
 			wantErr: assert.Error,
-			skip:    true,
 		},
 		{
 			name: "DBからの空文字列",
@@ -197,7 +194,6 @@ func TestValidatePlayerName(t *testing.T) {
 			name:    "無効な半角英数字を含む",
 			value:   "太郎123A",
 			wantErr: assert.Error,
-			skip:    true,
 		},
 	}
 	for _, tt := range tests {

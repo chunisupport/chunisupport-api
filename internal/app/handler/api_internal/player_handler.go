@@ -20,7 +20,7 @@ func NewPlayerHandler(playerUsecase usecase.PlayerUsecase) *PlayerHandler {
 
 // createPlayerRequest はプレイヤー作成リクエストのボディの構造です。
 type createPlayerRequest struct {
-	Name string `json:"name" validate:"required,min=1,max=50"`
+	Name string `json:"name" validate:"required,min=1,max=20,excludesall=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"`
 }
 
 // CreatePlayer はプレイヤー作成リクエストを処理します。

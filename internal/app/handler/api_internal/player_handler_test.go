@@ -48,7 +48,7 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 	mockService := new(mockPlayerService)
 	expectedPlayer := &dto.PlayerDTO{Name: "太郎"}
 	mockService.On("CreatePlayer", mock.Anything, "太郎").Return(expectedPlayer, nil)
-	mockService.On("CreatePlayer", mock.Anything, "Error Player").Return(nil, errors.New("failed to create player"))
+	mockService.On("CreatePlayer", mock.Anything, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
 
 	h := api_internal.NewPlayerHandler(mockService)
 
@@ -86,7 +86,7 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 	})
 
 	t.Run("アンハッピーパス: サービスエラー", func(t *testing.T) {
-		body := `{"name": "Error Player"}`
+		body := `{"name": "エラープレイヤー"}`
 		req := httptest.NewRequest(http.MethodPost, "/players", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()

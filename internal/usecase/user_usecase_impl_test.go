@@ -374,7 +374,7 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
-	pn1, _ := playername.NewPlayerName("player1")
+	pn1, _ := playername.NewPlayerName("プレイヤー１")
 	rating1 := 15.0
 	op1 := 10.0
 
@@ -422,8 +422,8 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	if list[0].UserName != "user1" {
 		t.Errorf("expected username user1, got %s", list[0].UserName)
 	}
-	if list[0].PlayerName != "player1" {
-		t.Errorf("expected player name player1, got %s", list[0].PlayerName)
+	if list[0].PlayerName != "プレイヤー１" {
+		t.Errorf("expected player name プレイヤー１, got %s", list[0].PlayerName)
 	}
 	if list[0].Rating == nil || *list[0].Rating != 15.0 {
 		t.Errorf("expected rating 15.0, got %v", list[0].Rating)
