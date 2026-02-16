@@ -1142,6 +1142,12 @@ curl -X POST \
 | `is_const_unknown` | bool | ✓ | 譜面定数が未確定かどうか |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
 
+**注意事項**:
+- リクエストに含まれない譜面は変更されません（削除もされません）
+- マスタに存在しないジャンル名を指定するとエラーになります
+- マスタに存在しない難易度名（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA以外）を指定するとエラーになります
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+
 - **レスポンス**: 204 No Content（成功時）
 
 - **主なエラー**:
