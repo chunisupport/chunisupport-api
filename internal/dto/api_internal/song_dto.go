@@ -80,7 +80,6 @@ type SongsResponse struct {
 
 // UpdateChartRequest は譜面更新リクエストを表します。
 type UpdateChartRequest struct {
-	DifficultyID   int     `json:"difficulty_id" validate:"required,gte=1"`
 	Const          float64 `json:"const" validate:"gte=0"`
 	IsConstUnknown bool    `json:"is_const_unknown"`
 	Notes          *int    `json:"notes" validate:"omitempty,gte=0"`
@@ -88,14 +87,14 @@ type UpdateChartRequest struct {
 
 // UpdateSongRequest は楽曲更新リクエストを表します。
 type UpdateSongRequest struct {
-	DisplayID  string                `json:"id" validate:"required,len=16"`
-	Title      string                `json:"title" validate:"required"`
-	Artist     string                `json:"artist" validate:"required"`
-	GenreID    *int                  `json:"genre_id" validate:"omitempty,gte=1"`
-	BPM        *int                  `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt *DateOnly             `json:"released_at"`
-	Jacket     *string               `json:"jacket"`
-	Charts     []*UpdateChartRequest `json:"charts" validate:"dive"`
+	DisplayID  string                         `json:"id" validate:"required,len=16"`
+	Title      string                         `json:"title" validate:"required"`
+	Artist     string                         `json:"artist" validate:"required"`
+	Genre      *string                        `json:"genre"`
+	BPM        *int                           `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt *DateOnly                      `json:"released_at"`
+	Jacket     *string                        `json:"jacket"`
+	Charts     map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
 }
 
 // ToChartDTO はChartエンティティからChartDTOへ変換します。

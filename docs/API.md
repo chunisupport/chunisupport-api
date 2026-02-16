@@ -1103,18 +1103,17 @@ curl -X POST \
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
     "artist": "アーティスト名",
-    "genre_id": 1,
+    "genre": "POPS & ANIME",
     "bpm": 180,
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
-    "charts": [
-      {
-        "difficulty_id": 3,
+    "charts": {
+      "EXPERT": {
         "const": 14.5,
         "is_const_unknown": false,
         "notes": 1234
       }
-    ]
+    }
   }
 ]
 ```
@@ -1126,17 +1125,16 @@ curl -X POST \
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
 | `artist` | string | ✓ | アーティスト名 |
-| `genre_id` | int \| null | | ジャンルID（マスタに存在する必要がある） |
+| `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
-| `charts` | UpdateChartRequest[] | | 更新する譜面情報の配列 |
+| `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ（キーは難易度名） |
 
 **UpdateChartRequest**:
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| `difficulty_id` | int | ✓ | 難易度ID（マスタに存在する必要がある） |
 | `const` | float | ✓ | 譜面定数（0以上、小数点以下1桁表記） |
 | `is_const_unknown` | bool | ✓ | 譜面定数が未確定かどうか |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |

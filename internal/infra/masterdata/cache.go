@@ -220,6 +220,8 @@ func (c *Cache) SongMasters() *domainmasterdata.SongMasters {
 			DifficultyNamesByID: maps.Clone(c.DifficultyNamesByID),
 		},
 		GenreNamesByID: maps.Clone(c.GenreNamesByID),
+		Genres:         maps.Clone(c.Genres),
+		Difficulties:   maps.Clone(c.Difficulties),
 	}
 }
 

@@ -121,9 +121,9 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 		if req == nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
 		}
-		for chartIdx, chart := range req.Charts {
+		for diff, chart := range req.Charts {
 			if chart == nil {
-				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%d]: chart is null", idx, chartIdx))
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%s]: chart is null", idx, diff))
 			}
 		}
 		if err := c.Validate(req); err != nil {

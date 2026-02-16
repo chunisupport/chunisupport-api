@@ -40,5 +40,7 @@ type PlayerDataMasters struct {
 // SongMasters は楽曲関連で必要になるマスタ集合です。
 type SongMasters struct {
 	CommonMasters
+	Genres         map[string]Item
 	GenreNamesByID map[int]string
+	Difficulties   map[string]Item
 }

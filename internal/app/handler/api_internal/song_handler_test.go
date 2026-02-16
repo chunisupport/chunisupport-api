@@ -178,7 +178,7 @@ func TestUpdateSongs(t *testing.T) {
 	}{
 		{
 			name:             "正常な配列で204が返る",
-			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト"}]`,
+			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":{"const":10.5}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
@@ -191,6 +191,12 @@ func TestUpdateSongs(t *testing.T) {
 				}
 				if requests[0].DisplayID != "1234567890123456" {
 					t.Fatalf("DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
+				}
+				if len(requests[0].Charts) != 1 {
+					t.Fatalf("Charts len = %d, want 1", len(requests[0].Charts))
+				}
+				if _, ok := requests[0].Charts["BASIC"]; !ok {
+					t.Fatal("Charts['BASIC'] should exist")
 				}
 			},
 		},
@@ -211,7 +217,7 @@ func TestUpdateSongs(t *testing.T) {
 		},
 		{
 			name:            "chartsにnull要素を含む配列でvalidation_failedが返る",
-			body:            `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":[null]}]`,
+			body:            `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":null}}]`,
 			expectedErrCode: apierror.CodeValidationFailed,
 		},
 	}

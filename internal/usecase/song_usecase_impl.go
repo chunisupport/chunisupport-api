@@ -3,8 +3,10 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -85,24 +87,8 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 		return fmt.Errorf("master cache is not initialized")
 	}
 
-	for _, req := range requests {
-		// GenreID の検証
-		if req.GenreID != nil {
-			if _, ok := masters.GenreNamesByID[*req.GenreID]; !ok {
-				return fmt.Errorf("invalid genre_id: %d (song: %s)", *req.GenreID, req.DisplayID)
-			}
-		}
-
-		// DifficultyID の検証
-		for _, chart := range req.Charts {
-			if _, ok := masters.DifficultyNamesByID[chart.DifficultyID]; !ok {
-				return fmt.Errorf("invalid difficulty_id: %d (song: %s)", chart.DifficultyID, req.DisplayID)
-			}
-		}
-	}
-
 	// DTOからエンティティへ変換
-	songsWithCharts, err := s.convertRequestsToEntities(requests)
+	songsWithCharts, err := s.convertRequestsToEntities(requests, masters)
 	if err != nil {
 		return fmt.Errorf("failed to convert requests to entities: %w", err)
 	}
@@ -125,38 +111,56 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 
 // convertRequestsToEntities はDTOリストからエンティティリストに変換します。
 // IDフィールドは既存データの参照に使用されないため、0のままです。
-func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest) ([]*entity.Song, error) {
+func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
 	result := make([]*entity.Song, 0, len(requests))
 
 	for _, req := range requests {
+		var genreID *int
+		if req.Genre != nil {
+			// ジャンル名の検証とID変換
+			if item, ok := masters.Genres[*req.Genre]; ok {
+				genreID = &item.ID
+			} else {
+				return nil, fmt.Errorf("invalid genre: %s (song: %s)", *req.Genre, req.DisplayID)
+			}
+		}
+
 		song := &entity.Song{
 			DisplayID:  req.DisplayID,
 			Title:      req.Title,
 			Artist:     req.Artist,
-			GenreID:    req.GenreID,
+			GenreID:    genreID,
 			BPM:        req.BPM,
 			ReleasedAt: req.ReleasedAt.TimePtr(),
 			Jacket:     req.Jacket,
 		}
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
-		for _, chartReq := range req.Charts {
+		for diffName, chartReq := range req.Charts {
+			// 難易度名の検証とID変換（大文字に変換してチェック）
+			diffKey := strings.ToUpper(diffName)
+			item, ok := masters.Difficulties[diffKey]
+			if !ok {
+				return nil, fmt.Errorf("invalid difficulty: %s (song: %s)", diffName, req.DisplayID)
+			}
+			difficultyID := item.ID
+
 			cc, err := chartconstant.NewChartConstant(chartReq.Const)
 			if err != nil {
-				return nil, fmt.Errorf("invalid chart constant (song: %s, difficulty: %d): %w", req.DisplayID, chartReq.DifficultyID, err)
+				return nil, fmt.Errorf("invalid chart constant (song: %s, difficulty: %s): %w", req.DisplayID, diffName, err)
 			}
 
 			var notesVO *notes.Notes
 			if chartReq.Notes != nil {
 				n, err := notes.NewNotes(*chartReq.Notes)
 				if err != nil {
-					return nil, fmt.Errorf("invalid notes (song: %s, difficulty: %d): %w", req.DisplayID, chartReq.DifficultyID, err)
+					return nil, fmt.Errorf("invalid notes (song: %s, difficulty: %s): %w", req.DisplayID, diffName, err)
 				}
 				notesVO = &n
 			}
 
 			chart := &entity.Chart{
-				DifficultyID:   chartReq.DifficultyID,
+				DifficultyID:   difficultyID,
 				Const:          cc,
 				IsConstUnknown: chartReq.IsConstUnknown,
 				Notes:          notesVO,
