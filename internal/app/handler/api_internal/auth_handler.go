@@ -61,9 +61,11 @@ func (h *AuthHandler) getUserEntity(c echo.Context) (*entity.User, error) {
 }
 
 // authRequest は認証リクエストのボディの構造です。
+// TODO: 将来的にRegister用(registerRequest)とLogin用(loginRequest)に分離し、
+// Register側ではユーザー名形式のバリデーション(validate:"required,min=5,max=50,alphanum")をHandler層で完結させることを検討する。
 type authRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"` // #nosec G117 API入力仕様として必要
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"` // #nosec G117 API入力仕様として必要
 }
 
 // Register はユーザー登録リクエストを処理します。
@@ -72,6 +74,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	req := new(authRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	user, token, err := h.authUsecase.Register(c.Request().Context(), req.Username, req.Password)
@@ -89,6 +94,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	req := new(authRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	token, err := h.authUsecase.Login(c.Request().Context(), req.Username, req.Password)
@@ -135,6 +143,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 }
 
 // updatePrivacyRequest はプライバシー設定更新リクエストのボディの構造です。
+// boolのゼロ値はfalseのため、requiredタグは使用しない（falseを送信できなくなるため）。
 type updatePrivacyRequest struct {
 	IsPrivate bool `json:"is_private"`
 }
@@ -149,6 +158,9 @@ func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
 	req := new(updatePrivacyRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	if err := h.authUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
@@ -165,18 +177,21 @@ func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
 }
 
 // changePasswordRequest はパスワード変更リクエストのボディの構造です。
+// TODO: カスタムバリデーション導入後、NewPasswordのmin=8,max=128をvalidateタグに移行し、
+// password_too_short/password_too_long等の具体的なエラーコードをHandler層で返せるようにする。
 type changePasswordRequest struct {
-	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password"`
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required"`
 }
 
 type issueRecoveryCodesResponse struct {
 	RecoveryCodes []string `json:"recovery_codes"`
 }
 
+// TODO: カスタムバリデーション導入後、NewPasswordのmin=8,max=128をvalidateタグに移行する。
 type recoveryCodeRecoverRequest struct {
-	RecoveryCode string `json:"recovery_code"`
-	NewPassword  string `json:"new_password"`
+	RecoveryCode string `json:"recovery_code" validate:"required"`
+	NewPassword  string `json:"new_password" validate:"required"`
 }
 
 var recoveryCodeFormat = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
@@ -191,6 +206,9 @@ func (h *AuthHandler) ChangePassword(c echo.Context) error {
 	req := new(changePasswordRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	if err := h.authUsecase.ChangePassword(c.Request().Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
@@ -224,6 +242,9 @@ func (h *AuthHandler) RecoverPassword(c echo.Context) error {
 	req := new(recoveryCodeRecoverRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 	if !recoveryCodeFormat.MatchString(req.RecoveryCode) {
 		return apierror.ErrBadRequest
