@@ -76,16 +76,16 @@ func ToNotesIntPtr(value *notes.Notes) *int {
 
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部へ公開するための DTO です。
 type WorldsendSongDTO struct {
-	ID          string     `json:"id"`           // DisplayID
-	Title       string     `json:"title"`        // 楽曲タイトル
-	Artist      string     `json:"artist"`       // アーティスト名
-	GenreID     *int       `json:"genre_id"`     // ジャンルID
-	BPM         *int       `json:"bpm"`          // BPM
-	ReleasedAt  *time.Time `json:"released_at"`  // リリース日
-	OfficialIdx string     `json:"official_idx"` // 公式インデックス
-	Jacket      *string    `json:"jacket"`       // ジャケット画像URL
-	WeStar      *int       `json:"we_star"`      // WORLD'S END 星の数（1～5）
-	WeKanji     *string    `json:"we_kanji"`     // WORLD'S END カテゴリ漢字
-	Notes       *int       `json:"notes"`        // ノーツ数
-	IsDeleted   bool       `json:"is_deleted"`   // 削除フラグ
+	ID          string  `json:"id"`           // DisplayID
+	Title       string  `json:"title"`        // 楽曲タイトル
+	Artist      string  `json:"artist"`       // アーティスト名
+	GenreID     *int    `json:"genre_id"`     // ジャンルID
+	BPM         *int    `json:"bpm"`          // BPM
+	ReleasedAt  *string `json:"released_at"`  // リリース日
+	OfficialIdx string  `json:"official_idx"` // 公式インデックス
+	Jacket      *string `json:"jacket"`       // ジャケット画像URL
+	WeStar      *int    `json:"we_star"`      // WORLD'S END 星の数（1～5）
+	WeKanji     *string `json:"we_kanji"`     // WORLD'S END カテゴリ漢字
+	Notes       *int    `json:"notes"`        // ノーツ数
+	IsDeleted   bool    `json:"is_deleted"`   // 削除フラグ
 }

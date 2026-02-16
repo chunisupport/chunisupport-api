@@ -135,7 +135,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 			Artist:     req.Artist,
 			GenreID:    req.GenreID,
 			BPM:        req.BPM,
-			ReleasedAt: req.ReleasedAt,
+			ReleasedAt: req.ReleasedAt.TimePtr(),
 			Jacket:     req.Jacket,
 		}
 

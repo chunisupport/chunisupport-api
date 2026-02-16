@@ -2,7 +2,6 @@ package api_internal
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -94,7 +93,7 @@ type UpdateSongRequest struct {
 	Artist     string                `json:"artist" validate:"required"`
 	GenreID    *int                  `json:"genre_id" validate:"omitempty,gte=1"`
 	BPM        *int                  `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt *time.Time            `json:"released_at"`
+	ReleasedAt *DateOnly             `json:"released_at"`
 	Jacket     *string               `json:"jacket"`
 	Charts     []*UpdateChartRequest `json:"charts" validate:"dive"`
 }

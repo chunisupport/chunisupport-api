@@ -134,12 +134,18 @@ func toWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *dto.WorldsendSo
 	}
 
 	if swc.Song != nil {
+		var releasedAt *string
+		if swc.Song.ReleasedAt != nil {
+			formatted := swc.Song.ReleasedAt.Format("2006-01-02")
+			releasedAt = &formatted
+		}
+
 		result.ID = swc.Song.DisplayID
 		result.Title = swc.Song.Title
 		result.Artist = swc.Song.Artist
 		result.GenreID = swc.Song.GenreID
 		result.BPM = swc.Song.BPM
-		result.ReleasedAt = swc.Song.ReleasedAt
+		result.ReleasedAt = releasedAt
 		result.OfficialIdx = swc.Song.OfficialIdx
 		result.Jacket = swc.Song.Jacket
 		result.IsDeleted = swc.Song.IsDeleted

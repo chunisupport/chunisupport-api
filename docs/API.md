@@ -1105,7 +1105,7 @@ curl -X POST \
     "artist": "アーティスト名",
     "genre_id": 1,
     "bpm": 180,
-    "released_at": "2024-01-01T00:00:00Z",
+    "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
     "charts": [
       {
@@ -1128,7 +1128,7 @@ curl -X POST \
 | `artist` | string | ✓ | アーティスト名 |
 | `genre_id` | int \| null | | ジャンルID（マスタに存在する必要がある） |
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
-| `released_at` | string \| null | | リリース日（ISO8601形式、nullの場合DBをNULLに更新） |
+| `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
 | `charts` | UpdateChartRequest[] | | 更新する譜面情報の配列 |
 
@@ -1163,7 +1163,7 @@ curl -X POST \
       "artist": "アーティスト名",
       "genre_id": 1,
       "bpm": 180,
-      "released_at": "2024-01-15T00:00:00Z",
+      "released_at": "2024-01-15",
       "official_idx": "123",
       "jacket": "img_filename",
       "we_star": 5,
@@ -1184,7 +1184,7 @@ curl -X POST \
 | `artist` | string | アーティスト名 |
 | `genre_id` | int \| null | ジャンルID |
 | `bpm` | int \| null | BPM |
-| `released_at` | string \| null | リリース日（ISO8601形式） |
+| `released_at` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `official_idx` | string \| null | 公式インデックス |
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `we_star` | int \| null | WORLD'S END 星の数（1～5） |
@@ -1210,7 +1210,7 @@ curl -X POST \
   "artist": "アーティスト名",
   "genre_id": 1,
   "bpm": 180,
-  "released_at": "2024-01-15T00:00:00Z",
+  "released_at": "2024-01-15",
   "official_idx": "123",
   "jacket": "img_filename",
   "we_star": 5,
@@ -1412,7 +1412,7 @@ curl -X POST \
       "artist": "アーティスト名",
       "genre_id": 1,
       "bpm": 180,
-      "released_at": "2024-01-15T00:00:00Z",
+      "released_at": "2024-01-15",
       "official_idx": "123",
       "jacket": "https://example.com/jacket.png",
       "we_star": 5,
@@ -1433,7 +1433,7 @@ curl -X POST \
 | `artist` | string | アーティスト名 |
 | `genre_id` | int \| null | ジャンルID |
 | `bpm` | int \| null | BPM |
-| `released_at` | string \| null | リリース日（ISO8601形式） |
+| `released_at` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `official_idx` | string \| null | 公式インデックス |
 | `jacket` | string \| null | ジャケット画像URL |
 | `we_star` | int \| null | WORLD'S END 星の数（1～5） |
@@ -1459,7 +1459,7 @@ curl -X POST \
   "artist": "アーティスト名",
   "genre_id": 1,
   "bpm": 180,
-  "released_at": "2024-01-15T00:00:00Z",
+  "released_at": "2024-01-15",
   "official_idx": "123",
   "jacket": "https://example.com/jacket.png",
   "we_star": 5,
