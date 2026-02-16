@@ -112,9 +112,20 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 	if err := c.Bind(&requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
+	if requests == nil {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
+	}
 
 	// バリデーション
 	for idx, req := range requests {
+		if req == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
+		}
+		for chartIdx, chart := range req.Charts {
+			if chart == nil {
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%d]: chart is null", idx, chartIdx))
+			}
+		}
 		if err := c.Validate(req); err != nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
 		}

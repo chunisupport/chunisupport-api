@@ -14,7 +14,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
@@ -206,16 +205,14 @@ func TestUpdateSongs(t *testing.T) {
 			expectedErrCode: apierror.CodeValidationFailed,
 		},
 		{
-			name:             "トップレベルnullでvalidation_failedが返る",
-			body:             `null`,
-			expectedErrCode:  apierror.CodeValidationFailed,
-			expectUsecaseHit: true,
+			name:            "トップレベルnullでvalidation_failedが返る",
+			body:            `null`,
+			expectedErrCode: apierror.CodeValidationFailed,
 		},
 		{
-			name:             "chartsにnull要素を含む配列でvalidation_failedが返る",
-			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":[null]}]`,
-			expectedErrCode:  apierror.CodeValidationFailed,
-			expectUsecaseHit: true,
+			name:            "chartsにnull要素を含む配列でvalidation_failedが返る",
+			body:            `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":[null]}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
 		},
 	}
 
@@ -225,21 +222,8 @@ func TestUpdateSongs(t *testing.T) {
 			mockUsecase := &testutil.MockSongUsecase{
 				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
 					called = true
-					if requests == nil {
-						return &usecase.SongValidationError{Field: "requests", Message: "must be array, not null"}
-					}
 					if tc.assertUsecaseReq != nil {
 						tc.assertUsecaseReq(t, requests)
-					}
-					for _, req := range requests {
-						if req == nil {
-							return &usecase.SongValidationError{Field: "requests", Message: "request is null"}
-						}
-						for _, chart := range req.Charts {
-							if chart == nil {
-								return &usecase.SongValidationError{Field: "requests", Message: "requests[0].charts[0]: chart is null"}
-							}
-						}
 					}
 					return nil
 				},
