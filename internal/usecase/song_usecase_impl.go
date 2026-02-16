@@ -75,9 +75,6 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
-	if err := validateUpdateSongRequests(requests); err != nil {
-		return err
-	}
 	if len(requests) == 0 {
 		return nil
 	}
@@ -114,25 +111,6 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
 	})
-}
-
-func validateUpdateSongRequests(requests []*api_internal.UpdateSongRequest) error {
-	if requests == nil {
-		return &SongValidationError{Field: "requests", Message: "must be array, not null"}
-	}
-
-	for idx, req := range requests {
-		if req == nil {
-			return &SongValidationError{Field: fmt.Sprintf("requests[%d]", idx), Message: "request is null"}
-		}
-		for chartIdx, chart := range req.Charts {
-			if chart == nil {
-				return &SongValidationError{Field: fmt.Sprintf("requests[%d].charts[%d]", idx, chartIdx), Message: "chart is null"}
-			}
-		}
-	}
-
-	return nil
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。

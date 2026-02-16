@@ -75,12 +75,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrAppVersionUnsupported.WithInternal(err)
 	}
 
-	// SongValidationError
-	var songValidationErr *usecase.SongValidationError
-	if errors.As(err, &songValidationErr) {
-		return ErrValidationFailed.WithInternal(err)
-	}
-
 	// PlayerDataValidationError
 	var validationErr *usecase.PlayerDataValidationError
 	if errors.As(err, &validationErr) {
