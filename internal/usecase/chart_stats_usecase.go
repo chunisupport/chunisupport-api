@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
@@ -114,7 +113,7 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 	if song.IsWorldsend {
 		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, song.DisplayID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, repository.ErrSongNotFound) {
 				return nil, repository.ErrSongNotFound
 			}
 			return nil, err
@@ -196,7 +195,7 @@ func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, 
 		}
 		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, song.DisplayID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, repository.ErrSongNotFound) {
 				return nil, ErrChartNotFound
 			}
 			return nil, err
