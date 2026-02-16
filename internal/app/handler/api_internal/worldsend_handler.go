@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
