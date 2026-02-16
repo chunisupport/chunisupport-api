@@ -101,7 +101,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, sql.ErrNoRows
+			return nil, repository.ErrSongNotFound
 		}
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (r *worldsendChartRepository) DeleteSong(ctx context.Context, exec reposito
 		return err
 	}
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return repository.ErrSongNotFound
 	}
 
 	return nil
@@ -144,7 +144,7 @@ func (r *worldsendChartRepository) RestoreSong(ctx context.Context, exec reposit
 		return err
 	}
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return repository.ErrSongNotFound
 	}
 
 	return nil

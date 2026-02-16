@@ -886,6 +886,7 @@ curl -X POST \
       "bpm": 180,
       "release": "2024-01-15T00:00:00Z",
       "jacket": "img_filename",
+      "official_idx": "123",
       "maxop": 82.5,
       "charts": {
         "BASIC": {
@@ -921,6 +922,7 @@ curl -X POST \
 | `bpm` | int \| null | BPM（未設定の場合null） |
 | `release` | string \| null | リリース日（ISO8601形式、未設定の場合null） |
 | `jacket` | string \| null | ジャケット画像ファイル名（未設定の場合null） |
+| `official_idx` | string | 公式インデックス |
 | `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
@@ -952,6 +954,7 @@ curl -X POST \
   "bpm": 180,
   "release": "2024-01-15T00:00:00Z",
   "jacket": "img_filename",
+  "official_idx": "123",
   "maxop": 82.5,
   "charts": {
     "BASIC": {
@@ -1159,15 +1162,19 @@ curl -X POST \
       "id": "0123456789abcdef",
       "title": "楽曲名",
       "artist": "アーティスト名",
-      "genre_id": 1,
+      "genre": "ジャンル名",
       "bpm": 180,
-      "released_at": "2024-01-15",
-      "official_idx": "123",
+      "release": "2024-01-15",
       "jacket": "img_filename",
-      "we_star": 5,
-      "we_kanji": "狂",
-      "notes": 2000,
-      "is_deleted": false
+      "official_idx": "123",
+      "maxop": null,
+      "charts": {
+        "WORLDSEND": {
+          "we_kanji": "狂",
+          "we_star": 5,
+          "notes": 2000
+        }
+      }
     }
   ]
 }
@@ -1180,15 +1187,21 @@ curl -X POST \
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
 | `artist` | string | アーティスト名 |
-| `genre_id` | int \| null | ジャンルID |
+| `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |
-| `released_at` | string \| null | リリース日（YYYY-MM-DD形式） |
-| `official_idx` | string \| null | 公式インデックス |
+| `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像ファイル名 |
-| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
+| `official_idx` | string | 公式インデックス |
+| `maxop` | null | WORLD'S END はレーティング対象外のため常にnull |
+| `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
+
+**WorldsendChartDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
 | `we_kanji` | string \| null | WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.） |
+| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
 | `notes` | int \| null | ノーツ数 |
-| `is_deleted` | bool | 削除フラグ |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -1206,21 +1219,26 @@ curl -X POST \
   "id": "0123456789abcdef",
   "title": "楽曲名",
   "artist": "アーティスト名",
-  "genre_id": 1,
+  "genre": "ジャンル名",
   "bpm": 180,
-  "released_at": "2024-01-15",
-  "official_idx": "123",
+  "release": "2024-01-15",
   "jacket": "img_filename",
-  "we_star": 5,
-  "we_kanji": "狂",
-  "notes": 2000,
-  "is_deleted": false
+  "official_idx": "123",
+  "maxop": null,
+  "charts": {
+    "WORLDSEND": {
+      "we_kanji": "狂",
+      "we_star": 5,
+      "notes": 2000
+    }
+  }
 }
 ```
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### DELETE `/internal/songs/worldsend/:displayid`
 - **認証**: Cookie 必須
@@ -1232,7 +1250,8 @@ curl -X POST \
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/songs/worldsend/:displayid/restore`
 - **認証**: Cookie 必須
@@ -1244,16 +1263,8 @@ curl -X POST \
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
-  - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
-
-**注意事項**:
-- リクエストに含まれない譜面は変更されません（削除もされません）
-- 存在しない `id` や `difficulty_id` を指定するとエラーになります
-- マスタに存在しない `genre_id` や `difficulty_id` を指定するとエラーになります
-- ポインタ型フィールド（`bpm`, `notes` など）にnullを指定すると、DBの該当カラムがNULLに更新されます
 
 ---
 
@@ -1357,6 +1368,7 @@ curl -X POST \
       "bpm": 180,
       "release": "2024-01-15",
       "jacket": "jacket_001.png",
+      "official_idx": "123",
       "maxop": 86.25,
       "charts": {
         "MASTER": {
@@ -1385,6 +1397,7 @@ curl -X POST \
 | `songs[].bpm` | number\|null | BPM |
 | `songs[].release` | string\|null | リリース日（YYYY-MM-DD形式） |
 | `songs[].jacket` | string\|null | ジャケット画像ファイル名 |
+| `songs[].official_idx` | string | 公式インデックス |
 | `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
@@ -1408,15 +1421,19 @@ curl -X POST \
       "id": "0123456789abcdef",
       "title": "楽曲名",
       "artist": "アーティスト名",
-      "genre_id": 1,
+      "genre": "ジャンル名",
       "bpm": 180,
-      "released_at": "2024-01-15",
-      "official_idx": "123",
+      "release": "2024-01-15",
       "jacket": "https://example.com/jacket.png",
-      "we_star": 5,
-      "we_kanji": "狂",
-      "notes": 2000,
-      "is_deleted": false
+      "official_idx": "123",
+      "maxop": null,
+      "charts": {
+        "WORLDSEND": {
+          "we_kanji": "狂",
+          "we_star": 5,
+          "notes": 2000
+        }
+      }
     }
   ]
 }
@@ -1429,15 +1446,21 @@ curl -X POST \
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
 | `artist` | string | アーティスト名 |
-| `genre_id` | int \| null | ジャンルID |
+| `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |
-| `released_at` | string \| null | リリース日（YYYY-MM-DD形式） |
-| `official_idx` | string \| null | 公式インデックス |
+| `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像URL |
-| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
+| `official_idx` | string | 公式インデックス |
+| `maxop` | null | WORLD'S END はレーティング対象外のため常にnull |
+| `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
+
+**WorldsendChartDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
 | `we_kanji` | string \| null | WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.） |
+| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
 | `notes` | int \| null | ノーツ数 |
-| `is_deleted` | bool | 削除フラグ（常にfalse） |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
@@ -1447,7 +1470,7 @@ curl -X POST \
 ### GET `/v1/songs/worldsend/:displayid`
 - **認証**: APIトークン必須
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **概要**: 指定された DisplayID の WORLD'S END 楽曲を取得します（削除済み楽曲は除外）。
+- **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -1455,22 +1478,26 @@ curl -X POST \
   "id": "0123456789abcdef",
   "title": "楽曲名",
   "artist": "アーティスト名",
-  "genre_id": 1,
+  "genre": "ジャンル名",
   "bpm": 180,
-  "released_at": "2024-01-15",
-  "official_idx": "123",
+  "release": "2024-01-15",
   "jacket": "https://example.com/jacket.png",
-  "we_star": 5,
-  "we_kanji": "狂",
-  "notes": 2000,
-  "is_deleted": false
+  "official_idx": "123",
+  "maxop": null,
+  "charts": {
+    "WORLDSEND": {
+      "we_kanji": "狂",
+      "we_star": 5,
+      "notes": 2000
+    }
+  }
 }
 ```
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`internal_error`): 楽曲が存在しない
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/v1/songs/:displayid`
@@ -1493,8 +1520,10 @@ curl -X POST \
   "bpm": 180,
   "release": "2024-01-15T00:00:00Z",
   "jacket": "https://example.com/jacket.png",
+  "official_idx": "123",
+  "maxop": 86.25,
   "charts": {
-    "master": {
+    "MASTER": {
       "const": 14.5,
       "is_const_unknown": false,
       "notes": 1500

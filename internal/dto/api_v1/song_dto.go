@@ -62,15 +62,16 @@ func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
 
 // V1SongDTO は外部API v1 用の楽曲情報DTOです。
 type V1SongDTO struct {
-	DisplayID string             `json:"id"`
-	Title     string             `json:"title"`
-	Artist    string             `json:"artist"`
-	Genre     *string            `json:"genre"`
-	BPM       *int               `json:"bpm"`
-	Release   *string            `json:"release"`
-	Jacket    *string            `json:"jacket"`
-	MaxOP     float64            `json:"maxop"`
-	Charts    V1OrderedChartsMap `json:"charts"`
+	DisplayID   string             `json:"id"`
+	Title       string             `json:"title"`
+	Artist      string             `json:"artist"`
+	Genre       *string            `json:"genre"`
+	BPM         *int               `json:"bpm"`
+	Release     *string            `json:"release"`
+	Jacket      *string            `json:"jacket"`
+	OfficialIdx string             `json:"official_idx"`
+	MaxOP       float64            `json:"maxop"`
+	Charts      V1OrderedChartsMap `json:"charts"`
 }
 
 // V1SongsResponse は外部API v1 用の楽曲一覧レスポンスです。
@@ -119,14 +120,15 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 	}
 
 	return &V1SongDTO{
-		DisplayID: song.DisplayID,
-		Title:     song.Title,
-		Artist:    song.Artist,
-		Genre:     genrePtr,
-		BPM:       song.BPM,
-		Release:   releaseDateStr,
-		Jacket:    song.Jacket,
-		MaxOP:     maxOP,
-		Charts:    make(V1OrderedChartsMap),
+		DisplayID:   song.DisplayID,
+		Title:       song.Title,
+		Artist:      song.Artist,
+		Genre:       genrePtr,
+		BPM:         song.BPM,
+		Release:     releaseDateStr,
+		Jacket:      song.Jacket,
+		OfficialIdx: song.OfficialIdx,
+		MaxOP:       maxOP,
+		Charts:      make(V1OrderedChartsMap),
 	}
 }

@@ -146,14 +146,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		User:       api_internal.NewUserHandler(userUsecase),
 		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
 		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase),
+		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
 		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:         api_internal.NewMeHandler(playerDataUsecase),
 		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase),
+		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, userRepo, db, masterCache),

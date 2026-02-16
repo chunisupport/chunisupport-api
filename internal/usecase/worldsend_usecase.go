@@ -2,23 +2,21 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 	// includeDeleted が false の場合、削除済み楽曲は除外されます。
-	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*dto.WorldsendSongDTO, error)
+	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error)
 
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-	GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*dto.WorldsendSongDTO, error)
+	GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*repository.WorldsendSongWithChart, error)
 
 	// DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 	DeleteWorldsendSong(ctx context.Context, displayID string) error
@@ -47,40 +45,35 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 }
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*dto.WorldsendSongDTO, error) {
+func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)
 		return nil, err
 	}
 
-	results := make([]*dto.WorldsendSongDTO, len(songsWithCharts))
-	for i, swc := range songsWithCharts {
-		results[i] = toWorldsendSongDTO(swc)
-	}
-
-	return results, nil
+	return songsWithCharts, nil
 }
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*dto.WorldsendSongDTO, error) {
+func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*repository.WorldsendSongWithChart, error) {
 	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrSongNotFound) {
 			return nil, repository.ErrSongNotFound
 		}
 		slog.Error("failed to find worldsend song by display_id", "display_id", displayID, "error", err)
 		return nil, err
 	}
 
-	return toWorldsendSongDTO(songWithChart), nil
+	return songWithChart, nil
 }
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
 	err := s.worldsendChartRepo.DeleteSong(ctx, s.defaultExecutor, displayID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrSongNotFound) {
 			return repository.ErrSongNotFound
 		}
 		slog.Error("failed to delete worldsend song", "display_id", displayID, "error", err)
@@ -93,7 +86,7 @@ func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID st
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
 	err := s.worldsendChartRepo.RestoreSong(ctx, s.defaultExecutor, displayID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrSongNotFound) {
 			return repository.ErrSongNotFound
 		}
 		slog.Error("failed to restore worldsend song", "display_id", displayID, "error", err)
@@ -121,41 +114,4 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*en
 	}
 
 	return nil
-}
-
-// toWorldsendSongDTO は WorldsendSongWithChart を WorldsendSongDTO に変換します。
-func toWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *dto.WorldsendSongDTO {
-	if swc == nil {
-		return nil
-	}
-
-	result := &dto.WorldsendSongDTO{
-		IsDeleted: false,
-	}
-
-	if swc.Song != nil {
-		var releasedAt *string
-		if swc.Song.ReleasedAt != nil {
-			formatted := swc.Song.ReleasedAt.Format("2006-01-02")
-			releasedAt = &formatted
-		}
-
-		result.ID = swc.Song.DisplayID
-		result.Title = swc.Song.Title
-		result.Artist = swc.Song.Artist
-		result.GenreID = swc.Song.GenreID
-		result.BPM = swc.Song.BPM
-		result.ReleasedAt = releasedAt
-		result.OfficialIdx = swc.Song.OfficialIdx
-		result.Jacket = swc.Song.Jacket
-		result.IsDeleted = swc.Song.IsDeleted
-	}
-
-	if swc.Chart != nil {
-		result.WeStar = swc.Chart.WeStar
-		result.WeKanji = swc.Chart.WeKanji
-		result.Notes = dto.ToNotesIntPtr(swc.Chart.Notes)
-	}
-
-	return result
 }
