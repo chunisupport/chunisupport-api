@@ -12,6 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // songUsecaseImpl は SongUsecase の実装です。
@@ -44,9 +45,22 @@ func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, inc
 }
 
 // GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
-	// リポジトリ側で既にErrSongNotFoundに変換済み
-	return s.songRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
+// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error) {
+	song, err := s.songRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 削除済み楽曲の権限チェック
+	if song.IsDeleted {
+		// EDITOR以上の権限を持たない場合は404を返す
+		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+			return nil, repository.ErrSongNotFound
+		}
+	}
+
+	return song, nil
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

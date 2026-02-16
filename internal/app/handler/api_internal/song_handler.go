@@ -55,9 +55,10 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 // GetSong は指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	// DTOに変換
@@ -77,7 +78,8 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 		return apierror.ErrInvalidDifficulty
 	}
 
-	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

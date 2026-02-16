@@ -7,6 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
@@ -16,7 +17,8 @@ type WorldsendUsecase interface {
 	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error)
 
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-	GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*repository.WorldsendSongWithChart, error)
+	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
 
 	// DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 	DeleteWorldsendSong(ctx context.Context, displayID string) error
@@ -56,7 +58,8 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 }
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*repository.WorldsendSongWithChart, error) {
+// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error) {
 	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSongNotFound) {
@@ -66,33 +69,29 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 		return nil, err
 	}
 
+	// 削除済み楽曲の権限チェック
+	if songWithChart.Song.IsDeleted {
+		// EDITOR以上の権限を持たない場合は404を返す
+		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+			return nil, repository.ErrSongNotFound
+		}
+	}
+
 	return songWithChart, nil
 }
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.DeleteSong(ctx, s.defaultExecutor, displayID)
-	if err != nil {
-		if errors.Is(err, repository.ErrSongNotFound) {
-			return repository.ErrSongNotFound
-		}
-		slog.Error("failed to delete worldsend song", "display_id", displayID, "error", err)
-		return err
-	}
-	return nil
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		return s.worldsendChartRepo.DeleteSong(ctx, tx, displayID)
+	})
 }
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.RestoreSong(ctx, s.defaultExecutor, displayID)
-	if err != nil {
-		if errors.Is(err, repository.ErrSongNotFound) {
-			return repository.ErrSongNotFound
-		}
-		slog.Error("failed to restore worldsend song", "display_id", displayID, "error", err)
-		return err
-	}
-	return nil
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		return s.worldsendChartRepo.RestoreSong(ctx, tx, displayID)
+	})
 }
 
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。

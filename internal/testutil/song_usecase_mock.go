@@ -10,7 +10,7 @@ import (
 // MockSongUsecase は楽曲ユースケースのテスト用モックです。
 type MockSongUsecase struct {
 	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
-	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string) (*entity.Song, error)
+	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
 	UpdateSongsFunc                   func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
@@ -24,9 +24,9 @@ func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, inc
 	return nil, nil
 }
 
-func (m *MockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error) {
+func (m *MockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error) {
 	if m.GetSongByDisplayIDFunc != nil {
-		return m.GetSongByDisplayIDFunc(ctx, displayID)
+		return m.GetSongByDisplayIDFunc(ctx, displayID, requesterAccountTypeID)
 	}
 	return nil, nil
 }

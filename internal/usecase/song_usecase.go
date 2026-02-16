@@ -14,7 +14,8 @@ type SongUsecase interface {
 	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool) ([]*entity.Song, error)
 
 	// GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-	GetSongByDisplayID(ctx context.Context, displayID string) (*entity.Song, error)
+	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 	DeleteSong(ctx context.Context, displayID string) error

@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年02月12日
+**最終更新日**: 2026年02月16日
 
 ## ベースURLと環境
 
@@ -110,9 +110,15 @@
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
+| `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得。 |
+| `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得。 |
+| `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
+| `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
+| `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得。 |
+| `/v1/songs/worldsend/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得。 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得。 |

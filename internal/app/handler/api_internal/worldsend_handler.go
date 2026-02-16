@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -44,7 +45,8 @@ func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 // GetWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を取得します。
 func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

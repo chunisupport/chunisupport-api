@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/labstack/echo/v4"
 )
 
 const (
@@ -41,4 +42,20 @@ func BuildChartsMap[T any](
 	}
 
 	return chartsMap
+}
+
+// GetRequesterAccountTypeID はコンテキストからログインユーザーのAccountTypeIDを取得します。
+// ユーザーがログインしていない場合はnilを返します。
+func GetRequesterAccountTypeID(c echo.Context) *int {
+	userObj := c.Get("userEntity")
+	if userObj == nil {
+		return nil
+	}
+
+	user, ok := userObj.(*entity.User)
+	if !ok {
+		return nil
+	}
+
+	return &user.AccountTypeID
 }
