@@ -107,7 +107,7 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 	}
 
 	// ユーザープロファイルとレコードを取得
-	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester)
+	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester, false)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):

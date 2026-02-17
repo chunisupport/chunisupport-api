@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -29,7 +30,8 @@ func (h *V1UserHandler) GetUser(c echo.Context) error {
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
-	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
+	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):

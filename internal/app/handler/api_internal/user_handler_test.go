@@ -23,8 +23,8 @@ type mockUserService struct {
 	mock.Mock
 }
 
-func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileWithRecordsDTO, error) {
-	args := m.Called(ctx, username, requester)
+func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+	args := m.Called(ctx, username, requester, includeNoPlay)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -99,7 +99,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	}
 
 	t.Run("viewなしは全レコードを返す", func(t *testing.T) {
-		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(result, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()

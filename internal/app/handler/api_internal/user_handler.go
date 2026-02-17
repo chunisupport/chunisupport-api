@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -38,7 +39,9 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 		return c.JSON(http.StatusOK, result)
 	}
 
-	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
+	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+
+	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
 	if err != nil {
 		return h.handleUserProfileError(err, username, "user profile with records")
 	}
