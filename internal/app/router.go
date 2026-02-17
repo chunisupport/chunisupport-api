@@ -126,7 +126,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	playerUsecase := usecase.NewPlayerService(db, playerRepo)
-	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase)
+	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase, songRepo, worldsendChartRepo, masterCache)
 	// userUsecase に worldsendRecordRepo を設定（通常レコードとの依存関係を避けるため後から設定）
 	if uu, ok := userUsecase.(interface {
 		SetWorldsendRecordRepository(repository.WorldsendRecordRepository)

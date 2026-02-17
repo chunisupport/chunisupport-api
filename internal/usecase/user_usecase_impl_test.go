@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
@@ -94,6 +95,86 @@ type stubPlayerService struct {
 	err    error
 }
 
+type stubWorldsendRecordRepository struct {
+	records []*entity.PlayerWorldsendRecord
+	err     error
+}
+
+func (s *stubWorldsendRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerWorldsendRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+type stubSongRepository struct {
+	songs []*entity.Song
+	err   error
+}
+
+func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.songs, nil
+}
+
+func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) FindByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) ([]*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubSongRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
+	return errors.New("not implemented")
+}
+
+type stubSongMasterProvider struct {
+	masters *masterdata.SongMasters
+}
+
+func (s *stubSongMasterProvider) SongMasters() *masterdata.SongMasters {
+	return s.masters
+}
+
+type stubWorldsendChartRepository struct {
+	records []*repository.WorldsendSongWithChart
+	err     error
+}
+
+func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
+	return errors.New("not implemented")
+}
+
 func (s *stubPlayerService) CreatePlayer(ctx context.Context, name string) (*dto.PlayerDTO, error) {
 	return nil, errors.New("not implemented")
 }
@@ -106,9 +187,9 @@ func (s *stubPlayerService) GetPlayerByID(ctx context.Context, id int) (*dto.Pla
 }
 
 func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{err: sql.ErrNoRows}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{err: sql.ErrNoRows}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil)
+	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil, false)
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
@@ -116,9 +197,9 @@ func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
 
 func TestUserService_GetUserProfileWithRecords_PlayerNotLinked(t *testing.T) {
 	user := &entity.User{ID: 1}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil)
+	_, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
 	if !errors.Is(err, ErrPlayerNotLinked) {
 		t.Fatalf("expected ErrPlayerNotLinked, got %v", err)
 	}
@@ -138,9 +219,9 @@ func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 		Level:     1,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{player: player})
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{player: player}, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1})
+	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1}, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -226,9 +307,9 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 		UpdatedAt: playerUpdatedAt,
 	}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{records: records}, &stubPlayerService{player: player})
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{records: records}, &stubPlayerService{player: player}, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,6 +346,84 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 	}
 	if bestRecord.Difficulty != "EXPERT" {
 		t.Fatalf("expected difficulty EXPERT, got %v", bestRecord.Difficulty)
+	}
+}
+
+func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
+	now := time.Now()
+	scorePlayed, _ := score.NewScore(1000000)
+	chartConst, _ := chartconstant.NewChartConstant(12.4)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: now.Add(-time.Hour)}
+	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
+	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
+	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
+	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			ChartID:         1001,
+			Score:           scorePlayed,
+			UpdatedAt:       now,
+			Chart:           playedSong.Charts[0],
+			Song:            playedSong,
+			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "expert"},
+		}}},
+		&stubPlayerService{player: player},
+		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
+		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}}},
+	)
+	service.(*userUsecase).SetWorldsendRecordRepository(&stubWorldsendRecordRepository{})
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Records.All) != 2 {
+		t.Fatalf("expected 2 all records, got %d", len(result.Records.All))
+	}
+	if result.Records.All[0].IsPlayed != true {
+		t.Fatal("expected first record is played")
+	}
+	if result.Records.All[1].IsPlayed != false {
+		t.Fatal("expected second record is unplayed")
+	}
+	if len(result.Records.Best) != 0 {
+		t.Fatalf("expected 0 best records, got %d", len(result.Records.Best))
+	}
+	if len(result.Records.New) != 0 {
+		t.Fatalf("expected 0 new records, got %d", len(result.Records.New))
+	}
+	if len(result.Records.NewCandidate) != 0 {
+		t.Fatalf("expected 0 new_candidate records, got %d", len(result.Records.NewCandidate))
+	}
+	if len(result.Records.BestCandidate) != 0 {
+		t.Fatalf("expected 0 best_candidate records, got %d", len(result.Records.BestCandidate))
+	}
+	if result.Records.All[1].UpdatedAt != nil {
+		t.Fatal("expected unplayed updated_at nil")
+	}
+	if result.Records.All[1].ClearLamp != nil {
+		t.Fatal("expected unplayed clear_lamp nil")
+	}
+	if result.Records.All[0].Difficulty != "EXPERT" || result.Records.All[1].Difficulty != "MASTER" {
+		t.Fatalf("expected uppercase difficulties, got %s and %s", result.Records.All[0].Difficulty, result.Records.All[1].Difficulty)
+	}
+	if len(result.Records.WorldsEnd) != 1 {
+		t.Fatalf("expected 1 worldsend record, got %d", len(result.Records.WorldsEnd))
+	}
+	if result.Records.WorldsEnd[0].IsPlayed {
+		t.Fatal("expected worldsend completion record is unplayed")
+	}
+
+	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
+	if len(result.Records.All) > 0 && result.Records.All[0].Slot != nil {
+		t.Fatalf("expected all record slot nil, got %v", result.Records.All[0].Slot)
 	}
 }
 
@@ -346,7 +505,7 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 		UpdatedAt: playerUpdatedAt,
 	}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{ratingRecords: records}, &stubPlayerService{player: player})
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{ratingRecords: records}, &stubPlayerService{player: player}, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
 	if err != nil {
@@ -407,7 +566,7 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	repo := &stubUserRepository{
 		usersWithPlayer: usersWithPlayer,
 	}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
 	if err != nil {
@@ -454,7 +613,7 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
 	if err != nil {
@@ -473,7 +632,7 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: sql.ErrNoRows}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "missing")
 	if !errors.Is(err, ErrUserNotFound) {
@@ -490,7 +649,7 @@ func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "deleteduser")
 	if !errors.Is(err, ErrUserAlreadyDeleted) {
@@ -500,7 +659,7 @@ func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
 
 func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
 	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), normalUser, "testuser")
 	if !errors.Is(err, ErrAdminRequired) {
@@ -509,7 +668,7 @@ func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
 }
 
 func TestUserService_DeleteUser_NilRequester(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
 	if !errors.Is(err, ErrAdminRequired) {
@@ -526,7 +685,7 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "deleteduser")
 	if err != nil {
@@ -545,7 +704,7 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: sql.ErrNoRows}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "missing")
 	if !errors.Is(err, ErrUserNotFound) {
@@ -562,7 +721,7 @@ func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "activeuser")
 	if !errors.Is(err, ErrUserNotDeleted) {
@@ -572,7 +731,7 @@ func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
 
 func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
 	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), normalUser, "deleteduser")
 	if !errors.Is(err, ErrAdminRequired) {
@@ -581,7 +740,7 @@ func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
 }
 
 func TestUserService_RestoreUser_NilRequester(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), nil, "deleteduser")
 	if !errors.Is(err, ErrAdminRequired) {

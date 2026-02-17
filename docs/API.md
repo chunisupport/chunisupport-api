@@ -1582,6 +1582,9 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 
+- **クエリパラメータ**:
+    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
+
 - **レスポンス**: 200 OK
 
 ```json

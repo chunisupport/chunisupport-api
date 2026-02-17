@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -10,7 +11,8 @@ import (
 
 // PlayerRecordDTO はプレイヤーレコードを外部へ公開するためのDTOです。
 type PlayerRecordDTO struct {
-	UpdatedAt      time.Time                   `json:"updated_at"`
+	UpdatedAt      *time.Time                  `json:"updated_at"`
+	IsPlayed       bool                        `json:"is_played"`
 	Difficulty     string                      `json:"difficulty"`
 	ID             string                      `json:"id"`
 	Title          string                      `json:"title"`
@@ -21,7 +23,7 @@ type PlayerRecordDTO struct {
 	Rating         float64                     `json:"rating"`
 	Overpower      float64                     `json:"overpower"`
 	Img            string                      `json:"img"`
-	ClearLamp      string                      `json:"clear_lamp"`
+	ClearLamp      *string                     `json:"clear_lamp"`
 	ComboLamp      *string                     `json:"combo_lamp"`
 	FullChain      *string                     `json:"full_chain"`
 	Slot           *string                     `json:"slot"`
@@ -43,20 +45,23 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 	}
 
 	dto := &PlayerRecordDTO{
-		UpdatedAt:      record.UpdatedAt,
 		Const:          chartConst,
 		IsConstUnknown: isConstUnknown,
 		Score:          score,
 		Rating:         service.CalcSingleRating(score, float64(chartConst)),
 		Overpower:      service.CalcSingleOverpower(score, float64(chartConst), record.ComboLampID),
-		ClearLamp:      toMasterName(record.ClearLamp),
+		ClearLamp:      toMasterNamePtr(record.ClearLamp),
 		ComboLamp:      toMasterNamePtr(record.ComboLamp),
 		FullChain:      toMasterNamePtr(record.FullChain),
 		Slot:           toMasterNamePtr(record.Slot),
 	}
+	if !record.UpdatedAt.IsZero() {
+		dto.UpdatedAt = &record.UpdatedAt
+		dto.IsPlayed = true
+	}
 
 	if record.ChartDifficulty != nil {
-		dto.Difficulty = record.ChartDifficulty.Name
+		dto.Difficulty = strings.ToUpper(record.ChartDifficulty.Name)
 	}
 
 	if record.Song != nil {

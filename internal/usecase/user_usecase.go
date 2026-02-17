@@ -12,7 +12,7 @@ type UserUsecase interface {
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 	// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
 	// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
-	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileWithRecordsDTO, error)
+	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error)
 
 	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
 	// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。

@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -20,16 +21,24 @@ type userUsecase struct {
 	userRepo            repository.UserRepository
 	playerRecordRepo    repository.PlayerRecordRepository
 	worldsendRecordRepo repository.WorldsendRecordRepository
+	songRepo            repository.SongRepository
+	worldsendChartRepo  repository.WorldsendChartRepository
+	recordCompletionSvc *service.RecordCompletionService
+	songMasterProvider  repository.SongMasterProvider
 	playerUsecase       PlayerUsecase
 }
 
 // NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, playerUsecase PlayerUsecase) UserUsecase {
+func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
 	return &userUsecase{
-		db:               db,
-		userRepo:         userRepo,
-		playerRecordRepo: playerRecordRepo,
-		playerUsecase:    playerUsecase,
+		db:                  db,
+		userRepo:            userRepo,
+		playerRecordRepo:    playerRecordRepo,
+		songRepo:            songRepo,
+		worldsendChartRepo:  worldsendChartRepo,
+		recordCompletionSvc: service.NewRecordCompletionService(),
+		songMasterProvider:  songMasterProvider,
+		playerUsecase:       playerUsecase,
 	}
 }
 
@@ -45,7 +54,7 @@ func (s *userUsecase) SetWorldsendRecordRepository(repo repository.WorldsendReco
 //
 // TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。
 // PlayerRepository.FindByIDWithHonors() のようなJOINクエリを作成して3回に削減できる可能性がある。
-func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileWithRecordsDTO, error) {
+func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {
 	user, player, err := s.getUserAndPlayer(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -62,12 +71,36 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		return nil, err
 	}
 
+	slotSourceRecords := records
+	allRecords := records
+
+	if includeNoPlay && s.songRepo != nil {
+		songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
+		if err != nil {
+			slog.Error("failed to find songs for no-play completion", "player_id", *user.PlayerID, "error", err)
+			return nil, err
+		}
+
+		var difficultyNamesByID map[int]string
+		if s.songMasterProvider != nil {
+			masters := s.songMasterProvider.SongMasters()
+			if masters != nil {
+				difficultyNamesByID = masters.DifficultyNamesByID
+			}
+		}
+
+		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID)
+	}
+
 	// スロット別にグルーピング
 	slotMap := initializeSlotMap()
+	for _, record := range allRecords {
+		slotMap["all"] = append(slotMap["all"], dto.ToPlayerRecordDTO(record))
+	}
+
 	var latestRecordUpdatedAt time.Time
-	for _, record := range records {
+	for _, record := range slotSourceRecords {
 		dtoRecord := dto.ToPlayerRecordDTO(record)
-		slotMap["all"] = append(slotMap["all"], dtoRecord)
 
 		slotKey := record.SlotKey()
 		if slotKey != "" {
@@ -91,6 +124,21 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 			// WORLD'S END レコードの取得失敗は致命的ではないため、空配列で続行
 			worldsendRecords = []*dto.WorldsendRecordDTO{}
 		} else {
+			if includeNoPlay && s.worldsendChartRepo != nil {
+				worldsendSongs, wsErr := s.worldsendChartRepo.FindAll(ctx, s.db, false)
+				if wsErr != nil {
+					slog.Error("failed to find worldsend songs for no-play completion", "player_id", *user.PlayerID, "error", wsErr)
+					return nil, wsErr
+				}
+				pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
+				for _, ws := range worldsendSongs {
+					if ws == nil {
+						continue
+					}
+					pairs = append(pairs, &service.WorldsendSongChartPair{Song: ws.Song, Chart: ws.Chart})
+				}
+				weRecords = s.recordCompletionSvc.CompleteWorldsendRecords(weRecords, pairs)
+			}
 			worldsendRecords = make([]*dto.WorldsendRecordDTO, len(weRecords))
 			for i, r := range weRecords {
 				worldsendRecords[i] = dto.ToWorldsendRecordDTO(r)
