@@ -44,7 +44,7 @@ func TestRecordCompletionService_CompletePlayerRecords(t *testing.T) {
 		},
 	}
 
-	completed := svc.CompletePlayerRecords(records, songs)
+	completed := svc.CompletePlayerRecords(records, songs, map[int]string{2: "ADVANCED", 4: "MASTER"})
 
 	if len(completed) != 3 {
 		t.Fatalf("expected 3 records, got %d", len(completed))

@@ -24,11 +24,12 @@ type userUsecase struct {
 	songRepo            repository.SongRepository
 	worldsendChartRepo  repository.WorldsendChartRepository
 	recordCompletionSvc *service.RecordCompletionService
+	songMasterProvider  repository.SongMasterProvider
 	playerUsecase       PlayerUsecase
 }
 
 // NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository) UserUsecase {
+func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
@@ -36,6 +37,7 @@ func NewUserService(db repository.Executor, userRepo repository.UserRepository, 
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
+		songMasterProvider:  songMasterProvider,
 		playerUsecase:       playerUsecase,
 	}
 }
@@ -78,7 +80,16 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 			slog.Error("failed to find songs for no-play completion", "player_id", *user.PlayerID, "error", err)
 			return nil, err
 		}
-		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs)
+
+		var difficultyNamesByID map[int]string
+		if s.songMasterProvider != nil {
+			masters := s.songMasterProvider.SongMasters()
+			if masters != nil {
+				difficultyNamesByID = masters.DifficultyNamesByID
+			}
+		}
+
+		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID)
 	}
 
 	// スロット別にグルーピング

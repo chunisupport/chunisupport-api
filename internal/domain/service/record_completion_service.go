@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"sort"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -21,7 +22,7 @@ func NewRecordCompletionService() *RecordCompletionService {
 }
 
 // CompletePlayerRecords は通常譜面レコードを未プレイ補完し、ソート済み配列を返します。
-func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.PlayerRecord, songs []*entity.Song) []*entity.PlayerRecord {
+func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.PlayerRecord, songs []*entity.Song, difficultyNamesByID map[int]string) []*entity.PlayerRecord {
 	completed := make([]*entity.PlayerRecord, 0, len(records))
 	playedByChartID := make(map[int]struct{}, len(records))
 
@@ -50,7 +51,7 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 				Song:    song,
 				ChartDifficulty: &entity.ChartDifficulty{
 					ID:   chart.DifficultyID,
-					Name: difficultyNameByID(chart.DifficultyID),
+					Name: difficultyNameByID(chart.DifficultyID, difficultyNamesByID),
 				},
 			})
 		}
@@ -107,47 +108,37 @@ func (s *RecordCompletionService) CompleteWorldsendRecords(records []*entity.Pla
 	return completed
 }
 
-func difficultyNameByID(difficultyID int) string {
-	switch difficultyID {
-	case 1:
-		return "BASIC"
-	case 2:
-		return "ADVANCED"
-	case 3:
-		return "EXPERT"
-	case 4:
-		return "MASTER"
-	case 5:
-		return "ULTIMA"
-	default:
+func difficultyNameByID(difficultyID int, difficultyNamesByID map[int]string) string {
+	if difficultyNamesByID == nil {
 		return ""
 	}
+	return difficultyNamesByID[difficultyID]
 }
 
 func playerRecordSongID(record *entity.PlayerRecord) int {
 	if record == nil || record.Song == nil {
-		return int(^uint(0) >> 1)
+		return math.MaxInt
 	}
 	return record.Song.ID
 }
 
 func playerRecordDifficultyID(record *entity.PlayerRecord) int {
 	if record == nil || record.Chart == nil {
-		return int(^uint(0) >> 1)
+		return math.MaxInt
 	}
 	return record.Chart.DifficultyID
 }
 
 func worldsendRecordSongID(record *entity.PlayerWorldsendRecord) int {
 	if record == nil || record.Song == nil {
-		return int(^uint(0) >> 1)
+		return math.MaxInt
 	}
 	return record.Song.ID
 }
 
 func worldsendRecordChartID(record *entity.PlayerWorldsendRecord) int {
 	if record == nil {
-		return int(^uint(0) >> 1)
+		return math.MaxInt
 	}
 	if record.WorldsendChart != nil {
 		return record.WorldsendChart.ID
