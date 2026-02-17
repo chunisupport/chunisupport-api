@@ -69,21 +69,27 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		return nil, err
 	}
 
+	slotSourceRecords := records
+	allRecords := records
+
 	if includeNoPlay && s.songRepo != nil {
 		songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
 		if err != nil {
 			slog.Error("failed to find songs for no-play completion", "player_id", *user.PlayerID, "error", err)
 			return nil, err
 		}
-		records = s.recordCompletionSvc.CompletePlayerRecords(records, songs)
+		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs)
 	}
 
 	// スロット別にグルーピング
 	slotMap := initializeSlotMap()
+	for _, record := range allRecords {
+		slotMap["all"] = append(slotMap["all"], dto.ToPlayerRecordDTO(record))
+	}
+
 	var latestRecordUpdatedAt time.Time
-	for _, record := range records {
+	for _, record := range slotSourceRecords {
 		dtoRecord := dto.ToPlayerRecordDTO(record)
-		slotMap["all"] = append(slotMap["all"], dtoRecord)
 
 		slotKey := record.SlotKey()
 		if slotKey != "" {

@@ -383,6 +383,18 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 	if result.Records.All[1].IsPlayed != false {
 		t.Fatal("expected second record is unplayed")
 	}
+	if len(result.Records.Best) != 0 {
+		t.Fatalf("expected 0 best records, got %d", len(result.Records.Best))
+	}
+	if len(result.Records.New) != 0 {
+		t.Fatalf("expected 0 new records, got %d", len(result.Records.New))
+	}
+	if len(result.Records.NewCandidate) != 0 {
+		t.Fatalf("expected 0 new_candidate records, got %d", len(result.Records.NewCandidate))
+	}
+	if len(result.Records.BestCandidate) != 0 {
+		t.Fatalf("expected 0 best_candidate records, got %d", len(result.Records.BestCandidate))
+	}
 	if result.Records.All[1].UpdatedAt != nil {
 		t.Fatal("expected unplayed updated_at nil")
 	}
@@ -397,6 +409,11 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 	}
 	if result.Records.WorldsEnd[0].IsPlayed {
 		t.Fatal("expected worldsend completion record is unplayed")
+	}
+
+	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
+	if len(result.Records.All) > 0 && result.Records.All[0].Slot != nil {
+		t.Fatalf("expected all record slot nil, got %v", result.Records.All[0].Slot)
 	}
 }
 
