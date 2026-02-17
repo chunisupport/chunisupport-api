@@ -50,7 +50,7 @@
 - `clear_lamp`: `null`
 - `updated_at`: `null`
 - `combo_lamp` / `full_chain` / `slot`: 既存ルールどおり `null`
-- `const` / `is_const_unknown` / `title` / `artist` / `difficulty` / `img`: マスタ値を採用
+- `id` / `const` / `is_const_unknown` / `title` / `artist` / `difficulty` / `img`: マスタ値を採用
 
 #### 既存プレイレコード
 - `is_played`: `true`
