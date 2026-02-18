@@ -109,8 +109,8 @@ CREATE TABLE goals (
       "additionalProperties": false,
       "required": ["min", "max"],
       "properties": {
-        "min": { "type": "number", "minimum": 1.0, "maximum": 15.7 },
-        "max": { "type": "number", "minimum": 1.0, "maximum": 15.7 }
+        "min": { "type": "number", "minimum": 1.0, "maximum": 15.9 },
+        "max": { "type": "number", "minimum": 1.0, "maximum": 15.9 }
       }
     },
     "genre": {
