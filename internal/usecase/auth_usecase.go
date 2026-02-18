@@ -81,10 +81,10 @@ func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repo
 // Register は新しいユーザーを登録し、セッションを作成してJWTトークンを返します。
 func (s *authService) Register(ctx context.Context, usernameStr, password string) (*api_internal.UserDTO, string, error) {
 	// パスワードのバリデーション
-	if len(password) < 8 {
+	if len(password) < info.PasswordMinLength {
 		return nil, "", ErrPasswordTooShort
 	}
-	if len(password) > 128 {
+	if len(password) > info.PasswordMaxLength {
 		return nil, "", ErrPasswordTooLong
 	}
 
