@@ -59,8 +59,8 @@ type V1WorldsendRecordDTO struct {
 	ID        string     `json:"id"`
 	Title     string     `json:"title"`
 	Artist    string     `json:"artist"`
-	WeStar    *int       `json:"we_star"`
-	WeKanji   *string    `json:"we_kanji"`
+	LevelStar *int       `json:"level_star"`
+	Attribute *string    `json:"attribute"`
 	Notes     *int       `json:"notes"`
 	Score     uint32     `json:"score"`
 	Img       string     `json:"img"`
@@ -159,8 +159,8 @@ func ToV1WorldsendRecordDTO(record *dto.WorldsendRecordDTO) *V1WorldsendRecordDT
 		ID:        record.ID,
 		Title:     record.Title,
 		Artist:    record.Artist,
-		WeStar:    record.WeStar,
-		WeKanji:   record.WeKanji,
+		LevelStar: record.LevelStar,
+		Attribute: record.Attribute,
 		Notes:     record.Notes,
 		Score:     record.Score,
 		Img:       record.Img,

@@ -35,8 +35,8 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
-			wc.we_star AS 'worldsend_charts.we_star',
-			wc.we_kanji AS 'worldsend_charts.we_kanji',
+			wc.level_star AS 'worldsend_charts.level_star',
+			wc.attribute AS 'worldsend_charts.attribute',
 			wc.notes AS 'worldsend_charts.notes'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
@@ -61,7 +61,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 			&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-			&chartModel.ID, &chartModel.SongID, &chartModel.WeStar, &chartModel.WeKanji, &chartModel.Notes,
+			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes,
 		)
 		if err != nil {
 			return nil, err
@@ -83,8 +83,8 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
-			wc.we_star AS 'worldsend_charts.we_star',
-			wc.we_kanji AS 'worldsend_charts.we_kanji',
+			wc.level_star AS 'worldsend_charts.level_star',
+			wc.attribute AS 'worldsend_charts.attribute',
 			wc.notes AS 'worldsend_charts.notes'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
@@ -97,7 +97,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 		&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-		&chartModel.ID, &chartModel.SongID, &chartModel.WeStar, &chartModel.WeKanji, &chartModel.Notes,
+		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -173,11 +173,11 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 	// WORLD'S END 譜面情報を更新
 	chartQuery := `
 		UPDATE worldsend_charts
-		SET we_star = ?, we_kanji = ?, notes = ?
+		SET level_star = ?, attribute = ?, notes = ?
 		WHERE id = ?`
 	for _, chart := range charts {
 		_, err := exec.ExecContext(ctx, chartQuery,
-			chart.WeStar, chart.WeKanji, chart.Notes, chart.ID)
+			chart.LevelStar, chart.Attribute, chart.Notes, chart.ID)
 		if err != nil {
 			return err
 		}

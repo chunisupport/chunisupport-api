@@ -31,8 +31,8 @@ type worldsendRecordRow struct {
 	FullChainID      int          `db:"full_chain_id"`
 	UpdatedAt        time.Time    `db:"updated_at"`
 	ChartSongID      int          `db:"chart_song_id"`
-	ChartWeStar      *int         `db:"chart_we_star"`
-	ChartWeKanji     *string      `db:"chart_we_kanji"`
+	ChartLevelStar   *int         `db:"chart_level_star"`
+	ChartAttribute   *string      `db:"chart_attribute"`
 	ChartNotes       *notes.Notes `db:"chart_notes"`
 	SongID           int          `db:"song_id"`
 	SongDisplayID    string       `db:"song_display_id"`
@@ -59,8 +59,8 @@ SELECT
     pwr.full_chain_id,
     pwr.updated_at,
     wc.song_id AS chart_song_id,
-    wc.we_star AS chart_we_star,
-    wc.we_kanji AS chart_we_kanji,
+    wc.level_star AS chart_level_star,
+    wc.attribute AS chart_attribute,
     wc.notes AS chart_notes,
     s.id AS song_id,
     s.display_id AS song_display_id,
@@ -108,11 +108,11 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 			FullChainID:      row.FullChainID,
 			UpdatedAt:        row.UpdatedAt,
 			WorldsendChart: &entity.WorldsendChart{
-				ID:      row.WorldsendChartID,
-				SongID:  row.ChartSongID,
-				WeStar:  row.ChartWeStar,
-				WeKanji: row.ChartWeKanji,
-				Notes:   row.ChartNotes,
+				ID:        row.WorldsendChartID,
+				SongID:    row.ChartSongID,
+				LevelStar: row.ChartLevelStar,
+				Attribute: row.ChartAttribute,
+				Notes:     row.ChartNotes,
 			},
 			// PlayerWorldsendRecord内のSongは楽曲メタデータの参照であり、完全な集約ではない。
 			// WORLD'S ENDの譜面情報はWorldsendChartで保持するため、Chartsは空スライスで初期化する。

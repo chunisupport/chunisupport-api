@@ -827,8 +827,8 @@ curl -X POST \
 | `id` | string | 楽曲表示用ID |
 | `title` | string | 楽曲タイトル |
 | `artist` | string | アーティスト名 |
-| `we_star` | number \| null | WORLD'S END 星の数 |
-| `we_kanji` | string \| null | WORLD'S END カテゴリ漢字 |
+| `level_star` | number \| null | WORLD'S END レベル |
+| `attribute` | string \| null | WORLD'S END 属性 |
 | `notes` | number \| null | ノーツ数 |
 | `score` | number | スコア |
 | `img` | string | 楽曲画像ID |
@@ -1183,8 +1183,8 @@ curl -X POST \
       "maxop": null,
       "charts": {
         "WORLDSEND": {
-          "we_kanji": "狂",
-          "we_star": 5,
+          "attribute": "狂",
+          "level_star": 5,
           "notes": 2000
         }
       }
@@ -1212,8 +1212,8 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `we_kanji` | string \| null | WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.） |
-| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
+| `attribute` | string \| null | WORLD'S END 属性（光、蔵、改、狂、etc.） |
+| `level_star` | int \| null | WORLD'S END レベル（1～5） |
 | `notes` | int \| null | ノーツ数 |
 
 - **主なエラー**:
@@ -1240,8 +1240,8 @@ curl -X POST \
   "maxop": null,
   "charts": {
     "WORLDSEND": {
-      "we_kanji": "狂",
-      "we_star": 5,
+      "attribute": "狂",
+      "level_star": 5,
       "notes": 2000
     }
   }
@@ -1442,8 +1442,8 @@ curl -X POST \
       "maxop": null,
       "charts": {
         "WORLDSEND": {
-          "we_kanji": "狂",
-          "we_star": 5,
+          "attribute": "狂",
+          "level_star": 5,
           "notes": 2000
         }
       }
@@ -1471,8 +1471,8 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `we_kanji` | string \| null | WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.） |
-| `we_star` | int \| null | WORLD'S END 星の数（1～5） |
+| `attribute` | string \| null | WORLD'S END 属性（光、蔵、改、狂、etc.） |
+| `level_star` | int \| null | WORLD'S END レベル（1～5） |
 | `notes` | int \| null | ノーツ数 |
 
 - **主なエラー**:
@@ -1499,8 +1499,8 @@ curl -X POST \
   "maxop": null,
   "charts": {
     "WORLDSEND": {
-      "we_kanji": "狂",
-      "we_star": 5,
+      "attribute": "狂",
+      "level_star": 5,
       "notes": 2000
     }
   }
@@ -1898,8 +1898,8 @@ interface WorldsendRecordDTO {
   id: string;
   title: string;
   artist: string;
-  we_star: number | null;         // WORLD'S END 星の数（1～5）
-  we_kanji: string | null;        // WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.）
+  level_star: number | null;      // WORLD'S END レベル（1～5）
+  attribute: string | null;       // WORLD'S END 属性（光、蔵、改、狂、etc.）
   notes: number | null;
   score: number;
   img: string;

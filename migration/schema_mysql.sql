@@ -326,14 +326,14 @@ CREATE TABLE `versions` (
 CREATE TABLE `worldsend_charts` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
   `song_id` int unsigned NOT NULL,
-  `we_star` tinyint DEFAULT NULL,
-  `we_kanji` char(1) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `level_star` tinyint DEFAULT NULL,
+  `attribute` char(1) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `song_id` (`song_id`),
   KEY `idx_worldsend_charts_song_id` (`song_id`),
   CONSTRAINT `worldsend_charts_ibfk_1` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `worldsend_charts_chk_1` CHECK (((`we_star` is null) or (`we_star` between 1 and 5))),
+  CONSTRAINT `worldsend_charts_chk_1` CHECK (((`level_star` is null) or (`level_star` between 1 and 5))),
   CONSTRAINT `worldsend_charts_chk_2` CHECK (((`notes` is null) or (`notes` >= 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

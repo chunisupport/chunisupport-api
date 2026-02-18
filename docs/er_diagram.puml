@@ -128,8 +128,8 @@ entity "worldsend_charts" as worldsend_charts {
   + id: MEDIUMINT UNSIGNED [PK]
   --
   song_id: INT NOT NULL [UNIQUE]
-  we_star: TINYINT
-  we_kanji: CHAR(1)
+  level_star: TINYINT
+  attribute: CHAR(1)
   notes: INT
 }
 

@@ -15,8 +15,8 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	bpm := 200
 	jacket := "v1jacket.png"
 	releasedAt := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
-	weStar := 3
-	weKanji := "光"
+	levelStar := 3
+	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
 
 	song := &entity.Song{
@@ -31,9 +31,9 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	}
 
 	chart := &entity.WorldsendChart{
-		WeStar:  &weStar,
-		WeKanji: &weKanji,
-		Notes:   &notesObj,
+		LevelStar: &levelStar,
+		Attribute: &attribute,
+		Notes:     &notesObj,
 	}
 
 	genreNamesByID := map[int]string{
@@ -104,12 +104,12 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 		t.Fatal("WORLDSEND chart is nil")
 	}
 
-	if weChart.WeStar == nil || *weChart.WeStar != 3 {
-		t.Errorf("WeStar = %v, want %v", weChart.WeStar, 3)
+	if weChart.LevelStar == nil || *weChart.LevelStar != 3 {
+		t.Errorf("LevelStar = %v, want %v", weChart.LevelStar, 3)
 	}
 
-	if weChart.WeKanji == nil || *weChart.WeKanji != "光" {
-		t.Errorf("WeKanji = %v, want %v", weChart.WeKanji, "光")
+	if weChart.Attribute == nil || *weChart.Attribute != "光" {
+		t.Errorf("Attribute = %v, want %v", weChart.Attribute, "光")
 	}
 
 	if weChart.Notes == nil || *weChart.Notes != 2000 {
@@ -131,8 +131,8 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	jacket := "we_jacket.png"
 	bpm := 160
 	genre := "VARIETY"
-	weStar := 4
-	weKanji := "蔵"
+	levelStar := 4
+	attribute := "蔵"
 	notesVal := 800
 
 	songDTO := &V1WorldsendSongDTO{
@@ -147,9 +147,9 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 		MaxOP:       nil,
 		Charts: map[string]*V1WorldsendChartDTO{
 			"WORLDSEND": {
-				WeKanji: &weKanji,
-				WeStar:  &weStar,
-				Notes:   &notesVal,
+				Attribute: &attribute,
+				LevelStar: &levelStar,
+				Notes:     &notesVal,
 			},
 		},
 	}
@@ -186,13 +186,13 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 		t.Errorf("JSON should contain 'WORLDSEND' key, got: %s", jsonString)
 	}
 
-	// we_kanji, we_star, notes が含まれること
-	if !containsString(jsonString, `"we_kanji":"蔵"`) {
-		t.Errorf("JSON should contain we_kanji, got: %s", jsonString)
+	// attribute, level_star, notes が含まれること
+	if !containsString(jsonString, `"attribute":"蔵"`) {
+		t.Errorf("JSON should contain attribute, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"we_star":4`) {
-		t.Errorf("JSON should contain we_star, got: %s", jsonString)
+	if !containsString(jsonString, `"level_star":4`) {
+		t.Errorf("JSON should contain level_star, got: %s", jsonString)
 	}
 
 	if !containsString(jsonString, `"notes":800`) {

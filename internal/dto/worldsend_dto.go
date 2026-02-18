@@ -15,8 +15,8 @@ type WorldsendRecordDTO struct {
 	ID        string     `json:"id"`         // 楽曲の DisplayID
 	Title     string     `json:"title"`      // 楽曲タイトル
 	Artist    string     `json:"artist"`     // アーティスト名
-	WeStar    *int       `json:"we_star"`    // WORLD'S END 星の数（1～5）
-	WeKanji   *string    `json:"we_kanji"`   // WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.）
+	LevelStar *int       `json:"level_star"` // WORLD'S END レベル（1～5）
+	Attribute *string    `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
 	Notes     *int       `json:"notes"`      // ノーツ数
 	Score     uint32     `json:"score"`      // スコア
 	Img       string     `json:"img"`        // ジャケット画像URL
@@ -50,8 +50,8 @@ func ToWorldsendRecordDTO(record *entity.PlayerWorldsendRecord) *WorldsendRecord
 
 	// WORLD'S END 譜面情報を設定
 	if record.WorldsendChart != nil {
-		dto.WeStar = record.WorldsendChart.WeStar
-		dto.WeKanji = record.WorldsendChart.WeKanji
+		dto.LevelStar = record.WorldsendChart.LevelStar
+		dto.Attribute = record.WorldsendChart.Attribute
 		dto.Notes = ToNotesIntPtr(record.WorldsendChart.Notes)
 	}
 

@@ -17,8 +17,8 @@ type OfficialSongWithGenreDTO struct {
 	LevExp     *string   `db:"lev_exp"`
 	LevMas     *string   `db:"lev_mas"`
 	LevUlt     *string   `db:"lev_ult"`
-	WeKanji    *string   `db:"we_kanji"`
-	WeStar     *string   `db:"we_star"`
+	Attribute  *string   `db:"attribute"`
+	LevelStar  *string   `db:"level_star"`
 	Image      string    `db:"image"`
 	CreatedAt  time.Time `db:"created_at"`
 	UpdatedAt  time.Time `db:"updated_at"`

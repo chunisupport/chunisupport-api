@@ -141,8 +141,8 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `id`: 譜面のユニークID。
     - `song_id`: `songs`テーブルへの外部キー（`ON DELETE CASCADE`設定、ユニーク制約）。
-    - `we_star`: 星の数（1～5、NULL可）。
-    - `we_kanji`: カテゴリ漢字（光、蔵、改、狂など、CHAR(1)）。
+    - `level_star`: WORLD'S END レベル（1～5、NULL可）。
+    - `attribute`: WORLD'S END 属性（光、蔵、改、狂など、CHAR(1)）。
     - `notes`: ノーツ数（NULL可）。
 
 ### マスタテーブル

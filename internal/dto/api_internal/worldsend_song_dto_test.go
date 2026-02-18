@@ -16,8 +16,8 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	bpm := 180
 	jacket := "jacket.png"
 	releasedAt := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
-	weStar := 5
-	weKanji := "狂"
+	levelStar := 5
+	attribute := "狂"
 	notesObj, _ := notes.NewNotes(1500)
 
 	song := &entity.Song{
@@ -32,9 +32,9 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	}
 
 	chart := &entity.WorldsendChart{
-		WeStar:  &weStar,
-		WeKanji: &weKanji,
-		Notes:   &notesObj,
+		LevelStar: &levelStar,
+		Attribute: &attribute,
+		Notes:     &notesObj,
 	}
 
 	genreNamesByID := map[int]string{
@@ -107,12 +107,12 @@ func TestToWorldsendSongDTO(t *testing.T) {
 		t.Fatal("WORLDSEND chart is nil")
 	}
 
-	if weChart.WeStar == nil || *weChart.WeStar != 5 {
-		t.Errorf("WeStar = %v, want %v", weChart.WeStar, 5)
+	if weChart.LevelStar == nil || *weChart.LevelStar != 5 {
+		t.Errorf("LevelStar = %v, want %v", weChart.LevelStar, 5)
 	}
 
-	if weChart.WeKanji == nil || *weChart.WeKanji != "狂" {
-		t.Errorf("WeKanji = %v, want %v", weChart.WeKanji, "狂")
+	if weChart.Attribute == nil || *weChart.Attribute != "狂" {
+		t.Errorf("Attribute = %v, want %v", weChart.Attribute, "狂")
 	}
 
 	if weChart.Notes == nil || *weChart.Notes != 1500 {
@@ -145,14 +145,14 @@ func TestToWorldsendSongDTO_NilSong(t *testing.T) {
 
 // TestToWorldsendChartDTO は ToWorldsendChartDTO 関数の基本的な変換をテストします。
 func TestToWorldsendChartDTO(t *testing.T) {
-	weStar := 3
-	weKanji := "光"
+	levelStar := 3
+	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
 
 	chart := &entity.WorldsendChart{
-		WeStar:  &weStar,
-		WeKanji: &weKanji,
-		Notes:   &notesObj,
+		LevelStar: &levelStar,
+		Attribute: &attribute,
+		Notes:     &notesObj,
 	}
 
 	dto := ToWorldsendChartDTO(chart)
@@ -161,12 +161,12 @@ func TestToWorldsendChartDTO(t *testing.T) {
 		t.Fatal("ToWorldsendChartDTO returned nil")
 	}
 
-	if dto.WeStar == nil || *dto.WeStar != 3 {
-		t.Errorf("WeStar = %v, want %v", dto.WeStar, 3)
+	if dto.LevelStar == nil || *dto.LevelStar != 3 {
+		t.Errorf("LevelStar = %v, want %v", dto.LevelStar, 3)
 	}
 
-	if dto.WeKanji == nil || *dto.WeKanji != "光" {
-		t.Errorf("WeKanji = %v, want %v", dto.WeKanji, "光")
+	if dto.Attribute == nil || *dto.Attribute != "光" {
+		t.Errorf("Attribute = %v, want %v", dto.Attribute, "光")
 	}
 
 	if dto.Notes == nil || *dto.Notes != 2000 {
@@ -189,8 +189,8 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 	jacket := "jacket123"
 	bpm := 180
 	genre := "POPS & ANIME"
-	weStar := 5
-	weKanji := "狂"
+	levelStar := 5
+	attribute := "狂"
 	notesVal := 1500
 
 	songDTO := &WorldsendSongDTO{
@@ -205,9 +205,9 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 		MaxOP:       nil,
 		Charts: map[string]*WorldsendChartDTO{
 			"WORLDSEND": {
-				WeKanji: &weKanji,
-				WeStar:  &weStar,
-				Notes:   &notesVal,
+				Attribute: &attribute,
+				LevelStar: &levelStar,
+				Notes:     &notesVal,
 			},
 		},
 	}
@@ -245,13 +245,13 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 		t.Errorf("JSON should contain 'WORLDSEND' key, got: %s", jsonString)
 	}
 
-	// we_kanji, we_star, notes が charts 内に含まれること
-	if !strings.Contains(jsonString, `"we_kanji":"狂"`) {
-		t.Errorf("JSON should contain we_kanji, got: %s", jsonString)
+	// attribute, level_star, notes が charts 内に含まれること
+	if !strings.Contains(jsonString, `"attribute":"狂"`) {
+		t.Errorf("JSON should contain attribute, got: %s", jsonString)
 	}
 
-	if !strings.Contains(jsonString, `"we_star":5`) {
-		t.Errorf("JSON should contain we_star, got: %s", jsonString)
+	if !strings.Contains(jsonString, `"level_star":5`) {
+		t.Errorf("JSON should contain level_star, got: %s", jsonString)
 	}
 
 	if !strings.Contains(jsonString, `"notes":1500`) {

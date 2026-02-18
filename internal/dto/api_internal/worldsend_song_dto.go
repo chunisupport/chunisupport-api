@@ -7,9 +7,9 @@ import (
 
 // WorldsendChartDTO は WORLD'S END 譜面情報を外部に公開するためのDTOです。
 type WorldsendChartDTO struct {
-	WeKanji *string `json:"we_kanji"` // WORLD'S END カテゴリ漢字（光、蔵、改、狂、etc.）
-	WeStar  *int    `json:"we_star"`  // WORLD'S END 星の数（1～5）
-	Notes   *int    `json:"notes"`    // ノーツ数
+	Attribute *string `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
+	LevelStar *int    `json:"level_star"` // WORLD'S END レベル（1～5）
+	Notes     *int    `json:"notes"`      // ノーツ数
 }
 
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
@@ -39,9 +39,9 @@ func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 	}
 
 	return &WorldsendChartDTO{
-		WeKanji: chart.WeKanji,
-		WeStar:  chart.WeStar,
-		Notes:   dto.ToNotesIntPtr(chart.Notes),
+		Attribute: chart.Attribute,
+		LevelStar: chart.LevelStar,
+		Notes:     dto.ToNotesIntPtr(chart.Notes),
 	}
 }
 
