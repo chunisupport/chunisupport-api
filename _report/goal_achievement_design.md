@@ -85,38 +85,6 @@ CREATE TABLE goals (
 }
 ```
 
-## テーブルスキーマのセルフレビュー結果（既存テーブルとの差分）
-
-`migration/schema_mysql.sql` を基準に、既存テーブル定義との整合性を確認した。
-
-### 確認した観点
-
-- ID系カラムの型（`users.id` と参照側 `user_id` の型一致）
-- 既存テーブルでの時刻カラム定義（`TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP`）
-- 外部キー運用（`ON DELETE CASCADE` の方針）
-
-### 修正した差分
-
-- `id`
-  - 変更前: `BIGINT UNSIGNED`
-  - 変更後: `INT UNSIGNED`
-  - 理由: 既存の主テーブル（例: `users.id`）に合わせ、型の統一性を優先する。
-- `user_id`
-  - 変更前: `VARCHAR(255)`
-  - 変更後: `INT UNSIGNED`
-  - 理由: 既存の `users.id` が `INT UNSIGNED` のため型を一致させる。
-- `created_at` / `updated_at`
-  - 変更前: `TIMESTAMP NOT NULL ...`
-  - 変更後: `TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ...`
-  - 理由: 既存テーブル群の定義に合わせ、運用上の一貫性を優先する。
-- 外部キー
-  - 追加: `fk_goals_user_id` (`user_id` -> `users.id` `ON DELETE CASCADE`)
-  - 理由: 他のユーザー配下テーブル（`sessions`, `api_tokens` など）と同様の削除整合性を担保する。
-
-### 結論
-
-上記修正により、提案している `goals` テーブルは既存スキーマの方針と主要な不整合がない状態になった。
-
 ## スキーマ定義例（JSON Schema）
 
 ### `attributes` のスキーマ
