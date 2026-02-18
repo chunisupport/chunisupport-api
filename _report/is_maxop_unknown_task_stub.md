@@ -2,7 +2,8 @@
 
 ## 背景
 - 現在の `maxop` は楽曲内の最大譜面定数 (`MAX(charts.const)`) から算出している。
-- 楽曲内で最も定数が高い譜面が `is_const_unknown = true` の場合、真の最大定数を特定できないため、`maxop` の確度を示す情報が必要。
+- MASTER/ULTIMA は定数未判明時に暫定値（例: 14.5）で保持されるため、片方だけ先に判明すると、もう片方の未判明譜面が真の最大定数候補であっても見落とす可能性がある。
+- そのため、最大定数候補となる難易度（MASTER/ULTIMA）に未判明譜面が残っている間は、`maxop` の確度を示す情報が必要。
 - `FindAllExcludingWorldsend` / `FindByDisplayIDs` では既に譜面を一括取得しており、過去はアプリケーション側で集約していた。
 - その後、集約処理をDB（相関サブクエリ）へ移譲したが、楽曲件数に比例してサブクエリ評価コストが増えるため、再びアプリケーション側での集約へ戻す方針を検討する。
 
@@ -11,7 +12,9 @@
 
 ## 仕様（合意案）
 - 判定ルール:
-  - その楽曲に紐づく譜面のうち、MASTERまたはULTIMAの譜面の中に、`is_const_unknown = true` のものが1件でも含まれる場合に `is_maxop_unknown = true`。
+  - その楽曲に紐づく譜面のうち、MASTERまたはULTIMAの譜面に `is_const_unknown = true` が1件でも含まれる場合、`is_maxop_unknown = true`。
+  - この判定は「現時点で `const` が最大に見える譜面」のみではなく、**最大定数候補（MASTER/ULTIMA）全体**を対象とする。
+  - EXPERT以下のunknownは `is_maxop_unknown` 判定対象に含めない（最高定数候補はMASTER/ULTIMAに限定する運用前提）。
   - それ以外は `false`。
 - WORLD'S END楽曲はOVER POWERの概念がないため、`is_maxop_unknown` は常に `false` として扱う（必要に応じてAPIドキュメントにも明記する）。
 - `maxop` 自体は既存どおり `number` で返し、互換性を維持する。
@@ -51,8 +54,9 @@
 - [ ] Red: Domain Serviceテストを追加
   - [ ] 取得済み譜面から `max_chart_const` を正しく集約できることを検証
   - [ ] unknown譜面なしで `is_maxop_unknown=false`
-  - [ ] 最大定数譜面がunknownで `is_maxop_unknown=true`
-  - [ ] 下位難易度のみunknownでも最大定数譜面がknownなら `is_maxop_unknown=false`
+  - [ ] MASTER known / ULTIMA unknown（暫定値が低く見えるケース）でも `is_maxop_unknown=true`（例: MASTER 14.6 known, ULTIMA 14.5 unknown）
+  - [ ] MASTER unknown / ULTIMA known でも `is_maxop_unknown=true`
+  - [ ] EXPERT以下のみunknown、かつMASTER/ULTIMAがknownなら `is_maxop_unknown=false`
   - [ ] 同一constのtie-break条件を満たすことを検証
   - [ ] 譜面なし楽曲の境界ケースを仕様に沿って確認
 - [ ] Red: DTOテストを追加
