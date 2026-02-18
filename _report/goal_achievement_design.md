@@ -19,16 +19,17 @@ CHUNITHM向け目標機能の永続化設計を、実装初期段階で過剰に
 
 ```sql
 CREATE TABLE goals (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id VARCHAR(255) NOT NULL,
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
   achievement_type VARCHAR(64) NOT NULL,
   achievement_params JSON NOT NULL,
   attributes JSON NOT NULL,
   invert BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  INDEX idx_goals_user_id (user_id)
+  KEY idx_goals_user_id (user_id),
+  CONSTRAINT fk_goals_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 ```
 
@@ -83,6 +84,38 @@ CREATE TABLE goals (
   "count": 100
 }
 ```
+
+## テーブルスキーマのセルフレビュー結果（既存テーブルとの差分）
+
+`migration/schema_mysql.sql` を基準に、既存テーブル定義との整合性を確認した。
+
+### 確認した観点
+
+- ID系カラムの型（`users.id` と参照側 `user_id` の型一致）
+- 既存テーブルでの時刻カラム定義（`TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP`）
+- 外部キー運用（`ON DELETE CASCADE` の方針）
+
+### 修正した差分
+
+- `id`
+  - 変更前: `BIGINT UNSIGNED`
+  - 変更後: `INT UNSIGNED`
+  - 理由: 既存の主テーブル（例: `users.id`）に合わせ、型の統一性を優先する。
+- `user_id`
+  - 変更前: `VARCHAR(255)`
+  - 変更後: `INT UNSIGNED`
+  - 理由: 既存の `users.id` が `INT UNSIGNED` のため型を一致させる。
+- `created_at` / `updated_at`
+  - 変更前: `TIMESTAMP NOT NULL ...`
+  - 変更後: `TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ...`
+  - 理由: 既存テーブル群の定義に合わせ、運用上の一貫性を優先する。
+- 外部キー
+  - 追加: `fk_goals_user_id` (`user_id` -> `users.id` `ON DELETE CASCADE`)
+  - 理由: 他のユーザー配下テーブル（`sessions`, `api_tokens` など）と同様の削除整合性を担保する。
+
+### 結論
+
+上記修正により、提案している `goals` テーブルは既存スキーマの方針と主要な不整合がない状態になった。
 
 ## スキーマ定義例（JSON Schema）
 
@@ -179,8 +212,8 @@ package goal
 import "encoding/json"
 
 type Goal struct {
-	ID                uint64
-	UserID            string
+	ID                int
+	UserID            int
 	AchievementType   AchievementType
 	AchievementParams json.RawMessage
 	Attributes        json.RawMessage
