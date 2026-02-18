@@ -33,7 +33,7 @@
   - `songs` 取得SQLから `max_chart_const` / `is_maxop_unknown` 用の相関サブクエリを除去し、楽曲基本情報の取得に責務を限定する。
   - 既存どおり `charts` を楽曲単位で一括取得し、取得後にドメインサービスへ譜面情報を渡して集約結果を取得する。
   - リポジトリは「永続化データの再構築」に責務を限定し、判定ロジックやtie-breakの詳細は保持しない。
-  - サービスの返却値を使って `toSongEntity` で `Song.MaxChartConst` / `Song.IsMaxOPUnknown` を設定する。
+  - `toSongEntity` は `songRow` から `Song` への変換専用に保ち、集約結果の適用は `FindAllExcludingWorldsend` / `FindByDisplayIDs` / `FindByDisplayID` 各メソッド内で行う。
   - `FindAllExcludingWorldsend` / `FindByDisplayIDs` / `FindByDisplayID` のすべてで同一ドメインサービスを利用し、経路差による仕様ズレを防ぐ。
 
 ### 3. DTO
