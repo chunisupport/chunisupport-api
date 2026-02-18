@@ -46,7 +46,7 @@ func (c *ChartConstant) Scan(value any) error {
 		// DECIMAL型は[]byteで返されることがあります。
 		f, err := strconv.ParseFloat(string(v), 64)
 		if err != nil {
-			return fmt.Errorf("[]byteからfloat64への変換に失敗しました: %w", err)
+			return fmt.Errorf("failed to convert []byte to float64: %w", err)
 		}
 		*c = ChartConstant(f)
 		return nil
@@ -55,7 +55,7 @@ func (c *ChartConstant) Scan(value any) error {
 		*c = ChartConstant(v)
 		return nil
 	default:
-		return fmt.Errorf("サポートされていない型(%T)です", v)
+		return fmt.Errorf("unsupported type: %T", v)
 	}
 }
 
