@@ -20,14 +20,17 @@
 ### 1. Domain
 - `internal/domain/entity/song.go`
   - `Song` に `IsMaxOPUnknown bool` を追加する。
+- `internal/domain/service/song_aggregation_service.go`（新規）
+  - `Song` と譜面リストを受け取り、`max_chart_const` と `is_maxop_unknown` を計算するドメインサービスを追加する。
+  - 判定ルール（MASTER/ULTIMAのunknown判定、最大定数算出）を単一点に集約し、リポジトリから分離する。
 
 ### 2. Infra (Repository)
 - `internal/infra/repository/song_repository_impl.go`
   - `songs` 取得SQLから `max_chart_const` / `is_maxop_unknown` 用の相関サブクエリを除去し、楽曲基本情報の取得に責務を限定する。
-  - 既存どおり `charts` を楽曲単位で一括取得し、リポジトリ実装内で `songID` ごとに `max_chart_const` と `is_maxop_unknown` を同時に集約する。
-  - 同一constが複数ある場合のtie-break（difficulty_id優先など）をリポジトリ側ロジックで明示し、DB方言差異に依存しない挙動に統一する。
-  - 集約結果マップを使って `toSongEntity` で `Song.MaxChartConst` / `Song.IsMaxOPUnknown` を設定する。
-  - `FindByDisplayID` は単曲取得のため、既存の譜面読み出し結果を使って同じ集約関数を再利用する。
+  - 既存どおり `charts` を楽曲単位で一括取得し、取得後にドメインサービスへ譜面情報を渡して集約結果を取得する。
+  - リポジトリは「永続化データの再構築」に責務を限定し、判定ロジックやtie-breakの詳細は保持しない。
+  - サービスの返却値を使って `toSongEntity` で `Song.MaxChartConst` / `Song.IsMaxOPUnknown` を設定する。
+  - `FindAllExcludingWorldsend` / `FindByDisplayIDs` / `FindByDisplayID` のすべてで同一ドメインサービスを利用し、経路差による仕様ズレを防ぐ。
 
 ### 3. DTO
 - `internal/dto/api_v1/song_dto.go`
@@ -42,6 +45,8 @@
 ## 実装タスク（TDD）
 - [ ] Red: Repositoryテストを追加
   - [ ] `songs` 取得SQLに相関サブクエリ（`SELECT MAX(...)` / `EXISTS(...)`）を含めないことを検証
+  - [ ] リポジトリがドメインサービスを利用して `Song.MaxChartConst` / `Song.IsMaxOPUnknown` を設定することを検証
+- [ ] Red: Domain Serviceテストを追加
   - [ ] 取得済み譜面から `max_chart_const` を正しく集約できることを検証
   - [ ] unknown譜面なしで `is_maxop_unknown=false`
   - [ ] 最大定数譜面がunknownで `is_maxop_unknown=true`
@@ -52,7 +57,7 @@
   - [ ] v1/internalの `SongDTO` に `is_maxop_unknown` が反映されること
   - [ ] JSONシリアライズに `is_maxop_unknown` が出力されること
 - [ ] Green: Domain/Repository/DTO実装
-- [ ] Refactor: 譜面集約ロジックを関数化し、`FindAllExcludingWorldsend` / `FindByDisplayIDs` / `FindByDisplayID` で共有
+- [ ] Refactor: リポジトリ内の譜面集約ロジックを除去し、ドメインサービス呼び出しへ統一
 - [ ] ドキュメント更新 (`docs/API.md`)
 
 ## 受け入れ条件
@@ -63,5 +68,5 @@
 
 ## リスク・注意点
 - アプリケーション側集約で、譜面数が多いケースのループコストとメモリ使用量を計測する。
-- SQL集約条件のDB差異は減る一方、集約ロジックの重複実装による仕様ズレに注意する。
+- SQL集約条件のDB差異は減る一方、ドメインサービスの利用漏れ（取得経路追加時の呼び忘れ）に注意する。
 - `is_const_unknown` は譜面単位、`is_maxop_unknown` は「最大定数譜面に対する確度」なので責務が異なる点をドキュメントで明記する。
