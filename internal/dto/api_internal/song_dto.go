@@ -62,16 +62,17 @@ func (o OrderedChartsMap) MarshalJSON() ([]byte, error) {
 
 // SongDTO は楽曲情報を外部に公開するためのDTOです。
 type SongDTO struct {
-	DisplayID   string           `json:"id"`
-	Title       string           `json:"title"`
-	Artist      string           `json:"artist"`
-	Genre       *string          `json:"genre"`
-	BPM         *int             `json:"bpm"`
-	Release     *string          `json:"release"`
-	Jacket      *string          `json:"jacket"`
-	OfficialIdx string           `json:"official_idx"`
-	MaxOP       float64          `json:"maxop"`
-	Charts      OrderedChartsMap `json:"charts"`
+	DisplayID      string           `json:"id"`
+	Title          string           `json:"title"`
+	Artist         string           `json:"artist"`
+	Genre          *string          `json:"genre"`
+	BPM            *int             `json:"bpm"`
+	Release        *string          `json:"release"`
+	Jacket         *string          `json:"jacket"`
+	OfficialIdx    string           `json:"official_idx"`
+	MaxOP          float64          `json:"maxop"`
+	IsMaxOPUnknown bool             `json:"is_maxop_unknown"`
+	Charts         OrderedChartsMap `json:"charts"`
 }
 
 // SongsResponse は楽曲一覧のレスポンスを表します。
@@ -140,15 +141,16 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 	}
 
 	return &SongDTO{
-		DisplayID:   song.DisplayID,
-		Title:       song.Title,
-		Artist:      song.Artist,
-		Genre:       genrePtr,
-		BPM:         song.BPM,
-		Release:     releaseDateStr,
-		Jacket:      song.Jacket,
-		OfficialIdx: song.OfficialIdx,
-		MaxOP:       maxOP,
-		Charts:      make(OrderedChartsMap),
+		DisplayID:      song.DisplayID,
+		Title:          song.Title,
+		Artist:         song.Artist,
+		Genre:          genrePtr,
+		BPM:            song.BPM,
+		Release:        releaseDateStr,
+		Jacket:         song.Jacket,
+		OfficialIdx:    song.OfficialIdx,
+		MaxOP:          maxOP,
+		IsMaxOPUnknown: song.IsMaxOPUnknown,
+		Charts:         make(OrderedChartsMap),
 	}
 }

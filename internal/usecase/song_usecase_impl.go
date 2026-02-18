@@ -121,7 +121,7 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。
-// MaxChartConst はリポジトリ層でSQL MAX集約により設定済みです。
+// MaxChartConst はドメインサービスにより譜面集約で設定済みです。
 func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	if song == nil {
 		return 0

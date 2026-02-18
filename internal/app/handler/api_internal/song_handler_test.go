@@ -57,12 +57,13 @@ func TestConvertToSongDTO(t *testing.T) {
 	imgURL := "https://example.com/jacket.jpg"
 
 	song := &entity.Song{
-		DisplayID: "test123456789012",
-		Title:     "テスト楽曲",
-		Artist:    "テストアーティスト",
-		GenreID:   &genreID,
-		BPM:       &bpm,
-		Jacket:    &imgURL,
+		DisplayID:      "test123456789012",
+		Title:          "テスト楽曲",
+		Artist:         "テストアーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 	}
 
 	notes1Value := 500
@@ -107,6 +108,11 @@ func TestConvertToSongDTO(t *testing.T) {
 
 	if dto.MaxOP != 90 {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
+	}
+
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
 
 	// Charts マップのキーが存在するか確認

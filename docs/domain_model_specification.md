@@ -195,6 +195,9 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | ReleaseDate | *time.Time | - | リリース日 |
 | OfficialIdx | *string | - | 公式インデックス |
 | Img | *string | - | ジャケット画像URL |
+| Charts | []*Chart | - | この楽曲に紐づく譜面リスト |
+| MaxChartConst | float64 | - | 全譜面のうち最大の譜面定数（ドメインサービスで算出） |
+| IsMaxOPUnknown | bool | ✓ | MASTER/ULTIMAに未判明定数が含まれる場合true（ドメインサービスで算出） |
 | IsWorldsend | bool | ✓ | WORLD'S END楽曲フラグ |
 | IsDeleted | bool | ✓ | 削除フラグ |
 
@@ -543,6 +546,28 @@ bcryptハッシュ化されたパスワードを表す値オブジェクト。
 CHUNITHMのレーティングおよびオーバーパワー計算ロジックを提供するドメインサービス。
 
 #### 提供関数
+
+##### AggregateSongCharts
+
+```go
+func AggregateSongCharts(charts []*entity.Chart) SongAggregation
+```
+
+- **概要**: 譜面リストから楽曲の最大譜面定数とMAXOP確度を計算する
+- **引数**:
+  - `charts`: 楽曲に紐づく譜面リスト
+- **返り値**: `SongAggregation`（`MaxChartConst float64`, `IsMaxOPUnknown bool`）
+- **判定ルール**:
+  - `MaxChartConst`: 全譜面のうち最大の定数値
+  - `IsMaxOPUnknown`: MASTER(ID=4)またはULTIMA(ID=5)の譜面に`is_const_unknown=true`が1件でも含まれればtrue。EXPERT以下のunknownは対象外
+
+##### ApplyAggregation
+
+```go
+func ApplyAggregation(song *entity.Song)
+```
+
+- **概要**: 楽曲エンティティの譜面リストから集約結果を計算し、`MaxChartConst`と`IsMaxOPUnknown`をエンティティに適用する
 
 ##### CalcSingleRating
 

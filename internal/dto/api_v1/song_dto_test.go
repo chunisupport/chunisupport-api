@@ -21,13 +21,14 @@ func TestToV1SongDTO(t *testing.T) {
 	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
 
 	song := &entity.Song{
-		DisplayID:  "test123456789012",
-		Title:      "テスト楽曲",
-		Artist:     "テストアーティスト",
-		GenreID:    &genreID,
-		BPM:        &bpm,
-		ReleasedAt: &releaseDate,
-		Jacket:     &imgURL,
+		DisplayID:      "test123456789012",
+		Title:          "テスト楽曲",
+		Artist:         "テストアーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		ReleasedAt:     &releaseDate,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -86,6 +87,11 @@ func TestToV1SongDTO(t *testing.T) {
 
 	if dto.MaxOP != 90 {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90.0)
+	}
+
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
 
 	// Charts は空の map として初期化される
@@ -175,6 +181,11 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 
 	if !containsString(jsonString, `"maxop":85`) {
 		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
+	}
+
+	// is_maxop_unknown がJSONに含まれることを確認
+	if !containsString(jsonString, `"is_maxop_unknown":`) {
+		t.Errorf("JSON should contain is_maxop_unknown field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）

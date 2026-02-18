@@ -163,7 +163,7 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から、理論値(AJC)を取った際のOPを返します。
-// maxChartConst はリポジトリ層でSQL MAX集約により算出された値を受け取ります。
+// maxChartConst はドメインサービスの AggregateSongCharts で算出された値を受け取ります。
 func CalcSongMaxOP(maxChartConst float64) float64 {
 	if maxChartConst <= 0 {
 		return 0

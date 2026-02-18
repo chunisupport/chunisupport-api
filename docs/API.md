@@ -894,6 +894,7 @@ curl -X POST \
       "jacket": "img_filename",
       "official_idx": "123",
       "maxop": 82.5,
+      "is_maxop_unknown": false,
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -930,6 +931,7 @@ curl -X POST \
 | `jacket` | string \| null | ジャケット画像ファイル名（未設定の場合null） |
 | `official_idx` | string | 公式インデックス |
 | `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
+| `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -962,6 +964,7 @@ curl -X POST \
   "jacket": "img_filename",
   "official_idx": "123",
   "maxop": 82.5,
+  "is_maxop_unknown": false,
   "charts": {
     "BASIC": {
       "const": 3.0,
@@ -1383,6 +1386,7 @@ curl -X POST \
       "jacket": "jacket_001.png",
       "official_idx": "123",
       "maxop": 86.25,
+      "is_maxop_unknown": false,
       "charts": {
         "MASTER": {
           "const": 14.5,
@@ -1412,6 +1416,7 @@ curl -X POST \
 | `songs[].jacket` | string\|null | ジャケット画像ファイル名 |
 | `songs[].official_idx` | string | 公式インデックス |
 | `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
+| `songs[].is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |
@@ -1535,6 +1540,7 @@ curl -X POST \
   "jacket": "https://example.com/jacket.png",
   "official_idx": "123",
   "maxop": 86.25,
+  "is_maxop_unknown": false,
   "charts": {
     "MASTER": {
       "const": 14.5,

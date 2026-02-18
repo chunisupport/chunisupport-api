@@ -10,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/jmoiron/sqlx"
@@ -27,18 +28,17 @@ func NewSongRepository(db *sqlx.DB) repository.SongRepository {
 
 // songRow はDBから取得する楽曲データの行を表します。
 type songRow struct {
-	ID            int        `db:"id"`
-	DisplayID     string     `db:"display_id"`
-	Title         string     `db:"title"`
-	Artist        string     `db:"artist"`
-	GenreID       *int       `db:"genre_id"`
-	BPM           *int       `db:"bpm"`
-	ReleasedAt    *time.Time `db:"released_at"`
-	OfficialIdx   string     `db:"official_idx"`
-	Jacket        *string    `db:"jacket"`
-	IsWorldsend   bool       `db:"is_worldsend"`
-	IsDeleted     bool       `db:"is_deleted"`
-	MaxChartConst *float64   `db:"max_chart_const"`
+	ID          int        `db:"id"`
+	DisplayID   string     `db:"display_id"`
+	Title       string     `db:"title"`
+	Artist      string     `db:"artist"`
+	GenreID     *int       `db:"genre_id"`
+	BPM         *int       `db:"bpm"`
+	ReleasedAt  *time.Time `db:"released_at"`
+	OfficialIdx string     `db:"official_idx"`
+	Jacket      *string    `db:"jacket"`
+	IsWorldsend bool       `db:"is_worldsend"`
+	IsDeleted   bool       `db:"is_deleted"`
 }
 
 // chartRow はDBから取得する譜面データの行を表します。
@@ -57,8 +57,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted,
-		       (SELECT MAX(c.const) FROM charts c WHERE c.song_id = songs.id) AS max_chart_const
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -119,29 +118,28 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		results[idx].Charts = append(results[idx].Charts, chart)
 	}
 
+	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	for _, song := range results {
+		service.ApplyAggregation(song)
+	}
+
 	return results, nil
 }
 
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
-	var maxChartConst float64
-	if row.MaxChartConst != nil {
-		maxChartConst = *row.MaxChartConst
-	}
-
 	return &entity.Song{
-		ID:            row.ID,
-		DisplayID:     row.DisplayID,
-		Title:         row.Title,
-		Artist:        row.Artist,
-		GenreID:       row.GenreID,
-		BPM:           row.BPM,
-		ReleasedAt:    row.ReleasedAt,
-		OfficialIdx:   row.OfficialIdx,
-		Jacket:        row.Jacket,
-		Charts:        []*entity.Chart{},
-		MaxChartConst: maxChartConst,
-		IsWorldsend:   row.IsWorldsend,
-		IsDeleted:     row.IsDeleted,
+		ID:          row.ID,
+		DisplayID:   row.DisplayID,
+		Title:       row.Title,
+		Artist:      row.Artist,
+		GenreID:     row.GenreID,
+		BPM:         row.BPM,
+		ReleasedAt:  row.ReleasedAt,
+		OfficialIdx: row.OfficialIdx,
+		Jacket:      row.Jacket,
+		Charts:      []*entity.Chart{},
+		IsWorldsend: row.IsWorldsend,
+		IsDeleted:   row.IsDeleted,
 	}
 }
 
@@ -174,8 +172,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted,
-		       (SELECT MAX(c.const) FROM charts c WHERE c.song_id = songs.id) AS max_chart_const
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
 		WHERE display_id IN (?)
 	`, displayIDs)
@@ -236,6 +233,11 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
+	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	for _, song := range songs {
+		service.ApplyAggregation(song)
+	}
+
 	return songs, nil
 }
 
@@ -244,8 +246,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted,
-		       (SELECT MAX(c.const) FROM charts c WHERE c.song_id = songs.id) AS max_chart_const
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
 		WHERE display_id = ?
 	`
@@ -277,6 +278,9 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	}
 
 	song.Charts = charts
+
+	// 3. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	service.ApplyAggregation(song)
 
 	return song, nil
 }
