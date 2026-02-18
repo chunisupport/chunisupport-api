@@ -85,11 +85,6 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 		t.Errorf("OfficialIdx = %v, want %v", dto.OfficialIdx, "456")
 	}
 
-	// MaxOP は WORLD'S END では常に null
-	if dto.MaxOP != nil {
-		t.Errorf("MaxOP = %v, want nil", *dto.MaxOP)
-	}
-
 	// Charts に WORLDSEND キーが存在すること
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
@@ -144,7 +139,6 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 		Release:     &releaseDate,
 		Jacket:      &jacket,
 		OfficialIdx: "789",
-		MaxOP:       nil,
 		Charts: map[string]*V1WorldsendChartDTO{
 			"WORLDSEND": {
 				Attribute: &attribute,
@@ -160,11 +154,6 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	}
 
 	jsonString := string(jsonBytes)
-
-	// maxop が null であることを確認
-	if !containsString(jsonString, `"maxop":null`) {
-		t.Errorf("JSON should contain \"maxop\":null, got: %s", jsonString)
-	}
 
 	// release フィールド名であることを確認
 	if !containsString(jsonString, `"release":"2024-06-01"`) {

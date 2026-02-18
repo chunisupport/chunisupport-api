@@ -88,11 +88,6 @@ func TestToWorldsendSongDTO(t *testing.T) {
 		t.Errorf("OfficialIdx = %v, want %v", dto.OfficialIdx, "123")
 	}
 
-	// MaxOP は WORLD'S END では常に null
-	if dto.MaxOP != nil {
-		t.Errorf("MaxOP = %v, want nil", *dto.MaxOP)
-	}
-
 	// Charts に WORLDSEND キーが存在すること
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
@@ -183,7 +178,7 @@ func TestToWorldsendChartDTO_NilChart(t *testing.T) {
 }
 
 // TestWorldsendSongDTO_JSONMarshal は WorldsendSongDTO のJSONマーシャリングをテストします。
-// charts内に "WORLDSEND" キーが含まれること、maxop が null であることを確認します。
+// charts内に "WORLDSEND" キーが含まれることを確認します。
 func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 	releaseDate := "2024-01-15"
 	jacket := "jacket123"
@@ -202,7 +197,6 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 		Release:     &releaseDate,
 		Jacket:      &jacket,
 		OfficialIdx: "123",
-		MaxOP:       nil,
 		Charts: map[string]*WorldsendChartDTO{
 			"WORLDSEND": {
 				Attribute: &attribute,
@@ -218,11 +212,6 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 	}
 
 	jsonString := string(jsonBytes)
-
-	// maxop が null であることを確認
-	if !strings.Contains(jsonString, `"maxop":null`) {
-		t.Errorf("JSON should contain \"maxop\":null, got: %s", jsonString)
-	}
 
 	// release フィールド名であることを確認（released_at ではない）
 	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {

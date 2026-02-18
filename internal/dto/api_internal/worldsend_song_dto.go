@@ -13,7 +13,7 @@ type WorldsendChartDTO struct {
 }
 
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
-// 通常楽曲の SongDTO と同じ形状を持ちますが、charts は "WORLDSEND" キーのみです。
+// WORLD'S END はレーティング対象外のため、charts は "WORLDSEND" キーのみを持ち maxop フィールドは存在しません。
 type WorldsendSongDTO struct {
 	DisplayID   string                        `json:"id"`
 	Title       string                        `json:"title"`
@@ -23,7 +23,6 @@ type WorldsendSongDTO struct {
 	Release     *string                       `json:"release"`
 	Jacket      *string                       `json:"jacket"`
 	OfficialIdx string                        `json:"official_idx"`
-	MaxOP       *float64                      `json:"maxop"`
 	Charts      map[string]*WorldsendChartDTO `json:"charts"`
 }
 
@@ -47,7 +46,6 @@ func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 
 // ToWorldsendSongDTO は Song エンティティと WorldsendChart エンティティから WorldsendSongDTO へ変換します。
 // genreNamesByID を使用してジャンルIDを名称に変換します。
-// maxOP は WORLD'S END ではレーティング対象外のため常に null です。
 func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNamesByID map[int]string) *WorldsendSongDTO {
 	if song == nil {
 		return nil
@@ -78,7 +76,6 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 		Release:     releaseDateStr,
 		Jacket:      song.Jacket,
 		OfficialIdx: song.OfficialIdx,
-		MaxOP:       nil, // WORLD'S END はレーティング対象外
 		Charts:      charts,
 	}
 }

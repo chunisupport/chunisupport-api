@@ -1183,7 +1183,6 @@ curl -X POST \
       "release": "2024-01-15",
       "jacket": "img_filename",
       "official_idx": "123",
-      "maxop": null,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -1208,7 +1207,6 @@ curl -X POST \
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `official_idx` | string | 公式インデックス |
-| `maxop` | null | WORLD'S END はレーティング対象外のため常にnull |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -1240,7 +1238,6 @@ curl -X POST \
   "release": "2024-01-15",
   "jacket": "img_filename",
   "official_idx": "123",
-  "maxop": null,
   "charts": {
     "WORLDSEND": {
       "attribute": "狂",
@@ -1249,10 +1246,6 @@ curl -X POST \
     }
   }
 }
-```
-
-- **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
@@ -1444,7 +1437,6 @@ curl -X POST \
       "release": "2024-01-15",
       "jacket": "https://example.com/jacket.png",
       "official_idx": "123",
-      "maxop": null,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -1469,7 +1461,6 @@ curl -X POST \
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像URL |
 | `official_idx` | string | 公式インデックス |
-| `maxop` | null | WORLD'S END はレーティング対象外のため常にnull |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -1501,7 +1492,6 @@ curl -X POST \
   "release": "2024-01-15",
   "jacket": "https://example.com/jacket.png",
   "official_idx": "123",
-  "maxop": null,
   "charts": {
     "WORLDSEND": {
       "attribute": "狂",
