@@ -11,7 +11,7 @@
 
 ## 仕様（合意案）
 - 判定ルール:
-  - その楽曲に紐づく譜面のうち、「現在の最大定数として採用される譜面」が `is_const_unknown = true` の場合に `is_maxop_unknown = true`。
+  - その楽曲に紐づく譜面のうち、MASTERまたはULTIMAの譜面の中に、`is_const_unknown = true` のものが1件でも含まれる場合に `is_maxop_unknown = true`。
   - それ以外は `false`。
 - `maxop` 自体は既存どおり `number` で返し、互換性を維持する。
 - `is_const_unknown`（譜面単位）と `is_maxop_unknown`（楽曲集約値の確度）は役割を分離する。
