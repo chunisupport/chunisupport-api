@@ -13,6 +13,7 @@
 - 判定ルール:
   - その楽曲に紐づく譜面のうち、MASTERまたはULTIMAの譜面の中に、`is_const_unknown = true` のものが1件でも含まれる場合に `is_maxop_unknown = true`。
   - それ以外は `false`。
+- WORLD'S END楽曲はOVER POWERの概念がないため、`is_maxop_unknown` は常に `false` として扱う（必要に応じてAPIドキュメントにも明記する）。
 - `maxop` 自体は既存どおり `number` で返し、互換性を維持する。
 - `is_const_unknown`（譜面単位）と `is_maxop_unknown`（楽曲集約値の確度）は役割を分離する。
 
@@ -41,6 +42,7 @@
 ### 4. APIドキュメント
 - `docs/API.md`
   - `songs[].is_maxop_unknown` の説明とサンプルJSONを追加。
+  - WORLD'S END楽曲では `is_maxop_unknown=false` とする扱いを追記。
 
 ## 実装タスク（TDD）
 - [ ] Red: Repositoryテストを追加
