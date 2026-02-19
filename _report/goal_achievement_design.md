@@ -16,8 +16,8 @@ CHUNITHM向け目標機能の永続化設計を、実装初期段階で過剰に
 - 目標は「属性（attributes）」と「成果（achievement）」を持つ。
 - 属性評価は基本AND。
 - 比較は原則 `>=`。
-- `difficulty` は固定序数（整数 0〜4）で扱う。DBのJSONに文字列ではなく整数を保存するためである。序数とその対応は §6 の序列定義に従い、アプリケーション定数として管理する。
-- `genre` / `version` は文字列ではなくマスタIDの単値で保存する。DBのJSONサイズを削減するためであり、複数ジャンル・バージョンを対象にしたい場合は目標を分けて作成することで対応できるため、配列にする必要はない。**IDの数値は順序・序列を表さないため、大小比較・レンジ判定に使用してはならない。**
+- `diff` は固定序数（整数 0〜4）の単値で扱う。DBのJSONに文字列ではなく整数を保存するためである。序数とその対応は §6 の序列定義に従い、アプリケーション定数として管理する。
+- `genre` / `ver` は文字列ではなくマスタIDの単値で保存する。DBのJSONサイズを削減するためであり、複数ジャンル・バージョンを対象にしたい場合は目標を分けて作成することで対応できるため、配列にする必要はない。**IDの数値は順序・序列を表さないため、大小比較・レンジ判定に使用してはならない。**
 - `achievement_type` は厳密固定し、対応する `achievement_params` の構造も厳密固定する。
 - DBにはJSONで保存するが、アプリ内部（Usecase/Domain）では型安全な構造体に変換して扱う。
 - `invert` は表示用のフラグであり、サーバー側の評価ロジックには影響させない。
@@ -25,6 +25,8 @@ CHUNITHM向け目標機能の永続化設計を、実装初期段階で過剰に
 ---
 
 ## 2. テーブル設計（MySQL）
+
+マイグレーションは1ファイル、一括で行う。
 
 ### 2.1 `achievement_types` マスタテーブル
 
@@ -82,6 +84,7 @@ CREATE TABLE goals (
 
 #### カラム方針
 
+- `title`: 目標のタイトル。30文字以内の任意の文字列。ユーザーが自由に設定できる。
 - `achievement_type_id`: `achievement_types.id` を参照する外部キー。アプリ層では対応する `code` に変換して扱う
 - `achievement_params`: 成果種別ごとの可変パラメータ（JSON）
 - `attributes`: 対象譜面の絞り込み条件（JSON）
@@ -91,9 +94,10 @@ CREATE TABLE goals (
 
 ## 3. 100件上限の扱い
 
-- 上限は **Usecaseで件数チェック + トランザクション（A+）** で担保する。
+- 上限は **Usecaseで件数チェック + トランザクション** で担保する。
+- 作成トランザクション内の先頭で `SELECT COUNT(*) FROM goals WHERE user_id = ? FOR UPDATE` を実行し、ユーザー行にロックを取得してからチェックする。これにより、同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止できる。MySQLのデフォルト分離レベル（REPEATABLE READ）のままで対応可能。
 - 101件目作成時は4xx系エラーを返し、専用エラーコードを用意する。
-- DBだけで厳密制約化できる場合は将来的に追加検討するが、初期実装はA+で進める。
+- DBだけで厳密制約化できる場合は将来的に追加検討するが、初期実装はこの方針で進める。
 
 ---
 
@@ -232,7 +236,11 @@ CREATE TABLE goals (
 
 - `total`: `number`（小数点以下3桁まで）
   - 最小値: 0
-  - 最大値: 対象譜面のOverPower値（理論値）の合計。指定が「全曲」「ジャンル別」の場合（特定楽曲の特定譜面を指定し得ない場合）、その曲で一番譜面定数が高い譜面のOverPower値（song APIで取れるmaxop値）を採用して計算する。
+  - 最大値: 対象譜面のOverPower値（理論値）の合計。
+  - 各譜面のOP理論値の算出方針:
+    - `diff` が指定されている場合: その難易度の譜面のOP値を使う。
+    - `diff` が省略され `const` が指定されている場合: `const` の範囲にマッチした各譜面自身のOP値を使う（特定難易度に絞り込まれているため）。
+    - `diff` も `const` も省略されている場合: その曲で最も譜面定数が高い難易度のOP値（song APIで取れる `maxop` 値）を使う。
 
 #### 4.8 `overpower_percent`
 
@@ -245,7 +253,8 @@ CREATE TABLE goals (
 - `total`: `number`（小数点以下2桁まで）
   - 最小値: 0
   - 最大値: 100
-  - 計算方法: `overpower_value` の合計 ÷ 対象譜面のOverPower値（理論値）の合計 × 100。対象譜面のOverPower値の算出方法は `overpower_value` と同様で、「その譜面の理論値OP値」を使う場合もあれば、「その曲のうち譜面定数が一番高いものの理論値OP値」を使う場合もある。
+  - 計算方法: `overpower_value` の合計 ÷ 対象譜面のOverPower値（理論値）の合計 × 100。
+  - 各譜面のOP理論値の算出方針は `overpower_value`（§4.7）と同一。
 
 ---
 
@@ -253,6 +262,7 @@ CREATE TABLE goals (
 
 ### 5.1 基本
 
+- 値を指定しないフィールドは条件なし（全譜面対象）とみなす。nullにしないのはJSONサイズ削減のためである。
 - `attributes` は「全譜面対象」を許可するため、空オブジェクト `{}` を許可する。
 - 条件指定時は以下の各フィールドを任意で指定可能。
 
@@ -260,28 +270,30 @@ CREATE TABLE goals (
 
 ```json
 {
-  "difficulty": { "min": 3, "max": 4 },
+  "diff": 3,
   "const": { "min": 14.0, "max": 14.4 },
   "genre": 1,
-  "version": 20
+  "ver": 20
 }
 ```
 
-- `difficulty` の `3` は `MASTER`、`4` は `ULTIMA` に対応する（序数の詳細は §6 参照）。
-- `genre` / `version` はマスタの `id`（整数・単値）を格納する。
+- `diff` の `3` は `MASTER` に対応する（序数の詳細は §6 参照）。省略時は全難易度対象。
+- `const` は数値レンジで指定する。`min <= max` が必須。省略時は定数条件なし。
+- `genre` はマスタの `id`（整数・単値）を格納する。複数ジャンルを対象にしたい場合は目標を分けて作成する。省略時は全ジャンル対象。
+- `ver` はマスタの `id`（整数・単値）を格納する。複数バージョンを対象にしたい場合は目標を分けて作成する。省略時は全バージョン対象。
 
 ### 5.3 各項目
 
-- `difficulty`: 固定序数（整数）でレンジ判定、`min <= max` 必須。文字列ではなく整数を使用する理由は、DBのJSONサイズ削減と、DBのIDに依存しない序列保証のためである。序数はアプリケーション定数として固定管理する（§6 参照）。
-- `const`: 数値レンジ判定、`min <= max` 必須
-- `genre`: マスタの `id`（整数・単値）を格納する。文字列名ではなくIDを使用する理由はDBのJSONサイズ削減のためである。複数ジャンルを対象にしたい場合は目標を分けて作成する。**IDの数値は順序を表さないため、大小比較・レンジ判定に使用してはならない。**
-- `version`: マスタの `id`（整数・単値）を格納する。理由は `genre` と同様。**IDの数値は順序を表さないため、大小比較・レンジ判定に使用してはならない。**
+- `diff`: 固定序数（整数）の単値で指定する。文字列ではなく整数を使用する理由はDBのJSONサイズ削減のためである。序数はアプリケーション定数として固定管理する（§6 参照）。有効値は `0〜4`、範囲外は4xxで返す。省略時は全難易度対象。
+- `const`: 譜面定数（Chart Constant）のレンジ判定。`min <= max` 必須。いずれも `float64`（小数点以下1桁）で扱う。有効範囲は `1.0 ≤ min, max ≤ 15.9`。省略時は定数条件なし。
+- `genre`: マスタの `id`（整数・単値）を格納する。文字列名ではなくIDを使用する理由はDBのJSONサイズ削減のためである。複数ジャンルを対象にしたい場合は目標を分けて作成する。
+- `ver`: マスタの `id`（整数・単値）を格納する。理由は `genre` と同様。
 
 ### 5.4 マスタ整合
 
-- `genre` / `version` は起動時プリロード済みのマスタIDのみ許可する。存在しないIDは4xxで返す。
-- `genre` / `version` のIDは存在確認（一致判定）のみに使用する。IDの数値による順序比較・レンジ判定は行ってはならない。
-- `difficulty` の序数は 0〜4 の範囲のみ許可する。範囲外は4xxで返す。
+- `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可する。存在しないIDは4xxで返す。
+- `genre` / `ver` のIDは存在確認（一致判定）のみに使用する。IDの数値による順序比較・レンジ判定は行ってはならない。
+- `diff` は `0〜4` の範囲のみ許可する。範囲外は4xxで返す。
 
 ---
 
@@ -291,7 +303,7 @@ CREATE TABLE goals (
 
 ### 難易度序数
 
-`attributes.difficulty` の `min` / `max` に格納する整数値。DBのIDとは独立した固定定数であり、序列を保証するためにアプリケーション側で定義する。
+`attributes.diff` の値として格納する整数値。DBのIDとは独立した固定定数であり、アプリケーション側で定義する。
 
 | 序数 | 難易度 |
 |---|---|
@@ -327,10 +339,10 @@ CREATE TABLE goals (
 - Usecaseで業務ルールチェック。
   - `achievement_type` の有効性確認（起動時プリロード済みのキャッシュ `AchievementTypesByCode` で検索。存在しなければ4xx）
   - `achievement_type` と `params` の一致
-  - `min <= max`
-  - `genre` / `version` のマスタID存在確認（起動時プリロード済みのキャッシュで検索）
-  - `difficulty` 序数の範囲チェック（0〜4）
-  - 100件上限
+  - `const` の有効範囲チェック（`1.0 ≤ min, max ≤ 15.9`・小数点以下1桁に丸め・`min <= max`）
+  - `diff` の範囲チェック（0〜4）
+  - `genre` / `ver` のマスタID存在確認（起動時プリロード済みのキャッシュで検索）
+  - 100件上限（`SELECT COUNT(*) ... FOR UPDATE` でロックを取ってからチェック。§3 参照）
 - 不正入力は4xx系を返す（必要に応じて専用エラーコード追加）。
 - DBの `fk_goals_achievement_type_id` 制約が最終防衛として機能し、Usecase検証をすり抜けた場合でもDB整合性は保たれる。
 
@@ -374,13 +386,38 @@ type AchievementType struct {
     Code string
 }
 
-// マスタキャッシュに追加するフィールドのイメージ
+// GoalMasters は目標機能で必要になるマスタ集合です。
+// 命名は既存の PlayerDataMasters / SongMasters と同パターン。
+// internal/domain/masterdata/masterdata.go に追加する。
 type GoalMasters struct {
     AchievementTypes       []*AchievementType
     AchievementTypesByID   map[uint8]*AchievementType  // DB FK 解決用
     AchievementTypesByCode map[string]*AchievementType // バリデーション用
 }
 ```
+
+### ランプ略称の変換テーブル
+
+`hardlamp_count` / `combolamp_count` で使う略称（`HRD`/`BRV` 等）とマスタ名の変換テーブルは  
+`internal/info/info.go` に `var` として定義する（AGENTS.md「定数は `info.go` 内に切り出す」方針に従う）。
+
+```go
+// HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブル
+var HardLampAbbrevToName = map[string]string{
+    "HRD": "HARD",
+    "BRV": "BRAVE",
+    "ABS": "ABSOLUTE",
+    "CTS": "CATASTROPHY",
+}
+
+// ComboLampAbbrevToName はAPI略称→マスタ名（combo_lamp_types.name）への変換テーブル
+var ComboLampAbbrevToName = map[string]string{
+    "FC": "FULL COMBO",
+    "AJ": "ALL JUSTICE",
+}
+```
+
+Usecase でマスタIDを引く際にこのテーブルを経由する。`info` パッケージは `domain`/`infra` に依存しないため依存方向が守られる。
 
 ### プリロードのタイミング
 
@@ -392,10 +429,63 @@ type GoalMasters struct {
 - `GET /internal/master` のレスポンスに `achievement_types` フィールドを追加し、既存マスタと一括返却する。
 - レスポンスはキャッシュから直接返却するため、DBアクセスは発生しない。
 - 表示名・説明はフロントエンドで i18n 対応するため、API はコードのみを返す。
+- **外部API（`/v1`）には公開しない。** 目標機能は `/internal/me/goals` 配下のみで完結するため、APIトークンユーザーが achievement_types を参照する必要はない。
 
 | フィールド | 内容 |
 |---|---|
 | `code` | 識別キー |
+
+---
+
+## 13. APIエンドポイント定義
+
+目標機能のエンドポイントはすべて `/internal/me/goals` 配下に置く。
+認証は Cookie 必須（既存の `/internal/me` グループと同じ方針）。
+
+| メソッド | パス | 概要 |
+|---|---|---|
+| `GET` | `/internal/me/goals` | 自分の目標一覧を取得 |
+| `POST` | `/internal/me/goals` | 目標を新規作成（100件上限チェックあり） |
+| `PATCH` | `/internal/me/goals/{id}` | 指定した目標を更新 |
+| `DELETE` | `/internal/me/goals/{id}` | 指定した目標を削除 |
+
+### リクエスト／レスポンスの共通構造
+
+#### Goal オブジェクト
+
+```json
+{
+  "id": 1,
+  "title": "マスター14+ 100枚",
+  "achievement_type": "score_count",
+  "achievement_params": { "score": 1007500, "count": 100 },
+  "attributes": { "diff": [3], "const": { "min": 14.0, "max": 14.9 } },
+  "invert": false
+}
+```
+
+- `id` はレスポンスのみ（POST/PATCHのリクエストボディには含まない）。
+- `achievement_type` はコード文字列（`achievement_types.code`）で送受信する。DB保存時にIDへ変換するのはInfra層の責務。
+
+### GET `/internal/me/goals`
+
+- 自分が作成した目標を全件返す。
+- ソート順: `id` 昇順（作成順）。
+
+### POST `/internal/me/goals`
+
+- Goal オブジェクト（`id` 除く）をリクエストボディとして受け取る。
+- 100件上限を超える場合は専用エラーコードで4xxを返す。
+
+### PATCH `/internal/me/goals/{id}`
+
+- 更新対象の goal を Goal オブジェクト（`id` 除く）で完全上書きする（§9 参照）。
+- 他ユーザーの goal を指定した場合は404を返す（存在しないとみなす）。
+
+### DELETE `/internal/me/goals/{id}`
+
+- 指定した goal を削除する。
+- 他ユーザーの goal を指定した場合は404を返す（存在しないとみなす）。
 
 ---
 
