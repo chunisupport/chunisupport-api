@@ -1,21 +1,29 @@
-# 目標（Goal）機能のデータ設計メモ
+# 目標（Goal）機能のデータ設計（確定版）
 
 ## 目的
 
 CHUNITHM向け目標機能の永続化設計を、実装初期段階で過剰に複雑化させず、
 運用しながら安全に拡張できる形で定義する。
 
-前提:
+本ドキュメントは、現時点で合意済みの仕様のみを記載する。
+
+---
+
+## 1. 基本方針
 
 - 目標はユーザー単位で管理する。
 - 1ユーザーあたり目標上限は100件。
-- 目標は「1つ以上の属性」と「1つの成果（achievement）」を持つ。
-- 属性の評価は基本AND、ただし `genre` / `version` は配列内ORで扱う。
-- 比較は原則 `>=` のみ。
-- 難易度・ハードランプの序列は固定。
-- `invert`（未達成数を表示する概念）はJSONではなく `goals` テーブルのカラムで持つ。
+- 目標は「属性（attributes）」と「成果（achievement）」を持つ。
+- 属性評価は基本AND。`genre` / `version` は配列内OR。
+- 比較は原則 `>=`。
+- `difficulty` は常に大文字（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）で扱う。
+- `achievement_type` は厳密固定し、対応する `achievement_params` の構造も厳密固定する。
+- DBにはJSONで保存するが、アプリ内部（Usecase/Domain）では型安全な構造体に変換して扱う。
+- `invert` は表示用のフラグであり、サーバー側の評価ロジックには影響させない。
 
-## テーブル設計（MySQL）
+---
+
+## 2. テーブル設計（MySQL）
 
 ```sql
 CREATE TABLE goals (
@@ -35,14 +43,84 @@ CREATE TABLE goals (
 
 ### カラム方針
 
-- `achievement_type`: 成果種別（例: `rank_count`, `avg_score`, `hardlamp_count`）
-- `achievement_params`: 成果種別ごとの可変パラメータ
-- `attributes`: 対象譜面の絞り込み条件
-- `invert`: 表示/評価を未達成ベースで反転するかどうか
+- `achievement_type`: 成果種別（`rank_count`, `avg_score`, `hardlamp_count`）
+- `achievement_params`: 成果種別ごとの可変パラメータ（JSON）
+- `attributes`: 対象譜面の絞り込み条件（JSON）
+- `invert`: UI表示反転フラグ（評価計算には不使用）
 
-## JSON仕様
+---
 
-### `attributes` の例
+## 3. 100件上限の扱い
+
+- 上限は **Usecaseで件数チェック + トランザクション（A+）** で担保する。
+- 101件目作成時は4xx系エラーを返し、専用エラーコードを用意する。
+- DBだけで厳密制約化できる場合は将来的に追加検討するが、初期実装はA+で進める。
+
+---
+
+## 4. `achievement_type` と `achievement_params`
+
+## `achievement_type` 一覧
+
+- `rank_count`
+- `avg_score`
+- `hardlamp_count`
+
+### 型整合ルール
+
+- `achievement_type` と `achievement_params` の不一致は不正入力として4xxで返す。
+- 受信時に `achievement_type` で分岐して専用構造体へデコードし、バリデーション後に保存する。
+
+### `achievement_params` 仕様
+
+#### 4.1 `rank_count`
+
+```json
+{
+  "rank": "AA",
+  "count": 100
+}
+```
+
+- `rank`: 以下の列挙値のみ許可
+  - `D`, `C`, `B`, `BB`, `BBB`, `A`, `AA`, `AAA`, `S`, `S+`, `SS`, `SS+`, `SSS`, `SSS+`
+- `count`: `integer`, `minimum: 1`
+- 判定は「対象譜面のうち、指定rank以上を満たす件数」
+
+#### 4.2 `avg_score`
+
+```json
+{
+  "threshold": 1000000
+}
+```
+
+- `threshold`: `integer`, `minimum: 0`, `maximum: 1010000`
+- スコアは整数で扱う。
+- 平均算出時の端数は小数点以下切り捨て。
+
+#### 4.3 `hardlamp_count`
+
+```json
+{
+  "lamp": "BRAVE",
+  "count": 100
+}
+```
+
+- `lamp`: `BRAVE`, `ABSOLUTE`, `CATASTROPHY`
+- `count`: `integer`, `minimum: 1`
+
+---
+
+## 5. `attributes` 仕様
+
+### 5.1 基本
+
+- `attributes` は「全譜面対象」を許可するため、空オブジェクト `{}` を許可する。
+- 条件指定時は以下の各フィールドを任意で指定可能。
+
+### 5.2 例
 
 ```json
 {
@@ -53,206 +131,69 @@ CREATE TABLE goals (
 }
 ```
 
-- `difficulty`: 固定序列でレンジ判定
-- `level`: 数値レンジ判定
-- `genre` / `version`: 配列内OR判定
+### 5.3 各項目
 
-### `achievement_params` の例
+- `difficulty`: 固定序列でレンジ判定、`min <= max` 必須
+- `level`: 数値レンジ判定、`min <= max` 必須
+- `genre`: 配列内OR（完全一致）
+- `version`: 配列内OR（完全一致）
 
-#### ランク達成数
+### 5.4 マスタ整合
 
-```json
-{
-  "rank": "AA",
-  "count": 100
-}
-```
+- `genre` / `version` はマスタ値のみ許可する。
+- ユーザー手入力は想定しないため、完全一致のみで判定する。
 
-#### 平均スコア
+---
 
-```json
-{
-  "threshold": 9800000
-}
-```
-
-#### ハードランプ達成数
-
-```json
-{
-  "lamp": "BRAVE",
-  "count": 100
-}
-```
-
-## スキーマ定義例（JSON Schema）
-
-### `attributes` のスキーマ
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "difficulty": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["min", "max"],
-      "properties": {
-        "min": { "type": "string", "enum": ["BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"] },
-        "max": { "type": "string", "enum": ["BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"] }
-      }
-    },
-    "level": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["min", "max"],
-      "properties": {
-        "min": { "type": "number", "minimum": 1.0, "maximum": 15.9 },
-        "max": { "type": "number", "minimum": 1.0, "maximum": 15.9 }
-      }
-    },
-    "genre": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "type": "string" }
-    },
-    "version": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "type": "string" }
-    }
-  },
-  "anyOf": [
-    { "required": ["difficulty"] },
-    { "required": ["level"] },
-    { "required": ["genre"] },
-    { "required": ["version"] }
-  ]
-}
-```
-
-### `achievement_params` のスキーマ（`achievement_type` 別）
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "oneOf": [
-    {
-      "title": "rank_count",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["rank", "count"],
-      "properties": {
-        "rank": { "type": "string" },
-        "count": { "type": "integer", "minimum": 1 }
-      }
-    },
-    {
-      "title": "avg_score",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["threshold"],
-      "properties": {
-        "threshold": { "type": "integer", "minimum": 0 }
-      }
-    },
-    {
-      "title": "hardlamp_count",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["lamp", "count"],
-      "properties": {
-        "lamp": { "type": "string", "enum": ["BRAVE", "ABSOLUTE", "CATASTROPHY"] },
-        "count": { "type": "integer", "minimum": 1 }
-      }
-    }
-  ]
-}
-```
-
-## コード定義例（Go）
-
-```go
-package goal
-
-import "encoding/json"
-
-type Goal struct {
-	ID                int
-	UserID            int
-	AchievementType   AchievementType
-	AchievementParams json.RawMessage
-	Attributes        json.RawMessage
-	Invert            bool
-}
-
-type AchievementType string
-
-const (
-	AchievementTypeRankCount    AchievementType = "rank_count"
-	AchievementTypeAvgScore     AchievementType = "avg_score"
-	AchievementTypeHardlampCount AchievementType = "hardlamp_count"
-)
-
-type RangeString struct {
-	Min string `json:"min"`
-	Max string `json:"max"`
-}
-
-type RangeFloat struct {
-	Min float64 `json:"min"`
-	Max float64 `json:"max"`
-}
-
-type Attributes struct {
-	Difficulty *RangeString `json:"difficulty,omitempty"`
-	Level      *RangeFloat  `json:"level,omitempty"`
-	Genre      []string     `json:"genre,omitempty"`
-	Version    []string     `json:"version,omitempty"`
-}
-
-type RankCountParams struct {
-	Rank  string `json:"rank"`
-	Count int    `json:"count"`
-}
-
-type AvgScoreParams struct {
-	Threshold int `json:"threshold"`
-}
-
-type HardlampCountParams struct {
-	Lamp  string `json:"lamp"`
-	Count int    `json:"count"`
-}
-```
-
-## 序列定義（固定）
+## 6. 序列定義（固定）
 
 - 難易度: `BASIC < ADVANCED < EXPERT < MASTER < ULTIMA`
 - ハードランプ: `BRAVE < ABSOLUTE < CATASTROPHY`
+- ランク: `D < C < B < BB < BBB < A < AA < AAA < S < S+ < SS < SS+ < SSS < SSS+`
 
-固定序列はアプリケーション層の定数として持ち、
-評価時に数値へマッピングして比較する。
+固定序列はアプリケーション層の定数として持ち、評価時に比較可能な値へ変換する。
 
-## `invert` の解釈
+---
 
-`invert=false`:
+## 7. `invert` の扱い（UI表示専用）
 
-- 達成済み件数を集計して表示する。
+- `invert` は全 `achievement_type` で保持可能。
+- ただしサーバー側の達成判定・集計ロジックには影響させない。
+- APIは常に生値（非反転値）を返す。
+- 反転表示（例: `1010000 - avg_score`）はUI側で実施する。
 
-`invert=true`:
+---
 
-- 未達成件数を集計して表示する。
-- 実装は `対象件数 - 達成件数` で算出する。
+## 8. バリデーション方針
 
-`invert` は表示や進捗評価の基本モードに近く、
-成果パラメータそのものではないため、JSONではなくテーブルカラムに保持する。
+- 方針は **A: Goバリデーション中心 + 必要最小限のSchema併用**。
+- 境界（Handler/DTO）で形式チェック。
+- Usecaseで業務ルールチェック。
+  - `achievement_type` と `params` の一致
+  - `min <= max`
+  - `genre` / `version` のマスタ一致
+  - 100件上限
+- 不正入力は4xx系を返す（必要に応じて専用エラーコード追加）。
 
-## 実装時の注意
+---
 
-- `difficulty` は常に大文字で扱う（`BASIC` など）。
+## 9. 更新API方針
+
+- 更新は **PATCH** を採用する。
+- 部分更新を受け付けるが、保存前には必ず正規化済みの完全データとして検証する。
+
+---
+
+## 10. JSON保存時の正規化
+
+- DB保存時はコンパクトJSON（インデントなし）で保存する。
+- 入力原文をそのまま保持せず、バリデーション済み構造体から再エンコードしたJSONを保存する。
+
+---
+
+## 11. 実装時の注意
+
 - `SELECT *` は使用しない。
-- 入力JSONは境界でバリデーションする。
-- 集計対象は事前に必要データをまとめて取得し、N+1を避ける。
+- N+1を避けるため、集計対象は事前に必要データをまとめて取得する。
+- Usecase層で `internal/infra` をimportしない（依存方向を守る）。
+- ドメインモデルにJSONタグやDBタグを直接持ち込まない。
