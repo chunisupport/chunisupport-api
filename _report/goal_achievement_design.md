@@ -160,7 +160,7 @@ CREATE TABLE goals (
 - `invert` は全 `achievement_type` で保持可能。
 - ただしサーバー側の達成判定・集計ロジックには影響させない。
 - APIは常に生値（非反転値）を返す。
-- 反転表示（例: `1010000 - avg_score`）はUI側で実施する。
+- 反転表示（例: `threshold - current_avg_score`）はUI側で実施する。
 
 ---
 
