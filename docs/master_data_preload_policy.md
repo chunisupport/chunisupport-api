@@ -14,6 +14,7 @@
 | `honor_types` | 称号の種類マスタで固定値が事前投入されている。 |
 | `account_types` | ユーザー権限区分。3件のみで固定値。 |
 | `versions` | CHUNITHMバージョン名マスタで固定値。 |
+| `achievement_types` | 目標機能の成果種別マスタ（8件の固定値）。`goals.achievement_type` の外部キー参照元。 |
 
 ## 読み込まない（随時参照）
 | テーブル | 理由 |
