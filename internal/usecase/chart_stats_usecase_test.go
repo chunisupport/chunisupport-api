@@ -63,31 +63,66 @@ func TestGetSongStatsByDisplayID_SortByRatingBandOrder(t *testing.T) {
 }
 
 func TestGetSongStatsByDisplayID_DeletedSongPermissionBranch(t *testing.T) {
-	ctx := context.Background()
-	mockSongRepo := new(MockSongRepository)
-	mockWorldsendRepo := new(MockWorldsendChartRepository)
-	mockStatsRepo := new(MockChartStatsRepository)
-	mockSongMasterProvider := new(MockSongMasterProvider)
-	mockExec := new(MockExecutor)
-	stubMasterProvider := &StubChartStatsMasterProvider{}
+	tests := []struct {
+		name               string
+		accountTypeID      *int
+		setupMocks         func(ctx context.Context, songRepo *MockSongRepository, statsRepo *MockChartStatsRepository, songMasterProvider *MockSongMasterProvider, exec *MockExecutor)
+		assertResult       func(t *testing.T, result *entity.SongChartStats)
+		expectedErrChecker assert.ErrorAssertionFunc
+	}{
+		{
+			name:          "権限がない場合は削除済み楽曲が取得できない",
+			accountTypeID: nil,
+			setupMocks: func(ctx context.Context, songRepo *MockSongRepository, _ *MockChartStatsRepository, _ *MockSongMasterProvider, exec *MockExecutor) {
+				deletedSong := &entity.Song{DisplayID: "S002", IsDeleted: true, Charts: []*entity.Chart{{ID: 201, DifficultyID: 4}}}
+				songRepo.On("FindByDisplayID", ctx, exec, "S002").Return(deletedSong, nil).Once()
+			},
+			assertResult: func(t *testing.T, result *entity.SongChartStats) {
+				assert.Nil(t, result)
+			},
+			expectedErrChecker: func(t assert.TestingT, err error, _ ...any) bool {
+				return assert.ErrorIs(t, err, repository.ErrSongNotFound)
+			},
+		},
+		{
+			name: "EDITOR権限がある場合は削除済み楽曲を取得できる",
+			accountTypeID: func() *int {
+				editor := info.AccountTypeEditor
+				return &editor
+			}(),
+			setupMocks: func(ctx context.Context, songRepo *MockSongRepository, statsRepo *MockChartStatsRepository, songMasterProvider *MockSongMasterProvider, exec *MockExecutor) {
+				deletedSong := &entity.Song{DisplayID: "S002", IsDeleted: true, Charts: []*entity.Chart{{ID: 201, DifficultyID: 4}}}
+				songRepo.On("FindByDisplayID", ctx, exec, "S002").Return(deletedSong, nil).Once()
+				songMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
+				statsRepo.On("FindChartStatsByChartIDs", ctx, exec, []int{201}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
+			},
+			assertResult: func(t *testing.T, result *entity.SongChartStats) {
+				assert.NotNil(t, result)
+			},
+			expectedErrChecker: assert.NoError,
+		},
+	}
 
-	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			mockSongRepo := new(MockSongRepository)
+			mockWorldsendRepo := new(MockWorldsendChartRepository)
+			mockStatsRepo := new(MockChartStatsRepository)
+			mockSongMasterProvider := new(MockSongMasterProvider)
+			mockExec := new(MockExecutor)
+			stubMasterProvider := &StubChartStatsMasterProvider{}
 
-	deletedSong := &entity.Song{DisplayID: "S002", IsDeleted: true, Charts: []*entity.Chart{{ID: 201, DifficultyID: 4}}}
-	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S002").Return(deletedSong, nil)
+			tt.setupMocks(ctx, mockSongRepo, mockStatsRepo, mockSongMasterProvider, mockExec)
 
-	result, err := u.GetSongStatsByDisplayID(ctx, "S002", nil)
-	assert.ErrorIs(t, err, repository.ErrSongNotFound)
-	assert.Nil(t, result)
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
-	editor := info.AccountTypeEditor
-	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S002").Return(deletedSong, nil).Once()
-	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
-	mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{201}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
+			result, err := u.GetSongStatsByDisplayID(ctx, "S002", tt.accountTypeID)
 
-	result, err = u.GetSongStatsByDisplayID(ctx, "S002", &editor)
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
+			tt.expectedErrChecker(t, err)
+			tt.assertResult(t, result)
+		})
+	}
 }
 
 func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendBranch(t *testing.T) {
