@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 
@@ -311,6 +312,9 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 	outs := make([]*GoalOutput, 0, len(goals))
 	for _, g := range goals {
 		typeCode := masters.AchievementTypesByID[g.AchievementTypeID]
+		if typeCode == "" {
+			slog.Warn("achievement type code not found in master cache", "goal_id", g.ID, "achievement_type_id", g.AchievementTypeID)
+		}
 		var p map[string]any
 		if err := json.Unmarshal(g.AchievementParams, &p); err != nil {
 			return nil, fmt.Errorf("failed to decode achievement params: %w", err)
