@@ -17,7 +17,7 @@ INSERT INTO achievement_types (code) VALUES
 
 CREATE TABLE goals (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
   title VARCHAR(30) NOT NULL,
   achievement_type_id TINYINT UNSIGNED NOT NULL,
   achievement_params JSON NOT NULL,
