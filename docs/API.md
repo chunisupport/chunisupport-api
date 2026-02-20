@@ -1277,11 +1277,59 @@ curl -X POST \
 
 ---
 
+
+## `/internal/me/goals` グループ
+
+### GET `/internal/me/goals`
+- **認証**: Cookie 必須
+- **概要**: 自分の目標一覧を取得します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "goals": [
+    {
+      "id": 1,
+      "title": "マスター14+ 100枚",
+      "achievement_type": "score_count",
+      "achievement_params": { "score": 1007500, "count": 100 },
+      "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+      "invert": false,
+      "created_at": "2026-01-01T09:00:00+09:00"
+    }
+  ]
+}
+```
+
+### POST `/internal/me/goals`
+- **認証**: Cookie 必須
+- **概要**: 目標を新規作成します（1ユーザー100件上限）。
+- **レスポンス**: 201 Created
+
+### PUT `/internal/me/goals/:id`
+- **認証**: Cookie 必須
+- **概要**: 指定した目標を更新します。
+- **レスポンス**: 204 No Content
+
+### DELETE `/internal/me/goals/:id`
+- **認証**: Cookie 必須
+- **概要**: 指定した目標を削除します。
+- **レスポンス**: 204 No Content
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_goal_request`): リクエスト内容が不正
+  - 400 Bad Request (`invalid_achievement_type`): 成果種別が不正
+  - 400 Bad Request (`goal_limit_exceeded`): 目標上限100件を超過
+  - 404 Not Found (`goal_not_found`): 目標が見つからない
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+
+---
+
 ## `/internal/master` グループ
 
 ### GET `/internal/master`
 - **認証**: Cookie 必須
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、成果種別、バージョン）を返却します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -1303,6 +1351,11 @@ curl -X POST \
     { "id": 2, "name": "EDITOR" },
     { "id": 3, "name": "ADMIN" }
   ],
+  "achievement_types": [
+    { "id": 1, "name": "rank_count" },
+    { "id": 2, "name": "score_count" },
+    { "id": 3, "name": "avg_score" }
+  ],
   "versions": [
     { "id": 1, "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
     { "id": 2, "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
@@ -1323,6 +1376,7 @@ curl -X POST \
 | `genres` | MasterItemDTO[] | ジャンル一覧（ID順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（ID順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
+| `achievement_types` | MasterItemDTO[] | 目標機能の成果種別一覧（ID順） |
 | `versions` | VersionDTO[] | バージョン一覧（ID順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 

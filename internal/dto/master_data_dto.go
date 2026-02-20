@@ -15,11 +15,12 @@ type VersionDTO struct {
 
 // MasterDataResponse はマスタデータ取得APIのレスポンスを表します。
 type MasterDataResponse struct {
-	Genres       []*MasterItemDTO `json:"genres"`
-	Difficulties []*MasterItemDTO `json:"difficulties"`
-	AccountTypes []*MasterItemDTO `json:"account_types"`
-	Versions     []*VersionDTO    `json:"versions"`
-	RatingBands  []*RatingBandDTO `json:"rating_bands"`
+	Genres           []*MasterItemDTO `json:"genres"`
+	Difficulties     []*MasterItemDTO `json:"difficulties"`
+	AccountTypes     []*MasterItemDTO `json:"account_types"`
+	AchievementTypes []*MasterItemDTO `json:"achievement_types"`
+	Versions         []*VersionDTO    `json:"versions"`
+	RatingBands      []*RatingBandDTO `json:"rating_bands"`
 }
 
 // RatingBandDTO はレーティング帯マスタのDTOです。

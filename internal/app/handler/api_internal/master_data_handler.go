@@ -63,6 +63,16 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	}
 	sortMasterItemsByID(accountTypes)
 
+	// AchievementTypes をID順にソートして配列化
+	achievementTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AchievementTypes))
+	for _, item := range h.masterCache.AchievementTypes {
+		achievementTypes = append(achievementTypes, &dto.MasterItemDTO{
+			ID:   item.ID,
+			Name: item.Name,
+		})
+	}
+	sortMasterItemsByID(achievementTypes)
+
 	// Versions をID順にソートして配列化
 	versions := make([]*dto.VersionDTO, 0, len(h.masterCache.Versions))
 	for _, item := range h.masterCache.Versions {
@@ -89,11 +99,12 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	}
 
 	response := &dto.MasterDataResponse{
-		Genres:       genres,
-		Difficulties: difficulties,
-		AccountTypes: accountTypes,
-		Versions:     versions,
-		RatingBands:  ratingBands,
+		Genres:           genres,
+		Difficulties:     difficulties,
+		AccountTypes:     accountTypes,
+		AchievementTypes: achievementTypes,
+		Versions:         versions,
+		RatingBands:      ratingBands,
 	}
 
 	return c.JSON(http.StatusOK, response)

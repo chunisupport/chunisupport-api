@@ -73,6 +73,14 @@ func FromUsecaseError(err error) *APIError {
 	// アプリバージョンバリデーションエラー
 	case errors.Is(err, usecase.ErrAppVersionUnsupported):
 		return ErrAppVersionUnsupported.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalNotFound):
+		return ErrGoalNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalLimitExceeded):
+		return ErrGoalLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalRequest):
+		return ErrInvalidGoalRequest.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAchievementType):
+		return ErrInvalidAchievementType.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

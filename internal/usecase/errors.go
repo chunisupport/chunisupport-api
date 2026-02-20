@@ -36,5 +36,9 @@ var (
 	ErrAdminRequired = errors.New("admin permission required") // ADMIN権限が必要
 
 	// アプリバージョン関連エラー
-	ErrAppVersionUnsupported = errors.New("unsupported app version") // 対応していないアプリバージョン
+	ErrAppVersionUnsupported  = errors.New("unsupported app version") // 対応していないアプリバージョン
+	ErrGoalNotFound           = errors.New("goal not found")
+	ErrGoalLimitExceeded      = errors.New("goal limit exceeded")
+	ErrInvalidAchievementType = errors.New("invalid achievement type")
+	ErrInvalidGoalRequest     = errors.New("invalid goal request")
 )
