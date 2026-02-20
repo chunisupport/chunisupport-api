@@ -184,12 +184,33 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	}
 	if v, ok := attrs["const"]; ok {
 		var c struct {
-			Min float64 `json:"min"`
-			Max float64 `json:"max"`
+			Min *float64 `json:"min"`
+			Max *float64 `json:"max"`
 		}
-		if err := json.Unmarshal(v, &c); err != nil || c.Min < info.ChartConstMin || c.Max > info.ChartConstMax || c.Min > c.Max {
+		if err := json.Unmarshal(v, &c); err != nil {
 			return nil, ErrInvalidGoalAttributes
 		}
+
+		minConst := info.ChartConstMin
+		maxConst := info.ChartConstMax
+		if c.Min != nil {
+			minConst = *c.Min
+		}
+		if c.Max != nil {
+			maxConst = *c.Max
+		}
+		if minConst < info.ChartConstMin || maxConst > info.ChartConstMax || minConst > maxConst {
+			return nil, ErrInvalidGoalAttributes
+		}
+
+		normalizedConst, err := json.Marshal(struct {
+			Min float64 `json:"min"`
+			Max float64 `json:"max"`
+		}{Min: minConst, Max: maxConst})
+		if err != nil {
+			return nil, ErrInvalidGoalAttributes
+		}
+		attrs["const"] = normalizedConst
 	}
 	if v, ok := attrs["genre"]; ok {
 		var id int

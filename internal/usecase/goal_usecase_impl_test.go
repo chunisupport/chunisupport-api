@@ -147,3 +147,29 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
+
+func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"const":{"max":15.9}}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(1), "max": float64(15.9)}}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateConstAttributeWithOmittedMaxUsesDefault(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"const":{"min":1.2}}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(1.2), "max": float64(15.9)}}, out.Attributes)
+}
