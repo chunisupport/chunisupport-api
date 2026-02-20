@@ -76,7 +76,6 @@
 | **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
 | **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
-| **QUAL-014** | **High** | Usecase層がInfra層をimport | `chart_stats_usecase.go` が `internal/infra/masterdata` をimport。AGENTS.mdで厳禁とされているクリーンアーキテクチャ違反。 |
 | **QUAL-017** | **Low** | ARCHITECTURE.mdのディレクトリ表記不整合 | `domain/rating` と記載されているが、実際は `domain/service`。参照ドキュメントとの不整合。 |
 
 ---
@@ -218,24 +217,6 @@
 - **修正案**:
   - 全リクエスト構造体に適切な `validate` タグを追加。
   - Bindの直後に `c.Validate()` を呼ぶパターンを全ハンドラーで統一。
-
----
-
-### QUAL-014: Usecase層がInfra層をimport
-- **根拠**:
-  - `internal/usecase/chart_stats_usecase.go:13` で `internal/infra/masterdata` パッケージをimport。
-  - プロダクションコードで `masterdata.StaticCache` を直接参照している。
-  - AGENTS.mdでは「`internal/usecase` パッケージが `internal/infra` パッケージを import すること」は**厳禁**と明記されている。
-- **影響範囲**:
-  - Clean Architectureの依存方向に重大な違反。Usecase層がインフラ層の実装詳細に依存しており、テスタビリティが低下。
-  - マスターデータの取得方法を変更する場合、Usecase層の修正が必要になる。
-  - 実装とAGENTS.mdのルールが乖離しており、AIエージェントが矛盾した判断をする原因となる。
-- **修正案**:
-  - マスターデータへのアクセスをDomain層のインターフェース経由に変更。
-  - `internal/domain/repository` に `MasterDataRepository` インターフェースを定義し、Usecase層はこれに依存する。
-  - Infra層の実装（`masterdata.StaticCache`）はDI経由でUsecaseに注入する。
-- **追加で確認したい点**:
-  - `internal/domain/masterdata` パッケージが既に存在するため、このパッケージとの関係を整理する必要がある。
 
 ---
 
