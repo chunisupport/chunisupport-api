@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 
@@ -67,8 +68,18 @@ func (r *goalRepository) Update(ctx context.Context, exec repository.Executor, g
 
 func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
 	query := `DELETE FROM goals WHERE id = ? AND user_id = ?`
-	_, err := exec.ExecContext(ctx, query, id, userID)
-	return err
+	res, err := exec.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (r *goalRepository) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {

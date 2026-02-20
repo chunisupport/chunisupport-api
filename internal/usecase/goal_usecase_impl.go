@@ -114,13 +114,11 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 }
 
 func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
-	if _, err := u.goalRepo.FindByIDAndUserID(ctx, u.db, id, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrGoalNotFound
-		}
-		return err
+	err := u.goalRepo.DeleteByIDAndUserID(ctx, u.db, id, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrGoalNotFound
 	}
-	return u.goalRepo.DeleteByIDAndUserID(ctx, u.db, id, userID)
+	return err
 }
 
 type validatedGoalInput struct {

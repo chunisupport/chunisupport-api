@@ -39,6 +39,9 @@ func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goa
 	return nil
 }
 func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
+	if s.goal == nil || s.goal.ID != id {
+		return sql.ErrNoRows
+	}
 	s.goal = nil
 	return nil
 }
@@ -81,4 +84,19 @@ func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{Title: "test", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)})
 	assert.True(t, errors.Is(err, ErrGoalLimitExceeded))
+}
+
+func TestGoalUsecase_Delete(t *testing.T) {
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	err := u.Delete(context.Background(), 1, 1)
+	require.NoError(t, err)
+	assert.Nil(t, repo.goal)
+}
+
+func TestGoalUsecase_DeleteNotFound(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	err := u.Delete(context.Background(), 1, 999)
+	assert.True(t, errors.Is(err, ErrGoalNotFound))
 }
