@@ -96,7 +96,7 @@ CREATE TABLE goals (
 ## 3. 100件上限の扱い
 
 - 上限は **Usecaseで件数チェック + トランザクション** で担保する。
-- 作成トランザクション内の先頭で `SELECT COUNT(*) FROM goals WHERE user_id = ? FOR UPDATE` を実行し、ユーザー行にロックを取得してからチェックする。これにより、同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止できる。MySQLのデフォルト分離レベル（REPEATABLE READ）のままで対応可能。
+- 作成トランザクション内の先頭で `SELECT id FROM users WHERE id = ? FOR UPDATE` を実行し、対象ユーザー行をロックする。その後 `SELECT COUNT(*) FROM goals WHERE user_id = ?` で件数を確認する。これにより、同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止できる。MySQLのデフォルト分離レベル（REPEATABLE READ）のままで対応可能。
 - 101件目作成時は4xx系エラーを返し、専用エラーコードを用意する。
 - DBだけで厳密制約化できる場合は将来的に追加検討するが、初期実装はこの方針で進める。
 
@@ -130,7 +130,7 @@ CREATE TABLE goals (
 
 #### 4.1 `rank_count`
 
-`score_count`と同じもので扱う。typeのみが違うようにしたい。
+`score_count`と同じ構造・同じ判定で扱う。`type` のみを分け、UIが「ランク由来の目標」として判別できるようにする。
 
 ```json
 {
@@ -144,10 +144,10 @@ CREATE TABLE goals (
   - 最大値: 1010000
 - `count`: `integer`
   - 最小値: 1
-  - 最大値: 対象譜面数
+  - 最大値: 対象譜面数（作成/更新リクエスト時点のマスタスナップショットで判定。将来の楽曲追加でこの上限値は変動しうる）
 - 判定は「対象譜面のうち、指定score以上を獲得している件数」
 
-ランクはスコアと完全に対応する（SSS=1007500、S=975000など）ため、`rank_count` と `score_count` は同じ構造で扱い、判定ロジックも同様に「指定スコア以上を獲得している件数」とする。UI側でランクとスコアの対応を持ち、`rank_count` の場合は指定されたランクに対応するスコアを内部的に参照して判定するイメージ。
+ランクはスコアと完全に対応するため、rank_count と score_count は同じ構造で扱い、判定ロジックも同様に「指定スコア以上を獲得している件数」とする。ランク境界テーブルはフロントエンド側で保持し、バックエンドはスコア閾値のみを扱う。
 
 #### 4.2 `score_count`
 
@@ -158,7 +158,7 @@ CREATE TABLE goals (
 }
 ```
 
-`rank_count`と判定は同じ
+`rank_count` と判定は同じ。
 
 #### 4.3 `avg_score`
 
@@ -194,7 +194,7 @@ CREATE TABLE goals (
 
 - `count`: `integer`
   - 最小値: 1
-  - 最大値: 対象譜面数
+  - 最大値: 対象譜面数（作成/更新リクエスト時点のマスタスナップショットで判定。将来の楽曲追加でこの上限値は変動しうる）
 
 #### 4.5 `combolamp_count`
 
@@ -214,7 +214,7 @@ CREATE TABLE goals (
 
 - `count`: `integer`
   - 最小値: 1
-  - 最大値: 対象譜面数
+  - 最大値: 対象譜面数（作成/更新リクエスト時点のマスタスナップショットで判定。将来の楽曲追加でこの上限値は変動しうる）
 
 #### 4.6 `total_score`
 ```json
@@ -225,7 +225,7 @@ CREATE TABLE goals (
 
 - `total`: `integer`
   - 最小値: 0
-  - 最大値: 対象譜面数 × 1010000
+  - 最大値: 対象譜面数 × 1010000（作成/更新リクエスト時点のマスタスナップショットで判定。将来の楽曲追加でこの上限値は変動しうる）
 
 #### 4.7 `overpower_value`
 
@@ -257,6 +257,7 @@ CREATE TABLE goals (
   - 最大値: 100
   - 計算方法: `overpower_value` の合計 ÷ 対象譜面のOverPower値（理論値）の合計 × 100。
   - 各譜面のOP理論値の算出方針は `overpower_value`（§4.7）と同一。
+  - 分母（対象譜面の理論値合計）が0かどうかは目標保存時には判定しない。保存時は構造・型・範囲のみを検証し、表示時の「破損目標」判定はフロントエンドで行う。
 ---
 
 ## 5. `attributes` 仕様
@@ -340,11 +341,13 @@ CREATE TABLE goals (
 - Usecaseで業務ルールチェック。
   - `title` の形式チェック（trim()後で30文字以内かつ空文字不可）
   - `achievement_type` の有効性確認（起動時プリロード済みのキャッシュ `AchievementTypesByCode` で検索。存在しなければ `goal_invalid_achievement_type` (400)）
+  - `achievement_type` の大文字小文字は完全一致のみ許可する（例: `score_count` は許可、`Score_Count` は不許可）
   - `achievement_type` と `params` の一致
   - `const` の有効範囲チェック（`info.ChartConstMin ≤ min, max ≤ info.ChartConstMax`・小数点以1桁に丸め・`min <= max`）
-  - `diff` の範囲チェック（1〜5。`difficulties.id` と剗り当てて存在確認でも庞じ）
+  - `diff` の範囲チェック（1〜5。`difficulties.id` と同値として検証）
   - `genre` / `ver` のマスタID存在確認（起動時プリロード済みのキャッシュで検索）
-  - 100件上限（`SELECT COUNT(*) ... FOR UPDATE` でロックを取ってからチェック。§3 参照）
+  - `hardlamp_count` / `combolamp_count` の `lamp` は略称の完全一致のみ許可する（`HRD`/`BRV`/`ABS`/`CTS`、`FC`/`AJ`）。小文字・混在ケースは不許可。
+  - 100件上限（`SELECT id FROM users WHERE id = ? FOR UPDATE` でユーザー行をロック後、件数チェック。§3 参照）
 - 不正入力は4xx系を返す。エラーコード一覧は§13を参照。
 - DBの `fk_goals_achievement_type_id` 制約が最終防衛として機能し、Usecase検証をすり抜けた場合でもDB整合性は保たれる。
 
@@ -501,12 +504,13 @@ Usecase でマスタIDを引く際は `AbbrevToName` テーブルを経由し、
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
   "invert": false,
-  "created_at": "2026-01-01T00:00:00Z"
+  "created_at": "2026-01-01T09:00:00+09:00"
 }
 ```
 
 - `id` / `created_at` はレスポンスのみ（POST/PUTのリクエストボディには含まない）。
 - `achievement_type` はコード文字列（`achievement_types.code`）で送受信する。DB保存時にIDへ変換するのはInfra層の責務。
+- `created_at` は既存 `/internal/me` 系エンドポイントの方針に合わせ、RFC3339文字列（タイムゾーンオフセット付き）で返却する。
 
 ### GET `/internal/me/goals`
 
