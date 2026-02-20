@@ -66,7 +66,7 @@ func (h *GoalHandler) Update(c echo.Context) error {
 	if !ok || user == nil {
 		return apierror.ErrUnauthorized
 	}
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
@@ -81,7 +81,7 @@ func (h *GoalHandler) Update(c echo.Context) error {
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
-	goal, err := h.goalUsecase.Update(c.Request().Context(), user.ID, id, in)
+	goal, err := h.goalUsecase.Update(c.Request().Context(), user.ID, uint32(id64), in)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -93,11 +93,11 @@ func (h *GoalHandler) Delete(c echo.Context) error {
 	if !ok || user == nil {
 		return apierror.ErrUnauthorized
 	}
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if err := h.goalUsecase.Delete(c.Request().Context(), user.ID, id); err != nil {
+	if err := h.goalUsecase.Delete(c.Request().Context(), user.ID, uint32(id64)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)

@@ -22,7 +22,7 @@ type stubGoalRepo struct {
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
 	return []*entity.Goal{s.goal}, nil
 }
-func (s *stubGoalRepo) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id int64, userID int) (*entity.Goal, error) {
+func (s *stubGoalRepo) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
 	if s.goal == nil || s.goal.ID != id {
 		return nil, sql.ErrNoRows
 	}
@@ -38,7 +38,7 @@ func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goa
 	s.goal = goal
 	return nil
 }
-func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id int64, userID int) error {
+func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
 	s.goal = nil
 	return nil
 }

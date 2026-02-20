@@ -8,7 +8,7 @@ import (
 
 // GoalModel はデータベース用のGoalモデルです。
 type GoalModel struct {
-	ID                int64     `db:"id"`
+	ID                uint32    `db:"id"`
 	UserID            int       `db:"user_id"`
 	Title             string    `db:"title"`
 	AchievementTypeID int       `db:"achievement_type_id"`

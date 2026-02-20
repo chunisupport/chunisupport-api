@@ -11,7 +11,7 @@ type GoalRequest struct {
 
 // GoalResponse は目標レスポンスです。
 type GoalResponse struct {
-	ID                int64          `json:"id"`
+	ID                uint32         `json:"id"`
 	Title             string         `json:"title"`
 	AchievementType   string         `json:"achievement_type"`
 	AchievementParams map[string]any `json:"achievement_params"`

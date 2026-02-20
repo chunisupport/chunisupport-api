@@ -4,7 +4,7 @@ import "time"
 
 // Goal はユーザーが設定する目標を表します。
 type Goal struct {
-	ID                int64
+	ID                uint32
 	UserID            int
 	Title             string
 	AchievementTypeID int

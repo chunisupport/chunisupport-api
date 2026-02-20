@@ -86,7 +86,7 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 	return outs[0], nil
 }
 
-func (u *goalUsecase) Update(ctx context.Context, userID int, id int64, input *GoalInput) (*GoalOutput, error) {
+func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *GoalInput) (*GoalOutput, error) {
 	validated, err := u.validateInput(input)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id int64, input *G
 	return outs[0], nil
 }
 
-func (u *goalUsecase) Delete(ctx context.Context, userID int, id int64) error {
+func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
 	if _, err := u.goalRepo.FindByIDAndUserID(ctx, u.db, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrGoalNotFound

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"math"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -31,7 +33,7 @@ func (r *goalRepository) ListByUserID(ctx context.Context, exec repository.Execu
 	return goals, nil
 }
 
-func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id int64, userID int) (*entity.Goal, error) {
+func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
 	var m models.GoalModel
 	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, created_at FROM goals WHERE id = ? AND user_id = ?`
 	if err := exec.GetContext(ctx, &m, query, id, userID); err != nil {
@@ -50,7 +52,10 @@ func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, g
 	if err != nil {
 		return err
 	}
-	goal.ID = id
+	if id < 0 || id > math.MaxUint32 {
+		return fmt.Errorf("goals.id out of range: %d", id)
+	}
+	goal.ID = uint32(id)
 	return nil
 }
 
@@ -60,7 +65,7 @@ func (r *goalRepository) Update(ctx context.Context, exec repository.Executor, g
 	return err
 }
 
-func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id int64, userID int) error {
+func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
 	query := `DELETE FROM goals WHERE id = ? AND user_id = ?`
 	_, err := exec.ExecContext(ctx, query, id, userID)
 	return err
