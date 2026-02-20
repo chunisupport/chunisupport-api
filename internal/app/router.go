@@ -58,6 +58,7 @@ type Handlers struct {
 	Me         *api_internal.MeHandler
 	MasterData *api_internal.MasterDataHandler
 	Session    *api_internal.SessionHandler
+	Goal       *api_internal.GoalHandler
 	// 外部API v1 用ハンドラ
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
@@ -121,6 +122,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
+	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
 	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
@@ -139,6 +141,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
+	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
@@ -152,6 +155,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		Me:         api_internal.NewMeHandler(playerDataUsecase),
 		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
+		Goal:       api_internal.NewGoalHandler(goalUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -233,6 +237,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 		// セッション管理
 		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
 		meGroup.DELETE("/sessions", handlers.Session.LogoutOtherSessions)
+		meGroup.GET("/goals", handlers.Goal.List)
+		meGroup.POST("/goals", handlers.Goal.Create)
+		meGroup.PUT("/goals/:id", handlers.Goal.Update)
+		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
 	}
 
 	// api.chunisupport.net/internal/users

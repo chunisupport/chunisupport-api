@@ -12,23 +12,26 @@ import (
 
 // Cache は起動時にプリロードされるマスタのセットです。
 type Cache struct {
-	ClassEmblems        map[string]Item
-	ClassEmblemBases    map[string]Item
-	ClearLamps          map[string]Item
-	ClearLampNamesByID  map[int]string
-	ComboLamps          map[string]Item
-	ComboLampNamesByID  map[int]string
-	FullChains          map[string]Item
-	FullChainNamesByID  map[int]string
-	Slots               map[string]Item
-	SlotNamesByID       map[int]string
-	HonorTypes          map[string]Item
-	Difficulties        map[string]Item
-	DifficultyNamesByID map[int]string
-	Genres              map[string]Item
-	GenreNamesByID      map[int]string
-	AccountTypes        map[string]Item
-	Versions            map[string]Version
+	ClassEmblems         map[string]Item
+	ClassEmblemBases     map[string]Item
+	ClearLamps           map[string]Item
+	ClearLampNamesByID   map[int]string
+	ComboLamps           map[string]Item
+	ComboLampNamesByID   map[int]string
+	FullChains           map[string]Item
+	FullChainNamesByID   map[int]string
+	Slots                map[string]Item
+	SlotNamesByID        map[int]string
+	HonorTypes           map[string]Item
+	Difficulties         map[string]Item
+	DifficultyNamesByID  map[int]string
+	Genres               map[string]Item
+	GenreNamesByID       map[int]string
+	AccountTypes         map[string]Item
+	Versions             map[string]Version
+	VersionsByID         map[int]Version
+	AchievementTypes     map[string]Item
+	AchievementTypesByID map[int]string
 }
 
 // Preload は固定値が INSERT されているマスタを読み込み、キャッシュを構築します。
@@ -113,24 +116,41 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
 	}
 
+	versionsByID := make(map[int]Version, len(versions))
+	for _, item := range versions {
+		versionsByID[int(item.ID)] = item
+	}
+
+	achievementTypes, err := loadSimpleMasters(ctx, db, "SELECT id, code FROM achievement_types", false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
+	}
+	achievementTypesByID := make(map[int]string, len(achievementTypes))
+	for _, item := range achievementTypes {
+		achievementTypesByID[item.ID] = item.Name
+	}
+
 	return &Cache{
-		ClassEmblems:        classEmblems,
-		ClassEmblemBases:    classEmblemBases,
-		ClearLamps:          clearLamps,
-		ClearLampNamesByID:  clearLampNamesByID,
-		ComboLamps:          comboLamps,
-		ComboLampNamesByID:  comboLampNamesByID,
-		FullChains:          fullChains,
-		FullChainNamesByID:  fullChainNamesByID,
-		Slots:               slots,
-		SlotNamesByID:       slotNamesByID,
-		HonorTypes:          honorTypes,
-		Difficulties:        difficulties,
-		DifficultyNamesByID: difficultyNamesByID,
-		Genres:              genres,
-		GenreNamesByID:      genreNamesByID,
-		AccountTypes:        accountTypes,
-		Versions:            versions,
+		ClassEmblems:         classEmblems,
+		ClassEmblemBases:     classEmblemBases,
+		ClearLamps:           clearLamps,
+		ClearLampNamesByID:   clearLampNamesByID,
+		ComboLamps:           comboLamps,
+		ComboLampNamesByID:   comboLampNamesByID,
+		FullChains:           fullChains,
+		FullChainNamesByID:   fullChainNamesByID,
+		Slots:                slots,
+		SlotNamesByID:        slotNamesByID,
+		HonorTypes:           honorTypes,
+		Difficulties:         difficulties,
+		DifficultyNamesByID:  difficultyNamesByID,
+		Genres:               genres,
+		GenreNamesByID:       genreNamesByID,
+		AccountTypes:         accountTypes,
+		Versions:             versions,
+		VersionsByID:         versionsByID,
+		AchievementTypes:     achievementTypes,
+		AchievementTypesByID: achievementTypesByID,
 	}, nil
 }
 
@@ -265,4 +285,29 @@ func (c *Cache) GetAccountTypeNameByID(id int) string {
 		}
 	}
 	return "UNKNOWN"
+}
+
+// GoalMasters は目標機能で必要なマスタ集合を返します。
+func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
+	if c == nil {
+		return nil
+	}
+
+	versionsByID := make(map[int]domainmasterdata.Version, len(c.VersionsByID))
+	for k, v := range c.VersionsByID {
+		versionsByID[k] = domainmasterdata.Version{
+			ID:         v.ID,
+			Name:       v.Name,
+			ReleasedAt: v.ReleasedAt,
+		}
+	}
+
+	return &domainmasterdata.GoalMasters{
+		AchievementTypesByCode: maps.Clone(c.AchievementTypes),
+		AchievementTypesByID:   maps.Clone(c.AchievementTypesByID),
+		GenreNamesByID:         maps.Clone(c.GenreNamesByID),
+		VersionsByID:           versionsByID,
+		ClearLampNamesByID:     maps.Clone(c.ClearLampNamesByID),
+		ComboLampNamesByID:     maps.Clone(c.ComboLampNamesByID),
+	}
 }

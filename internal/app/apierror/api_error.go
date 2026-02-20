@@ -103,6 +103,10 @@ var (
 	ErrPasswordTooLong       = New(CodePasswordTooLong, http.StatusBadRequest)
 	ErrInvalidPassword       = New(CodeInvalidPassword, http.StatusBadRequest)       // パスワード無効（詳細隠蔽）
 	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
+
+	ErrGoalNotFound      = New(CodeGoalNotFound, http.StatusNotFound)
+	ErrGoalLimitExceeded = New(CodeGoalLimitExceeded, http.StatusBadRequest)
+	ErrInvalidGoalInput  = New(CodeInvalidGoalInput, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

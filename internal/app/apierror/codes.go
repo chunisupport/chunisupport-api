@@ -54,4 +54,9 @@ const (
 	CodePasswordTooLong       = "password_too_long"
 	CodeInvalidPassword       = "invalid_password"        // パスワードが無効（詳細を隠蔽）
 	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
+
+	// 目標関連エラー
+	CodeGoalNotFound      = "goal_not_found"
+	CodeGoalLimitExceeded = "goal_limit_exceeded"
+	CodeInvalidGoalInput  = "invalid_goal_input"
 )
