@@ -138,18 +138,18 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 	query := `
 		SELECT
 			COUNT(*) AS chart_count,
-			COALESCE(SUM((c.const + 2.0) * 5.0 + 5.0), 0) AS total_overpower_max
+			COALESCE(SUM(c.const), 0) AS total_chart_const
 		FROM charts c
 		INNER JOIN songs s ON s.id = c.song_id
 		WHERE ` + strings.Join(where, " AND ")
 
 	var row struct {
-		ChartCount        int     `db:"chart_count"`
-		TotalOverpowerMax float64 `db:"total_overpower_max"`
+		ChartCount      int     `db:"chart_count"`
+		TotalChartConst float64 `db:"total_chart_const"`
 	}
 	if err := exec.GetContext(ctx, &row, query, args...); err != nil {
 		return nil, err
 	}
 
-	return &repository.GoalTargetStats{ChartCount: row.ChartCount, TotalOverpowerMax: row.TotalOverpowerMax}, nil
+	return &repository.GoalTargetStats{ChartCount: row.ChartCount, TotalChartConst: row.TotalChartConst}, nil
 }

@@ -297,7 +297,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		var score, count int
-		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > 1010000 {
+		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		if err := json.Unmarshal(m["count"], &count); err != nil || count < 1 {
@@ -307,7 +307,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		result.Count = &count
 	case achievementType == "avg_score":
 		var score int
-		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > 1010000 {
+		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
@@ -380,16 +380,19 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 		}
 	case "total_score":
 		if params.Total != nil {
-			maxTotal := float64(stats.ChartCount) * 1010000
+			maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 			if *params.Total > maxTotal {
 				slog.Info("goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
 		}
 	case "overpower_value":
-		if params.Total != nil && *params.Total > stats.TotalOverpowerMax {
-			slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", stats.TotalOverpowerMax)
-			return ErrInvalidAchievementParam
+		if params.Total != nil {
+			maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
+			if *params.Total > maxTotal {
+				slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
+				return ErrInvalidAchievementParam
+			}
 		}
 	case "overpower_percent":
 		// 割合(0-100)で扱うため動的上限は不要

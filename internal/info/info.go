@@ -17,6 +17,12 @@ const (
 	ChartConstMin        = 1.0
 	ChartConstMax        = 15.9
 
+	// Goal関連の理論値計算定数
+	TheoreticalScore            = 1010000
+	TheoreticalOverpowerBaseAdd = 2.0
+	TheoreticalOverpowerScale   = 5.0
+	TheoreticalOverpowerBonus   = 5.0
+
 	// レートリミット設定: 外部API v1
 	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）
 	APIRateLimitAdminRequests = 150000           // ADMINユーザーのリクエスト制限（15分間）
@@ -93,4 +99,9 @@ var ComboLampAbbrevToName = map[string]string{
 var ComboLampNameToAbbrev = map[string]string{
 	"FULL COMBO":  "FC",
 	"ALL JUSTICE": "AJ",
+}
+
+// CalcTheoreticalOverpowerTotal は対象譜面群の理論値OVER POWER合計を計算します。
+func CalcTheoreticalOverpowerTotal(totalChartConst float64, chartCount int) float64 {
+	return (totalChartConst+float64(chartCount)*TheoreticalOverpowerBaseAdd)*TheoreticalOverpowerScale + float64(chartCount)*TheoreticalOverpowerBonus
 }

@@ -31,6 +31,6 @@ type GoalTargetFilter struct {
 
 // GoalTargetStats は絞り込み結果から得られる上限計算用統計です。
 type GoalTargetStats struct {
-	ChartCount        int
-	TotalOverpowerMax float64
+	ChartCount      int
+	TotalChartConst float64
 }

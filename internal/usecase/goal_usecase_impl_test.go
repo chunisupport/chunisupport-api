@@ -58,7 +58,7 @@ func (s *stubGoalRepo) LockUserByID(ctx context.Context, exec repository.Executo
 }
 func (s *stubGoalRepo) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
 	if s.stats == nil {
-		return &repository.GoalTargetStats{ChartCount: 1000, TotalOverpowerMax: 90000}, nil
+		return &repository.GoalTargetStats{ChartCount: 1000, TotalChartConst: 17000}, nil
 	}
 	return s.stats, nil
 }
@@ -231,7 +231,7 @@ func TestGoalUsecase_CreateRejectsUnknownAttributeKey(t *testing.T) {
 }
 
 func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
-	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalOverpowerMax: 100}}
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
@@ -243,7 +243,7 @@ func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
 }
 
 func TestGoalUsecase_CreateRejectsTotalScoreOverDynamicUpperBound(t *testing.T) {
-	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalOverpowerMax: 100}}
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
@@ -255,7 +255,7 @@ func TestGoalUsecase_CreateRejectsTotalScoreOverDynamicUpperBound(t *testing.T) 
 }
 
 func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing.T) {
-	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalOverpowerMax: 99.9}}
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 10.0}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
