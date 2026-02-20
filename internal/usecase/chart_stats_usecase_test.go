@@ -17,7 +17,7 @@ type MockChartStatsRepository struct {
 }
 
 func (m *MockChartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*entity.RatingBand, error) {
-	panic("FindRatingBands は使用されません")
+	panic("FindRatingBands is not used")
 }
 
 func (m *MockChartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
