@@ -23,9 +23,9 @@ func NewGoalHandler(goalUsecase usecase.GoalUsecase) *GoalHandler {
 }
 
 func (h *GoalHandler) List(c echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 	goals, err := h.goalUsecase.List(c.Request().Context(), user.ID)
 	if err != nil {
@@ -39,9 +39,9 @@ func (h *GoalHandler) List(c echo.Context) error {
 }
 
 func (h *GoalHandler) Create(c echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 	var req internaldto.GoalRequest
 	if err := c.Bind(&req); err != nil {
@@ -62,9 +62,9 @@ func (h *GoalHandler) Create(c echo.Context) error {
 }
 
 func (h *GoalHandler) Update(c echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -89,9 +89,9 @@ func (h *GoalHandler) Update(c echo.Context) error {
 }
 
 func (h *GoalHandler) Delete(c echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -116,6 +116,14 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 		}
 	}
 	return &usecase.GoalInput{Title: req.Title, AchievementType: req.AchievementType, AchievementParams: params, Attributes: attrs, Invert: req.Invert}, nil
+}
+
+func getUser(c echo.Context) (*entity.User, error) {
+	user, ok := c.Get("userEntity").(*entity.User)
+	if !ok || user == nil {
+		return nil, apierror.ErrUnauthorized
+	}
+	return user, nil
 }
 
 func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
