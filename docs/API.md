@@ -101,6 +101,10 @@
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除。 |
 | `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得。 |
 | `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト。 |
+| `/internal/me/goals` | GET | Cookie | 目標一覧を取得。 |
+| `/internal/me/goals` | POST | Cookie | 目標を作成。 |
+| `/internal/me/goals/:id` | PUT | Cookie | 目標を更新。 |
+| `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除。 |
 | `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・削除済み・プレイヤー未紐付けを含む）。 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得。 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除。 |
@@ -1280,6 +1284,9 @@ curl -X POST \
 ## `/internal/master` グループ
 
 ### GET `/internal/master`
+
+レスポンスに `achievement_types` が追加されます。
+
 - **認証**: Cookie 必須
 - **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン）を返却します。
 - **レスポンス**: 200 OK
@@ -1976,3 +1983,20 @@ interface SkippedRecord {
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
 - ユーザーを論理削除するとログインは失敗し、既存セッションも無効化されます。
+
+
+### GET `/internal/me/goals`
+
+`{ "goals": Goal[] }` を返します。
+
+### POST `/internal/me/goals`
+
+目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合ではなく実数値（0以上・小数3桁まで）として扱います。
+
+### PUT `/internal/me/goals/:id`
+
+指定IDの目標を更新します。
+
+### DELETE `/internal/me/goals/:id`
+
+指定IDの目標を削除します。

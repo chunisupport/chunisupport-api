@@ -88,12 +88,19 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		})
 	}
 
+	achievementTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AchievementTypes))
+	for _, item := range h.masterCache.AchievementTypes {
+		achievementTypes = append(achievementTypes, &dto.MasterItemDTO{ID: item.ID, Name: item.Name})
+	}
+	sortMasterItemsByID(achievementTypes)
+
 	response := &dto.MasterDataResponse{
-		Genres:       genres,
-		Difficulties: difficulties,
-		AccountTypes: accountTypes,
-		Versions:     versions,
-		RatingBands:  ratingBands,
+		Genres:           genres,
+		Difficulties:     difficulties,
+		AccountTypes:     accountTypes,
+		Versions:         versions,
+		RatingBands:      ratingBands,
+		AchievementTypes: achievementTypes,
 	}
 
 	return c.JSON(http.StatusOK, response)

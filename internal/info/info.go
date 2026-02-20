@@ -13,6 +13,9 @@ const (
 	BulkSelectChunkSize  = 1000 // IN句のプレースホルダ上限を避けるための分割数
 	DefaultUserListLimit = 100
 	DefaultSongListLimit = 100
+	GoalMaxPerUser       = 100
+	ChartConstMin        = 1.0
+	ChartConstMax        = 15.9
 
 	// レートリミット設定: 外部API v1
 	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）
@@ -63,3 +66,31 @@ const (
 // プレイヤーデータ登録時に、このリストに含まれるバージョンのみ受け付ける
 // NOTE: ユーザーが設定ファイルで変更できるようにする必要があれば、example.setting.jsonに追加してください
 var SupportedAppVersions = []string{"0.0.2"}
+
+// HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブルです。
+var HardLampAbbrevToName = map[string]string{
+	"HRD": "HARD",
+	"BRV": "BRAVE",
+	"ABS": "ABSOLUTE",
+	"CTS": "CATASTROPHY",
+}
+
+// HardLampNameToAbbrev はマスタ名→API略称への逆引き変換テーブルです。
+var HardLampNameToAbbrev = map[string]string{
+	"HARD":        "HRD",
+	"BRAVE":       "BRV",
+	"ABSOLUTE":    "ABS",
+	"CATASTROPHY": "CTS",
+}
+
+// ComboLampAbbrevToName はAPI略称→マスタ名（combo_lamp_types.name）への変換テーブルです。
+var ComboLampAbbrevToName = map[string]string{
+	"FC": "FULL COMBO",
+	"AJ": "ALL JUSTICE",
+}
+
+// ComboLampNameToAbbrev はマスタ名→API略称への逆引き変換テーブルです。
+var ComboLampNameToAbbrev = map[string]string{
+	"FULL COMBO":  "FC",
+	"ALL JUSTICE": "AJ",
+}

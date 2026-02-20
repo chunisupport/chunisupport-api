@@ -28,3 +28,8 @@ type AccountTypeMasterProvider interface {
 type ChartStatsMasterProvider interface {
 	RatingBands() []*entity.RatingBand
 }
+
+// GoalMasterProvider は目標機能で必要なマスタデータを提供します。
+type GoalMasterProvider interface {
+	GoalMasters() *masterdata.GoalMasters
+}

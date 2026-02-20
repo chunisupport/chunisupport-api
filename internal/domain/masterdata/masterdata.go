@@ -44,3 +44,14 @@ type SongMasters struct {
 	GenreNamesByID map[int]string
 	Difficulties   map[string]Item
 }
+
+// GoalMasters は目標機能で必要になるマスタ集合です。
+type GoalMasters struct {
+	AchievementTypesByCode map[string]Item
+	AchievementTypesByID   map[int]string
+	DifficultyNamesByID    map[int]string
+	GenreNamesByID         map[int]string
+	VersionsByID           map[int]Version
+	ClearLampNamesByID     map[int]string
+	ComboLampNamesByID     map[int]string
+}
