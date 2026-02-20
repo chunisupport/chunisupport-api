@@ -56,7 +56,11 @@ const (
 	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
 
 	// 目標関連エラー
-	CodeGoalNotFound      = "goal_not_found"
-	CodeGoalLimitExceeded = "goal_limit_exceeded"
-	CodeInvalidGoalInput  = "invalid_goal_input"
+	CodeGoalNotFound                 = "goal_not_found"
+	CodeGoalLimitExceeded            = "goal_limit_exceeded"
+	CodeGoalInvalidTitle             = "goal_invalid_title"
+	CodeGoalInvalidAchievementType   = "goal_invalid_achievement_type"
+	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
+	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
+	CodeInvalidGoalInput             = "invalid_goal_input"
 )

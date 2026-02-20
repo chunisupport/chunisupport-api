@@ -1993,6 +1993,15 @@ interface SkippedRecord {
 
 目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合（0以上100以下・小数3桁まで）として扱います。
 
+`attributes` は `diff` / `const` / `genre` / `ver` のみ許可します。未知キーは不正入力です。`const.min` / `const.max` は小数1桁まで許可します。
+
+サーバー側では `attributes` で絞り込まれた対象譜面数をもとに上限を動的に検証します。
+
+- `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` は対象譜面数以下
+- `total_score.total` は `対象譜面数 × 1010000` 以下
+- `overpower_value.total` は対象譜面の理論値OverPower合計以下
+- `overpower_percent.total` は割合のため 0〜100 の固定上限
+
 ### PUT `/internal/me/goals/:id`
 
 指定IDの目標を更新します。
@@ -2000,3 +2009,14 @@ interface SkippedRecord {
 ### DELETE `/internal/me/goals/:id`
 
 指定IDの目標を削除します。
+
+### Goal API エラーコード
+
+| エラーコード | HTTP | 説明 |
+|---|---|---|
+| `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
+| `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `goal_invalid_title` | 400 | `title` が空文字、trim後30文字超、または制御文字を含む |
+| `goal_invalid_achievement_type` | 400 | `achievement_type` が不正 |
+| `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過 |
+| `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー |

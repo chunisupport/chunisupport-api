@@ -339,7 +339,7 @@ CREATE TABLE goals (
 - 方針は **A: Goバリデーション中心 + 必要最小限のSchema併用**。
 - 境界（Handler/DTO）で形式チェック。
 - Usecaseで業務ルールチェック。
-  - `title` の形式チェック（trim()後で30文字以内かつ空文字不可）
+  - `title` の形式チェック（trim()後で30文字以内かつ空文字不可、制御文字は禁止）
   - `achievement_type` の有効性確認（起動時プリロード済みのキャッシュ `AchievementTypesByCode` で検索。存在しなければ `goal_invalid_achievement_type` (400)）
   - `achievement_type` の大文字小文字は完全一致のみ許可する（例: `score_count` は許可、`Score_Count` は不許可）
   - `achievement_type` と `params` の一致
@@ -548,6 +548,7 @@ Usecase でマスタIDを引く際は `AbbrevToName` テーブルを経由し、
 |---|---|---|
 | `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
 | `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む）|
-| `goal_invalid_achievement_type` | 400 | `achievement_type` が不正な値または `params` との組み合わせが不一致 |
+| `goal_invalid_achievement_type` | 400 | `achievement_type` が不正な値 |
+| `goal_invalid_achievement_params` | 400 | `achievement_params` が不正な値または `achievement_type` との組み合わせが不一致 |
 | `goal_invalid_attributes` | 400 | `attributes` の値が不正（`diff` 範囲外・`const` 範囲外・`genre`/`ver` 未存在など） |
 | `goal_invalid_title` | 400 | `title` が空文字またはtrim後30文字超 |

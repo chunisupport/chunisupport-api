@@ -30,8 +30,10 @@
   - 「対象譜面数を超える count」を保存できる可能性がある。
 - 例: `total_score.total`
   - 「対象譜面数 × 1010000」を超える値を保存できる可能性がある。
-- 例: `overpower_value.total` / `overpower_percent.total`
+- 例: `overpower_value.total`
   - 対象譜面の理論値合計を超える値が保存できる可能性がある。
+- 例: `overpower_percent.total`
+  - 割合仕様（0〜100）を超える値が保存できる可能性がある。
 
 **対応方針**
 - Usecase層で `attributes` を解釈し対象譜面集合を確定。

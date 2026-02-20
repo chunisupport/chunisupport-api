@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"unicode"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -46,7 +47,7 @@ func (u *goalUsecase) List(ctx context.Context, userID int) ([]*GoalOutput, erro
 }
 
 func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) (*GoalOutput, error) {
-	validated, err := u.validateInput(input)
+	validated, err := u.validateInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 }
 
 func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *GoalInput) (*GoalOutput, error) {
-	validated, err := u.validateInput(input)
+	validated, err := u.validateInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -133,12 +134,27 @@ type validatedGoalInput struct {
 	Invert            bool
 }
 
-func (u *goalUsecase) validateInput(input *GoalInput) (*validatedGoalInput, error) {
+type goalAttributeFilter struct {
+	DifficultyID          *int
+	ConstMin              *float64
+	ConstMax              *float64
+	GenreID               *int
+	VersionReleasedAt     *domainmasterdata.Version
+	VersionReleasedBefore *domainmasterdata.Version
+}
+
+type goalAchievementParam struct {
+	Score *int
+	Count *int
+	Total *float64
+}
+
+func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*validatedGoalInput, error) {
 	if input == nil {
 		return nil, ErrInvalidGoalInput
 	}
 	title := strings.TrimSpace(input.Title)
-	if title == "" || len([]rune(title)) > 30 {
+	if title == "" || len([]rune(title)) > 30 || hasControlCharacter(title) {
 		return nil, ErrInvalidGoalTitle
 	}
 	masters := u.masterProvider.GoalMasters()
@@ -149,39 +165,47 @@ func (u *goalUsecase) validateInput(input *GoalInput) (*validatedGoalInput, erro
 	if !ok {
 		return nil, ErrInvalidAchievementType
 	}
-	attrsRaw, err := validateAttributes(input.Attributes, masters)
+	attrsRaw, attrsFilter, err := validateAttributes(input.Attributes, masters)
 	if err != nil {
 		return nil, err
 	}
-	paramsRaw, err := validateAchievementParams(input.AchievementType, input.AchievementParams)
+	paramsRaw, params, err := validateAchievementParams(input.AchievementType, input.AchievementParams)
 	if err != nil {
 		return nil, err
 	}
+
+	if err := u.validateDynamicUpperBound(ctx, input.AchievementType, attrsFilter, params); err != nil {
+		return nil, err
+	}
+
 	return &validatedGoalInput{Title: title, AchievementTypeID: item.ID, AchievementParams: paramsRaw, Attributes: attrsRaw, Invert: input.Invert}, nil
 }
 
-func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]byte, error) {
+func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]byte, *goalAttributeFilter, error) {
 	var attrs map[string]json.RawMessage
 	if len(raw) == 0 {
-		return []byte("{}"), nil
+		return []byte("{}"), &goalAttributeFilter{}, nil
 	}
 	if err := json.Unmarshal(raw, &attrs); err != nil {
-		return nil, ErrInvalidGoalAttributes
+		return nil, nil, ErrInvalidGoalAttributes
 	}
 	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true}
 	for k := range attrs {
 		if !allowed[k] {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 	}
+
+	result := &goalAttributeFilter{}
 	if v, ok := attrs["diff"]; ok {
 		var diff int
 		if err := json.Unmarshal(v, &diff); err != nil {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 		if _, exists := masters.DifficultyNamesByID[diff]; !exists {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
+		result.DifficultyID = &diff
 	}
 	if v, ok := attrs["const"]; ok {
 		var c struct {
@@ -189,19 +213,25 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 			Max *float64 `json:"max"`
 		}
 		if err := json.Unmarshal(v, &c); err != nil {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 
 		minConst := info.ChartConstMin
 		maxConst := info.ChartConstMax
 		if c.Min != nil {
+			if !isScale(*c.Min, 1) {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
 			minConst = *c.Min
 		}
 		if c.Max != nil {
+			if !isScale(*c.Max, 1) {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
 			maxConst = *c.Max
 		}
 		if minConst < info.ChartConstMin || maxConst > info.ChartConstMax || minConst > maxConst {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 
 		normalizedConst, err := json.Marshal(struct {
@@ -209,97 +239,166 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 			Max float64 `json:"max"`
 		}{Min: minConst, Max: maxConst})
 		if err != nil {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 		attrs["const"] = normalizedConst
+		result.ConstMin = &minConst
+		result.ConstMax = &maxConst
 	}
 	if v, ok := attrs["genre"]; ok {
 		var id int
 		if err := json.Unmarshal(v, &id); err != nil {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
 		if _, exists := masters.GenreNamesByID[id]; !exists {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
+		result.GenreID = &id
 	}
 	if v, ok := attrs["ver"]; ok {
 		var id int
 		if err := json.Unmarshal(v, &id); err != nil {
-			return nil, ErrInvalidGoalAttributes
+			return nil, nil, ErrInvalidGoalAttributes
 		}
-		if _, exists := masters.VersionsByID[id]; !exists {
-			return nil, ErrInvalidGoalAttributes
+		version, exists := masters.VersionsByID[id]
+		if !exists {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		result.VersionReleasedAt = &version
+		for _, candidate := range masters.VersionsByID {
+			if candidate.ReleasedAt.After(version.ReleasedAt) {
+				if result.VersionReleasedBefore == nil || candidate.ReleasedAt.Before(result.VersionReleasedBefore.ReleasedAt) {
+					v := candidate
+					result.VersionReleasedBefore = &v
+				}
+			}
 		}
 	}
 	canon, err := json.Marshal(attrs)
 	if err != nil {
-		return nil, ErrInvalidGoalAttributes
+		return nil, nil, ErrInvalidGoalAttributes
 	}
-	return canon, nil
+	return canon, result, nil
 }
 
-func validateAchievementParams(achievementType string, raw []byte) ([]byte, error) {
+func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goalAchievementParam, error) {
 	if len(raw) == 0 {
-		return nil, ErrInvalidAchievementParam
+		return nil, nil, ErrInvalidAchievementParam
 	}
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, ErrInvalidAchievementParam
+		return nil, nil, ErrInvalidAchievementParam
 	}
+	result := &goalAchievementParam{}
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
 		if len(m) != 2 {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
 		var score, count int
-		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > 1010000 {
-			return nil, ErrInvalidAchievementParam
+		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > info.TheoreticalScore {
+			return nil, nil, ErrInvalidAchievementParam
 		}
 		if err := json.Unmarshal(m["count"], &count); err != nil || count < 1 {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		result.Score = &score
+		result.Count = &count
 	case achievementType == "avg_score":
 		var score int
-		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > 1010000 {
-			return nil, ErrInvalidAchievementParam
+		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		result.Score = &score
 	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
 		var lamp string
 		var count int
 		if len(m) != 2 || json.Unmarshal(m["lamp"], &lamp) != nil || json.Unmarshal(m["count"], &count) != nil || count < 1 {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
 		if achievementType == "hardlamp_count" {
 			if _, ok := info.HardLampAbbrevToName[lamp]; !ok {
-				return nil, ErrInvalidAchievementParam
+				return nil, nil, ErrInvalidAchievementParam
 			}
 		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		result.Count = &count
 	case achievementType == "total_score":
 		var total int64
 		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		totalFloat := float64(total)
+		result.Total = &totalFloat
 	case achievementType == "overpower_value":
 		var total float64
 		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || !isScale(total, 3) {
-			return nil, ErrInvalidAchievementParam
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		result.Total = &total
 	case achievementType == "overpower_percent":
 		var total float64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || !isScale(total, 3) {
-			return nil, ErrInvalidAchievementParam
+		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || total > 100 || !isScale(total, 3) {
+			return nil, nil, ErrInvalidAchievementParam
 		}
+		result.Total = &total
 	default:
-		return nil, ErrInvalidAchievementType
+		return nil, nil, ErrInvalidAchievementType
 	}
 	b, err := json.Marshal(m)
 	if err != nil {
-		return nil, ErrInvalidAchievementParam
+		return nil, nil, ErrInvalidAchievementParam
 	}
-	return b, nil
+	return b, result, nil
+}
+
+func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
+	filter := repository.GoalTargetFilter{
+		DifficultyID: attrs.DifficultyID,
+		GenreID:      attrs.GenreID,
+		ConstMin:     attrs.ConstMin,
+		ConstMax:     attrs.ConstMax,
+	}
+	if attrs.VersionReleasedAt != nil {
+		filter.VersionReleasedAt = &attrs.VersionReleasedAt.ReleasedAt
+	}
+	if attrs.VersionReleasedBefore != nil {
+		filter.VersionReleasedBefore = &attrs.VersionReleasedBefore.ReleasedAt
+	}
+	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
+	if err != nil {
+		return err
+	}
+
+	switch achievementType {
+	case "rank_count", "score_count", "hardlamp_count", "combolamp_count":
+		if params.Count != nil && *params.Count > stats.ChartCount {
+			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
+	case "total_score":
+		if params.Total != nil {
+			maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
+			if *params.Total > maxTotal {
+				slog.Info("goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
+				return ErrInvalidAchievementParam
+			}
+		}
+	case "overpower_value":
+		if params.Total != nil {
+			maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
+			if *params.Total > maxTotal {
+				slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
+				return ErrInvalidAchievementParam
+			}
+		}
+	case "overpower_percent":
+		// 割合(0-100)で扱うため動的上限は不要
+	}
+
+	return nil
 }
 
 func isScale(v float64, scale int) bool {
@@ -307,13 +406,26 @@ func isScale(v float64, scale int) bool {
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
 }
 
+func hasControlCharacter(value string) bool {
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+	return false
+}
+
 func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 	masters := u.masterProvider.GoalMasters()
+	if masters == nil {
+		return nil, ErrInternalError
+	}
 	outs := make([]*GoalOutput, 0, len(goals))
 	for _, g := range goals {
 		typeCode := masters.AchievementTypesByID[g.AchievementTypeID]
 		if typeCode == "" {
-			slog.Warn("achievement type code not found in master cache", "goal_id", g.ID, "achievement_type_id", g.AchievementTypeID)
+			slog.Error("achievement type code not found in master cache", "goal_id", g.ID, "achievement_type_id", g.AchievementTypeID)
+			return nil, ErrInternalError
 		}
 		var p map[string]any
 		if err := json.Unmarshal(g.AchievementParams, &p); err != nil {

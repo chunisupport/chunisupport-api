@@ -104,9 +104,13 @@ var (
 	ErrInvalidPassword       = New(CodeInvalidPassword, http.StatusBadRequest)       // パスワード無効（詳細隠蔽）
 	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
 
-	ErrGoalNotFound      = New(CodeGoalNotFound, http.StatusNotFound)
-	ErrGoalLimitExceeded = New(CodeGoalLimitExceeded, http.StatusBadRequest)
-	ErrInvalidGoalInput  = New(CodeInvalidGoalInput, http.StatusBadRequest)
+	ErrGoalNotFound                 = New(CodeGoalNotFound, http.StatusNotFound)
+	ErrGoalLimitExceeded            = New(CodeGoalLimitExceeded, http.StatusBadRequest)
+	ErrGoalInvalidTitle             = New(CodeGoalInvalidTitle, http.StatusBadRequest)
+	ErrGoalInvalidAchievementType   = New(CodeGoalInvalidAchievementType, http.StatusBadRequest)
+	ErrGoalInvalidAchievementParams = New(CodeGoalInvalidAchievementParams, http.StatusBadRequest)
+	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
+	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

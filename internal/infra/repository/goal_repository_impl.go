@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -103,4 +104,52 @@ func (r *goalRepository) CountByUserID(ctx context.Context, exec repository.Exec
 func (r *goalRepository) LockUserByID(ctx context.Context, exec repository.Executor, userID int) error {
 	var id int
 	return exec.GetContext(ctx, &id, `SELECT id FROM users WHERE id = ? FOR UPDATE`, userID)
+}
+
+func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
+	where := []string{"s.is_deleted = 0"}
+	args := make([]any, 0, 5)
+
+	if filter.DifficultyID != nil {
+		where = append(where, "c.difficulty_id = ?")
+		args = append(args, *filter.DifficultyID)
+	}
+	if filter.GenreID != nil {
+		where = append(where, "s.genre_id = ?")
+		args = append(args, *filter.GenreID)
+	}
+	if filter.VersionReleasedAt != nil {
+		where = append(where, "s.released_at >= ?")
+		args = append(args, *filter.VersionReleasedAt)
+	}
+	if filter.VersionReleasedBefore != nil {
+		where = append(where, "s.released_at < ?")
+		args = append(args, *filter.VersionReleasedBefore)
+	}
+	if filter.ConstMin != nil {
+		where = append(where, "c.const >= ?")
+		args = append(args, *filter.ConstMin)
+	}
+	if filter.ConstMax != nil {
+		where = append(where, "c.const <= ?")
+		args = append(args, *filter.ConstMax)
+	}
+
+	query := `
+		SELECT
+			COUNT(*) AS chart_count,
+			COALESCE(SUM(c.const), 0) AS total_chart_const
+		FROM charts c
+		INNER JOIN songs s ON s.id = c.song_id
+		WHERE ` + strings.Join(where, " AND ")
+
+	var row struct {
+		ChartCount      int     `db:"chart_count"`
+		TotalChartConst float64 `db:"total_chart_const"`
+	}
+	if err := exec.GetContext(ctx, &row, query, args...); err != nil {
+		return nil, err
+	}
+
+	return &repository.GoalTargetStats{ChartCount: row.ChartCount, TotalChartConst: row.TotalChartConst}, nil
 }
