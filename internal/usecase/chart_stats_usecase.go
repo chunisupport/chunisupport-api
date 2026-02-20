@@ -9,7 +9,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 // ChartStatsUsecase は譜面統計の取得ユースケースを提供します。
@@ -30,7 +29,7 @@ type chartStatsUsecaseImpl struct {
 	worldsendChartRepo repository.WorldsendChartRepository
 	statsRepo          repository.ChartStatsRepository
 	masterCache        repository.SongMasterProvider
-	staticMasterCache  *masterdata.StaticCache
+	masterProvider     repository.ChartStatsMasterProvider
 	defaultExecutor    repository.Executor
 	statsExecutor      repository.Executor
 }
@@ -41,7 +40,7 @@ func NewChartStatsUsecase(
 	worldsendChartRepo repository.WorldsendChartRepository,
 	statsRepo repository.ChartStatsRepository,
 	masterCache repository.SongMasterProvider,
-	staticMasterCache *masterdata.StaticCache,
+	masterProvider repository.ChartStatsMasterProvider,
 	defaultExecutor repository.Executor,
 	statsExecutor repository.Executor,
 ) ChartStatsUsecase {
@@ -50,7 +49,7 @@ func NewChartStatsUsecase(
 		worldsendChartRepo: worldsendChartRepo,
 		statsRepo:          statsRepo,
 		masterCache:        masterCache,
-		staticMasterCache:  staticMasterCache,
+		masterProvider:     masterProvider,
 		defaultExecutor:    defaultExecutor,
 		statsExecutor:      statsExecutor,
 	}
@@ -69,16 +68,13 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		return nil, err
 	}
 
-	// 削除済み楽曲の権限チェック
 	if song.IsDeleted {
-		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
 		}
 	}
 
-	// rating_bandsはキャッシュから取得
-	ratingBands := u.staticMasterCache.RatingBands
+	ratingBands := u.masterProvider.RatingBands()
 
 	entries, err := u.buildChartEntries(ctx, song)
 	if err != nil {
@@ -114,10 +110,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		charts[entry.key] = stats
 	}
 
-	return &entity.SongChartStats{
-		SongID: song.DisplayID,
-		Charts: charts,
-	}, nil
+	return &entity.SongChartStats{SongID: song.DisplayID, Charts: charts}, nil
 }
 
 func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *entity.Song) ([]chartEntry, error) {
@@ -130,12 +123,7 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 			return nil, err
 		}
 
-		return []chartEntry{
-			{
-				id:  worldsend.Chart.ID,
-				key: info.StatsDifficultyWorldsend,
-			},
-		}, nil
+		return []chartEntry{{id: worldsend.Chart.ID, key: info.StatsDifficultyWorldsend}}, nil
 	}
 
 	masters := u.masterCache.SongMasters()
@@ -149,10 +137,7 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 		if !ok {
 			return nil, fmt.Errorf("difficulty not found: %d", chart.DifficultyID)
 		}
-		entries = append(entries, chartEntry{
-			id:  chart.ID,
-			key: name,
-		})
+		entries = append(entries, chartEntry{id: chart.ID, key: name})
 	}
 
 	return entries, nil
@@ -166,30 +151,24 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		return nil, err
 	}
 
-	// 削除済み楽曲の権限チェック
 	if song.IsDeleted {
-		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
 		}
 	}
 
-	// rating_bandsはキャッシュから取得
-	ratingBands := u.staticMasterCache.RatingBands
+	ratingBands := u.masterProvider.RatingBands()
 
-	// 指定難易度の譜面を検索
 	entry, err := u.findChartEntryByDifficulty(ctx, song, difficultyName)
 	if err != nil {
 		return nil, err
 	}
 
-	// 譜面統計を取得
 	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, []int{entry.id})
 	if err != nil {
 		return nil, err
 	}
 
-	// レーティング帯順でソート
 	bandOrder := make(map[int]int, len(ratingBands))
 	for _, band := range ratingBands {
 		bandOrder[band.ID] = band.SortOrder
@@ -199,16 +178,11 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		return bandOrder[statsRows[i].RatingBandID] < bandOrder[statsRows[j].RatingBandID]
 	})
 
-	return &entity.SingleChartStats{
-		SongID:     song.DisplayID,
-		Difficulty: entry.key,
-		Stats:      statsRows,
-	}, nil
+	return &entity.SingleChartStats{SongID: song.DisplayID, Difficulty: entry.key, Stats: statsRows}, nil
 }
 
 // findChartEntryByDifficulty は指定難易度の譜面エントリを検索します。
 func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, song *entity.Song, difficultyName string) (*chartEntry, error) {
-	// WORLD'S END楽曲の場合
 	if difficultyName == info.StatsDifficultyWorldsend {
 		if !song.IsWorldsend {
 			return nil, ErrChartNotFound
@@ -220,13 +194,9 @@ func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, 
 			}
 			return nil, err
 		}
-		return &chartEntry{
-			id:  worldsend.Chart.ID,
-			key: info.StatsDifficultyWorldsend,
-		}, nil
+		return &chartEntry{id: worldsend.Chart.ID, key: info.StatsDifficultyWorldsend}, nil
 	}
 
-	// 通常楽曲の場合、WORLD'S ENDリクエストは無効
 	if song.IsWorldsend {
 		return nil, ErrChartNotFound
 	}
@@ -236,20 +206,13 @@ func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, 
 		return nil, fmt.Errorf("master cache is not initialized")
 	}
 
-	// 該当する難易度の譜面を検索
-	// DifficultyNamesByIDを逆引きして、難易度名に一致する譜面を探す
 	for _, chart := range song.Charts {
 		name, ok := masters.DifficultyNamesByID[chart.DifficultyID]
 		if ok && name == difficultyName {
-			return &chartEntry{
-				id:  chart.ID,
-				key: difficultyName,
-			}, nil
+			return &chartEntry{id: chart.ID, key: difficultyName}, nil
 		}
 	}
 
-	// 指定された難易度の譜面が存在しない
-	// 難易度名が有効かどうかをチェック
 	validDifficulty := false
 	for _, name := range masters.DifficultyNamesByID {
 		if name == difficultyName {
