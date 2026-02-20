@@ -44,6 +44,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrOperationFailed.WithInternal(err) // 409 → 400 で詳細を隠蔽
 	case errors.Is(err, usecase.ErrOperationFailed):
 		return ErrOperationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInternalError):
+		return ErrInternalError.WithInternal(err)
 	case errors.Is(err, usecase.ErrAdminRequired):
 		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPIToken):

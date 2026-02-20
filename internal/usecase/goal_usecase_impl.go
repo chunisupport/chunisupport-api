@@ -142,7 +142,7 @@ func (u *goalUsecase) validateInput(input *GoalInput) (*validatedGoalInput, erro
 	}
 	masters := u.masterProvider.GoalMasters()
 	if masters == nil {
-		return nil, ErrOperationFailed
+		return nil, ErrInternalError
 	}
 	item, ok := masters.AchievementTypesByCode[input.AchievementType]
 	if !ok {

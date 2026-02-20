@@ -64,6 +64,12 @@ func (s *stubTM) Transactional(ctx context.Context, f func(tx repository.Executo
 
 type stubGoalMasterProvider struct{}
 
+type stubNilGoalMasterProvider struct{}
+
+func (s *stubNilGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
+	return nil
+}
+
 func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 	return &domainmasterdata.GoalMasters{
 		AchievementTypesByCode: map[string]domainmasterdata.Item{"score_count": {ID: 2, Name: "score_count"}},
@@ -116,6 +122,18 @@ func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
 		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
 	})
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
+}
+
+func TestGoalUsecase_CreateMasterDataUnavailable(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubNilGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInternalError))
 }
 
 func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
