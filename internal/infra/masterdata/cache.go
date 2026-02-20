@@ -305,6 +305,7 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 	return &domainmasterdata.GoalMasters{
 		AchievementTypesByCode: maps.Clone(c.AchievementTypes),
 		AchievementTypesByID:   maps.Clone(c.AchievementTypesByID),
+		DifficultyNamesByID:    maps.Clone(c.DifficultyNamesByID),
 		GenreNamesByID:         maps.Clone(c.GenreNamesByID),
 		VersionsByID:           versionsByID,
 		ClearLampNamesByID:     maps.Clone(c.ClearLampNamesByID),

@@ -172,7 +172,10 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	}
 	if v, ok := attrs["diff"]; ok {
 		var diff int
-		if err := json.Unmarshal(v, &diff); err != nil || diff < 1 || diff > 5 {
+		if err := json.Unmarshal(v, &diff); err != nil {
+			return nil, ErrInvalidGoalAttributes
+		}
+		if _, exists := masters.DifficultyNamesByID[diff]; !exists {
 			return nil, ErrInvalidGoalAttributes
 		}
 	}

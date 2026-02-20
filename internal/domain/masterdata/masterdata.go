@@ -49,6 +49,7 @@ type SongMasters struct {
 type GoalMasters struct {
 	AchievementTypesByCode map[string]Item
 	AchievementTypesByID   map[int]string
+	DifficultyNamesByID    map[int]string
 	GenreNamesByID         map[int]string
 	VersionsByID           map[int]Version
 	ClearLampNamesByID     map[int]string

@@ -64,6 +64,7 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 	return &domainmasterdata.GoalMasters{
 		AchievementTypesByCode: map[string]domainmasterdata.Item{"score_count": {ID: 2, Name: "score_count"}},
 		AchievementTypesByID:   map[int]string{2: "score_count"},
+		DifficultyNamesByID:    map[int]string{4: "MASTER"},
 		GenreNamesByID:         map[int]string{1: "POPS & ANIME"},
 		VersionsByID:           map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE"}},
 	}
@@ -99,4 +100,16 @@ func TestGoalUsecase_DeleteNotFound(t *testing.T) {
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	err := u.Delete(context.Background(), 1, 999)
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
+}
+
+func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":5,"genre":1,"ver":20}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
