@@ -15,8 +15,9 @@ import (
 )
 
 type stubGoalRepo struct {
-	count int
-	goal  *entity.Goal
+	count     int
+	goal      *entity.Goal
+	updateErr error
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
@@ -35,6 +36,9 @@ func (s *stubGoalRepo) Create(ctx context.Context, exec repository.Executor, goa
 	return nil
 }
 func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
+	if s.updateErr != nil {
+		return s.updateErr
+	}
 	s.goal = goal
 	return nil
 }
@@ -99,6 +103,18 @@ func TestGoalUsecase_DeleteNotFound(t *testing.T) {
 	repo := &stubGoalRepo{}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	err := u.Delete(context.Background(), 1, 999)
+	assert.True(t, errors.Is(err, ErrGoalNotFound))
+}
+
+func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}, updateErr: sql.ErrNoRows}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Update(context.Background(), 1, 1, &GoalInput{
+		Title:             "updated",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+	})
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
 }
 

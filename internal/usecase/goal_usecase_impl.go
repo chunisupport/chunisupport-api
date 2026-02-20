@@ -104,6 +104,9 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 	goal.Attributes = validated.Attributes
 	goal.Invert = validated.Invert
 	if err := u.goalRepo.Update(ctx, u.db, goal); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrGoalNotFound
+		}
 		return nil, err
 	}
 	outs, err := u.toOutputs([]*entity.Goal{goal})
