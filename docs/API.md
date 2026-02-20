@@ -1980,6 +1980,8 @@ interface SkippedRecord {
 
 ## 運用上の注意
 
+- エラーコードと内部理由コードの最新一覧は `docs/error_code_reason_codes.md` を参照してください。
+
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
 - ユーザーを論理削除するとログインは失敗し、既存セッションも無効化されます。
@@ -1994,6 +1996,8 @@ interface SkippedRecord {
 目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合（0以上100以下・小数3桁まで）として扱います。
 
 `attributes` は `diff` / `const` / `genre` / `ver` のみ許可します。未知キーは不正入力です。`const.min` / `const.max` は小数1桁まで許可します。
+
+リクエストボディは厳格デコードされるため、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
 
 サーバー側では `attributes` で絞り込まれた対象譜面数をもとに上限を動的に検証します。
 
@@ -2016,7 +2020,7 @@ interface SkippedRecord {
 |---|---|---|
 | `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
 | `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
-| `goal_invalid_title` | 400 | `title` が空文字、trim後30文字超、または制御文字を含む |
+| `goal_invalid_title` | 400 | `title` が空文字、または制御文字を含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正 |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー |
