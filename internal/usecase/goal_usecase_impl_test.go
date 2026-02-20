@@ -72,8 +72,8 @@ func (s *stubNilGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters 
 
 func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 	return &domainmasterdata.GoalMasters{
-		AchievementTypesByCode: map[string]domainmasterdata.Item{"score_count": {ID: 2, Name: "score_count"}},
-		AchievementTypesByID:   map[int]string{2: "score_count"},
+		AchievementTypesByCode: map[string]domainmasterdata.Item{"score_count": {ID: 2, Name: "score_count"}, "overpower_percent": {ID: 8, Name: "overpower_percent"}},
+		AchievementTypesByID:   map[int]string{2: "score_count", 8: "overpower_percent"},
 		DifficultyNamesByID:    map[int]string{4: "MASTER"},
 		GenreNamesByID:         map[int]string{1: "POPS & ANIME"},
 		VersionsByID:           map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE"}},
@@ -172,4 +172,28 @@ func TestGoalUsecase_CreateConstAttributeWithOmittedMaxUsesDefault(t *testing.T)
 	})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(1.2), "max": float64(15.9)}}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateOverpowerPercentAcceptsRealValue(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "overpower_percent",
+		AchievementParams: []byte(`{"total":123.456}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+}
+
+func TestGoalUsecase_CreateOverpowerPercentRejectsMoreThan3Decimals(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "overpower_percent",
+		AchievementParams: []byte(`{"total":12.3456}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
 }

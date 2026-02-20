@@ -289,7 +289,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, erro
 		}
 	case achievementType == "overpower_percent":
 		var total float64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || total > 100 || !isScale(total, 2) {
+		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || !isScale(total, 3) {
 			return nil, ErrInvalidAchievementParam
 		}
 	default:
