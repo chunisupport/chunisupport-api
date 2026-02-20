@@ -118,7 +118,7 @@ CREATE TABLE goals (
 | `combolamp_count` | 指定したコンボランプの達成数 |
 | `total_score` | 全譜面のスコア合計 |
 | `overpower_value` | 全譜面のOverPower値合計 |
-| `overpower_percent` | 全譜面のOverPower値割合 |
+| `overpower_percent` | 全譜面のOverPower値合計（表示カテゴリ名はpercentのまま） |
 
 ### 型整合ルール
 
@@ -248,16 +248,17 @@ CREATE TABLE goals (
 
 ```json
 {
-  "total": 100.00
+  "total": 1000000.000
 }
 ```
 
-- `total`: `number`（小数点以下2桁まで）
+- `total`: `number`（小数点以下3桁まで）
   - 最小値: 0
-  - 最大値: 100
-  - 計算方法: `overpower_value` の合計 ÷ 対象譜面のOverPower値（理論値）の合計 × 100。
+  - 最大値: 対象譜面のOverPower値（理論値）の合計。
+  - **内部表現は割合ではなく実数値**とし、`overpower_value.total` と同じ単位で扱う。
+  - 表示時の割合換算（`現在値 ÷ 理論値合計 × 100`）はフロントエンドで行う。
   - 各譜面のOP理論値の算出方針は `overpower_value`（§4.7）と同一。
-  - 分母（対象譜面の理論値合計）が0かどうかは目標保存時には判定しない。保存時は構造・型・範囲のみを検証し、表示時の「破損目標」判定はフロントエンドで行う。
+  - 分母（対象譜面の理論値合計）が0かどうかは目標保存時には判定しない。保存時は構造・型・範囲のみを検証し、表示時の割合換算可否（破損目標判定を含む）はフロントエンドで行う。
 ---
 
 ## 5. `attributes` 仕様
