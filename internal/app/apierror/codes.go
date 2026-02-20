@@ -59,4 +59,8 @@ const (
 	CodeGoalNotFound      = "goal_not_found"
 	CodeGoalLimitExceeded = "goal_limit_exceeded"
 	CodeInvalidGoalInput  = "invalid_goal_input"
+	CodeInvalidGoalTitle  = "invalid_goal_title"
+	CodeInvalidGoalType   = "invalid_goal_achievement_type"
+	CodeInvalidGoalParam  = "invalid_goal_achievement_params"
+	CodeInvalidGoalAttr   = "invalid_goal_attributes"
 )

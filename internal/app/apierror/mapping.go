@@ -79,8 +79,16 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrGoalLimitExceeded):
 		return ErrGoalLimitExceeded.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidGoalInput), errors.Is(err, usecase.ErrInvalidGoalTitle), errors.Is(err, usecase.ErrInvalidAchievementType), errors.Is(err, usecase.ErrInvalidAchievementParam), errors.Is(err, usecase.ErrInvalidGoalAttributes):
+	case errors.Is(err, usecase.ErrInvalidGoalInput):
 		return ErrInvalidGoalInput.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalTitle):
+		return ErrInvalidGoalTitle.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAchievementType):
+		return ErrInvalidGoalType.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAchievementParam):
+		return ErrInvalidGoalParam.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
+		return ErrInvalidGoalAttr.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

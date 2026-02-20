@@ -107,6 +107,10 @@ var (
 	ErrGoalNotFound      = New(CodeGoalNotFound, http.StatusNotFound)
 	ErrGoalLimitExceeded = New(CodeGoalLimitExceeded, http.StatusBadRequest)
 	ErrInvalidGoalInput  = New(CodeInvalidGoalInput, http.StatusBadRequest)
+	ErrInvalidGoalTitle  = New(CodeInvalidGoalTitle, http.StatusBadRequest)
+	ErrInvalidGoalType   = New(CodeInvalidGoalType, http.StatusBadRequest)
+	ErrInvalidGoalParam  = New(CodeInvalidGoalParam, http.StatusBadRequest)
+	ErrInvalidGoalAttr   = New(CodeInvalidGoalAttr, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

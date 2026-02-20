@@ -141,7 +141,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
-	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, songRepo, masterCache)
 
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)

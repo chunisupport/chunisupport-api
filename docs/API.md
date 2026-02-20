@@ -1993,9 +1993,31 @@ interface SkippedRecord {
 
 目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合（0以上100以下・小数3桁まで）として扱います。
 
+- `title`: 前後の空白はtrimされます。trim後は1〜30文字で、改行を含む制御文字およびゼロ幅文字は許可されません。
+- `attributes`: 未知キーは不許可です（`diff` / `const` / `genre` / `ver` のみ許可）。
+- `attributes.const`: `min` / `max` は小数1桁までを許可します。
+
+主なエラーコード:
+
+- `invalid_goal_input`
+- `invalid_goal_title`
+- `invalid_goal_achievement_type`
+- `invalid_goal_achievement_params`
+- `invalid_goal_attributes`
+- `goal_limit_exceeded`
+
 ### PUT `/internal/me/goals/:id`
 
 指定IDの目標を更新します。
+
+主なエラーコード:
+
+- `goal_not_found`
+- `invalid_goal_input`
+- `invalid_goal_title`
+- `invalid_goal_achievement_type`
+- `invalid_goal_achievement_params`
+- `invalid_goal_attributes`
 
 ### DELETE `/internal/me/goals/:id`
 
