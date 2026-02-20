@@ -504,7 +504,7 @@ Usecase でマスタIDを引く際は `AbbrevToName` テーブルを経由し、
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
   "invert": false,
-  "created_at": "2026-01-01T00:00:00Z"
+  "created_at": "2026-01-01T09:00:00+09:00"
 }
 ```
 
