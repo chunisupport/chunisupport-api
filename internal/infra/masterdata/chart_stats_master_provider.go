@@ -18,7 +18,10 @@ func NewChartStatsMasterProviderAdapter(cache *StaticCache) repository.ChartStat
 // RatingBands は譜面統計で参照するレーティング帯一覧を返します。
 func (a *ChartStatsMasterProviderAdapter) RatingBands() []*entity.RatingBand {
 	if a == nil || a.cache == nil {
-		return nil
+		return []*entity.RatingBand{}
+	}
+	if a.cache.RatingBands == nil {
+		return []*entity.RatingBand{}
 	}
 	return a.cache.RatingBands
 }
