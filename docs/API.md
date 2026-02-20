@@ -1991,7 +1991,7 @@ interface SkippedRecord {
 
 ### POST `/internal/me/goals`
 
-目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合ではなく実数値（0以上・小数3桁まで）として扱います。
+目標を作成します。`achievement_type` と `achievement_params` の組み合わせはサーバー側で検証します。`overpower_percent` の `achievement_params.total` は割合（0以上100以下・小数3桁まで）として扱います。
 
 ### PUT `/internal/me/goals/:id`
 
