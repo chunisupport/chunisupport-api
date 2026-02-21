@@ -153,7 +153,7 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 		return nil, ErrInvalidGoalInput
 	}
 	title := input.Title
-	if title == "" || hasControlCharacter(title) {
+	if title == "" || len([]rune(title)) > 255 || hasControlCharacter(title) {
 		return nil, ErrInvalidGoalTitle
 	}
 	masters := u.masterProvider.GoalMasters()
