@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -61,7 +62,7 @@ func TestDecodeStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T)
 	header := http.Header{}
 
 	var out map[string]any
-	err := decodeStrictJSON(body, header, &out)
+	err := apphandler.DecodeStrictJSON(body, header, &out)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -76,7 +77,7 @@ func TestDecodeStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T)
 	header.Set(echo.HeaderContentType, "text/plain")
 
 	var out map[string]any
-	err := decodeStrictJSON(body, header, &out)
+	err := apphandler.DecodeStrictJSON(body, header, &out)
 	if err == nil {
 		t.Fatal("expected error")
 	}
