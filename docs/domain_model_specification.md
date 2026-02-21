@@ -256,6 +256,62 @@ CHUNITHM の楽曲情報を表すエンティティ。
 - **ClassEmblemBase**: クラスエンブレムベース（称号の基礎デザイン）
 - **APIToken**: API認証トークン
 - **Session**: ユーザーセッション
+- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count` 等）
+
+---
+
+### Goal（目標エンティティ）
+
+#### 概要
+ユーザーが設定する目標を表すエンティティ。成果種別（`achievement_type`）と対象譜面の絞り込み条件（`attributes`）を持ち、達成状況の追跡に使用されます。1ユーザーあたり最大100件まで作成可能です。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| ID | uint32 | ✓ | 目標ID（主キー、自動採番） |
+| UserID | int | ✓ | 所属ユーザーID（外部キー） |
+| Title | string | ✓ | 目標タイトル（trim後30文字以内、空文字不可、制御文字不可） |
+| AchievementTypeID | int | ✓ | 成果種別ID（`achievement_types.id` への外部キー） |
+| AchievementType | string | - | 成果種別コード（DBには永続化されない。マスタ逆引きで出力時に解決） |
+| AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
+| Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
+| Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
+| CreatedAt | time.Time | ✓ | 作成日時 |
+
+#### 振る舞い（メソッド）
+
+現在、振る舞いメソッドなし。将来的に型安全な `AchievementParams` / `Attributes` 構造体への段階移行を予定。
+
+#### 不変条件
+
+- `Title` はtrim後に1文字以上30文字（ルーン単位）以内。制御文字を含まない
+- `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
+- `AchievementParams` は `AchievementType` に対応する構造のJSON
+- `Attributes` は許可キー（`diff`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
+
+#### `AchievementParams` の型整合ルール
+
+`achievement_type` と `achievement_params` の構造は厳密に対応しなければなりません。不一致は不正入力として4xxエラーを返します。詳細な仕様は `docs/API.md` の「`achievement_params` 仕様」を参照してください。
+
+#### `Attributes` の仕様
+
+| キー | 型 | 説明 |
+|---|---|---|
+| `diff` | `integer` | 難易度ID（`difficulties.id` と同値、1〜5）。IDの数値は順序を表すが、`genre`/`ver` とは異なり固定序列 |
+| `const` | `object` | 譜面定数レンジ（`min`/`max`。`float64`、小数1桁）。有効範囲: `1.0 ≤ min, max ≤ 15.9` |
+| `genre` | `integer` | ジャンルマスタID（単値）。IDの数値は順序を表さない |
+| `ver` | `integer` | バージョンマスタID（単値）。IDの数値は順序を表さない |
+
+`genre` / `ver` のIDは**存在確認（一致判定）のみに使用**し、IDの数値による順序比較・レンジ判定は行ってはなりません。
+
+#### DB設計の補足
+
+- `achievement_params` / `attributes` はDB上ではJSON型で保存されます
+- DB保存時はコンパクトJSON（インデントなし）で、バリデーション済み構造体から再エンコードしたJSONを保存します（入力原文をそのまま保持しません）
+- `updated_at` / 達成日時カラムは持ちません（楽曲追加により達成状態が揺らぐ可能性があるため）
+- `created_at` はソート基準として使用されます
 
 ---
 
