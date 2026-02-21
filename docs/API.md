@@ -665,6 +665,275 @@ curl -X POST \
 
 ---
 
+## 目標（Goal）API
+
+目標はユーザー個人のデータであり、認証済みユーザーの個人データ操作が集約されている `/internal/me` 配下に配置されます。他ユーザーへの公開は現時点では行いません。
+
+- 1ユーザーあたり目標上限は **100件** です。
+- 目標は「属性（`attributes`）」と「成果（`achievement`）」を持ちます。
+- 外部API（`/v1`）には公開しません。
+
+### Goal オブジェクト
+
+```json
+{
+  "id": 1,
+  "title": "マスター14+ 100枚",
+  "achievement_type": "score_count",
+  "achievement_params": { "score": 1007500, "count": 100 },
+  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+  "invert": false,
+  "created_at": "2026-01-01T09:00:00+09:00"
+}
+```
+
+| フィールド | 型 | 方向 | 説明 |
+|---|---|---|---|
+| `id` | `integer` | レスポンスのみ | 目標ID（自動採番） |
+| `title` | `string` | 双方向 | 目標タイトル。trim後30文字以内、空文字不可、制御文字不可 |
+| `achievement_type` | `string` | 双方向 | 成果種別コード（`achievement_types.code` と完全一致。大文字小文字の混在不可） |
+| `achievement_params` | `object` | 双方向 | 成果種別ごとの可変パラメータ（詳細は後述） |
+| `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
+| `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
+| `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
+
+### `achievement_type` 一覧
+
+| code | 意味 |
+|---|---|
+| `rank_count` | 指定ランク（スコア）以上の譜面数 |
+| `score_count` | 指定スコア以上の譜面数 |
+| `avg_score` | 全譜面の平均スコア |
+| `hardlamp_count` | 指定ハードランプの達成数 |
+| `combolamp_count` | 指定コンボランプの達成数 |
+| `total_score` | 全譜面のスコア合計 |
+| `overpower_value` | 全譜面のOverPower値合計 |
+| `overpower_percent` | 全譜面に対するOverPower達成割合（%） |
+
+### `achievement_params` 仕様
+
+#### `rank_count` / `score_count`
+
+`rank_count` と `score_count` は同じ構造・同じ判定ロジックです。`rank_count` はUIが「ランク由来の目標」として判別するために分けています。ランク境界はフロントエンドが保持し、バックエンドはスコア閾値のみを扱います。
+
+```json
+{ "score": 1000000, "count": 100 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `score` | `integer` | 0〜1,010,000 | スコア閾値 |
+| `count` | `integer` | 1〜対象譜面数 | 目標件数。上限は `attributes` 絞り込み後の対象譜面数（動的検証） |
+
+#### `avg_score`
+
+```json
+{ "score": 1000000 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `score` | `integer` | 0〜1,010,000 | 平均スコア目標値。平均算出時の端数は小数点以下切り捨て |
+
+#### `hardlamp_count`
+
+```json
+{ "lamp": "BRV", "count": 100 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `lamp` | `string` | 下表の略称（完全一致） | ハードランプ種別 |
+| `count` | `integer` | 1〜対象譜面数 | 目標件数（動的検証） |
+
+**ハードランプ略称**:
+
+| 略称 | マスタ名（`clear_lamp_types.name`） |
+|---|---|
+| `HRD` | `HARD` |
+| `BRV` | `BRAVE` |
+| `ABS` | `ABSOLUTE` |
+| `CTS` | `CATASTROPHY` |
+
+序列: `HRD < BRV < ABS < CTS`
+
+#### `combolamp_count`
+
+```json
+{ "lamp": "AJ", "count": 100 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `lamp` | `string` | 下表の略称（完全一致） | コンボランプ種別 |
+| `count` | `integer` | 1〜対象譜面数 | 目標件数（動的検証） |
+
+**コンボランプ略称**:
+
+| 略称 | マスタ名（`combo_lamp_types.name`） |
+|---|---|
+| `FC` | `FULL COMBO` |
+| `AJ` | `ALL JUSTICE` |
+
+#### `total_score`
+
+```json
+{ "total": 100000000 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `total` | `integer` | 0〜対象譜面数 × 1,010,000 | スコア合計目標値（動的検証） |
+
+#### `overpower_value`
+
+```json
+{ "total": 1000000.000 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `total` | `number` | 0〜対象譜面の理論値OP合計（小数点以下3桁まで） | OverPower合計目標値（動的検証） |
+
+理論値OP合計はリクエスト時にマスタデータから算出されます。
+
+#### `overpower_percent`
+
+```json
+{ "total": 76.500 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `total` | `number` | 0〜100（小数点以下3桁まで） | OverPower達成割合の目標値（%） |
+
+### `attributes` 仕様
+
+対象譜面の絞り込み条件です。省略したフィールドは条件なし（全譜面対象）とみなします。空オブジェクト `{}` は全譜面が対象です。
+
+**許可キーは `diff` / `const` / `genre` / `ver` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
+
+```json
+{
+  "diff": 4,
+  "const": { "min": 14.0, "max": 14.4 },
+  "genre": 1,
+  "ver": 20
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `diff` | `integer` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。省略時は全難易度対象 |
+| `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 15.9`。省略時は定数条件なし |
+| `genre` | `integer` | 任意 | ジャンルマスタID（単値）。省略時は全ジャンル対象 |
+| `ver` | `integer` | 任意 | バージョンマスタID（単値）。省略時は全バージョン対象 |
+
+**難易度IDの対応**:
+
+| 値 | 難易度 |
+|---|---|
+| 1 | `BASIC` |
+| 2 | `ADVANCED` |
+| 3 | `EXPERT` |
+| 4 | `MASTER` |
+| 5 | `ULTIMA` |
+
+**マスタ整合**:
+- `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可。存在しないIDは `goal_invalid_attributes` エラー。
+- `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
+- `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
+
+### バリデーション方針
+
+#### 境界（Handler/DTO）での検査
+
+- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
+
+#### Usecase層での業務ルール検査
+
+1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
+2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 15.9]`
+4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
+5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
+   - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
+   - `total_score.total` ≤ 対象譜面数 × 1,010,000
+   - `overpower_value.total` ≤ 対象譜面の理論値OverPower合計
+   - `overpower_percent.total` は 0〜100 の固定上限
+
+#### 100件上限の担保
+
+作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。これにより同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止します。
+
+### GET `/internal/me/goals`
+
+自分が作成した目標を全件返します。ソート順は `created_at` 昇順（作成順）です。
+
+**レスポンス**: 200 OK
+
+```json
+{
+  "goals": [
+    {
+      "id": 1,
+      "title": "マスター14+ 100枚",
+      "achievement_type": "score_count",
+      "achievement_params": { "score": 1007500, "count": 100 },
+      "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+      "invert": false,
+      "created_at": "2026-01-01T09:00:00+09:00"
+    }
+  ]
+}
+```
+
+### POST `/internal/me/goals`
+
+目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
+
+**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
+
+```json
+{
+  "title": "マスター14+ 100枚",
+  "achievement_type": "score_count",
+  "achievement_params": { "score": 1007500, "count": 100 },
+  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+  "invert": false
+}
+```
+
+**レスポンス**: 201 Created（作成された Goal オブジェクト）
+
+### PUT `/internal/me/goals/:id`
+
+指定IDの目標を完全上書き更新します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
+
+**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
+
+**レスポンス**: 200 OK（更新後の Goal オブジェクト）
+
+### DELETE `/internal/me/goals/:id`
+
+指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
+
+**レスポンス**: 204 No Content
+
+### Goal API エラーコード
+
+| エラーコード | HTTP | 説明 |
+|---|---|---|
+| `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
+| `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
+| `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
+| `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
+| `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
+| `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
+
+---
+
 ## `/internal/users` グループ
 
 ### GET `/internal/users/`
@@ -1985,271 +2254,3 @@ interface SkippedRecord {
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
 - ユーザーを論理削除するとログインは失敗し、既存セッションも無効化されます。
-
-
-## 目標（Goal）API
-
-目標はユーザー個人のデータであり、認証済みユーザーの個人データ操作が集約されている `/internal/me` 配下に配置されます。他ユーザーへの公開は現時点では行いません。
-
-- 1ユーザーあたり目標上限は **100件** です。
-- 目標は「属性（`attributes`）」と「成果（`achievement`）」を持ちます。
-- 外部API（`/v1`）には公開しません。
-
-### Goal オブジェクト
-
-```json
-{
-  "id": 1,
-  "title": "マスター14+ 100枚",
-  "achievement_type": "score_count",
-  "achievement_params": { "score": 1007500, "count": 100 },
-  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-  "invert": false,
-  "created_at": "2026-01-01T09:00:00+09:00"
-}
-```
-
-| フィールド | 型 | 方向 | 説明 |
-|---|---|---|---|
-| `id` | `integer` | レスポンスのみ | 目標ID（自動採番） |
-| `title` | `string` | 双方向 | 目標タイトル。trim後30文字以内、空文字不可、制御文字不可 |
-| `achievement_type` | `string` | 双方向 | 成果種別コード（`achievement_types.code` と完全一致。大文字小文字の混在不可） |
-| `achievement_params` | `object` | 双方向 | 成果種別ごとの可変パラメータ（詳細は後述） |
-| `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
-| `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
-| `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
-
-### `achievement_type` 一覧
-
-| code | 意味 |
-|---|---|
-| `rank_count` | 指定ランク（スコア）以上の譜面数 |
-| `score_count` | 指定スコア以上の譜面数 |
-| `avg_score` | 全譜面の平均スコア |
-| `hardlamp_count` | 指定ハードランプの達成数 |
-| `combolamp_count` | 指定コンボランプの達成数 |
-| `total_score` | 全譜面のスコア合計 |
-| `overpower_value` | 全譜面のOverPower値合計 |
-| `overpower_percent` | 全譜面に対するOverPower達成割合（%） |
-
-### `achievement_params` 仕様
-
-#### `rank_count` / `score_count`
-
-`rank_count` と `score_count` は同じ構造・同じ判定ロジックです。`rank_count` はUIが「ランク由来の目標」として判別するために分けています。ランク境界はフロントエンドが保持し、バックエンドはスコア閾値のみを扱います。
-
-```json
-{ "score": 1000000, "count": 100 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `score` | `integer` | 0〜1,010,000 | スコア閾値 |
-| `count` | `integer` | 1〜対象譜面数 | 目標件数。上限は `attributes` 絞り込み後の対象譜面数（動的検証） |
-
-#### `avg_score`
-
-```json
-{ "score": 1000000 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `score` | `integer` | 0〜1,010,000 | 平均スコア目標値。平均算出時の端数は小数点以下切り捨て |
-
-#### `hardlamp_count`
-
-```json
-{ "lamp": "BRV", "count": 100 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `lamp` | `string` | 下表の略称（完全一致） | ハードランプ種別 |
-| `count` | `integer` | 1〜対象譜面数 | 目標件数（動的検証） |
-
-**ハードランプ略称**:
-
-| 略称 | マスタ名（`clear_lamp_types.name`） |
-|---|---|
-| `HRD` | `HARD` |
-| `BRV` | `BRAVE` |
-| `ABS` | `ABSOLUTE` |
-| `CTS` | `CATASTROPHY` |
-
-序列: `HRD < BRV < ABS < CTS`
-
-#### `combolamp_count`
-
-```json
-{ "lamp": "AJ", "count": 100 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `lamp` | `string` | 下表の略称（完全一致） | コンボランプ種別 |
-| `count` | `integer` | 1〜対象譜面数 | 目標件数（動的検証） |
-
-**コンボランプ略称**:
-
-| 略称 | マスタ名（`combo_lamp_types.name`） |
-|---|---|
-| `FC` | `FULL COMBO` |
-| `AJ` | `ALL JUSTICE` |
-
-#### `total_score`
-
-```json
-{ "total": 100000000 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `total` | `integer` | 0〜対象譜面数 × 1,010,000 | スコア合計目標値（動的検証） |
-
-#### `overpower_value`
-
-```json
-{ "total": 1000000.000 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `total` | `number` | 0〜対象譜面の理論値OP合計（小数点以下3桁まで） | OverPower合計目標値（動的検証） |
-
-理論値OP合計はリクエスト時にマスタデータから算出されます。
-
-#### `overpower_percent`
-
-```json
-{ "total": 76.500 }
-```
-
-| パラメータ | 型 | 範囲 | 説明 |
-|---|---|---|---|
-| `total` | `number` | 0〜100（小数点以下3桁まで） | OverPower達成割合の目標値（%） |
-
-### `attributes` 仕様
-
-対象譜面の絞り込み条件です。省略したフィールドは条件なし（全譜面対象）とみなします。空オブジェクト `{}` は全譜面が対象です。
-
-**許可キーは `diff` / `const` / `genre` / `ver` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
-
-```json
-{
-  "diff": 4,
-  "const": { "min": 14.0, "max": 14.4 },
-  "genre": 1,
-  "ver": 20
-}
-```
-
-| フィールド | 型 | 必須 | 説明 |
-|---|---|---|---|
-| `diff` | `integer` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。省略時は全難易度対象 |
-| `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 15.9`。省略時は定数条件なし |
-| `genre` | `integer` | 任意 | ジャンルマスタID（単値）。省略時は全ジャンル対象 |
-| `ver` | `integer` | 任意 | バージョンマスタID（単値）。省略時は全バージョン対象 |
-
-**難易度IDの対応**:
-
-| 値 | 難易度 |
-|---|---|
-| 1 | `BASIC` |
-| 2 | `ADVANCED` |
-| 3 | `EXPERT` |
-| 4 | `MASTER` |
-| 5 | `ULTIMA` |
-
-**マスタ整合**:
-- `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可。存在しないIDは `goal_invalid_attributes` エラー。
-- `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
-- `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
-
-### バリデーション方針
-
-#### 境界（Handler/DTO）での検査
-
-- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
-
-#### Usecase層での業務ルール検査
-
-1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
-2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 15.9]`
-4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
-5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
-   - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
-   - `total_score.total` ≤ 対象譜面数 × 1,010,000
-   - `overpower_value.total` ≤ 対象譜面の理論値OverPower合計
-   - `overpower_percent.total` は 0〜100 の固定上限
-
-#### 100件上限の担保
-
-作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。これにより同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止します。
-
-### GET `/internal/me/goals`
-
-自分が作成した目標を全件返します。ソート順は `created_at` 昇順（作成順）です。
-
-**レスポンス**: 200 OK
-
-```json
-{
-  "goals": [
-    {
-      "id": 1,
-      "title": "マスター14+ 100枚",
-      "achievement_type": "score_count",
-      "achievement_params": { "score": 1007500, "count": 100 },
-      "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-      "invert": false,
-      "created_at": "2026-01-01T09:00:00+09:00"
-    }
-  ]
-}
-```
-
-### POST `/internal/me/goals`
-
-目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
-
-**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
-
-```json
-{
-  "title": "マスター14+ 100枚",
-  "achievement_type": "score_count",
-  "achievement_params": { "score": 1007500, "count": 100 },
-  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-  "invert": false
-}
-```
-
-**レスポンス**: 201 Created（作成された Goal オブジェクト）
-
-### PUT `/internal/me/goals/:id`
-
-指定IDの目標を完全上書き更新します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
-
-**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
-
-**レスポンス**: 200 OK（更新後の Goal オブジェクト）
-
-### DELETE `/internal/me/goals/:id`
-
-指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
-
-**レスポンス**: 204 No Content
-
-### Goal API エラーコード
-
-| エラーコード | HTTP | 説明 |
-|---|---|---|
-| `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
-| `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
-| `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
-| `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
-| `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
-| `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
-| `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
