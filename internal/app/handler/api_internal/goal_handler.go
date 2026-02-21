@@ -110,7 +110,7 @@ func (h *GoalHandler) Delete(c echo.Context) error {
 func bindStrictJSON(c echo.Context, out any) error {
 	ct := c.Request().Header.Get(echo.HeaderContentType)
 	if ct == "" {
-		return errors.New("content-type must be application/json")
+		return errors.New("content-type header is missing")
 	}
 	mediaType, _, err := mime.ParseMediaType(ct)
 	if err != nil || !strings.EqualFold(mediaType, echo.MIMEApplicationJSON) {

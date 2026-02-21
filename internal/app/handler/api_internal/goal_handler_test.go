@@ -56,6 +56,39 @@ func (m *mockGoalUsecase) Delete(ctx context.Context, userID int, id uint32) err
 	return nil
 }
 
+func TestBindStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(`{"title":"t"}`))
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var out map[string]any
+	err := bindStrictJSON(c, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "content-type header is missing" {
+		t.Fatalf("error = %q, want %q", err.Error(), "content-type header is missing")
+	}
+}
+
+func TestBindStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(`{"title":"t"}`))
+	req.Header.Set(echo.HeaderContentType, "text/plain")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var out map[string]any
+	err := bindStrictJSON(c, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "content-type must be application/json" {
+		t.Fatalf("error = %q, want %q", err.Error(), "content-type must be application/json")
+	}
+}
+
 func TestGoalHandlerCreateRejectsMissingContentType(t *testing.T) {
 	e := echo.New()
 	e.Validator = &goalTestValidator{validator: validator.New()}
