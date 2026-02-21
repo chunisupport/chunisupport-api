@@ -56,6 +56,63 @@ func (m *mockGoalUsecase) Delete(ctx context.Context, userID int, id uint32) err
 	return nil
 }
 
+func TestGoalHandlerCreateRejectsMissingContentType(t *testing.T) {
+	e := echo.New()
+	e.Validator = &goalTestValidator{validator: validator.New()}
+	uc := &mockGoalUsecase{}
+	h := NewGoalHandler(uc)
+
+	body := `{"title":"t","achievement_type":"score_count","achievement_params":{"score":1000000,"count":1},"attributes":{}}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	err := h.Create(c)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	apiErr := &apierror.APIError{}
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err type = %T, want *apierror.APIError", err)
+	}
+	if apiErr.Code != apierror.CodeBadRequest {
+		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+	}
+	if uc.createCalled {
+		t.Fatal("usecase Create should not be called")
+	}
+}
+
+func TestGoalHandlerCreateRejectsNonJSONContentType(t *testing.T) {
+	e := echo.New()
+	e.Validator = &goalTestValidator{validator: validator.New()}
+	uc := &mockGoalUsecase{}
+	h := NewGoalHandler(uc)
+
+	body := `{"title":"t","achievement_type":"score_count","achievement_params":{"score":1000000,"count":1},"attributes":{}}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(body))
+	req.Header.Set(echo.HeaderContentType, "text/plain")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	err := h.Create(c)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	apiErr := &apierror.APIError{}
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err type = %T, want *apierror.APIError", err)
+	}
+	if apiErr.Code != apierror.CodeBadRequest {
+		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+	}
+	if uc.createCalled {
+		t.Fatal("usecase Create should not be called")
+	}
+}
+
 func TestGoalHandlerCreateRejectsUnknownTopLevelKey(t *testing.T) {
 	e := echo.New()
 	e.Validator = &goalTestValidator{validator: validator.New()}

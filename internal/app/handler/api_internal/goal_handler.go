@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -107,6 +108,15 @@ func (h *GoalHandler) Delete(c echo.Context) error {
 }
 
 func bindStrictJSON(c echo.Context, out any) error {
+	ct := c.Request().Header.Get(echo.HeaderContentType)
+	if ct == "" {
+		return errors.New("content-type must be application/json")
+	}
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err != nil || !strings.EqualFold(mediaType, echo.MIMEApplicationJSON) {
+		return errors.New("content-type must be application/json")
+	}
+
 	decoder := json.NewDecoder(c.Request().Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(out); err != nil {
@@ -117,9 +127,6 @@ func bindStrictJSON(c echo.Context, out any) error {
 			return errors.New("unexpected trailing JSON value")
 		}
 		return err
-	}
-	if ct := c.Request().Header.Get(echo.HeaderContentType); ct != "" && !strings.HasPrefix(ct, echo.MIMEApplicationJSON) {
-		return errors.New("content-type must be application/json")
 	}
 	return nil
 }
