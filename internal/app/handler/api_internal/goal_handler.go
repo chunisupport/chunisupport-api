@@ -108,7 +108,11 @@ func (h *GoalHandler) Delete(c echo.Context) error {
 }
 
 func bindStrictJSON(c echo.Context, out any) error {
-	ct := c.Request().Header.Get(echo.HeaderContentType)
+	return decodeStrictJSON(c.Request().Body, c.Request().Header, out)
+}
+
+func decodeStrictJSON(body io.Reader, header http.Header, out any) error {
+	ct := header.Get(echo.HeaderContentType)
 	if ct == "" {
 		return errors.New("content-type header is missing")
 	}
@@ -117,7 +121,7 @@ func bindStrictJSON(c echo.Context, out any) error {
 		return errors.New("content-type must be application/json")
 	}
 
-	decoder := json.NewDecoder(c.Request().Body)
+	decoder := json.NewDecoder(body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(out); err != nil {
 		return err

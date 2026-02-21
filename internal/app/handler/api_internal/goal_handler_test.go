@@ -56,14 +56,12 @@ func (m *mockGoalUsecase) Delete(ctx context.Context, userID int, id uint32) err
 	return nil
 }
 
-func TestBindStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(`{"title":"t"}`))
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+func TestDecodeStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T) {
+	body := bytes.NewBufferString(`{"title":"t"}`)
+	header := http.Header{}
 
 	var out map[string]any
-	err := bindStrictJSON(c, &out)
+	err := decodeStrictJSON(body, header, &out)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -72,15 +70,13 @@ func TestBindStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T) {
 	}
 }
 
-func TestBindStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(`{"title":"t"}`))
-	req.Header.Set(echo.HeaderContentType, "text/plain")
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+func TestDecodeStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T) {
+	body := bytes.NewBufferString(`{"title":"t"}`)
+	header := http.Header{}
+	header.Set(echo.HeaderContentType, "text/plain")
 
 	var out map[string]any
-	err := bindStrictJSON(c, &out)
+	err := decodeStrictJSON(body, header, &out)
 	if err == nil {
 		t.Fatal("expected error")
 	}
