@@ -111,6 +111,30 @@ func TestGoalUsecase_Create(t *testing.T) {
 	assert.Equal(t, "score_count", out.AchievementType)
 }
 
+func TestGoalUsecase_CreateRejectsTitleOver30Runes(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "1234567890123456789012345678901",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidGoalTitle))
+}
+
+func TestGoalUsecase_CreateAcceptsTitleAt30Runes(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "123456789012345678901234567890",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+}
+
 func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 	repo := &stubGoalRepo{count: 100}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})

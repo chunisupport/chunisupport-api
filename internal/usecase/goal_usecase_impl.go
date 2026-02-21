@@ -153,7 +153,8 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 	if input == nil {
 		return nil, ErrInvalidGoalInput
 	}
-	title := strings.TrimSpace(input.Title)
+	title := input.Title
+	title = strings.TrimSpace(title)
 	if title == "" || len([]rune(title)) > 30 || hasControlCharacter(title) {
 		return nil, ErrInvalidGoalTitle
 	}

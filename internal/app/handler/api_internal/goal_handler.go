@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -44,7 +45,7 @@ func (h *GoalHandler) Create(c echo.Context) error {
 		return err
 	}
 	var req internaldto.GoalRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
@@ -71,7 +72,7 @@ func (h *GoalHandler) Update(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	var req internaldto.GoalRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
