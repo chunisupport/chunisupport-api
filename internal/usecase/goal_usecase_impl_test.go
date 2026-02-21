@@ -107,15 +107,27 @@ func TestGoalUsecase_Create(t *testing.T) {
 	in := &GoalInput{Title: "  test  ", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"diff":4,"genre":1,"ver":20}`)}
 	out, err := u.Create(context.Background(), 1, in)
 	require.NoError(t, err)
-	assert.Equal(t, "  test  ", out.Title)
+	assert.Equal(t, "test", out.Title)
 	assert.Equal(t, "score_count", out.AchievementType)
 }
 
-func TestGoalUsecase_CreateAcceptsLongTitleWithoutControlCharacter(t *testing.T) {
+func TestGoalUsecase_CreateRejectsTitleOver30Runes(t *testing.T) {
 	repo := &stubGoalRepo{}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "1234567890123456789012345678901",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidGoalTitle))
+}
+
+func TestGoalUsecase_CreateAcceptsTitleAt30Runes(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "123456789012345678901234567890",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
 		Attributes:        []byte(`{}`),

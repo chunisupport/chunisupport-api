@@ -2020,7 +2020,7 @@ interface SkippedRecord {
 |---|---|---|
 | `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
 | `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
-| `goal_invalid_title` | 400 | `title` が空文字、または制御文字を含む |
+| `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正 |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー |

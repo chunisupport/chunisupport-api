@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strings"
 	"unicode"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -153,7 +154,8 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 		return nil, ErrInvalidGoalInput
 	}
 	title := input.Title
-	if title == "" || len([]rune(title)) > 255 || hasControlCharacter(title) {
+	title = strings.TrimSpace(title)
+	if title == "" || len([]rune(title)) > 30 || hasControlCharacter(title) {
 		return nil, ErrInvalidGoalTitle
 	}
 	masters := u.masterProvider.GoalMasters()
