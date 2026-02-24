@@ -41,7 +41,7 @@
 | **SEC-01** | **High** | CSRF対策不足 | Double Submit Cookie または Synchronizer Token を導入。SameSite=Lax/Strict と Origin/Referer 検証を併用。 |
 | **SEC-011** | **High** | パスワード複雑性要件の欠如 | 長さチェックのみ。`zxcvbn-go` 等の導入または正規表現による文字種チェックを追加。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー未実施 | `gosec` などで抑制箇所を洗い出し、根拠を明記。不必要な抑制は削除。 |
-| **SEC-008** | **Medium** | Cookie Domain属性の未設定 | サブドメイン間のセッション共有が必要な場合に備え、Domain属性の設定可否を追加。 |
+| **SEC-008** | **Low** | Cookie Domain属性の要件確認不足 | Domain属性は常時必須ではないため、まず「サブドメイン間でセッション共有が必要か」を要件として明確化し、必要時のみ設定を追加。 |
 
 ### パフォーマンス (PERF)
 
@@ -72,7 +72,6 @@
 | **QUAL-002** | **Medium** | セキュリティヘッダーの欠如 | Echoの `Secure` ミドルウェア導入でHSTS等を設定。 |
 | **DB-003** | **Low** | 手動マッピングの冗長性 | `sqlx.StructScan` 等の活用で構造体タグベースに移行。 |
 | **QUAL-006** | **Medium** | コンストラクタのエラー無視 | `toChartEntity` 等で値オブジェクトの生成エラーを無視している。不整合なエンティティが生成されるリスク。 |
-| **QUAL-007** | **Medium** | 論理削除の連動ロジック不足 | ユーザーの論理削除時に、DB制約（CASCADE）が効かない関連データ（将来的なフレンド等）を無効化する仕組みが未整備。 |
 | **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
 | **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
@@ -135,16 +134,6 @@
   - DBに不正な値が入っていた場合、異常な状態でドメイン層にデータが渡り、予期せぬ挙動や計算ミスを引き起こす。
 - **修正案**:
   - エラーが発生した場合は上位に返し、データの整合性エラーとして適切にログ出力・処理する。
-
-### QUAL-007: 論理削除の連動ロジック不足
-- **根拠**:
-  - `userRepository.SoftDelete` 等で `is_deleted` フラグを更新しているが、アプリケーションレベルでの関連データ（将来的なフレンド関係、一時的なバッチ処理用データなど）を無効化するフックや連動ロジックが欠如している。
-- **影響範囲**:
-  - ユーザーが論理削除されても、他ユーザーからフレンドとして見え続ける、あるいは集計処理に意図せず含まれるといった不整合が発生する。
-- **修正案**:
-  - ドメイン層に「ユーザー削除」のドメインイベントを導入するか、ユースケース層で連動して削除すべきエンティティを一括で処理するロジックを実装する。
-
----
 
 ### QUAL-001: TODOコメントの残置
 - **根拠**:
@@ -375,7 +364,7 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **INFRA-001** | **Critical** | `playerRepository.Create` のカラム名誤り | `INSERT INTO players (name)` だがDBスキーマでは `player_name`。さらに `user_id`/`player_level` 等の必須カラムが欠落。プレイヤー作成APIが実行時に必ず失敗する。`Create` を廃止し `Save` に統一すべき。 |
-| **INFRA-002** | **High** | `validation.go` のSQLインジェクションリスク | `fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)` でテーブル名を動的組立。現在は内部値のみだが関数シグネチャが任意stringを受付。ホワイトリスト検証を追加すべき。 |
+| **INFRA-002** | **Low** | `validation.go` のテーブル名組み立ての安全性改善余地 | 現状は内部固定値のみで直ちに脆弱性とは言えないが、将来の誤用防止のためテーブル名をホワイトリスト化し、任意入力を受け付けないAPIに制限すべき。 |
 | **INFRA-003** | **High** | `FindByUserID` の文字列比較によるエラー判定 | `err.Error() == "sql: no rows in result set"` は脆弱。`errors.Is(err, sql.ErrNoRows)` に変更すべき。 |
 | **INFRA-004** | **Medium** | WORLD'S END楽曲 `UpdateSongs` のN+1問題 | 楽曲と譜面を個別ループでUPDATE。通常楽曲はCASE式一括更新を実装済みであり不整合。バルク更新パターンに統一すべき。 |
 | **INFRA-005** | **Medium** | `validation.go` の全関数でContext未伝播 | `context.Context` を引数に取らず、`db.Get` を使用（`GetContext` ではない）。起動時のキャンセル不能の原因。 |
@@ -403,7 +392,7 @@
 | **UC-007** | **Low** | 削除済み楽曲の権限チェックパターンの4箇所重複 | `song_usecase_impl`, `worldsend_usecase`, `chart_stats_usecase` で同一パターン。共通ヘルパーに抽出すべき。 |
 | **UC-008** | **Medium** | `applyScores` のGod Function（約200行） | 通常譜面ループとWE譜面ループで解決ロジックがほぼ同一のまま2回繰り返し。共通関数に抽出すべき。 |
 | **UC-009** | **Low** | `sort` パッケージ使用（Go 1.25では `slices` 推奨） | `player_data_usecase_impl.go` と `chart_stats_usecase.go` で `sort.Strings`/`sort.Slice` 使用。`slices.Sort`/`slices.SortFunc` に統一すべき。 |
-| **UC-010** | **Low** | `time.LoadLocation` の繰り返し呼び出し | `Register` メソッド内で毎回OS呼び出し。パッケージレベル変数にキャッシュすべき。 |
+| **UC-010** | **Low** | `time.LoadLocation` の繰り返し呼び出し | `player_data_usecase_impl.go` で都度 `time.LoadLocation("Asia/Tokyo")` を実行。ホットパス化する場合はパッケージレベルでキャッシュを検討。 |
 | **UC-011** | **Medium** | コンストラクタ名のService/Usecase混在 | `NewAuthService`, `NewUserService` 等の"Service"接尾辞と `NewWorldsendUsecase`, `NewGoalUsecase` 等の"Usecase"接尾辞が混在。AGENTS.mdでは `Usecase` を推奨。統一すべき。 |
 | **UC-012** | **Low** | テストモック手法の不一致 | testify/mockベースと手動スタブが混在。プロジェクト全体で統一すべき。 |
 | **UC-013** | **Medium** | `goalUsecase.Update` にトランザクション欠如 | `Create` はトランザクション内で実行しているが `Update` にはない。並行アクセス時のrace condition リスク。 |
@@ -485,7 +474,7 @@
 ---
 
 ## まとめ
-- 主要なリスクは **CSRF対策不足** と **DBコネクションプール設定欠如**。
+- 主要なリスクは **CSRF対策不足** と **INFRA-001（`playerRepository.Create`の実行時エラー）**。
 - **INFRA-001（`playerRepository.Create`のカラム名誤り）** は即時修正が必要な実行時エラー。
 - アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
 - ドメイン層では **貧血症モデル（Player, Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
