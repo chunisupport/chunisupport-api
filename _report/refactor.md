@@ -474,8 +474,7 @@
 ---
 
 ## まとめ
-- 主要なリスクは **CSRF対策不足** と **INFRA-001（`playerRepository.Create`の実行時エラー）**。
-- **INFRA-001（`playerRepository.Create`のカラム名誤り）** は即時修正が必要な実行時エラー。
+- 主要なリスクは **CSRF対策不足** と **INFRA-001（`playerRepository.Create` のカラム名誤りによる実行時エラー）** です。後者は即時修正が必要です。
 - アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
 - ドメイン層では **貧血症モデル（Player, Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
 - **AuthUsecaseの責務過多（10メソッド）** はSRP違反であり、分割が望ましい。
