@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -33,7 +35,12 @@ func (h *PlayerHandler) CreatePlayer(c echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 
-	player, err := h.playerUsecase.CreatePlayer(c.Request().Context(), req.Name)
+	user, ok := c.Get("userEntity").(*entity.User)
+	if !ok || user == nil {
+		return apierror.ErrUnauthorized.WithInternal(errors.New("user entity not found in context"))
+	}
+
+	player, err := h.playerUsecase.CreatePlayer(c.Request().Context(), user.ID, req.Name)
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}

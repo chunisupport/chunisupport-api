@@ -26,7 +26,7 @@ func NewPlayerService(db repository.Executor, playerRepo repository.PlayerReposi
 }
 
 // CreatePlayer は新しいプレイヤーを作成し、永続化後のDTOを返します。
-func (us *playerUsecase) CreatePlayer(ctx context.Context, name string) (*dto.PlayerDTO, error) {
+func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
 	// 値オブジェクトを生成
 	playerNameVO, err := playername.NewPlayerName(name)
 	if err != nil {
@@ -35,7 +35,9 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, name string) (*dto.Pl
 
 	// 新しいプレイヤーエンティティを作成
 	player := &entity.Player{
-		Name: playerNameVO,
+		UserID: userID,
+		Name:   playerNameVO,
+		Level:  1,
 	}
 
 	// プレイヤーを永続化

@@ -175,7 +175,7 @@ func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec rep
 	return errors.New("not implemented")
 }
 
-func (s *stubPlayerService) CreatePlayer(ctx context.Context, name string) (*dto.PlayerDTO, error) {
+func (s *stubPlayerService) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
 	return nil, errors.New("not implemented")
 }
 
