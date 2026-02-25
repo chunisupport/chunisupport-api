@@ -37,7 +37,7 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name stri
 	player := &entity.Player{
 		UserID: userID,
 		Name:   playerNameVO,
-		Level:  1,
+		Level:  entity.DefaultPlayerLevel,
 	}
 
 	// プレイヤーを永続化

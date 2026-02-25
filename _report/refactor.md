@@ -198,7 +198,7 @@
 ### QUAL-012: ハンドラーでのValidate呼び出し漏れ
 - **根拠**:
   - `internal/app/handler/api_internal/auth_handler.go` の `authRequest`, `changePasswordRequest`, `recoveryCodeRecoverRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。
-  - 他のハンドラー（`song_handler.go`, `player_handler.go`）では `c.Validate()` が呼ばれている。
+  - 他のハンドラー（`song_handler.go` など）では `c.Validate()` が呼ばれている。
 - **影響範囲**:
   - 入力検証のアプローチが統一されておらず、バリデーション漏れのリスクがある。
   - 例えば `authRequest` ではユーザー名やパスワードの長さチェックをUsecase層で個別に行っているが、これはHandler/DTO層で統一的に行うべき。
@@ -208,16 +208,6 @@
 
 ---
 
-### INFRA-001: `playerRepository.Create` のカラム名誤りによる実行時エラー
-- **根拠**:
-  - `internal/infra/repository/player_repository_impl.go` の `Create` メソッドが `INSERT INTO players (name) VALUES (?)` を実行するが、DBスキーマ上のカラム名は `player_name`。さらに `user_id`（NOT NULL）と `player_level`（NOT NULL, CHECK >= 1）が欠落。
-  - 同リポジトリの `insert` メソッドは正しく `player_name` を使用しており、`Create` と `insert` で不整合。
-- **影響範囲**:
-  - `CreatePlayer` ハンドラ → usecase → `playerRepo.Create` の呼び出しチェーンで、プレイヤー作成APIが実行時に必ずSQLエラーで失敗する。
-- **修正案**:
-  - `Create` メソッドを廃止し、`Save` メソッドに統一する。
-
----
 
 ### UC-001: AuthUsecaseの責務過多（God Interface）
 - **根拠**:
@@ -327,7 +317,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **INFRA-001** | **Critical** | `playerRepository.Create` のカラム名誤り | `INSERT INTO players (name)` だがDBスキーマでは `player_name`。さらに `user_id`/`player_level` 等の必須カラムが欠落。プレイヤー作成APIが実行時に必ず失敗する。`Create` を廃止し `Save` に統一すべき。 |
 | **INFRA-002** | **Low** | `validation.go` のテーブル名組み立ての安全性改善余地 | 現状は内部固定値のみで直ちに脆弱性とは言えないが、将来の誤用防止のためテーブル名をホワイトリスト化し、任意入力を受け付けないAPIに制限すべき。 |
 | **INFRA-004** | **Medium** | WORLD'S END楽曲 `UpdateSongs` のN+1問題 | 楽曲と譜面を個別ループでUPDATE。通常楽曲はCASE式一括更新を実装済みであり不整合。バルク更新パターンに統一すべき。 |
 | **INFRA-005** | **Medium** | `validation.go` の全関数でContext未伝播 | `context.Context` を引数に取らず、`db.Get` を使用（`GetContext` ではない）。起動時のキャンセル不能の原因。 |
@@ -376,7 +365,6 @@
 | **HDL-004** | **Medium** | エラーハンドリングが粗い箇所の複数存在 | `DeleteSong`/`RestoreSong`, `APITokenHandler`, `DeleteAccount`, `Logout`, `UpdatePrivacy` でエラーを一律 `ErrInternalError` にしている。`FromUsecaseError()` を使って適切な HTTP ステータスに変換すべき。 |
 | **HDL-005** | **Low** | ユーザープロファイルエラーハンドリングの3箇所重複 | `api_internal/user_handler`, `api_v1/user_handler`, `chunirec_handler` で同一パターン。共通ヘルパーに抽出すべき。 |
 | **HDL-006** | **Low** | `OrderedChartsMap.MarshalJSON` のロジック重複＋非効率 | `api_internal/song_dto.go` と `api_v1/song_dto.go` でほぼ同一。文字列連結でJSON構築も非効率。共通ヘルパーに抽出し `strings.Builder` を使用すべき。 |
-| **HDL-007** | **Low** | `handler/player_handler.go` がデッドコード | `api_internal/player_handler.go` と完全に同一で、ルーターからの参照なし。削除すべき。 |
 | **HDL-008** | **Low** | `sanitizeLogValue` 関数の重複 | `middleware/error_handler.go` と `chunirec/error_handler.go` に同一定義。共通ユーティリティに抽出すべき。 |
 | **HDL-009** | **Low** | `me_handler.go` で `c.Logger()` と `slog` が混在 | プロジェクト全体では `slog` だが `me_handler.go` だけ `c.Logger().Warnf` を使用。`user.ID` を `%s` フォーマットで出力するバグもあり。 |
 | **HDL-010** | **Low** | `me_handler.go` の `knownFields` マップがハードコード | `PlayerDataPayload` 構造体のフィールド変更時に同期忘れリスク。`reflect` で自動生成し初期化時にキャッシュすべき。 |
@@ -437,7 +425,7 @@
 ---
 
 ## まとめ
-- 主要なリスクは **CSRF対策不足** と **INFRA-001（`playerRepository.Create` のカラム名誤りによる実行時エラー）** です。後者は即時修正が必要です。
+- 主要なリスクは **CSRF対策不足** です。
 - アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
 - ドメイン層では **貧血症モデル（Player, Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
 - **AuthUsecaseの責務過多（10メソッド）** はSRP違反であり、分割が望ましい。
