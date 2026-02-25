@@ -42,7 +42,7 @@ func (h *PlayerHandler) CreatePlayer(c echo.Context) error {
 
 	player, err := h.playerUsecase.CreatePlayer(c.Request().Context(), user.ID, req.Name)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusCreated, player)

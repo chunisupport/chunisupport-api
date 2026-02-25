@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -30,7 +31,7 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name stri
 	// 値オブジェクトを生成
 	playerNameVO, err := playername.NewPlayerName(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPlayerName, err)
 	}
 
 	// 新しいプレイヤーエンティティを作成

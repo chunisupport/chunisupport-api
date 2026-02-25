@@ -15,6 +15,7 @@ var (
 	ErrInvalidPassword            = errors.New("invalid password")               // パスワード無効（詳細隠蔽）
 	ErrOperationFailed            = errors.New("operation failed")               // 操作失敗（詳細隠蔽）
 	ErrInternalError              = errors.New("internal error")                 // サーバ内部エラー（詳細隠蔽）
+	ErrInvalidPlayerName          = errors.New("invalid player name")            // プレイヤー名バリデーション失敗
 	ErrInvalidRecoveryCredentials = errors.New("invalid recovery credentials")   // リカバリー失敗（詳細隠蔽）
 	ErrUserAlreadyDeleted         = errors.New("user already deleted")           // 内部用
 	ErrUserNotDeleted             = errors.New("user not deleted")               // 内部用
