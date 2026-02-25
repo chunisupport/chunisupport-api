@@ -18,7 +18,7 @@ internal/
 ├── domain/      # ドメインモデルとリポジトリインターフェース
 │   ├── entity/  # エンティティ（純粋なドメインモデル、db/jsonタグなし）
 │   ├── vo/      # 値オブジェクト
-│   ├── rating/  # レーティング計算ドメインサービス
+│   ├── service/  # レーティング計算ドメインサービス
 │   └── repository/ # リポジトリインターフェース
 ├── dto/         # データ転送オブジェクト（API入出力用）
 ├── info/        # アプリケーションの基本情報
@@ -44,7 +44,7 @@ internal/
 - **`entity`**: アプリケーションで扱うエンティティ（例: `User`, `Player`）を定義します。**ドメインの純粋性を保つため、`db`タグや`json`タグは一切含まれません**。エンティティは振る舞いメソッド（例: `User.IsActive()`, `PlayerRecord.IsRanked()`）を持ち、ビジネスロジックをカプセル化します。
 - **`vo`**: 値オブジェクト（Value Object）を定義します。エンティティの属性を型安全に表現し、不変性とバリデーションを保証します（例: `username.UserName`, `score.Score`）。
 - **`repository`**: データベースなどへの永続化処理を抽象化するためのインターフェースを定義します。具体的な実装は`infra/repository`層が担当します。全メソッドは `context.Context` を第一引数に取ります。
-- **`rating`**: CHUNITHM特有のレーティング計算ロジックを提供するドメインサービスです（例: `CalcSingleRating`, `CalcSingleOverpower`）。
+- **`service`**: CHUNITHM特有のレーティング計算ロジックを提供するドメインサービスです（例: `CalcSingleRating`, `CalcSingleOverpower`）。
 
 ### `internal/usecase` - ユースケース層
 
