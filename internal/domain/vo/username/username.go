@@ -13,6 +13,8 @@ type UserName struct {
 	value string
 }
 
+var usernamePattern = regexp.MustCompile("^[a-z0-9]+$")
+
 // NewUserName はバリデーション付きで新しい UserName を作成します
 func NewUserName(value string) (UserName, error) {
 	if err := validateUserName(value); err != nil {
@@ -104,11 +106,7 @@ func validateUserName(value string) error {
 	if len(value) > 50 {
 		return errors.New("username must be 50 characters or less")
 	}
-	matched, err := regexp.MatchString("^[a-z0-9]+$", value)
-	if err != nil {
-		return err
-	}
-	if !matched {
+	if !usernamePattern.MatchString(value) {
 		return errors.New("username can only contain lowercase letters and numbers")
 	}
 	return nil

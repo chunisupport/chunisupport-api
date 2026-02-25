@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -122,7 +124,7 @@ func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Exe
 	`
 	var playerModel models.PlayerModel
 	if err := exec.GetContext(ctx, &playerModel, query, userID); err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
