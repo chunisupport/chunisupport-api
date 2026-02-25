@@ -294,7 +294,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **DOM-001** | **Medium** | VOが `database/sql/driver` に依存 | 全値オブジェクト（`chartconstant`, `notes`, `passwordhash`, `playername`, `score`, `username`）が `driver.Valuer`/`sql.Scanner` を実装しており、DB永続化というインフラ関心事がドメイン層に混入。`infra/models` 層でアダプタを用意し、VOからDB依存を排除する。 |
-| **DOM-003** | **High** | `Player` エンティティが貧血症モデル | メソッドが一切なく、`PlayerRepository.UpdateCalculatedRatings` という部分更新メソッドが存在する。AGENTS.mdで禁止されているパターン。`player.UpdateRatings(...)` + `repo.Save()` パターンに移行すべき。 |
 | **DOM-004** | **Medium** | `Song` エンティティが貧血症モデル | メソッドがなく、`SongRepository.DeleteSong`/`RestoreSong` がDisplayID指定の直接操作。`song.Delete()`, `song.Restore()`, `song.IsActive()` メソッドを追加すべき。また「`Charts` はnil禁止」という不変条件を強制するコンストラクタが存在しない。 |
 | **DOM-005** | **Low** | `Session` エンティティにメソッドなし | `IsExpired()` メソッドがあるべき。セッション有効期限判定ロジックがドメイン外に流出している。 |
 | **DOM-006** | **Medium** | `Goal` エンティティが貧血症モデル＋`[]byte`フィールド | `AchievementParams []byte` と `Attributes []byte` はJSONバイト列の生保持であり、インフラ層の都合がドメイン層に漏洩している。適切な構造体やマップに変換すべき。 |
@@ -427,7 +426,7 @@
 ## まとめ
 - 主要なリスクは **CSRF対策不足** です。
 - アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
-- ドメイン層では **貧血症モデル（Player, Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
+- ドメイン層では **貧血症モデル（Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
 - **AuthUsecaseの責務過多（10メソッド）** はSRP違反であり、分割が望ましい。
 - **値オブジェクトのScan/UnmarshalJSONがバリデーションをバイパス** する問題は、不正データがドメイン層に流入するリスク。
 - 入力検証の統一方針（`c.Validate()` の呼び出し漏れ解消・パスパラメータの検証）とAPI仕様の整合性は、バグ防止・運用事故防止に直結する。

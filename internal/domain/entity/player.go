@@ -26,3 +26,16 @@ type Player struct {
 	UpdatedAt         time.Time             // 更新日時
 	Users             *User                 // このプレイヤーに紐づくユーザー
 }
+
+// NewPlayer は新規プレイヤーを生成し、永続化に必要な初期状態を設定します。
+func NewPlayer(userID int, name playername.PlayerName) *Player {
+	now := time.Now()
+
+	return &Player{
+		UserID:    userID,
+		Name:      name,
+		Level:     DefaultPlayerLevel,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -35,12 +34,7 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name stri
 	}
 
 	// 新しいプレイヤーエンティティを作成
-	player := &entity.Player{
-		UserID:    userID,
-		Name:      playerNameVO,
-		Level:     entity.DefaultPlayerLevel,
-		UpdatedAt: time.Now(),
-	}
+	player := entity.NewPlayer(userID, playerNameVO)
 
 	// プレイヤーを永続化
 	if err := us.playerRepo.Save(ctx, us.db, player); err != nil {
