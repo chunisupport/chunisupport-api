@@ -39,7 +39,7 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, name string) (*dto.Pl
 	}
 
 	// プレイヤーを永続化
-	if err := us.playerRepo.Create(ctx, us.db, player); err != nil {
+	if err := us.playerRepo.Save(ctx, us.db, player); err != nil {
 		return nil, err
 	}
 

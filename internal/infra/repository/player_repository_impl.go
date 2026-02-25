@@ -21,21 +21,6 @@ func NewPlayerRepository(db *sqlx.DB) repository.PlayerRepository {
 	return &playerRepository{db: db}
 }
 
-// Create は新しいプレイヤーをデータベースに保存します。保存後、player.IDに自動採番されたIDが設定されます。
-func (r *playerRepository) Create(ctx context.Context, exec repository.Executor, player *entity.Player) error {
-	query := `INSERT INTO players (name) VALUES (?)`
-	result, err := exec.ExecContext(ctx, query, player.Name)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	player.ID = int(id)
-	return nil
-}
-
 // FindByID はIDでプレイヤーを検索します。関連する全てのフィールドを含むエンティティを返します。
 func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
 	query := `
@@ -133,6 +118,7 @@ func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Exe
 }
 
 // Save はプレイヤー情報を保存します（ID=0の場合はINSERT、それ以外はUPDATE）。
+// INSERT時は player が user_id や player_name、player_level など必須カラムを保持している前提です。
 // INSERTの場合、playerのIDフィールドが更新されます。
 func (r *playerRepository) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	if player.ID == 0 {
@@ -142,6 +128,7 @@ func (r *playerRepository) Save(ctx context.Context, exec repository.Executor, p
 }
 
 // insert は新しいプレイヤーをINSERTします。
+// Saveからのみ呼び出され、INSERTに必要なカラムが満たされていることを前提にします。
 func (r *playerRepository) insert(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	query := `
 		INSERT INTO players (
@@ -167,6 +154,7 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 }
 
 // update は既存のプレイヤーをUPDATEします。
+// Saveからのみ呼び出され、既存レコード（player.ID != 0）の更新のみを担当します。
 func (r *playerRepository) update(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	query := `
 		UPDATE players
