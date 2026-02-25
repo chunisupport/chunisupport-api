@@ -142,7 +142,7 @@ repo.Save(ctx, user)
 
 複数エンティティにまたがる、またはエンティティに属さないドメインロジックは、ドメインサービスとして実装されています：
 
-- **domain/rating**: CHUNITHMのレーティング計算ロジック（`CalcSingleRating`, `CalcSingleOverpower`）
+- **domain/service**: CHUNITHMのレーティング計算ロジック（`CalcSingleRating`, `CalcSingleOverpower`）
 
 ---
 

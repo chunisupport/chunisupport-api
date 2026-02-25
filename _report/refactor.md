@@ -75,7 +75,6 @@
 | **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
 | **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
-| **QUAL-017** | **Low** | ARCHITECTURE.mdのディレクトリ表記不整合 | `domain/rating` と記載されているが、実際は `domain/service`。参照ドキュメントとの不整合。 |
 
 ---
 
@@ -209,19 +208,6 @@
 
 ---
 
-### QUAL-017: ARCHITECTURE.mdのディレクトリ表記不整合
-- **根拠**:
-  - `ARCHITECTURE.md:21` に `domain/rating` と記載されているが、実際のディレクトリ構造は `internal/domain/service`。
-  - レーティング計算サービスは `internal/domain/service/rating_service.go` に配置されている。
-- **影響範囲**:
-  - AGENTS.mdから参照される関連ドキュメントの不整合は、AIエージェントが正しいディレクトリを判断できない原因となる。
-  - 新規参加者がドキュメントを読んだ際に混乱する。
-- **修正案**:
-  - `ARCHITECTURE.md` の該当箇所を `domain/service` に修正。
-  - プロジェクト全体のドキュメントで他にも古い記載がないか確認。
-
----
-
 ### INFRA-001: `playerRepository.Create` のカラム名誤りによる実行時エラー
 - **根拠**:
   - `internal/infra/repository/player_repository_impl.go` の `Create` メソッドが `INSERT INTO players (name) VALUES (?)` を実行するが、DBスキーマ上のカラム名は `player_name`。さらに `user_id`（NOT NULL）と `player_level`（NOT NULL, CHECK >= 1）が欠落。
@@ -230,16 +216,6 @@
   - `CreatePlayer` ハンドラ → usecase → `playerRepo.Create` の呼び出しチェーンで、プレイヤー作成APIが実行時に必ずSQLエラーで失敗する。
 - **修正案**:
   - `Create` メソッドを廃止し、`Save` メソッドに統一する。
-
----
-
-### INFRA-003: `FindByUserID` の文字列比較によるエラー判定
-- **根拠**:
-  - `internal/infra/repository/player_repository_impl.go` で `err.Error() == "sql: no rows in result set"` という文字列比較で `sql.ErrNoRows` を判定している。
-- **影響範囲**:
-  - Goのバージョンアップやエラーラッピングでメッセージが変更された場合、エラー判定が壊れる。
-- **修正案**:
-  - `errors.Is(err, sql.ErrNoRows)` に変更する。
 
 ---
 
@@ -284,17 +260,6 @@
   - DBやJSON入力に不正な値（負値等）が存在した場合、バリデーションなしで不正なVOが生成される。
 - **修正案**:
   - `Scan`/`UnmarshalJSON` 内で `NewChartConstant`/`NewNotes` を経由してバリデーションを実行する。`score.Score` のパターンに統一。
-
----
-
-### DOM-015: `username.validateUserName` で毎回正規表現をコンパイル
-- **根拠**:
-  - `internal/domain/vo/username/username.go` で `regexp.MatchString("^[a-z0-9]+$", value)` を使用。これは呼び出しのたびに正規表現をコンパイルする。
-  - 同パッケージの `internal/domain/vo/displayid/displayid.go` では `regexp.MustCompile` でプリコンパイル済みの正規表現を使用しており、パターンが不一致。
-- **影響範囲**:
-  - ユーザー登録・ログイン時に毎回コンパイルコストが発生。高負荷時にパフォーマンス影響。
-- **修正案**:
-  - パッケージレベルで `var usernamePattern = regexp.MustCompile(...)` として定義し、`usernamePattern.MatchString(value)` を使用する。
 
 ---
 
@@ -349,7 +314,6 @@
 | **DOM-012** | **Low** | `WorldsendSongWithChart` と `WorldsendSongChartPair` の重複 | `repository` 層と `service` 層にフィールド同一の重複構造体。entity層に統一構造体を定義すべき。 |
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり。方針を統一すべき。 |
 | **DOM-014** | **Medium** | `PlayerDataChart.Const` がVO未使用 | `float64` で定義されており、通常の `Chart` が使う `chartconstant.ChartConstant` と不整合。VOによるバリデーションが適用されない。 |
-| **DOM-015** | **Medium** | `username.validateUserName` で毎回正規表現をコンパイル | `regexp.MatchString` は呼び出しのたびにコンパイル。`displayid.go` では `regexp.MustCompile` でプリコンパイル済みであり一貫性がない。 |
 | **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.25で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
 | **DOM-018** | **Medium** | `repository.errors.go` のエラー定義不足 | `ErrSongNotFound` のみで `ErrUserNotFound` 等はusecase層に定義。リポジトリが適切なドメインエラーを返せず、QUAL-009の根本原因となっている。 |
@@ -365,7 +329,6 @@
 |---|---|---|---|
 | **INFRA-001** | **Critical** | `playerRepository.Create` のカラム名誤り | `INSERT INTO players (name)` だがDBスキーマでは `player_name`。さらに `user_id`/`player_level` 等の必須カラムが欠落。プレイヤー作成APIが実行時に必ず失敗する。`Create` を廃止し `Save` に統一すべき。 |
 | **INFRA-002** | **Low** | `validation.go` のテーブル名組み立ての安全性改善余地 | 現状は内部固定値のみで直ちに脆弱性とは言えないが、将来の誤用防止のためテーブル名をホワイトリスト化し、任意入力を受け付けないAPIに制限すべき。 |
-| **INFRA-003** | **High** | `FindByUserID` の文字列比較によるエラー判定 | `err.Error() == "sql: no rows in result set"` は脆弱。`errors.Is(err, sql.ErrNoRows)` に変更すべき。 |
 | **INFRA-004** | **Medium** | WORLD'S END楽曲 `UpdateSongs` のN+1問題 | 楽曲と譜面を個別ループでUPDATE。通常楽曲はCASE式一括更新を実装済みであり不整合。バルク更新パターンに統一すべき。 |
 | **INFRA-005** | **Medium** | `validation.go` の全関数でContext未伝播 | `context.Context` を引数に取らず、`db.Get` を使用（`GetContext` ではない）。起動時のキャンセル不能の原因。 |
 | **INFRA-007** | **Medium** | `FindAllWithPlayer` と `FindAllWithPlayerForAdmin` のコード重複 | クエリ構築・LIKE検索・rows反復がほぼ同一。共通ヘルパーに抽出すべき。 |
