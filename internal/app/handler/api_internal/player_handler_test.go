@@ -12,7 +12,9 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,8 +25,8 @@ type mockPlayerService struct {
 	mock.Mock
 }
 
-func (m *mockPlayerService) CreatePlayer(ctx context.Context, name string) (*dto.PlayerDTO, error) {
-	args := m.Called(ctx, name)
+func (m *mockPlayerService) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
+	args := m.Called(ctx, userID, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -47,8 +49,9 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 	// モックの期待値設定
 	mockService := new(mockPlayerService)
 	expectedPlayer := &dto.PlayerDTO{Name: "太郎"}
-	mockService.On("CreatePlayer", mock.Anything, "太郎").Return(expectedPlayer, nil)
-	mockService.On("CreatePlayer", mock.Anything, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
+	mockService.On("CreatePlayer", mock.Anything, 1, "太郎").Return(expectedPlayer, nil)
+	mockService.On("CreatePlayer", mock.Anything, 1, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
+	mockService.On("CreatePlayer", mock.Anything, 1, "不正名").Return(nil, usecase.ErrInvalidPlayerName)
 
 	h := api_internal.NewPlayerHandler(mockService)
 
@@ -58,6 +61,7 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
 
 		err := h.CreatePlayer(c)
 		assert.NoError(t, err)
@@ -76,6 +80,7 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
 
 		err := h.CreatePlayer(c)
 		assert.Error(t, err)
@@ -91,11 +96,41 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
 
 		err := h.CreatePlayer(c)
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+	})
+
+	t.Run("アンハッピーパス: プレイヤー名バリデーションエラー", func(t *testing.T) {
+		body := `{"name": "不正名"}`
+		req := httptest.NewRequest(http.MethodPost, "/players", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
+
+		err := h.CreatePlayer(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok, "error should be *apierror.APIError")
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	})
+	t.Run("アンハッピーパス: 未認証（userEntityなし）", func(t *testing.T) {
+		body := `{"name": "太郎"}`
+		req := httptest.NewRequest(http.MethodPost, "/players", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.CreatePlayer(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok, "error should be *apierror.APIError")
+		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 	})
 }
