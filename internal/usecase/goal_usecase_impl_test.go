@@ -242,6 +242,12 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			expectedAttributes: nil,
 			expectError:        true,
 		},
+		{
+			name:               "diff が null の場合はエラーになる",
+			attributes:         []byte(`{"diff":null}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
 	}
 
 	for _, tt := range tests {

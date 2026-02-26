@@ -277,17 +277,48 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 }
 
 func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
-	var single int
-	if err := json.Unmarshal(raw, &single); err == nil {
-		return []int{single}, nil
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+
+	parseInt := func(value float64) (int, error) {
+		if math.Trunc(value) != value {
+			return 0, errors.New("value is not an integer")
+		}
+		parsed := int(value)
+		if float64(parsed) != value {
+			return 0, errors.New("integer value out of range")
+		}
+		return parsed, nil
 	}
 
 	var ids []int
-	if err := json.Unmarshal(raw, &ids); err != nil {
-		return nil, err
-	}
-	if len(ids) == 0 {
-		return nil, errors.New("empty int slice")
+	switch value := v.(type) {
+	case float64:
+		parsed, err := parseInt(value)
+		if err != nil {
+			return nil, err
+		}
+		ids = []int{parsed}
+	case []any:
+		if len(value) == 0 {
+			return nil, errors.New("empty int slice")
+		}
+		ids = make([]int, 0, len(value))
+		for _, item := range value {
+			floatValue, ok := item.(float64)
+			if !ok {
+				return nil, errors.New("slice contains non-integer value")
+			}
+			parsed, err := parseInt(floatValue)
+			if err != nil {
+				return nil, errors.New("slice contains non-integer value")
+			}
+			ids = append(ids, parsed)
+		}
+	default:
+		return nil, errors.New("unsupported type for int or int slice")
 	}
 
 	slices.Sort(ids)
