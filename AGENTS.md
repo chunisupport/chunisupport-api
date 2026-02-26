@@ -227,5 +227,182 @@
 - UI や 統合テストなど、技術的な制約でテストが難しい場合は、その理由を明記してください。
 - レガシーコードの緊急修正など、やむを得ない場合は判断してください。ただし、可能な限りテストを補足してください。
 
+## テストコードの作成
+
+Go言語でテストコードを作成する際の手順とテンプレートです。
+
+### テストファイルの配置
+
+テストファイルは対象ファイルと同じディレクトリに `_test.go` サフィックスで作成します。
+
+### テストの構成
+
+**テーブルテスト + Given-When-Then パターン** を採用します。
+
+- テーブルテストで複数のケースを効率的に記述
+- 各ケースの構造を Given-When-Then で整理
+
+### テストメソッドの命名
+
+ビジネス上の意味が伝わる名前をつけます。Goのテーブルテストではnameフィールドも含めて意味が明確になるよう適用しています。
+
+| 観点 | ガイドライン |
+|------|--------------|
+| 対象読者 | 非開発者にも伝わる |
+| 内容 | ビジネス上の意味を伝える |
+| 禁止 | メソッド名をテスト名に含めない |
+
+### テストテンプレート
+
+func TestPriceCalculator(t *testing.T) {
+    tests := []struct {
+        name     string
+        // Given: テストの前提条件
+        taxRate  float64
+        price    int
+        // Then: 期待する結果
+        expected int
+    }{
+        {
+            name:     "税率10%で1000円の場合1100円になる",
+            taxRate:  0.10,
+            price:    1000,
+            expected: 1100,
+        },
+        {
+            name:     "税率8%で500円の場合540円になる",
+            taxRate:  0.08,
+            price:    500,
+            expected: 540,
+        },
+        {
+            name:     "価格が0の場合は0のまま",
+            taxRate:  0.10,
+            price:    0,
+            expected: 0,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Given
+            calc := NewPriceCalculator(tt.taxRate)
+
+            // When
+            result := calc.Calculate(tt.price)
+
+            // Then
+            if result != tt.expected {
+                t.Errorf("got %d, want %d", result, tt.expected)
+            }
+        })
+    }
+}
+
+### 集約の振る舞いテスト（状態ベース）
+
+集約の内部実装（在庫減少など）を直接テストするのではなく、
+集約の振る舞い（商品購入）をテストし、その結果を検証します。
+
+func TestPurchase(t *testing.T) {
+    tests := []struct {
+        name string
+        // Given: 商品購入の前提条件
+        initialStock    int
+        purchaseQuantity int
+        // Then: 購入後の期待結果
+        expectedSuccess bool
+        expectedStock   int
+    }{
+        {
+            name:             "在庫がある場合は購入成功し在庫が減る",
+            initialStock:    10,
+            purchaseQuantity: 3,
+            expectedSuccess: true,
+            expectedStock:   7,
+        },
+        {
+            name:             "在庫と同数の購入で在庫が0になる",
+            initialStock:    5,
+            purchaseQuantity: 5,
+            expectedSuccess: true,
+            expectedStock:   0,
+        },
+        {
+            name:             "在庫不足の場合は購入失敗し在庫は変わらない",
+            initialStock:    2,
+            purchaseQuantity: 5,
+            expectedSuccess: false,
+            expectedStock:   2,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Given: 店舗に商品を登録
+            store := NewStore()
+            store.AddProduct("商品A", tt.initialStock)
+
+            // When: 商品を購入（集約の振る舞い）
+            result := store.Purchase("商品A", tt.purchaseQuantity)
+
+            // Then: 購入結果と在庫の状態を検証
+            if result.Success != tt.expectedSuccess {
+                t.Errorf("購入結果: got %v, want %v", result.Success, tt.expectedSuccess)
+            }
+            if got := store.GetStock("商品A"); got != tt.expectedStock {
+                t.Errorf("在庫数: got %d, want %d", got, tt.expectedStock)
+            }
+        })
+    }
+}
+
+### エラーケースのテンプレート
+
+func TestPriceCalculator_Validation(t *testing.T) {
+    tests := []struct {
+        name    string
+        // Given
+        taxRate float64
+        price   int
+        // Then
+        wantErr bool
+    }{
+        {
+            name:    "負の価格はエラー",
+            taxRate: 0.10,
+            price:   -100,
+            wantErr: true,
+        },
+        {
+            name:    "負の税率はエラー",
+            taxRate: -0.10,
+            price:   1000,
+            wantErr: true,
+        },
+        {
+            name:    "正常な値はエラーなし",
+            taxRate: 0.10,
+            price:   1000,
+            wantErr: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Given
+            calc := NewPriceCalculator(tt.taxRate)
+
+            // When
+            _, err := calc.CalculateWithValidation(tt.price)
+
+            // Then
+            if (err != nil) != tt.wantErr {
+                t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
+}
+
 ---
 このドキュメントは生きた文書であり、プロジェクトの成長とともに更新されるべきですが、**「依存関係の方向」や「ドメインの純粋性」といった核心的な原則が緩められることはありません。**
