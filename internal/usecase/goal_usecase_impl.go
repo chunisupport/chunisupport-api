@@ -313,7 +313,7 @@ func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
 			}
 			parsed, err := parseInt(floatValue)
 			if err != nil {
-				return nil, errors.New("slice contains non-integer value")
+				return nil, err
 			}
 			ids = append(ids, parsed)
 		}
