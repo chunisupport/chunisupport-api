@@ -199,21 +199,12 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	}
 
 	result := &goalAttributeFilter{}
-	if v, ok := attrs["diff"]; ok {
-		ids, err := parseIntOrIntSlice(v)
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		for _, id := range ids {
-			if _, exists := masters.DifficultyNamesByID[id]; !exists {
-				return nil, nil, ErrInvalidGoalAttributes
-			}
-		}
-		normalizedDiff, err := json.Marshal(normalizeIntOrSlice(ids))
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		attrs["diff"] = normalizedDiff
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "diff", func(id int) bool {
+		_, exists := masters.DifficultyNamesByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
 		result.DifficultyIDs = ids
 	}
 	if v, ok := attrs["const"]; ok {
@@ -254,44 +245,28 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 		result.ConstMin = &minConst
 		result.ConstMax = &maxConst
 	}
-	if v, ok := attrs["genre"]; ok {
-		ids, err := parseIntOrIntSlice(v)
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		for _, id := range ids {
-			if _, exists := masters.GenreNamesByID[id]; !exists {
-				return nil, nil, ErrInvalidGoalAttributes
-			}
-		}
-		normalizedGenre, err := json.Marshal(normalizeIntOrSlice(ids))
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		attrs["genre"] = normalizedGenre
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "genre", func(id int) bool {
+		_, exists := masters.GenreNamesByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
 		result.GenreIDs = ids
 	}
-	if v, ok := attrs["ver"]; ok {
-		ids, err := parseIntOrIntSlice(v)
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "ver", func(id int) bool {
+		_, exists := masters.VersionsByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
 		ranges := make([]repository.VersionRange, 0, len(ids))
 		for _, id := range ids {
-			version, exists := masters.VersionsByID[id]
-			if !exists {
-				return nil, nil, ErrInvalidGoalAttributes
-			}
+			version := masters.VersionsByID[id]
 			ranges = append(ranges, repository.VersionRange{
 				From: version.ReleasedAt,
 				To:   findNextVersionReleasedAt(masters, version.ReleasedAt),
 			})
 		}
-		normalizedVer, err := json.Marshal(normalizeIntOrSlice(ids))
-		if err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		attrs["ver"] = normalizedVer
 		result.VersionRanges = ranges
 	}
 	canon, err := json.Marshal(attrs)
@@ -318,6 +293,30 @@ func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
 	slices.Sort(ids)
 	normalized := slices.Compact(ids)
 	return normalized, nil
+}
+
+func validateAndNormalizeAttributeIDs(attrs map[string]json.RawMessage, key string, isValidID func(int) bool) ([]int, bool, error) {
+	v, ok := attrs[key]
+	if !ok {
+		return nil, false, nil
+	}
+
+	ids, err := parseIntOrIntSlice(v)
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	for _, id := range ids {
+		if !isValidID(id) {
+			return nil, false, ErrInvalidGoalAttributes
+		}
+	}
+
+	normalized, err := json.Marshal(normalizeIntOrSlice(ids))
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	attrs[key] = normalized
+	return ids, true, nil
 }
 
 func normalizeIntOrSlice(ids []int) any {
