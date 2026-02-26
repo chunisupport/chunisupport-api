@@ -16,21 +16,25 @@ import (
 
 // AuthHandler は認証関連のHTTPリクエストを処理します。
 type AuthHandler struct {
-	authUsecase    usecase.AuthUsecase
-	cookieSecure   bool
-	cookieSameSite http.SameSite
-	masterCache    *masterdata.Cache
+	authUsecase           usecase.AuthUsecase
+	userCredentialUsecase usecase.UserCredentialUsecase
+	recoveryUsecase       usecase.RecoveryUsecase
+	cookieSecure          bool
+	cookieSameSite        http.SameSite
+	masterCache           *masterdata.Cache
 }
 
 const authCookieName = "token"
 
 // NewAuthHandler は新しいAuthHandlerを生成します。
-func NewAuthHandler(authUsecase usecase.AuthUsecase, cookieSecure bool, cookieSameSite http.SameSite, masterCache *masterdata.Cache) *AuthHandler {
+func NewAuthHandler(authUsecase usecase.AuthUsecase, userCredentialUsecase usecase.UserCredentialUsecase, recoveryUsecase usecase.RecoveryUsecase, cookieSecure bool, cookieSameSite http.SameSite, masterCache *masterdata.Cache) *AuthHandler {
 	return &AuthHandler{
-		authUsecase:    authUsecase,
-		cookieSecure:   cookieSecure,
-		cookieSameSite: cookieSameSite,
-		masterCache:    masterCache,
+		authUsecase:           authUsecase,
+		userCredentialUsecase: userCredentialUsecase,
+		recoveryUsecase:       recoveryUsecase,
+		cookieSecure:          cookieSecure,
+		cookieSameSite:        cookieSameSite,
+		masterCache:           masterCache,
 	}
 }
 
@@ -126,7 +130,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		return err
 	}
 
-	userDTO, err := h.authUsecase.GetUser(c.Request().Context(), user.ID)
+	userDTO, err := h.userCredentialUsecase.GetUser(c.Request().Context(), user.ID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -151,7 +155,7 @@ func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
-	if err := h.authUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
+	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
 		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
@@ -193,7 +197,7 @@ func (h *AuthHandler) ChangePassword(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
-	if err := h.authUsecase.ChangePassword(c.Request().Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
+	if err := h.userCredentialUsecase.ChangePassword(c.Request().Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
 		slog.Error("Failed to change password", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
 	}
@@ -208,7 +212,7 @@ func (h *AuthHandler) IssueRecoveryCodes(c echo.Context) error {
 		return err
 	}
 
-	codes, err := h.authUsecase.IssueRecoveryCodes(c.Request().Context(), user.ID)
+	codes, err := h.recoveryUsecase.IssueRecoveryCodes(c.Request().Context(), user.ID)
 	if err != nil {
 		slog.Error("Failed to issue recovery codes", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
@@ -229,7 +233,7 @@ func (h *AuthHandler) RecoverPassword(c echo.Context) error {
 		return apierror.ErrBadRequest
 	}
 
-	if err := h.authUsecase.RecoverWithRecoveryCode(c.Request().Context(), req.RecoveryCode, req.NewPassword); err != nil {
+	if err := h.recoveryUsecase.RecoverWithRecoveryCode(c.Request().Context(), req.RecoveryCode, req.NewPassword); err != nil {
 		slog.Error("Failed to recover password with recovery code", "error", err, "ip_address", c.RealIP())
 		return apierror.FromUsecaseError(err)
 	}
@@ -244,7 +248,7 @@ func (h *AuthHandler) DeleteAccount(c echo.Context) error {
 		return err
 	}
 
-	if err := h.authUsecase.DeleteUser(c.Request().Context(), user.ID); err != nil {
+	if err := h.userCredentialUsecase.DeleteUser(c.Request().Context(), user.ID); err != nil {
 		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}

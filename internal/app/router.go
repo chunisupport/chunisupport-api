@@ -125,7 +125,9 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
+	authUsecase := usecase.NewAuthUsecase(db, userRepo, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
+	userCredentialUsecase := usecase.NewUserCredentialUsecase(db, userRepo, playerRecordRepo, cfg.PwPepper, masterCache)
+	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	playerUsecase := usecase.NewPlayerService(db, playerRepo)
 	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase, songRepo, worldsendChartRepo, masterCache)
@@ -146,7 +148,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
+		Auth:       api_internal.NewAuthHandler(authUsecase, userCredentialUsecase, recoveryUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
 		User:       api_internal.NewUserHandler(userUsecase),
 		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
 		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
