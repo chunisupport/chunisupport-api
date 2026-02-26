@@ -193,93 +193,80 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
 
-func TestGoalUsecase_CreateAcceptsDifficultyAsSingleElementArrayAndNormalizesToScalar(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	out, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":[4]}`),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"diff": float64(4)}, out.Attributes)
-}
+func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
+	tests := []struct {
+		name               string
+		attributes         []byte
+		expectedAttributes map[string]any
+		expectError        bool
+	}{
+		{
+			name:               "難易度を単一要素配列で指定するとスカラーに正規化される",
+			attributes:         []byte(`{"diff":[4]}`),
+			expectedAttributes: map[string]any{"diff": float64(4)},
+			expectError:        false,
+		},
+		{
+			name:               "難易度を複数配列で指定できる",
+			attributes:         []byte(`{"diff":[3,4]}`),
+			expectedAttributes: map[string]any{"diff": []any{float64(3), float64(4)}},
+			expectError:        false,
+		},
+		{
+			name:               "ジャンルを複数配列で指定できる",
+			attributes:         []byte(`{"genre":[1,2]}`),
+			expectedAttributes: map[string]any{"genre": []any{float64(1), float64(2)}},
+			expectError:        false,
+		},
+		{
+			name:               "バージョンを複数配列で指定できる",
+			attributes:         []byte(`{"ver":[20,21]}`),
+			expectedAttributes: map[string]any{"ver": []any{float64(20), float64(21)}},
+			expectError:        false,
+		},
+		{
+			name:               "難易度配列の重複は除去されスカラーに正規化される",
+			attributes:         []byte(`{"diff":[4,4]}`),
+			expectedAttributes: map[string]any{"diff": float64(4)},
+			expectError:        false,
+		},
+		{
+			name:               "存在しない難易度IDを含む配列はエラーになる",
+			attributes:         []byte(`{"diff":[4,99]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "空の難易度配列はエラーになる",
+			attributes:         []byte(`{"diff":[]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+	}
 
-func TestGoalUsecase_CreateAcceptsDifficultyAsMultiArray(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	out, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":[3,4]}`),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"diff": []any{float64(3), float64(4)}}, out.Attributes)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 
-func TestGoalUsecase_CreateAcceptsGenreAsMultiArray(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	out, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"genre":[1,2]}`),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"genre": []any{float64(1), float64(2)}}, out.Attributes)
-}
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   "score_count",
+				AchievementParams: []byte(`{"score":1000000,"count":1}`),
+				Attributes:        tt.attributes,
+			})
 
-func TestGoalUsecase_CreateAcceptsVersionAsMultiArray(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	out, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"ver":[20,21]}`),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"ver": []any{float64(20), float64(21)}}, out.Attributes)
-}
-
-func TestGoalUsecase_CreateNormalizesDuplicateDifficultyArrayToScalar(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	out, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":[4,4]}`),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"diff": float64(4)}, out.Attributes)
-}
-
-func TestGoalUsecase_CreateRejectsDifficultyArrayIncludingUnknownID(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	_, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":[4,99]}`),
-	})
-	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
-}
-
-func TestGoalUsecase_CreateRejectsEmptyDifficultyArray(t *testing.T) {
-	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
-	_, err := u.Create(context.Background(), 1, &GoalInput{
-		Title:             "test",
-		AchievementType:   "score_count",
-		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":[]}`),
-	})
-	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+			// Then
+			if tt.expectError {
+				assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedAttributes, out.Attributes)
+		})
+	}
 }
 
 func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T) {
