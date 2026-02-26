@@ -141,12 +141,7 @@ type goalAttributeFilter struct {
 	ConstMin      *float64
 	ConstMax      *float64
 	GenreIDs      []int
-	VersionRanges []versionRange
-}
-
-type versionRange struct {
-	From time.Time
-	To   *time.Time
+	VersionRanges []repository.VersionRange
 }
 
 type goalAchievementParam struct {
@@ -281,13 +276,13 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 		if err != nil {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
-		ranges := make([]versionRange, 0, len(ids))
+		ranges := make([]repository.VersionRange, 0, len(ids))
 		for _, id := range ids {
 			version, exists := masters.VersionsByID[id]
 			if !exists {
 				return nil, nil, ErrInvalidGoalAttributes
 			}
-			ranges = append(ranges, versionRange{
+			ranges = append(ranges, repository.VersionRange{
 				From: version.ReleasedAt,
 				To:   findNextVersionReleasedAt(masters, version.ReleasedAt),
 			})
@@ -428,18 +423,10 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 }
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
-	versionRanges := make([]repository.VersionRange, 0, len(attrs.VersionRanges))
-	for _, vr := range attrs.VersionRanges {
-		versionRanges = append(versionRanges, repository.VersionRange{
-			From: vr.From,
-			To:   vr.To,
-		})
-	}
-
 	filter := repository.GoalTargetFilter{
 		DifficultyIDs: attrs.DifficultyIDs,
 		GenreIDs:      attrs.GenreIDs,
-		VersionRanges: versionRanges,
+		VersionRanges: attrs.VersionRanges,
 		ConstMin:      attrs.ConstMin,
 		ConstMax:      attrs.ConstMax,
 	}
