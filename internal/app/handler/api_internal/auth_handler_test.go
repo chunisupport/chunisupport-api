@@ -36,12 +36,12 @@ func newMockMasterCache() *masterdata.Cache {
 	}
 }
 
-// mockAuthService は service.AuthService のモックです。
-type mockAuthService struct {
+// mockAuthUsecase は usecase.AuthUsecase のモックです。
+type mockAuthUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAuthService) Register(ctx context.Context, username, password string) (*dto_internal.UserDTO, string, error) {
+func (m *mockAuthUsecase) Register(ctx context.Context, username, password string) (*dto_internal.UserDTO, string, error) {
 	args := m.Called(ctx, username, password)
 	if args.Get(0) == nil {
 		return nil, "", args.Error(2)
@@ -49,17 +49,17 @@ func (m *mockAuthService) Register(ctx context.Context, username, password strin
 	return args.Get(0).(*dto_internal.UserDTO), args.String(1), args.Error(2)
 }
 
-func (m *mockAuthService) Login(ctx context.Context, username, password string) (string, error) {
+func (m *mockAuthUsecase) Login(ctx context.Context, username, password string) (string, error) {
 	args := m.Called(ctx, username, password)
 	return args.String(0), args.Error(1)
 }
 
-func (m *mockAuthService) Logout(ctx context.Context, sessionID string) error {
+func (m *mockAuthUsecase) Logout(ctx context.Context, sessionID string) error {
 	args := m.Called(ctx, sessionID)
 	return args.Error(0)
 }
 
-func (m *mockAuthService) Authenticate(ctx context.Context, userID int, sessionID string) (*entity.User, error) {
+func (m *mockAuthUsecase) Authenticate(ctx context.Context, userID int, sessionID string) (*entity.User, error) {
 	args := m.Called(ctx, userID, sessionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -67,7 +67,12 @@ func (m *mockAuthService) Authenticate(ctx context.Context, userID int, sessionI
 	return args.Get(0).(*entity.User), args.Error(1)
 }
 
-func (m *mockAuthService) GetUser(ctx context.Context, id int) (*dto_internal.UserDTO, error) {
+// mockUserCredentialUsecase は usecase.UserCredentialUsecase のモックです。
+type mockUserCredentialUsecase struct {
+	mock.Mock
+}
+
+func (m *mockUserCredentialUsecase) GetUser(ctx context.Context, id int) (*dto_internal.UserDTO, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -75,17 +80,27 @@ func (m *mockAuthService) GetUser(ctx context.Context, id int) (*dto_internal.Us
 	return args.Get(0).(*dto_internal.UserDTO), args.Error(1)
 }
 
-func (m *mockAuthService) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {
+func (m *mockUserCredentialUsecase) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {
 	args := m.Called(ctx, userID, isPrivate)
 	return args.Error(0)
 }
 
-func (m *mockAuthService) ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) error {
+func (m *mockUserCredentialUsecase) ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) error {
 	args := m.Called(ctx, userID, currentPassword, newPassword)
 	return args.Error(0)
 }
 
-func (m *mockAuthService) IssueRecoveryCodes(ctx context.Context, userID int) ([]string, error) {
+func (m *mockUserCredentialUsecase) DeleteUser(ctx context.Context, userID int) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+// mockRecoveryUsecase は usecase.RecoveryUsecase のモックです。
+type mockRecoveryUsecase struct {
+	mock.Mock
+}
+
+func (m *mockRecoveryUsecase) IssueRecoveryCodes(ctx context.Context, userID int) ([]string, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -93,14 +108,19 @@ func (m *mockAuthService) IssueRecoveryCodes(ctx context.Context, userID int) ([
 	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *mockAuthService) RecoverWithRecoveryCode(ctx context.Context, recoveryCode, newPassword string) error {
+func (m *mockRecoveryUsecase) RecoverWithRecoveryCode(ctx context.Context, recoveryCode, newPassword string) error {
 	args := m.Called(ctx, recoveryCode, newPassword)
 	return args.Error(0)
 }
 
-func (m *mockAuthService) DeleteUser(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
-	return args.Error(0)
+func newAuthHandlerWithMocks(secureCookie bool, sameSite http.SameSite) (*api_internal.AuthHandler, *mockAuthUsecase, *mockUserCredentialUsecase, *mockRecoveryUsecase) {
+	authMock := new(mockAuthUsecase)
+	userCredentialMock := new(mockUserCredentialUsecase)
+	recoveryMock := new(mockRecoveryUsecase)
+
+	h := api_internal.NewAuthHandler(authMock, userCredentialMock, recoveryMock, secureCookie, sameSite, newMockMasterCache())
+
+	return h, authMock, userCredentialMock, recoveryMock
 }
 
 func newTestEcho() *echo.Echo {
@@ -111,15 +131,14 @@ func newTestEcho() *echo.Echo {
 
 func TestAuthHandler_Register(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h, authMock, _, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 	t.Run("正常系: ユーザー登録", func(t *testing.T) {
 		expectedUser := &dto_internal.UserDTO{
 			Username:  "testuser",
 			IsPrivate: false,
 		}
-		mockService.On("Register", mock.Anything, "testuser", "password123").Return(expectedUser, "test_token", nil).Once()
+		authMock.On("Register", mock.Anything, "testuser", "password123").Return(expectedUser, "test_token", nil).Once()
 
 		body := `{"username": "testuser", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
@@ -137,11 +156,11 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Equal(t, "test_token", cookie.Value)
 		assert.True(t, cookie.HttpOnly)
 
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユーザー名重複時は409エラー", func(t *testing.T) {
-		mockService.On("Register", mock.Anything, "existinguser", "password123").Return(nil, "", usecase.ErrUsernameTaken).Once()
+		authMock.On("Register", mock.Anything, "existinguser", "password123").Return(nil, "", usecase.ErrUsernameTaken).Once()
 
 		body := `{"username": "existinguser", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
@@ -156,11 +175,11 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)     // セキュリティ強化: 409→400
 		assert.Equal(t, apierror.CodeRegistrationFailed, apiErr.Code) // username_taken→registration_failed
 
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユーザー名が短すぎる", func(t *testing.T) {
-		mockService.On("Register", mock.Anything, "abc", "password123").Return(nil, "", usecase.ErrUsernameTooShort).Once()
+		authMock.On("Register", mock.Anything, "abc", "password123").Return(nil, "", usecase.ErrUsernameTooShort).Once()
 
 		body := `{"username": "abc", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
@@ -175,11 +194,11 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeUsernameTooShort, apiErr.Code)
 
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: パスワードが短すぎる", func(t *testing.T) {
-		mockService.On("Register", mock.Anything, "testuser", "short").Return(nil, "", usecase.ErrPasswordTooShort).Once()
+		authMock.On("Register", mock.Anything, "testuser", "short").Return(nil, "", usecase.ErrPasswordTooShort).Once()
 
 		body := `{"username": "testuser", "password": "short"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
@@ -194,17 +213,16 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodePasswordTooShort, apiErr.Code)
 
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 }
 
 func TestAuthHandler_Login(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h, authMock, _, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 	t.Run("正常系: ログイン", func(t *testing.T) {
-		mockService.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
+		authMock.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
 
 		body := `{"username": "testuser", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
@@ -222,11 +240,11 @@ func TestAuthHandler_Login(t *testing.T) {
 		assert.True(t, cookie.HttpOnly)
 		assert.False(t, cookie.Secure) // テストではfalseを期待
 		assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: 不正な資格情報", func(t *testing.T) {
-		mockService.On("Login", mock.Anything, "testuser", "wrongpassword").Return("", usecase.ErrInvalidCredentials).Once()
+		authMock.On("Login", mock.Anything, "testuser", "wrongpassword").Return("", usecase.ErrInvalidCredentials).Once()
 
 		body := `{"username": "testuser", "password": "wrongpassword"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
@@ -239,15 +257,14 @@ func TestAuthHandler_Login(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("正常系: Secure属性がtrueの場合", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, true, http.SameSiteStrictMode, newMockMasterCache())
+		h, authMock, _, _ := newAuthHandlerWithMocks(true, http.SameSiteStrictMode)
 
-		mockService.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
+		authMock.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
 
 		body := `{"username": "testuser", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
@@ -263,19 +280,18 @@ func TestAuthHandler_Login(t *testing.T) {
 		assert.Equal(t, "token", cookie.Name)
 		assert.True(t, cookie.Secure) // Secure=trueを期待
 		assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 }
 
 func TestAuthHandler_Logout(t *testing.T) {
 	t.Run("正常系: ログアウト", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, authMock, _, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		sessionID := uuid.New().String()
 		claims := &auth.Claims{UserID: 1, SessionID: sessionID}
-		mockService.On("Logout", mock.Anything, sessionID).Return(nil).Once()
+		authMock.On("Logout", mock.Anything, sessionID).Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 		rec := httptest.NewRecorder()
@@ -297,13 +313,12 @@ func TestAuthHandler_Logout(t *testing.T) {
 		// ボディは空であることを確認
 		assert.Empty(t, rec.Body.String())
 
-		mockService.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: クレームがコンテキストに存在しない", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, authMock, _, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 		rec := httptest.NewRecorder()
@@ -316,18 +331,17 @@ func TestAuthHandler_Logout(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 
-		mockService.AssertNotCalled(t, "Logout", mock.Anything)
+		authMock.AssertNotCalled(t, "Logout", mock.Anything)
 	})
 }
 
 func TestAuthHandler_IssueRecoveryCodes(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h, _, _, recoveryMock := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 	t.Run("正常系: リカバリーコード発行", func(t *testing.T) {
 		expectedCodes := []string{"ABCD-EFGH-IJKL", "MNOP-QRST-UVWX"}
-		mockService.On("IssueRecoveryCodes", mock.Anything, 1).Return(expectedCodes, nil).Once()
+		recoveryMock.On("IssueRecoveryCodes", mock.Anything, 1).Return(expectedCodes, nil).Once()
 
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/recovery-codes", http.NoBody)
 		rec := httptest.NewRecorder()
@@ -344,11 +358,11 @@ func TestAuthHandler_IssueRecoveryCodes(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 		assert.Equal(t, expectedCodes, resp.RecoveryCodes)
 
-		mockService.AssertExpectations(t)
+		recoveryMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: 発行に失敗する", func(t *testing.T) {
-		mockService.On("IssueRecoveryCodes", mock.Anything, 1).Return(nil, usecase.ErrUserNotFound).Once()
+		recoveryMock.On("IssueRecoveryCodes", mock.Anything, 1).Return(nil, usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/recovery-codes", http.NoBody)
 		rec := httptest.NewRecorder()
@@ -362,17 +376,16 @@ func TestAuthHandler_IssueRecoveryCodes(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
 
-		mockService.AssertExpectations(t)
+		recoveryMock.AssertExpectations(t)
 	})
 }
 
 func TestAuthHandler_RecoverPassword(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h, _, _, recoveryMock := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 	t.Run("正常系: リカバリーコードで復旧", func(t *testing.T) {
-		mockService.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "new-password").Return(nil).Once()
+		recoveryMock.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "new-password").Return(nil).Once()
 
 		body := `{"recovery_code": "ABCD-EFGH-IJKL", "new_password": "new-password"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/recovery-codes", bytes.NewBufferString(body))
@@ -383,7 +396,7 @@ func TestAuthHandler_RecoverPassword(t *testing.T) {
 		err := h.RecoverPassword(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		mockService.AssertExpectations(t)
+		recoveryMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: リカバリーコードの形式が不正", func(t *testing.T) {
@@ -402,7 +415,7 @@ func TestAuthHandler_RecoverPassword(t *testing.T) {
 	})
 
 	t.Run("異常系: リカバリーコードが無効", func(t *testing.T) {
-		mockService.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "new-password").Return(usecase.ErrInvalidRecoveryCredentials).Once()
+		recoveryMock.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "new-password").Return(usecase.ErrInvalidRecoveryCredentials).Once()
 
 		body := `{"recovery_code": "ABCD-EFGH-IJKL", "new_password": "new-password"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/recovery-codes", bytes.NewBufferString(body))
@@ -416,14 +429,13 @@ func TestAuthHandler_RecoverPassword(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeInvalidRecovery, apiErr.Code)
-		mockService.AssertExpectations(t)
+		recoveryMock.AssertExpectations(t)
 	})
 }
 
 func TestAuthHandler_Me(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 	t.Run("正常系: ユーザー情報取得", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
@@ -434,7 +446,7 @@ func TestAuthHandler_Me(t *testing.T) {
 			IsPrivate:   false,
 		}
 
-		mockService.On("GetUser", mock.Anything, mockUser.ID).Return(mockUserDTO, nil).Once()
+		userCredentialMock.On("GetUser", mock.Anything, mockUser.ID).Return(mockUserDTO, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -452,19 +464,18 @@ func TestAuthHandler_Me(t *testing.T) {
 		assert.Equal(t, "PLAYER", userDTO.AccountType)
 		assert.False(t, userDTO.IsPrivate)
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
 	})
 }
 
 func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 	t.Run("正常系: 非公開設定を有効化", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false}
-		mockService.On("UpdatePrivacy", mock.Anything, 1, true).Return(nil).Once()
+		userCredentialMock.On("UpdatePrivacy", mock.Anything, 1, true).Return(nil).Once()
 
 		body := `{"is_private": true}`
 		req := httptest.NewRequest(http.MethodPut, "/api/me/privacy", bytes.NewBufferString(body))
@@ -482,17 +493,16 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, respBody["is_private"].(bool))
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
 	})
 
 	t.Run("正常系: 非公開設定を無効化", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: true}
-		mockService.On("UpdatePrivacy", mock.Anything, 1, false).Return(nil).Once()
+		userCredentialMock.On("UpdatePrivacy", mock.Anything, 1, false).Return(nil).Once()
 
 		body := `{"is_private": false}`
 		req := httptest.NewRequest(http.MethodPut, "/api/me/privacy", bytes.NewBufferString(body))
@@ -510,13 +520,12 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, respBody["is_private"].(bool))
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユーザーエンティティがコンテキストに存在しない", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		body := `{"is_private": true}`
 		req := httptest.NewRequest(http.MethodPut, "/api/me/privacy", bytes.NewBufferString(body))
@@ -531,17 +540,16 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 
-		mockService.AssertNotCalled(t, "UpdatePrivacy", mock.Anything, mock.Anything)
+		userCredentialMock.AssertNotCalled(t, "UpdatePrivacy", mock.Anything, mock.Anything)
 	})
 
 	t.Run("異常系: サービスエラー", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false}
-		mockService.On("UpdatePrivacy", mock.Anything, 1, true).Return(errors.New("database error")).Once()
+		userCredentialMock.On("UpdatePrivacy", mock.Anything, 1, true).Return(errors.New("database error")).Once()
 
 		body := `{"is_private": true}`
 		req := httptest.NewRequest(http.MethodPut, "/api/me/privacy", bytes.NewBufferString(body))
@@ -557,7 +565,7 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
 	})
 }
 
@@ -565,14 +573,14 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
-		setupMock      func(*mockAuthService)
+		setupMock      func(*mockUserCredentialUsecase)
 		expectedStatus int
 		expectError    bool
 	}{
 		{
 			name: "正常系: パスワード変更",
 			body: `{"current_password": "oldpass123", "new_password": "newpass123"}`,
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mockUserCredentialUsecase) {
 				m.On("ChangePassword", mock.Anything, 1, "oldpass123", "newpass123").Return(nil).Once()
 			},
 			expectedStatus: http.StatusOK,
@@ -581,7 +589,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		{
 			name: "異常系: バリデーションエラー - パスワードが短すぎる",
 			body: `{"current_password": "short", "new_password": "short"}`,
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mockUserCredentialUsecase) {
 				m.On("ChangePassword", mock.Anything, 1, "short", "short").Return(usecase.ErrPasswordTooShort).Once()
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -590,7 +598,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		{
 			name: "異常系: 現在のパスワードが間違っている",
 			body: `{"current_password": "wrongpass", "new_password": "newpass123"}`,
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mockUserCredentialUsecase) {
 				m.On("ChangePassword", mock.Anything, 1, "wrongpass", "newpass123").Return(usecase.ErrIncorrectPassword).Once()
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -599,7 +607,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		{
 			name: "異常系: 新しいパスワードが現在のパスワードと同じ",
 			body: `{"current_password": "password123", "new_password": "password123"}`,
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mockUserCredentialUsecase) {
 				m.On("ChangePassword", mock.Anything, 1, "password123", "password123").Return(usecase.ErrInvalidPassword).Once() // セキュリティ強化
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -608,7 +616,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		{
 			name: "異常系: サービスエラー",
 			body: `{"current_password": "oldpass123", "new_password": "newpass123"}`,
-			setupMock: func(m *mockAuthService) {
+			setupMock: func(m *mockUserCredentialUsecase) {
 				m.On("ChangePassword", mock.Anything, 1, "oldpass123", "newpass123").Return(errors.New("db error")).Once()
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -619,13 +627,12 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newTestEcho()
-			mockService := new(mockAuthService)
-			h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+			h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 			un, _ := username.NewUserName("testuser")
 			mockUser := &entity.User{ID: 1, Username: un}
 
-			tc.setupMock(mockService)
+			tc.setupMock(userCredentialMock)
 
 			req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(tc.body))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -645,7 +652,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 				assert.Equal(t, tc.expectedStatus, rec.Code)
 			}
 
-			mockService.AssertExpectations(t)
+			userCredentialMock.AssertExpectations(t)
 		})
 	}
 }
@@ -653,15 +660,14 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 func TestAuthHandler_DeleteAccount(t *testing.T) {
 	t.Run("正常系: アカウント削除", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, authMock, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
 		claims := &auth.Claims{SessionID: "session-123"}
 
-		mockService.On("DeleteUser", mock.Anything, 1).Return(nil).Once()
-		mockService.On("Logout", mock.Anything, claims.SessionID).Return(nil).Once()
+		userCredentialMock.On("DeleteUser", mock.Anything, 1).Return(nil).Once()
+		authMock.On("Logout", mock.Anything, claims.SessionID).Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -682,13 +688,13 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 		// ボディは空であることを確認
 		assert.Empty(t, rec.Body.String())
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
+		authMock.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユーザーエンティティが存在しない", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, _, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -701,18 +707,17 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 
-		mockService.AssertNotCalled(t, "DeleteUser", mock.Anything)
+		userCredentialMock.AssertNotCalled(t, "DeleteUser", mock.Anything)
 	})
 
 	t.Run("異常系: 削除処理でエラー", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, authMock, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
 
-		mockService.On("DeleteUser", mock.Anything, 1).Return(errors.New("database error")).Once()
+		userCredentialMock.On("DeleteUser", mock.Anything, 1).Return(errors.New("database error")).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -726,21 +731,20 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
 
-		mockService.AssertExpectations(t)
-		mockService.AssertNotCalled(t, "Logout", mock.Anything)
+		userCredentialMock.AssertExpectations(t)
+		authMock.AssertNotCalled(t, "Logout", mock.Anything)
 	})
 
 	t.Run("異常系: セッション無効化でエラー", func(t *testing.T) {
 		e := newTestEcho()
-		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h, authMock, userCredentialMock, _ := newAuthHandlerWithMocks(false, http.SameSiteLaxMode)
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
 		claims := &auth.Claims{SessionID: "session-123"}
 
-		mockService.On("DeleteUser", mock.Anything, 1).Return(nil).Once()
-		mockService.On("Logout", mock.Anything, claims.SessionID).Return(errors.New("session error")).Once()
+		userCredentialMock.On("DeleteUser", mock.Anything, 1).Return(nil).Once()
+		authMock.On("Logout", mock.Anything, claims.SessionID).Return(errors.New("session error")).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -755,6 +759,6 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
 
-		mockService.AssertExpectations(t)
+		userCredentialMock.AssertExpectations(t)
 	})
 }
