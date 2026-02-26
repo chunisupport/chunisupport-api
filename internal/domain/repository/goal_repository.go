@@ -21,12 +21,16 @@ type GoalRepository interface {
 
 // GoalTargetFilter は目標対象譜面の絞り込み条件です。
 type GoalTargetFilter struct {
-	DifficultyID          *int
-	GenreID               *int
-	VersionReleasedAt     *time.Time
-	VersionReleasedBefore *time.Time
-	ConstMin              *float64
-	ConstMax              *float64
+	DifficultyIDs []int
+	GenreIDs      []int
+	VersionRanges []VersionRange
+	ConstMin      *float64
+	ConstMax      *float64
+}
+
+type VersionRange struct {
+	From time.Time
+	To   *time.Time
 }
 
 // GoalTargetStats は絞り込み結果から得られる上限計算用統計です。

@@ -108,23 +108,28 @@ func (r *goalRepository) LockUserByID(ctx context.Context, exec repository.Execu
 
 func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
 	where := []string{"s.is_deleted = 0"}
-	args := make([]any, 0, 5)
+	args := make([]any, 0, 8)
 
-	if filter.DifficultyID != nil {
-		where = append(where, "c.difficulty_id = ?")
-		args = append(args, *filter.DifficultyID)
+	if len(filter.DifficultyIDs) > 0 {
+		where = append(where, "c.difficulty_id IN (?)")
+		args = append(args, filter.DifficultyIDs)
 	}
-	if filter.GenreID != nil {
-		where = append(where, "s.genre_id = ?")
-		args = append(args, *filter.GenreID)
+	if len(filter.GenreIDs) > 0 {
+		where = append(where, "s.genre_id IN (?)")
+		args = append(args, filter.GenreIDs)
 	}
-	if filter.VersionReleasedAt != nil {
-		where = append(where, "s.released_at >= ?")
-		args = append(args, *filter.VersionReleasedAt)
-	}
-	if filter.VersionReleasedBefore != nil {
-		where = append(where, "s.released_at < ?")
-		args = append(args, *filter.VersionReleasedBefore)
+	if len(filter.VersionRanges) > 0 {
+		versionWhere := make([]string, 0, len(filter.VersionRanges))
+		for _, versionRange := range filter.VersionRanges {
+			if versionRange.To == nil {
+				versionWhere = append(versionWhere, "s.released_at >= ?")
+				args = append(args, versionRange.From)
+				continue
+			}
+			versionWhere = append(versionWhere, "(s.released_at >= ? AND s.released_at < ?)")
+			args = append(args, versionRange.From, *versionRange.To)
+		}
+		where = append(where, "("+strings.Join(versionWhere, " OR ")+")")
 	}
 	if filter.ConstMin != nil {
 		where = append(where, "c.const >= ?")
@@ -142,6 +147,11 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 		FROM charts c
 		INNER JOIN songs s ON s.id = c.song_id
 		WHERE ` + strings.Join(where, " AND ")
+	query, args, err := sqlx.In(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	query = r.db.Rebind(query)
 
 	var row struct {
 		ChartCount      int     `db:"chart_count"`

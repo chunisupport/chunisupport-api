@@ -89,9 +89,9 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
 		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent"},
-		DifficultyNamesByID:  map[int]string{4: "MASTER"},
-		GenreNamesByID:       map[int]string{1: "POPS & ANIME"},
-		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
+		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
+		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
 	}
 }
 
@@ -189,6 +189,95 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
 		Attributes:        []byte(`{"diff":5,"genre":1,"ver":20}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+}
+
+func TestGoalUsecase_CreateAcceptsDifficultyAsSingleElementArrayAndNormalizesToScalar(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":[4]}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"diff": float64(4)}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateAcceptsDifficultyAsMultiArray(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":[3,4]}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"diff": []any{float64(3), float64(4)}}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateAcceptsGenreAsMultiArray(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"genre":[1,2]}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"genre": []any{float64(1), float64(2)}}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateAcceptsVersionAsMultiArray(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"ver":[20,21]}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"ver": []any{float64(20), float64(21)}}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateNormalizesDuplicateDifficultyArrayToScalar(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":[4,4]}`),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"diff": float64(4)}, out.Attributes)
+}
+
+func TestGoalUsecase_CreateRejectsDifficultyArrayIncludingUnknownID(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":[4,99]}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+}
+
+func TestGoalUsecase_CreateRejectsEmptyDifficultyArray(t *testing.T) {
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":[]}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }

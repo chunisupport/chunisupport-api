@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -135,12 +137,16 @@ type validatedGoalInput struct {
 }
 
 type goalAttributeFilter struct {
-	DifficultyID          *int
-	ConstMin              *float64
-	ConstMax              *float64
-	GenreID               *int
-	VersionReleasedAt     *domainmasterdata.Version
-	VersionReleasedBefore *domainmasterdata.Version
+	DifficultyIDs []int
+	ConstMin      *float64
+	ConstMax      *float64
+	GenreIDs      []int
+	VersionRanges []versionRange
+}
+
+type versionRange struct {
+	From time.Time
+	To   *time.Time
 }
 
 type goalAchievementParam struct {
@@ -199,14 +205,21 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 
 	result := &goalAttributeFilter{}
 	if v, ok := attrs["diff"]; ok {
-		var diff int
-		if err := json.Unmarshal(v, &diff); err != nil {
+		ids, err := parseIntOrIntSlice(v)
+		if err != nil {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
-		if _, exists := masters.DifficultyNamesByID[diff]; !exists {
+		for _, id := range ids {
+			if _, exists := masters.DifficultyNamesByID[id]; !exists {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
+		}
+		normalizedDiff, err := json.Marshal(normalizeIntOrSlice(ids))
+		if err != nil {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
-		result.DifficultyID = &diff
+		attrs["diff"] = normalizedDiff
+		result.DifficultyIDs = ids
 	}
 	if v, ok := attrs["const"]; ok {
 		var c struct {
@@ -247,39 +260,98 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 		result.ConstMax = &maxConst
 	}
 	if v, ok := attrs["genre"]; ok {
-		var id int
-		if err := json.Unmarshal(v, &id); err != nil {
+		ids, err := parseIntOrIntSlice(v)
+		if err != nil {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
-		if _, exists := masters.GenreNamesByID[id]; !exists {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		result.GenreID = &id
-	}
-	if v, ok := attrs["ver"]; ok {
-		var id int
-		if err := json.Unmarshal(v, &id); err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		version, exists := masters.VersionsByID[id]
-		if !exists {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		result.VersionReleasedAt = &version
-		for _, candidate := range masters.VersionsByID {
-			if candidate.ReleasedAt.After(version.ReleasedAt) {
-				if result.VersionReleasedBefore == nil || candidate.ReleasedAt.Before(result.VersionReleasedBefore.ReleasedAt) {
-					v := candidate
-					result.VersionReleasedBefore = &v
-				}
+		for _, id := range ids {
+			if _, exists := masters.GenreNamesByID[id]; !exists {
+				return nil, nil, ErrInvalidGoalAttributes
 			}
 		}
+		normalizedGenre, err := json.Marshal(normalizeIntOrSlice(ids))
+		if err != nil {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		attrs["genre"] = normalizedGenre
+		result.GenreIDs = ids
+	}
+	if v, ok := attrs["ver"]; ok {
+		ids, err := parseIntOrIntSlice(v)
+		if err != nil {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		ranges := make([]versionRange, 0, len(ids))
+		for _, id := range ids {
+			version, exists := masters.VersionsByID[id]
+			if !exists {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
+			ranges = append(ranges, versionRange{
+				From: version.ReleasedAt,
+				To:   findNextVersionReleasedAt(masters, version.ReleasedAt),
+			})
+		}
+		normalizedVer, err := json.Marshal(normalizeIntOrSlice(ids))
+		if err != nil {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		attrs["ver"] = normalizedVer
+		result.VersionRanges = ranges
 	}
 	canon, err := json.Marshal(attrs)
 	if err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
 	return canon, result, nil
+}
+
+func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
+	var single int
+	if err := json.Unmarshal(raw, &single); err == nil {
+		return []int{single}, nil
+	}
+
+	var ids []int
+	if err := json.Unmarshal(raw, &ids); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, errors.New("empty int slice")
+	}
+
+	uniq := make(map[int]struct{}, len(ids))
+	normalized := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if _, exists := uniq[id]; exists {
+			continue
+		}
+		uniq[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	slices.Sort(normalized)
+	return normalized, nil
+}
+
+func normalizeIntOrSlice(ids []int) any {
+	if len(ids) == 1 {
+		return ids[0]
+	}
+	return ids
+}
+
+func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt time.Time) *time.Time {
+	var next *time.Time
+	for _, candidate := range masters.VersionsByID {
+		if !candidate.ReleasedAt.After(releasedAt) {
+			continue
+		}
+		if next == nil || candidate.ReleasedAt.Before(*next) {
+			t := candidate.ReleasedAt
+			next = &t
+		}
+	}
+	return next
 }
 
 func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goalAchievementParam, error) {
@@ -356,17 +428,20 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 }
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
+	versionRanges := make([]repository.VersionRange, 0, len(attrs.VersionRanges))
+	for _, vr := range attrs.VersionRanges {
+		versionRanges = append(versionRanges, repository.VersionRange{
+			From: vr.From,
+			To:   vr.To,
+		})
+	}
+
 	filter := repository.GoalTargetFilter{
-		DifficultyID: attrs.DifficultyID,
-		GenreID:      attrs.GenreID,
-		ConstMin:     attrs.ConstMin,
-		ConstMax:     attrs.ConstMax,
-	}
-	if attrs.VersionReleasedAt != nil {
-		filter.VersionReleasedAt = &attrs.VersionReleasedAt.ReleasedAt
-	}
-	if attrs.VersionReleasedBefore != nil {
-		filter.VersionReleasedBefore = &attrs.VersionReleasedBefore.ReleasedAt
+		DifficultyIDs: attrs.DifficultyIDs,
+		GenreIDs:      attrs.GenreIDs,
+		VersionRanges: versionRanges,
+		ConstMin:      attrs.ConstMin,
+		ConstMax:      attrs.ConstMax,
 	}
 	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
 	if err != nil {
