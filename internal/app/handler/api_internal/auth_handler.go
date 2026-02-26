@@ -6,30 +6,23 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/auth"
-	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
 // AuthHandler は認証関連のHTTPリクエストを処理します。
 type AuthHandler struct {
-	authUsecase           usecase.AuthUsecase
-	userCredentialUsecase usecase.UserCredentialUsecase
-	recoveryUsecase       usecase.RecoveryUsecase
-	cookieSecure          bool
-	cookieSameSite        http.SameSite
-	masterCache           *masterdata.Cache
+	authUsecase    usecase.AuthUsecase
+	cookieSecure   bool
+	cookieSameSite http.SameSite
 }
 
 // NewAuthHandler は新しいAuthHandlerを生成します。
-func NewAuthHandler(authUsecase usecase.AuthUsecase, userCredentialUsecase usecase.UserCredentialUsecase, recoveryUsecase usecase.RecoveryUsecase, cookieSecure bool, cookieSameSite http.SameSite, masterCache *masterdata.Cache) *AuthHandler {
+func NewAuthHandler(authUsecase usecase.AuthUsecase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
 	return &AuthHandler{
-		authUsecase:           authUsecase,
-		userCredentialUsecase: userCredentialUsecase,
-		recoveryUsecase:       recoveryUsecase,
-		cookieSecure:          cookieSecure,
-		cookieSameSite:        cookieSameSite,
-		masterCache:           masterCache,
+		authUsecase:    authUsecase,
+		cookieSecure:   cookieSecure,
+		cookieSameSite: cookieSameSite,
 	}
 }
 
@@ -89,40 +82,4 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	c.SetCookie(newAuthCookie(h.cookieSecure, h.cookieSameSite, "", -1))
 
 	return c.NoContent(http.StatusOK)
-}
-
-// Me は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) Me(c echo.Context) error {
-	profileHandler := NewProfileHandler(h.authUsecase, h.userCredentialUsecase, h.cookieSecure, h.cookieSameSite)
-	return profileHandler.Me(c)
-}
-
-// UpdatePrivacy は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) UpdatePrivacy(c echo.Context) error {
-	profileHandler := NewProfileHandler(h.authUsecase, h.userCredentialUsecase, h.cookieSecure, h.cookieSameSite)
-	return profileHandler.UpdatePrivacy(c)
-}
-
-// ChangePassword は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) ChangePassword(c echo.Context) error {
-	profileHandler := NewProfileHandler(h.authUsecase, h.userCredentialUsecase, h.cookieSecure, h.cookieSameSite)
-	return profileHandler.ChangePassword(c)
-}
-
-// DeleteAccount は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) DeleteAccount(c echo.Context) error {
-	profileHandler := NewProfileHandler(h.authUsecase, h.userCredentialUsecase, h.cookieSecure, h.cookieSameSite)
-	return profileHandler.DeleteAccount(c)
-}
-
-// IssueRecoveryCodes は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) IssueRecoveryCodes(c echo.Context) error {
-	recoveryHandler := NewRecoveryHandler(h.recoveryUsecase)
-	return recoveryHandler.IssueRecoveryCodes(c)
-}
-
-// RecoverPassword は後方互換のため残した委譲メソッドです。
-func (h *AuthHandler) RecoverPassword(c echo.Context) error {
-	recoveryHandler := NewRecoveryHandler(h.recoveryUsecase)
-	return recoveryHandler.RecoverPassword(c)
 }

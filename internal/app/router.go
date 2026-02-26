@@ -150,7 +150,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, userCredentialUsecase, recoveryUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
+		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
 		Recovery:   api_internal.NewRecoveryHandler(recoveryUsecase),
 		Profile:    api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
 		User:       api_internal.NewUserHandler(userUsecase),
