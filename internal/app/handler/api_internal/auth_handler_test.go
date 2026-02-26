@@ -112,7 +112,7 @@ func newTestEcho() *echo.Echo {
 func TestAuthHandler_Register(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: ユーザー登録", func(t *testing.T) {
 		expectedUser := &dto_internal.UserDTO{
@@ -201,7 +201,7 @@ func TestAuthHandler_Register(t *testing.T) {
 func TestAuthHandler_Login(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: ログイン", func(t *testing.T) {
 		mockService.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
@@ -245,7 +245,7 @@ func TestAuthHandler_Login(t *testing.T) {
 	t.Run("正常系: Secure属性がtrueの場合", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, true, http.SameSiteStrictMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, true, http.SameSiteStrictMode, newMockMasterCache())
 
 		mockService.On("Login", mock.Anything, "testuser", "password123").Return("test_token", nil).Once()
 
@@ -271,7 +271,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 	t.Run("正常系: ログアウト", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		sessionID := uuid.New().String()
 		claims := &auth.Claims{UserID: 1, SessionID: sessionID}
@@ -303,7 +303,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 	t.Run("異常系: クレームがコンテキストに存在しない", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 		rec := httptest.NewRecorder()
@@ -323,7 +323,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 func TestAuthHandler_IssueRecoveryCodes(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: リカバリーコード発行", func(t *testing.T) {
 		expectedCodes := []string{"ABCD-EFGH-IJKL", "MNOP-QRST-UVWX"}
@@ -369,7 +369,7 @@ func TestAuthHandler_IssueRecoveryCodes(t *testing.T) {
 func TestAuthHandler_RecoverPassword(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: リカバリーコードで復旧", func(t *testing.T) {
 		mockService.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "new-password").Return(nil).Once()
@@ -423,7 +423,7 @@ func TestAuthHandler_RecoverPassword(t *testing.T) {
 func TestAuthHandler_Me(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockAuthService)
-	h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+	h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 	t.Run("正常系: ユーザー情報取得", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
@@ -460,7 +460,7 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 	t.Run("正常系: 非公開設定を有効化", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false}
@@ -488,7 +488,7 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 	t.Run("正常系: 非公開設定を無効化", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: true}
@@ -516,7 +516,7 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 	t.Run("異常系: ユーザーエンティティがコンテキストに存在しない", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		body := `{"is_private": true}`
 		req := httptest.NewRequest(http.MethodPut, "/api/me/privacy", bytes.NewBufferString(body))
@@ -537,7 +537,7 @@ func TestAuthHandler_UpdatePrivacy(t *testing.T) {
 	t.Run("異常系: サービスエラー", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false}
@@ -620,7 +620,7 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newTestEcho()
 			mockService := new(mockAuthService)
-			h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+			h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 			un, _ := username.NewUserName("testuser")
 			mockUser := &entity.User{ID: 1, Username: un}
@@ -654,7 +654,7 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 	t.Run("正常系: アカウント削除", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
@@ -688,7 +688,7 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 	t.Run("異常系: ユーザーエンティティが存在しない", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/me", nil)
 		rec := httptest.NewRecorder()
@@ -707,7 +707,7 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 	t.Run("異常系: 削除処理でエラー", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
@@ -733,7 +733,7 @@ func TestAuthHandler_DeleteAccount(t *testing.T) {
 	t.Run("異常系: セッション無効化でエラー", func(t *testing.T) {
 		e := newTestEcho()
 		mockService := new(mockAuthService)
-		h := api_internal.NewAuthHandler(mockService, false, http.SameSiteLaxMode, newMockMasterCache())
+		h := api_internal.NewAuthHandler(mockService, mockService, mockService, false, http.SameSiteLaxMode, newMockMasterCache())
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
