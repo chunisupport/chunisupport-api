@@ -147,6 +147,9 @@ func convertUsernameError(err error) error {
 	if err == nil {
 		return nil
 	}
+	// TODO: internal/domain/vo/username パッケージでエラー変数を公開し、
+	// errors.Is() を使った判定に切り替えることを検討してください。
+	// 例: case errors.Is(err, username.ErrEmpty):
 	switch err.Error() {
 	case "username cannot be empty":
 		return ErrUsernameEmpty
