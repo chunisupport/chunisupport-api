@@ -89,9 +89,9 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
 		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent"},
-		DifficultyNamesByID:  map[int]string{4: "MASTER"},
-		GenreNamesByID:       map[int]string{1: "POPS & ANIME"},
-		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
+		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
+		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
 	}
 }
 
@@ -191,6 +191,88 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 		Attributes:        []byte(`{"diff":5,"genre":1,"ver":20}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+}
+
+func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
+	tests := []struct {
+		name               string
+		attributes         []byte
+		expectedAttributes map[string]any
+		expectError        bool
+	}{
+		{
+			name:               "難易度を単一要素配列で指定するとスカラーに正規化される",
+			attributes:         []byte(`{"diff":[4]}`),
+			expectedAttributes: map[string]any{"diff": float64(4)},
+			expectError:        false,
+		},
+		{
+			name:               "難易度を複数配列で指定できる",
+			attributes:         []byte(`{"diff":[3,4]}`),
+			expectedAttributes: map[string]any{"diff": []any{float64(3), float64(4)}},
+			expectError:        false,
+		},
+		{
+			name:               "ジャンルを複数配列で指定できる",
+			attributes:         []byte(`{"genre":[1,2]}`),
+			expectedAttributes: map[string]any{"genre": []any{float64(1), float64(2)}},
+			expectError:        false,
+		},
+		{
+			name:               "バージョンを複数配列で指定できる",
+			attributes:         []byte(`{"ver":[20,21]}`),
+			expectedAttributes: map[string]any{"ver": []any{float64(20), float64(21)}},
+			expectError:        false,
+		},
+		{
+			name:               "難易度配列の重複は除去されスカラーに正規化される",
+			attributes:         []byte(`{"diff":[4,4]}`),
+			expectedAttributes: map[string]any{"diff": float64(4)},
+			expectError:        false,
+		},
+		{
+			name:               "存在しない難易度IDを含む配列はエラーになる",
+			attributes:         []byte(`{"diff":[4,99]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "空の難易度配列はエラーになる",
+			attributes:         []byte(`{"diff":[]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "diff が null の場合はエラーになる",
+			attributes:         []byte(`{"diff":null}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   "score_count",
+				AchievementParams: []byte(`{"score":1000000,"count":1}`),
+				Attributes:        tt.attributes,
+			})
+
+			// Then
+			if tt.expectError {
+				assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedAttributes, out.Attributes)
+		})
+	}
 }
 
 func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T) {

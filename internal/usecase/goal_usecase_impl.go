@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -135,12 +137,11 @@ type validatedGoalInput struct {
 }
 
 type goalAttributeFilter struct {
-	DifficultyID          *int
-	ConstMin              *float64
-	ConstMax              *float64
-	GenreID               *int
-	VersionReleasedAt     *domainmasterdata.Version
-	VersionReleasedBefore *domainmasterdata.Version
+	DifficultyIDs []int
+	ConstMin      *float64
+	ConstMax      *float64
+	GenreIDs      []int
+	VersionRanges []repository.VersionRange
 }
 
 type goalAchievementParam struct {
@@ -198,15 +199,13 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	}
 
 	result := &goalAttributeFilter{}
-	if v, ok := attrs["diff"]; ok {
-		var diff int
-		if err := json.Unmarshal(v, &diff); err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		if _, exists := masters.DifficultyNamesByID[diff]; !exists {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		result.DifficultyID = &diff
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "diff", func(id int) bool {
+		_, exists := masters.DifficultyNamesByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
+		result.DifficultyIDs = ids
 	}
 	if v, ok := attrs["const"]; ok {
 		var c struct {
@@ -246,40 +245,130 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 		result.ConstMin = &minConst
 		result.ConstMax = &maxConst
 	}
-	if v, ok := attrs["genre"]; ok {
-		var id int
-		if err := json.Unmarshal(v, &id); err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		if _, exists := masters.GenreNamesByID[id]; !exists {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		result.GenreID = &id
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "genre", func(id int) bool {
+		_, exists := masters.GenreNamesByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
+		result.GenreIDs = ids
 	}
-	if v, ok := attrs["ver"]; ok {
-		var id int
-		if err := json.Unmarshal(v, &id); err != nil {
-			return nil, nil, ErrInvalidGoalAttributes
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "ver", func(id int) bool {
+		_, exists := masters.VersionsByID[id]
+		return exists
+	}); err != nil {
+		return nil, nil, err
+	} else if ok {
+		ranges := make([]repository.VersionRange, 0, len(ids))
+		for _, id := range ids {
+			version := masters.VersionsByID[id]
+			ranges = append(ranges, repository.VersionRange{
+				From: version.ReleasedAt,
+				To:   findNextVersionReleasedAt(masters, version.ReleasedAt),
+			})
 		}
-		version, exists := masters.VersionsByID[id]
-		if !exists {
-			return nil, nil, ErrInvalidGoalAttributes
-		}
-		result.VersionReleasedAt = &version
-		for _, candidate := range masters.VersionsByID {
-			if candidate.ReleasedAt.After(version.ReleasedAt) {
-				if result.VersionReleasedBefore == nil || candidate.ReleasedAt.Before(result.VersionReleasedBefore.ReleasedAt) {
-					v := candidate
-					result.VersionReleasedBefore = &v
-				}
-			}
-		}
+		result.VersionRanges = ranges
 	}
 	canon, err := json.Marshal(attrs)
 	if err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
 	return canon, result, nil
+}
+
+func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+
+	parseInt := func(value float64) (int, error) {
+		if math.Trunc(value) != value {
+			return 0, errors.New("value is not an integer")
+		}
+		parsed := int(value)
+		if float64(parsed) != value {
+			return 0, errors.New("integer value out of range")
+		}
+		return parsed, nil
+	}
+
+	var ids []int
+	switch value := v.(type) {
+	case float64:
+		parsed, err := parseInt(value)
+		if err != nil {
+			return nil, err
+		}
+		ids = []int{parsed}
+	case []any:
+		if len(value) == 0 {
+			return nil, errors.New("empty int slice")
+		}
+		ids = make([]int, 0, len(value))
+		for _, item := range value {
+			floatValue, ok := item.(float64)
+			if !ok {
+				return nil, errors.New("slice contains non-integer value")
+			}
+			parsed, err := parseInt(floatValue)
+			if err != nil {
+				return nil, err
+			}
+			ids = append(ids, parsed)
+		}
+	default:
+		return nil, errors.New("unsupported type for int or int slice")
+	}
+
+	slices.Sort(ids)
+	normalized := slices.Compact(ids)
+	return normalized, nil
+}
+
+func validateAndNormalizeAttributeIDs(attrs map[string]json.RawMessage, key string, isValidID func(int) bool) ([]int, bool, error) {
+	v, ok := attrs[key]
+	if !ok {
+		return nil, false, nil
+	}
+
+	ids, err := parseIntOrIntSlice(v)
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	for _, id := range ids {
+		if !isValidID(id) {
+			return nil, false, ErrInvalidGoalAttributes
+		}
+	}
+
+	normalized, err := json.Marshal(normalizeIntOrSlice(ids))
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	attrs[key] = normalized
+	return ids, true, nil
+}
+
+func normalizeIntOrSlice(ids []int) any {
+	if len(ids) == 1 {
+		return ids[0]
+	}
+	return ids
+}
+
+func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt time.Time) *time.Time {
+	var next *time.Time
+	for _, candidate := range masters.VersionsByID {
+		if !candidate.ReleasedAt.After(releasedAt) {
+			continue
+		}
+		if next == nil || candidate.ReleasedAt.Before(*next) {
+			t := candidate.ReleasedAt
+			next = &t
+		}
+	}
+	return next
 }
 
 func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goalAchievementParam, error) {
@@ -357,16 +446,11 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
 	filter := repository.GoalTargetFilter{
-		DifficultyID: attrs.DifficultyID,
-		GenreID:      attrs.GenreID,
-		ConstMin:     attrs.ConstMin,
-		ConstMax:     attrs.ConstMax,
-	}
-	if attrs.VersionReleasedAt != nil {
-		filter.VersionReleasedAt = &attrs.VersionReleasedAt.ReleasedAt
-	}
-	if attrs.VersionReleasedBefore != nil {
-		filter.VersionReleasedBefore = &attrs.VersionReleasedBefore.ReleasedAt
+		DifficultyIDs: attrs.DifficultyIDs,
+		GenreIDs:      attrs.GenreIDs,
+		VersionRanges: attrs.VersionRanges,
+		ConstMin:      attrs.ConstMin,
+		ConstMax:      attrs.ConstMax,
 	}
 	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
 	if err != nil {

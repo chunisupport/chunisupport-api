@@ -815,19 +815,19 @@ curl -X POST \
 
 ```json
 {
-  "diff": 4,
+  "diff": [3, 4],
   "const": { "min": 14.0, "max": 14.4 },
-  "genre": 1,
-  "ver": 20
+  "genre": [1, 2],
+  "ver": [20, 21]
 }
 ```
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `diff` | `integer` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。省略時は全難易度対象 |
+| `diff` | `integer \| integer[]` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。単一値または配列で指定可能。省略時は全難易度対象 |
 | `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 15.9`。省略時は定数条件なし |
-| `genre` | `integer` | 任意 | ジャンルマスタID（単値）。省略時は全ジャンル対象 |
-| `ver` | `integer` | 任意 | バージョンマスタID（単値）。省略時は全バージョン対象 |
+| `genre` | `integer \| integer[]` | 任意 | ジャンルマスタID。単一値または配列で指定可能。省略時は全ジャンル対象 |
+| `ver` | `integer \| integer[]` | 任意 | バージョンマスタID。単一値または配列で指定可能。省略時は全バージョン対象 |
 
 **難易度IDの対応**:
 
@@ -844,6 +844,13 @@ curl -X POST \
 - `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
 - `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
 
+**配列入力の正規化**:
+- `diff` / `genre` / `ver` は単一値（例: `"diff": 4`）と配列（例: `"diff": [3, 4]`）の両方を受け付けます。
+- 配列は重複除去 + 昇順ソートで正規化されます。
+- 要素数1の配列は単一値に正規化されます（例: `"diff": [4]` → `"diff": 4`）。
+- 配列の実質上限は、対応するマスタデータの全件数です。
+- レスポンスの `attributes` は正規化後の形式で返却されます（要素1ならスカラー、複数なら配列）。
+
 ### バリデーション方針
 
 #### 境界（Handler/DTO）での検査
@@ -854,7 +861,7 @@ curl -X POST \
 
 1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 15.9]`
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 15.9]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
