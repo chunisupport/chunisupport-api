@@ -388,7 +388,6 @@
 | **CFG-002** | **Low** | `AppPort` の範囲チェックなし | 0や負値、65535超でもエラーにならない。 |
 | **CFG-003** | **Low** | `JWTExpirationHour`/`SessionExpirationHour` の検証なし | 0や負値でもエラーにならず、JWTが即時無効になる。正の値であることを検証すべき。 |
 | **CFG-004** | **Low** | `main.go` の `ValidateRequiredData` がコメントアウト | 必須データの存在チェックが無効化されており、空DBでもアプリ起動。意図的なら理由をコメントに残すべき。 |
-| **CFG-005** | **Low** | `Taskfile.yml` にDBパスワードがハードコード | 環境変数を使用すべき。 |
 
 ---
 
