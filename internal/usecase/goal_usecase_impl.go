@@ -315,16 +315,8 @@ func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
 		return nil, errors.New("empty int slice")
 	}
 
-	uniq := make(map[int]struct{}, len(ids))
-	normalized := make([]int, 0, len(ids))
-	for _, id := range ids {
-		if _, exists := uniq[id]; exists {
-			continue
-		}
-		uniq[id] = struct{}{}
-		normalized = append(normalized, id)
-	}
-	slices.Sort(normalized)
+	slices.Sort(ids)
+	normalized := slices.Compact(ids)
 	return normalized, nil
 }
 
