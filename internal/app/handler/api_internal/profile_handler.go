@@ -64,7 +64,7 @@ func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
-	user.IsPrivate = req.IsPrivate
+	user.ChangePrivacy(req.IsPrivate)
 
 	return c.JSON(http.StatusOK, map[string]any{"is_private": req.IsPrivate})
 }
@@ -114,7 +114,7 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 	}
 
 	c.SetCookie(newAuthCookie(h.cookieSecure, h.cookieSameSite, "", -1))
-	user.IsDeleted = true
+	user.Delete()
 
 	return c.NoContent(http.StatusOK)
 }
