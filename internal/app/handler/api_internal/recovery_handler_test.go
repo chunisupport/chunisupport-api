@@ -7,18 +7,12 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func newRecoveryHandlerWithMock() (*api_internal.RecoveryHandler, *mockRecoveryUsecase) {
-	recoveryMock := new(mockRecoveryUsecase)
-	return api_internal.NewRecoveryHandler(recoveryMock), recoveryMock
-}
 
 func TestRecoveryHandler_IssueRecoveryCodes(t *testing.T) {
 	e := newTestEcho()

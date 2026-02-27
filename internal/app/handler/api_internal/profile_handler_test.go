@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/auth"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -16,15 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func newProfileHandlerWithMocks(secureCookie bool, sameSite http.SameSite) (*api_internal.ProfileHandler, *mockAuthUsecase, *mockUserCredentialUsecase) {
-	authMock := new(mockAuthUsecase)
-	userCredentialMock := new(mockUserCredentialUsecase)
-
-	h := api_internal.NewProfileHandler(authMock, userCredentialMock, secureCookie, sameSite)
-
-	return h, authMock, userCredentialMock
-}
 
 func TestProfileHandler_Me(t *testing.T) {
 	e := newTestEcho()
