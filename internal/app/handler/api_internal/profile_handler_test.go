@@ -62,7 +62,7 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 		userCredentialMock.On("UpdatePrivacy", mock.Anything, 10, true).Return(nil).Once()
 
 		body := `{"is_private": true}`
-		req := httptest.NewRequest(http.MethodPatch, "/internal/me/privacy", bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/privacy", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -134,7 +134,7 @@ func TestProfileHandler_ChangePassword(t *testing.T) {
 		userCredentialMock.On("ChangePassword", mock.Anything, 5, "oldpass123", "newpass123").Return(nil).Once()
 
 		body := `{"current_password":"oldpass123","new_password":"newpass123"}`
-		req := httptest.NewRequest(http.MethodPatch, "/internal/me/password", bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -155,7 +155,7 @@ func TestProfileHandler_ChangePassword(t *testing.T) {
 		userCredentialMock.On("ChangePassword", mock.Anything, 5, "oldpass123", "short").Return(usecase.ErrPasswordTooShort).Once()
 
 		body := `{"current_password":"oldpass123","new_password":"short"}`
-		req := httptest.NewRequest(http.MethodPatch, "/internal/me/password", bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
