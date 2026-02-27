@@ -1,14 +1,21 @@
 package middleware
 
 import (
+	"context"
+
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/auth"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/labstack/echo/v4"
 )
 
+// Authenticator はJWT検証後にセッションの有効性を確認するための最小インターフェースです。
+type Authenticator interface {
+	Authenticate(ctx context.Context, userID int, sessionID string) (*entity.User, error)
+}
+
 // JWTMiddleware はJWT認証を行うミドルウェアを返します。
-func JWTMiddleware(secret string, authUsecase usecase.AuthUsecase) echo.MiddlewareFunc {
+func JWTMiddleware(secret string, authenticator Authenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			cookie, err := c.Cookie("token")
@@ -22,23 +29,20 @@ func JWTMiddleware(secret string, authUsecase usecase.AuthUsecase) echo.Middlewa
 				return apierror.ErrInvalidToken.WithInternal(err)
 			}
 
-			// セッションの有効性を検証
-			user, err := authUsecase.Authenticate(c.Request().Context(), claims.UserID, claims.SessionID)
+			user, err := authenticator.Authenticate(c.Request().Context(), claims.UserID, claims.SessionID)
 			if err != nil {
 				return apierror.FromUsecaseError(err)
 			}
 
-			// コンテキストにuserエンティティとclaimsをセットして後続のハンドラで利用できるようにする
-			// Note: userエンティティもセットすることで、ハンドラ側で再取得する手間を省く
 			c.Set("userEntity", user)
-			c.Set("user", claims) // 既存の処理との互換性のため残す
+			c.Set("user", claims)
 			return next(c)
 		}
 	}
 }
 
 // OptionalJWTMiddleware はCookieが存在する場合のみJWT認証を行います。
-func OptionalJWTMiddleware(secret string, authUsecase usecase.AuthUsecase) echo.MiddlewareFunc {
+func OptionalJWTMiddleware(secret string, authenticator Authenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			cookie, err := c.Cookie("token")
@@ -52,7 +56,7 @@ func OptionalJWTMiddleware(secret string, authUsecase usecase.AuthUsecase) echo.
 				return apierror.ErrInvalidToken.WithInternal(err)
 			}
 
-			user, err := authUsecase.Authenticate(c.Request().Context(), claims.UserID, claims.SessionID)
+			user, err := authenticator.Authenticate(c.Request().Context(), claims.UserID, claims.SessionID)
 			if err != nil {
 				return apierror.FromUsecaseError(err)
 			}

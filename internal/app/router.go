@@ -50,6 +50,8 @@ func (cv *CustomValidator) Validate(i any) error {
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
 	Auth       *api_internal.AuthHandler
+	Recovery   *api_internal.RecoveryHandler
+	Profile    *api_internal.ProfileHandler
 	User       *api_internal.UserHandler
 	AdminUser  *api_internal.AdminUserHandler
 	Song       *api_internal.SongHandler
@@ -148,7 +150,9 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, userCredentialUsecase, recoveryUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
+		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
+		Recovery:   api_internal.NewRecoveryHandler(recoveryUsecase),
+		Profile:    api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
 		User:       api_internal.NewUserHandler(userUsecase),
 		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
 		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -182,13 +186,13 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUsecase, apiTokenUsecase usecase.APITokenUsecase, secret string) {
+func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.Authenticator, apiTokenUsecase usecase.APITokenUsecase, secret string) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
 	// JWT認証ミドルウェア
-	jwtAuth := middleware.JWTMiddleware(secret, authUsecase)
-	optionalJWTAuth := middleware.OptionalJWTMiddleware(secret, authUsecase)
+	jwtAuth := middleware.JWTMiddleware(secret, authenticator)
+	optionalJWTAuth := middleware.OptionalJWTMiddleware(secret, authenticator)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
@@ -214,7 +218,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.POST("/recovery-codes", handlers.Auth.RecoverPassword, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		authGroup.POST("/recovery-codes", handlers.Recovery.RecoverPassword, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RecoveryCodeRateLimitRequests,
 			Window:   info.RecoveryCodeRateLimitWindow,
 		}))
@@ -226,11 +230,11 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	meGroup := internal.Group("/me")
 	meGroup.Use(jwtAuth)
 	{
-		meGroup.GET("", handlers.Auth.Me)
-		meGroup.PUT("/privacy", handlers.Auth.UpdatePrivacy)
-		meGroup.PUT("/password", handlers.Auth.ChangePassword)
-		meGroup.POST("/recovery-codes", handlers.Auth.IssueRecoveryCodes)
-		meGroup.DELETE("", handlers.Auth.DeleteAccount)
+		meGroup.GET("", handlers.Profile.Me)
+		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
+		meGroup.PUT("/password", handlers.Profile.ChangePassword)
+		meGroup.POST("/recovery-codes", handlers.Recovery.IssueRecoveryCodes)
+		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
