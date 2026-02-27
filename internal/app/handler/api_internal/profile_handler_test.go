@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
@@ -57,10 +56,9 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 	e := newTestEcho()
 	h, _, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
 
-	t.Run("公開設定更新時にエンティティメソッド経由で状態が更新される", func(t *testing.T) {
+	t.Run("公開設定更新時にユースケースを呼び出して成功レスポンスを返す", func(t *testing.T) {
 		// Given
-		oldUpdatedAt := time.Now().Add(-time.Hour)
-		user := &entity.User{ID: 10, IsPrivate: false, UpdatedAt: oldUpdatedAt}
+		user := &entity.User{ID: 10, IsPrivate: false}
 		userCredentialMock.On("UpdatePrivacy", mock.Anything, 10, true).Return(nil).Once()
 
 		body := `{"is_private": true}`
@@ -76,8 +74,6 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.True(t, user.IsPrivate)
-		assert.True(t, user.UpdatedAt.After(oldUpdatedAt))
 		userCredentialMock.AssertExpectations(t)
 	})
 }
@@ -86,10 +82,9 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 	e := newTestEcho()
 	h, authMock, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
 
-	t.Run("アカウント削除時にエンティティメソッド経由で削除状態と更新日時が更新される", func(t *testing.T) {
+	t.Run("アカウント削除時にセッション無効化とCookie削除を行う", func(t *testing.T) {
 		// Given
-		oldUpdatedAt := time.Now().Add(-time.Hour)
-		user := &entity.User{ID: 20, UpdatedAt: oldUpdatedAt}
+		user := &entity.User{ID: 20}
 		claims := &auth.Claims{SessionID: "session-1"}
 		userCredentialMock.On("DeleteUser", mock.Anything, 20).Return(nil).Once()
 		authMock.On("Logout", mock.Anything, "session-1").Return(nil).Once()
@@ -106,8 +101,6 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.True(t, user.IsDeleted)
-		assert.True(t, user.UpdatedAt.After(oldUpdatedAt))
 		cookies := rec.Result().Cookies()
 		if assert.NotEmpty(t, cookies) {
 			assert.Equal(t, "token", cookies[0].Name)
