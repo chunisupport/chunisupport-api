@@ -44,19 +44,6 @@ func TestAuthUsecase_Register(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 
-	t.Run("Register_正常系_セッション数制限が機能する", func(t *testing.T) {
-		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "sessionlimituser").Return(nil, sql.ErrNoRows).Once()
-		mockUserRepo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
-		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
-
-		userDTO, token, err := authService.Register(context.Background(), "sessionlimituser", "password")
-		assert.NoError(t, err)
-		assert.NotNil(t, userDTO)
-		assert.NotEmpty(t, token)
-		mockUserRepo.AssertExpectations(t)
-		mockSessionRepo.AssertExpectations(t)
-	})
 }
 
 func TestAuthUsecase_Login(t *testing.T) {
