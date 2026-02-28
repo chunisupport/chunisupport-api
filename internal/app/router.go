@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -17,6 +16,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	vo_recoverycode "github.com/chunisupport/chunisupport-api/internal/domain/vo/recoverycode"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -46,10 +46,9 @@ func NewCustomValidator() *CustomValidator {
 	return &CustomValidator{Validator: v}
 }
 
-var recoveryCodePattern = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
-
 func validateRecoveryCode(fl validator.FieldLevel) bool {
-	return recoveryCodePattern.MatchString(fl.Field().String())
+	_, err := vo_recoverycode.New(fl.Field().String())
+	return err == nil
 }
 
 func validateUsername(fl validator.FieldLevel) bool {
