@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -61,6 +62,10 @@ func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		// 詳細なエラーはログに出力し、クライアントには汎用的なエラーコードを返す
 		slog.Warn("Validation error", "error", err.Error())
+		var validationErrors validator.ValidationErrors
+		if ok := errors.As(err, &validationErrors); ok {
+			return apierror.ErrValidationFailed.WithInternal(apierror.ValidationErrors(validationErrors))
+		}
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 	return nil

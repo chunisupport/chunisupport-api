@@ -2,6 +2,7 @@ package api_internal_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/auth"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -168,6 +170,32 @@ func TestAuthHandler_Login(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
 		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	})
+
+	t.Run("異常系: バリデーションエラーのレスポンスに安全な詳細を含む", func(t *testing.T) {
+		e := newTestEcho()
+		e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
+
+		body := `{"username": "abc", "password": "short"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Login(c)
+		assert.Error(t, err)
+		e.HTTPErrorHandler(err, c)
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+
+		var bodyJSON map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &bodyJSON))
+		errorBody, ok := bodyJSON["error"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, apierror.CodeValidationFailed, errorBody["code"])
+		assert.Equal(t, "入力値の形式に誤りがあります。", errorBody["message"])
+		details, ok := errorBody["details"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, details, 2)
 	})
 
 	t.Run("正常系: Secure属性がtrueの場合", func(t *testing.T) {

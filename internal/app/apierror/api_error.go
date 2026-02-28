@@ -117,7 +117,16 @@ var (
 // クライアントにはエラーコードとステータスを返します
 type ErrorResponse struct {
 	Error struct {
-		Status int    `json:"status"`
-		Code   string `json:"code"`
+		Status  int                     `json:"status"`
+		Code    string                  `json:"code"`
+		Message string                  `json:"message,omitempty"`
+		Details []ValidationErrorDetail `json:"details,omitempty"`
 	} `json:"error"`
+}
+
+// ValidationErrorDetail は入力バリデーション失敗時の詳細情報です。
+// 入力フォーマットに関する情報のみを返し、認証成否などの機微情報は含めません。
+type ValidationErrorDetail struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
 }
