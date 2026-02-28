@@ -156,7 +156,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		authMock.AssertExpectations(t)
 	})
 
-	t.Run("異常系: バリデーションエラー時は400を返す", func(t *testing.T) {
+	t.Run("異常系: バリデーションエラー時は422を返す", func(t *testing.T) {
 		body := `{"username": "abc", "password": "short"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
