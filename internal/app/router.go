@@ -17,6 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
@@ -46,14 +47,14 @@ func NewCustomValidator() *CustomValidator {
 }
 
 var recoveryCodePattern = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
-var usernamePattern = regexp.MustCompile(`^[a-z0-9]+$`)
 
 func validateRecoveryCode(fl validator.FieldLevel) bool {
 	return recoveryCodePattern.MatchString(fl.Field().String())
 }
 
 func validateUsername(fl validator.FieldLevel) bool {
-	return usernamePattern.MatchString(fl.Field().String())
+	_, err := vo_username.NewUserName(fl.Field().String())
+	return err == nil
 }
 
 // Validate は与えられた構造体を検証します。
