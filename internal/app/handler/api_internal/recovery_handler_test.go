@@ -8,7 +8,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -76,9 +75,8 @@ func TestRecoveryHandler_RecoverPassword(t *testing.T) {
 		assert.ErrorIs(t, err, apierror.ErrBadRequest)
 	})
 
-	t.Run("異常系: 新しいパスワードが短い", func(t *testing.T) {
+	t.Run("異常系: 新しいパスワードが短い場合はバリデーションエラー", func(t *testing.T) {
 		// Given
-		recoveryMock.On("RecoverWithRecoveryCode", mock.Anything, "ABCD-EFGH-IJKL", "short").Return(usecase.ErrPasswordTooShort).Once()
 		body := `{"recovery_code":"ABCD-EFGH-IJKL","new_password":"short"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/recovery-codes", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -92,7 +90,7 @@ func TestRecoveryHandler_RecoverPassword(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		recoveryMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 }

@@ -25,8 +25,8 @@ type issueRecoveryCodesResponse struct {
 }
 
 type recoveryCodeRecoverRequest struct {
-	RecoveryCode string `json:"recovery_code"`
-	NewPassword  string `json:"new_password"`
+	RecoveryCode string `json:"recovery_code" validate:"required"`
+	NewPassword  string `json:"new_password" validate:"required,min=8,max=128"`
 }
 
 var recoveryCodeFormat = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
@@ -52,6 +52,9 @@ func (h *RecoveryHandler) RecoverPassword(c echo.Context) error {
 	req := new(recoveryCodeRecoverRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 	if !recoveryCodeFormat.MatchString(req.RecoveryCode) {
 		return apierror.ErrBadRequest

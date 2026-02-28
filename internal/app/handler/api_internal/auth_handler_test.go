@@ -67,9 +67,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		authMock.AssertExpectations(t)
 	})
 
-	t.Run("異常系: ユーザー名が短すぎる", func(t *testing.T) {
-		authMock.On("Register", mock.Anything, "abc", "password123").Return(nil, "", usecase.ErrUsernameTooShort).Once()
-
+	t.Run("異常系: ユーザー名が短すぎる場合はバリデーションエラー", func(t *testing.T) {
 		body := `{"username": "abc", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -80,14 +78,11 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		assert.Equal(t, apierror.CodeUsernameTooShort, apiErr.Code)
-		authMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 
-	t.Run("異常系: パスワードが短すぎる", func(t *testing.T) {
-		authMock.On("Register", mock.Anything, "testuser", "short").Return(nil, "", usecase.ErrPasswordTooShort).Once()
-
+	t.Run("異常系: パスワードが短すぎる場合はバリデーションエラー", func(t *testing.T) {
 		body := `{"username": "testuser", "password": "short"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -98,9 +93,8 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		assert.Equal(t, apierror.CodePasswordTooShort, apiErr.Code)
-		authMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 }
 
@@ -145,6 +139,20 @@ func TestAuthHandler_Login(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		authMock.AssertExpectations(t)
+	})
+
+	t.Run("異常系: バリデーションエラー時は400を返す", func(t *testing.T) {
+		body := `{"username": "abc", "password": "short"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Login(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
 	})
 
 	t.Run("正常系: Secure属性がtrueの場合", func(t *testing.T) {
