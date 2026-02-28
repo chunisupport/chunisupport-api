@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -34,7 +35,17 @@ type CustomValidator struct {
 
 // NewCustomValidator は新しいCustomValidatorを生成します。
 func NewCustomValidator() *CustomValidator {
-	return &CustomValidator{Validator: validator.New()}
+	v := validator.New()
+	if err := v.RegisterValidation("recoverycode", validateRecoveryCode); err != nil {
+		panic(err)
+	}
+	return &CustomValidator{Validator: v}
+}
+
+var recoveryCodePattern = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
+
+func validateRecoveryCode(fl validator.FieldLevel) bool {
+	return recoveryCodePattern.MatchString(fl.Field().String())
 }
 
 // Validate は与えられた構造体を検証します。

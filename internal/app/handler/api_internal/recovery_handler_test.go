@@ -60,7 +60,7 @@ func TestRecoveryHandler_RecoverPassword(t *testing.T) {
 		recoveryMock.AssertExpectations(t)
 	})
 
-	t.Run("異常系: リカバリーコード形式不正", func(t *testing.T) {
+	t.Run("異常系: リカバリーコード形式不正はバリデーションエラー", func(t *testing.T) {
 		// Given
 		body := `{"recovery_code":"INVALID","new_password":"newPassword123"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/recovery-codes", bytes.NewBufferString(body))
@@ -72,7 +72,11 @@ func TestRecoveryHandler_RecoverPassword(t *testing.T) {
 		err := h.RecoverPassword(c)
 
 		// Then
-		assert.ErrorIs(t, err, apierror.ErrBadRequest)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 
 	t.Run("異常系: 新しいパスワードが短い場合はバリデーションエラー", func(t *testing.T) {
