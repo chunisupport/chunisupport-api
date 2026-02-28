@@ -82,6 +82,21 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 
+	t.Run("異常系: ユーザー名に大文字が含まれる場合はバリデーションエラー", func(t *testing.T) {
+		body := `{"username": "Testuser", "password": "password123"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Register(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	})
+
 	t.Run("異常系: パスワードが短すぎる場合はバリデーションエラー", func(t *testing.T) {
 		body := `{"username": "testuser", "password": "short"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))

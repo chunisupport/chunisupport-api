@@ -28,7 +28,7 @@ func NewAuthHandler(authUsecase usecase.AuthUsecase, cookieSecure bool, cookieSa
 
 // authRequest は認証リクエストのボディの構造です。
 type authRequest struct {
-	Username string `json:"username" validate:"required,min=5,max=50,alphanum"`
+	Username string `json:"username" validate:"required,min=5,max=50,username"`
 	Password string `json:"password" validate:"required,min=8,max=128"` // #nosec G117 API入力仕様として必要
 }
 
