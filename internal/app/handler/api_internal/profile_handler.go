@@ -58,9 +58,6 @@ func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if err := c.Validate(req); err != nil {
-		return err
-	}
 
 	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
 		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
