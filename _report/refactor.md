@@ -209,17 +209,6 @@
 ---
 
 
-### UC-001: AuthUsecaseの責務過多（God Interface）
-- **根拠**:
-  - `internal/usecase/auth_usecase.go` の `AuthUsecase` インターフェースが10個のメソッドを持ち、認証（Register/Login/Logout/Authenticate）、ユーザー情報取得（GetUser）、プロファイル管理（UpdatePrivacy/ChangePassword/DeleteUser）、リカバリー（IssueRecoveryCodes/RecoverWithRecoveryCode）が混在。
-- **影響範囲**:
-  - テスト時に巨大なモックが必要になり、テスタビリティが低下。単一責任原則に違反。
-- **修正案**:
-  - 認証関連のみ `AuthUsecase` に残し、プロファイル管理は `UserUsecase` に移管、リカバリーは `RecoveryUsecase` として分離。
-  - コンストラクタ名も `NewAuthService` → `NewAuthUsecase` に統一。
-
----
-
 ### UC-004: Register でのトランザクション未使用
 - **根拠**:
   - `internal/usecase/auth_usecase.go` の `Register` でユーザー作成（`Create`）とセッション作成（`createSessionAndToken`）が非トランザクションで連続実行。
@@ -334,7 +323,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-001** | **High** | `AuthUsecase` の責務過多（God Interface） | 10個のメソッドに認証・ユーザー管理・リカバリーが混在しSRP違反。認証（Register/Login/Logout/Authenticate）のみ残し、プロファイル管理は `UserUsecase` に、リカバリーは `RecoveryUsecase` に分離すべき。 |
 | **UC-002** | **Medium** | `DeleteUser` の重複定義 | `AuthUsecase.DeleteUser(userID)` と `UserUsecase.DeleteUser(requester, username)` が異なるセマンティクスで同名。auth版には削除済みチェックも欠如。命名統一と重複排除が必要。 |
 | **UC-003** | **Medium** | Setter Injection アンチパターン | `userUsecase.SetWorldsendRecordRepository` が構築後にリポジトリ注入。temporal couplingを導入。コンストラクタで全依存を渡すべき。 |
 | **UC-004** | **Medium** | `Register` でトランザクション未使用 | ユーザー作成とセッション作成が非トランザクション。ユーザー作成成功・セッション作成失敗でログイン不能ユーザーが生成されるリスク。 |
@@ -426,7 +414,6 @@
 - 主要なリスクは **CSRF対策不足** です。
 - アーキテクチャ面では **Usecase層からのsql.ErrNoRows参照** と **Domain層のsqlx依存** がクリーンアーキテクチャ違反として要対応。
 - ドメイン層では **貧血症モデル（Song, Goal等）** がDDD原則に反しており、Rich Model化が必要。
-- **AuthUsecaseの責務過多（10メソッド）** はSRP違反であり、分割が望ましい。
 - **値オブジェクトのScan/UnmarshalJSONがバリデーションをバイパス** する問題は、不正データがドメイン層に流入するリスク。
 - 入力検証の統一方針（`c.Validate()` の呼び出し漏れ解消・パスパラメータの検証）とAPI仕様の整合性は、バグ防止・運用事故防止に直結する。
 - **コード重複**がハンドラー層・ユースケース層・インフラ層の各所に散在しており、共通ヘルパーへの抽出で保守性を改善すべき。
