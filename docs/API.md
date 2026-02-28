@@ -42,12 +42,19 @@
 {
   "error": {
     "status": 401,
-    "code": "invalid_token"
+    "code": "invalid_token",
+    "message": "...",
+    "details": [
+      {
+        "field": "username",
+        "message": "5〜50文字の小文字英数字で入力してください。"
+      }
+    ]
   }
 }
 ```
 
-`error` オブジェクト内の `code` フィールドには機械処理しやすいスネークケースのエラーコードが入ります。`status` フィールドにはHTTPステータスコードが入ります。詳細なエラーメッセージはサーバーログにのみ記録され、クライアントには返却されません。
+`error` オブジェクト内の `code` フィールドには機械処理しやすいスネークケースのエラーコードが入ります。`status` フィールドにはHTTPステータスコードが入ります。`validation_failed` の場合のみ、入力フォーマット修正のための安全な `message` と `details` を返すことがあります（認証成否や内部状態などの機微情報は含みません）。
 
 ## エラーコード一覧（主要）
 
@@ -2189,7 +2196,15 @@ interface WorldsendRecordDTO {
 
 // エラーレスポンス
 interface ErrorResponse {
-  code: string;  // エラーコード (例: "invalid_token", "validation_failed")
+  error: {
+    status: number;
+    code: string;  // エラーコード (例: "invalid_token", "validation_failed")
+    message?: string; // validation_failed の場合のみ返却されることがある
+    details?: {
+      field: string;
+      message: string;
+    }[];
+  }
 }
 
 // プレイヤーデータ登録結果

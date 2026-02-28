@@ -28,8 +28,8 @@ func NewAuthHandler(authUsecase usecase.AuthUsecase, cookieSecure bool, cookieSa
 
 // authRequest は認証リクエストのボディの構造です。
 type authRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"` // #nosec G117 API入力仕様として必要
+	Username string `json:"username" validate:"required,username"`
+	Password string `json:"password" validate:"required,min=8,max=128"` // #nosec G117 API入力仕様として必要
 }
 
 // Register はユーザー登録リクエストを処理します。
@@ -38,6 +38,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	req := new(authRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	user, token, err := h.authUsecase.Register(c.Request().Context(), req.Username, req.Password)
@@ -55,6 +58,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	req := new(authRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	token, err := h.authUsecase.Login(c.Request().Context(), req.Username, req.Password)

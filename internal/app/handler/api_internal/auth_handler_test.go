@@ -2,6 +2,7 @@ package api_internal_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/auth"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -67,9 +69,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		authMock.AssertExpectations(t)
 	})
 
-	t.Run("異常系: ユーザー名が短すぎる", func(t *testing.T) {
-		authMock.On("Register", mock.Anything, "abc", "password123").Return(nil, "", usecase.ErrUsernameTooShort).Once()
-
+	t.Run("異常系: ユーザー名が短すぎる場合はバリデーションエラー", func(t *testing.T) {
 		body := `{"username": "abc", "password": "password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -80,14 +80,26 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		assert.Equal(t, apierror.CodeUsernameTooShort, apiErr.Code)
-		authMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 
-	t.Run("異常系: パスワードが短すぎる", func(t *testing.T) {
-		authMock.On("Register", mock.Anything, "testuser", "short").Return(nil, "", usecase.ErrPasswordTooShort).Once()
+	t.Run("異常系: ユーザー名に大文字が含まれる場合はバリデーションエラー", func(t *testing.T) {
+		body := `{"username": "Testuser", "password": "password123"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
 
+		err := h.Register(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	})
+
+	t.Run("異常系: パスワードが短すぎる場合はバリデーションエラー", func(t *testing.T) {
 		body := `{"username": "testuser", "password": "short"}`
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -98,9 +110,8 @@ func TestAuthHandler_Register(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		assert.Equal(t, apierror.CodePasswordTooShort, apiErr.Code)
-		authMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 }
 
@@ -145,6 +156,46 @@ func TestAuthHandler_Login(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		authMock.AssertExpectations(t)
+	})
+
+	t.Run("異常系: バリデーションエラー時は422を返す", func(t *testing.T) {
+		body := `{"username": "abc", "password": "short"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Login(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	})
+
+	t.Run("異常系: バリデーションエラーのレスポンスに安全な詳細を含む", func(t *testing.T) {
+		e := newTestEcho()
+		e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
+
+		body := `{"username": "abc", "password": "short"}`
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Login(c)
+		assert.Error(t, err)
+		e.HTTPErrorHandler(err, c)
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+
+		var bodyJSON map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &bodyJSON))
+		errorBody, ok := bodyJSON["error"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, apierror.CodeValidationFailed, errorBody["code"])
+		assert.Equal(t, "入力値の形式に誤りがあります。", errorBody["message"])
+		details, ok := errorBody["details"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, details, 2)
 	})
 
 	t.Run("正常系: Secure属性がtrueの場合", func(t *testing.T) {

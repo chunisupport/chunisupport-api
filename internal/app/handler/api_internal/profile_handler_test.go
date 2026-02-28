@@ -10,7 +10,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/auth"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -139,10 +138,9 @@ func TestProfileHandler_ChangePassword(t *testing.T) {
 		userCredentialMock.AssertExpectations(t)
 	})
 
-	t.Run("異常系: 新しいパスワードが短い場合はユースケースエラーを返す", func(t *testing.T) {
+	t.Run("異常系: 新しいパスワードが短い場合はバリデーションエラー", func(t *testing.T) {
 		// Given
 		user := &entity.User{ID: 5}
-		userCredentialMock.On("ChangePassword", mock.Anything, 5, "oldpass123", "short").Return(usecase.ErrPasswordTooShort).Once()
 
 		body := `{"current_password":"oldpass123","new_password":"short"}`
 		req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(body))
@@ -158,7 +156,7 @@ func TestProfileHandler_ChangePassword(t *testing.T) {
 		assert.Error(t, err)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-		userCredentialMock.AssertExpectations(t)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 }

@@ -3,7 +3,6 @@ package api_internal
 import (
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -25,11 +24,9 @@ type issueRecoveryCodesResponse struct {
 }
 
 type recoveryCodeRecoverRequest struct {
-	RecoveryCode string `json:"recovery_code"`
-	NewPassword  string `json:"new_password"`
+	RecoveryCode string `json:"recovery_code" validate:"required,recoverycode"`
+	NewPassword  string `json:"new_password" validate:"required,min=8,max=128"`
 }
-
-var recoveryCodeFormat = regexp.MustCompile(`^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$`)
 
 // IssueRecoveryCodes は認証済みユーザーのリカバリーコードを再発行します。
 func (h *RecoveryHandler) IssueRecoveryCodes(c echo.Context) error {
@@ -53,8 +50,8 @@ func (h *RecoveryHandler) RecoverPassword(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if !recoveryCodeFormat.MatchString(req.RecoveryCode) {
-		return apierror.ErrBadRequest
+	if err := c.Validate(req); err != nil {
+		return err
 	}
 
 	if err := h.recoveryUsecase.RecoverWithRecoveryCode(c.Request().Context(), req.RecoveryCode, req.NewPassword); err != nil {

@@ -62,7 +62,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **API-001** | **Low** | 入力検証のDTO適用範囲の確認 | `CustomValidator`は実装済み。全DTOでの`validate`タグ適用状況を確認し、未対応のDTOを洗い出す。入力制限を`docs/API.md`に反映。 |
 
 ### 実装品質・保守性 (QUAL/GO/DB)
 
@@ -74,7 +73,6 @@
 | **QUAL-006** | **Medium** | コンストラクタのエラー無視 | `toChartEntity` 等で値オブジェクトの生成エラーを無視している。不整合なエンティティが生成されるリスク。 |
 | **QUAL-009** | **Medium** | Usecase層でのインフラ層エラー直接参照 | `sql.ErrNoRows` をUsecase層で直接参照している。リポジトリ層でドメインエラーに変換すべき。 |
 | **QUAL-010** | **Medium** | Domain層のExecutorインターフェースがsqlxに依存 | `internal/domain/repository/executor.go` で `*sqlx.Rows`, `*sqlx.Row` を直接参照。ドメイン層がインフラ実装に依存している。 |
-| **QUAL-012** | **Low** | ハンドラーでのValidate呼び出し漏れ | `authRequest`, `changePasswordRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。 |
 
 ---
 
@@ -147,20 +145,6 @@
 
 ---
 
-### API-001: 入力検証のDTO適用範囲の確認
-- **根拠**:
-  - `CustomValidator` は `internal/app/router.go` で実装済み。一部DTOには `validate` タグが使用されているが、全DTOへの統一的な適用状況が未確認（`internal/usecase/auth_usecase.go`, `internal/usecase/player_data_usecase_impl.go`）。
-- **影響範囲**:
-  - `validate` タグが未適用のDTOでは、手動バリデーションに依存しており、バリデーションロジックが分散する可能性。
-  - API仕様書との整合性が取れていない箇所がある可能性。
-- **修正案**:
-  - 全DTOで `validate` タグの適用状況を確認し、未対応の箇所を洗い出す。
-  - 入力上限（最大長・最大件数）を仕様（`docs/API.md`）に反映し、実装と仕様の整合性を確保する。
-- **追加で確認したい点**:
-  - 現状のAPI仕様書に入力制約が明記されているか。
-
----
-
 ### QUAL-009: Usecase層でのインフラ層エラー直接参照
 - **根拠**:
   - `internal/usecase/worldsend_usecase.go`, `internal/usecase/auth_usecase.go` 等で `database/sql` パッケージの `sql.ErrNoRows` を直接 `errors.Is()` で判定している。
@@ -194,20 +178,6 @@
   - ただし影響範囲が大きいため、現状の妥協として許容し、将来的なリファクタリング対象とする選択肢もある。
 
 ---
-
-### QUAL-012: ハンドラーでのValidate呼び出し漏れ
-- **根拠**:
-  - `internal/app/handler/api_internal/auth_handler.go` の `authRequest`, `changePasswordRequest`, `recoveryCodeRecoverRequest` 等のリクエスト構造体に `validate` タグがなく、`c.Validate()` も呼ばれていない。
-  - 他のハンドラー（`song_handler.go` など）では `c.Validate()` が呼ばれている。
-- **影響範囲**:
-  - 入力検証のアプローチが統一されておらず、バリデーション漏れのリスクがある。
-  - 例えば `authRequest` ではユーザー名やパスワードの長さチェックをUsecase層で個別に行っているが、これはHandler/DTO層で統一的に行うべき。
-- **修正案**:
-  - 全リクエスト構造体に適切な `validate` タグを追加。
-  - Bindの直後に `c.Validate()` を呼ぶパターンを全ハンドラーで統一。
-
----
-
 
 ### UC-004: Register でのトランザクション未使用
 - **根拠**:

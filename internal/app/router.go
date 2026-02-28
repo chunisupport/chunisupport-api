@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +17,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	vo_recoverycode "github.com/chunisupport/chunisupport-api/internal/domain/vo/recoverycode"
+	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
@@ -34,7 +37,24 @@ type CustomValidator struct {
 
 // NewCustomValidator は新しいCustomValidatorを生成します。
 func NewCustomValidator() *CustomValidator {
-	return &CustomValidator{Validator: validator.New()}
+	v := validator.New()
+	if err := v.RegisterValidation("recoverycode", validateRecoveryCode); err != nil {
+		panic(err)
+	}
+	if err := v.RegisterValidation("username", validateUsername); err != nil {
+		panic(err)
+	}
+	return &CustomValidator{Validator: v}
+}
+
+func validateRecoveryCode(fl validator.FieldLevel) bool {
+	_, err := vo_recoverycode.New(fl.Field().String())
+	return err == nil
+}
+
+func validateUsername(fl validator.FieldLevel) bool {
+	_, err := vo_username.NewUserName(fl.Field().String())
+	return err == nil
 }
 
 // Validate は与えられた構造体を検証します。
@@ -42,6 +62,10 @@ func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		// 詳細なエラーはログに出力し、クライアントには汎用的なエラーコードを返す
 		slog.Warn("Validation error", "error", err.Error())
+		var validationErrors validator.ValidationErrors
+		if ok := errors.As(err, &validationErrors); ok {
+			return apierror.ErrValidationFailed.WithInternal(apierror.ValidationErrors(validationErrors))
+		}
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 	return nil
