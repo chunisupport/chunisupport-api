@@ -24,7 +24,11 @@ type stubAccountTypeProvider struct {
 }
 
 func (s *stubAccountTypeProvider) GetAccountTypeNameByID(id int) string {
-	return s.nameByID[id]
+	if name, ok := s.nameByID[id]; ok {
+		return name
+	}
+
+	return "UNKNOWN"
 }
 
 // MockUserRepository はUserRepositoryのモックです。
