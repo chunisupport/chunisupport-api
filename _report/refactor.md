@@ -52,7 +52,6 @@
 | **REF-G10** | 設定バリデーションと起動時安全性の強化 | CFG-001, CFG-002, CFG-003, CFG-004, LIB-002 | 不正設定の早期検知不足が共通課題。設定読み込み方式とバリデーションを統一し、起動時にフェイルファスト化する。 |
 | **REF-G11** | コード重複削減と共通化 | UC-006, UC-007, UC-008, HDL-005, HDL-006, HDL-008, INFRA-007, DOM-012 | 各層に散在する重複ロジックを、ユースケース/ハンドラ/リポジトリ単位の共通ヘルパーへ抽出して保守性を改善する。 |
 | **REF-G12** | コーディング規約・命名・近代化の統一 | DOM-016, UC-009, UC-011, UC-015, UC-012, DOM-013, DOM-011, QUAL-001 | `slices` への統一、命名規約、設定引数集約、メッセージ言語統一、重複定数整理、TODO解消などを同時に進めてコード規律を揃える。 |
-| **REF-G13** | Clean Architecture境界違反の解消 | ARCH-001, UC-003, UC-016 | Handler/テスト/Usecaseでのインフラ直接依存やSetter Injectionをまとめて是正し、依存方向を内向きに統一する。 |
 | **REF-G14** | セキュリティ運用の継続的検証 | SEC-03, HDL-001, INFRA-002, INFRA-014, LIB-005 | 単発修正ではなく、抑制コメント妥当性・IP抽出・SQL安全性・転送効率を含む運用時の継続検証項目として同時管理する。 |
 
 
@@ -316,7 +315,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **UC-002** | **Medium** | `DeleteUser` の重複定義 | `AuthUsecase.DeleteUser(userID)` と `UserUsecase.DeleteUser(requester, username)` が異なるセマンティクスで同名。auth版には削除済みチェックも欠如。命名統一と重複排除が必要。 |
-| **UC-003** | **Medium** | Setter Injection アンチパターン | `userUsecase.SetWorldsendRecordRepository` が構築後にリポジトリ注入。temporal couplingを導入。コンストラクタで全依存を渡すべき。 |
 | **UC-004** | **Medium** | `Register` でトランザクション未使用 | ユーザー作成とセッション作成が非トランザクション。ユーザー作成成功・セッション作成失敗でログイン不能ユーザーが生成されるリスク。 |
 | **UC-005** | **Medium** | `convertUsernameError` の文字列比較によるエラー変換 | VOのエラーメッセージ文字列と直接比較。メッセージ変更時に検知不能。VOにセンチネルエラーを定義し `errors.Is` で判定すべき。 |
 | **UC-006** | **Low** | パスワードバリデーションロジックの3箇所重複 | `Register`, `ChangePassword`, `RecoverWithRecoveryCode` で長さチェックが重複。`validatePassword` ヘルパーに抽出すべき。 |
@@ -329,7 +327,6 @@
 | **UC-013** | **Medium** | `goalUsecase.Update` にトランザクション欠如 | `Create` はトランザクション内で実行しているが `Update` にはない。並行アクセス時のrace condition リスク。 |
 | **UC-014** | **Low** | `context.Canceled` ログの一貫性欠如 | 一部のメソッドのみ `context.Canceled` でWarn/Error分岐。共通ヘルパーに抽出し全ユースケースで統一適用すべき。 |
 | **UC-015** | **Medium** | `NewAuthService` のパラメータ数過多（11個） | 構成情報（jwtSecret, pepper等）とリポジトリが混在。`AuthConfig` 構造体にまとめて削減すべき。 |
-| **UC-016** | **Medium** | テストコードからinfra層への直接依存 | `auth_usecase_test.go` が `internal/infra/masterdata` をimport、`worldsend_usecase_test.go` が `sqlx` をimport。テスト用スタブを作成すべき。 |
 | **UC-017** | **Low** | `Register` 内のバリデーション順序が非効率 | ユーザー名VOバリデーションがDB問合せより後に実行される。不正ユーザー名でもDBアクセスが発生。 |
 
 ---
@@ -375,7 +372,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **ARCH-001** | **Medium** | `ChunirecHandler` が `repository.UserRepository` と `*sqlx.DB` を直接保持 | Handler層がUsecase層を飛ばしてリポジトリ・DB接続を直接参照。Clean Architecture違反。DTO/UsecaseにUserID返却機能を追加しHandler依存を排除すべき。 |
 | **ARCH-002** | **Low** | `OfficialSongWithGenreDTO` にインフラ層の `db:` タグ | DTO層にDBタグ付き構造体があるのは不適切。`infra/models` に移動すべき。未使用の可能性もあり、その場合は削除。 |
 
 ---

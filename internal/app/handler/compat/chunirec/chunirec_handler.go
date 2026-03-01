@@ -11,7 +11,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 )
 
@@ -19,18 +18,14 @@ import (
 type ChunirecHandler struct {
 	songUsecase usecase.SongUsecase
 	userUsecase usecase.UserUsecase
-	userRepo    repository.UserRepository
-	db          *sqlx.DB
 	masterCache *masterdata.Cache
 }
 
 // NewChunirecHandler はChunirecHandlerの新しいインスタンスを返します
-func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, userRepo repository.UserRepository, db *sqlx.DB, masterCache *masterdata.Cache) *ChunirecHandler {
+func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache) *ChunirecHandler {
 	return &ChunirecHandler{
 		songUsecase: songUsecase,
 		userUsecase: userUsecase,
-		userRepo:    userRepo,
-		db:          db,
 		masterCache: masterCache,
 	}
 }
@@ -124,19 +119,8 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 		}
 	}
 
-	// UserIDを取得するため、UserRepositoryから対象ユーザーのエンティティを取得
-	// TODO: UserProfileWithRecordsDTOにUserIDフィールドを追加してリファクタリング
-	user, err := h.userRepo.FindByUsername(ctx, h.db, username)
-	if err != nil {
-		slog.Error("failed to get user entity for UserID", "username", username, "error", err)
-		return apierror.ErrInternalError.WithInternal(err)
-	}
-	if user == nil {
-		return apierror.ErrUserNotFound
-	}
-
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, user.ID, h.masterCache)
+	response := ToChunirecUserDTO(result, h.masterCache)
 
 	return c.JSON(http.StatusOK, response)
 }

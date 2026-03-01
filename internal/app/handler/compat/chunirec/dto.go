@@ -159,13 +159,13 @@ type ChunirecUserDTO struct {
 }
 
 // ToChunirecUserDTO は内部APIのUserProfileWithRecordsDTOをchunirec互換形式に変換します
-func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, userID int, masterCache *masterdata.Cache) *ChunirecUserDTO {
+func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCache *masterdata.Cache) *ChunirecUserDTO {
 	if profile == nil || profile.Player == nil {
 		return nil
 	}
 
 	dto := &ChunirecUserDTO{
-		UserID:       userID,
+		UserID:       profile.UserID,
 		PlayerName:   profile.Player.Name,
 		Level:        profile.Player.Level,
 		IsJoinedTeam: nil, // ChuniSupportでは保持しないデータ

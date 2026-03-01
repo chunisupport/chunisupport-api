@@ -16,7 +16,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	vo_recoverycode "github.com/chunisupport/chunisupport-api/internal/domain/vo/recoverycode"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -156,13 +155,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	playerUsecase := usecase.NewPlayerService(db, playerRepo)
-	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase, songRepo, worldsendChartRepo, masterCache)
-	// userUsecase に worldsendRecordRepo を設定（通常レコードとの依存関係を避けるため後から設定）
-	if uu, ok := userUsecase.(interface {
-		SetWorldsendRecordRepository(repository.WorldsendRecordRepository)
-	}); ok {
-		uu.SetWorldsendRecordRepository(worldsendRecordRepo)
-	}
+	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, worldsendRecordRepo, playerUsecase, songRepo, worldsendChartRepo, masterCache)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
@@ -191,7 +184,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
 		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, userRepo, db, masterCache),
+		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
 	}
 
 	// ルートの設定
