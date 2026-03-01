@@ -182,7 +182,7 @@
 1. **参照箇所の大量修正による回帰**
    - 対策: Phase を小さく刻み、1型ずつ移行
 2. **Infra 変換漏れ**
-   - 対策: `ToEntity` / `FromEntity` 相当の変換テストを追加
+   - 対策: `infra/models` 側の `ToEntity` / `FromEntity` で、VO を含むエンティティとのマッピングを検証する変換テストを追加する（例: `infra/models.PlayerRecord.ToEntity` が `SlotID` から `vo.Slot` を正しく生成できること、`FromEntity` で `vo.Slot` を永続化モデルへ正しく戻せることを確認する）
 3. **難易度の大文字ルール逸脱**
    - 対策: VO コンストラクタで `strings.ToUpper` を適用し整合性を統一
 
