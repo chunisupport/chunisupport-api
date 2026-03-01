@@ -55,6 +55,8 @@
 - 不変（Immutable）を前提にする
 - 生成はコンストラクタ経由（`NewXxx`）
 - バリデーション責務を型内に閉じ込める
+- DB などの信頼できるソースから大量生成するケースでは、性能劣化を避けるため、
+  バリデーションを省略可能なリポジトリ専用ファクトリ（例: `NewXxxFromRepository`）の導入を検討する
 - 可能な限り振る舞い（例: `IsRankedTarget`）を型に持たせる
 - 既存 VO（`username`, `playername`, `score`, `chartconstant`, `notes`）の実装様式に統一する
 
@@ -62,8 +64,8 @@
 
 - `internal/domain/entity`: 集約ルートおよび実体として同一性が必要なもののみ
 - `internal/domain/vo`: 値・分類・ルールを表す概念
-- `internal/usecase/dto` または `internal/domain/querymodel`（新設検討）:
-  読み取り最適化の返却モデル
+- `internal/dto`: Usecase 境界をまたぐ搬送モデル
+- `internal/domain/querymodel`（必要時のみ新設）: ドメイン知識を含む読み取り専用モデル
 
 ## 4. 段階的移行ロードマップ
 
