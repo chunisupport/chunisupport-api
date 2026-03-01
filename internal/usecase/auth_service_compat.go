@@ -16,7 +16,7 @@ type legacyAuthService struct {
 }
 
 // NewAuthService は後方互換のためのコンストラクタです。新規実装では NewAuthUsecase を使用してください。
-func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, playerRecordRepo repository.PlayerRecordRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache repository.AccountTypeMasterProvider) *legacyAuthService {
+func NewAuthService(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, recoveryCodeRepo repository.RecoveryCodeRepository, playerRecordRepo repository.PlayerRecordRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache AccountTypeProvider) *legacyAuthService {
 	return &legacyAuthService{
 		auth:            NewAuthUsecase(db, userRepo, sessionRepo, jwtSecret, jwtExpirationHour, sessionExpirationHour, pepper, masterCache),
 		userCredential:  NewUserCredentialUsecase(db, userRepo, playerRecordRepo, pepper, masterCache),

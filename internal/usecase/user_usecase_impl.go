@@ -29,23 +29,18 @@ type userUsecase struct {
 }
 
 // NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
+func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
 		playerRecordRepo:    playerRecordRepo,
+		worldsendRecordRepo: worldsendRecordRepo,
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		songMasterProvider:  songMasterProvider,
 		playerUsecase:       playerUsecase,
 	}
-}
-
-// SetWorldsendRecordRepository は WorldsendRecordRepository を設定します。
-// DI の都合上、後から設定できるようにしています。
-func (s *userUsecase) SetWorldsendRecordRepository(repo repository.WorldsendRecordRepository) {
-	s.worldsendRecordRepo = repo
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
@@ -163,6 +158,7 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 	}
 
 	return &api_internal.UserProfileWithRecordsDTO{
+		UserID:    user.ID,
 		Username:  user.Username.String(),
 		Player:    player,
 		Records:   recordsDTO,

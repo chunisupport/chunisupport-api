@@ -27,10 +27,10 @@ type userCredentialUsecaseImpl struct {
 	userRepo         repository.UserRepository
 	playerRecordRepo repository.PlayerRecordRepository
 	pepper           string
-	masterCache      repository.AccountTypeMasterProvider
+	masterCache      AccountTypeProvider
 }
 
-func NewUserCredentialUsecase(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string, masterCache repository.AccountTypeMasterProvider) UserCredentialUsecase {
+func NewUserCredentialUsecase(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string, masterCache AccountTypeProvider) UserCredentialUsecase {
 	return &userCredentialUsecaseImpl{db: db, userRepo: userRepo, playerRecordRepo: playerRecordRepo, pepper: pepper, masterCache: masterCache}
 }
 

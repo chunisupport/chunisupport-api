@@ -5,19 +5,26 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/stretchr/testify/mock"
 )
 
-// newMockMasterCache はテスト用のマスタデータキャッシュを作成します。
-func newMockMasterCache() *masterdata.Cache {
-	return &masterdata.Cache{
-		AccountTypes: map[string]masterdata.Item{
-			"PLAYER": {ID: 1, Name: "PLAYER"},
-			"EDITOR": {ID: 2, Name: "EDITOR"},
-			"ADMIN":  {ID: 3, Name: "ADMIN"},
+// newMockMasterCache はテスト用のアカウント種別プロバイダを作成します。
+func newMockMasterCache() AccountTypeProvider {
+	return &stubAccountTypeProvider{
+		nameByID: map[int]string{
+			1: "PLAYER",
+			2: "EDITOR",
+			3: "ADMIN",
 		},
 	}
+}
+
+type stubAccountTypeProvider struct {
+	nameByID map[int]string
+}
+
+func (s *stubAccountTypeProvider) GetAccountTypeNameByID(id int) string {
+	return s.nameByID[id]
 }
 
 // MockUserRepository はUserRepositoryのモックです。
