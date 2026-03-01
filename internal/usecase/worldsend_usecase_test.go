@@ -107,8 +107,9 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			// Arrange
 			mockRepo := new(MockWorldsendChartRepository)
 			mockTM := new(MockTransactionManager)
+			mockExec := new(MockExecutor)
 
-			usecase := NewWorldsendUsecase(mockRepo, mockTM, nil)
+			usecase := NewWorldsendUsecase(mockRepo, mockTM, mockExec)
 
 			ctx := context.Background()
 
@@ -130,7 +131,7 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			}
 
 			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
-			mockRepo.On("FindAll", ctx, nil, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
+			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
 
 			// Act
 			result, err := usecase.GetAllWorldsendSongs(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
