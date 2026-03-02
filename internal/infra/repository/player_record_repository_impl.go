@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -216,23 +217,23 @@ func buildPlayerRecords(rows []playerRecordRow) []*entity.PlayerRecord {
 				Charts:      []*entity.Chart{},
 				IsDeleted:   row.SongIsDeleted,
 			},
-			ClearLamp: &entity.ClearLampType{
+			ClearLamp: &master.ClearLampType{
 				ID:   row.ClearLampID,
 				Name: row.ClearLampName,
 			},
-			ComboLamp: &entity.ComboLampType{
+			ComboLamp: &master.ComboLampType{
 				ID:   row.ComboLampID,
 				Name: row.ComboLampName,
 			},
-			FullChain: &entity.FullChainType{
+			FullChain: &master.FullChainType{
 				ID:   row.FullChainID,
 				Name: row.FullChainName,
 			},
-			Slot: &entity.Slot{
+			Slot: &master.Slot{
 				ID:   row.SlotID,
 				Name: row.SlotName,
 			},
-			ChartDifficulty: &entity.ChartDifficulty{
+			ChartDifficulty: &master.ChartDifficulty{
 				ID:   row.ChartDifficultyID,
 				Name: row.DifficultyName,
 			},

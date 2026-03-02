@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -37,7 +38,7 @@ func TestRecordCompletionService_CompletePlayerRecords(t *testing.T) {
 			ChartID: 11,
 			Song:    songs[0],
 			Chart:   songs[0].Charts[0],
-			ChartDifficulty: &entity.ChartDifficulty{
+			ChartDifficulty: &master.ChartDifficulty{
 				ID:   3,
 				Name: "expert",
 			},

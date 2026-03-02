@@ -1,7 +1,6 @@
 package entity
 
-// HonorType は称号種類マスタのエンティティを表します
-type HonorType struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// HonorType は称号種類マスタの互換エイリアスです。
+type HonorType = master.HonorType

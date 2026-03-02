@@ -1,14 +1,5 @@
 package entity
 
-// RatingBand はレーティング帯のマスタ情報です。
-type RatingBand struct {
-	ID           int
-	Label        string
-	MinInclusive *float64
-	MaxExclusive *float64
-	SortOrder    int
-}
-
 // ChartRankStats はランク別の人数統計です。
 type ChartRankStats struct {
 	AAAL int

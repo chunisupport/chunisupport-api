@@ -1,7 +1,6 @@
 package entity
 
-// ClassEmblem はクラスエンブレムマスタのエンティティを表します
-type ClassEmblem struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// ClassEmblem はクラスエンブレムマスタの互換エイリアスです。
+type ClassEmblem = master.ClassEmblem

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -129,15 +130,15 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 				Charts:      []*entity.Chart{},
 				IsDeleted:   row.SongIsDeleted,
 			},
-			ClearLamp: &entity.ClearLampType{
+			ClearLamp: &master.ClearLampType{
 				ID:   row.ClearLampID,
 				Name: row.ClearLampName,
 			},
-			ComboLamp: &entity.ComboLampType{
+			ComboLamp: &master.ComboLampType{
 				ID:   row.ComboLampID,
 				Name: row.ComboLampName,
 			},
-			FullChain: &entity.FullChainType{
+			FullChain: &master.FullChainType{
 				ID:   row.FullChainID,
 				Name: row.FullChainName,
 			},

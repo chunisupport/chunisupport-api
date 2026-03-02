@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"math"
 	"sort"
 
@@ -49,7 +50,7 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 				ChartID: chart.ID,
 				Chart:   chart,
 				Song:    song,
-				ChartDifficulty: &entity.ChartDifficulty{
+				ChartDifficulty: &master.ChartDifficulty{
 					ID:   chart.DifficultyID,
 					Name: difficultyNameByID(chart.DifficultyID, difficultyNamesByID),
 				},

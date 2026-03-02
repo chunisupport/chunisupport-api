@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 )
 
 // PlayerDataMasterProvider は、プレイヤーデータ登録時に必要なマスタデータを提供します。
@@ -26,7 +26,7 @@ type AccountTypeMasterProvider interface {
 // ChartStatsMasterProvider は譜面統計取得で必要なマスタデータを提供します。
 // Interface Segregation Principleに従い、ChartStatsUsecaseが必要とするメソッドのみを定義します。
 type ChartStatsMasterProvider interface {
-	RatingBands() []*entity.RatingBand
+	RatingBands() []*ratingband.RatingBand
 }
 
 // GoalMasterProvider は目標機能で必要なマスタデータを提供します。

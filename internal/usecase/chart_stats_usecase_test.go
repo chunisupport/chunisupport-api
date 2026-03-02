@@ -7,6 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +17,7 @@ type MockChartStatsRepository struct {
 	mock.Mock
 }
 
-func (m *MockChartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*entity.RatingBand, error) {
+func (m *MockChartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
 	panic("FindRatingBands is not used")
 }
 
@@ -29,10 +30,10 @@ func (m *MockChartStatsRepository) FindChartStatsByChartIDs(ctx context.Context,
 }
 
 type StubChartStatsMasterProvider struct {
-	bands []*entity.RatingBand
+	bands []*ratingband.RatingBand
 }
 
-func (s *StubChartStatsMasterProvider) RatingBands() []*entity.RatingBand {
+func (s *StubChartStatsMasterProvider) RatingBands() []*ratingband.RatingBand {
 	return s.bands
 }
 
@@ -43,7 +44,7 @@ func TestGetSongStatsByDisplayID_SortByRatingBandOrder(t *testing.T) {
 	mockStatsRepo := new(MockChartStatsRepository)
 	mockSongMasterProvider := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
-	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*entity.RatingBand{{ID: 10, SortOrder: 2}, {ID: 20, SortOrder: 1}}}
+	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 2}, {ID: 20, SortOrder: 1}}}
 
 	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
@@ -128,7 +129,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendBranch(t *testing.T) {
 	mockStatsRepo := new(MockChartStatsRepository)
 	mockSongMasterProvider := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
-	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*entity.RatingBand{{ID: 1, SortOrder: 2}, {ID: 2, SortOrder: 1}}}
+	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 1, SortOrder: 2}, {ID: 2, SortOrder: 1}}}
 
 	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
