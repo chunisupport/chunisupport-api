@@ -1,61 +1,37 @@
 package master
 
-// AccountType はアカウントタイプマスタの値オブジェクトです。
-type AccountType struct {
+// BaseMasterVO は、IDとNameを持つ単純なマスタ値オブジェクトの基本構造体です。
+type BaseMasterVO struct {
 	ID   int
 	Name string
 }
+
+// AccountType はアカウントタイプマスタの値オブジェクトです。
+type AccountType BaseMasterVO
 
 // ChartDifficulty は譜面難易度マスタの値オブジェクトです。
-type ChartDifficulty struct {
-	ID   int
-	Name string
-}
+type ChartDifficulty BaseMasterVO
 
 // ClassEmblem はクラスエンブレムマスタの値オブジェクトです。
-type ClassEmblem struct {
-	ID   int
-	Name string
-}
+type ClassEmblem BaseMasterVO
 
 // ClassEmblemBase はクラスエンブレムベースマスタの値オブジェクトです。
-type ClassEmblemBase struct {
-	ID   int
-	Name string
-}
+type ClassEmblemBase BaseMasterVO
 
 // ClearLampType はクリアランプマスタの値オブジェクトです。
-type ClearLampType struct {
-	ID   int
-	Name string
-}
+type ClearLampType BaseMasterVO
 
 // ComboLampType はコンボランプマスタの値オブジェクトです。
-type ComboLampType struct {
-	ID   int
-	Name string
-}
+type ComboLampType BaseMasterVO
 
 // FullChainType はフルチェインランプマスタの値オブジェクトです。
-type FullChainType struct {
-	ID   int
-	Name string
-}
+type FullChainType BaseMasterVO
 
 // Genre はジャンルマスタの値オブジェクトです。
-type Genre struct {
-	ID   int
-	Name string
-}
+type Genre BaseMasterVO
 
 // HonorType は称号種類マスタの値オブジェクトです。
-type HonorType struct {
-	ID   int
-	Name string
-}
+type HonorType BaseMasterVO
 
 // Slot はプレイヤーレコードのスロット種別の値オブジェクトです。
-type Slot struct {
-	ID   int
-	Name string
-}
+type Slot BaseMasterVO
