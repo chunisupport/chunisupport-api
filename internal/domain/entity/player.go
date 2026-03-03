@@ -24,7 +24,6 @@ type Player struct {
 	OverpowerPercent  *float64              // オーバーパワー割合
 	CreatedAt         time.Time             // 作成日時
 	UpdatedAt         time.Time             // 更新日時
-	Users             *User                 // このプレイヤーに紐づくユーザー
 }
 
 // NewPlayer は新規プレイヤーを生成し、永続化に必要な初期状態を設定します。

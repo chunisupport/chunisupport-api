@@ -23,3 +23,25 @@ type Song struct {
 	IsWorldsend    bool
 	IsDeleted      bool
 }
+
+// NewSong は Charts を必ず非nilで初期化した Song を生成します。
+func NewSong() *Song {
+	return &Song{
+		Charts: []*Chart{},
+	}
+}
+
+// IsActive は楽曲が有効（削除されていない）かを判定します。
+func (s *Song) IsActive() bool {
+	return !s.IsDeleted
+}
+
+// Delete は楽曲を論理削除します。
+func (s *Song) Delete() {
+	s.IsDeleted = true
+}
+
+// Restore は楽曲を復活させます。
+func (s *Song) Restore() {
+	s.IsDeleted = false
+}

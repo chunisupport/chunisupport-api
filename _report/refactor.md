@@ -45,7 +45,6 @@
 | **REF-G03** | ドメイン純粋性の回復（インフラ依存排除） | DOM-001, DOM-006, DOM-017, ARCH-002 | ドメイン/DTO側にインフラ都合（driver/sql、dbタグ、JSONバイト生保持）が混入。モデルの責務分離を同時実施して依存方向を正す。 |
 | **REF-G04** | 値オブジェクトの整合性・型安全性向上 | DOM-007, DOM-008, DOM-014, INFRA-009, INFRA-016 | VOバリデーション迂回・危険な型変換・エラー無視が連鎖している。VOの生成/変換/永続化パスを一体で修正する。 |
 | **REF-G05** | リポジトリエラーとユースケース依存の是正 | QUAL-009, DOM-018, QUAL-010 | Usecaseが `sql.ErrNoRows` を直接参照する原因は、Repositoryのドメインエラー設計不足とDomain層のsqlx依存。同時改修でクリーンアーキテクチャ違反を解消。 |
-| **REF-G06** | 貧血症モデル解消と集約振る舞いの集約 | DOM-004, DOM-005, DOM-019, INFRA-008, UC-002 | エンティティに振る舞いがなく、削除/有効判定が層外に散在。集約メソッド化とリポジトリ契約見直しを同時に行う。 |
 | **REF-G07** | トランザクション整合性と実行器契約の統一 | UC-004, UC-013, INFRA-011 | トランザクション欠如と暗黙フォールバックは同系統の整合性リスク。境界をまたぐ処理を「必ずTxで完結」に統一する。 |
 | **REF-G08** | クエリ負荷・N+1・バルク処理最適化 | PERF-003, PERF-004, PERF-006, INFRA-004, INFRA-010, INFRA-012 | 全件取得・N+1・巨大IN句・無分割バルクなど、DB負荷起因の課題群。取得戦略とチャンク戦略を同時に最適化する。 |
 | **REF-G09** | 監視性・運用信頼性の標準化 | OPS-001, OPS-002, INFRA-005, UC-014, HDL-009, LIB-004 | リクエスト追跡、タイムアウト、キャンセルログ、ログ運用の課題をまとめて扱い、運用観測性を標準化する。 |
@@ -274,8 +273,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **DOM-001** | **Medium** | VOが `database/sql/driver` に依存 | 全値オブジェクト（`chartconstant`, `notes`, `passwordhash`, `playername`, `score`, `username`）が `driver.Valuer`/`sql.Scanner` を実装しており、DB永続化というインフラ関心事がドメイン層に混入。`infra/models` 層でアダプタを用意し、VOからDB依存を排除する。 |
-| **DOM-004** | **Medium** | `Song` エンティティが貧血症モデル | メソッドがなく、`SongRepository.DeleteSong`/`RestoreSong` がDisplayID指定の直接操作。`song.Delete()`, `song.Restore()`, `song.IsActive()` メソッドを追加すべき。また「`Charts` はnil禁止」という不変条件を強制するコンストラクタが存在しない。 |
-| **DOM-005** | **Low** | `Session` エンティティにメソッドなし | `IsExpired()` メソッドがあるべき。セッション有効期限判定ロジックがドメイン外に流出している。 |
 | **DOM-006** | **Medium** | `Goal` エンティティが貧血症モデル＋`[]byte`フィールド | `AchievementParams []byte` と `Attributes []byte` はJSONバイト列の生保持であり、インフラ層の都合がドメイン層に漏洩している。適切な構造体やマップに変換すべき。 |
 | **DOM-007** | **Medium** | `ChartConstant.Scan`/`UnmarshalJSON` がバリデーションをバイパス | コンストラクタは「0以上」の検証を行うが、`Scan` と `UnmarshalJSON` は直接値を設定。負値がDB/JSONから入力された場合に不正なVOが生成される。`score.Score` の `Scan` 実装を模範にすべき。 |
 | **DOM-008** | **Medium** | `Notes.Scan` がバリデーションをバイパス | `Notes(v)` で直接キャストしており、`NewNotes` のバリデーション（0以上）を経由しない。 |
@@ -286,7 +283,6 @@
 | **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.25で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
 | **DOM-018** | **Medium** | `repository.errors.go` のエラー定義不足 | `ErrSongNotFound` のみで `ErrUserNotFound` 等はusecase層に定義。リポジトリが適切なドメインエラーを返せず、QUAL-009の根本原因となっている。 |
-| **DOM-019** | **Low** | `Player.Users` フィールドがDDD集約境界を侵害 | `User` への直接参照。DDDでは集約間はID参照が原則。また命名が `Users`（複数形）だが実態は単一。 |
 | **DOM-021** | **Low** | Deprecated関数が残存 | `rating_service.go` の `CalcBestAverageRating`, `CalcNewAverageRating`, `CalcPlayerRating`。テストでまだ使用中。移行完了後に削除すべき。 |
 | **DOM-010** | **Low** | `WorldsendChart.Validate` が構築済みVOを冗長に再検証 | `notes.NewNotes(int(*w.Notes))` で既に構築済みの `Notes` VOを再バリデーション。VOの不変性を信頼する設計にすべき。 |
 
@@ -300,7 +296,6 @@
 | **INFRA-004** | **Medium** | WORLD'S END楽曲 `UpdateSongs` のN+1問題 | 楽曲と譜面を個別ループでUPDATE。通常楽曲はCASE式一括更新を実装済みであり不整合。バルク更新パターンに統一すべき。 |
 | **INFRA-005** | **Medium** | `validation.go` の全関数でContext未伝播 | `context.Context` を引数に取らず、`db.Get` を使用（`GetContext` ではない）。起動時のキャンセル不能の原因。 |
 | **INFRA-007** | **Medium** | `FindAllWithPlayer` と `FindAllWithPlayerForAdmin` のコード重複 | クエリ構築・LIKE検索・rows反復がほぼ同一。共通ヘルパーに抽出すべき。 |
-| **INFRA-008** | **Medium** | `song_repository_impl.go` の `DeleteSong`/`RestoreSong` で `RowsAffected` 未確認 | 対象不存在でもエラーにならない。WE版では `RowsAffected` チェック済みであり不整合。 |
 | **INFRA-009** | **Medium** | `FromChartEntity` の脆弱な定数変換処理 | `Value()` → 型アサーション(string) → `ParseFloat` の多段変換で失敗時に0.0フォールバック。`ChartConstant` に `Float64()` アクセサを追加すべき。 |
 | **INFRA-010** | **Medium** | `BulkAssignHonors` にチャンクサイズ制限なし | 全件を1つのINSERTで発行。他のバルク処理は `info.BulkInsertChunkSize` で分割済み。 |
 | **INFRA-011** | **Medium** | `resolveExecutor` の暗黙nil フォールバック | exec が nil の場合に `r.db` へフォールバック。トランザクション保証が暗黙に破壊されるリスク。他リポジトリはexec必須。 |
@@ -314,7 +309,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-002** | **Medium** | `DeleteUser` の重複定義 | `AuthUsecase.DeleteUser(userID)` と `UserUsecase.DeleteUser(requester, username)` が異なるセマンティクスで同名。auth版には削除済みチェックも欠如。命名統一と重複排除が必要。 |
 | **UC-004** | **Medium** | `Register` でトランザクション未使用 | ユーザー作成とセッション作成が非トランザクション。ユーザー作成成功・セッション作成失敗でログイン不能ユーザーが生成されるリスク。 |
 | **UC-005** | **Medium** | `convertUsernameError` の文字列比較によるエラー変換 | VOのエラーメッセージ文字列と直接比較。メッセージ変更時に検知不能。VOにセンチネルエラーを定義し `errors.Is` で判定すべき。 |
 | **UC-006** | **Low** | パスワードバリデーションロジックの3箇所重複 | `Register`, `ChangePassword`, `RecoverWithRecoveryCode` で長さチェックが重複。`validatePassword` ヘルパーに抽出すべき。 |

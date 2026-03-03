@@ -75,7 +75,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		// Given
 		user := &entity.User{ID: 20}
 		claims := &auth.Claims{SessionID: "session-1"}
-		userCredentialMock.On("DeleteUser", mock.Anything, 20).Return(nil).Once()
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20).Return(nil).Once()
 		authMock.On("Logout", mock.Anything, "session-1").Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)

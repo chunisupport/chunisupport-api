@@ -26,20 +26,19 @@ type SongModel struct {
 
 // ToEntity はSongModelをentity.Songに変換します。
 func (m *SongModel) ToEntity() *entity.Song {
-	return &entity.Song{
-		ID:          m.ID,
-		DisplayID:   m.DisplayID,
-		Title:       m.Title,
-		Artist:      m.Artist,
-		GenreID:     m.GenreID,
-		BPM:         m.BPM,
-		ReleasedAt:  m.ReleasedAt,
-		OfficialIdx: m.OfficialIdx,
-		Jacket:      m.Jacket,
-		Charts:      []*entity.Chart{},
-		IsWorldsend: m.IsWorldsend,
-		IsDeleted:   m.IsDeleted,
-	}
+	song := entity.NewSong()
+	song.ID = m.ID
+	song.DisplayID = m.DisplayID
+	song.Title = m.Title
+	song.Artist = m.Artist
+	song.GenreID = m.GenreID
+	song.BPM = m.BPM
+	song.ReleasedAt = m.ReleasedAt
+	song.OfficialIdx = m.OfficialIdx
+	song.Jacket = m.Jacket
+	song.IsWorldsend = m.IsWorldsend
+	song.IsDeleted = m.IsDeleted
+	return song
 }
 
 // FromSongEntity はentity.SongをSongModelに変換します。

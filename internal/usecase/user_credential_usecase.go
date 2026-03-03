@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"time"
@@ -19,7 +18,7 @@ type UserCredentialUsecase interface {
 	GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
 	ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) error
-	DeleteUser(ctx context.Context, userID int) error
+	DeleteOwnAccount(ctx context.Context, userID int) error
 }
 
 type userCredentialUsecaseImpl struct {
@@ -53,7 +52,7 @@ func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_i
 func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {
 	user, err := s.userRepo.FindByID(ctx, s.db, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		return err
@@ -71,7 +70,7 @@ func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID i
 	}
 	user, err := s.userRepo.FindByID(ctx, s.db, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		return err
@@ -94,13 +93,16 @@ func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID i
 	return s.userRepo.Save(ctx, s.db, user)
 }
 
-func (s *userCredentialUsecaseImpl) DeleteUser(ctx context.Context, userID int) error {
+func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int) error {
 	user, err := s.userRepo.FindByID(ctx, s.db, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		return err
+	}
+	if !user.IsActive() {
+		return ErrUserAlreadyDeleted
 	}
 	user.Delete()
 	return s.userRepo.Save(ctx, s.db, user)

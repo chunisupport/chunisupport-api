@@ -127,20 +127,19 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 }
 
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
-	return &entity.Song{
-		ID:          row.ID,
-		DisplayID:   row.DisplayID,
-		Title:       row.Title,
-		Artist:      row.Artist,
-		GenreID:     row.GenreID,
-		BPM:         row.BPM,
-		ReleasedAt:  row.ReleasedAt,
-		OfficialIdx: row.OfficialIdx,
-		Jacket:      row.Jacket,
-		Charts:      []*entity.Chart{},
-		IsWorldsend: row.IsWorldsend,
-		IsDeleted:   row.IsDeleted,
-	}
+	song := entity.NewSong()
+	song.ID = row.ID
+	song.DisplayID = row.DisplayID
+	song.Title = row.Title
+	song.Artist = row.Artist
+	song.GenreID = row.GenreID
+	song.BPM = row.BPM
+	song.ReleasedAt = row.ReleasedAt
+	song.OfficialIdx = row.OfficialIdx
+	song.Jacket = row.Jacket
+	song.IsWorldsend = row.IsWorldsend
+	song.IsDeleted = row.IsDeleted
+	return song
 }
 
 func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
@@ -285,18 +284,42 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	return song, nil
 }
 
-// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
-func (r *songRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	query := `UPDATE songs SET is_deleted = TRUE WHERE display_id = ?`
-	_, err := exec.ExecContext(ctx, query, displayID)
-	return err
-}
+// Save は楽曲エンティティの現在の状態を永続化します。
+// 対象が存在しない場合は ErrSongNotFound を返します。
+func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	query := `
+		UPDATE songs
+		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		WHERE id = ?
+	`
+	result, err := exec.ExecContext(
+		ctx,
+		query,
+		song.DisplayID,
+		song.Title,
+		song.Artist,
+		song.GenreID,
+		song.BPM,
+		song.ReleasedAt,
+		song.OfficialIdx,
+		song.Jacket,
+		song.IsWorldsend,
+		song.IsDeleted,
+		song.ID,
+	)
+	if err != nil {
+		return err
+	}
 
-// RestoreSong は指定されたDisplayIDの楽曲を復活させます。
-func (r *songRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	query := `UPDATE songs SET is_deleted = FALSE WHERE display_id = ?`
-	_, err := exec.ExecContext(ctx, query, displayID)
-	return err
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return repository.ErrSongNotFound
+	}
+
+	return nil
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。

@@ -78,7 +78,7 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 	}
 
 	// 削除済み楽曲の権限チェック
-	if songWithChart.Song.IsDeleted {
+	if !songWithChart.Song.IsActive() {
 		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
@@ -91,14 +91,26 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.worldsendChartRepo.DeleteSong(ctx, tx, displayID)
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		if err != nil {
+			return err
+		}
+
+		songWithChart.Song.Delete()
+		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
 	})
 }
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.worldsendChartRepo.RestoreSong(ctx, tx, displayID)
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		if err != nil {
+			return err
+		}
+
+		songWithChart.Song.Restore()
+		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
 	})
 }
 

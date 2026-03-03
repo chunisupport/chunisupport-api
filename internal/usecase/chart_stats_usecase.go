@@ -69,7 +69,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 	}
 
 	// 削除済み楽曲は権限に応じて公開可否を制御する。
-	if song.IsDeleted {
+	if !song.IsActive() {
 		// EDITOR以上の権限を持たない場合は404を返す。
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
@@ -153,7 +153,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		return nil, err
 	}
 
-	if song.IsDeleted {
+	if !song.IsActive() {
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
 		}

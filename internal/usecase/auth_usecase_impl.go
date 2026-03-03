@@ -116,7 +116,7 @@ func (s *authUsecaseImpl) Authenticate(ctx context.Context, userID int, sessionI
 		slog.Error("failed to find session by id", "session_id", sessionID, "error", err)
 		return nil, err
 	}
-	if session.ExpiresAt.Before(time.Now()) {
+	if session.IsExpired(time.Now()) {
 		if err := s.sessionRepo.Delete(ctx, s.db, sessionID); err != nil {
 			slog.Error("Failed to delete expired session", "session_id", sessionID, "error", err)
 		}

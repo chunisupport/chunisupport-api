@@ -32,7 +32,7 @@ func (m *mockUserCredentialUsecase) ChangePassword(ctx context.Context, userID i
 	return args.Error(0)
 }
 
-func (m *mockUserCredentialUsecase) DeleteUser(ctx context.Context, userID int) error {
+func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID int) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }

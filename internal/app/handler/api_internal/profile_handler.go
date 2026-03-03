@@ -102,9 +102,9 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 		return err
 	}
 
-	if err := h.userCredentialUsecase.DeleteUser(c.Request().Context(), user.ID); err != nil {
+	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID); err != nil {
 		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	if claims, ok := c.Get("user").(*auth.Claims); ok && claims != nil {

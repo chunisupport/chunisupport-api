@@ -52,5 +52,5 @@ func (s *legacyAuthService) RecoverWithRecoveryCode(ctx context.Context, recover
 	return s.recoveryUsecase.RecoverWithRecoveryCode(ctx, recoveryCode, newPassword)
 }
 func (s *legacyAuthService) DeleteUser(ctx context.Context, userID int) error {
-	return s.userCredential.DeleteUser(ctx, userID)
+	return s.userCredential.DeleteOwnAccount(ctx, userID)
 }

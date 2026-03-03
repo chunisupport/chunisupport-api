@@ -25,11 +25,9 @@ type SongRepository interface {
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayIDs(ctx context.Context, exec Executor, displayIDs []string) ([]*entity.Song, error)
 
-	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
-	DeleteSong(ctx context.Context, exec Executor, displayID string) error
-
-	// RestoreSong は指定されたDisplayIDの楽曲を復活させます。
-	RestoreSong(ctx context.Context, exec Executor, displayID string) error
+	// Save は楽曲エンティティの現在の状態を永続化します。
+	// 対象が存在しない場合は ErrSongNotFound を返します。
+	Save(ctx context.Context, exec Executor, song *entity.Song) error
 
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// トランザクション管理はUseCase層（TransactionManager経由）で行います。

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -29,6 +31,9 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE id = ?`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
 		return nil, err
 	}
 	return userModel.ToEntity()
@@ -40,6 +45,9 @@ func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Exe
 	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE username = ?`
 	err := exec.GetContext(ctx, &userModel, query, username)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
 		return nil, err
 	}
 	return userModel.ToEntity()
