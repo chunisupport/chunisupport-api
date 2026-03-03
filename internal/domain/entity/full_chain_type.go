@@ -1,7 +1,6 @@
 package entity
 
-// FullChainType はフルチェインランプマスタのエンティティを表します
-type FullChainType struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// FullChainType はフルチェインランプマスタの互換エイリアスです。
+type FullChainType = master.FullChainType

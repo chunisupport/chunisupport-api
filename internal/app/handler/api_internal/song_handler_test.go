@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
@@ -325,7 +326,7 @@ func TestGetSongs(t *testing.T) {
 
 	// ハンドラーの準備
 	staticMasterCache := &masterdata.StaticCache{
-		RatingBands: []*entity.RatingBand{},
+		RatingBands: []*ratingband.RatingBand{},
 	}
 	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 

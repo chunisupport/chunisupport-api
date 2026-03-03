@@ -1,7 +1,6 @@
 package entity
 
-// Slot はプレイヤーレコードのスロット種別を表します。
-type Slot struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// Slot はプレイヤーレコードのスロット種別の互換エイリアスです。
+type Slot = master.Slot

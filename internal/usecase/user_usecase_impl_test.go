@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"testing"
 	"time"
 
@@ -261,11 +262,11 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 				Artist:    "Artist A",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 1, Name: "FAILED"},
-			ComboLamp:       &entity.ComboLampType{ID: 1, Name: "NONE"},
-			FullChain:       &entity.FullChainType{ID: 1, Name: "NONE"},
-			Slot:            &entity.Slot{ID: 1, Name: "best"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 2, Name: "EXPERT"},
+			ClearLamp:       &master.ClearLampType{ID: 1, Name: "FAILED"},
+			ComboLamp:       &master.ComboLampType{ID: 1, Name: "NONE"},
+			FullChain:       &master.FullChainType{ID: 1, Name: "NONE"},
+			Slot:            &master.Slot{ID: 1, Name: "best"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 2, Name: "EXPERT"},
 		},
 		{
 			PlayerID:    1,
@@ -290,11 +291,11 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 				Artist:    "Artist B",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 2, Name: "CLEAR"},
-			ComboLamp:       &entity.ComboLampType{ID: 2, Name: "FC"},
-			FullChain:       &entity.FullChainType{ID: 2, Name: "FC"},
-			Slot:            &entity.Slot{ID: 2, Name: "new_candidate"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "MASTER"},
+			ClearLamp:       &master.ClearLampType{ID: 2, Name: "CLEAR"},
+			ComboLamp:       &master.ComboLampType{ID: 2, Name: "FC"},
+			FullChain:       &master.FullChainType{ID: 2, Name: "FC"},
+			Slot:            &master.Slot{ID: 2, Name: "new_candidate"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "MASTER"},
 		},
 	}
 
@@ -373,7 +374,7 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 			UpdatedAt:       now,
 			Chart:           playedSong.Charts[0],
 			Song:            playedSong,
-			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "expert"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
 		&stubPlayerService{player: player},
@@ -464,11 +465,11 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 				Artist:    "Artist A",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 1, Name: "FAILED"},
-			ComboLamp:       &entity.ComboLampType{ID: 1, Name: "NONE"},
-			FullChain:       &entity.FullChainType{ID: 1, Name: "NONE"},
-			Slot:            &entity.Slot{ID: 1, Name: "best"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 2, Name: "EXPERT"},
+			ClearLamp:       &master.ClearLampType{ID: 1, Name: "FAILED"},
+			ComboLamp:       &master.ComboLampType{ID: 1, Name: "NONE"},
+			FullChain:       &master.FullChainType{ID: 1, Name: "NONE"},
+			Slot:            &master.Slot{ID: 1, Name: "best"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 2, Name: "EXPERT"},
 		},
 		{
 			PlayerID:    1,
@@ -493,11 +494,11 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 				Artist:    "Artist B",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 2, Name: "CLEAR"},
-			ComboLamp:       &entity.ComboLampType{ID: 2, Name: "FC"},
-			FullChain:       &entity.FullChainType{ID: 2, Name: "FC"},
-			Slot:            &entity.Slot{ID: 2, Name: "new_candidate"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "MASTER"},
+			ClearLamp:       &master.ClearLampType{ID: 2, Name: "CLEAR"},
+			ComboLamp:       &master.ComboLampType{ID: 2, Name: "FC"},
+			FullChain:       &master.FullChainType{ID: 2, Name: "FC"},
+			Slot:            &master.Slot{ID: 2, Name: "new_candidate"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "MASTER"},
 		},
 	}
 

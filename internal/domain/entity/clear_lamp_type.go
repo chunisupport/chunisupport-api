@@ -1,7 +1,6 @@
 package entity
 
-// ClearLampType はクリアランプマスタのエンティティを表します
-type ClearLampType struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// ClearLampType はクリアランプマスタの互換エイリアスです。
+type ClearLampType = master.ClearLampType

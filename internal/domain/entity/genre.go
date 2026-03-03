@@ -1,7 +1,6 @@
 package entity
 
-// Genre はジャンルマスタのエンティティを表します
-type Genre struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// Genre はジャンルマスタの互換エイリアスです。
+type Genre = master.Genre

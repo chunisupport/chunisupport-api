@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"strings"
 	"time"
 
@@ -77,24 +78,24 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 }
 
 // toMasterName はマスタエンティティからName文字列を取り出します。nilの場合は空文字を返します。
-func toMasterName(master any) string {
-	switch v := master.(type) {
-	case *entity.ClearLampType:
+func toMasterName(masterValue any) string {
+	switch v := masterValue.(type) {
+	case *master.ClearLampType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.ComboLampType:
+	case *master.ComboLampType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.FullChainType:
+	case *master.FullChainType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.Slot:
+	case *master.Slot:
 		if v == nil {
 			return ""
 		}
@@ -111,8 +112,8 @@ func isNoneValue(name string) bool {
 
 // toMasterNamePtr はマスタエンティティからName文字列のポインタを取り出します。
 // nilの場合、または「NONE」「none」など便宜上の値の場合はnilを返します。
-func toMasterNamePtr(master any) *string {
-	name := toMasterName(master)
+func toMasterNamePtr(masterValue any) *string {
+	name := toMasterName(masterValue)
 	if name == "" || isNoneValue(name) {
 		return nil
 	}

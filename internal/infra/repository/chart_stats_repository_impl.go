@@ -5,6 +5,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -51,7 +52,7 @@ type chartStatsRow struct {
 }
 
 // FindRatingBands はレーティング帯マスタ一覧を返します。
-func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*entity.RatingBand, error) {
+func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
 	const query = `
 		SELECT id, label, min_inclusive, max_exclusive, sort_order
 		FROM rating_bands
@@ -63,9 +64,9 @@ func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec reposit
 		return nil, err
 	}
 
-	results := make([]*entity.RatingBand, 0, len(rows))
+	results := make([]*ratingband.RatingBand, 0, len(rows))
 	for _, row := range rows {
-		results = append(results, &entity.RatingBand{
+		results = append(results, &ratingband.RatingBand{
 			ID:           row.ID,
 			Label:        row.Label,
 			MinInclusive: row.MinInclusive,

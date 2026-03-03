@@ -1,7 +1,6 @@
 package entity
 
-// ComboLampType はコンボランプマスタのエンティティを表します
-type ComboLampType struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// ComboLampType はコンボランプマスタの互換エイリアスです。
+type ComboLampType = master.ComboLampType

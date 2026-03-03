@@ -1,7 +1,6 @@
 package entity
 
-// ClassEmblemBase はクラスエンブレムベースマスタのエンティティを表します
-type ClassEmblemBase struct {
-	ID   int
-	Name string
-}
+import "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
+// ClassEmblemBase はクラスエンブレムベースマスタの互換エイリアスです。
+type ClassEmblemBase = master.ClassEmblemBase

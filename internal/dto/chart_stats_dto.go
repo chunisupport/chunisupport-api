@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 )
 
 // ChartStatsResponse は譜面統計APIのレスポンスです。
@@ -65,7 +66,7 @@ type SingleChartStatsResponse struct {
 }
 
 // ToChartStatsResponse は SongChartStats を ChartStatsResponse に変換します。
-func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.RatingBand) *ChartStatsResponse {
+func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingband.RatingBand) *ChartStatsResponse {
 	if stats == nil {
 		return nil
 	}
@@ -127,7 +128,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*entity.Ra
 }
 
 // ToSingleChartStatsResponse は SingleChartStats を SingleChartStatsResponse に変換します。
-func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*entity.RatingBand) *SingleChartStatsResponse {
+func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*ratingband.RatingBand) *SingleChartStatsResponse {
 	if stats == nil {
 		return nil
 	}
