@@ -20,8 +20,5 @@ func (a *ChartStatsMasterProviderAdapter) RatingBands() []*ratingband.RatingBand
 	if a == nil || a.cache == nil {
 		return []*ratingband.RatingBand{}
 	}
-	if a.cache.RatingBands == nil {
-		return []*ratingband.RatingBand{}
-	}
 	return a.cache.RatingBands
 }
