@@ -131,7 +131,6 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 		song.ReleasedAt,
 		song.OfficialIdx,
 		song.Jacket,
-		song.IsWorldsend,
 		song.IsDeleted,
 		song.ID,
 	)
