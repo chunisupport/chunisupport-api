@@ -117,7 +117,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_deleted = ?
 		WHERE id = ? AND is_worldsend = 1
 	`
 	result, err := exec.ExecContext(
