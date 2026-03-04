@@ -158,8 +158,7 @@
 - **現状のTODO箇所一覧**:
   | ファイル | 行 | 内容 |
   |---|---|---|
-  | `internal/app/handler/compat/chunirec/chunirec_handler.go` | 126 | `// TODO: UserProfileWithRecordsDTOにUserIDフィールドを追加してリファクタリング` |
-  | `internal/usecase/user_usecase_impl.go` | 45 | `// TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。` |
+  | `internal/usecase/user_usecase_impl.go` | 50 | `// TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。` |
 - **修正案**:
   - 解消またはIssue化。
 
@@ -238,7 +237,7 @@
   - 該当箇所:
     - `api_internal/song_handler.go`: `DeleteSong`, `RestoreSong`
     - `api_internal/api_token_handler.go`: `Generate`, `Delete`
-    - `api_internal/auth_handler.go`: `DeleteAccount`, `Logout`, `UpdatePrivacy`
+    - `api_internal/auth_handler.go`: `Logout`
   - 他のハンドラ（WorldsendHandler等）は正しく `FromUsecaseError()` を使用しており不整合。
 - **影響範囲**:
   - 404系エラー（楽曲/トークン/ユーザー未発見）が500で返されてしまい、クライアント側の適切なエラーハンドリングが困難。
