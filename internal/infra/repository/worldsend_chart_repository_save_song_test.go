@@ -31,6 +31,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				BPM:         intPtrForWorldsendSaveTest(230),
 				OfficialIdx: "WEIDX001-UPDATED",
 				Jacket:      stringPtrForWorldsendSaveTest("we-updated.png"),
+				IsWorldsend: true,
 				IsDeleted:   true,
 				ReleasedAt:  nil,
 			},
@@ -93,10 +94,11 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					BPM         int     `db:"bpm"`
 					OfficialIdx string  `db:"official_idx"`
 					Jacket      *string `db:"jacket"`
+					IsWorldsend bool    `db:"is_worldsend"`
 					IsDeleted   bool    `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, artist, genre_id, bpm, official_idx, jacket, is_deleted
+					SELECT id, display_id, title, artist, genre_id, bpm, official_idx, jacket, is_worldsend, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -111,6 +113,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
+				assert.Equal(t, tt.saveSong.IsWorldsend, saved.IsWorldsend)
 				assert.Equal(t, tt.saveSong.IsDeleted, saved.IsDeleted)
 			}
 		})
