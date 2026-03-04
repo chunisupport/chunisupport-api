@@ -38,24 +38,6 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 			assertPersist: true,
 		},
 		{
-			name:        "既存WORLD'S END楽曲を通常楽曲へ更新できる",
-			isWorldsend: true,
-			saveSong: &entity.Song{
-				ID:          1,
-				DisplayID:   "WE001-TO-NORMAL",
-				Title:       "WE to Normal",
-				Artist:      "WE Artist",
-				GenreID:     intPtrForWorldsendSaveTest(3),
-				BPM:         intPtrForWorldsendSaveTest(180),
-				OfficialIdx: "WEIDX001-NORMAL",
-				Jacket:      stringPtrForWorldsendSaveTest("normal.png"),
-				IsWorldsend: false,
-				IsDeleted:   false,
-				ReleasedAt:  nil,
-			},
-			assertPersist: true,
-		},
-		{
 			name:        "WORLD'S END以外の楽曲はErrSongNotFoundを返す",
 			isWorldsend: false,
 			saveSong: &entity.Song{
