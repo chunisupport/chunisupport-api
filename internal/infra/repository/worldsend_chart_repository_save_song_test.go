@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -88,20 +89,20 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 
 			if tt.assertPersist {
 				var saved struct {
-					ID          int     `db:"id"`
-					DisplayID   string  `db:"display_id"`
-					Title       string  `db:"title"`
-					Artist      string  `db:"artist"`
-					GenreID     int     `db:"genre_id"`
-					BPM         int     `db:"bpm"`
-					ReleasedAt  string  `db:"released_at"`
-					OfficialIdx string  `db:"official_idx"`
-					Jacket      *string `db:"jacket"`
-					IsWorldsend bool    `db:"is_worldsend"`
-					IsDeleted   bool    `db:"is_deleted"`
+					ID          int            `db:"id"`
+					DisplayID   string         `db:"display_id"`
+					Title       string         `db:"title"`
+					Artist      string         `db:"artist"`
+					GenreID     int            `db:"genre_id"`
+					BPM         int            `db:"bpm"`
+					ReleasedAt  sql.NullString `db:"released_at"`
+					OfficialIdx string         `db:"official_idx"`
+					Jacket      *string        `db:"jacket"`
+					IsWorldsend bool           `db:"is_worldsend"`
+					IsDeleted   bool           `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, artist, genre_id, bpm, substr(released_at, 1, 10) AS released_at, official_idx, jacket, is_worldsend, is_deleted
+					SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -114,9 +115,14 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, *tt.saveSong.GenreID, saved.GenreID)
 				assert.Equal(t, *tt.saveSong.BPM, saved.BPM)
 				require.NotNil(t, tt.saveSong.ReleasedAt)
+				require.True(t, saved.ReleasedAt.Valid)
 				// DBのカラムはDATE型なので、日付部分のみを比較する
-				expectedDate := tt.saveSong.ReleasedAt.Format(time.DateOnly)
-				assert.Equal(t, expectedDate, saved.ReleasedAt)
+				require.GreaterOrEqual(t, len(saved.ReleasedAt.String), len(time.DateOnly))
+				savedReleasedAt, err := time.Parse(time.DateOnly, saved.ReleasedAt.String[:len(time.DateOnly)])
+				require.NoError(t, err)
+				assert.Equal(t, tt.saveSong.ReleasedAt.Year(), savedReleasedAt.Year())
+				assert.Equal(t, tt.saveSong.ReleasedAt.Month(), savedReleasedAt.Month())
+				assert.Equal(t, tt.saveSong.ReleasedAt.Day(), savedReleasedAt.Day())
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
