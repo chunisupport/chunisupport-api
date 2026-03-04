@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"testing"
 	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -128,11 +129,7 @@ func (s *stubSongRepository) FindByDisplayIDs(ctx context.Context, exec reposito
 	return nil, errors.New("not implemented")
 }
 
-func (s *stubSongRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	return errors.New("not implemented")
-}
-
-func (s *stubSongRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
+func (s *stubSongRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	return errors.New("not implemented")
 }
 
@@ -164,11 +161,7 @@ func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec
 	return nil, errors.New("not implemented")
 }
 
-func (s *stubWorldsendChartRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	return errors.New("not implemented")
-}
-
-func (s *stubWorldsendChartRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
+func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	return errors.New("not implemented")
 }
 

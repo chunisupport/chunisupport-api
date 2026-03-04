@@ -368,6 +368,9 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない
+  - 400 Bad Request (`operation_failed`): 操作失敗（例: 既に削除済み）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー（セッション無効化失敗など）
 
 ### DELETE `/internal/me/player-data`
 - **認証**: Cookie 必須

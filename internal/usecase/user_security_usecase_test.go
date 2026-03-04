@@ -2,11 +2,11 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/utils"
@@ -46,7 +46,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			currentPassword: "old-password",
 			newPassword:     "new-password",
 			setupMock: func(m *MockUserRepository) {
-				m.On("FindByID", mock.Anything, mock.Anything, 2).Return(nil, sql.ErrNoRows).Once()
+				m.On("FindByID", mock.Anything, mock.Anything, 2).Return(nil, repository.ErrUserNotFound).Once()
 			},
 			wantErr: ErrUserNotFound,
 		},
@@ -146,14 +146,14 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 
 func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
-	mockUser := &entity.User{ID: 1, Username: un}
 
 	t.Run("DeleteUser_正常系_論理削除が成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
 		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
+		user := &entity.User{ID: 1, Username: un}
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		err := authService.DeleteUser(context.Background(), 1)
@@ -166,12 +166,26 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockSessionRepo := new(MockSessionRepository)
 		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
 
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(mockUser, nil).Once()
+		user := &entity.User{ID: 2, Username: un}
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("db error")).Once()
 
 		err := authService.DeleteUser(context.Background(), 2)
 		assert.Error(t, err)
 		assert.Equal(t, "db error", err.Error())
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("DeleteUser_異常系_既に削除済みのユーザー", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+
+		deletedUser := &entity.User{ID: 3, Username: un, IsDeleted: true}
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 3).Return(deletedUser, nil).Once()
+
+		err := authService.DeleteUser(context.Background(), 3)
+		assert.ErrorIs(t, err, ErrUserAlreadyDeleted)
 		mockUserRepo.AssertExpectations(t)
 	})
 }

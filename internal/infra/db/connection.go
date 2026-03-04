@@ -14,7 +14,10 @@ import (
 // Connect はデータベースへの接続を確立し、*sqlx.DBを返します。
 func Connect(dbConfig config.DbConfig) (*sqlx.DB, error) {
 	// DSN (Data Source Name) を構築
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local",
+	// clientFoundRows=true: UPDATE時に「変更された行数」ではなく「マッチした行数」を返すようにする。
+	// これにより、値が変わらないUPDATEでもRowsAffected>=1となり、
+	// Save/SaveSongのRowsAffected==0チェック（存在確認）が正しく動作する。
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local&clientFoundRows=true",
 		dbConfig.DbUser,
 		dbConfig.DbPass,
 		dbConfig.DbHost,

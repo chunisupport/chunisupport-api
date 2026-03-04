@@ -112,29 +112,28 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 	}, nil
 }
 
-// DeleteSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
-func (r *worldsendChartRepository) DeleteSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	query := `UPDATE songs SET is_deleted = 1 WHERE display_id = ? AND is_worldsend = 1`
-	result, err := exec.ExecContext(ctx, query, displayID)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return repository.ErrSongNotFound
-	}
-
-	return nil
-}
-
-// RestoreSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
-func (r *worldsendChartRepository) RestoreSong(ctx context.Context, exec repository.Executor, displayID string) error {
-	query := `UPDATE songs SET is_deleted = 0 WHERE display_id = ? AND is_worldsend = 1`
-	result, err := exec.ExecContext(ctx, query, displayID)
+// SaveSong は WORLD'S END 楽曲エンティティの現在の状態を永続化します。
+// 対象が存在しない場合は ErrSongNotFound を返します。
+func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	query := `
+		UPDATE songs
+		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_deleted = ?
+		WHERE id = ? AND is_worldsend = 1
+	`
+	result, err := exec.ExecContext(
+		ctx,
+		query,
+		song.DisplayID,
+		song.Title,
+		song.Artist,
+		song.GenreID,
+		song.BPM,
+		song.ReleasedAt,
+		song.OfficialIdx,
+		song.Jacket,
+		song.IsDeleted,
+		song.ID,
+	)
 	if err != nil {
 		return err
 	}

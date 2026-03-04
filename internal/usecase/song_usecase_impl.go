@@ -60,7 +60,7 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 	}
 
 	// 削除済み楽曲の権限チェック
-	if song.IsDeleted {
+	if !song.IsActive() {
 		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
 			return nil, repository.ErrSongNotFound
@@ -73,26 +73,26 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		// 楽曲の存在確認
-		_, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
 
-		return s.songRepo.DeleteSong(ctx, tx, displayID)
+		song.Delete()
+		return s.songRepo.Save(ctx, tx, song)
 	})
 }
 
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		// 楽曲の存在確認
-		_, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
 
-		return s.songRepo.RestoreSong(ctx, tx, displayID)
+		song.Restore()
+		return s.songRepo.Save(ctx, tx, song)
 	})
 }
 
@@ -146,15 +146,14 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 			}
 		}
 
-		song := &entity.Song{
-			DisplayID:  req.DisplayID,
-			Title:      req.Title,
-			Artist:     req.Artist,
-			GenreID:    genreID,
-			BPM:        req.BPM,
-			ReleasedAt: req.ReleasedAt.TimePtr(),
-			Jacket:     req.Jacket,
-		}
+		song := entity.NewSong()
+		song.DisplayID = req.DisplayID
+		song.Title = req.Title
+		song.Artist = req.Artist
+		song.GenreID = genreID
+		song.BPM = req.BPM
+		song.ReleasedAt = req.ReleasedAt.TimePtr()
+		song.Jacket = req.Jacket
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
 		for diffName, chartReq := range req.Charts {
