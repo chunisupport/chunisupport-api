@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -89,20 +88,20 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 
 			if tt.assertPersist {
 				var saved struct {
-					ID          int            `db:"id"`
-					DisplayID   string         `db:"display_id"`
-					Title       string         `db:"title"`
-					Artist      string         `db:"artist"`
-					GenreID     int            `db:"genre_id"`
-					BPM         int            `db:"bpm"`
-					ReleasedAt  sql.NullString `db:"released_at"`
-					OfficialIdx string         `db:"official_idx"`
-					Jacket      *string        `db:"jacket"`
-					IsWorldsend bool           `db:"is_worldsend"`
-					IsDeleted   bool           `db:"is_deleted"`
+					ID          int     `db:"id"`
+					DisplayID   string  `db:"display_id"`
+					Title       string  `db:"title"`
+					Artist      string  `db:"artist"`
+					GenreID     int     `db:"genre_id"`
+					BPM         int     `db:"bpm"`
+					ReleasedAt  string  `db:"released_at"`
+					OfficialIdx string  `db:"official_idx"`
+					Jacket      *string `db:"jacket"`
+					IsWorldsend bool    `db:"is_worldsend"`
+					IsDeleted   bool    `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+					SELECT id, display_id, title, artist, genre_id, bpm, substr(released_at, 1, 10) AS released_at, official_idx, jacket, is_worldsend, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -115,11 +114,9 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, *tt.saveSong.GenreID, saved.GenreID)
 				assert.Equal(t, *tt.saveSong.BPM, saved.BPM)
 				require.NotNil(t, tt.saveSong.ReleasedAt)
-				require.True(t, saved.ReleasedAt.Valid)
 				// DBのカラムはDATE型なので、日付部分のみを比較する
-				expectedDate := tt.saveSong.ReleasedAt.Truncate(24 * time.Hour)
-				savedDate := saved.ReleasedAt.Time.Truncate(24 * time.Hour)
-				assert.True(t, expectedDate.Equal(savedDate), "expected date %v, but got %v", expectedDate, savedDate)
+				expectedDate := tt.saveSong.ReleasedAt.Format(time.DateOnly)
+				assert.Equal(t, expectedDate, saved.ReleasedAt)
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
@@ -140,25 +137,4 @@ func stringPtrForWorldsendSaveTest(v string) *string {
 
 func timePtrForWorldsendSaveTest(v time.Time) *time.Time {
 	return &v
-}
-
-func parseReleasedAtForWorldsendSaveTest(v string) (time.Time, error) {
-	layouts := []string{
-		time.RFC3339Nano,
-		"2006-01-02 15:04:05.999999999-07:00",
-		"2006-01-02 15:04:05-07:00",
-		"2006-01-02 15:04:05",
-		"2006-01-02 15:04:05 -0700 MST",
-	}
-
-	var lastErr error
-	for _, layout := range layouts {
-		parsed, err := time.Parse(layout, v)
-		if err == nil {
-			return parsed.UTC(), nil
-		}
-		lastErr = err
-	}
-
-	return time.Time{}, lastErr
 }
