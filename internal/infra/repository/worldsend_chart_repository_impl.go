@@ -115,9 +115,11 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 // SaveSong は WORLD'S END 楽曲エンティティの現在の状態を永続化します。
 // 対象が存在しない場合は ErrSongNotFound を返します。
 func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	// worldsendChartRepository は WORLD'S END 楽曲のみを責務として扱うため、
+	// is_worldsend 自体の状態遷移はここでは永続化しない（WHERE 句の対象条件を維持する）。
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_deleted = ?
 		WHERE id = ? AND is_worldsend = 1
 	`
 	result, err := exec.ExecContext(
@@ -131,7 +133,6 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 		song.ReleasedAt,
 		song.OfficialIdx,
 		song.Jacket,
-		song.IsWorldsend,
 		song.IsDeleted,
 		song.ID,
 	)

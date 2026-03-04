@@ -13,11 +13,12 @@ import (
 
 func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 	tests := []struct {
-		name          string
-		isWorldsend   bool
-		saveSong      *entity.Song
-		expectedErr   error
-		assertPersist bool
+		name                       string
+		isWorldsend                bool
+		saveSong                   *entity.Song
+		expectedErr                error
+		assertPersist              bool
+		expectedPersistedWorldsend bool
 	}{
 		{
 			name:        "既存WORLD'S END楽曲の集約状態を保存できる",
@@ -31,11 +32,12 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				BPM:         intPtrForWorldsendSaveTest(230),
 				OfficialIdx: "WEIDX001-UPDATED",
 				Jacket:      stringPtrForWorldsendSaveTest("we-updated.png"),
-				IsWorldsend: true,
+				IsWorldsend: false,
 				IsDeleted:   true,
 				ReleasedAt:  nil,
 			},
-			assertPersist: true,
+			assertPersist:              true,
+			expectedPersistedWorldsend: true,
 		},
 		{
 			name:        "WORLD'S END以外の楽曲はErrSongNotFoundを返す",
@@ -50,7 +52,8 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				OfficialIdx: "IDX-NOT-WE",
 				IsDeleted:   true,
 			},
-			expectedErr: domainrepo.ErrSongNotFound,
+			expectedErr:                domainrepo.ErrSongNotFound,
+			expectedPersistedWorldsend: false,
 		},
 	}
 
@@ -113,7 +116,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
-				assert.Equal(t, tt.saveSong.IsWorldsend, saved.IsWorldsend)
+				assert.Equal(t, tt.expectedPersistedWorldsend, saved.IsWorldsend)
 				assert.Equal(t, tt.saveSong.IsDeleted, saved.IsDeleted)
 			}
 		})
