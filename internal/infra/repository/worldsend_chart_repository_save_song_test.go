@@ -116,9 +116,10 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, *tt.saveSong.BPM, saved.BPM)
 				require.NotNil(t, tt.saveSong.ReleasedAt)
 				require.True(t, saved.ReleasedAt.Valid)
-				savedReleasedAt, parseErr := parseReleasedAtForWorldsendSaveTest(saved.ReleasedAt.String)
-				require.NoError(t, parseErr)
-				assert.True(t, tt.saveSong.ReleasedAt.Equal(savedReleasedAt))
+				// DBのカラムはDATE型なので、日付部分のみを比較する
+				expectedDate := tt.saveSong.ReleasedAt.Truncate(24 * time.Hour)
+				savedDate := saved.ReleasedAt.Time.Truncate(24 * time.Hour)
+				assert.True(t, expectedDate.Equal(savedDate), "expected date %v, but got %v", expectedDate, savedDate)
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
