@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 )
 
 func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
+	releasedAt := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+
 	tests := []struct {
 		name          string
 		isWorldsend   bool
@@ -31,8 +35,9 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				BPM:         intPtrForWorldsendSaveTest(230),
 				OfficialIdx: "WEIDX001-UPDATED",
 				Jacket:      stringPtrForWorldsendSaveTest("we-updated.png"),
+				IsWorldsend: true,
 				IsDeleted:   true,
-				ReleasedAt:  nil,
+				ReleasedAt:  timePtrForWorldsendSaveTest(releasedAt),
 			},
 			assertPersist: true,
 		},
@@ -85,18 +90,20 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 
 			if tt.assertPersist {
 				var saved struct {
-					ID          int     `db:"id"`
-					DisplayID   string  `db:"display_id"`
-					Title       string  `db:"title"`
-					Artist      string  `db:"artist"`
-					GenreID     int     `db:"genre_id"`
-					BPM         int     `db:"bpm"`
-					OfficialIdx string  `db:"official_idx"`
-					Jacket      *string `db:"jacket"`
-					IsDeleted   bool    `db:"is_deleted"`
+					ID          int            `db:"id"`
+					DisplayID   string         `db:"display_id"`
+					Title       string         `db:"title"`
+					Artist      string         `db:"artist"`
+					GenreID     int            `db:"genre_id"`
+					BPM         int            `db:"bpm"`
+					ReleasedAt  sql.NullString `db:"released_at"`
+					OfficialIdx string         `db:"official_idx"`
+					Jacket      *string        `db:"jacket"`
+					IsWorldsend bool           `db:"is_worldsend"`
+					IsDeleted   bool           `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, artist, genre_id, bpm, official_idx, jacket, is_deleted
+					SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -108,9 +115,17 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, tt.saveSong.Artist, saved.Artist)
 				assert.Equal(t, *tt.saveSong.GenreID, saved.GenreID)
 				assert.Equal(t, *tt.saveSong.BPM, saved.BPM)
+				require.NotNil(t, tt.saveSong.ReleasedAt)
+				require.True(t, saved.ReleasedAt.Valid)
+				// DBのカラムはDATE型なので、日付部分のみを比較する
+				expectedDate := tt.saveSong.ReleasedAt.UTC().Format(time.DateOnly)
+				savedDate, parseErr := parseWorldsendSavedDate(saved.ReleasedAt.String)
+				require.NoError(t, parseErr)
+				assert.Equal(t, expectedDate, savedDate.Format(time.DateOnly))
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
+				assert.Equal(t, tt.saveSong.IsWorldsend, saved.IsWorldsend)
 				assert.Equal(t, tt.saveSong.IsDeleted, saved.IsDeleted)
 			}
 		})
@@ -123,4 +138,25 @@ func intPtrForWorldsendSaveTest(v int) *int {
 
 func stringPtrForWorldsendSaveTest(v string) *string {
 	return &v
+}
+
+func timePtrForWorldsendSaveTest(v time.Time) *time.Time {
+	return &v
+}
+
+func parseWorldsendSavedDate(v string) (time.Time, error) {
+	layouts := []string{
+		time.DateOnly,
+		time.DateTime,
+		time.RFC3339,
+		"2006-01-02 15:04:05 -0700 MST",
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, v); err == nil {
+			return parsed, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("released_atの解析に失敗しました: %s", v)
 }
