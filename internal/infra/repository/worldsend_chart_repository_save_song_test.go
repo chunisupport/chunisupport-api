@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					Artist      string         `db:"artist"`
 					GenreID     int            `db:"genre_id"`
 					BPM         int            `db:"bpm"`
-					ReleasedAt  sql.NullTime   `db:"released_at"`
+					ReleasedAt  sql.NullString `db:"released_at"`
 					OfficialIdx string         `db:"official_idx"`
 					Jacket      *string        `db:"jacket"`
 					IsWorldsend bool           `db:"is_worldsend"`
@@ -117,7 +118,10 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				require.NotNil(t, tt.saveSong.ReleasedAt)
 				require.True(t, saved.ReleasedAt.Valid)
 				// DBのカラムはDATE型なので、日付部分のみを比較する
-                assert.Equal(t, tt.saveSong.ReleasedAt.Format("2006-01-02"), saved.ReleasedAt.Time.Format("2006-01-02"))
+				expectedDate := tt.saveSong.ReleasedAt.UTC().Format(time.DateOnly)
+				savedDate, parseErr := parseWorldsendSavedDate(saved.ReleasedAt.String)
+				require.NoError(t, parseErr)
+				assert.Equal(t, expectedDate, savedDate.Format(time.DateOnly))
 				assert.Equal(t, tt.saveSong.OfficialIdx, saved.OfficialIdx)
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
@@ -138,4 +142,21 @@ func stringPtrForWorldsendSaveTest(v string) *string {
 
 func timePtrForWorldsendSaveTest(v time.Time) *time.Time {
 	return &v
+}
+
+func parseWorldsendSavedDate(v string) (time.Time, error) {
+	layouts := []string{
+		time.DateOnly,
+		time.DateTime,
+		time.RFC3339,
+		"2006-01-02 15:04:05 -0700 MST",
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, v); err == nil {
+			return parsed, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("released_atの解析に失敗しました: %s", v)
 }
