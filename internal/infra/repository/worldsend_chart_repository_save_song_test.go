@@ -95,7 +95,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					Artist      string         `db:"artist"`
 					GenreID     int            `db:"genre_id"`
 					BPM         int            `db:"bpm"`
-					ReleasedAt  sql.NullString `db:"released_at"`
+					ReleasedAt  sql.NullTime   `db:"released_at"`
 					OfficialIdx string         `db:"official_idx"`
 					Jacket      *string        `db:"jacket"`
 					IsWorldsend bool           `db:"is_worldsend"`
