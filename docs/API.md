@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年02月21日
+**最終更新日**: 2026年03月05日
 
 ## ベースURLと環境
 
@@ -119,10 +119,12 @@
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得。 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
+| `/internal/songs` | PUT | Cookie (EDITOR+) | 楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
 | `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得。 |
 | `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得。 |
+| `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
@@ -1536,6 +1538,71 @@ curl -X POST \
     }
   }
 }
+```
+
+- **主なエラー**:
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### PUT `/internal/songs/worldsend`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: WORLD'S END 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
+- **リクエスト**: JSON配列
+
+```json
+[
+  {
+    "id": "0123456789abcdef",
+    "title": "楽曲タイトル",
+    "artist": "アーティスト名",
+    "genre": "POPS & ANIME",
+    "bpm": 180,
+    "released_at": "2024-01-01",
+    "jacket": "jacket_img_name",
+    "charts": {
+      "WORLDSEND": {
+        "attribute": "狂",
+        "level_star": 5,
+        "notes": 2000
+      }
+    }
+  }
+]
+```
+
+**リクエストフィールド（UpdateWorldsendSongRequest）**:
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
+| `title` | string | ✓ | 楽曲名 |
+| `artist` | string | ✓ | アーティスト名 |
+| `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
+| `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
+| `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
+| `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
+| `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
+
+**UpdateWorldsendChartRequest**:
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `attribute` | string \| null | | WORLD'S END 属性（光、蔵、改、狂、etc.） |
+| `level_star` | int \| null | | WORLD'S END レベル（1〜5、nullの場合DBをNULLに更新） |
+| `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
+
+**注意事項**:
+- `charts` を省略または `null` にした場合、譜面情報は更新されません（楽曲情報のみ更新されます）
+- `charts` を指定する場合は `WORLDSEND` キーのみ指定可能です（大文字固定）
+- `charts` で `WORLDSEND` 以外のキーを指定するとエラーになります
+- マスタに存在しないジャンル名を指定するとエラーになります
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+
+- **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): バリデーションエラー
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 

@@ -308,6 +308,48 @@ func TestRestoreWorldsendSong_SavesRestoredState(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+func TestUpdateWorldsendSongs_NilChartIsSkippedAndNonNilValidated(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
+	ctx := context.Background()
+
+	level := 3
+	songs := []*entity.Song{{DisplayID: "WE001"}, {DisplayID: "WE002"}}
+	charts := []*entity.WorldsendChart{nil, {LevelStar: &level}}
+
+	mockRepo.On("UpdateSongs", ctx, mockExec, songs, charts).Return(nil).Once()
+
+	// When
+	err := uc.UpdateWorldsendSongs(ctx, songs, charts)
+
+	// Then
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestUpdateWorldsendSongs_InvalidNonNilChartReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
+	ctx := context.Background()
+
+	invalidLevel := 0
+	songs := []*entity.Song{{DisplayID: "WE001"}}
+	charts := []*entity.WorldsendChart{{LevelStar: &invalidLevel}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(ctx, songs, charts)
+
+	// Then
+	assert.Error(t, err)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 // intPtr はint値へのポインタを返すヘルパー関数です。
 func intPtr(i int) *int {
 	return &i

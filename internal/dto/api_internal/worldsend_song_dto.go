@@ -31,6 +31,25 @@ type WorldsendSongsResponse struct {
 	Songs []*WorldsendSongDTO `json:"songs"`
 }
 
+// UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。
+type UpdateWorldsendChartRequest struct {
+	Attribute *string `json:"attribute"`
+	LevelStar *int    `json:"level_star" validate:"omitempty,min=1,max=5"`
+	Notes     *int    `json:"notes" validate:"omitempty,gte=0"`
+}
+
+// UpdateWorldsendSongRequest は WORLD'S END 楽曲更新リクエストを表します。
+type UpdateWorldsendSongRequest struct {
+	DisplayID  string                                  `json:"id" validate:"required,len=16"`
+	Title      string                                  `json:"title" validate:"required"`
+	Artist     string                                  `json:"artist" validate:"required"`
+	Genre      *string                                 `json:"genre"`
+	BPM        *int                                    `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt *DateOnly                               `json:"released_at"`
+	Jacket     *string                                 `json:"jacket"`
+	Charts     map[string]*UpdateWorldsendChartRequest `json:"charts" validate:"dive"`
+}
+
 // ToWorldsendChartDTO は WorldsendChart エンティティから WorldsendChartDTO へ変換します。
 func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 	if chart == nil {

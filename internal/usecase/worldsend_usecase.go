@@ -118,6 +118,9 @@ func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID s
 func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error {
 	// バリデーション
 	for i, chart := range charts {
+		if chart == nil {
+			continue
+		}
 		if err := chart.Validate(); err != nil {
 			slog.Warn("worldsend chart validation failed", "index", i, "error", err)
 			return err
