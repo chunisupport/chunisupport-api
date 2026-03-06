@@ -40,8 +40,8 @@ func (m *MockWorldsendChartRepository) SaveSong(ctx context.Context, exec reposi
 	return args.Error(0)
 }
 
-func (m *MockWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
-	args := m.Called(ctx, exec, songs, charts)
+func (m *MockWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
+	args := m.Called(ctx, exec, updates)
 	return args.Error(0)
 }
 
@@ -276,32 +276,29 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 	}
 
 	mockRepo.On("UpdateSongs", ctx, mockExec,
-		mock.MatchedBy(func(songs []*entity.Song) bool {
-			if len(songs) != 2 {
+		mock.MatchedBy(func(updates []*repository.WorldsendUpdate) bool {
+			if len(updates) != 2 {
 				return false
 			}
-			if songs[0] == nil || songs[0].DisplayID != "1234567890abcdef" || songs[0].GenreID == nil || *songs[0].GenreID != 1 {
+			if updates[0] == nil || updates[0].Song == nil || updates[0].Song.DisplayID != "1234567890abcdef" {
 				return false
 			}
-			if songs[1] == nil || songs[1].DisplayID != "abcdef1234567890" {
+			if updates[0].Song.GenreID == nil || *updates[0].Song.GenreID != 1 {
 				return false
 			}
-			return true
-		}),
-		mock.MatchedBy(func(charts []*entity.WorldsendChart) bool {
-			if len(charts) != 2 {
+			if updates[1] == nil || updates[1].Song == nil || updates[1].Song.DisplayID != "abcdef1234567890" {
 				return false
 			}
-			if charts[0] == nil || charts[0].LevelStar == nil || *charts[0].LevelStar != levelstar.LevelStar(5) {
+			if updates[0].Chart == nil || updates[0].Chart.LevelStar == nil || *updates[0].Chart.LevelStar != levelstar.LevelStar(5) {
 				return false
 			}
-			if charts[0].Notes == nil || *charts[0].Notes != notes.Notes(2000) {
+			if updates[0].Chart.Notes == nil || *updates[0].Chart.Notes != notes.Notes(2000) {
 				return false
 			}
-			if charts[0].Attribute == nil || *charts[0].Attribute != "狂" {
+			if updates[0].Chart.Attribute == nil || *updates[0].Chart.Attribute != "狂" {
 				return false
 			}
-			return charts[1] == nil
+			return updates[1].Chart == nil
 		}),
 	).Return(nil).Once()
 
@@ -326,7 +323,7 @@ func TestUpdateWorldsendSongs_EmptyRequestsIsNoOp(t *testing.T) {
 
 	// Then
 	assert.NoError(t, err)
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_MastersNilReturnsError(t *testing.T) {
@@ -343,7 +340,7 @@ func TestUpdateWorldsendSongs_MastersNilReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInternalError)
 	assert.ErrorContains(t, err, "masters is nil")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_NilRequestReturnsError(t *testing.T) {
@@ -361,7 +358,7 @@ func TestUpdateWorldsendSongs_NilRequestReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "requests[0]: request is null")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
@@ -384,7 +381,7 @@ func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "invalid genre")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_InvalidLevelStarReturnsError(t *testing.T) {
@@ -409,7 +406,7 @@ func TestUpdateWorldsendSongs_InvalidLevelStarReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "level_star")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_InvalidNotesReturnsError(t *testing.T) {
@@ -434,7 +431,7 @@ func TestUpdateWorldsendSongs_InvalidNotesReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "notes")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_InvalidChartKeyReturnsError(t *testing.T) {
@@ -459,7 +456,7 @@ func TestUpdateWorldsendSongs_InvalidChartKeyReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "unsupported chart key")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_MultipleChartKeysReturnsError(t *testing.T) {
@@ -485,7 +482,7 @@ func TestUpdateWorldsendSongs_MultipleChartKeysReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "only one chart key")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUpdateWorldsendSongs_WorldsendChartNullReturnsError(t *testing.T) {
@@ -510,7 +507,7 @@ func TestUpdateWorldsendSongs_WorldsendChartNullReturnsError(t *testing.T) {
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorContains(t, err, "chart for WORLDSEND is null")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError はリポジトリ防衛チェックが
@@ -536,11 +533,14 @@ func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *tes
 	}
 
 	mockRepo.On("UpdateSongs", mock.Anything, mockExec,
-		mock.MatchedBy(func(songs []*entity.Song) bool {
-			return len(songs) == 2 && songs[0] != nil && songs[1] != nil && songs[0].DisplayID == songs[1].DisplayID
-		}),
-		mock.MatchedBy(func(charts []*entity.WorldsendChart) bool {
-			return len(charts) == 2 && charts[0] == nil && charts[1] == nil
+		mock.MatchedBy(func(updates []*repository.WorldsendUpdate) bool {
+			if len(updates) != 2 || updates[0] == nil || updates[1] == nil {
+				return false
+			}
+			if updates[0].Song == nil || updates[1].Song == nil {
+				return false
+			}
+			return updates[0].Song.DisplayID == updates[1].Song.DisplayID && updates[0].Chart == nil && updates[1].Chart == nil
 		}),
 	).
 		Return(repository.ErrDuplicateDisplayID).

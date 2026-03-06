@@ -91,19 +91,21 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	releasedAt := time.Date(2025, time.March, 1, 0, 0, 0, 0, time.UTC)
 	newJacket := "new.png"
 
-	songs := []*entity.Song{{
-		DisplayID:  "WE001",
-		Title:      "new title",
-		Artist:     "new artist",
-		GenreID:    &newGenreID,
-		BPM:        &newBPM,
-		ReleasedAt: &releasedAt,
-		Jacket:     &newJacket,
+	updates := []*domainrepo.WorldsendUpdate{{
+		Song: &entity.Song{
+			DisplayID:  "WE001",
+			Title:      "new title",
+			Artist:     "new artist",
+			GenreID:    &newGenreID,
+			BPM:        &newBPM,
+			ReleasedAt: &releasedAt,
+			Jacket:     &newJacket,
+		},
+		Chart: nil,
 	}}
-	charts := []*entity.WorldsendChart{nil}
 
 	repo := &worldsendChartRepository{db: db}
-	err = repo.UpdateSongs(ctx, db, songs, charts)
+	err = repo.UpdateSongs(ctx, db, updates)
 	require.NoError(t, err)
 
 	var song struct {
@@ -156,23 +158,25 @@ func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
 	bpm := 180
 	releasedAt := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 	jacket := "old.png"
-	songs := []*entity.Song{{
-		DisplayID:  "WE001",
-		Title:      "new title",
-		Artist:     "new artist",
-		GenreID:    &genreID,
-		BPM:        &bpm,
-		ReleasedAt: &releasedAt,
-		Jacket:     &jacket,
-	}}
-	charts := []*entity.WorldsendChart{{
-		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-		Attribute: stringPtrForWorldsendSaveTest("改"),
-		Notes:     &n,
+	updates := []*domainrepo.WorldsendUpdate{{
+		Song: &entity.Song{
+			DisplayID:  "WE001",
+			Title:      "new title",
+			Artist:     "new artist",
+			GenreID:    &genreID,
+			BPM:        &bpm,
+			ReleasedAt: &releasedAt,
+			Jacket:     &jacket,
+		},
+		Chart: &entity.WorldsendChart{
+			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute: stringPtrForWorldsendSaveTest("改"),
+			Notes:     &n,
+		},
 	}}
 
 	repo := &worldsendChartRepository{db: db}
-	err = repo.UpdateSongs(ctx, db, songs, charts)
+	err = repo.UpdateSongs(ctx, db, updates)
 	require.NoError(t, err)
 
 	var chart struct {
@@ -192,18 +196,20 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 	repo := &worldsendChartRepository{db: db}
 
 	n := notes.Notes(1300)
-	songs := []*entity.Song{{
-		DisplayID: "WE999",
-		Title:     "title",
-		Artist:    "artist",
-	}}
-	charts := []*entity.WorldsendChart{{
-		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-		Attribute: stringPtrForWorldsendSaveTest("狂"),
-		Notes:     &n,
+	updates := []*domainrepo.WorldsendUpdate{{
+		Song: &entity.Song{
+			DisplayID: "WE999",
+			Title:     "title",
+			Artist:    "artist",
+		},
+		Chart: &entity.WorldsendChart{
+			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute: stringPtrForWorldsendSaveTest("狂"),
+			Notes:     &n,
+		},
 	}}
 
-	err := repo.UpdateSongs(ctx, db, songs, charts)
+	err := repo.UpdateSongs(ctx, db, updates)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrSongNotFound)
 }
@@ -227,13 +233,12 @@ func TestUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t
 	`)
 	require.NoError(t, err)
 
-	songs := []*entity.Song{
-		{DisplayID: "WE001", Title: "first", Artist: "artist1"},
-		{DisplayID: "WE001", Title: "second", Artist: "artist2"},
+	updates := []*domainrepo.WorldsendUpdate{
+		{Song: &entity.Song{DisplayID: "WE001", Title: "first", Artist: "artist1"}, Chart: nil},
+		{Song: &entity.Song{DisplayID: "WE001", Title: "second", Artist: "artist2"}, Chart: nil},
 	}
-	charts := []*entity.WorldsendChart{nil, nil}
 
-	err = repo.UpdateSongs(ctx, db, songs, charts)
+	err = repo.UpdateSongs(ctx, db, updates)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrDuplicateDisplayID)
 
@@ -269,25 +274,168 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 	bpm := 180
 	releasedAt := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 	jacket := "old.png"
-	songs := []*entity.Song{{
-		DisplayID:  "WE001",
-		Title:      "new title",
-		Artist:     "new artist",
-		GenreID:    &genreID,
-		BPM:        &bpm,
-		ReleasedAt: &releasedAt,
-		Jacket:     &jacket,
-	}}
-	charts := []*entity.WorldsendChart{{
-		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-		Attribute: stringPtrForWorldsendSaveTest("改"),
-		Notes:     &n,
+	updates := []*domainrepo.WorldsendUpdate{{
+		Song: &entity.Song{
+			DisplayID:  "WE001",
+			Title:      "new title",
+			Artist:     "new artist",
+			GenreID:    &genreID,
+			BPM:        &bpm,
+			ReleasedAt: &releasedAt,
+			Jacket:     &jacket,
+		},
+		Chart: &entity.WorldsendChart{
+			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute: stringPtrForWorldsendSaveTest("改"),
+			Notes:     &n,
+		},
 	}}
 
 	exec := &deletingChartExecutor{db: db, chartID: 101}
-	err = repo.UpdateSongs(ctx, exec, songs, charts)
+	err = repo.UpdateSongs(ctx, exec, updates)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrSongNotFound)
+}
+
+func TestUpdateSongs_ReturnsErrorWhenUpdateOrSongIsNil(t *testing.T) {
+	tests := []struct {
+		name    string
+		updates []*domainrepo.WorldsendUpdate
+	}{
+		{
+			name:    "updateがnil",
+			updates: []*domainrepo.WorldsendUpdate{nil},
+		},
+		{
+			name:    "songがnil",
+			updates: []*domainrepo.WorldsendUpdate{{Song: nil, Chart: nil}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &worldsendChartRepository{}
+
+			err := repo.UpdateSongs(context.Background(), nil, tt.updates)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "song is nil")
+		})
+	}
+}
+
+func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) {
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES
+			(1, 'WE001', 'old title 1', 'old artist 1', 1, 180, '2024-01-01', 'WEIDX001', 'old1.png', 1, 0),
+			(2, 'WE002', 'old title 2', 'old artist 2', 2, 190, '2024-01-02', 'WEIDX002', 'old2.png', 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES
+			(101, 1, 3, '狂', 1000),
+			(102, 2, 4, '止', 1100)
+	`)
+	require.NoError(t, err)
+
+	genreID1 := 10
+	bpm1 := 200
+	releasedAt1 := time.Date(2025, time.January, 10, 0, 0, 0, 0, time.UTC)
+	jacket1 := "new1.png"
+
+	genreID2 := 20
+	bpm2 := 210
+	releasedAt2 := time.Date(2025, time.February, 10, 0, 0, 0, 0, time.UTC)
+	jacket2 := "new2.png"
+	n := notes.Notes(2200)
+
+	updates := []*domainrepo.WorldsendUpdate{
+		{
+			Song: &entity.Song{
+				DisplayID:  "WE001",
+				Title:      "new title 1",
+				Artist:     "new artist 1",
+				GenreID:    &genreID1,
+				BPM:        &bpm1,
+				ReleasedAt: &releasedAt1,
+				Jacket:     &jacket1,
+			},
+			Chart: nil,
+		},
+		{
+			Song: &entity.Song{
+				DisplayID:  "WE002",
+				Title:      "new title 2",
+				Artist:     "new artist 2",
+				GenreID:    &genreID2,
+				BPM:        &bpm2,
+				ReleasedAt: &releasedAt2,
+				Jacket:     &jacket2,
+			},
+			Chart: &entity.WorldsendChart{
+				LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
+				Attribute: stringPtrForWorldsendSaveTest("改"),
+				Notes:     &n,
+			},
+		},
+	}
+
+	repo := &worldsendChartRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, updates)
+	require.NoError(t, err)
+
+	var song1 struct {
+		Title  string `db:"title"`
+		Artist string `db:"artist"`
+	}
+	err = db.Get(&song1, `SELECT title, artist FROM songs WHERE id = 1`)
+	require.NoError(t, err)
+	assert.Equal(t, "new title 1", song1.Title)
+	assert.Equal(t, "new artist 1", song1.Artist)
+
+	var song2 struct {
+		Title  string `db:"title"`
+		Artist string `db:"artist"`
+	}
+	err = db.Get(&song2, `SELECT title, artist FROM songs WHERE id = 2`)
+	require.NoError(t, err)
+	assert.Equal(t, "new title 2", song2.Title)
+	assert.Equal(t, "new artist 2", song2.Artist)
+
+	var chart1 struct {
+		LevelStar *int    `db:"level_star"`
+		Attribute *string `db:"attribute"`
+		Notes     *int    `db:"notes"`
+	}
+	err = db.Get(&chart1, `SELECT level_star, attribute, notes FROM worldsend_charts WHERE id = 101`)
+	require.NoError(t, err)
+	require.NotNil(t, chart1.LevelStar)
+	assert.Equal(t, 3, *chart1.LevelStar)
+	require.NotNil(t, chart1.Attribute)
+	assert.Equal(t, "狂", *chart1.Attribute)
+	require.NotNil(t, chart1.Notes)
+	assert.Equal(t, 1000, *chart1.Notes)
+
+	var chart2 struct {
+		LevelStar *int    `db:"level_star"`
+		Attribute *string `db:"attribute"`
+		Notes     *int    `db:"notes"`
+	}
+	err = db.Get(&chart2, `SELECT level_star, attribute, notes FROM worldsend_charts WHERE id = 102`)
+	require.NoError(t, err)
+	require.NotNil(t, chart2.LevelStar)
+	assert.Equal(t, 5, *chart2.LevelStar)
+	require.NotNil(t, chart2.Attribute)
+	assert.Equal(t, "改", *chart2.Attribute)
+	require.NotNil(t, chart2.Notes)
+	assert.Equal(t, 2200, *chart2.Notes)
 }
 
 func levelStarPtrForWorldsendUpdateTest(t *testing.T, value int) *levelstar.LevelStar {

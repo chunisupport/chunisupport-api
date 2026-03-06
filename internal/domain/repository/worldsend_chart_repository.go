@@ -13,6 +13,13 @@ type WorldsendSongWithChart struct {
 	Chart *entity.WorldsendChart
 }
 
+// WorldsendUpdate は WORLD'S END 楽曲と譜面の更新情報を表します。
+// Chart が nil の場合は楽曲情報のみ更新します。
+type WorldsendUpdate struct {
+	Song  *entity.Song
+	Chart *entity.WorldsendChart
+}
+
 // WorldsendChartRepository は WORLD'S END 譜面に関する永続化を扱うリポジトリです。
 type WorldsendChartRepository interface {
 	// FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
@@ -28,5 +35,5 @@ type WorldsendChartRepository interface {
 	SaveSong(ctx context.Context, exec Executor, song *entity.Song) error
 
 	// UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-	UpdateSongs(ctx context.Context, exec Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error
+	UpdateSongs(ctx context.Context, exec Executor, updates []*WorldsendUpdate) error
 }

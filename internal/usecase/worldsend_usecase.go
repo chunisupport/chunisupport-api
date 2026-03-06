@@ -153,14 +153,14 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		return nil
 	}
 
-	songs, charts, err := convertWorldsendRequestsToEntities(requests, masters)
+	updates, err := convertWorldsendRequestsToEntities(requests, masters)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
 	}
 
 	// リポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.worldsendChartRepo.UpdateSongs(ctx, tx, songs, charts)
+		return s.worldsendChartRepo.UpdateSongs(ctx, tx, updates)
 	}); err != nil {
 		if errors.Is(err, repository.ErrDuplicateDisplayID) {
 			return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
@@ -172,25 +172,24 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 	return nil
 }
 
-func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) ([]*entity.Song, []*entity.WorldsendChart, error) {
-	songs := make([]*entity.Song, 0, len(requests))
-	charts := make([]*entity.WorldsendChart, 0, len(requests))
+func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) ([]*repository.WorldsendUpdate, error) {
+	updates := make([]*repository.WorldsendUpdate, 0, len(requests))
 
 	for idx, req := range requests {
 		if req == nil {
-			return nil, nil, fmt.Errorf("requests[%d]: request is null", idx)
+			return nil, fmt.Errorf("requests[%d]: request is null", idx)
 		}
 
 		chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
 		if err != nil {
-			return nil, nil, fmt.Errorf("requests[%d].charts: %w", idx, err)
+			return nil, fmt.Errorf("requests[%d].charts: %w", idx, err)
 		}
 
 		var genreID *int
 		if req.Genre != nil {
 			genreMaster, ok := masters.Genres[*req.Genre]
 			if !ok {
-				return nil, nil, fmt.Errorf("invalid genre: %s", *req.Genre)
+				return nil, fmt.Errorf("invalid genre: %s", *req.Genre)
 			}
 			genreID = &genreMaster.ID
 		}
@@ -211,7 +210,7 @@ func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, ma
 			if chartReq.LevelStar != nil {
 				ls, lsErr := levelstar.NewLevelStar(*chartReq.LevelStar)
 				if lsErr != nil {
-					return nil, nil, fmt.Errorf("requests[%d].charts.%s.level_star: %w", idx, worldsendChartKey, lsErr)
+					return nil, fmt.Errorf("requests[%d].charts.%s.level_star: %w", idx, worldsendChartKey, lsErr)
 				}
 				levelStarVO = &ls
 			}
@@ -220,7 +219,7 @@ func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, ma
 			if chartReq.Notes != nil {
 				n, nErr := notes.NewNotes(*chartReq.Notes)
 				if nErr != nil {
-					return nil, nil, fmt.Errorf("requests[%d].charts.%s.notes: %w", idx, worldsendChartKey, nErr)
+					return nil, fmt.Errorf("requests[%d].charts.%s.notes: %w", idx, worldsendChartKey, nErr)
 				}
 				notesVO = &n
 			}
@@ -232,11 +231,13 @@ func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, ma
 			}
 		}
 
-		songs = append(songs, updatedSong)
-		charts = append(charts, updatedChart)
+		updates = append(updates, &repository.WorldsendUpdate{
+			Song:  updatedSong,
+			Chart: updatedChart,
+		})
 	}
 
-	return songs, charts, nil
+	return updates, nil
 }
 
 func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChartInput) (*UpdateWorldsendChartInput, bool, error) {

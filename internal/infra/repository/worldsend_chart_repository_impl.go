@@ -153,9 +153,14 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 
 // UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 // トランザクション管理は呼び出し元で行う必要があります。
-func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
-	if len(songs) == 0 {
+func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
+	if len(updates) == 0 {
 		return nil
+	}
+
+	songs, err := collectSongsFromWorldsendUpdates(updates)
+	if err != nil {
+		return err
 	}
 
 	displayIDs, err := collectUniqueDisplayIDs(songs)
@@ -179,7 +184,7 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		return err
 	}
 
-	chartRowsAffected, expectedChartUpdates, err := r.bulkUpdateCharts(ctx, exec, songs, charts, targets)
+	chartRowsAffected, expectedChartUpdates, err := r.bulkUpdateCharts(ctx, exec, updates, targets)
 	if err != nil {
 		return err
 	}
@@ -197,6 +202,18 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 	}
 
 	return nil
+}
+
+func collectSongsFromWorldsendUpdates(updates []*repository.WorldsendUpdate) ([]*entity.Song, error) {
+	songs := make([]*entity.Song, 0, len(updates))
+	for i, update := range updates {
+		if update == nil || update.Song == nil {
+			return nil, fmt.Errorf("updates[%d].song is nil", i)
+		}
+		songs = append(songs, update.Song)
+	}
+
+	return songs, nil
 }
 
 type worldsendUpdateTarget struct {
@@ -316,7 +333,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	return rowsAffected, nil
 }
 
-func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart, targets map[string]worldsendUpdateTarget) (int64, int, error) {
+func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, int, error) {
 	type chartUpdate struct {
 		ChartID   int
 		LevelStar *levelstar.LevelStar
@@ -324,30 +341,30 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		Notes     any
 	}
 
-	updates := make([]chartUpdate, 0, len(charts))
-	for idx, chart := range charts {
-		if chart == nil {
+	chartUpdates := make([]chartUpdate, 0, len(updates))
+	for _, update := range updates {
+		if update == nil || update.Chart == nil {
 			continue
 		}
 
-		target := targets[songs[idx].DisplayID]
-		updates = append(updates, chartUpdate{
+		target := targets[update.Song.DisplayID]
+		chartUpdates = append(chartUpdates, chartUpdate{
 			ChartID:   target.ChartID,
-			LevelStar: chart.LevelStar,
-			Attribute: chart.Attribute,
-			Notes:     chart.Notes,
+			LevelStar: update.Chart.LevelStar,
+			Attribute: update.Chart.Attribute,
+			Notes:     update.Chart.Notes,
 		})
 	}
 
-	if len(updates) == 0 {
+	if len(chartUpdates) == 0 {
 		return 0, 0, nil
 	}
 
 	var levelCases, attributeCases, notesCases []string
 	var levelArgs, attributeArgs, notesArgs []any
-	chartIDs := make([]int, 0, len(updates))
+	chartIDs := make([]int, 0, len(chartUpdates))
 
-	for _, update := range updates {
+	for _, update := range chartUpdates {
 		chartIDs = append(chartIDs, update.ChartID)
 
 		levelCases = append(levelCases, "WHEN id = ? THEN ?")
@@ -394,7 +411,7 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		return 0, 0, err
 	}
 
-	return rowsAffected, len(updates), nil
+	return rowsAffected, len(chartUpdates), nil
 }
 
 func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec repository.Executor, targets map[string]worldsendUpdateTarget) (bool, error) {
