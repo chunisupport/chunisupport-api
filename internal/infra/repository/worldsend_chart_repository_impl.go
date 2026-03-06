@@ -174,16 +174,26 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		}
 	}
 
-	if err := r.bulkUpdateSongs(ctx, exec, songs, targets); err != nil {
+	songRowsAffected, err := r.bulkUpdateSongs(ctx, exec, songs, targets)
+	if err != nil {
 		return err
 	}
 
-	if err := r.bulkUpdateCharts(ctx, exec, songs, charts, targets); err != nil {
+	chartRowsAffected, expectedChartUpdates, err := r.bulkUpdateCharts(ctx, exec, songs, charts, targets)
+	if err != nil {
 		return err
 	}
 
-	if err := r.ensureTargetsExist(ctx, exec, targets); err != nil {
-		return err
+	// RowsAffected はドライバごとの差異があるため、不一致時は存在確認クエリで最終判定する。
+	// また、譜面更新が 0 件のときは並行削除を検知するため存在確認を行う。
+	if songRowsAffected != int64(len(songs)) || chartRowsAffected != int64(expectedChartUpdates) || expectedChartUpdates == 0 {
+		exists, err := r.ensureTargetsExist(ctx, exec, targets)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return repository.ErrSongNotFound
+		}
 	}
 
 	return nil
@@ -232,7 +242,7 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 	return targets, nil
 }
 
-func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, targets map[string]worldsendUpdateTarget) error {
+func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, targets map[string]worldsendUpdateTarget) (int64, error) {
 	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
 	var titleArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
 	songIDs := make([]int, 0, len(songs))
@@ -293,11 +303,20 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		strings.Join(placeholders, ","),
 	)
 
-	_, err := exec.ExecContext(ctx, query, args...)
-	return err
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return rowsAffected, nil
 }
 
-func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart, targets map[string]worldsendUpdateTarget) error {
+func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart, targets map[string]worldsendUpdateTarget) (int64, int, error) {
 	type chartUpdate struct {
 		ChartID   int
 		LevelStar *levelstar.LevelStar
@@ -321,7 +340,7 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 	}
 
 	if len(updates) == 0 {
-		return nil
+		return 0, 0, nil
 	}
 
 	var levelCases, attributeCases, notesCases []string
@@ -365,13 +384,22 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		strings.Join(placeholders, ","),
 	)
 
-	_, err := exec.ExecContext(ctx, query, args...)
-	return err
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return rowsAffected, len(updates), nil
 }
 
-func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec repository.Executor, targets map[string]worldsendUpdateTarget) error {
+func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec repository.Executor, targets map[string]worldsendUpdateTarget) (bool, error) {
 	if len(targets) == 0 {
-		return nil
+		return true, nil
 	}
 
 	pairConditions := make([]string, 0, len(targets))
@@ -390,11 +418,8 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 
 	var count int
 	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
-		return err
-	}
-	if count != len(targets) {
-		return repository.ErrSongNotFound
+		return false, err
 	}
 
-	return nil
+	return count == len(targets), nil
 }
