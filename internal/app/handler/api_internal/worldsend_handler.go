@@ -101,7 +101,7 @@ func (h *WorldsendHandler) UpdateWorldsendSongs(c echo.Context) error {
 
 	masters := h.masterCache.SongMasters()
 	if masters == nil {
-		return apierror.ErrInternalError.WithInternal(fmt.Errorf("master cache is not initialized"))
+		return apierror.ErrInternalError.WithInternal(fmt.Errorf("song masters are not initialized in master cache"))
 	}
 
 	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), requests, masters); err != nil {
