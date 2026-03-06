@@ -121,3 +121,40 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrSongNotFound)
 }
+
+func TestUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t *testing.T) {
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	repo := &worldsendChartRepository{db: db}
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES (101, 1, 4, '狂', 1200)
+	`)
+	require.NoError(t, err)
+
+	songs := []*entity.Song{
+		{DisplayID: "WE001", Title: "first", Artist: "artist1"},
+		{DisplayID: "WE001", Title: "second", Artist: "artist2"},
+	}
+	charts := []*entity.WorldsendChart{nil, nil}
+
+	err = repo.UpdateSongs(ctx, db, songs, charts)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domainrepo.ErrDuplicateDisplayID)
+
+	var song struct {
+		Title string `db:"title"`
+	}
+	err = db.Get(&song, `SELECT title FROM songs WHERE id = 1`)
+	require.NoError(t, err)
+	assert.Equal(t, "old title", song.Title)
+}

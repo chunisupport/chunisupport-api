@@ -155,6 +155,9 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.worldsendChartRepo.UpdateSongs(ctx, tx, songs, charts)
 	}); err != nil {
+		if errors.Is(err, repository.ErrDuplicateDisplayID) {
+			return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
+		}
 		slog.Error("failed to update worldsend songs", "error", err)
 		return err
 	}

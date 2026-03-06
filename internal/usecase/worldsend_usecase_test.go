@@ -383,6 +383,31 @@ func TestUpdateWorldsendSongs_InvalidChartReturnsError(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
+func TestUpdateWorldsendSongs_DuplicateDisplayIDReturnsValidationError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	requests := []*dtoapi.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+	}}
+
+	mockRepo.On("UpdateSongs", mock.Anything, mockExec, mock.Anything, mock.Anything).
+		Return(repository.ErrDuplicateDisplayID).
+		Once()
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorIs(t, err, repository.ErrDuplicateDisplayID)
+	mockRepo.AssertExpectations(t)
+}
+
 // intPtr はint値へのポインタを返すヘルパー関数です。
 func intPtr(i int) *int {
 	return &i

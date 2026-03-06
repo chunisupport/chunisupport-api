@@ -1596,6 +1596,7 @@ curl -X POST \
 - `charts` を省略または `null` にした場合、譜面情報は更新されません（楽曲情報のみ更新されます）
 - `charts` を指定する場合は `WORLDSEND` キーのみ指定可能です（大文字固定）
 - `charts` で `WORLDSEND` 以外のキーを指定するとエラーになります
+- リクエスト配列内で `id`（display_id）が重複している場合はエラーになります
 - マスタに存在しないジャンル名を指定するとエラーになります
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
 
