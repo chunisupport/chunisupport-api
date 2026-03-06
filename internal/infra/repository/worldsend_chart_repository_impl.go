@@ -153,9 +153,6 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 // UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 // トランザクション管理は呼び出し元で行う必要があります。
 func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
-	if len(songs) != len(charts) {
-		return fmt.Errorf("songs and charts length mismatch: %d != %d", len(songs), len(charts))
-	}
 	if len(songs) == 0 {
 		return nil
 	}
