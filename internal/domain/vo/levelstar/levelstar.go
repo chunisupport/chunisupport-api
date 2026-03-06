@@ -35,8 +35,7 @@ func (l *LevelStar) Value() (driver.Value, error) {
 // Scan は sql.Scanner インターフェースを実装します。
 func (l *LevelStar) Scan(value any) error {
 	if value == nil {
-		*l = 0
-		return nil
+		return fmt.Errorf("cannot scan nil into LevelStar")
 	}
 
 	var parsed int

@@ -37,20 +37,24 @@ func TestLevelStar_Scan(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     any
+		initial   LevelStar
 		want      int
 		wantError bool
 	}{
 		{name: "int64を読み取れる", value: int64(3), want: 3},
 		{name: "文字列を読み取れる", value: "4", want: 4},
-		{name: "範囲外はエラー", value: int64(9), wantError: true},
+		{name: "[]byteを読み取れる", value: []byte("5"), want: 5},
+		{name: "nilはエラーで既存値を維持", value: nil, initial: LevelStar(3), want: 3, wantError: true},
+		{name: "範囲外はエラーで既存値を維持", value: int64(9), initial: LevelStar(2), want: 2, wantError: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var got LevelStar
+			got := tt.initial
 			err := got.Scan(tt.value)
 			if tt.wantError {
 				require.Error(t, err)
+				assert.Equal(t, tt.want, got.Int())
 				return
 			}
 
