@@ -160,12 +160,8 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		return nil
 	}
 
-	displayIDs := make([]string, len(songs))
-	for i, song := range songs {
-		displayIDs[i] = song.DisplayID
-	}
-
-	if err := validateUniqueDisplayIDs(displayIDs); err != nil {
+	displayIDs, err := collectUniqueDisplayIDs(songs)
+	if err != nil {
 		return err
 	}
 
@@ -190,18 +186,6 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 
 	if err := r.ensureTargetsExist(ctx, exec, targets); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func validateUniqueDisplayIDs(displayIDs []string) error {
-	seen := make(map[string]struct{}, len(displayIDs))
-	for _, displayID := range displayIDs {
-		if _, exists := seen[displayID]; exists {
-			return fmt.Errorf("%w: display_id=%s", repository.ErrDuplicateDisplayID, displayID)
-		}
-		seen[displayID] = struct{}{}
 	}
 
 	return nil

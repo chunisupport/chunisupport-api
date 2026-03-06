@@ -330,14 +330,9 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		return nil
 	}
 
-	// 1. 全DisplayIDを収集
-	displayIDs := make([]string, len(songs))
-	for i, song := range songs {
-		displayIDs[i] = song.DisplayID
-	}
-
 	// 重複display_idは後続のCASE WHEN構築で先出現側が暗黙適用されるため事前に弾く
-	if err := validateUniqueDisplayIDs(displayIDs); err != nil {
+	displayIDs, err := collectUniqueDisplayIDs(songs)
+	if err != nil {
 		return err
 	}
 
