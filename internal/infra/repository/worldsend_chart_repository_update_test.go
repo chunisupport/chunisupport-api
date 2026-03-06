@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -12,6 +13,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type deletingChartExecutor struct {
+	baseExecutor
+	db        *sqlx.DB
+	chartID   int
+	execCount int
+}
+
+func (e *deletingChartExecutor) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
+	return e.db.QueryxContext(ctx, query, args...)
+}
+
+func (e *deletingChartExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
+	return e.db.QueryRowxContext(ctx, query, args...)
+}
+
+func (e *deletingChartExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	e.execCount++
+	result, err := e.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if e.execCount == 1 {
+		if _, deleteErr := e.db.ExecContext(ctx, `DELETE FROM worldsend_charts WHERE id = ?`, e.chartID); deleteErr != nil {
+			return nil, deleteErr
+		}
+	}
+
+	return result, nil
+}
+
+var _ domainrepo.Executor = (*deletingChartExecutor)(nil)
 
 func setupWorldsendUpdateDB(t *testing.T) *sqlx.DB {
 	t.Helper()
@@ -157,4 +191,49 @@ func TestUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t
 	err = db.Get(&song, `SELECT title FROM songs WHERE id = 1`)
 	require.NoError(t, err)
 	assert.Equal(t, "old title", song.Title)
+}
+
+func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *testing.T) {
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	repo := &worldsendChartRepository{db: db}
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES (101, 1, 4, '狂', 1200)
+	`)
+	require.NoError(t, err)
+
+	n := notes.Notes(1300)
+	genreID := 1
+	bpm := 180
+	releasedAt := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	jacket := "old.png"
+	songs := []*entity.Song{{
+		DisplayID:  "WE001",
+		Title:      "new title",
+		Artist:     "new artist",
+		GenreID:    &genreID,
+		BPM:        &bpm,
+		ReleasedAt: &releasedAt,
+		Jacket:     &jacket,
+	}}
+	charts := []*entity.WorldsendChart{{
+		LevelStar: intPtrForWorldsendSaveTest(5),
+		Attribute: stringPtrForWorldsendSaveTest("改"),
+		Notes:     &n,
+	}}
+
+	exec := &deletingChartExecutor{db: db, chartID: 101}
+	err = repo.UpdateSongs(ctx, exec, songs, charts)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domainrepo.ErrSongNotFound)
 }

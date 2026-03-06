@@ -388,45 +388,31 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 }
 
 func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec repository.Executor, targets map[string]worldsendUpdateTarget) error {
-	songIDs := make([]int, 0, len(targets))
-	chartIDs := make([]int, 0, len(targets))
+	if len(targets) == 0 {
+		return nil
+	}
+
+	pairConditions := make([]string, 0, len(targets))
+	args := make([]any, 0, len(targets)*2)
 	for _, target := range targets {
-		songIDs = append(songIDs, target.SongID)
-		chartIDs = append(chartIDs, target.ChartID)
+		pairConditions = append(pairConditions, "(s.id = ? AND wc.id = ?)")
+		args = append(args, target.SongID, target.ChartID)
 	}
 
-	songCount, err := countByIDs(ctx, exec, "songs", "id", songIDs)
-	if err != nil {
-		return err
-	}
-	if songCount != len(songIDs) {
-		return repository.ErrSongNotFound
-	}
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM songs s
+		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
+		WHERE s.is_worldsend = 1 AND (%s)
+	`, strings.Join(pairConditions, " OR "))
 
-	chartCount, err := countByIDs(ctx, exec, "worldsend_charts", "id", chartIDs)
-	if err != nil {
+	var count int
+	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
 		return err
 	}
-	if chartCount != len(chartIDs) {
+	if count != len(targets) {
 		return repository.ErrSongNotFound
 	}
 
 	return nil
-}
-
-func countByIDs(ctx context.Context, exec repository.Executor, table string, column string, ids []int) (int, error) {
-	placeholders := make([]string, len(ids))
-	args := make([]any, 0, len(ids))
-	for i, id := range ids {
-		placeholders[i] = "?"
-		args = append(args, id)
-	}
-
-	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE %s IN (%s)`, table, column, strings.Join(placeholders, ","))
-	var count int
-	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
-		return 0, err
-	}
-
-	return count, nil
 }
