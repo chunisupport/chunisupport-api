@@ -339,13 +339,6 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 				},
 			}},
 		},
-		{
-			name: "リクエスト内に重複したdisplay_idがある場合はエラー",
-			requests: []*dtoapi.UpdateWorldsendSongRequest{
-				{DisplayID: "1234567890abcdef", Title: "A", Artist: "AR"},
-				{DisplayID: "1234567890abcdef", Title: "B", Artist: "BR"},
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -398,13 +391,25 @@ func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *tes
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	requests := []*dtoapi.UpdateWorldsendSongRequest{{
-		DisplayID: "1234567890abcdef",
-		Title:     "A",
-		Artist:    "AR",
-	}}
+	requests := []*dtoapi.UpdateWorldsendSongRequest{
+		{
+			DisplayID: "1234567890abcdef",
+			Title:     "A",
+			Artist:    "AR",
+		},
+		{
+			DisplayID: "1234567890abcdef",
+			Title:     "B",
+			Artist:    "BR",
+		},
+	}
 
-	mockRepo.On("UpdateSongs", mock.Anything, mockExec, mock.Anything, mock.Anything).
+	mockRepo.On("UpdateSongs", mock.Anything, mockExec,
+		mock.MatchedBy(func(songs []*entity.Song) bool {
+			return len(songs) == 2 && songs[0] != nil && songs[1] != nil && songs[0].DisplayID == songs[1].DisplayID
+		}),
+		mock.Anything,
+	).
 		Return(repository.ErrDuplicateDisplayID).
 		Once()
 
