@@ -5,7 +5,11 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	apiinternaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -249,74 +253,264 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
+	masters := &domainmasterdata.SongMasters{Genres: map[string]domainmasterdata.Item{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
 
-	songs := []*entity.Song{
-		{DisplayID: "1234567890abcdef", Title: "A", Artist: "AR", IsWorldsend: true},
-		{DisplayID: "abcdef1234567890", Title: "B", Artist: "BR", IsWorldsend: true},
-	}
-	charts := []*entity.WorldsendChart{
-		nil,
-		{},
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{
+		{
+			DisplayID: "1234567890abcdef",
+			Title:     "A",
+			Artist:    "AR",
+			Genre:     strPtr("POPS & ANIME"),
+			Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+				"WORLDSEND": {
+					Attribute: strPtr("狂"),
+					LevelStar: intPtr(5),
+					Notes:     intPtr(2000),
+				},
+			},
+		},
+		{
+			DisplayID: "abcdef1234567890",
+			Title:     "B",
+			Artist:    "BR",
+		},
 	}
 
-	mockRepo.On("UpdateSongs", ctx, mockExec, songs, charts).Return(nil).Once()
+	mockRepo.On("UpdateSongs", ctx, mockExec,
+		mock.MatchedBy(func(songs []*entity.Song) bool {
+			if len(songs) != 2 {
+				return false
+			}
+			if songs[0] == nil || songs[0].DisplayID != "1234567890abcdef" || songs[0].GenreID == nil || *songs[0].GenreID != 1 {
+				return false
+			}
+			if songs[1] == nil || songs[1].DisplayID != "abcdef1234567890" {
+				return false
+			}
+			return true
+		}),
+		mock.MatchedBy(func(charts []*entity.WorldsendChart) bool {
+			if len(charts) != 2 {
+				return false
+			}
+			if charts[0] == nil || charts[0].LevelStar == nil || *charts[0].LevelStar != levelstar.LevelStar(5) {
+				return false
+			}
+			if charts[0].Notes == nil || *charts[0].Notes != notes.Notes(2000) {
+				return false
+			}
+			if charts[0].Attribute == nil || *charts[0].Attribute != "狂" {
+				return false
+			}
+			return charts[1] == nil
+		}),
+	).Return(nil).Once()
 
 	// When
-	err := uc.UpdateWorldsendSongs(ctx, songs, charts)
+	err := uc.UpdateWorldsendSongs(ctx, requests, masters)
 
 	// Then
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }
 
-func TestUpdateWorldsendSongs_EmptySongsIsNoOp(t *testing.T) {
+func TestUpdateWorldsendSongs_EmptyRequestsIsNoOp(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
 
 	// When
-	err := uc.UpdateWorldsendSongs(context.Background(), []*entity.Song{}, []*entity.WorldsendChart{})
+	err := uc.UpdateWorldsendSongs(context.Background(), []*apiinternaldto.UpdateWorldsendSongRequest{}, masters)
 
 	// Then
 	assert.NoError(t, err)
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUpdateWorldsendSongs_LengthMismatchReturnsError(t *testing.T) {
+func TestUpdateWorldsendSongs_MastersNilReturnsError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	songs := []*entity.Song{{DisplayID: "1234567890abcdef", IsWorldsend: true}}
-	charts := []*entity.WorldsendChart{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{DisplayID: "1234567890abcdef", Title: "A", Artist: "AR"}}
 
 	// When
-	err := uc.UpdateWorldsendSongs(context.Background(), songs, charts)
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, nil)
 
 	// Then
-	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
-	assert.ErrorContains(t, err, "songs and charts length mismatch")
+	assert.ErrorIs(t, err, ErrInternalError)
+	assert.ErrorContains(t, err, "masters is nil")
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUpdateWorldsendSongs_NilSongReturnsError(t *testing.T) {
+func TestUpdateWorldsendSongs_NilRequestReturnsError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	songs := []*entity.Song{nil}
-	charts := []*entity.WorldsendChart{nil}
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{nil}
 
 	// When
-	err := uc.UpdateWorldsendSongs(context.Background(), songs, charts)
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
-	assert.ErrorContains(t, err, "songs[0] is null")
+	assert.ErrorContains(t, err, "requests[0]: request is null")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{Genres: map[string]domainmasterdata.Item{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Genre:     strPtr("UNKNOWN"),
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "invalid genre")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_InvalidLevelStarReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+			"WORLDSEND": {LevelStar: intPtr(0)},
+		},
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "level_star")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_InvalidNotesReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+			"WORLDSEND": {Notes: intPtr(-1)},
+		},
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "notes")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_InvalidChartKeyReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+			"MASTER": {LevelStar: intPtr(5)},
+		},
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "unsupported chart key")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_MultipleChartKeysReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+			"WORLDSEND": {},
+			"MASTER":    {},
+		},
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "only one chart key")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestUpdateWorldsendSongs_WorldsendChartNullReturnsError(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*apiinternaldto.UpdateWorldsendChartRequest{
+			"WORLDSEND": nil,
+		},
+	}}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "chart for WORLDSEND is null")
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -328,33 +522,33 @@ func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *tes
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	songs := []*entity.Song{
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*apiinternaldto.UpdateWorldsendSongRequest{
 		{
-			DisplayID:   "1234567890abcdef",
-			Title:       "A",
-			Artist:      "AR",
-			IsWorldsend: true,
+			DisplayID: "1234567890abcdef",
+			Title:     "A",
+			Artist:    "AR",
 		},
 		{
-			DisplayID:   "1234567890abcdef",
-			Title:       "B",
-			Artist:      "BR",
-			IsWorldsend: true,
+			DisplayID: "1234567890abcdef",
+			Title:     "B",
+			Artist:    "BR",
 		},
 	}
-	charts := []*entity.WorldsendChart{nil, nil}
 
 	mockRepo.On("UpdateSongs", mock.Anything, mockExec,
 		mock.MatchedBy(func(songs []*entity.Song) bool {
 			return len(songs) == 2 && songs[0] != nil && songs[1] != nil && songs[0].DisplayID == songs[1].DisplayID
 		}),
-		charts,
+		mock.MatchedBy(func(charts []*entity.WorldsendChart) bool {
+			return len(charts) == 2 && charts[0] == nil && charts[1] == nil
+		}),
 	).
 		Return(repository.ErrDuplicateDisplayID).
 		Once()
 
 	// When
-	err := uc.UpdateWorldsendSongs(context.Background(), songs, charts)
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
@@ -365,4 +559,8 @@ func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *tes
 // intPtr はint値へのポインタを返すヘルパー関数です。
 func intPtr(i int) *int {
 	return &i
+}
+
+func strPtr(s string) *string {
+	return &s
 }
