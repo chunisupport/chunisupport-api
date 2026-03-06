@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/jmoiron/sqlx"
@@ -275,4 +276,35 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 14.3, result[3].Const, 0.01, "Song2 MASTER: Const should be 14.3")
 	assert.False(t, result[3].IsConstUnknown, "Song2 MASTER: IsConstUnknown should be false")
 	assert.Equal(t, 1250, *result[3].Notes, "Song2 MASTER: Notes should be 1250")
+}
+
+func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0)
+	`)
+	require.NoError(t, err)
+
+	bpm1 := 150
+	bpm2 := 200
+	songs := []*entity.Song{
+		{DisplayID: "DISPLAY001", Title: "first update", Artist: "artist", BPM: &bpm1, Charts: []*entity.Chart{}},
+		{DisplayID: "DISPLAY001", Title: "second update", Artist: "artist", BPM: &bpm2, Charts: []*entity.Chart{}},
+	}
+
+	repo := &songRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, songs)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domainrepo.ErrDuplicateDisplayID)
+
+	// DBが変更されていないことを確認
+	var title string
+	err = db.Get(&title, `SELECT title FROM songs WHERE id = 1`)
+	require.NoError(t, err)
+	assert.Equal(t, "Original Title", title)
 }

@@ -339,6 +339,13 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 				},
 			}},
 		},
+		{
+			name: "リクエスト内に重複したdisplay_idがある場合はエラー",
+			requests: []*dtoapi.UpdateWorldsendSongRequest{
+				{DisplayID: "1234567890abcdef", Title: "A", Artist: "AR"},
+				{DisplayID: "1234567890abcdef", Title: "B", Artist: "BR"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -383,7 +390,9 @@ func TestUpdateWorldsendSongs_InvalidChartReturnsError(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUpdateWorldsendSongs_DuplicateDisplayIDReturnsValidationError(t *testing.T) {
+// TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError はリポジトリ防衛チェックが
+// ErrDuplicateDisplayID を返した際に ErrInvalidWorldsendInput へ変換されることを検証します。
+func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)

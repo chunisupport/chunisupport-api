@@ -140,6 +140,15 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		return err
 	}
 
+	// 重複display_idの事前バリデーション（トランザクション開始前に弾く）
+	seenDisplayIDs := make(map[string]struct{}, len(songs))
+	for idx, song := range songs {
+		if _, exists := seenDisplayIDs[song.DisplayID]; exists {
+			return fmt.Errorf("%w: requests[%d]: duplicate display_id=%s", ErrInvalidWorldsendInput, idx, song.DisplayID)
+		}
+		seenDisplayIDs[song.DisplayID] = struct{}{}
+	}
+
 	// バリデーション
 	for i, chart := range charts {
 		if chart == nil {
