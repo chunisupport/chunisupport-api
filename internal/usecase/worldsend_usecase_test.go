@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	dtoapi "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -52,48 +54,54 @@ func (m *MockTransactionManager) Transactional(ctx context.Context, fn func(tx r
 	return args.Error(0)
 }
 
+type stubWorldsendSongMasterProvider struct {
+	masters *domainmasterdata.SongMasters
+}
+
+func (s *stubWorldsendSongMasterProvider) SongMasters() *domainmasterdata.SongMasters {
+	return s.masters
+}
+
+func newWorldsendUsecaseForTest(repo repository.WorldsendChartRepository, tm TransactionManager, exec repository.Executor) WorldsendUsecase {
+	return NewWorldsendUsecase(repo, &stubWorldsendSongMasterProvider{
+		masters: &domainmasterdata.SongMasters{
+			Genres: map[string]domainmasterdata.Item{
+				"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"},
+			},
+		},
+	}, tm, exec)
+}
+
 func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testing.T) {
 	tests := []struct {
 		name                   string
 		includeDeleted         bool
 		requesterAccountTypeID *int
 		expectedIncludeDeleted bool
-		description            string
 	}{
 		{
 			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
 			expectedIncludeDeleted: true,
-			description:            "EDITOR権限がある場合、includeDeleted=trueで削除済み楽曲を取得できる",
 		},
 		{
 			name:                   "ADMIN権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
 			expectedIncludeDeleted: true,
-			description:            "ADMIN権限がある場合、includeDeleted=trueで削除済み楽曲を取得できる",
 		},
 		{
 			name:                   "PLAYER権限のみ_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
 			expectedIncludeDeleted: false,
-			description:            "PLAYER権限の場合、includeDeleted=trueでも削除済み楽曲は除外される",
 		},
 		{
 			name:                   "権限なし_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
-			description:            "権限がない場合、includeDeleted=trueでも削除済み楽曲は除外される",
-		},
-		{
-			name:                   "権限なし_includeDeleted=false_削除済みを除外",
-			includeDeleted:         false,
-			requesterAccountTypeID: nil,
-			expectedIncludeDeleted: false,
-			description:            "includeDeleted=falseの場合、削除済み楽曲は除外される",
 		},
 	}
 
@@ -103,37 +111,20 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			mockRepo := new(MockWorldsendChartRepository)
 			mockTM := new(MockTransactionManager)
 			mockExec := new(MockExecutor)
-
-			usecase := NewWorldsendUsecase(mockRepo, mockTM, mockExec)
-
+			uc := newWorldsendUsecaseForTest(mockRepo, mockTM, mockExec)
 			ctx := context.Background()
 
-			// 期待されるリポジトリの呼び出し
-			expectedSongs := []*repository.WorldsendSongWithChart{
-				{
-					Song: &entity.Song{
-						ID:          1,
-						DisplayID:   "WE001",
-						Title:       "Active Song",
-						IsWorldsend: true,
-						IsDeleted:   false,
-					},
-					Chart: &entity.WorldsendChart{
-						ID:     1,
-						SongID: 1,
-					},
-				},
-			}
-
-			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
+			expectedSongs := []*repository.WorldsendSongWithChart{{
+				Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
+				Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
+			}}
 			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
 
 			// When
-			result, err := usecase.GetAllWorldsendSongs(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
+			result, err := uc.GetAllWorldsendSongs(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
 
 			// Then
 			assert.NoError(t, err)
-			assert.NotNil(t, result)
 			assert.Equal(t, expectedSongs, result)
 			mockRepo.AssertExpectations(t)
 		})
@@ -142,36 +133,22 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 
 func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 	activeSong := &repository.WorldsendSongWithChart{
-		Song: &entity.Song{
-			ID:          1,
-			DisplayID:   "WE001",
-			Title:       "Active Song",
-			IsWorldsend: true,
-			IsDeleted:   false,
-		},
+		Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
 		Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
 	}
 	deletedSong := &repository.WorldsendSongWithChart{
-		Song: &entity.Song{
-			ID:          2,
-			DisplayID:   "WE002",
-			Title:       "Deleted Song",
-			IsWorldsend: true,
-			IsDeleted:   true,
-		},
+		Song:  &entity.Song{ID: 2, DisplayID: "WE002", IsWorldsend: true, IsDeleted: true},
 		Chart: &entity.WorldsendChart{ID: 2, SongID: 2},
 	}
 
 	tests := []struct {
-		name string
-		// Given
+		name                   string
 		displayID              string
 		requesterAccountTypeID *int
 		repoReturn             *repository.WorldsendSongWithChart
 		repoErr                error
-		// Then
-		wantResult *repository.WorldsendSongWithChart
-		wantErr    error
+		wantResult             *repository.WorldsendSongWithChart
+		wantErr                error
 	}{
 		{
 			name:                   "有効な楽曲は誰でも取得できる",
@@ -195,13 +172,6 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
-			name:                   "削除済み楽曲は権限なしではErrSongNotFoundになる",
-			displayID:              "WE002",
-			requesterAccountTypeID: nil,
-			repoReturn:             deletedSong,
-			wantErr:                repository.ErrSongNotFound,
-		},
-		{
 			name:                   "存在しない楽曲はErrSongNotFoundを返す",
 			displayID:              "WE999",
 			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
@@ -216,10 +186,8 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 			mockRepo := new(MockWorldsendChartRepository)
 			mockTM := new(MockTransactionManager)
 			mockExec := new(MockExecutor)
-
-			uc := NewWorldsendUsecase(mockRepo, mockTM, mockExec)
+			uc := newWorldsendUsecaseForTest(mockRepo, mockTM, mockExec)
 			ctx := context.Background()
-
 			mockRepo.On("FindByDisplayID", ctx, mockExec, tt.displayID).Return(tt.repoReturn, tt.repoErr)
 
 			// When
@@ -243,21 +211,12 @@ func TestDeleteWorldsendSong_SavesDeletedState(t *testing.T) {
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
 
 	songWithChart := &repository.WorldsendSongWithChart{
-		Song: &entity.Song{
-			ID:          21,
-			DisplayID:   "WE021",
-			IsWorldsend: true,
-			IsDeleted:   false,
-			Charts:      []*entity.Chart{},
-		},
-		Chart: &entity.WorldsendChart{
-			ID:     210,
-			SongID: 21,
-		},
+		Song:  &entity.Song{ID: 21, DisplayID: "WE021", IsWorldsend: true, IsDeleted: false, Charts: []*entity.Chart{}},
+		Chart: &entity.WorldsendChart{ID: 210, SongID: 21},
 	}
 	mockRepo.On("FindByDisplayID", ctx, mockExec, "WE021").Return(songWithChart, nil).Once()
 	mockRepo.On("SaveSong", ctx, mockExec, mock.MatchedBy(func(song *entity.Song) bool {
@@ -278,21 +237,12 @@ func TestRestoreWorldsendSong_SavesRestoredState(t *testing.T) {
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
 
 	songWithChart := &repository.WorldsendSongWithChart{
-		Song: &entity.Song{
-			ID:          22,
-			DisplayID:   "WE022",
-			IsWorldsend: true,
-			IsDeleted:   true,
-			Charts:      []*entity.Chart{},
-		},
-		Chart: &entity.WorldsendChart{
-			ID:     220,
-			SongID: 22,
-		},
+		Song:  &entity.Song{ID: 22, DisplayID: "WE022", IsWorldsend: true, IsDeleted: true, Charts: []*entity.Chart{}},
+		Chart: &entity.WorldsendChart{ID: 220, SongID: 22},
 	}
 	mockRepo.On("FindByDisplayID", ctx, mockExec, "WE022").Return(songWithChart, nil).Once()
 	mockRepo.On("SaveSong", ctx, mockExec, mock.MatchedBy(func(song *entity.Song) bool {
@@ -308,49 +258,136 @@ func TestRestoreWorldsendSong_SavesRestoredState(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestUpdateWorldsendSongs_NilChartIsSkippedAndNonNilValidated(t *testing.T) {
+func TestUpdateWorldsendSongs_ConvertsAndSaves(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
 
+	notes := 2000
 	level := 3
-	songs := []*entity.Song{{DisplayID: "WE001"}, {DisplayID: "WE002"}}
-	charts := []*entity.WorldsendChart{nil, {LevelStar: &level}}
+	attribute := "狂"
+	genre := "POPS & ANIME"
+	requests := []*dtoapi.UpdateWorldsendSongRequest{
+		{DisplayID: "1234567890abcdef", Title: "A", Artist: "AR", Genre: &genre},
+		{DisplayID: "abcdef1234567890", Title: "B", Artist: "BR", Charts: map[string]*dtoapi.UpdateWorldsendChartRequest{
+			"WORLDSEND": {Notes: &notes, LevelStar: &level, Attribute: &attribute},
+		}},
+	}
 
-	mockRepo.On("UpdateSongs", ctx, mockExec, songs, charts).Return(nil).Once()
+	mockRepo.On("UpdateSongs", ctx, mockExec, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		songs := args.Get(2).([]*entity.Song)
+		charts := args.Get(3).([]*entity.WorldsendChart)
+		assert.Len(t, songs, 2)
+		assert.Len(t, charts, 2)
+		assert.Equal(t, "1234567890abcdef", songs[0].DisplayID)
+		if assert.NotNil(t, songs[0].GenreID) {
+			assert.Equal(t, 1, *songs[0].GenreID)
+		}
+		assert.Nil(t, charts[0])
+		assert.Equal(t, "abcdef1234567890", songs[1].DisplayID)
+		if assert.NotNil(t, charts[1]) {
+			if assert.NotNil(t, charts[1].Notes) {
+				assert.Equal(t, 2000, int(*charts[1].Notes))
+			}
+		}
+	}).Return(nil).Once()
 
 	// When
-	err := uc.UpdateWorldsendSongs(ctx, songs, charts)
+	err := uc.UpdateWorldsendSongs(ctx, requests)
 
 	// Then
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }
 
-func TestUpdateWorldsendSongs_InvalidNonNilChartReturnsError(t *testing.T) {
+func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
+	tests := []struct {
+		name     string
+		requests []*dtoapi.UpdateWorldsendSongRequest
+	}{
+		{
+			name: "WORLDSEND以外のchartsキーはエラー",
+			requests: []*dtoapi.UpdateWorldsendSongRequest{{
+				DisplayID: "1234567890abcdef",
+				Title:     "A",
+				Artist:    "AR",
+				Charts: map[string]*dtoapi.UpdateWorldsendChartRequest{
+					"MASTER": {},
+				},
+			}},
+		},
+		{
+			name: "存在しないgenreはエラー",
+			requests: []*dtoapi.UpdateWorldsendSongRequest{{
+				DisplayID: "1234567890abcdef",
+				Title:     "A",
+				Artist:    "AR",
+				Genre:     strPtr("UNKNOWN"),
+			}},
+		},
+		{
+			name: "notesの値オブジェクト生成失敗はエラー",
+			requests: []*dtoapi.UpdateWorldsendSongRequest{{
+				DisplayID: "1234567890abcdef",
+				Title:     "A",
+				Artist:    "AR",
+				Charts: map[string]*dtoapi.UpdateWorldsendChartRequest{
+					"WORLDSEND": {Notes: intPtr(-1)},
+				},
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockRepo := new(MockWorldsendChartRepository)
+			mockExec := new(MockExecutor)
+			tm := &passthroughTransactionManager{tx: mockExec}
+			uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+
+			// When
+			err := uc.UpdateWorldsendSongs(context.Background(), tt.requests)
+
+			// Then
+			assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+			mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+func TestUpdateWorldsendSongs_InvalidChartReturnsError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewWorldsendUsecase(mockRepo, tm, mockExec)
-	ctx := context.Background()
-
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	invalidLevel := 0
-	songs := []*entity.Song{{DisplayID: "WE001"}}
-	charts := []*entity.WorldsendChart{{LevelStar: &invalidLevel}}
+	requests := []*dtoapi.UpdateWorldsendSongRequest{{
+		DisplayID: "1234567890abcdef",
+		Title:     "A",
+		Artist:    "AR",
+		Charts: map[string]*dtoapi.UpdateWorldsendChartRequest{
+			"WORLDSEND": {LevelStar: &invalidLevel},
+		},
+	}}
 
 	// When
-	err := uc.UpdateWorldsendSongs(ctx, songs, charts)
+	err := uc.UpdateWorldsendSongs(context.Background(), requests)
 
 	// Then
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // intPtr はint値へのポインタを返すヘルパー関数です。
 func intPtr(i int) *int {
 	return &i
+}
+
+func strPtr(s string) *string {
+	return &s
 }

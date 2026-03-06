@@ -60,6 +60,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrChartNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidPlayerName):
 		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidWorldsendInput):
+		return ErrValidationFailed.WithInternal(err)
 	// ユーザー名バリデーションエラー
 	case errors.Is(err, usecase.ErrUsernameEmpty):
 		return ErrUsernameEmpty.WithInternal(err)

@@ -7,9 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -88,9 +86,6 @@ func (h *WorldsendHandler) UpdateWorldsendSongs(c echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
 	}
 
-	songs := make([]*entity.Song, 0, len(requests))
-	charts := make([]*entity.WorldsendChart, 0, len(requests))
-
 	for idx, req := range requests {
 		if req == nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
@@ -98,87 +93,13 @@ func (h *WorldsendHandler) UpdateWorldsendSongs(c echo.Context) error {
 		if err := c.Validate(req); err != nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
 		}
-
-		chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
-		if err != nil {
-			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts: %w", idx, err))
-		}
-
-		var genreID *int
-		if req.Genre != nil {
-			genreMaster, ok := h.masterCache.Genres[*req.Genre]
-			if !ok {
-				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("invalid genre: %s", *req.Genre))
-			}
-			genreID = &genreMaster.ID
-		}
-
-		updatedSong := entity.NewSong()
-		updatedSong.DisplayID = req.DisplayID
-		updatedSong.Title = req.Title
-		updatedSong.Artist = req.Artist
-		updatedSong.GenreID = genreID
-		updatedSong.BPM = req.BPM
-		updatedSong.ReleasedAt = req.ReleasedAt.TimePtr()
-		updatedSong.Jacket = req.Jacket
-		updatedSong.IsWorldsend = true
-
-		var updatedChart *entity.WorldsendChart
-		if hasChartUpdate {
-			var notesVO *notes.Notes
-			if chartReq.Notes != nil {
-				n, nErr := notes.NewNotes(*chartReq.Notes)
-				if nErr != nil {
-					return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts.WORLDSEND.notes: %w", idx, nErr))
-				}
-				notesVO = &n
-			}
-
-			updatedChart = &entity.WorldsendChart{
-				LevelStar: chartReq.LevelStar,
-				Attribute: chartReq.Attribute,
-				Notes:     notesVO,
-			}
-		}
-
-		songs = append(songs, updatedSong)
-		charts = append(charts, updatedChart)
 	}
 
-	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), songs, charts); err != nil {
+	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), requests); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-func validateAndGetWorldsendChartRequest(charts map[string]*api_internal.UpdateWorldsendChartRequest) (*api_internal.UpdateWorldsendChartRequest, bool, error) {
-	if len(charts) == 0 {
-		return nil, false, nil
-	}
-
-	var worldsendChart *api_internal.UpdateWorldsendChartRequest
-	for diff, chart := range charts {
-		if chart == nil {
-			return nil, false, fmt.Errorf("chart is null")
-		}
-
-		if diff != "WORLDSEND" {
-			return nil, false, fmt.Errorf("unsupported chart key: %s", diff)
-		}
-
-		if worldsendChart != nil {
-			return nil, false, fmt.Errorf("duplicated WORLDSEND chart")
-		}
-
-		worldsendChart = chart
-	}
-
-	if worldsendChart == nil {
-		return nil, false, fmt.Errorf("must include WORLDSEND chart")
-	}
-
-	return worldsendChart, true, nil
 }
 
 // convertToWorldsendSongDTOs は WorldsendSongWithChart のスライスを WorldsendSongDTO のスライスに変換します。
