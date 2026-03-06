@@ -1606,9 +1606,12 @@ curl -X POST \
 - **レスポンス**: 204 No Content（成功時）
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): バリデーションエラー
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
+  - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### DELETE `/internal/songs/worldsend/:displayid`
 - **認証**: Cookie 必須
