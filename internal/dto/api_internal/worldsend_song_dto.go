@@ -34,8 +34,8 @@ type WorldsendSongsResponse struct {
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。
 type UpdateWorldsendChartRequest struct {
 	Attribute *string `json:"attribute"`
-	LevelStar *int    `json:"level_star"`
-	Notes     *int    `json:"notes"`
+	LevelStar *int    `json:"level_star" validate:"omitempty,levelStar"`
+	Notes     *int    `json:"notes" validate:"omitempty,notes"`
 }
 
 // UpdateWorldsendSongRequest は WORLD'S END 楽曲更新リクエストを表します。
