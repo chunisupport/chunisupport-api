@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -228,22 +230,23 @@ func validateAndGetWorldsendChartRequest(charts map[string]*api_internal.UpdateW
 		return nil, false, nil
 	}
 
-	var worldsendChart *api_internal.UpdateWorldsendChartRequest
-	for diff, chart := range charts {
-		if chart == nil {
-			return nil, false, fmt.Errorf("chart is null")
-		}
-
-		if diff != "WORLDSEND" {
-			return nil, false, fmt.Errorf("unsupported chart key: %s", diff)
-		}
-
-		if worldsendChart != nil {
-			return nil, false, fmt.Errorf("duplicated WORLDSEND chart")
-		}
-
-		worldsendChart = chart
+	if len(charts) > 1 {
+		keys := slices.Sorted(maps.Keys(charts))
+		return nil, false, fmt.Errorf("only one chart key (WORLDSEND) is allowed: got %v", keys)
 	}
 
-	return worldsendChart, true, nil
+	chart, ok := charts["WORLDSEND"]
+	if !ok {
+		var invalidKey string
+		for k := range charts {
+			invalidKey = k
+		}
+		return nil, false, fmt.Errorf("unsupported chart key: %s", invalidKey)
+	}
+
+	if chart == nil {
+		return nil, false, fmt.Errorf("chart for WORLDSEND is null")
+	}
+
+	return chart, true, nil
 }

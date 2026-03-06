@@ -305,8 +305,9 @@ func TestUpdateWorldsendSongs_ConvertsAndSaves(t *testing.T) {
 
 func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 	tests := []struct {
-		name     string
-		requests []*dtoapi.UpdateWorldsendSongRequest
+		name            string
+		requests        []*dtoapi.UpdateWorldsendSongRequest
+		wantErrContains string
 	}{
 		{
 			name: "WORLDSEND以外のchartsキーはエラー",
@@ -318,6 +319,20 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 					"MASTER": {},
 				},
 			}},
+			wantErrContains: "requests[0].charts: unsupported chart key: MASTER",
+		},
+		{
+			name: "chartsキーが複数ある場合はエラー",
+			requests: []*dtoapi.UpdateWorldsendSongRequest{{
+				DisplayID: "1234567890abcdef",
+				Title:     "A",
+				Artist:    "AR",
+				Charts: map[string]*dtoapi.UpdateWorldsendChartRequest{
+					"WORLDSEND": {},
+					"MASTER":    {},
+				},
+			}},
+			wantErrContains: "requests[0].charts: only one chart key (WORLDSEND) is allowed",
 		},
 		{
 			name: "存在しないgenreはエラー",
@@ -327,6 +342,7 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 				Artist:    "AR",
 				Genre:     strPtr("UNKNOWN"),
 			}},
+			wantErrContains: "invalid genre: UNKNOWN",
 		},
 		{
 			name: "notesの値オブジェクト生成失敗はエラー",
@@ -338,6 +354,7 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 					"WORLDSEND": {Notes: intPtr(-1)},
 				},
 			}},
+			wantErrContains: "requests[0].charts.WORLDSEND.notes",
 		},
 	}
 
@@ -354,6 +371,7 @@ func TestUpdateWorldsendSongs_InvalidInputReturnsError(t *testing.T) {
 
 			// Then
 			assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+			assert.ErrorContains(t, err, tt.wantErrContains)
 			mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
