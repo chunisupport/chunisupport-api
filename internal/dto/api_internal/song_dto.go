@@ -89,7 +89,7 @@ type UpdateChartRequest struct {
 
 // UpdateSongRequest は楽曲更新リクエストを表します。
 type UpdateSongRequest struct {
-	DisplayID  string                         `json:"id" validate:"required,len=16"`
+	DisplayID  string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
 	Title      string                         `json:"title" validate:"required"`
 	Artist     string                         `json:"artist" validate:"required"`
 	Genre      *string                        `json:"genre"`
