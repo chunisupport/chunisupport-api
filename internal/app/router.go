@@ -160,7 +160,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
-	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, masterCache, tm, db)
+	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 

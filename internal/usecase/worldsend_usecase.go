@@ -5,15 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -34,22 +28,20 @@ type WorldsendUsecase interface {
 	RestoreWorldsendSong(ctx context.Context, displayID string) error
 
 	// UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-	UpdateWorldsendSongs(ctx context.Context, requests []*api_internal.UpdateWorldsendSongRequest) error
+	UpdateWorldsendSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error
 }
 
 // worldsendUsecase は WorldsendUsecase の実装です。
 type worldsendUsecase struct {
 	worldsendChartRepo repository.WorldsendChartRepository
-	masterCache        repository.SongMasterProvider
 	defaultExecutor    repository.Executor
 	tm                 TransactionManager
 }
 
 // NewWorldsendUsecase は WorldsendUsecase の実装を生成します。
-func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository, masterCache repository.SongMasterProvider, tm TransactionManager, defaultExecutor repository.Executor) WorldsendUsecase {
+func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository, tm TransactionManager, defaultExecutor repository.Executor) WorldsendUsecase {
 	return &worldsendUsecase{
 		worldsendChartRepo: worldsendChartRepo,
-		masterCache:        masterCache,
 		defaultExecutor:    defaultExecutor,
 		tm:                 tm,
 	}
@@ -124,23 +116,19 @@ func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID s
 }
 
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*api_internal.UpdateWorldsendSongRequest) error {
-	if len(requests) == 0 {
+func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error {
+	if len(songs) != len(charts) {
+		return fmt.Errorf("%w: songs and charts length mismatch", ErrInvalidWorldsendInput)
+	}
+
+	if len(songs) == 0 {
 		return nil
 	}
 
-	if s.masterCache == nil {
-		return fmt.Errorf("master cache is not initialized")
-	}
-
-	masters := s.masterCache.SongMasters()
-	if masters == nil {
-		return fmt.Errorf("master cache is not initialized")
-	}
-
-	songs, charts, err := s.convertRequestsToEntities(requests, masters)
-	if err != nil {
-		return err
+	for idx, song := range songs {
+		if song == nil {
+			return fmt.Errorf("%w: songs[%d] is null", ErrInvalidWorldsendInput, idx)
+		}
 	}
 
 	// リポジトリに委譲
@@ -155,97 +143,4 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 	}
 
 	return nil
-}
-
-func (s *worldsendUsecase) convertRequestsToEntities(requests []*api_internal.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, []*entity.WorldsendChart, error) {
-	songs := make([]*entity.Song, 0, len(requests))
-	charts := make([]*entity.WorldsendChart, 0, len(requests))
-
-	for idx, req := range requests {
-		if req == nil {
-			return nil, nil, fmt.Errorf("%w: requests[%d]: request is null", ErrInvalidWorldsendInput, idx)
-		}
-
-		chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
-		if err != nil {
-			return nil, nil, fmt.Errorf("%w: requests[%d].charts: %w", ErrInvalidWorldsendInput, idx, err)
-		}
-
-		var genreID *int
-		if req.Genre != nil {
-			genreMaster, ok := masters.Genres[*req.Genre]
-			if !ok {
-				return nil, nil, fmt.Errorf("%w: invalid genre: %s", ErrInvalidWorldsendInput, *req.Genre)
-			}
-			genreID = &genreMaster.ID
-		}
-
-		updatedSong := entity.NewSong()
-		updatedSong.DisplayID = req.DisplayID
-		updatedSong.Title = req.Title
-		updatedSong.Artist = req.Artist
-		updatedSong.GenreID = genreID
-		updatedSong.BPM = req.BPM
-		updatedSong.ReleasedAt = req.ReleasedAt.TimePtr()
-		updatedSong.Jacket = req.Jacket
-		updatedSong.IsWorldsend = true
-
-		var updatedChart *entity.WorldsendChart
-		if hasChartUpdate {
-			var levelStarVO *levelstar.LevelStar
-			if chartReq.LevelStar != nil {
-				ls, lsErr := levelstar.NewLevelStar(*chartReq.LevelStar)
-				if lsErr != nil {
-					return nil, nil, fmt.Errorf("%w: requests[%d].charts.WORLDSEND.level_star: %w", ErrInvalidWorldsendInput, idx, lsErr)
-				}
-				levelStarVO = &ls
-			}
-
-			var notesVO *notes.Notes
-			if chartReq.Notes != nil {
-				n, nErr := notes.NewNotes(*chartReq.Notes)
-				if nErr != nil {
-					return nil, nil, fmt.Errorf("%w: requests[%d].charts.WORLDSEND.notes: %w", ErrInvalidWorldsendInput, idx, nErr)
-				}
-				notesVO = &n
-			}
-
-			updatedChart = &entity.WorldsendChart{
-				LevelStar: levelStarVO,
-				Attribute: chartReq.Attribute,
-				Notes:     notesVO,
-			}
-		}
-
-		songs = append(songs, updatedSong)
-		charts = append(charts, updatedChart)
-	}
-
-	return songs, charts, nil
-}
-
-func validateAndGetWorldsendChartRequest(charts map[string]*api_internal.UpdateWorldsendChartRequest) (*api_internal.UpdateWorldsendChartRequest, bool, error) {
-	if len(charts) == 0 {
-		return nil, false, nil
-	}
-
-	if len(charts) > 1 {
-		keys := slices.Sorted(maps.Keys(charts))
-		return nil, false, fmt.Errorf("only one chart key (WORLDSEND) is allowed: got %v", keys)
-	}
-
-	chart, ok := charts["WORLDSEND"]
-	if !ok {
-		var invalidKey string
-		for k := range charts {
-			invalidKey = k
-		}
-		return nil, false, fmt.Errorf("unsupported chart key: %s", invalidKey)
-	}
-
-	if chart == nil {
-		return nil, false, fmt.Errorf("chart for WORLDSEND is null")
-	}
-
-	return chart, true, nil
 }
