@@ -254,9 +254,5 @@ func validateAndGetWorldsendChartRequest(charts map[string]*api_internal.UpdateW
 		worldsendChart = chart
 	}
 
-	if worldsendChart == nil {
-		return nil, false, fmt.Errorf("must include WORLDSEND chart")
-	}
-
 	return worldsendChart, true, nil
 }
