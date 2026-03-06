@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -132,6 +133,57 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	}
 }
 
+func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES (101, 1, 2, '狂', 1200)
+	`)
+	require.NoError(t, err)
+
+	n := notes.Notes(1300)
+	genreID := 1
+	bpm := 180
+	releasedAt := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	jacket := "old.png"
+	songs := []*entity.Song{{
+		DisplayID:  "WE001",
+		Title:      "new title",
+		Artist:     "new artist",
+		GenreID:    &genreID,
+		BPM:        &bpm,
+		ReleasedAt: &releasedAt,
+		Jacket:     &jacket,
+	}}
+	charts := []*entity.WorldsendChart{{
+		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
+		Attribute: stringPtrForWorldsendSaveTest("改"),
+		Notes:     &n,
+	}}
+
+	repo := &worldsendChartRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, songs, charts)
+	require.NoError(t, err)
+
+	var chart struct {
+		LevelStar *int `db:"level_star"`
+	}
+	err = db.Get(&chart, `SELECT level_star FROM worldsend_charts WHERE id = 101`)
+	require.NoError(t, err)
+	require.NotNil(t, chart.LevelStar)
+	assert.Equal(t, 5, *chart.LevelStar)
+}
+
 func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 	db := setupWorldsendUpdateDB(t)
 	defer db.Close()
@@ -146,7 +198,7 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 		Artist:    "artist",
 	}}
 	charts := []*entity.WorldsendChart{{
-		LevelStar: intPtrForWorldsendSaveTest(5),
+		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
 		Attribute: stringPtrForWorldsendSaveTest("狂"),
 		Notes:     &n,
 	}}
@@ -227,7 +279,7 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 		Jacket:     &jacket,
 	}}
 	charts := []*entity.WorldsendChart{{
-		LevelStar: intPtrForWorldsendSaveTest(5),
+		LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
 		Attribute: stringPtrForWorldsendSaveTest("改"),
 		Notes:     &n,
 	}}
@@ -236,4 +288,13 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 	err = repo.UpdateSongs(ctx, exec, songs, charts)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrSongNotFound)
+}
+
+func levelStarPtrForWorldsendUpdateTest(t *testing.T, value int) *levelstar.LevelStar {
+	t.Helper()
+
+	ls, err := levelstar.NewLevelStar(value)
+	require.NoError(t, err)
+
+	return &ls
 }

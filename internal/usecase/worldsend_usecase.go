@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -142,17 +143,6 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		return err
 	}
 
-	// バリデーション
-	for i, chart := range charts {
-		if chart == nil {
-			continue
-		}
-		if err := chart.Validate(); err != nil {
-			slog.Warn("worldsend chart validation failed", "index", i, "error", err)
-			return fmt.Errorf("%w: requests[%d].charts.WORLDSEND: %w", ErrInvalidWorldsendInput, i, err)
-		}
-	}
-
 	// リポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.worldsendChartRepo.UpdateSongs(ctx, tx, songs, charts)
@@ -202,6 +192,15 @@ func (s *worldsendUsecase) convertRequestsToEntities(requests []*api_internal.Up
 
 		var updatedChart *entity.WorldsendChart
 		if hasChartUpdate {
+			var levelStarVO *levelstar.LevelStar
+			if chartReq.LevelStar != nil {
+				ls, lsErr := levelstar.NewLevelStar(*chartReq.LevelStar)
+				if lsErr != nil {
+					return nil, nil, fmt.Errorf("%w: requests[%d].charts.WORLDSEND.level_star: %w", ErrInvalidWorldsendInput, idx, lsErr)
+				}
+				levelStarVO = &ls
+			}
+
 			var notesVO *notes.Notes
 			if chartReq.Notes != nil {
 				n, nErr := notes.NewNotes(*chartReq.Notes)
@@ -212,7 +211,7 @@ func (s *worldsendUsecase) convertRequestsToEntities(requests []*api_internal.Up
 			}
 
 			updatedChart = &entity.WorldsendChart{
-				LevelStar: chartReq.LevelStar,
+				LevelStar: levelStarVO,
 				Attribute: chartReq.Attribute,
 				Notes:     notesVO,
 			}

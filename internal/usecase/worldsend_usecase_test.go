@@ -398,6 +398,7 @@ func TestUpdateWorldsendSongs_InvalidChartReturnsError(t *testing.T) {
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "requests[0].charts.WORLDSEND.level_star")
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 

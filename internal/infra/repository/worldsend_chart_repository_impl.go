@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -299,7 +300,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart, targets map[string]worldsendUpdateTarget) error {
 	type chartUpdate struct {
 		ChartID   int
-		LevelStar *int
+		LevelStar *levelstar.LevelStar
 		Attribute *string
 		Notes     any
 	}

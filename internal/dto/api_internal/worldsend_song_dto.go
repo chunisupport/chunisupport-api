@@ -34,8 +34,8 @@ type WorldsendSongsResponse struct {
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。
 type UpdateWorldsendChartRequest struct {
 	Attribute *string `json:"attribute"`
-	LevelStar *int    `json:"level_star" validate:"omitempty,min=1,max=5"`
-	Notes     *int    `json:"notes" validate:"omitempty,gte=0"`
+	LevelStar *int    `json:"level_star"`
+	Notes     *int    `json:"notes"`
 }
 
 // UpdateWorldsendSongRequest は WORLD'S END 楽曲更新リクエストを表します。
@@ -58,7 +58,7 @@ func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 
 	return &WorldsendChartDTO{
 		Attribute: chart.Attribute,
-		LevelStar: chart.LevelStar,
+		LevelStar: dto.ToLevelStarIntPtr(chart.LevelStar),
 		Notes:     dto.ToNotesIntPtr(chart.Notes),
 	}
 }
