@@ -44,7 +44,8 @@ func TestLevelStar_Scan(t *testing.T) {
 		{name: "int64を読み取れる", value: int64(3), want: 3},
 		{name: "文字列を読み取れる", value: "4", want: 4},
 		{name: "[]byteを読み取れる", value: []byte("5"), want: 5},
-		{name: "nilはエラーで既存値を維持", value: nil, initial: LevelStar(3), want: 3, wantError: true},
+		{name: "nilは既存値を維持して成功", value: nil, initial: LevelStar(3), want: 3},
+		{name: "nilの[]byteは既存値を維持して成功", value: []byte(nil), initial: LevelStar(3), want: 3},
 		{name: "範囲外はエラーで既存値を維持", value: int64(9), initial: LevelStar(2), want: 2, wantError: true},
 	}
 
@@ -62,4 +63,11 @@ func TestLevelStar_Scan(t *testing.T) {
 			assert.Equal(t, tt.want, got.Int())
 		})
 	}
+}
+
+func TestLevelStar_Scan_NilReceiver(t *testing.T) {
+	var got *LevelStar
+
+	err := got.Scan(int64(3))
+	require.Error(t, err)
 }

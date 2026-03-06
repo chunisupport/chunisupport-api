@@ -34,8 +34,12 @@ func (l *LevelStar) Value() (driver.Value, error) {
 
 // Scan は sql.Scanner インターフェースを実装します。
 func (l *LevelStar) Scan(value any) error {
+	if l == nil {
+		return fmt.Errorf("cannot scan into nil LevelStar receiver")
+	}
+
 	if value == nil {
-		return fmt.Errorf("cannot scan nil into LevelStar")
+		return nil
 	}
 
 	var parsed int
@@ -44,6 +48,10 @@ func (l *LevelStar) Scan(value any) error {
 	case int64:
 		parsed = int(v)
 	case []byte:
+		if v == nil {
+			return nil
+		}
+
 		n, err := strconv.Atoi(string(v))
 		if err != nil {
 			return fmt.Errorf("failed to convert []byte to int: %w", err)
