@@ -5,7 +5,7 @@ import (
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	apiinternaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 // MockWorldsendUsecase は WORLD'S END 楽曲ユースケースのテスト用モックです。
@@ -14,7 +14,7 @@ type MockWorldsendUsecase struct {
 	GetWorldsendSongByDisplayIDFunc func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
 	DeleteWorldsendSongFunc         func(ctx context.Context, displayID string) error
 	RestoreWorldsendSongFunc        func(ctx context.Context, displayID string) error
-	UpdateWorldsendSongsFunc        func(ctx context.Context, requests []*apiinternaldto.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) error
+	UpdateWorldsendSongsFunc        func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
 }
 
 func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
@@ -45,7 +45,7 @@ func (m *MockWorldsendUsecase) RestoreWorldsendSong(ctx context.Context, display
 	return nil
 }
 
-func (m *MockWorldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*apiinternaldto.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) error {
+func (m *MockWorldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error {
 	if m.UpdateWorldsendSongsFunc != nil {
 		return m.UpdateWorldsendSongsFunc(ctx, requests, masters)
 	}

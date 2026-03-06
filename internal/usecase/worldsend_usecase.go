@@ -7,17 +7,36 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
-	apiinternaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 const worldsendChartKey = "WORLDSEND"
+
+// UpdateWorldsendChartInput は WORLD'S END 譜面更新入力を表します。
+type UpdateWorldsendChartInput struct {
+	Attribute *string
+	LevelStar *int
+	Notes     *int
+}
+
+// UpdateWorldsendSongInput は WORLD'S END 楽曲更新入力を表します。
+type UpdateWorldsendSongInput struct {
+	DisplayID  string
+	Title      string
+	Artist     string
+	Genre      *string
+	BPM        *int
+	ReleasedAt *time.Time
+	Jacket     *string
+	Charts     map[string]*UpdateWorldsendChartInput
+}
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
@@ -36,7 +55,7 @@ type WorldsendUsecase interface {
 	RestoreWorldsendSong(ctx context.Context, displayID string) error
 
 	// UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-	UpdateWorldsendSongs(ctx context.Context, requests []*apiinternaldto.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) error
+	UpdateWorldsendSongs(ctx context.Context, requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
 }
 
 // worldsendUsecase は WorldsendUsecase の実装です。
@@ -125,7 +144,7 @@ func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID s
 
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 
-func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*apiinternaldto.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) error {
+func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error {
 	if masters == nil {
 		return fmt.Errorf("%w: masters is nil", ErrInternalError)
 	}
@@ -153,7 +172,7 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 	return nil
 }
 
-func convertWorldsendRequestsToEntities(requests []*apiinternaldto.UpdateWorldsendSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, []*entity.WorldsendChart, error) {
+func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) ([]*entity.Song, []*entity.WorldsendChart, error) {
 	songs := make([]*entity.Song, 0, len(requests))
 	charts := make([]*entity.WorldsendChart, 0, len(requests))
 
@@ -182,7 +201,7 @@ func convertWorldsendRequestsToEntities(requests []*apiinternaldto.UpdateWorldse
 		updatedSong.Artist = req.Artist
 		updatedSong.GenreID = genreID
 		updatedSong.BPM = req.BPM
-		updatedSong.ReleasedAt = req.ReleasedAt.TimePtr()
+		updatedSong.ReleasedAt = req.ReleasedAt
 		updatedSong.Jacket = req.Jacket
 		updatedSong.IsWorldsend = true
 
@@ -220,7 +239,7 @@ func convertWorldsendRequestsToEntities(requests []*apiinternaldto.UpdateWorldse
 	return songs, charts, nil
 }
 
-func validateAndGetWorldsendChartRequest(charts map[string]*apiinternaldto.UpdateWorldsendChartRequest) (*apiinternaldto.UpdateWorldsendChartRequest, bool, error) {
+func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChartInput) (*UpdateWorldsendChartInput, bool, error) {
 	if len(charts) == 0 {
 		return nil, false, nil
 	}

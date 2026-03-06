@@ -104,11 +104,51 @@ func (h *WorldsendHandler) UpdateWorldsendSongs(c echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(fmt.Errorf("song masters are not initialized in master cache"))
 	}
 
-	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), requests, masters); err != nil {
+	inputs := convertToUpdateWorldsendSongInputs(requests)
+
+	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), inputs, masters); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsendSongRequest) []*usecase.UpdateWorldsendSongInput {
+	inputs := make([]*usecase.UpdateWorldsendSongInput, 0, len(requests))
+	for _, req := range requests {
+		input := &usecase.UpdateWorldsendSongInput{
+			DisplayID: req.DisplayID,
+			Title:     req.Title,
+			Artist:    req.Artist,
+			Genre:     req.Genre,
+			BPM:       req.BPM,
+			Jacket:    req.Jacket,
+		}
+
+		if req.ReleasedAt != nil {
+			input.ReleasedAt = req.ReleasedAt.TimePtr()
+		}
+
+		if req.Charts != nil {
+			input.Charts = make(map[string]*usecase.UpdateWorldsendChartInput, len(req.Charts))
+			for key, chartReq := range req.Charts {
+				if chartReq == nil {
+					input.Charts[key] = nil
+					continue
+				}
+
+				input.Charts[key] = &usecase.UpdateWorldsendChartInput{
+					Attribute: chartReq.Attribute,
+					LevelStar: chartReq.LevelStar,
+					Notes:     chartReq.Notes,
+				}
+			}
+		}
+
+		inputs = append(inputs, input)
+	}
+
+	return inputs
 }
 
 // convertToWorldsendSongDTOs は WorldsendSongWithChart のスライスを WorldsendSongDTO のスライスに変換します。
