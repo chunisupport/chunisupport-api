@@ -361,6 +361,38 @@ func TestUpdateWorldsendSongs_NilRequestReturnsError(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
+func TestUpdateWorldsendSongs_SecondRequestInvalidContainsIndex(t *testing.T) {
+	// Given
+	mockRepo := new(MockWorldsendChartRepository)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
+	masters := &domainmasterdata.SongMasters{}
+	requests := []*UpdateWorldsendSongInput{
+		{
+			DisplayID: "1234567890abcdef",
+			Title:     "A",
+			Artist:    "AR",
+		},
+		{
+			DisplayID: "abcdef1234567890",
+			Title:     "B",
+			Artist:    "BR",
+			Charts: map[string]*UpdateWorldsendChartInput{
+				"MASTER": {LevelStar: intPtr(5)},
+			},
+		},
+	}
+
+	// When
+	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
+	assert.ErrorContains(t, err, "requests[1].charts: unsupported chart key")
+	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)

@@ -180,64 +180,72 @@ func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, ma
 			return nil, fmt.Errorf("requests[%d]: request is null", idx)
 		}
 
-		chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
+		update, err := convertSingleRequestToUpdate(req, masters)
 		if err != nil {
-			return nil, fmt.Errorf("requests[%d].charts: %w", idx, err)
+			return nil, fmt.Errorf("requests[%d].%w", idx, err)
 		}
-
-		var genreID *int
-		if req.Genre != nil {
-			genreMaster, ok := masters.Genres[*req.Genre]
-			if !ok {
-				return nil, fmt.Errorf("invalid genre: %s", *req.Genre)
-			}
-			genreID = &genreMaster.ID
-		}
-
-		updatedSong := entity.NewSong()
-		updatedSong.DisplayID = req.DisplayID
-		updatedSong.Title = req.Title
-		updatedSong.Artist = req.Artist
-		updatedSong.GenreID = genreID
-		updatedSong.BPM = req.BPM
-		updatedSong.ReleasedAt = req.ReleasedAt
-		updatedSong.Jacket = req.Jacket
-		updatedSong.IsWorldsend = true
-
-		var updatedChart *entity.WorldsendChart
-		if hasChartUpdate {
-			var levelStarVO *levelstar.LevelStar
-			if chartReq.LevelStar != nil {
-				ls, lsErr := levelstar.NewLevelStar(*chartReq.LevelStar)
-				if lsErr != nil {
-					return nil, fmt.Errorf("requests[%d].charts.%s.level_star: %w", idx, worldsendChartKey, lsErr)
-				}
-				levelStarVO = &ls
-			}
-
-			var notesVO *notes.Notes
-			if chartReq.Notes != nil {
-				n, nErr := notes.NewNotes(*chartReq.Notes)
-				if nErr != nil {
-					return nil, fmt.Errorf("requests[%d].charts.%s.notes: %w", idx, worldsendChartKey, nErr)
-				}
-				notesVO = &n
-			}
-
-			updatedChart = &entity.WorldsendChart{
-				LevelStar: levelStarVO,
-				Attribute: chartReq.Attribute,
-				Notes:     notesVO,
-			}
-		}
-
-		updates = append(updates, &repository.WorldsendUpdate{
-			Song:  updatedSong,
-			Chart: updatedChart,
-		})
+		updates = append(updates, update)
 	}
 
 	return updates, nil
+}
+
+func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*repository.WorldsendUpdate, error) {
+	chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
+	if err != nil {
+		return nil, fmt.Errorf("charts: %w", err)
+	}
+
+	var genreID *int
+	if req.Genre != nil {
+		genreMaster, ok := masters.Genres[*req.Genre]
+		if !ok {
+			return nil, fmt.Errorf("invalid genre: %s", *req.Genre)
+		}
+		genreID = &genreMaster.ID
+	}
+
+	updatedSong := entity.NewSong()
+	updatedSong.DisplayID = req.DisplayID
+	updatedSong.Title = req.Title
+	updatedSong.Artist = req.Artist
+	updatedSong.GenreID = genreID
+	updatedSong.BPM = req.BPM
+	updatedSong.ReleasedAt = req.ReleasedAt
+	updatedSong.Jacket = req.Jacket
+	updatedSong.IsWorldsend = true
+
+	var updatedChart *entity.WorldsendChart
+	if hasChartUpdate {
+		var levelStarVO *levelstar.LevelStar
+		if chartReq.LevelStar != nil {
+			ls, err := levelstar.NewLevelStar(*chartReq.LevelStar)
+			if err != nil {
+				return nil, fmt.Errorf("charts.%s.level_star: %w", worldsendChartKey, err)
+			}
+			levelStarVO = &ls
+		}
+
+		var notesVO *notes.Notes
+		if chartReq.Notes != nil {
+			n, err := notes.NewNotes(*chartReq.Notes)
+			if err != nil {
+				return nil, fmt.Errorf("charts.%s.notes: %w", worldsendChartKey, err)
+			}
+			notesVO = &n
+		}
+
+		updatedChart = &entity.WorldsendChart{
+			LevelStar: levelStarVO,
+			Attribute: chartReq.Attribute,
+			Notes:     notesVO,
+		}
+	}
+
+	return &repository.WorldsendUpdate{
+		Song:  updatedSong,
+		Chart: updatedChart,
+	}, nil
 }
 
 func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChartInput) (*UpdateWorldsendChartInput, bool, error) {
