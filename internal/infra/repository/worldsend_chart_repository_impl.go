@@ -190,8 +190,12 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 	}
 
 	// RowsAffected はドライバごとの差異があるため、不一致時は存在確認クエリで最終判定する。
-	// また、譜面更新が 0 件のときは並行削除を検知するため存在確認を行う。
-	if songRowsAffected != int64(len(songs)) || chartRowsAffected != int64(expectedChartUpdates) || expectedChartUpdates == 0 {
+	rowsAffectedMismatch := songRowsAffected != int64(len(songs)) || chartRowsAffected != int64(expectedChartUpdates)
+	// 一部リクエストで譜面更新が無い場合、RowsAffected だけでは songs 更新後に発生した
+	// 並行削除(例: 更新対象外 chart の削除)を検知できないため存在確認を行う。
+	requiresExistenceCheckForSkippedChartUpdates := expectedChartUpdates < len(updates)
+
+	if rowsAffectedMismatch || requiresExistenceCheckForSkippedChartUpdates {
 		exists, err := r.ensureTargetsExist(ctx, exec, targets)
 		if err != nil {
 			return err
@@ -430,7 +434,7 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 		SELECT COUNT(*)
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
-		WHERE s.is_worldsend = 1 AND (%s)
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND (%s)
 	`, strings.Join(pairConditions, " OR "))
 
 	var count int
