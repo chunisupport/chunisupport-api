@@ -1,7 +1,7 @@
 # リファクタリング指摘書 (Current Code Issues)
 
 本ドキュメントは、コードベース評価に基づき修正が必要な項目を整理したものです。
-`chunisupport-api` (Go 1.25, Echo, MySQL, ~50k users) の規模と特性、および Clean Architecture/DDD を考慮し、実効性の高い項目に絞り込んでいます。
+`chunisupport-api` (Go 1.26, Echo, MySQL, ~50k users) の規模と特性、および Clean Architecture/DDD を考慮し、実効性の高い項目に絞り込んでいます。
 
 ## 優先度定義
 - **Critical (緊急)**: セキュリティ上の重大な欠陥、または主要機能の停止に直結する問題。即時対応が必要。
@@ -279,7 +279,7 @@
 | **DOM-012** | **Low** | `WorldsendSongWithChart` と `WorldsendSongChartPair` の重複 | `repository` 層と `service` 層にフィールド同一の重複構造体。entity層に統一構造体を定義すべき。 |
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり。方針を統一すべき。 |
 | **DOM-014** | **Medium** | `PlayerDataChart.Const` がVO未使用 | `float64` で定義されており、通常の `Chart` が使う `chartconstant.ChartConstant` と不整合。VOによるバリデーションが適用されない。 |
-| **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.25で推奨される `slices` パッケージに統一すべき。 |
+| **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.26で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
 | **DOM-018** | **Medium** | `repository.errors.go` のエラー定義不足 | `ErrSongNotFound` のみで `ErrUserNotFound` 等はusecase層に定義。リポジトリが適切なドメインエラーを返せず、QUAL-009の根本原因となっている。 |
 | **DOM-021** | **Low** | Deprecated関数が残存 | `rating_service.go` の `CalcBestAverageRating`, `CalcNewAverageRating`, `CalcPlayerRating`。テストでまだ使用中。移行完了後に削除すべき。 |
@@ -313,7 +313,7 @@
 | **UC-006** | **Low** | パスワードバリデーションロジックの3箇所重複 | `Register`, `ChangePassword`, `RecoverWithRecoveryCode` で長さチェックが重複。`validatePassword` ヘルパーに抽出すべき。 |
 | **UC-007** | **Low** | 削除済み楽曲の権限チェックパターンの4箇所重複 | `song_usecase_impl`, `worldsend_usecase`, `chart_stats_usecase` で同一パターン。共通ヘルパーに抽出すべき。 |
 | **UC-008** | **Medium** | `applyScores` のGod Function（約200行） | 通常譜面ループとWE譜面ループで解決ロジックがほぼ同一のまま2回繰り返し。共通関数に抽出すべき。 |
-| **UC-009** | **Low** | `sort` パッケージ使用（Go 1.25では `slices` 推奨） | `player_data_usecase_impl.go` と `chart_stats_usecase.go` で `sort.Strings`/`sort.Slice` 使用。`slices.Sort`/`slices.SortFunc` に統一すべき。 |
+| **UC-009** | **Low** | `sort` パッケージ使用（Go 1.26では `slices` 推奨） | `player_data_usecase_impl.go` と `chart_stats_usecase.go` で `sort.Strings`/`sort.Slice` 使用。`slices.Sort`/`slices.SortFunc` に統一すべき。 |
 | **UC-010** | **Low** | `time.LoadLocation` の繰り返し呼び出し | `player_data_usecase_impl.go` で都度 `time.LoadLocation("Asia/Tokyo")` を実行。ホットパス化する場合はパッケージレベルでキャッシュを検討。 |
 | **UC-011** | **Medium** | コンストラクタ名のService/Usecase混在 | `NewAuthService`, `NewUserService` 等の"Service"接尾辞と `NewWorldsendUsecase`, `NewGoalUsecase` 等の"Usecase"接尾辞が混在。AGENTS.mdでは `Usecase` を推奨。統一すべき。 |
 | **UC-012** | **Low** | テストモック手法の不一致 | testify/mockベースと手動スタブが混在。プロジェクト全体で統一すべき。 |

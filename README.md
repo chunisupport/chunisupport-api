@@ -17,7 +17,7 @@
 
 ## 技術スタック
 
-- **言語**: [Go](https://golang.org/) (1.25.7)
+- **言語**: [Go](https://golang.org/) (1.26.1)
 - **Webフレームワーク**: [Echo](https://echo.labstack.com/)
 - **データベース**: [MySQL](https://www.mysql.com/)
 - **O/Rマッパー**: [sqlx](https://github.com/jmoiron/sqlx)
