@@ -233,7 +233,7 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 		SELECT s.display_id, s.id, wc.id
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
-		WHERE s.is_worldsend = 1 AND s.display_id IN (%s)
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND s.display_id IN (%s)
 	`, strings.Join(placeholders, ","))
 
 	rows, err := exec.QueryxContext(ctx, query, args...)
