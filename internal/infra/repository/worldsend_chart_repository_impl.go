@@ -226,19 +226,20 @@ type worldsendUpdateTarget struct {
 }
 
 func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) (map[string]worldsendUpdateTarget, error) {
-	placeholders := make([]string, len(displayIDs))
-	args := make([]any, 0, len(displayIDs))
-	for i, displayID := range displayIDs {
-		placeholders[i] = "?"
-		args = append(args, displayID)
+	if len(displayIDs) == 0 {
+		return map[string]worldsendUpdateTarget{}, nil
 	}
 
-	query := fmt.Sprintf(`
+	query, args, err := sqlx.In(`
 		SELECT s.display_id, s.id, wc.id
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
-		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND s.display_id IN (%s)
-	`, strings.Join(placeholders, ","))
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND s.display_id IN (?)
+	`, displayIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = exec.Rebind(query)
 
 	rows, err := exec.QueryxContext(ctx, query, args...)
 	if err != nil {

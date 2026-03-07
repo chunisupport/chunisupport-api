@@ -30,6 +30,10 @@ func (e *deletingChartExecutor) QueryRowxContext(ctx context.Context, query stri
 	return e.db.QueryRowxContext(ctx, query, args...)
 }
 
+func (e *deletingChartExecutor) Rebind(query string) string {
+	return e.db.Rebind(query)
+}
+
 func (e *deletingChartExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	e.execCount++
 	result, err := e.db.ExecContext(ctx, query, args...)
@@ -61,6 +65,10 @@ func (e *softDeletingSongExecutor) QueryxContext(ctx context.Context, query stri
 
 func (e *softDeletingSongExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
 	return e.db.QueryRowxContext(ctx, query, args...)
+}
+
+func (e *softDeletingSongExecutor) Rebind(query string) string {
+	return e.db.Rebind(query)
 }
 
 func (e *softDeletingSongExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
@@ -166,6 +174,17 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	if assert.NotNil(t, chart.Notes) {
 		assert.Equal(t, 1200, *chart.Notes)
 	}
+}
+
+func TestFindUpdateTargetsByDisplayIDs_ReturnsEmptyWhenDisplayIDsIsEmpty(t *testing.T) {
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+
+	repo := &worldsendChartRepository{db: db}
+
+	targets, err := repo.findUpdateTargetsByDisplayIDs(context.Background(), db, []string{})
+	require.NoError(t, err)
+	require.Empty(t, targets)
 }
 
 func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
