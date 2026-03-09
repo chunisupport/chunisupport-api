@@ -307,6 +307,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		// WORLD'S END 楽曲エンドポイント
 		worldsendGroup := songsGroup.Group("/worldsend")
 		{
+			worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
 			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireEditor)
 			worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 		}

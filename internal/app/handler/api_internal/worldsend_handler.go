@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -73,6 +74,81 @@ func (h *WorldsendHandler) RestoreWorldsendSong(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
+func (h *WorldsendHandler) UpdateWorldsendSongs(c echo.Context) error {
+	var requests []*api_internal.UpdateWorldsendSongRequest
+	if err := c.Bind(&requests); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if requests == nil {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
+	}
+
+	for idx, req := range requests {
+		if req == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
+		}
+		if err := c.Validate(req); err != nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
+		}
+	}
+
+	if h.masterCache == nil {
+		return apierror.ErrInternalError.WithInternal(fmt.Errorf("master cache is not initialized"))
+	}
+
+	masters := h.masterCache.SongMasters()
+	if masters == nil {
+		return apierror.ErrInternalError.WithInternal(fmt.Errorf("song masters are not initialized in master cache"))
+	}
+
+	inputs := convertToUpdateWorldsendSongInputs(requests)
+
+	if err := h.worldsendUsecase.UpdateWorldsendSongs(c.Request().Context(), inputs, masters); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsendSongRequest) []*usecase.UpdateWorldsendSongInput {
+	inputs := make([]*usecase.UpdateWorldsendSongInput, 0, len(requests))
+	for _, req := range requests {
+		input := &usecase.UpdateWorldsendSongInput{
+			DisplayID: req.DisplayID,
+			Title:     req.Title,
+			Artist:    req.Artist,
+			Genre:     req.Genre,
+			BPM:       req.BPM,
+			Jacket:    req.Jacket,
+		}
+
+		if req.ReleasedAt != nil {
+			input.ReleasedAt = req.ReleasedAt.TimePtr()
+		}
+
+		if req.Charts != nil {
+			input.Charts = make(map[string]*usecase.UpdateWorldsendChartInput, len(req.Charts))
+			for key, chartReq := range req.Charts {
+				if chartReq == nil {
+					input.Charts[key] = nil
+					continue
+				}
+
+				input.Charts[key] = &usecase.UpdateWorldsendChartInput{
+					Attribute: chartReq.Attribute,
+					LevelStar: chartReq.LevelStar,
+					Notes:     chartReq.Notes,
+				}
+			}
+		}
+
+		inputs = append(inputs, input)
+	}
+
+	return inputs
 }
 
 // convertToWorldsendSongDTOs は WorldsendSongWithChart のスライスを WorldsendSongDTO のスライスに変換します。

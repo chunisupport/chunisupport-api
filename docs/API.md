@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年02月21日
+**最終更新日**: 2026年03月05日
 
 ## ベースURLと環境
 
@@ -119,10 +119,12 @@
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得。 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
+| `/internal/songs` | PUT | Cookie (EDITOR+) | 楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
 | `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
 | `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得。 |
 | `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得。 |
+| `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
@@ -1369,34 +1371,10 @@ curl -X POST \
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### DELETE `/internal/songs/:displayid`
-- **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
-- **レスポンス**: 204 No Content（成功時）
-
-- **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
-
-### POST `/internal/songs/:displayid/restore`
-- **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **概要**: 指定されたDisplayIDの削除済み楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
-- **レスポンス**: 204 No Content（成功時）
-
-- **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
-
 ### PUT `/internal/songs`
 - **認証**: Cookie 必須
 - **権限**: EDITOR (2) または ADMIN (3) 以上が必要
-- **概要**: 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
+- **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列
 
 ```json
@@ -1431,27 +1409,55 @@ curl -X POST \
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
-| `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ（キーは難易度名） |
+| `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ |
 
 **UpdateChartRequest**:
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| `const` | float | ✓ | 譜面定数（0以上、小数点以下1桁表記） |
+| `const` | float | ✓ | 譜面定数（0以上。小数1桁表記を推奨） |
 | `is_const_unknown` | bool | ✓ | 譜面定数が未確定かどうか |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
 
 **注意事項**:
-- リクエストに含まれない譜面は変更されません（削除もされません）
-- マスタに存在しないジャンル名を指定するとエラーになります
-- マスタに存在しない難易度名（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA以外）を指定するとエラーになります
-- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+- リクエスト配列内で `id`（display_id）が重複している場合はエラーになります。
+- WORLD'S END楽曲（`is_worldsend = 1`）の `id` を指定した場合、このエンドポイントでは更新できずエラーになります。
+- マスタに存在しないジャンル名を指定するとエラーになります。
+- `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます。
 
 - **レスポンス**: 204 No Content（成功時）
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): バリデーションエラー
-  - 400 Bad Request (`internal_error`): 存在しない楽曲・譜面・マスタIDの指定
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
+  - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
+
+### DELETE `/internal/songs/:displayid`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
+- **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+
+### POST `/internal/songs/:displayid/restore`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 指定されたDisplayIDの削除済み楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
+- **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
 ### GET `/internal/songs/worldsend`
 - **認証**: Cookie (任意)
@@ -1536,8 +1542,77 @@ curl -X POST \
     }
   }
 }
+```
+
+- **主なエラー**:
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### PUT `/internal/songs/worldsend`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: WORLD'S END 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
+- **リクエスト**: JSON配列
+
+```json
+[
+  {
+    "id": "0123456789abcdef",
+    "title": "楽曲タイトル",
+    "artist": "アーティスト名",
+    "genre": "POPS & ANIME",
+    "bpm": 180,
+    "released_at": "2024-01-01",
+    "jacket": "jacket_img_name",
+    "charts": {
+      "WORLDSEND": {
+        "attribute": "狂",
+        "level_star": 5,
+        "notes": 2000
+      }
+    }
+  }
+]
+```
+
+**リクエストフィールド（UpdateWorldsendSongRequest）**:
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
+| `title` | string | ✓ | 楽曲名 |
+| `artist` | string | ✓ | アーティスト名 |
+| `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
+| `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
+| `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
+| `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
+| `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
+
+**UpdateWorldsendChartRequest**:
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `attribute` | string \| null | | WORLD'S END 属性（光、蔵、改、狂、etc.） |
+| `level_star` | int \| null | | WORLD'S END レベル（1〜5、nullの場合DBをNULLに更新） |
+| `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
+
+**注意事項**:
+- `charts` を省略または `null` にした場合、譜面情報は更新されません（楽曲情報のみ更新されます）
+- `charts` を指定する場合は `WORLDSEND` キーのみ指定可能です（大文字固定）
+- `charts` で `WORLDSEND` 以外のキーを指定するとエラーになります
+- リクエスト配列内で `id`（display_id）が重複している場合はエラーになります
+- マスタに存在しないジャンル名を指定するとエラーになります
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+
+- **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
+  - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### DELETE `/internal/songs/worldsend/:displayid`
 - **認証**: Cookie 必須

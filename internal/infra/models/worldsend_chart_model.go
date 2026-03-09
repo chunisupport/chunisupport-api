@@ -2,16 +2,17 @@ package models
 
 import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
 // WorldsendChartModel はデータベース用の WORLD'S END 譜面モデルです。
 type WorldsendChartModel struct {
-	ID        int          `db:"id"`
-	SongID    int          `db:"song_id"`
-	LevelStar *int         `db:"level_star"`
-	Attribute *string      `db:"attribute"`
-	Notes     *notes.Notes `db:"notes"`
+	ID        int                  `db:"id"`
+	SongID    int                  `db:"song_id"`
+	LevelStar *levelstar.LevelStar `db:"level_star"`
+	Attribute *string              `db:"attribute"`
+	Notes     *notes.Notes         `db:"notes"`
 }
 
 func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {

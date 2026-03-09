@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/jmoiron/sqlx"
@@ -275,4 +276,199 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 14.3, result[3].Const, 0.01, "Song2 MASTER: Const should be 14.3")
 	assert.False(t, result[3].IsConstUnknown, "Song2 MASTER: IsConstUnknown should be false")
 	assert.Equal(t, 1250, *result[3].Notes, "Song2 MASTER: Notes should be 1250")
+}
+
+func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0)
+	`)
+	require.NoError(t, err)
+
+	bpm1 := 150
+	bpm2 := 200
+	songs := []*entity.Song{
+		{DisplayID: "DISPLAY001", Title: "first update", Artist: "artist", BPM: &bpm1, Charts: []*entity.Chart{}},
+		{DisplayID: "DISPLAY001", Title: "second update", Artist: "artist", BPM: &bpm2, Charts: []*entity.Chart{}},
+	}
+
+	repo := &songRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, songs)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domainrepo.ErrDuplicateDisplayID)
+
+	// DBが変更されていないことを確認
+	var title string
+	err = db.Get(&title, `SELECT title FROM songs WHERE id = 1`)
+	require.NoError(t, err)
+	assert.Equal(t, "Original Title", title)
+}
+
+func TestSongUpdateSongs_ReturnsErrorWhenTargetIsWorldsendSong(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (1, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		VALUES (1, 4, 14.8, 0, 1200)
+	`)
+	require.NoError(t, err)
+
+	bpm := 200
+	songs := []*entity.Song{
+		{
+			DisplayID: "WORLD001",
+			Title:     "Updated Worldsend Title",
+			Artist:    "Updated Worldsend Artist",
+			BPM:       &bpm,
+			Charts: []*entity.Chart{
+				{DifficultyID: 4, Const: chartconstant.ChartConstant(15.0), IsConstUnknown: false},
+			},
+		},
+	}
+
+	repo := &songRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, songs)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "song with display_id 'WORLD001' not found")
+
+	var result struct {
+		Title  string `db:"title"`
+		Artist string `db:"artist"`
+		BPM    int    `db:"bpm"`
+	}
+	err = db.Get(&result, `SELECT title, artist, bpm FROM songs WHERE id = 1`)
+	require.NoError(t, err)
+	assert.Equal(t, "Worldsend Title", result.Title)
+	assert.Equal(t, "Worldsend Artist", result.Artist)
+	assert.Equal(t, 180, result.BPM)
+}
+
+func TestBulkUpdateSongs_DoesNotUpdateWorldsendSongs(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES
+			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0),
+			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+	`)
+	require.NoError(t, err)
+
+	repo := &songRepository{db: db}
+	bpmNormal := 190
+	bpmWorld := 210
+	genreNormal := 1
+	genreWorld := 1
+	songs := []*entity.Song{
+		{DisplayID: "NORMAL001", Title: "Normal Updated", Artist: "Normal Updated Artist", GenreID: &genreNormal, BPM: &bpmNormal, Charts: []*entity.Chart{}},
+		{DisplayID: "WORLD001", Title: "World Updated", Artist: "World Updated Artist", GenreID: &genreWorld, BPM: &bpmWorld, Charts: []*entity.Chart{}},
+	}
+
+	displayIDToSongID := map[string]int{
+		"NORMAL001": 1,
+		"WORLD001":  2,
+	}
+
+	err = repo.bulkUpdateSongs(ctx, db, songs, displayIDToSongID)
+	require.NoError(t, err)
+
+	var rows []struct {
+		ID    int    `db:"id"`
+		Title string `db:"title"`
+		BPM   int    `db:"bpm"`
+	}
+	err = db.Select(&rows, `SELECT id, title, bpm FROM songs ORDER BY id`)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	assert.Equal(t, "Normal Updated", rows[0].Title)
+	assert.Equal(t, 190, rows[0].BPM)
+
+	assert.Equal(t, "Worldsend Title", rows[1].Title)
+	assert.Equal(t, 200, rows[1].BPM)
+}
+
+func TestSongUpdateSongs_ReturnsErrorWithoutPartialUpdateWhenMixedWithWorldsend(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES
+			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0),
+			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		VALUES
+			(1, 4, 13.8, 0, 1100),
+			(2, 4, 14.8, 0, 1200)
+	`)
+	require.NoError(t, err)
+
+	bpmNormal := 190
+	bpmWorld := 210
+	genreID := 1
+	songs := []*entity.Song{
+		{
+			DisplayID: "NORMAL001",
+			Title:     "Normal Updated",
+			Artist:    "Normal Updated Artist",
+			GenreID:   &genreID,
+			BPM:       &bpmNormal,
+			Charts: []*entity.Chart{
+				{DifficultyID: 4, Const: chartconstant.ChartConstant(14.0), IsConstUnknown: false},
+			},
+		},
+		{
+			DisplayID: "WORLD001",
+			Title:     "World Updated",
+			Artist:    "World Updated Artist",
+			GenreID:   &genreID,
+			BPM:       &bpmWorld,
+			Charts: []*entity.Chart{
+				{DifficultyID: 4, Const: chartconstant.ChartConstant(15.0), IsConstUnknown: false},
+			},
+		},
+	}
+
+	repo := &songRepository{db: db}
+	err = repo.UpdateSongs(ctx, db, songs)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "song with display_id 'WORLD001' not found")
+
+	var rows []struct {
+		ID    int    `db:"id"`
+		Title string `db:"title"`
+		BPM   int    `db:"bpm"`
+	}
+	err = db.Select(&rows, `SELECT id, title, bpm FROM songs ORDER BY id`)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	assert.Equal(t, "Normal Title", rows[0].Title)
+	assert.Equal(t, 180, rows[0].BPM)
+	assert.Equal(t, "Worldsend Title", rows[1].Title)
+	assert.Equal(t, 200, rows[1].BPM)
 }

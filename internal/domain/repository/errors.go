@@ -10,4 +10,7 @@ var (
 
 	// ErrSongNotFound は楽曲が見つからなかった場合に返されるエラーです。
 	ErrSongNotFound = errors.New("song not found")
+
+	// ErrDuplicateDisplayID はリクエスト内に重複したdisplay_idが含まれる場合に返されるエラーです。
+	ErrDuplicateDisplayID = errors.New("duplicate display_id")
 )

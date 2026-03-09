@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -151,36 +153,295 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 
 // UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 // トランザクション管理は呼び出し元で行う必要があります。
-func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
-	if len(songs) != len(charts) {
-		return fmt.Errorf("songs and charts length mismatch: %d != %d", len(songs), len(charts))
+func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
+	if len(updates) == 0 {
+		return nil
 	}
 
-	// 楽曲情報を更新
-	songQuery := `
-		UPDATE songs
-		SET title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?
-		WHERE id = ? AND is_worldsend = 1`
-	for _, song := range songs {
-		_, err := exec.ExecContext(ctx, songQuery,
-			song.Title, song.Artist, song.GenreID, song.BPM, song.ReleasedAt, song.OfficialIdx, song.Jacket, song.ID)
-		if err != nil {
-			return err
+	songs, err := collectSongsFromWorldsendUpdates(updates)
+	if err != nil {
+		return err
+	}
+
+	displayIDs, err := collectUniqueDisplayIDs(songs)
+	if err != nil {
+		return err
+	}
+
+	targets, err := r.findUpdateTargetsByDisplayIDs(ctx, exec, displayIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, displayID := range displayIDs {
+		if _, ok := targets[displayID]; !ok {
+			return fmt.Errorf("%w: display_id=%s", repository.ErrSongNotFound, displayID)
 		}
 	}
 
-	// WORLD'S END 譜面情報を更新
-	chartQuery := `
-		UPDATE worldsend_charts
-		SET level_star = ?, attribute = ?, notes = ?
-		WHERE id = ?`
-	for _, chart := range charts {
-		_, err := exec.ExecContext(ctx, chartQuery,
-			chart.LevelStar, chart.Attribute, chart.Notes, chart.ID)
+	songRowsAffected, err := r.bulkUpdateSongs(ctx, exec, songs, targets)
+	if err != nil {
+		return err
+	}
+
+	chartRowsAffected, expectedChartUpdates, err := r.bulkUpdateCharts(ctx, exec, updates, targets)
+	if err != nil {
+		return err
+	}
+
+	// RowsAffected はドライバごとの差異があるため、不一致時は存在確認クエリで最終判定する。
+	rowsAffectedMismatch := songRowsAffected != int64(len(songs)) || chartRowsAffected != int64(expectedChartUpdates)
+	// 一部リクエストで譜面更新が無い場合、RowsAffected だけでは songs 更新後に発生した
+	// 並行削除(例: 更新対象外 chart の削除)を検知できないため存在確認を行う。
+	requiresExistenceCheckForSkippedChartUpdates := expectedChartUpdates < len(updates)
+
+	if rowsAffectedMismatch || requiresExistenceCheckForSkippedChartUpdates {
+		exists, err := r.ensureTargetsExist(ctx, exec, targets)
 		if err != nil {
 			return err
+		}
+		if !exists {
+			return repository.ErrSongNotFound
 		}
 	}
 
 	return nil
+}
+
+func collectSongsFromWorldsendUpdates(updates []*repository.WorldsendUpdate) ([]*entity.Song, error) {
+	songs := make([]*entity.Song, 0, len(updates))
+	for i, update := range updates {
+		if update == nil || update.Song == nil {
+			return nil, fmt.Errorf("updates[%d].song is nil", i)
+		}
+		songs = append(songs, update.Song)
+	}
+
+	return songs, nil
+}
+
+type worldsendUpdateTarget struct {
+	SongID  int
+	ChartID int
+}
+
+func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) (map[string]worldsendUpdateTarget, error) {
+	if len(displayIDs) == 0 {
+		return map[string]worldsendUpdateTarget{}, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT s.display_id, s.id, wc.id
+		FROM songs s
+		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND s.display_id IN (?)
+	`, displayIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = exec.Rebind(query)
+
+	rows, err := exec.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	targets := make(map[string]worldsendUpdateTarget)
+	for rows.Next() {
+		var displayID string
+		var songID, chartID int
+		if err := rows.Scan(&displayID, &songID, &chartID); err != nil {
+			return nil, err
+		}
+		targets[displayID] = worldsendUpdateTarget{SongID: songID, ChartID: chartID}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return targets, nil
+}
+
+func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, targets map[string]worldsendUpdateTarget) (int64, error) {
+	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
+	var titleArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
+	songIDs := make([]int, 0, len(songs))
+
+	for _, song := range songs {
+		target := targets[song.DisplayID]
+		songIDs = append(songIDs, target.SongID)
+
+		titleCases = append(titleCases, "WHEN id = ? THEN ?")
+		titleArgs = append(titleArgs, target.SongID, song.Title)
+
+		artistCases = append(artistCases, "WHEN id = ? THEN ?")
+		artistArgs = append(artistArgs, target.SongID, song.Artist)
+
+		genreCases = append(genreCases, "WHEN id = ? THEN ?")
+		genreArgs = append(genreArgs, target.SongID, song.GenreID)
+
+		bpmCases = append(bpmCases, "WHEN id = ? THEN ?")
+		bpmArgs = append(bpmArgs, target.SongID, song.BPM)
+
+		releasedCases = append(releasedCases, "WHEN id = ? THEN ?")
+		releasedArgs = append(releasedArgs, target.SongID, song.ReleasedAt)
+
+		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
+		jacketArgs = append(jacketArgs, target.SongID, song.Jacket)
+	}
+
+	args := make([]any, 0)
+	args = append(args, titleArgs...)
+	args = append(args, artistArgs...)
+	args = append(args, genreArgs...)
+	args = append(args, bpmArgs...)
+	args = append(args, releasedArgs...)
+	args = append(args, jacketArgs...)
+
+	placeholders := make([]string, len(songIDs))
+	for i, id := range songIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE songs SET
+			title = CASE %s END,
+			artist = CASE %s END,
+			genre_id = CASE %s END,
+			bpm = CASE %s END,
+			released_at = CASE %s END,
+			jacket = CASE %s END
+		WHERE is_worldsend = 1 AND id IN (%s)
+	`,
+		strings.Join(titleCases, " "),
+		strings.Join(artistCases, " "),
+		strings.Join(genreCases, " "),
+		strings.Join(bpmCases, " "),
+		strings.Join(releasedCases, " "),
+		strings.Join(jacketCases, " "),
+		strings.Join(placeholders, ","),
+	)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return rowsAffected, nil
+}
+
+func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, int, error) {
+	type chartUpdate struct {
+		ChartID   int
+		LevelStar *levelstar.LevelStar
+		Attribute *string
+		Notes     any
+	}
+
+	chartUpdates := make([]chartUpdate, 0, len(updates))
+	for _, update := range updates {
+		if update == nil || update.Chart == nil {
+			continue
+		}
+
+		target := targets[update.Song.DisplayID]
+		chartUpdates = append(chartUpdates, chartUpdate{
+			ChartID:   target.ChartID,
+			LevelStar: update.Chart.LevelStar,
+			Attribute: update.Chart.Attribute,
+			Notes:     update.Chart.Notes,
+		})
+	}
+
+	if len(chartUpdates) == 0 {
+		return 0, 0, nil
+	}
+
+	var levelCases, attributeCases, notesCases []string
+	var levelArgs, attributeArgs, notesArgs []any
+	chartIDs := make([]int, 0, len(chartUpdates))
+
+	for _, update := range chartUpdates {
+		chartIDs = append(chartIDs, update.ChartID)
+
+		levelCases = append(levelCases, "WHEN id = ? THEN ?")
+		levelArgs = append(levelArgs, update.ChartID, update.LevelStar)
+
+		attributeCases = append(attributeCases, "WHEN id = ? THEN ?")
+		attributeArgs = append(attributeArgs, update.ChartID, update.Attribute)
+
+		notesCases = append(notesCases, "WHEN id = ? THEN ?")
+		notesArgs = append(notesArgs, update.ChartID, update.Notes)
+	}
+
+	args := make([]any, 0)
+	args = append(args, levelArgs...)
+	args = append(args, attributeArgs...)
+	args = append(args, notesArgs...)
+
+	placeholders := make([]string, len(chartIDs))
+	for i, id := range chartIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE worldsend_charts SET
+			level_star = CASE %s END,
+			attribute = CASE %s END,
+			notes = CASE %s END
+		WHERE id IN (%s)
+	`,
+		strings.Join(levelCases, " "),
+		strings.Join(attributeCases, " "),
+		strings.Join(notesCases, " "),
+		strings.Join(placeholders, ","),
+	)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return rowsAffected, len(chartUpdates), nil
+}
+
+func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec repository.Executor, targets map[string]worldsendUpdateTarget) (bool, error) {
+	if len(targets) == 0 {
+		return true, nil
+	}
+
+	pairConditions := make([]string, 0, len(targets))
+	args := make([]any, 0, len(targets)*2)
+	for _, target := range targets {
+		pairConditions = append(pairConditions, "(s.id = ? AND wc.id = ?)")
+		args = append(args, target.SongID, target.ChartID)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM songs s
+		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND (%s)
+	`, strings.Join(pairConditions, " OR "))
+
+	var count int
+	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
+		return false, err
+	}
+
+	return count == len(targets), nil
 }

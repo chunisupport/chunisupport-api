@@ -39,7 +39,7 @@ func ToV1WorldsendChartDTO(chart *entity.WorldsendChart) *V1WorldsendChartDTO {
 
 	return &V1WorldsendChartDTO{
 		Attribute: chart.Attribute,
-		LevelStar: chart.LevelStar,
+		LevelStar: dto.ToLevelStarIntPtr(chart.LevelStar),
 		Notes:     dto.ToNotesIntPtr(chart.Notes),
 	}
 }

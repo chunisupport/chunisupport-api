@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -24,30 +26,30 @@ func NewWorldsendRecordRepository(db *sqlx.DB) repository.WorldsendRecordReposit
 
 // worldsendRecordRow は DB から WORLD'S END レコード取得用の JOIN 結果をマッピングする構造体です。
 type worldsendRecordRow struct {
-	PlayerID         int          `db:"player_id"`
-	WorldsendChartID int          `db:"worldsend_chart_id"`
-	Score            uint32       `db:"score"`
-	ClearLampID      int          `db:"clear_lamp_id"`
-	ComboLampID      int          `db:"combo_lamp_id"`
-	FullChainID      int          `db:"full_chain_id"`
-	UpdatedAt        time.Time    `db:"updated_at"`
-	ChartSongID      int          `db:"chart_song_id"`
-	ChartLevelStar   *int         `db:"chart_level_star"`
-	ChartAttribute   *string      `db:"chart_attribute"`
-	ChartNotes       *notes.Notes `db:"chart_notes"`
-	SongID           int          `db:"song_id"`
-	SongDisplayID    string       `db:"song_display_id"`
-	SongTitle        string       `db:"song_title"`
-	SongArtist       string       `db:"song_artist"`
-	SongGenreID      *int         `db:"song_genre_id"`
-	SongBPM          *int         `db:"song_bpm"`
-	SongReleasedAt   *time.Time   `db:"song_released_at"`
-	SongOfficialIdx  string       `db:"song_official_idx"`
-	SongJacket       *string      `db:"song_jacket"`
-	SongIsDeleted    bool         `db:"song_is_deleted"`
-	ClearLampName    string       `db:"clear_lamp_name"`
-	ComboLampName    string       `db:"combo_lamp_name"`
-	FullChainName    string       `db:"full_chain_name"`
+	PlayerID         int                  `db:"player_id"`
+	WorldsendChartID int                  `db:"worldsend_chart_id"`
+	Score            uint32               `db:"score"`
+	ClearLampID      int                  `db:"clear_lamp_id"`
+	ComboLampID      int                  `db:"combo_lamp_id"`
+	FullChainID      int                  `db:"full_chain_id"`
+	UpdatedAt        time.Time            `db:"updated_at"`
+	ChartSongID      int                  `db:"chart_song_id"`
+	ChartLevelStar   *levelstar.LevelStar `db:"chart_level_star"`
+	ChartAttribute   *string              `db:"chart_attribute"`
+	ChartNotes       *notes.Notes         `db:"chart_notes"`
+	SongID           int                  `db:"song_id"`
+	SongDisplayID    string               `db:"song_display_id"`
+	SongTitle        string               `db:"song_title"`
+	SongArtist       string               `db:"song_artist"`
+	SongGenreID      *int                 `db:"song_genre_id"`
+	SongBPM          *int                 `db:"song_bpm"`
+	SongReleasedAt   *time.Time           `db:"song_released_at"`
+	SongOfficialIdx  string               `db:"song_official_idx"`
+	SongJacket       *string              `db:"song_jacket"`
+	SongIsDeleted    bool                 `db:"song_is_deleted"`
+	ClearLampName    string               `db:"clear_lamp_name"`
+	ComboLampName    string               `db:"combo_lamp_name"`
+	FullChainName    string               `db:"full_chain_name"`
 }
 
 const worldsendRecordQuery = `

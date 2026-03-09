@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -15,7 +16,10 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	bpm := 200
 	jacket := "v1jacket.png"
 	releasedAt := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
-	levelStar := 3
+	levelStar, levelStarErr := levelstar.NewLevelStar(3)
+	if levelStarErr != nil {
+		t.Fatalf("levelstar.NewLevelStar failed: %v", levelStarErr)
+	}
 	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -16,7 +17,10 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	bpm := 180
 	jacket := "jacket.png"
 	releasedAt := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
-	levelStar := 5
+	levelStar, levelStarErr := levelstar.NewLevelStar(5)
+	if levelStarErr != nil {
+		t.Fatalf("levelstar.NewLevelStar failed: %v", levelStarErr)
+	}
 	attribute := "狂"
 	notesObj, _ := notes.NewNotes(1500)
 
@@ -140,7 +144,10 @@ func TestToWorldsendSongDTO_NilSong(t *testing.T) {
 
 // TestToWorldsendChartDTO は ToWorldsendChartDTO 関数の基本的な変換をテストします。
 func TestToWorldsendChartDTO(t *testing.T) {
-	levelStar := 3
+	levelStar, levelStarErr := levelstar.NewLevelStar(3)
+	if levelStarErr != nil {
+		t.Fatalf("levelstar.NewLevelStar failed: %v", levelStarErr)
+	}
 	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
 

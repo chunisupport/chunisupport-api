@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -50,7 +51,7 @@ func ToWorldsendRecordDTO(record *entity.PlayerWorldsendRecord) *WorldsendRecord
 
 	// WORLD'S END 譜面情報を設定
 	if record.WorldsendChart != nil {
-		dto.LevelStar = record.WorldsendChart.LevelStar
+		dto.LevelStar = ToLevelStarIntPtr(record.WorldsendChart.LevelStar)
 		dto.Attribute = record.WorldsendChart.Attribute
 		dto.Notes = ToNotesIntPtr(record.WorldsendChart.Notes)
 	}
@@ -75,5 +76,15 @@ func ToNotesIntPtr(value *notes.Notes) *int {
 	}
 
 	converted := int(*value)
+	return &converted
+}
+
+// ToLevelStarIntPtr は LevelStar の値オブジェクトを *int に変換します。
+func ToLevelStarIntPtr(value *levelstar.LevelStar) *int {
+	if value == nil {
+		return nil
+	}
+
+	converted := value.Int()
 	return &converted
 }

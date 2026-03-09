@@ -165,7 +165,7 @@ func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec reposi
 	return errors.New("not implemented")
 }
 
-func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, charts []*entity.WorldsendChart) error {
+func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
 	return errors.New("not implemented")
 }
 
