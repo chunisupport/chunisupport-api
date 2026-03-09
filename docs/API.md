@@ -1421,6 +1421,7 @@ curl -X POST \
 
 **注意事項**:
 - リクエスト配列内で `id`（display_id）が重複している場合はエラーになります。
+- WORLD'S END楽曲（`is_worldsend = 1`）の `id` を指定した場合、このエンドポイントでは更新できずエラーになります。
 - マスタに存在しないジャンル名を指定するとエラーになります。
 - `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます。

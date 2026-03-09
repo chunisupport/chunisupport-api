@@ -135,3 +135,35 @@ func TestFindByDisplayIDs_SetsIsMaxOPUnknownWhenMasterOrUltimaIsConstUnknown(t *
 	assert.InDelta(t, 14.6, songs[0].MaxChartConst, 0.001)
 	assert.True(t, songs[0].IsMaxOPUnknown)
 }
+
+func TestFindByDisplayIDs_ExcludesWorldsendSongs(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0),
+			(2, 'WORLD001', 'Worldsend Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		VALUES
+			(1, 4, 13.8, 0, 1050),
+			(2, 4, 14.5, 0, 1200)
+	`)
+	require.NoError(t, err)
+
+	repo := &songRepository{db: db}
+	songs, err := repo.FindByDisplayIDs(ctx, db, []string{"DISPLAY001", "WORLD001"})
+	require.NoError(t, err)
+
+	require.Len(t, songs, 1)
+	assert.Equal(t, "DISPLAY001", songs[0].DisplayID)
+	require.Len(t, songs[0].Charts, 1)
+	assert.Equal(t, 1, songs[0].Charts[0].SongID)
+}

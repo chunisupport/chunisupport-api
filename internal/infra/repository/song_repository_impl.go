@@ -161,7 +161,7 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 	}
 }
 
-// FindByDisplayIDs は指定されたDisplayIDのリストに該当する楽曲を取得します。
+// FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
 // 各楽曲には関連する譜面情報が含まれます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
 func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) ([]*entity.Song, error) {
@@ -174,6 +174,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
 		WHERE display_id IN (?)
+		  AND is_worldsend = 0
 	`, displayIDs)
 	if err != nil {
 		return nil, err
@@ -457,6 +458,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			released_at = CASE %s END,
 			jacket = CASE %s END
 		WHERE id IN (%s)
+		  AND is_worldsend = 0
 	`,
 		strings.Join(titleCases, " "),
 		strings.Join(artistCases, " "),
@@ -541,7 +543,8 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 			const = CASE %s END,
 			is_const_unknown = CASE %s END,
 			notes = CASE %s END
-		WHERE %s
+		WHERE (%s)
+		  AND song_id IN (SELECT id FROM songs WHERE is_worldsend = 0)
 	`,
 		strings.Join(constCases, " "),
 		strings.Join(unknownCases, " "),

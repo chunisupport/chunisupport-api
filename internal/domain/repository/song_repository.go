@@ -20,7 +20,7 @@ type SongRepository interface {
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
 
-	// FindByDisplayIDs は指定されたDisplayIDのリストに該当する楽曲を取得します。
+	// FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
 	// 存在しないDisplayIDがある場合でもエラーにはせず、存在する楽曲のみを返します。
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayIDs(ctx context.Context, exec Executor, displayIDs []string) ([]*entity.Song, error)
