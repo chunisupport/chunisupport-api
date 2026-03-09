@@ -158,20 +158,14 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		return nil
 	}
 
-	songs := make([]*entity.Song, 0, len(updates))
-	displayIDs := make([]string, 0, len(updates))
-	seen := make(map[string]struct{}, len(updates))
-	for i, update := range updates {
-		if update == nil || update.Song == nil {
-			return fmt.Errorf("updates[%d].song is nil", i)
-		}
-		song := update.Song
-		if _, exists := seen[song.DisplayID]; exists {
-			return fmt.Errorf("%w: display_id=%s", repository.ErrDuplicateDisplayID, song.DisplayID)
-		}
-		seen[song.DisplayID] = struct{}{}
-		songs = append(songs, song)
-		displayIDs = append(displayIDs, song.DisplayID)
+	songs, err := collectSongsFromWorldsendUpdates(updates)
+	if err != nil {
+		return err
+	}
+
+	displayIDs, err := collectUniqueDisplayIDs(songs)
+	if err != nil {
+		return err
 	}
 
 	targets, err := r.findUpdateTargetsByDisplayIDs(ctx, exec, displayIDs)
