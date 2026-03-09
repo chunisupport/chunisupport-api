@@ -39,6 +39,7 @@ func (l *LevelStar) Scan(value any) error {
 	}
 
 	if value == nil {
+		*l = 0
 		return nil
 	}
 
