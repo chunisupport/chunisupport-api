@@ -37,7 +37,11 @@ func (c ChartConstant) Value() (driver.Value, error) {
 // データベースから値を読み取る際に呼び出されます。
 func (c *ChartConstant) Scan(value any) error {
 	if value == nil {
-		*c = 0
+		chartConst, err := NewChartConstant(0)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	}
 
@@ -48,11 +52,19 @@ func (c *ChartConstant) Scan(value any) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert []byte to float64: %w", err)
 		}
-		*c = ChartConstant(f)
+		chartConst, err := NewChartConstant(f)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	case float64:
 		// 数値型として返される場合。
-		*c = ChartConstant(v)
+		chartConst, err := NewChartConstant(v)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	default:
 		return fmt.Errorf("unsupported type: %T", v)
@@ -74,6 +86,10 @@ func (c *ChartConstant) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return err
 	}
-	*c = ChartConstant(f)
+	chartConst, err := NewChartConstant(f)
+	if err != nil {
+		return err
+	}
+	*c = chartConst
 	return nil
 }

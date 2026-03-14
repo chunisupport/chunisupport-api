@@ -77,7 +77,10 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec reposito
 	}
 
 	for _, model := range chartModels {
-		chart := model.ToEntity()
+		chart, err := model.ToEntity()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert chart model to entity: %w", err)
+		}
 		key := fmt.Sprintf("%d:%d", chart.SongID, chart.DifficultyID)
 		result.ChartsByKey[key] = *chart
 		result.ChartsByID[chart.ID] = *chart

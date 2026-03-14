@@ -3,6 +3,7 @@ package entity
 import (
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -25,7 +26,7 @@ type PlayerDataChart struct {
 	ID             int
 	SongID         int
 	DifficultyID   int
-	Const          float64
+	Const          chartconstant.ChartConstant
 	IsConstUnknown bool
 	Notes          *notes.Notes
 }

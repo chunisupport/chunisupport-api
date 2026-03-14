@@ -1,9 +1,11 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -63,15 +65,20 @@ type PlayerDataChartModel struct {
 }
 
 // ToEntity は PlayerDataChartModel を entity.PlayerDataChart に変換します。
-func (m *PlayerDataChartModel) ToEntity() *entity.PlayerDataChart {
+func (m *PlayerDataChartModel) ToEntity() (*entity.PlayerDataChart, error) {
+	chartConst, err := chartconstant.NewChartConstant(m.Const)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chart constant (chart_id=%d): %w", m.ID, err)
+	}
+
 	return &entity.PlayerDataChart{
 		ID:             m.ID,
 		SongID:         m.SongID,
 		DifficultyID:   m.DifficultyID,
-		Const:          m.Const,
+		Const:          chartConst,
 		IsConstUnknown: m.IsConstUnknown,
 		Notes:          m.Notes,
-	}
+	}, nil
 }
 
 func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel {
@@ -79,7 +86,7 @@ func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel 
 		ID:             e.ID,
 		SongID:         e.SongID,
 		DifficultyID:   e.DifficultyID,
-		Const:          e.Const,
+		Const:          float64(e.Const),
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          e.Notes,
 	}

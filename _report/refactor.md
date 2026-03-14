@@ -43,7 +43,7 @@
 | **REF-G01** | 認証・セッション境界の防御強化 | SEC-01, SEC-04, SEC-05, SEC-06, SEC-008, SEC-011 | 認証周辺の攻撃面（CSRF、秘密鍵/ペッパー強度、タイミング攻撃、Cookie運用要件）を同時に見直すことで、脅威モデル・設定値・実装を一括で整合できる。 |
 | **REF-G02** | 入力検証・エラー変換の境界統一 | HDL-002, HDL-003, HDL-004, UC-005, DTO-001 | HTTP境界での入力検証不足と、層間エラー変換の不整合は同じ「境界責務」の問題。バリデーション方針とエラー変換規約を同時整備する。 |
 | **REF-G03** | ドメイン純粋性の回復（インフラ依存排除） | DOM-006, DOM-017, ARCH-002 | ドメイン/DTO側にインフラ都合（dbタグ、JSONバイト生保持）が混入。モデルの責務分離を同時実施して依存方向を正す。 |
-| **REF-G04** | 値オブジェクトの整合性・型安全性向上 | DOM-007, DOM-008, DOM-014, INFRA-009, INFRA-016 | VOバリデーション迂回・危険な型変換・エラー無視が連鎖している。VOの生成/変換/永続化パスを一体で修正する。 |
+| **REF-G04** | 値オブジェクトの整合性・型安全性向上 | DOM-007, DOM-008, INFRA-009, INFRA-016 | VOバリデーション迂回・危険な型変換・エラー無視が連鎖している。VOの生成/変換/永続化パスを一体で修正する。 |
 | **REF-G05** | リポジトリエラーとユースケース依存の是正 | QUAL-009, DOM-018, QUAL-010 | Usecaseが `sql.ErrNoRows` を直接参照する原因は、Repositoryのドメインエラー設計不足とDomain層のsqlx依存。同時改修でクリーンアーキテクチャ違反を解消。 |
 | **REF-G07** | トランザクション整合性と実行器契約の統一 | UC-004, UC-013, INFRA-011 | トランザクション欠如と暗黙フォールバックは同系統の整合性リスク。境界をまたぐ処理を「必ずTxで完結」に統一する。 |
 | **REF-G08** | クエリ負荷・N+1・バルク処理最適化 | PERF-003, PERF-004, PERF-006, INFRA-004, INFRA-010, INFRA-012 | 全件取得・N+1・巨大IN句・無分割バルクなど、DB負荷起因の課題群。取得戦略とチャンク戦略を同時に最適化する。 |
@@ -277,7 +277,6 @@
 | **DOM-011** | **Medium** | 理論値スコア定数の二重定義 | `internal/domain/service/info.go` の `theoreticalScore uint32 = 1010000` と `internal/info/info.go` の `TheoreticalScore = 1010000` が重複。1箇所に集約すべき。 |
 | **DOM-012** | **Low** | `WorldsendSongWithChart` と `WorldsendSongChartPair` の重複 | `repository` 層と `service` 層にフィールド同一の重複構造体。entity層に統一構造体を定義すべき。 |
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり。方針を統一すべき。 |
-| **DOM-014** | **Medium** | `PlayerDataChart.Const` がVO未使用 | `float64` で定義されており、通常の `Chart` が使う `chartconstant.ChartConstant` と不整合。VOによるバリデーションが適用されない。 |
 | **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.26で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
 | **DOM-018** | **Medium** | `repository.errors.go` のエラー定義不足 | `ErrSongNotFound` のみで `ErrUserNotFound` 等はusecase層に定義。リポジトリが適切なドメインエラーを返せず、QUAL-009の根本原因となっている。 |
