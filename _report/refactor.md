@@ -42,7 +42,7 @@
 |---|---|---|---|
 | **REF-G01** | 認証・セッション境界の防御強化 | SEC-01, SEC-04, SEC-05, SEC-06, SEC-008, SEC-011 | 認証周辺の攻撃面（CSRF、秘密鍵/ペッパー強度、タイミング攻撃、Cookie運用要件）を同時に見直すことで、脅威モデル・設定値・実装を一括で整合できる。 |
 | **REF-G02** | 入力検証・エラー変換の境界統一 | HDL-002, HDL-003, HDL-004, UC-005, DTO-001 | HTTP境界での入力検証不足と、層間エラー変換の不整合は同じ「境界責務」の問題。バリデーション方針とエラー変換規約を同時整備する。 |
-| **REF-G03** | ドメイン純粋性の回復（インフラ依存排除） | DOM-001, DOM-006, DOM-017, ARCH-002 | ドメイン/DTO側にインフラ都合（driver/sql、dbタグ、JSONバイト生保持）が混入。モデルの責務分離を同時実施して依存方向を正す。 |
+| **REF-G03** | ドメイン純粋性の回復（インフラ依存排除） | DOM-006, DOM-017, ARCH-002 | ドメイン/DTO側にインフラ都合（dbタグ、JSONバイト生保持）が混入。モデルの責務分離を同時実施して依存方向を正す。 |
 | **REF-G04** | 値オブジェクトの整合性・型安全性向上 | DOM-007, DOM-008, DOM-014, INFRA-009, INFRA-016 | VOバリデーション迂回・危険な型変換・エラー無視が連鎖している。VOの生成/変換/永続化パスを一体で修正する。 |
 | **REF-G05** | リポジトリエラーとユースケース依存の是正 | QUAL-009, DOM-018, QUAL-010 | Usecaseが `sql.ErrNoRows` を直接参照する原因は、Repositoryのドメインエラー設計不足とDomain層のsqlx依存。同時改修でクリーンアーキテクチャ違反を解消。 |
 | **REF-G07** | トランザクション整合性と実行器契約の統一 | UC-004, UC-013, INFRA-011 | トランザクション欠如と暗黙フォールバックは同系統の整合性リスク。境界をまたぐ処理を「必ずTxで完結」に統一する。 |
@@ -271,7 +271,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **DOM-001** | **Medium** | VOが `database/sql/driver` に依存 | 全値オブジェクト（`chartconstant`, `notes`, `passwordhash`, `playername`, `score`, `username`）が `driver.Valuer`/`sql.Scanner` を実装しており、DB永続化というインフラ関心事がドメイン層に混入。`infra/models` 層でアダプタを用意し、VOからDB依存を排除する。 |
 | **DOM-006** | **Medium** | `Goal` エンティティが貧血症モデル＋`[]byte`フィールド | `AchievementParams []byte` と `Attributes []byte` はJSONバイト列の生保持であり、インフラ層の都合がドメイン層に漏洩している。適切な構造体やマップに変換すべき。 |
 | **DOM-007** | **Medium** | `ChartConstant.Scan`/`UnmarshalJSON` がバリデーションをバイパス | コンストラクタは「0以上」の検証を行うが、`Scan` と `UnmarshalJSON` は直接値を設定。負値がDB/JSONから入力された場合に不正なVOが生成される。`score.Score` の `Scan` 実装を模範にすべき。 |
 | **DOM-008** | **Medium** | `Notes.Scan` がバリデーションをバイパス | `Notes(v)` で直接キャストしており、`NewNotes` のバリデーション（0以上）を経由しない。 |
@@ -374,14 +373,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **DTO-001** | **Low** | `GoalRequest` の `AchievementParams`/`Attributes` が `map[string]any` | 型安全でなく、スキーマ検証なし。任意データをDBに保存可能。サイズ上限チェックも不在。 |
-
----
-
-## 将来のリファクタリング計画 (FUTURE)
-
-| ID | 優先度 | 概要 | 詳細・対応方針 |
-|---|---|---|---|
-| **FUTURE-001** | **Low** | Primitive Obsession 対応 | レビューで指摘された「プリミティブ型への執着」を将来的に解消する。現時点では別テーマとして扱い、段階的に進める。<br><br>**対象と狙い**: `PlayerDataMasters` 内の `map[string]Item` など、ドメイン概念のキーを `string` で扱っている箇所。クリアランプ名や難易度などはドメイン固有の概念であり、Value Object 化で型安全性を高める。<br><br>**方針**:<br>1. `ClearLampName` などの Value Object を Domain 層に定義し、コンストラクタで正規化・検証を行う。<br>2. `map[string]Item` を `map[ClearLampName]Item` のように置換し、呼び出し側も Value Object を使うように統一する。<br>3. 正規化処理（大文字化など）を Value Object に集約し、重複する `strings.ToUpper()`/`strings.ToLower()` を排除する。<br>4. 影響範囲が大きいため、マスターデータの一部（例: クリアランプ/難易度）から段階的に移行する。<br>5. 既存テストの修正で整合を取ることを基本とし、新規テスト追加は重複が出ない範囲に限定する。 |
 
 ## 追加で重点的に確認したい事項
 - **JWTの運用ポリシー**: `issuer`/`audience` の運用があるか（必要なら `ValidateToken` に追加）。
