@@ -173,3 +173,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 ### マイグレーション履歴
 - **000001**: 初期スキーマ。全マスタテーブル（genres, difficulties, class_emblems, clear_lamp_types, combo_lamp_types, slots, full_chain_types, honor_types, account_types, versions等）、楽曲・譜面関連テーブル（songs, charts, worldsend_charts）、ユーザー・認証関連テーブル（users, sessions, api_tokens, user_recovery_codes）、プレイヤー関連テーブル（players, player_records, player_worldsend_records, player_honors）、および各種インデックスを含む。
 - **000002**: セッション自動クリーンアップイベントの追加。1時間ごとに期限切れのセッション（`expires_at < NOW()`）を削除するMySQLイベントスケジューラー（`cleanup_expired_sessions`）を設定。運用時は `event_scheduler = ON` の設定が必要。
+- **000006**: `players.overpower_value` を `DECIMAL(9, 3)`、`players.overpower_percentage` を `DECIMAL(7, 4)` に拡張し、OVER POWER 関連値の保持精度を上げる。

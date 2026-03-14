@@ -52,8 +52,8 @@ entity "players" as players {
   class_emblem_id: TINYINT
   class_emblem_base_id: TINYINT
   last_played_at: DATETIME
-  overpower_value: DECIMAL(8, 2)
-  overpower_percentage: DECIMAL(5, 2)
+  overpower_value: DECIMAL(9, 3)
+  overpower_percentage: DECIMAL(7, 4)
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
 }
