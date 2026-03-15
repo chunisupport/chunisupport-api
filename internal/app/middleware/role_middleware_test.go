@@ -29,53 +29,37 @@ func runRequireRoleTestRequest(t *testing.T, e *echo.Echo, handler echo.HandlerF
 	return rec
 }
 
-func TestRequireRole_AdminRequired(t *testing.T) {
+func TestRequireRole(t *testing.T) {
 	tests := []struct {
-		name       string
-		user       *entity.User
-		wantStatus int
+		name           string
+		requiredRoleID int
+		user           *entity.User
+		wantStatus     int
 	}{
-		{name: "PLAYERは拒否", user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
-		{name: "EDITORは拒否", user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusForbidden},
-		{name: "ADMINは許可", user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
-		{name: "未知ロールは拒否", user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
-		{name: "未認証は拒否", user: nil, wantStatus: http.StatusUnauthorized},
+		{name: "AdminRequired/PLAYERは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
+		{name: "AdminRequired/EDITORは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusForbidden},
+		{name: "AdminRequired/ADMINは許可", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
+		{name: "AdminRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
+		{name: "AdminRequired/未認証は拒否", requiredRoleID: info.AccountTypeAdmin, user: nil, wantStatus: http.StatusUnauthorized},
+		{name: "EditorRequired/PLAYERは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
+		{name: "EditorRequired/EDITORは許可", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusOK},
+		{name: "EditorRequired/ADMINは許可", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
+		{name: "EditorRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
+		{name: "EditorRequired/未認証は拒否", requiredRoleID: info.AccountTypeEditor, user: nil, wantStatus: http.StatusUnauthorized},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given
 			e := setupEchoWithErrorHandler(t)
-			handler := RequireRole(info.AccountTypeAdmin)(func(c echo.Context) error {
+			handler := RequireRole(tt.requiredRoleID)(func(c echo.Context) error {
 				return c.String(http.StatusOK, "OK")
 			})
 
+			// When
 			rec := runRequireRoleTestRequest(t, e, handler, tt.user)
-			assert.Equal(t, tt.wantStatus, rec.Code)
-		})
-	}
-}
 
-func TestRequireRole_EditorRequired(t *testing.T) {
-	tests := []struct {
-		name       string
-		user       *entity.User
-		wantStatus int
-	}{
-		{name: "PLAYERは拒否", user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
-		{name: "EDITORは許可", user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusOK},
-		{name: "ADMINは許可", user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
-		{name: "未知ロールは拒否", user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
-		{name: "未認証は拒否", user: nil, wantStatus: http.StatusUnauthorized},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := setupEchoWithErrorHandler(t)
-			handler := RequireRole(info.AccountTypeEditor)(func(c echo.Context) error {
-				return c.String(http.StatusOK, "OK")
-			})
-
-			rec := runRequireRoleTestRequest(t, e, handler, tt.user)
+			// Then
 			assert.Equal(t, tt.wantStatus, rec.Code)
 		})
 	}

@@ -1,6 +1,10 @@
 package info
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestIsKnownAccountType(t *testing.T) {
 	tests := []struct {
@@ -19,9 +23,7 @@ func TestIsKnownAccountType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsKnownAccountType(tt.accountTypeID)
-			if got != tt.want {
-				t.Fatalf("IsKnownAccountType(%d) = %v, want %v", tt.accountTypeID, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -50,9 +52,7 @@ func TestHasRole(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := HasRole(tt.accountTypeID, tt.requiredRoleID)
-			if got != tt.want {
-				t.Fatalf("HasRole(%d, %d) = %v, want %v", tt.accountTypeID, tt.requiredRoleID, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
