@@ -208,9 +208,6 @@ func (h *SongHandler) convertToEditorSongDTO(song *entity.Song) *api_internal.Ed
 		return nil
 	}
 	base := h.convertToSongDTO(song)
-	if base == nil {
-		return nil
-	}
 
 	return &api_internal.EditorSongDTO{
 		SongDTO:   base,
