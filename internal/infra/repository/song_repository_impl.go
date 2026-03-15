@@ -241,14 +241,14 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 	return songs, nil
 }
 
-// FindByDisplayID は指定されたDisplayIDの楽曲を取得します。
+// FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 // 削除済み楽曲も取得します。
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 		FROM songs
-		WHERE display_id = ?
+		WHERE display_id = ? AND is_worldsend = 0
 	`
 	var songRow songRow
 	if err := exec.GetContext(ctx, &songRow, songQuery, displayID); err != nil {

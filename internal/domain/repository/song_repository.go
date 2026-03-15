@@ -15,7 +15,7 @@ type SongRepository interface {
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindAllExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Song, error)
 
-	// FindByDisplayID は指定されたDisplayIDの楽曲を取得します。
+	// FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 	// 削除済み楽曲も取得します。
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
