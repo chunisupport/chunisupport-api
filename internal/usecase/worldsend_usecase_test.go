@@ -85,6 +85,12 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			expectedIncludeDeleted: false,
 		},
 		{
+			name:                   "未知ロール_includeDeleted=true_削除済みを除外",
+			includeDeleted:         true,
+			requesterAccountTypeID: intPtr(4),
+			expectedIncludeDeleted: false,
+		},
+		{
 			name:                   "権限なし_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: nil,
@@ -155,6 +161,13 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 			name:                   "削除済み楽曲はPLAYER権限ではErrSongNotFoundになる",
 			displayID:              "WE002",
 			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
+			repoReturn:             deletedSong,
+			wantErr:                repository.ErrSongNotFound,
+		},
+		{
+			name:                   "削除済み楽曲は未知ロールではErrSongNotFoundになる",
+			displayID:              "WE002",
+			requesterAccountTypeID: intPtr(4),
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},

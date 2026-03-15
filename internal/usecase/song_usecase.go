@@ -10,11 +10,11 @@ import (
 // SongUsecase は楽曲に関するユースケースを提供します。
 type SongUsecase interface {
 	// GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
-	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
 
 	// GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

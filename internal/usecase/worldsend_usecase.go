@@ -41,11 +41,11 @@ type UpdateWorldsendSongInput struct {
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
 
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
 
 	// DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
@@ -75,11 +75,11 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 }
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-// includeDeleted が true かつ requesterAccountTypeID が EDITOR 未満の場合、削除済み楽曲は除外されます。
+// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
 	// 削除済み楽曲を含める場合はEDITOR権限が必要
 	if includeDeleted {
-		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			includeDeleted = false
 		}
 	}
@@ -94,7 +94,7 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 }
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error) {
 	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 	// 削除済み楽曲の権限チェック
 	if !songWithChart.Song.IsActive() {
 		// EDITOR以上の権限を持たない場合は404を返す
-		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
 	}

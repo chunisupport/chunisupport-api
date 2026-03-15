@@ -3,12 +3,9 @@ package middleware
 import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-
-	// ...existing code...
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v4"
 )
-
-// ...existing code...
 
 // RequireRole は指定された権限レベル以上を要求するミドルウェアを返します。
 // JWTMiddleware の後に使用することを想定しています。
@@ -26,8 +23,8 @@ func RequireRole(minRoleID int) echo.MiddlewareFunc {
 				return apierror.ErrUnauthorized
 			}
 
-			// 権限チェック
-			if user.AccountTypeID < minRoleID {
+			// 権限チェック（未知ロールIDは拒否）
+			if !info.HasRole(user.AccountTypeID, minRoleID) {
 				return apierror.ErrForbidden
 			}
 

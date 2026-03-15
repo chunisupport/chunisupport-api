@@ -14,13 +14,13 @@ import (
 // ChartStatsUsecase は譜面統計の取得ユースケースを提供します。
 type ChartStatsUsecase interface {
 	// GetSongStatsByDisplayID は指定されたDisplayIDの譜面統計を取得します。
-	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetSongStatsByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SongChartStats, error)
 
 	// GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 	// difficultyNameは大文字の難易度名（"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"）
 	// または "WORLD'S END" である必要があります。
-	// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error)
 }
 
@@ -61,7 +61,7 @@ type chartEntry struct {
 }
 
 // GetSongStatsByDisplayID は指定されたDisplayIDの譜面統計を取得します。
-// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SongChartStats, error) {
 	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
 	if err != nil {
@@ -71,7 +71,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 	// 削除済み楽曲は権限に応じて公開可否を制御する。
 	if !song.IsActive() {
 		// EDITOR以上の権限を持たない場合は404を返す。
-		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
 	}
@@ -146,7 +146,7 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 }
 
 // GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
-// requesterAccountTypeIDがnilまたはEDITOR(2)未満の場合、削除済み楽曲はErrSongNotFoundを返します。
+// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error) {
 	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
 	if err != nil {
@@ -154,7 +154,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 	}
 
 	if !song.IsActive() {
-		if requesterAccountTypeID == nil || *requesterAccountTypeID < info.AccountTypeEditor {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
 	}

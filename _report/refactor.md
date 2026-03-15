@@ -59,7 +59,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **SEC-01** | **High** | CSRF対策不足 | Double Submit Cookie または Synchronizer Token を導入。SameSite=Lax/Strict と Origin/Referer 検証を併用。 |
-| **SEC-012** | **High** | 権限判定を `account_type_id` の大小比較に依存 | `>= ADMIN` 判定により、DBに追加された未知の権限ID（例: 4）がADMIN専用操作を通過しうる。権限は列挙型（Name/Code）ベースで明示判定し、未知ロールは拒否する。 |
 | **SEC-011** | **High** | パスワード複雑性要件の欠如 | 長さチェックのみ。`zxcvbn-go` 等の導入または正規表現による文字種チェックを追加。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー未実施 | `gosec` などで抑制箇所を洗い出し、根拠を明記。不必要な抑制は削除。 |
 | **SEC-008** | **Low** | Cookie Domain属性の要件確認不足 | Domain属性は常時必須ではないため、まず「サブドメイン間でセッション共有が必要か」を要件として明確化し、必要時のみ設定を追加。 |

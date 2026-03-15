@@ -256,7 +256,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	// 認可チェック: ADMIN権限が必要
-	if requester == nil || requester.AccountTypeID < info.AccountTypeAdmin {
+	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
 	}
 
@@ -290,7 +290,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) RestoreUser(ctx context.Context, requester *entity.User, username string) error {
 	// 認可チェック: ADMIN権限が必要
-	if requester == nil || requester.AccountTypeID < info.AccountTypeAdmin {
+	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
 	}
 
