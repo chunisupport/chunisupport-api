@@ -58,6 +58,31 @@ func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
+// GetEditorWorldsendSongs は編集者向けに全 WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetEditorWorldsendSongs(c echo.Context) error {
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.EditorWorldsendSongsResponse{
+		Songs: h.convertToEditorWorldsendSongDTOs(songsWithCharts),
+	})
+}
+
+// GetEditorWorldsendSong は編集者向けに指定された DisplayID の WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetEditorWorldsendSong(c echo.Context) error {
+	displayID := c.Param("displayid")
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToEditorWorldsendSongDTO(songWithChart))
+}
+
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (h *WorldsendHandler) DeleteWorldsendSong(c echo.Context) error {
 	displayID := c.Param("displayid")
@@ -168,4 +193,26 @@ func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *repository.WorldsendSo
 		}
 	}
 	return api_internal.ToWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
+}
+
+// convertToEditorWorldsendSongDTOs は WorldsendSongWithChart のスライスを EditorWorldsendSongDTO のスライスに変換します。
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
+	songDTOs := make([]*api_internal.EditorWorldsendSongDTO, 0, len(songsWithCharts))
+	for _, swc := range songsWithCharts {
+		songDTOs = append(songDTOs, h.convertToEditorWorldsendSongDTO(swc))
+	}
+	return songDTOs
+}
+
+// convertToEditorWorldsendSongDTO は WorldsendSongWithChart を EditorWorldsendSongDTO に変換します。
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
+	if swc == nil {
+		return nil
+	}
+	base := h.convertToWorldsendSongDTO(swc)
+
+	return &api_internal.EditorWorldsendSongDTO{
+		WorldsendSongDTO: base,
+		IsDeleted:        swc.Song.IsDeleted,
+	}
 }

@@ -69,6 +69,31 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
+// GetEditorSongs は編集者向けにWORLD'S END以外の全楽曲を取得します。
+func (h *SongHandler) GetEditorSongs(c echo.Context) error {
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.EditorSongsResponse{
+		Songs: h.convertToEditorSongDTOs(songsWithCharts),
+	})
+}
+
+// GetEditorSong は編集者向けに指定されたDisplayIDの楽曲を取得します。
+func (h *SongHandler) GetEditorSong(c echo.Context) error {
+	displayID := c.Param("displayid")
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToEditorSongDTO(song))
+}
+
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	displayID := c.Param("displayid")
@@ -166,4 +191,26 @@ func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO 
 		return api_internal.ToChartDTO(chart)
 	})
 	return songDTO
+}
+
+// convertToEditorSongDTOs は Song のスライスを EditorSongDTO のスライスに変換します。
+func (h *SongHandler) convertToEditorSongDTOs(songs []*entity.Song) []*api_internal.EditorSongDTO {
+	songDTOs := make([]*api_internal.EditorSongDTO, 0, len(songs))
+	for _, song := range songs {
+		songDTOs = append(songDTOs, h.convertToEditorSongDTO(song))
+	}
+	return songDTOs
+}
+
+// convertToEditorSongDTO は Song を EditorSongDTO に変換します。
+func (h *SongHandler) convertToEditorSongDTO(song *entity.Song) *api_internal.EditorSongDTO {
+	if song == nil {
+		return nil
+	}
+	base := h.convertToSongDTO(song)
+
+	return &api_internal.EditorSongDTO{
+		SongDTO:   base,
+		IsDeleted: song.IsDeleted,
+	}
 }

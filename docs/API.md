@@ -127,6 +127,10 @@
 | `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
+| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted` を含む）。 |
+| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted` を含む）。 |
+| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む）。 |
+| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む）。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
@@ -1633,6 +1637,90 @@ curl -X POST \
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の削除済み WORLD'S END 楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
+
+## `/internal/editor/songs` グループ
+
+### GET `/internal/editor/songs`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: 編集者向けに、WORLD'S END以外の全楽曲を削除済みも含めて取得します。
+- **レスポンス**: 200 OK
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `songs` | EditorSongDTO[] | 楽曲情報の配列 |
+
+**EditorSongDTO**:
+
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `is_deleted` | bool | 論理削除済みかどうか |
+
+`SongDTO` の各フィールドの詳細は GET `/internal/songs` の `SongDTO` を参照してください。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/editor/songs/:displayid`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 編集者向けに、指定されたDisplayIDの通常楽曲を取得します。削除済みも取得対象です。
+- **レスポンス**: 200 OK (`EditorSongDTO`)
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/editor/songs/worldsend`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: 編集者向けに、全 WORLD'S END 楽曲を削除済みも含めて取得します。
+- **レスポンス**: 200 OK
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `songs` | EditorWorldsendSongDTO[] | WORLD'S END 楽曲情報の配列 |
+
+**EditorWorldsendSongDTO**:
+
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `is_deleted` | bool | 論理削除済みかどうか |
+
+`WorldsendSongDTO` の各フィールドの詳細は GET `/internal/songs/worldsend` の `WorldsendSongDTO` を参照してください。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/editor/songs/worldsend/:displayid`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 編集者向けに、指定されたDisplayIDの WORLD'S END 楽曲を取得します。削除済みも取得対象です。
+- **レスポンス**: 200 OK (`EditorWorldsendSongDTO`)
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要

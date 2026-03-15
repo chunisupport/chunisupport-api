@@ -80,6 +80,17 @@ type SongsResponse struct {
 	Songs []*SongDTO `json:"songs"`
 }
 
+// EditorSongDTO は編集者向けの楽曲情報DTOです。
+type EditorSongDTO struct {
+	*SongDTO
+	IsDeleted bool `json:"is_deleted"`
+}
+
+// EditorSongsResponse は編集者向け楽曲一覧のレスポンスを表します。
+type EditorSongsResponse struct {
+	Songs []*EditorSongDTO `json:"songs"`
+}
+
 // UpdateChartRequest は譜面更新リクエストを表します。
 type UpdateChartRequest struct {
 	Const          float64 `json:"const" validate:"gte=0"`

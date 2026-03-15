@@ -59,6 +59,7 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **SEC-01** | **High** | CSRF対策不足 | Double Submit Cookie または Synchronizer Token を導入。SameSite=Lax/Strict と Origin/Referer 検証を併用。 |
+| **SEC-012** | **High** | 権限判定を `account_type_id` の大小比較に依存 | `>= ADMIN` 判定により、DBに追加された未知の権限ID（例: 4）がADMIN専用操作を通過しうる。権限は列挙型（Name/Code）ベースで明示判定し、未知ロールは拒否する。 |
 | **SEC-011** | **High** | パスワード複雑性要件の欠如 | 長さチェックのみ。`zxcvbn-go` 等の導入または正規表現による文字種チェックを追加。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー未実施 | `gosec` などで抑制箇所を洗い出し、根拠を明記。不必要な抑制は削除。 |
 | **SEC-008** | **Low** | Cookie Domain属性の要件確認不足 | Domain属性は常時必須ではないため、まず「サブドメイン間でセッション共有が必要か」を要件として明確化し、必要時のみ設定を追加。 |
@@ -139,6 +140,22 @@
   - その他の箇所は適切な根拠コメントあり
 - **追加で確認したい点**:
   - 利用中の静的解析ツールとCI連携の有無。
+
+---
+
+### SEC-012: `account_type_id` の大小比較に依存した認可判定
+- **根拠**:
+  - 認可で `user.AccountTypeID < info.AccountTypeAdmin` の比較を使用しており、実質的に `ADMIN以上` 判定になっている。
+  - `account_types` は `AUTO_INCREMENT` であり、新規権限追加時に `id=4` などが自然に払い出されうる。
+  - その結果、`id=4` のユーザーが ADMIN 専用エンドポイントやユースケースの認可を通過する可能性がある。
+- **影響範囲**:
+  - 想定外ロールの権限昇格（Privilege Escalation）。
+  - 実装内で「`>= ADMIN` 判定」と「`== ADMIN` 判定」が混在すると、機能ごとに許可範囲が不整合になり、監査や運用時の誤判断を招く。
+- **修正案**:
+  - ロールは数値の序列ではなく、**明示的な許可集合**で判定する（例: `RequireAnyRole(ADMIN)`、または `RequireRoleByName("ADMIN")`）。
+  - 互換維持が必要な場合も、最低限 `ADMIN` 専用操作は `== info.AccountTypeAdmin` へ統一。
+  - 未知の `account_type_id` は拒否し、監査ログへ記録する。
+  - 追加で回帰テストを作成し、「未知ロールIDはADMIN操作を通過しない」ことを固定化する。
 
 ---
 
