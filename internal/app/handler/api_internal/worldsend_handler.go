@@ -210,9 +210,6 @@ func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *repository.World
 		return nil
 	}
 	base := h.convertToWorldsendSongDTO(swc)
-	if base == nil {
-		return nil
-	}
 
 	return &api_internal.EditorWorldsendSongDTO{
 		WorldsendSongDTO: base,
