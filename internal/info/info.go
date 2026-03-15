@@ -107,10 +107,6 @@ func HasRole(accountTypeID, requiredRoleID int) bool {
 		return false
 	}
 
-	if !IsKnownAccountType(requiredRoleID) {
-		return false
-	}
-
 	allowedAccountTypes, ok := roleAllowedAccountTypes[requiredRoleID]
 	if !ok {
 		return false
