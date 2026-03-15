@@ -73,25 +73,28 @@ const (
 // NOTE: ユーザーが設定ファイルで変更できるようにする必要があれば、example.setting.jsonに追加してください
 var SupportedAppVersions = []string{"0.0.2"}
 
-var knownAccountTypes = map[int]struct{}{
-	AccountTypePlayer: {},
-	AccountTypeEditor: {},
-	AccountTypeAdmin:  {},
-}
+var (
+	knownAccountTypes       = make(map[int]struct{})
+	roleAllowedAccountTypes = map[int]map[int]struct{}{
+		AccountTypePlayer: {
+			AccountTypePlayer: {},
+			AccountTypeEditor: {},
+			AccountTypeAdmin:  {},
+		},
+		AccountTypeEditor: {
+			AccountTypeEditor: {},
+			AccountTypeAdmin:  {},
+		},
+		AccountTypeAdmin: {
+			AccountTypeAdmin: {},
+		},
+	}
+)
 
-var roleAllowedAccountTypes = map[int]map[int]struct{}{
-	AccountTypePlayer: {
-		AccountTypePlayer: {},
-		AccountTypeEditor: {},
-		AccountTypeAdmin:  {},
-	},
-	AccountTypeEditor: {
-		AccountTypeEditor: {},
-		AccountTypeAdmin:  {},
-	},
-	AccountTypeAdmin: {
-		AccountTypeAdmin: {},
-	},
+func init() {
+	for roleID := range roleAllowedAccountTypes {
+		knownAccountTypes[roleID] = struct{}{}
+	}
 }
 
 // IsKnownAccountType は account_type_id が既知ロールかを判定します。

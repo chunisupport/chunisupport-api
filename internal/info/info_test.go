@@ -56,15 +56,3 @@ func TestHasRole(t *testing.T) {
 		})
 	}
 }
-
-func TestRoleMapsConsistency(t *testing.T) {
-	for roleID := range knownAccountTypes {
-		_, ok := roleAllowedAccountTypes[roleID]
-		assert.Truef(t, ok, "roleID %d is in knownAccountTypes but not in roleAllowedAccountTypes", roleID)
-	}
-
-	for roleID := range roleAllowedAccountTypes {
-		_, ok := knownAccountTypes[roleID]
-		assert.Truef(t, ok, "roleID %d is in roleAllowedAccountTypes but not in knownAccountTypes", roleID)
-	}
-}
