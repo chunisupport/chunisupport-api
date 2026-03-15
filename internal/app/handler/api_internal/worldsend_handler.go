@@ -58,6 +58,31 @@ func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
+// GetAdminWorldsendSongs は管理者向けに全 WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetAdminWorldsendSongs(c echo.Context) error {
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.AdminWorldsendSongsResponse{
+		Songs: h.convertToAdminWorldsendSongDTOs(songsWithCharts),
+	})
+}
+
+// GetAdminWorldsendSong は管理者向けに指定された DisplayID の WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetAdminWorldsendSong(c echo.Context) error {
+	displayID := c.Param("displayid")
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToAdminWorldsendSongDTO(songWithChart))
+}
+
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (h *WorldsendHandler) DeleteWorldsendSong(c echo.Context) error {
 	displayID := c.Param("displayid")
@@ -168,4 +193,23 @@ func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *repository.WorldsendSo
 		}
 	}
 	return api_internal.ToWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
+}
+
+// convertToAdminWorldsendSongDTOs は WorldsendSongWithChart のスライスを AdminWorldsendSongDTO のスライスに変換します。
+func (h *WorldsendHandler) convertToAdminWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.AdminWorldsendSongDTO {
+	songDTOs := make([]*api_internal.AdminWorldsendSongDTO, 0, len(songsWithCharts))
+	for _, swc := range songsWithCharts {
+		songDTOs = append(songDTOs, h.convertToAdminWorldsendSongDTO(swc))
+	}
+	return songDTOs
+}
+
+// convertToAdminWorldsendSongDTO は WorldsendSongWithChart を AdminWorldsendSongDTO に変換します。
+func (h *WorldsendHandler) convertToAdminWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.AdminWorldsendSongDTO {
+	if swc.Song != nil && swc.Song.GenreID != nil {
+		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
+			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
+		}
+	}
+	return api_internal.ToAdminWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
 }

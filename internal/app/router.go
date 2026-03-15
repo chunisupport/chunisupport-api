@@ -313,6 +313,15 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		}
 	}
 
+	adminSongsGroup := internal.Group("/admin/songs")
+	adminSongsGroup.Use(jwtAuth, requireEditor)
+	{
+		adminSongsGroup.GET("", handlers.Song.GetAdminSongs)
+		adminSongsGroup.GET("/:displayid", handlers.Song.GetAdminSong)
+		adminSongsGroup.GET("/worldsend", handlers.Worldsend.GetAdminWorldsendSongs)
+		adminSongsGroup.GET("/worldsend/:displayid", handlers.Worldsend.GetAdminWorldsendSong)
+	}
+
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
 	masterGroup.Use(jwtAuth)

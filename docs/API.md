@@ -127,6 +127,10 @@
 | `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新。 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
+| `/internal/admin/songs` | GET | Cookie (EDITOR+) | 管理者向け通常楽曲一覧取得（`is_deleted` を含む）。 |
+| `/internal/admin/songs/:displayid` | GET | Cookie (EDITOR+) | 管理者向け通常楽曲詳細取得（`is_deleted` を含む）。 |
+| `/internal/admin/songs/worldsend` | GET | Cookie (EDITOR+) | 管理者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む）。 |
+| `/internal/admin/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 管理者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む）。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
@@ -1633,6 +1637,86 @@ curl -X POST \
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の削除済み WORLD'S END 楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
+
+## `/internal/admin/songs` グループ
+
+### GET `/internal/admin/songs`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: 管理者向けに、WORLD'S END以外の全楽曲を削除済みも含めて取得します。
+- **レスポンス**: 200 OK
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `songs` | AdminSongDTO[] | 楽曲情報の配列 |
+
+**AdminSongDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `is_deleted` | bool | 論理削除済みかどうか |
+
+`is_deleted` 以外のフィールドは GET `/internal/songs` の SongDTO と同様です。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/admin/songs/:displayid`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 管理者向けに、指定されたDisplayIDの通常楽曲を取得します。削除済みも取得対象です。
+- **レスポンス**: 200 OK (`AdminSongDTO`)
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/admin/songs/worldsend`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **概要**: 管理者向けに、全 WORLD'S END 楽曲を削除済みも含めて取得します。
+- **レスポンス**: 200 OK
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `songs` | AdminWorldsendSongDTO[] | WORLD'S END 楽曲情報の配列 |
+
+**AdminWorldsendSongDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `is_deleted` | bool | 論理削除済みかどうか |
+
+`is_deleted` 以外のフィールドは GET `/internal/songs/worldsend` の WorldsendSongDTO と同様です。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/admin/songs/worldsend/:displayid`
+- **認証**: Cookie 必須
+- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **概要**: 管理者向けに、指定されたDisplayIDの WORLD'S END 楽曲を取得します。削除済みも取得対象です。
+- **レスポンス**: 200 OK (`AdminWorldsendSongDTO`)
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要

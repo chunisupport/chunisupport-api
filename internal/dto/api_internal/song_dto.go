@@ -80,6 +80,17 @@ type SongsResponse struct {
 	Songs []*SongDTO `json:"songs"`
 }
 
+// AdminSongDTO は管理者向けの楽曲情報DTOです。
+type AdminSongDTO struct {
+	*SongDTO
+	IsDeleted bool `json:"is_deleted"`
+}
+
+// AdminSongsResponse は管理者向け楽曲一覧のレスポンスを表します。
+type AdminSongsResponse struct {
+	Songs []*AdminSongDTO `json:"songs"`
+}
+
 // UpdateChartRequest は譜面更新リクエストを表します。
 type UpdateChartRequest struct {
 	Const          float64 `json:"const" validate:"gte=0"`
@@ -152,5 +163,18 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 		MaxOP:          maxOP,
 		IsMaxOPUnknown: song.IsMaxOPUnknown,
 		Charts:         make(OrderedChartsMap),
+	}
+}
+
+// ToAdminSongDTO はSongエンティティからAdminSongDTOへ変換します。
+func ToAdminSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) *AdminSongDTO {
+	base := ToSongDTO(song, genreNamesByID, maxOP)
+	if base == nil {
+		return nil
+	}
+
+	return &AdminSongDTO{
+		SongDTO:   base,
+		IsDeleted: song.IsDeleted,
 	}
 }

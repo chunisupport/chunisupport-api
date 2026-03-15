@@ -31,6 +31,17 @@ type WorldsendSongsResponse struct {
 	Songs []*WorldsendSongDTO `json:"songs"`
 }
 
+// AdminWorldsendSongDTO は管理者向けの WORLD'S END 楽曲情報DTOです。
+type AdminWorldsendSongDTO struct {
+	*WorldsendSongDTO
+	IsDeleted bool `json:"is_deleted"`
+}
+
+// AdminWorldsendSongsResponse は管理者向け WORLD'S END 楽曲一覧のレスポンスを表します。
+type AdminWorldsendSongsResponse struct {
+	Songs []*AdminWorldsendSongDTO `json:"songs"`
+}
+
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。
 type UpdateWorldsendChartRequest struct {
 	Attribute *string `json:"attribute"`
@@ -96,5 +107,18 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 		Jacket:      song.Jacket,
 		OfficialIdx: song.OfficialIdx,
 		Charts:      charts,
+	}
+}
+
+// ToAdminWorldsendSongDTO は Song エンティティと WorldsendChart エンティティから AdminWorldsendSongDTO へ変換します。
+func ToAdminWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNamesByID map[int]string) *AdminWorldsendSongDTO {
+	base := ToWorldsendSongDTO(song, chart, genreNamesByID)
+	if base == nil {
+		return nil
+	}
+
+	return &AdminWorldsendSongDTO{
+		WorldsendSongDTO: base,
+		IsDeleted:        song.IsDeleted,
 	}
 }

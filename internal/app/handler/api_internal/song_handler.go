@@ -69,6 +69,31 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
+// GetAdminSongs は管理者向けにWORLD'S END以外の全楽曲を取得します。
+func (h *SongHandler) GetAdminSongs(c echo.Context) error {
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.AdminSongsResponse{
+		Songs: h.convertToAdminSongDTOs(songsWithCharts),
+	})
+}
+
+// GetAdminSong は管理者向けに指定されたDisplayIDの楽曲を取得します。
+func (h *SongHandler) GetAdminSong(c echo.Context) error {
+	displayID := c.Param("displayid")
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToAdminSongDTO(song))
+}
+
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	displayID := c.Param("displayid")
@@ -158,6 +183,29 @@ func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.So
 func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO {
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
+
+	// 難易度IDから名称へのマッピング（マスタデータから取得）
+	difficultyNames := h.masterCache.DifficultyNamesByID
+
+	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {
+		return api_internal.ToChartDTO(chart)
+	})
+	return songDTO
+}
+
+// convertToAdminSongDTOs は Song のスライスを AdminSongDTO のスライスに変換します。
+func (h *SongHandler) convertToAdminSongDTOs(songs []*entity.Song) []*api_internal.AdminSongDTO {
+	songDTOs := make([]*api_internal.AdminSongDTO, 0, len(songs))
+	for _, song := range songs {
+		songDTOs = append(songDTOs, h.convertToAdminSongDTO(song))
+	}
+	return songDTOs
+}
+
+// convertToAdminSongDTO は Song を AdminSongDTO に変換します。
+func (h *SongHandler) convertToAdminSongDTO(song *entity.Song) *api_internal.AdminSongDTO {
+	maxOP := h.songUsecase.CalcSongMaxOP(song)
+	songDTO := api_internal.ToAdminSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
 	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
