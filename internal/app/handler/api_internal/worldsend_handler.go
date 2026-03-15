@@ -206,8 +206,11 @@ func (h *WorldsendHandler) convertToAdminWorldsendSongDTOs(songsWithCharts []*re
 
 // convertToAdminWorldsendSongDTO は WorldsendSongWithChart を AdminWorldsendSongDTO に変換します。
 func (h *WorldsendHandler) convertToAdminWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.AdminWorldsendSongDTO {
+	if swc == nil {
+		return nil
+	}
 	base := h.convertToWorldsendSongDTO(swc)
-	if base == nil || swc == nil || swc.Song == nil {
+	if base == nil {
 		return nil
 	}
 
