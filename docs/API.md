@@ -1662,11 +1662,13 @@ curl -X POST \
 
 **EditorSongDTO**:
 
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `is_deleted` | bool | 論理削除済みかどうか |
 
-`is_deleted` 以外のフィールドは GET `/internal/songs` の SongDTO と同様です。
+`SongDTO` の各フィールドの詳細は GET `/internal/songs` の `SongDTO` を参照してください。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -1700,11 +1702,13 @@ curl -X POST \
 
 **EditorWorldsendSongDTO**:
 
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `is_deleted` | bool | 論理削除済みかどうか |
 
-`is_deleted` 以外のフィールドは GET `/internal/songs/worldsend` の WorldsendSongDTO と同様です。
+`WorldsendSongDTO` の各フィールドの詳細は GET `/internal/songs/worldsend` の `WorldsendSongDTO` を参照してください。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
