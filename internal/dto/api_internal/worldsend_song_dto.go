@@ -31,15 +31,15 @@ type WorldsendSongsResponse struct {
 	Songs []*WorldsendSongDTO `json:"songs"`
 }
 
-// AdminWorldsendSongDTO は管理者向けの WORLD'S END 楽曲情報DTOです。
-type AdminWorldsendSongDTO struct {
+// EditorWorldsendSongDTO は編集者向けの WORLD'S END 楽曲情報DTOです。
+type EditorWorldsendSongDTO struct {
 	*WorldsendSongDTO
 	IsDeleted bool `json:"is_deleted"`
 }
 
-// AdminWorldsendSongsResponse は管理者向け WORLD'S END 楽曲一覧のレスポンスを表します。
-type AdminWorldsendSongsResponse struct {
-	Songs []*AdminWorldsendSongDTO `json:"songs"`
+// EditorWorldsendSongsResponse は編集者向け WORLD'S END 楽曲一覧のレスポンスを表します。
+type EditorWorldsendSongsResponse struct {
+	Songs []*EditorWorldsendSongDTO `json:"songs"`
 }
 
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。

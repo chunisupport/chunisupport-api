@@ -80,15 +80,15 @@ type SongsResponse struct {
 	Songs []*SongDTO `json:"songs"`
 }
 
-// AdminSongDTO は管理者向けの楽曲情報DTOです。
-type AdminSongDTO struct {
+// EditorSongDTO は編集者向けの楽曲情報DTOです。
+type EditorSongDTO struct {
 	*SongDTO
 	IsDeleted bool `json:"is_deleted"`
 }
 
-// AdminSongsResponse は管理者向け楽曲一覧のレスポンスを表します。
-type AdminSongsResponse struct {
-	Songs []*AdminSongDTO `json:"songs"`
+// EditorSongsResponse は編集者向け楽曲一覧のレスポンスを表します。
+type EditorSongsResponse struct {
+	Songs []*EditorSongDTO `json:"songs"`
 }
 
 // UpdateChartRequest は譜面更新リクエストを表します。

@@ -58,21 +58,21 @@ func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 	return c.JSON(http.StatusOK, songDTO)
 }
 
-// GetAdminWorldsendSongs は管理者向けに全 WORLD'S END 楽曲を取得します。
-func (h *WorldsendHandler) GetAdminWorldsendSongs(c echo.Context) error {
+// GetEditorWorldsendSongs は編集者向けに全 WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetEditorWorldsendSongs(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), true, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, &api_internal.AdminWorldsendSongsResponse{
-		Songs: h.convertToAdminWorldsendSongDTOs(songsWithCharts),
+	return c.JSON(http.StatusOK, &api_internal.EditorWorldsendSongsResponse{
+		Songs: h.convertToEditorWorldsendSongDTOs(songsWithCharts),
 	})
 }
 
-// GetAdminWorldsendSong は管理者向けに指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (h *WorldsendHandler) GetAdminWorldsendSong(c echo.Context) error {
+// GetEditorWorldsendSong は編集者向けに指定された DisplayID の WORLD'S END 楽曲を取得します。
+func (h *WorldsendHandler) GetEditorWorldsendSong(c echo.Context) error {
 	displayID := c.Param("displayid")
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
@@ -80,7 +80,7 @@ func (h *WorldsendHandler) GetAdminWorldsendSong(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, h.convertToAdminWorldsendSongDTO(songWithChart))
+	return c.JSON(http.StatusOK, h.convertToEditorWorldsendSongDTO(songWithChart))
 }
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
@@ -195,17 +195,17 @@ func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *repository.WorldsendSo
 	return api_internal.ToWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
 }
 
-// convertToAdminWorldsendSongDTOs は WorldsendSongWithChart のスライスを AdminWorldsendSongDTO のスライスに変換します。
-func (h *WorldsendHandler) convertToAdminWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.AdminWorldsendSongDTO {
-	songDTOs := make([]*api_internal.AdminWorldsendSongDTO, 0, len(songsWithCharts))
+// convertToEditorWorldsendSongDTOs は WorldsendSongWithChart のスライスを EditorWorldsendSongDTO のスライスに変換します。
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
+	songDTOs := make([]*api_internal.EditorWorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
-		songDTOs = append(songDTOs, h.convertToAdminWorldsendSongDTO(swc))
+		songDTOs = append(songDTOs, h.convertToEditorWorldsendSongDTO(swc))
 	}
 	return songDTOs
 }
 
-// convertToAdminWorldsendSongDTO は WorldsendSongWithChart を AdminWorldsendSongDTO に変換します。
-func (h *WorldsendHandler) convertToAdminWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.AdminWorldsendSongDTO {
+// convertToEditorWorldsendSongDTO は WorldsendSongWithChart を EditorWorldsendSongDTO に変換します。
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
 	if swc == nil {
 		return nil
 	}
@@ -214,7 +214,7 @@ func (h *WorldsendHandler) convertToAdminWorldsendSongDTO(swc *repository.Worlds
 		return nil
 	}
 
-	return &api_internal.AdminWorldsendSongDTO{
+	return &api_internal.EditorWorldsendSongDTO{
 		WorldsendSongDTO: base,
 		IsDeleted:        swc.Song.IsDeleted,
 	}
