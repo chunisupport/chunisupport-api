@@ -204,6 +204,9 @@ func (h *SongHandler) convertToAdminSongDTOs(songs []*entity.Song) []*api_intern
 
 // convertToAdminSongDTO は Song を AdminSongDTO に変換します。
 func (h *SongHandler) convertToAdminSongDTO(song *entity.Song) *api_internal.AdminSongDTO {
+	if song == nil {
+		return nil
+	}
 	base := h.convertToSongDTO(song)
 	if base == nil {
 		return nil
