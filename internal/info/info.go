@@ -79,6 +79,21 @@ var knownAccountTypes = map[int]struct{}{
 	AccountTypeAdmin:  {},
 }
 
+var roleAllowedAccountTypes = map[int]map[int]struct{}{
+	AccountTypePlayer: {
+		AccountTypePlayer: {},
+		AccountTypeEditor: {},
+		AccountTypeAdmin:  {},
+	},
+	AccountTypeEditor: {
+		AccountTypeEditor: {},
+		AccountTypeAdmin:  {},
+	},
+	AccountTypeAdmin: {
+		AccountTypeAdmin: {},
+	},
+}
+
 // IsKnownAccountType は account_type_id が既知ロールかを判定します。
 func IsKnownAccountType(accountTypeID int) bool {
 	_, ok := knownAccountTypes[accountTypeID]
@@ -96,7 +111,13 @@ func HasRole(accountTypeID, requiredRoleID int) bool {
 		return false
 	}
 
-	return accountTypeID >= requiredRoleID
+	allowedAccountTypes, ok := roleAllowedAccountTypes[requiredRoleID]
+	if !ok {
+		return false
+	}
+
+	_, ok = allowedAccountTypes[accountTypeID]
+	return ok
 }
 
 // HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブルです。

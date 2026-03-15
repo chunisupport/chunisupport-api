@@ -39,7 +39,11 @@ func TestHasRole(t *testing.T) {
 		{name: "EDITOR要求にADMINは成功", accountTypeID: AccountTypeAdmin, requiredRoleID: AccountTypeEditor, want: true},
 		{name: "EDITOR要求にEDITORは成功", accountTypeID: AccountTypeEditor, requiredRoleID: AccountTypeEditor, want: true},
 		{name: "EDITOR要求にPLAYERは失敗", accountTypeID: AccountTypePlayer, requiredRoleID: AccountTypeEditor, want: false},
+		{name: "PLAYER要求にPLAYERは成功", accountTypeID: AccountTypePlayer, requiredRoleID: AccountTypePlayer, want: true},
+		{name: "PLAYER要求にEDITORは成功", accountTypeID: AccountTypeEditor, requiredRoleID: AccountTypePlayer, want: true},
+		{name: "PLAYER要求にADMINは成功", accountTypeID: AccountTypeAdmin, requiredRoleID: AccountTypePlayer, want: true},
 		{name: "未知ロールIDは失敗", accountTypeID: 4, requiredRoleID: AccountTypeAdmin, want: false},
+		{name: "未知ロールIDは数値が大きくても失敗", accountTypeID: 999, requiredRoleID: AccountTypeAdmin, want: false},
 		{name: "未知のrequiredRoleIDは失敗", accountTypeID: AccountTypeAdmin, requiredRoleID: 4, want: false},
 	}
 
