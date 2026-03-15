@@ -109,16 +109,3 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 		Charts:      charts,
 	}
 }
-
-// ToAdminWorldsendSongDTO は Song エンティティと WorldsendChart エンティティから AdminWorldsendSongDTO へ変換します。
-func ToAdminWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNamesByID map[int]string) *AdminWorldsendSongDTO {
-	base := ToWorldsendSongDTO(song, chart, genreNamesByID)
-	if base == nil {
-		return nil
-	}
-
-	return &AdminWorldsendSongDTO{
-		WorldsendSongDTO: base,
-		IsDeleted:        song.IsDeleted,
-	}
-}

@@ -165,16 +165,3 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 		Charts:         make(OrderedChartsMap),
 	}
 }
-
-// ToAdminSongDTO はSongエンティティからAdminSongDTOへ変換します。
-func ToAdminSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) *AdminSongDTO {
-	base := ToSongDTO(song, genreNamesByID, maxOP)
-	if base == nil {
-		return nil
-	}
-
-	return &AdminSongDTO{
-		SongDTO:   base,
-		IsDeleted: song.IsDeleted,
-	}
-}

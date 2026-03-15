@@ -206,10 +206,13 @@ func (h *WorldsendHandler) convertToAdminWorldsendSongDTOs(songsWithCharts []*re
 
 // convertToAdminWorldsendSongDTO は WorldsendSongWithChart を AdminWorldsendSongDTO に変換します。
 func (h *WorldsendHandler) convertToAdminWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.AdminWorldsendSongDTO {
-	if swc.Song != nil && swc.Song.GenreID != nil {
-		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
-			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
-		}
+	base := h.convertToWorldsendSongDTO(swc)
+	if base == nil || swc == nil || swc.Song == nil {
+		return nil
 	}
-	return api_internal.ToAdminWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
+
+	return &api_internal.AdminWorldsendSongDTO{
+		WorldsendSongDTO: base,
+		IsDeleted:        swc.Song.IsDeleted,
+	}
 }

@@ -204,14 +204,13 @@ func (h *SongHandler) convertToAdminSongDTOs(songs []*entity.Song) []*api_intern
 
 // convertToAdminSongDTO は Song を AdminSongDTO に変換します。
 func (h *SongHandler) convertToAdminSongDTO(song *entity.Song) *api_internal.AdminSongDTO {
-	maxOP := h.songUsecase.CalcSongMaxOP(song)
-	songDTO := api_internal.ToAdminSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
+	base := h.convertToSongDTO(song)
+	if base == nil {
+		return nil
+	}
 
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
-	difficultyNames := h.masterCache.DifficultyNamesByID
-
-	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {
-		return api_internal.ToChartDTO(chart)
-	})
-	return songDTO
+	return &api_internal.AdminSongDTO{
+		SongDTO:   base,
+		IsDeleted: song.IsDeleted,
+	}
 }
