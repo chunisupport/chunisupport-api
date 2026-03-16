@@ -106,10 +106,6 @@ func IsKnownAccountType(accountTypeID int) bool {
 // HasRole は account_type_id が requiredRoleID を満たすかを判定します。
 // 未知ロールIDは常に拒否します。
 func HasRole(accountTypeID, requiredRoleID int) bool {
-	if !IsKnownAccountType(accountTypeID) {
-		return false
-	}
-
 	allowedAccountTypes, ok := roleAllowedAccountTypes[requiredRoleID]
 	if !ok {
 		return false
