@@ -412,10 +412,13 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 	if existingPlayer != nil {
 		// 既存のプレイヤーを更新
 		player.ID = existingPlayer.ID
+		player.CreatedAt = existingPlayer.CreatedAt
 		// 計算レーティング等は既存の値を維持
 		player.CalculatedRating = existingPlayer.CalculatedRating
 		player.NewAverageRating = existingPlayer.NewAverageRating
 		player.BestAverageRating = existingPlayer.BestAverageRating
+	} else {
+		player.CreatedAt = time.Now()
 	}
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）
