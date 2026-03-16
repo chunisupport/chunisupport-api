@@ -73,6 +73,48 @@ const (
 // NOTE: ユーザーが設定ファイルで変更できるようにする必要があれば、example.setting.jsonに追加してください
 var SupportedAppVersions = []string{"0.0.2"}
 
+var (
+	knownAccountTypes       = make(map[int]struct{})
+	roleAllowedAccountTypes = map[int]map[int]struct{}{
+		AccountTypePlayer: {
+			AccountTypePlayer: {},
+			AccountTypeEditor: {},
+			AccountTypeAdmin:  {},
+		},
+		AccountTypeEditor: {
+			AccountTypeEditor: {},
+			AccountTypeAdmin:  {},
+		},
+		AccountTypeAdmin: {
+			AccountTypeAdmin: {},
+		},
+	}
+)
+
+func init() {
+	for roleID := range roleAllowedAccountTypes {
+		knownAccountTypes[roleID] = struct{}{}
+	}
+}
+
+// IsKnownAccountType は account_type_id が既知ロールかを判定します。
+func IsKnownAccountType(accountTypeID int) bool {
+	_, ok := knownAccountTypes[accountTypeID]
+	return ok
+}
+
+// HasRole は account_type_id が requiredRoleID を満たすかを判定します。
+// 未知ロールIDは常に拒否します。
+func HasRole(accountTypeID, requiredRoleID int) bool {
+	allowedAccountTypes, ok := roleAllowedAccountTypes[requiredRoleID]
+	if !ok {
+		return false
+	}
+
+	_, ok = allowedAccountTypes[accountTypeID]
+	return ok
+}
+
 // HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブルです。
 var HardLampAbbrevToName = map[string]string{
 	"HRD": "HARD",

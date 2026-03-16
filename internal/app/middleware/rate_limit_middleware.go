@@ -126,11 +126,6 @@ func (s *FixedWindowStore) Cleanup() {
 	}
 }
 
-// denyHandler はレートリミット超過時に呼び出されるハンドラーです
-func denyHandler(_ echo.Context, _ string, _ error) error {
-	return apierror.ErrTooManyRequests
-}
-
 // APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
 // ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
