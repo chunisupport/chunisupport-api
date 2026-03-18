@@ -270,6 +270,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	publicUsersGroup := internal.Group("/users")
 	publicUsersGroup.Use(optionalJWTAuth, anonymousRateLimit)
 	{
+		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}
 

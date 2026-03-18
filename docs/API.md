@@ -1082,6 +1082,28 @@ curl -X POST \
 | `records` | UserRecordResponseDTO | スロット別レコード |
 | `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
 
+---
+
+### GET `/internal/users/:username/updated-at`
+- **認証**: Cookie (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: プレイヤーデータの `updated_at` のみを返します。非公開設定のユーザーは本人以外 404 を返します。
+
+#### レスポンス例
+
+```json
+{
+  "updated_at": "2025-11-28T22:23:32+09:00"
+}
+```
+
+#### UserUpdatedAtDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
+
 #### UserRecordResponseDTO スキーマ
 
 | フィールド | 型 | 説明 |

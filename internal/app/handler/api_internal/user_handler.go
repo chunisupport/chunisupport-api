@@ -49,6 +49,22 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
+// GetUserUpdatedAt はプレイヤーデータの updated_at のみを返すハンドラです。
+func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
+	username := c.Param("username")
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserUpdatedAt(c.Request().Context(), username, requester)
+	if err != nil {
+		return h.handleUserProfileError(err, username, "user updated_at")
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 func (h *UserHandler) handleUserProfileError(err error, username string, contextDescription string) error {
 	switch {
 	case errors.Is(err, usecase.ErrUserNotFound):

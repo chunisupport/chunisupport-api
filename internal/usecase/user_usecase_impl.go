@@ -217,6 +217,18 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 	}, nil
 }
 
+// GetUserUpdatedAt はユーザー名をキーにプレイヤーデータの updated_at のみを取得します。
+func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error) {
+	_, player, err := s.getUserAndPlayer(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api_internal.UserUpdatedAtDTO{
+		UpdatedAt: player.UpdatedAt,
+	}, nil
+}
+
 // GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。
 // プライベート・削除済み・プレイヤー未紐付けアカウントを含みます。
 func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]api_internal.AdminUserListResponse, error) {

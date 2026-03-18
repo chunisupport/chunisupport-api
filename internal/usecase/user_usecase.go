@@ -7,30 +7,29 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
-// UserUsecase はユーザー関連のユースケースを提供します。
+// UserUsecase はユーザー関連のユースケースを定義します。
 type UserUsecase interface {
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
-	// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-	// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error)
 
 	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
-	// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-	// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error)
 
-	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します（ADMIN権限必須）。
-	// ページングと検索条件（ユーザー名またはプレイヤー名の前方一致）をサポートします。
-	// プライベート・削除済み・プレイヤー未紐付けアカウントも含みます。
+	// GetUserUpdatedAt はユーザー名をキーにプレイヤーデータの updated_at のみを取得します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
+	GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error)
+
+	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。
 	GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]api_internal.AdminUserListResponse, error)
 
-	// DeleteUser はユーザーを論理削除します（ADMIN権限必須）。
-	// 既に削除済みのユーザーの場合は ErrUserAlreadyDeleted を返します。
-	// requester に ADMIN 権限がない場合は ErrAdminRequired を返します。
+	// DeleteUser はユーザーを論理削除します。
 	DeleteUser(ctx context.Context, requester *entity.User, username string) error
 
-	// RestoreUser はユーザーを復活させます（ADMIN権限必須）。
-	// 削除されていないユーザーの場合は ErrUserNotDeleted を返します。
-	// requester に ADMIN 権限がない場合は ErrAdminRequired を返します。
+	// RestoreUser はユーザーを復元します。
 	RestoreUser(ctx context.Context, requester *entity.User, username string) error
 }
