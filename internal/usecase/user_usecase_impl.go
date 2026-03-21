@@ -28,6 +28,12 @@ type userUsecase struct {
 	playerUsecase       PlayerUsecase
 }
 
+type userProfilePlayerRecords struct {
+	all             []*dto.PlayerRecordDTO
+	slotMap         map[string][]*dto.PlayerRecordDTO
+	latestUpdatedAt time.Time
+}
+
 // NewUserService は UserUsecase の実装を生成します。
 func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
 	return &userUsecase{
@@ -55,105 +61,27 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		return nil, err
 	}
 
-	// 3. レコードを取得
-	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
+	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player records due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
-			slog.Error("failed to find player records", "player_id", *user.PlayerID, "error", err)
-		}
 		return nil, err
 	}
 
-	slotSourceRecords := records
-	allRecords := records
-
-	if includeNoPlay && s.songRepo != nil {
-		songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
-		if err != nil {
-			slog.Error("failed to find songs for no-play completion", "player_id", *user.PlayerID, "error", err)
-			return nil, err
-		}
-
-		var difficultyNamesByID map[int]string
-		if s.songMasterProvider != nil {
-			masters := s.songMasterProvider.SongMasters()
-			if masters != nil {
-				difficultyNamesByID = masters.DifficultyNamesByID
-			}
-		}
-
-		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID)
+	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
 	}
 
-	// スロット別にグルーピング
-	slotMap := initializeSlotMap()
-	for _, record := range allRecords {
-		slotMap["all"] = append(slotMap["all"], dto.ToPlayerRecordDTO(record))
-	}
-
-	var latestRecordUpdatedAt time.Time
-	for _, record := range slotSourceRecords {
-		dtoRecord := dto.ToPlayerRecordDTO(record)
-
-		slotKey := record.SlotKey()
-		if slotKey != "" {
-			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
-		}
-		if record.UpdatedAt.After(latestRecordUpdatedAt) {
-			latestRecordUpdatedAt = record.UpdatedAt
-		}
-	}
-
-	// 4. WORLD'S END レコードを取得（通常レコードとは完全に独立）
-	var worldsendRecords []*dto.WorldsendRecordDTO
-	if s.worldsendRecordRepo != nil {
-		weRecords, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				slog.Warn("failed to find worldsend records due to context canceled", "player_id", *user.PlayerID, "error", err)
-			} else {
-				slog.Error("failed to find worldsend records", "player_id", *user.PlayerID, "error", err)
-			}
-			// WORLD'S END レコードの取得失敗は致命的ではないため、空配列で続行
-			worldsendRecords = []*dto.WorldsendRecordDTO{}
-		} else {
-			if includeNoPlay && s.worldsendChartRepo != nil {
-				worldsendSongs, wsErr := s.worldsendChartRepo.FindAll(ctx, s.db, false)
-				if wsErr != nil {
-					slog.Error("failed to find worldsend songs for no-play completion", "player_id", *user.PlayerID, "error", wsErr)
-					return nil, wsErr
-				}
-				pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
-				for _, ws := range worldsendSongs {
-					if ws == nil {
-						continue
-					}
-					pairs = append(pairs, &service.WorldsendSongChartPair{Song: ws.Song, Chart: ws.Chart})
-				}
-				weRecords = s.recordCompletionSvc.CompleteWorldsendRecords(weRecords, pairs)
-			}
-			worldsendRecords = make([]*dto.WorldsendRecordDTO, len(weRecords))
-			for i, r := range weRecords {
-				worldsendRecords[i] = dto.ToWorldsendRecordDTO(r)
-			}
-		}
-	} else {
-		worldsendRecords = []*dto.WorldsendRecordDTO{}
-	}
-
-	recordsUpdatedAt := latestRecordUpdatedAt
+	recordsUpdatedAt := playerRecords.latestUpdatedAt
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
 	recordsDTO := &dto.UserRecordResponseDTO{
 		UpdatedAt:     recordsUpdatedAt,
-		Best:          slotMap["best"],
-		BestCandidate: slotMap["best_candidate"],
-		New:           slotMap["new"],
-		NewCandidate:  slotMap["new_candidate"],
-		All:           slotMap["all"],
+		Best:          playerRecords.slotMap["best"],
+		BestCandidate: playerRecords.slotMap["best_candidate"],
+		New:           playerRecords.slotMap["new"],
+		NewCandidate:  playerRecords.slotMap["new_candidate"],
+		All:           playerRecords.all,
 		WorldsEnd:     worldsendRecords,
 	}
 
@@ -339,83 +267,17 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		return nil, err
 	}
 
-	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
+	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player records due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
-			slog.Error("failed to find player records", "player_id", *user.PlayerID, "error", err)
-		}
 		return nil, err
 	}
 
-	allRecords := records
-	if includeNoPlay && s.songRepo != nil {
-		songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
-		if err != nil {
-			slog.Error("failed to find songs for no-play completion", "player_id", *user.PlayerID, "error", err)
-			return nil, err
-		}
-
-		var difficultyNamesByID map[int]string
-		if s.songMasterProvider != nil {
-			masters := s.songMasterProvider.SongMasters()
-			if masters != nil {
-				difficultyNamesByID = masters.DifficultyNamesByID
-			}
-		}
-
-		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID)
+	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
 	}
 
-	allRecordDTOs := make([]*dto.PlayerRecordDTO, 0, len(allRecords))
-	for _, record := range allRecords {
-		allRecordDTOs = append(allRecordDTOs, dto.ToPlayerRecordDTO(record))
-	}
-
-	var latestRecordUpdatedAt time.Time
-	for _, record := range records {
-		if record.UpdatedAt.After(latestRecordUpdatedAt) {
-			latestRecordUpdatedAt = record.UpdatedAt
-		}
-	}
-
-	var worldsendRecords []*dto.WorldsendRecordDTO
-	if s.worldsendRecordRepo != nil {
-		weRecords, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				slog.Warn("failed to find worldsend records due to context canceled", "player_id", *user.PlayerID, "error", err)
-			} else {
-				slog.Error("failed to find worldsend records", "player_id", *user.PlayerID, "error", err)
-			}
-			worldsendRecords = []*dto.WorldsendRecordDTO{}
-		} else {
-			if includeNoPlay && s.worldsendChartRepo != nil {
-				worldsendSongs, wsErr := s.worldsendChartRepo.FindAll(ctx, s.db, false)
-				if wsErr != nil {
-					slog.Error("failed to find worldsend songs for no-play completion", "player_id", *user.PlayerID, "error", wsErr)
-					return nil, wsErr
-				}
-				pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
-				for _, ws := range worldsendSongs {
-					if ws == nil {
-						continue
-					}
-					pairs = append(pairs, &service.WorldsendSongChartPair{Song: ws.Song, Chart: ws.Chart})
-				}
-				weRecords = s.recordCompletionSvc.CompleteWorldsendRecords(weRecords, pairs)
-			}
-			worldsendRecords = make([]*dto.WorldsendRecordDTO, len(weRecords))
-			for i, r := range weRecords {
-				worldsendRecords[i] = dto.ToWorldsendRecordDTO(r)
-			}
-		}
-	} else {
-		worldsendRecords = []*dto.WorldsendRecordDTO{}
-	}
-
-	recordsUpdatedAt := latestRecordUpdatedAt
+	recordsUpdatedAt := playerRecords.latestUpdatedAt
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
@@ -425,11 +287,139 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		Player:   player,
 		Records: &api_internal.UserRecordViewResponseDTO{
 			UpdatedAt: recordsUpdatedAt,
-			All:       allRecordDTOs,
+			All:       playerRecords.all,
 			Worldsend: worldsendRecords,
 		},
 		UpdatedAt: &player.UpdatedAt,
 	}, nil
+}
+
+func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int, includeNoPlay bool) (*userProfilePlayerRecords, error) {
+	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, playerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find player records due to context canceled", "player_id", playerID, "error", err)
+		} else {
+			slog.Error("failed to find player records", "player_id", playerID, "error", err)
+		}
+		return nil, err
+	}
+
+	allRecords := records
+	if includeNoPlay {
+		allRecords, err = s.completePlayerRecords(ctx, playerID, records)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	slotMap := initializeSlotMap()
+	allRecordDTOs := make([]*dto.PlayerRecordDTO, 0, len(allRecords))
+	for _, record := range allRecords {
+		dtoRecord := dto.ToPlayerRecordDTO(record)
+		allRecordDTOs = append(allRecordDTOs, dtoRecord)
+		slotMap["all"] = append(slotMap["all"], dtoRecord)
+	}
+
+	for _, record := range records {
+		dtoRecord := dto.ToPlayerRecordDTO(record)
+		slotKey := record.SlotKey()
+		if slotKey != "" {
+			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
+		}
+	}
+
+	return &userProfilePlayerRecords{
+		all:             allRecordDTOs,
+		slotMap:         slotMap,
+		latestUpdatedAt: latestPlayerRecordUpdatedAt(records),
+	}, nil
+}
+
+func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, records []*entity.PlayerRecord) ([]*entity.PlayerRecord, error) {
+	if s.songRepo == nil {
+		return records, nil
+	}
+
+	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
+	if err != nil {
+		slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
+		return nil, err
+	}
+
+	var difficultyNamesByID map[int]string
+	if s.songMasterProvider != nil {
+		masters := s.songMasterProvider.SongMasters()
+		if masters != nil {
+			difficultyNamesByID = masters.DifficultyNamesByID
+		}
+	}
+
+	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID), nil
+}
+
+func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.WorldsendRecordDTO, error) {
+	if s.worldsendRecordRepo == nil {
+		return []*dto.WorldsendRecordDTO{}, nil
+	}
+
+	records, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, playerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find worldsend records due to context canceled", "player_id", playerID, "error", err)
+		} else {
+			slog.Error("failed to find worldsend records", "player_id", playerID, "error", err)
+		}
+		return []*dto.WorldsendRecordDTO{}, nil
+	}
+
+	if includeNoPlay {
+		records, err = s.completeWorldsendRecords(ctx, playerID, records)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	worldsendRecords := make([]*dto.WorldsendRecordDTO, len(records))
+	for i, record := range records {
+		worldsendRecords[i] = dto.ToWorldsendRecordDTO(record)
+	}
+	return worldsendRecords, nil
+}
+
+func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int, records []*entity.PlayerWorldsendRecord) ([]*entity.PlayerWorldsendRecord, error) {
+	if s.worldsendChartRepo == nil {
+		return records, nil
+	}
+
+	worldsendSongs, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
+	if err != nil {
+		slog.Error("failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
+		return nil, err
+	}
+
+	pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
+	for _, worldsendSong := range worldsendSongs {
+		if worldsendSong == nil {
+			continue
+		}
+		pairs = append(pairs, &service.WorldsendSongChartPair{
+			Song:  worldsendSong.Song,
+			Chart: worldsendSong.Chart,
+		})
+	}
+
+	return s.recordCompletionSvc.CompleteWorldsendRecords(records, pairs), nil
+}
+
+func latestPlayerRecordUpdatedAt(records []*entity.PlayerRecord) time.Time {
+	var latest time.Time
+	for _, record := range records {
+		if record != nil && record.UpdatedAt.After(latest) {
+			latest = record.UpdatedAt
+		}
+	}
+	return latest
 }
 
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。

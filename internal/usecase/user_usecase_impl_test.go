@@ -589,6 +589,33 @@ func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 	}
 }
 
+func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerUpdatedAt(t *testing.T) {
+	now := time.Now()
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: now}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Records.UpdatedAt.Equal(now) {
+		t.Fatalf("expected updated_at to be %v, got %v", now, result.Records.UpdatedAt)
+	}
+}
+
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
