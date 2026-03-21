@@ -831,8 +831,8 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
 // ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
 func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) error {
-	// プレイヤーレコードを全件取得
-	records, err := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
+	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch player records: %w", err)
 	}
