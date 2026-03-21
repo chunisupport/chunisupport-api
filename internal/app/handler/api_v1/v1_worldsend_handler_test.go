@@ -13,6 +13,7 @@ import (
 	api_v1_dto "github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
@@ -20,14 +21,11 @@ func TestGetWorldsendSongs(t *testing.T) {
 	updatedAt := time.Date(2026, 3, 22, 15, 4, 5, 0, time.UTC)
 	handler := &V1WorldsendHandler{
 		worldsendUsecase: &testutil.MockWorldsendUsecase{
-			GetAllWorldsendSongsFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
-				return []*repository.WorldsendSongWithChart{{
+			GetAllWorldsendSongsFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.WorldsendSongListResult, error) {
+				return &usecase.WorldsendSongListResult{Songs: []*repository.WorldsendSongWithChart{{
 					Song:  &entity.Song{DisplayID: "we1234567890abcd", Title: "WE曲", Artist: "WEアーティスト", IsWorldsend: true},
 					Chart: &entity.WorldsendChart{},
-				}}, nil
-			},
-			GetWorldsendSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
-				return &updatedAt, nil
+				}}, UpdatedAt: &updatedAt}, nil
 			},
 		},
 		masterCache: &masterdata.Cache{GenreNamesByID: map[int]string{}},

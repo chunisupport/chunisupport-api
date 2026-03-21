@@ -27,11 +27,11 @@ func TestGetWorldsendSongs(t *testing.T) {
 	updatedAt := time.Date(2026, 3, 22, 15, 4, 5, 0, time.UTC)
 
 	mockUsecase := &testutil.MockWorldsendUsecase{
-		GetAllWorldsendSongsFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
-			return []*repository.WorldsendSongWithChart{{
+		GetAllWorldsendSongsFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.WorldsendSongListResult, error) {
+			return &usecase.WorldsendSongListResult{Songs: []*repository.WorldsendSongWithChart{{
 				Song:  &entity.Song{DisplayID: "we1234567890abcd", Title: "WE曲", Artist: "WEアーティスト", IsWorldsend: true},
 				Chart: &entity.WorldsendChart{},
-			}}, nil
+			}}, UpdatedAt: &updatedAt}, nil
 		},
 		GetWorldsendSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
 			return &updatedAt, nil

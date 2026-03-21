@@ -36,14 +36,14 @@ func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
-	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
+	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}
 
 	// DTOに変換
 	masters := h.masterCache.SongMasters()
-	response := ToMusicShowAllResponse(songs, masters)
+	response := ToMusicShowAllResponse(listResult.Songs, masters)
 
 	return c.JSON(http.StatusOK, response)
 }

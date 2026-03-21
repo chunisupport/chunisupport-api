@@ -116,11 +116,11 @@ type stubSongRepository struct {
 	err   error
 }
 
-func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.SongListResult, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.songs, nil
+	return &repository.SongListResult{Songs: s.songs}, nil
 }
 
 func (s *stubSongRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
@@ -156,11 +156,11 @@ type stubWorldsendChartRepository struct {
 	err     error
 }
 
-func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.WorldsendSongListResult, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.records, nil
+	return &repository.WorldsendSongListResult{Songs: s.records}, nil
 }
 
 func (s *stubWorldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {

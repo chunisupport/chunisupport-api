@@ -13,7 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// V1WorldsendHandler は外部 API v1 用の WORLD'S END 楽曲ハンドラです。
+// V1WorldsendHandler は公開 API v1 用の WORLD'S END 楽曲ハンドラです。
 type V1WorldsendHandler struct {
 	worldsendUsecase usecase.WorldsendUsecase
 	masterCache      *masterdata.Cache
@@ -30,20 +30,16 @@ func NewV1WorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCach
 // GetWorldsendSongs は全 WORLD'S END 楽曲を取得します（公開 API）。
 // 削除済み楽曲は含まれません。
 func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
-	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
-	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false, nil)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
-	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), false, nil)
+	// 公開APIでは削除済み楽曲は含めません。requesterAccountTypeIDはnilを渡す。
+	listResult, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false, nil)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTOs := h.convertToV1WorldsendSongDTOs(songsWithCharts)
+	songDTOs := h.convertToV1WorldsendSongDTOs(listResult.Songs)
 	return c.JSON(http.StatusOK, &api_v1.V1WorldsendSongsResponse{
 		Songs:     songDTOs,
-		UpdatedAt: updatedAt,
+		UpdatedAt: listResult.UpdatedAt,
 	})
 }
 

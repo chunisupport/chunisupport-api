@@ -34,19 +34,15 @@ func NewWorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCache 
 func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
-	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted, requesterAccountTypeID)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
-	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	listResult, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTOs := h.convertToWorldsendSongDTOs(songsWithCharts)
+	songDTOs := h.convertToWorldsendSongDTOs(listResult.Songs)
 	return c.JSON(http.StatusOK, &api_internal.WorldsendSongsResponse{
 		Songs:     songDTOs,
-		UpdatedAt: updatedAt,
+		UpdatedAt: listResult.UpdatedAt,
 	})
 }
 
@@ -66,18 +62,14 @@ func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 // GetEditorWorldsendSongs は編集者向けに全 WORLD'S END 楽曲を取得します。
 func (h *WorldsendHandler) GetEditorWorldsendSongs(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
-	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), true, requesterAccountTypeID)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
-	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), true, requesterAccountTypeID)
+	listResult, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), true, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorWorldsendSongsResponse{
-		Songs:     h.convertToEditorWorldsendSongDTOs(songsWithCharts),
-		UpdatedAt: updatedAt,
+		Songs:     h.convertToEditorWorldsendSongDTOs(listResult.Songs),
+		UpdatedAt: listResult.UpdatedAt,
 	})
 }
 

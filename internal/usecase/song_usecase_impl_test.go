@@ -18,12 +18,12 @@ type MockSongRepository struct {
 	mock.Mock
 }
 
-func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.SongListResult, error) {
 	args := m.Called(ctx, exec, includeDeleted)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*entity.Song), args.Error(1)
+	return args.Get(0).(*repository.SongListResult), args.Error(1)
 }
 
 func (m *MockSongRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
@@ -158,7 +158,7 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 			}
 
 			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
-			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
+			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.SongListResult{Songs: expectedSongs}, nil)
 
 			// When
 			result, err := usecase.GetAllSongsExcludingWorldsend(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
@@ -166,7 +166,7 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 			// Then
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
-			assert.Equal(t, expectedSongs, result)
+			assert.Equal(t, expectedSongs, result.Songs)
 			mockRepo.AssertExpectations(t)
 		})
 	}

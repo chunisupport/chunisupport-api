@@ -14,7 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// SongHandler は曲関連のHTTPリクエストを処理します。
+// SongHandler は楽曲関連のHTTPリクエストを処理します。
 type SongHandler struct {
 	songUsecase       usecase.SongUsecase
 	statsUsecase      usecase.ChartStatsUsecase
@@ -39,21 +39,17 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
-	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	// DTOに変換
-	songDTOs := h.convertToSongDTOs(songsWithCharts)
+	songDTOs := h.convertToSongDTOs(listResult.Songs)
 
 	result := &api_internal.SongsResponse{
 		Songs:     songDTOs,
-		UpdatedAt: updatedAt,
+		UpdatedAt: listResult.UpdatedAt,
 	}
 
 	return c.JSON(http.StatusOK, result)
@@ -77,18 +73,14 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 // GetEditorSongs は編集者向けにWORLD'S END以外の全楽曲を取得します。
 func (h *SongHandler) GetEditorSongs(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
-	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), true, requesterAccountTypeID)
+	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorSongsResponse{
-		Songs:     h.convertToEditorSongDTOs(songsWithCharts),
-		UpdatedAt: updatedAt,
+		Songs:     h.convertToEditorSongDTOs(listResult.Songs),
+		UpdatedAt: listResult.UpdatedAt,
 	})
 }
 
@@ -121,7 +113,7 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// rating_bandsはキャッシュから取得
+	// rating_bands はキャッシュから取得
 	ratingBands := h.staticMasterCache.RatingBands
 
 	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
@@ -194,7 +186,7 @@ func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO 
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
+	// 難易度IDから文字列へのマッピング（マスターデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
 	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {

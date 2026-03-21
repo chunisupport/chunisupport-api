@@ -13,7 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// V1SongHandler は外部API v1 の楽曲関連エンドポイントを処理します。
+// V1SongHandler は公開API v1 の楽曲関連エンドポイントを処理します。
 type V1SongHandler struct {
 	songUsecase       usecase.SongUsecase
 	statsUsecase      usecase.ChartStatsUsecase
@@ -33,23 +33,19 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
 func (h *V1SongHandler) GetSongs(c echo.Context) error {
-	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
+	// 公開APIでは削除済み楽曲は含めない。requesterAccountTypeIDはnilを渡す。
+	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
 		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
-	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), false, nil)
-	if err != nil {
-		return apierror.FromUsecaseError(err)
-	}
 
 	// V1DTOに変換
-	v1Songs := h.convertToV1SongDTOs(songsWithCharts)
+	v1Songs := h.convertToV1SongDTOs(listResult.Songs)
 
 	return c.JSON(http.StatusOK, &api_v1.V1SongsResponse{
 		Songs:     v1Songs,
-		UpdatedAt: updatedAt,
+		UpdatedAt: listResult.UpdatedAt,
 	})
 }
 
@@ -109,7 +105,7 @@ func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO 
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
+	// 難易度IDから文字列へのマッピング（マスターデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
 	v1SongDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {

@@ -11,7 +11,7 @@ import (
 
 // MockWorldsendUsecase は WORLD'S END 楽曲ユースケースのテスト用モックです。
 type MockWorldsendUsecase struct {
-	GetAllWorldsendSongsFunc           func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
+	GetAllWorldsendSongsFunc           func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.WorldsendSongListResult, error)
 	GetWorldsendSongsLastUpdatedAtFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
 	GetWorldsendSongByDisplayIDFunc    func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
 	DeleteWorldsendSongFunc            func(ctx context.Context, displayID string) error
@@ -19,7 +19,7 @@ type MockWorldsendUsecase struct {
 	UpdateWorldsendSongsFunc           func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
 }
 
-func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
+func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.WorldsendSongListResult, error) {
 	if m.GetAllWorldsendSongsFunc != nil {
 		return m.GetAllWorldsendSongsFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}

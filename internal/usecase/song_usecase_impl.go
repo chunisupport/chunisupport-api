@@ -40,11 +40,20 @@ func NewSongService(
 }
 
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
-// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
-func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を持たない場合、
+// 削除済み楽曲は含められません。
+func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*SongListResult, error) {
 	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
-	return s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
+	result, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SongListResult{
+		Songs:     result.Songs,
+		UpdatedAt: result.UpdatedAt,
+	}, nil
 }
 
 // GetSongsLastUpdatedAt はWORLD'S END以外の楽曲一覧全体の最終更新日時を取得します。
@@ -55,7 +64,8 @@ func (s *songUsecaseImpl) GetSongsLastUpdatedAt(ctx context.Context, includeDele
 }
 
 // GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
-// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
+// requesterAccountTypeIDがnilまたはEDITOR権限を持たない場合、
+// 削除済み楽曲はErrSongNotFoundを返します。
 func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error) {
 	song, err := s.songRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
@@ -105,7 +115,7 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 		return nil
 	}
 
-	// マスターデータ検証
+	// マスターデータ取得
 	masters := s.masterCache.SongMasters()
 	if masters == nil {
 		return fmt.Errorf("master cache is not initialized")
@@ -117,14 +127,14 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 		return fmt.Errorf("failed to convert requests to entities: %w", err)
 	}
 
-	// トランザクション内でリポジトリに委譲
+	// トランザクション内でリポジトリに保存
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
 	})
 }
 
-// CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。
-// MaxChartConst はドメインサービスにより譜面集約で設定済みです。
+// CalcSongMaxOP は楽曲の最大譜面定数から逆算した最大OPを計算します。
+// MaxChartConst はドメインサービスにより譜面集約時に設定済みです。
 func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	if song == nil {
 		return 0
@@ -134,14 +144,14 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 }
 
 // convertRequestsToEntities はDTOリストからエンティティリストに変換します。
-// IDフィールドは既存データの参照に使用されないため、0のままです。
+// IDフィールドは既存データの検索に使用されないため、0のままです。
 func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
 	result := make([]*entity.Song, 0, len(requests))
 
 	for _, req := range requests {
 		var genreID *int
 		if req.Genre != nil {
-			// ジャンル名の検証とID変換
+			// ジャンル名からマスタとID変換
 			if item, ok := masters.Genres[*req.Genre]; ok {
 				genreID = &item.ID
 			} else {
@@ -160,7 +170,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
 		for diffName, chartReq := range req.Charts {
-			// 難易度名の検証とID変換（大文字に変換してチェック）
+			// 難易度名からマスタとID変換。大文字に変換してチェック。
 			diffKey := strings.ToUpper(diffName)
 			item, ok := masters.Difficulties[diffKey]
 			if !ok {

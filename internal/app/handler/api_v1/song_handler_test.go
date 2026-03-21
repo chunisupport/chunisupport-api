@@ -13,12 +13,11 @@ import (
 	api_v1_dto "github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
-// TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
 func TestConvertToV1SongDTO(t *testing.T) {
-	// マスタデータキャッシュの準備
 	masterCache := &masterdata.Cache{
 		GenreNamesByID: map[int]string{
 			1: "POPS & ANIME",
@@ -38,7 +37,6 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		masterCache: masterCache,
 	}
 
-	// テストデータの準備
 	genreID := 2
 	bpm := 200
 	imgURL := "https://example.com/v1jacket.jpg"
@@ -53,93 +51,67 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		IsMaxOPUnknown: true,
 	}
 
-	notes1Value := 600
-	notes2Value := 1200
-	notes1, err := notes.NewNotes(notes1Value)
+	notes1, err := notes.NewNotes(600)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes1Value: %v", err)
+		t.Fatalf("notes.NewNotes failed for notes1: %v", err)
 	}
-	notes2, err := notes.NewNotes(notes2Value)
+	notes2, err := notes.NewNotes(1200)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes2Value: %v", err)
+		t.Fatalf("notes.NewNotes failed for notes2: %v", err)
 	}
 
-	charts := []*entity.Chart{
+	song.Charts = []*entity.Chart{
 		{
-			DifficultyID:   2, // advanced
+			DifficultyID:   2,
 			Const:          9.0,
 			IsConstUnknown: false,
 			Notes:          &notes1,
 		},
 		{
-			DifficultyID:   4, // master
+			DifficultyID:   4,
 			Const:          13.7,
 			IsConstUnknown: false,
 			Notes:          &notes2,
 		},
 	}
 
-	song.Charts = charts
-
-	// 変換実行
 	dto := handler.convertToV1SongDTO(song)
 
-	// アサーション
 	if dto == nil {
 		t.Fatal("convertToV1SongDTO returned nil")
 	}
-
 	if dto.DisplayID != "v1test1234567890" {
 		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "v1test1234567890")
 	}
-
 	if dto.MaxOP != 90 {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
-
-	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
 		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
-
-	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
 	}
-
-	// advanced 譜面が存在することを確認
 	if advancedChart, ok := dto.Charts["ADVANCED"]; !ok || advancedChart == nil {
 		t.Error("ADVANCED chart not found")
-	} else {
-		if advancedChart.Const != 9.0 {
-			t.Errorf("ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
-		}
+	} else if advancedChart.Const != 9.0 {
+		t.Errorf("ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
 	}
-
-	// master 譜面が存在することを確認
 	if masterChart, ok := dto.Charts["MASTER"]; !ok || masterChart == nil {
 		t.Error("MASTER chart not found")
-	} else {
-		if masterChart.Const != 13.7 {
-			t.Errorf("MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
-		}
+	} else if masterChart.Const != 13.7 {
+		t.Errorf("MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
 	}
-
-	// basic 譜面は存在しないので nil であることを確認
 	if basicChart, ok := dto.Charts["BASIC"]; !ok {
 		t.Error("BASIC key not found in map")
 	} else if basicChart != nil {
 		t.Error("BASIC chart should be nil")
 	}
-
-	// expert 譜面は存在しないので nil であることを確認
 	if expertChart, ok := dto.Charts["EXPERT"]; !ok {
 		t.Error("EXPERT key not found in map")
 	} else if expertChart != nil {
 		t.Error("EXPERT chart should be nil")
 	}
-
-	// ultima 譜面は存在しないので nil であることを確認
 	if ultimaChart, ok := dto.Charts["ULTIMA"]; !ok {
 		t.Error("ULTIMA key not found in map")
 	} else if ultimaChart != nil {
@@ -156,11 +128,11 @@ func TestGetSongs(t *testing.T) {
 
 	handler := &V1SongHandler{
 		songUsecase: &testutil.MockSongUsecase{
-			GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
-				return []*entity.Song{{DisplayID: "v1songs123456789", Title: "曲", Artist: "作者", Charts: []*entity.Chart{}}}, nil
-			},
-			GetSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
-				return &updatedAt, nil
+			GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.SongListResult, error) {
+				return &usecase.SongListResult{
+					Songs:     []*entity.Song{{DisplayID: "v1songs123456789", Title: "楽曲", Artist: "アーティスト", Charts: []*entity.Chart{}}},
+					UpdatedAt: &updatedAt,
+				}, nil
 			},
 		},
 		masterCache: masterCache,

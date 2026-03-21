@@ -29,18 +29,22 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 type worldsendSongChartRow struct {
 	models.SongModel
 	models.WorldsendChartModel
+	SongUpdatedAt  *time.Time `db:"song_updated_at"`
+	ChartUpdatedAt *time.Time `db:"chart_updated_at"`
 }
 
 // FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
-func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.WorldsendSongListResult, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
+			s.updated_at AS song_updated_at,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
 			wc.attribute AS 'worldsend_charts.attribute',
-			wc.notes AS 'worldsend_charts.notes'
+			wc.notes AS 'worldsend_charts.notes',
+			wc.updated_at AS chart_updated_at
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.is_worldsend = 1`
@@ -56,19 +60,24 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 	defer rows.Close()
 
 	results := []*repository.WorldsendSongWithChart{}
+	var maxUpdatedAt *time.Time
 	for rows.Next() {
 		var songModel models.SongModel
 		var chartModel models.WorldsendChartModel
+		var songUpdatedAt *time.Time
+		var chartUpdatedAt *time.Time
 
 		err := rows.Scan(
 			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 			&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
-			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes,
+			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted, &songUpdatedAt,
+			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartUpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+		maxUpdatedAt = maxTimePtr(maxUpdatedAt, songUpdatedAt)
+		maxUpdatedAt = maxTimePtr(maxUpdatedAt, chartUpdatedAt)
 
 		results = append(results, &repository.WorldsendSongWithChart{
 			Song:  songModel.ToEntity(),
@@ -76,7 +85,14 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 		})
 	}
 
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &repository.WorldsendSongListResult{
+		Songs:     results,
+		UpdatedAt: maxUpdatedAt,
+	}, nil
 }
 
 // GetLatestUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を返します。

@@ -39,25 +39,27 @@ type songRow struct {
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
 	IsDeleted   bool       `db:"is_deleted"`
+	UpdatedAt   *time.Time `db:"updated_at"`
 }
 
 // chartRow はDBから取得する譜面データの行を表します。
 type chartRow struct {
-	ID             int     `db:"id"`
-	SongID         int     `db:"song_id"`
-	DifficultyID   int     `db:"difficulty_id"`
-	Const          float64 `db:"const"`
-	IsConstUnknown bool    `db:"is_const_unknown"`
-	Notes          *int    `db:"notes"`
+	ID             int        `db:"id"`
+	SongID         int        `db:"song_id"`
+	DifficultyID   int        `db:"difficulty_id"`
+	Const          float64    `db:"const"`
+	IsConstUnknown bool       `db:"is_const_unknown"`
+	Notes          *int       `db:"notes"`
+	UpdatedAt      *time.Time `db:"updated_at"`
 }
 
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
-func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.SongListResult, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -72,7 +74,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	}
 
 	if len(songRows) == 0 {
-		return []*entity.Song{}, nil
+		return &repository.SongListResult{Songs: []*entity.Song{}}, nil
 	}
 
 	// 2. 取得した楽曲のIDを収集
@@ -85,7 +87,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, args, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, updated_at
 		FROM charts
 		WHERE song_id IN (?)
 		ORDER BY song_id, difficulty_id
@@ -123,7 +125,10 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		service.ApplyAggregation(song)
 	}
 
-	return results, nil
+	return &repository.SongListResult{
+		Songs:     results,
+		UpdatedAt: maxSongListUpdatedAt(songRows, chartRows),
+	}, nil
 }
 
 // GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
@@ -153,6 +158,31 @@ func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Contex
 	`, chartsWhereClause)
 
 	return scanNullableTime(ctx, exec, query)
+}
+
+func maxSongListUpdatedAt(songRows []songRow, chartRows []chartRow) *time.Time {
+	var maxUpdatedAt *time.Time
+
+	for _, row := range songRows {
+		maxUpdatedAt = maxTimePtr(maxUpdatedAt, row.UpdatedAt)
+	}
+	for _, row := range chartRows {
+		maxUpdatedAt = maxTimePtr(maxUpdatedAt, row.UpdatedAt)
+	}
+
+	return maxUpdatedAt
+}
+
+func maxTimePtr(current *time.Time, candidate *time.Time) *time.Time {
+	if candidate == nil {
+		return current
+	}
+	if current == nil || candidate.After(*current) {
+		value := *candidate
+		return &value
+	}
+
+	return current
 }
 
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {

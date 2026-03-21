@@ -38,11 +38,16 @@ type UpdateWorldsendSongInput struct {
 	Charts     map[string]*UpdateWorldsendChartInput
 }
 
+type WorldsendSongListResult struct {
+	Songs     []*repository.WorldsendSongWithChart
+	UpdatedAt *time.Time
+}
+
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
-	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
+	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*WorldsendSongListResult, error)
 
 	// GetWorldsendSongsLastUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を取得します。
 	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
@@ -80,16 +85,19 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
-func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
+func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*WorldsendSongListResult, error) {
 	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
-	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
+	result, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)
 		return nil, err
 	}
 
-	return songsWithCharts, nil
+	return &WorldsendSongListResult{
+		Songs:     result.Songs,
+		UpdatedAt: result.UpdatedAt,
+	}, nil
 }
 
 // GetWorldsendSongsLastUpdatedAt は全 WORLD'S END 楽曲一覧の最終更新日時を取得します。
