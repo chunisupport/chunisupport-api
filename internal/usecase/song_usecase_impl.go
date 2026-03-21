@@ -42,14 +42,14 @@ func NewSongService(
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
-	includeDeleted = normalizeSongIncludeDeleted(includeDeleted, requesterAccountTypeID)
+	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
 	return s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
 }
 
 // GetSongsLastUpdatedAt はWORLD'S END以外の楽曲一覧全体の最終更新日時を取得します。
 func (s *songUsecaseImpl) GetSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
-	includeDeleted = normalizeSongIncludeDeleted(includeDeleted, requesterAccountTypeID)
+	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
 	return s.songRepo.GetLatestUpdatedAtExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
 }
@@ -131,18 +131,6 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	}
 
 	return service.CalcSongMaxOP(song.MaxChartConst)
-}
-
-func normalizeSongIncludeDeleted(includeDeleted bool, requesterAccountTypeID *int) bool {
-	if !includeDeleted {
-		return false
-	}
-
-	if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
-		return false
-	}
-
-	return true
 }
 
 // convertRequestsToEntities はDTOリストからエンティティリストに変換します。
