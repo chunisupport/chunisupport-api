@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -614,6 +616,72 @@ func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerU
 	if !result.Records.UpdatedAt.Equal(now) {
 		t.Fatalf("expected updated_at to be %v, got %v", now, result.Records.UpdatedAt)
 	}
+}
+
+func TestUserService_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
+	}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
+}
+
+func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
+	}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
 }
 
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {

@@ -71,7 +71,7 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		return nil, err
 	}
 
-	recordsUpdatedAt := playerRecords.latestUpdatedAt
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
@@ -277,7 +277,7 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		return nil, err
 	}
 
-	recordsUpdatedAt := playerRecords.latestUpdatedAt
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
@@ -420,6 +420,26 @@ func latestPlayerRecordUpdatedAt(records []*entity.PlayerRecord) time.Time {
 		}
 	}
 	return latest
+}
+
+func latestWorldsendRecordUpdatedAt(records []*dto.WorldsendRecordDTO) time.Time {
+	var latest time.Time
+	for _, record := range records {
+		if record == nil || record.UpdatedAt == nil {
+			continue
+		}
+		if record.UpdatedAt.After(latest) {
+			latest = *record.UpdatedAt
+		}
+	}
+	return latest
+}
+
+func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecordsUpdatedAt time.Time) time.Time {
+	if worldsendRecordsUpdatedAt.After(playerRecordsUpdatedAt) {
+		return worldsendRecordsUpdatedAt
+	}
+	return playerRecordsUpdatedAt
 }
 
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
