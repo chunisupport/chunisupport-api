@@ -316,9 +316,7 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	slotMap := initializeSlotMap()
 	allRecordDTOs := make([]*dto.PlayerRecordDTO, 0, len(allRecords))
 	for _, record := range allRecords {
-		dtoRecord := dto.ToPlayerRecordDTO(record)
-		allRecordDTOs = append(allRecordDTOs, dtoRecord)
-		slotMap["all"] = append(slotMap["all"], dtoRecord)
+		allRecordDTOs = append(allRecordDTOs, dto.ToPlayerRecordDTO(record))
 	}
 
 	for _, record := range records {
@@ -445,11 +443,10 @@ func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecord
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
 func initializeSlotMap() map[string][]*dto.PlayerRecordDTO {
 	slots := []string{"best", "best_candidate", "new", "new_candidate"}
-	result := make(map[string][]*dto.PlayerRecordDTO, len(slots)+1)
+	result := make(map[string][]*dto.PlayerRecordDTO, len(slots))
 	for _, slot := range slots {
 		result[slot] = []*dto.PlayerRecordDTO{}
 	}
-	result["all"] = []*dto.PlayerRecordDTO{}
 	return result
 }
 
