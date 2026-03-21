@@ -1,18 +1,17 @@
 package usecase
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestValidatePlayerDataPayload_AppVersion は、app_verのバリデーションが正しく動作することをテストします
 func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
 	// 対応バージョンを動的に取得（テストの脆弱性を回避）
-	if len(info.SupportedAppVersions) == 0 {
-		t.Fatal("info.SupportedAppVersions is empty - test cannot proceed")
-	}
+	require.NotEmpty(t, info.SupportedAppVersions, "info.SupportedAppVersions is empty - test cannot proceed")
 	supportedVersion := info.SupportedAppVersions[0]
 
 	tests := []struct {
@@ -79,17 +78,12 @@ func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
 			err := validatePlayerDataPayload(payload)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("validatePlayerDataPayload() error = nil, want error")
-					return
-				}
-				if tt.errType != nil && err != tt.errType {
-					t.Errorf("validatePlayerDataPayload() error = %v, want %v", err, tt.errType)
+				require.Error(t, err, "validatePlayerDataPayload() error = nil, want error")
+				if tt.errType != nil {
+					assert.ErrorIs(t, err, tt.errType, "validatePlayerDataPayload() error = %v, want %v", err, tt.errType)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("validatePlayerDataPayload() unexpected error = %v", err)
-				}
+				assert.NoError(t, err, "validatePlayerDataPayload() unexpected error = %v", err)
 			}
 		})
 	}
@@ -102,9 +96,7 @@ func TestValidatePlayerDataPayload_MultipleVersions(t *testing.T) {
 	t.Logf("Current supported versions: %v", info.SupportedAppVersions)
 
 	// 対応バージョンリストが空でないことを確認
-	if len(info.SupportedAppVersions) == 0 {
-		t.Fatal("info.SupportedAppVersions is empty - test cannot proceed")
-	}
+	require.NotEmpty(t, info.SupportedAppVersions, "info.SupportedAppVersions is empty - test cannot proceed")
 	supportedVersion := info.SupportedAppVersions[0]
 
 	payload := &PlayerDataPayload{
@@ -134,23 +126,16 @@ func TestValidatePlayerDataPayload_MultipleVersions(t *testing.T) {
 	}
 
 	err := validatePlayerDataPayload(payload)
-	if err != nil {
-		t.Errorf("validatePlayerDataPayload() with supported version %s should not error, got: %v", supportedVersion, err)
-	}
+	assert.NoError(t, err, "validatePlayerDataPayload() with supported version %s should not error", supportedVersion)
 }
 
 // TestValidatePlayerDataPayload_NilPayload は、payloadがnilの場合のテストです
 func TestValidatePlayerDataPayload_NilPayload(t *testing.T) {
 	err := validatePlayerDataPayload(nil)
-	if err == nil {
-		t.Error("validatePlayerDataPayload(nil) should return error")
-		return
-	}
+	require.Error(t, err, "validatePlayerDataPayload(nil) should return error")
 
 	var validationErr *PlayerDataValidationError
-	if !errors.As(err, &validationErr) {
-		t.Errorf("validatePlayerDataPayload(nil) should return PlayerDataValidationError, got: %T", err)
-	}
+	require.ErrorAs(t, err, &validationErr, "validatePlayerDataPayload(nil) should return PlayerDataValidationError")
 }
 
 // ptrFloat64 はfloat64のポインタを返すヘルパー関数です
