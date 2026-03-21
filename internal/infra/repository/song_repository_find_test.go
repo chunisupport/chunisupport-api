@@ -248,11 +248,11 @@ func TestGetLatestUpdatedAtExcludingWorldsend(t *testing.T) {
 
 	repo := &songRepository{db: db}
 
-	t.Run("削除済み除外時は公開対象の最大時刻を返す", func(t *testing.T) {
+	t.Run("削除済み除外時でも削除済み楽曲自体の updated_at を含む最大時刻を返す", func(t *testing.T) {
 		updatedAt, err := repo.GetLatestUpdatedAtExcludingWorldsend(ctx, db, false)
 		require.NoError(t, err)
 		require.NotNil(t, updatedAt)
-		assert.True(t, activeChartUpdatedAt.Equal(updatedAt.UTC()))
+		assert.True(t, deletedSongUpdatedAt.Equal(updatedAt.UTC()))
 	})
 
 	t.Run("削除済み含む時は削除済みも含めた最大時刻を返す", func(t *testing.T) {

@@ -127,15 +127,17 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 }
 
 // GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
+// includeDeleted=false の場合でも songs の updated_at は全楽曲対象とします。
+// is_deleted=1 への遷移（削除操作）そのものが公開一覧の内容を変えるため、
+// 削除済み楽曲の updated_at も MAX 計算に含める必要があるためです。
+// 一方 charts の updated_at は公開楽曲（is_deleted=0）に属するもののみを対象とします。
 func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
 	query := `
 		SELECT MAX(updated_at) FROM (
 			SELECT s.updated_at AS updated_at
 			FROM songs s
 			WHERE s.is_worldsend = 0`
-	if !includeDeleted {
-		query += ` AND s.is_deleted = 0`
-	}
+	// songs は includeDeleted に関わらず全楽曲対象（削除操作の検知のため、is_deleted フィルタなし）
 	query += `
 			UNION ALL
 			SELECT c.updated_at AS updated_at

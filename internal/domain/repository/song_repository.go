@@ -17,7 +17,8 @@ type SongRepository interface {
 	FindAllExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Song, error)
 
 	// GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
-	// includeDeletedがfalseの場合、削除済み楽曲は除外されます。
+	// includeDeleted=false の場合、削除済み楽曲のチャート更新は除外されますが、
+	// 楽曲自体の updated_at（削除操作による変更を含む）は常に集計対象とします。
 	GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) (*time.Time, error)
 
 	// FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。

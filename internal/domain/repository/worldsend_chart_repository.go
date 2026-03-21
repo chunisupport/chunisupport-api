@@ -28,7 +28,8 @@ type WorldsendChartRepository interface {
 	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*WorldsendSongWithChart, error)
 
 	// GetLatestUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を返します。
-	// includeDeleted が false の場合、削除済み楽曲は除外されます。
+	// includeDeleted=false の場合、削除済み楽曲のチャート更新は除外されますが、
+	// 楽曲自体の updated_at（削除操作による変更を含む）は常に集計対象とします。
 	GetLatestUpdatedAt(ctx context.Context, exec Executor, includeDeleted bool) (*time.Time, error)
 
 	// FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
