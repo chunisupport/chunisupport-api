@@ -175,20 +175,33 @@ func scanNullableTime(ctx context.Context, exec repository.Executor, query strin
 }
 
 func parseTimeString(value string) (*time.Time, error) {
+	return parseTimeStringInLocation(value, time.Local)
+}
+
+func parseTimeStringInLocation(value string, location *time.Location) (*time.Time, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return nil, nil
 	}
 
-	layouts := []string{
+	zonedLayouts := []string{
 		time.RFC3339Nano,
 		"2006-01-02 15:04:05.999999999Z07:00",
 		"2006-01-02 15:04:05Z07:00",
+	}
+	for _, layout := range zonedLayouts {
+		parsed, err := time.Parse(layout, trimmed)
+		if err == nil {
+			return &parsed, nil
+		}
+	}
+
+	localLayouts := []string{
 		"2006-01-02 15:04:05.999999999",
 		"2006-01-02 15:04:05",
 	}
-	for _, layout := range layouts {
-		parsed, err := time.Parse(layout, trimmed)
+	for _, layout := range localLayouts {
+		parsed, err := time.ParseInLocation(layout, trimmed, location)
 		if err == nil {
 			return &parsed, nil
 		}
