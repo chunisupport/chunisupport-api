@@ -19,6 +19,11 @@ type UserUsecase interface {
 	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error)
 
+	// GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
+	GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileRecordViewDTO, error)
+
 	// GetUserUpdatedAt はユーザー名をキーにプレイヤーデータの updated_at のみを取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
 	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。

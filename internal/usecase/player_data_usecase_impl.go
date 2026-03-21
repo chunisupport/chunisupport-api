@@ -21,11 +21,10 @@ import (
 )
 
 const (
-	maxScoreValue     = 1010000
-	minScoreValue     = 1
-	tokyoLayout       = "2006/01/02 15:04"
-	defaultSlotName   = "none"
-	worldsendDiffName = "WORLD'S END"
+	maxScoreValue   = 1010000
+	minScoreValue   = 1
+	tokyoLayout     = "2006/01/02 15:04"
+	defaultSlotName = "none"
 )
 
 var (
@@ -121,11 +120,6 @@ func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index in
 	}
 
 	return nil
-}
-
-// isNoneValue は、「存在しない」を表す便宜上のマスタ値かどうかを判定します。
-func isNoneValue(name string) bool {
-	return name == "NONE" || name == "none"
 }
 
 // playerDataMaster はプレイヤーデータ登録時に使用するマスターデータのキャッシュを保持します。

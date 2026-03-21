@@ -39,6 +39,14 @@ func (m *mockUserService) GetUserProfileRatingView(ctx context.Context, username
 	return args.Get(0).(*dto_internal.UserProfileRatingViewDTO), args.Error(1)
 }
 
+func (m *mockUserService) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileRecordViewDTO, error) {
+	args := m.Called(ctx, username, requester, includeNoPlay)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto_internal.UserProfileRecordViewDTO), args.Error(1)
+}
+
 func (m *mockUserService) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
 	args := m.Called(ctx, page, limit, name)
 	if args.Get(0) == nil {
@@ -186,6 +194,56 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewUserHandler(mockService)
+	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	player := &dto.PlayerDTO{
+		Name:      "player",
+		Level:     10,
+		Honors:    []*dto.HonorDTO{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	recordViewResult := &dto_internal.UserProfileRecordViewDTO{
+		Username: "testuser",
+		Player:   player,
+		Records: &dto_internal.UserRecordViewResponseDTO{
+			UpdatedAt: now,
+			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
+		},
+		UpdatedAt: &now,
+	}
+
+	mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordViewResult, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record&include_noplay=true", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("username")
+	c.SetParamValues("testuser")
+
+	err := h.GetUserProfileWithRecords(c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	recordsBody, ok := body["records"].(map[string]any)
+	assert.True(t, ok)
+	_, hasAll := recordsBody["all"]
+	_, hasWorldsend := recordsBody["worldsend"]
+	_, hasBest := recordsBody["best"]
+	_, hasNew := recordsBody["new"]
+	assert.True(t, hasAll)
+	assert.True(t, hasWorldsend)
+	assert.False(t, hasBest)
+	assert.False(t, hasNew)
+	mockService.AssertExpectations(t)
 }
 
 func TestUserHandler_DeleteUser(t *testing.T) {

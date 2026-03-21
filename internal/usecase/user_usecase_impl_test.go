@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -184,9 +186,7 @@ func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{err: sql.ErrNoRows}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil, false)
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
 func TestUserService_GetUserProfileWithRecords_PlayerNotLinked(t *testing.T) {
@@ -194,9 +194,7 @@ func TestUserService_GetUserProfileWithRecords_PlayerNotLinked(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
-	if !errors.Is(err, ErrPlayerNotLinked) {
-		t.Fatalf("expected ErrPlayerNotLinked, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrPlayerNotLinked)
 }
 
 func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
@@ -216,9 +214,7 @@ func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{player: player}, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1}, false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
@@ -304,46 +300,24 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{records: records}, nil, &stubPlayerService{player: player}, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.UserID != 1 {
-		t.Fatalf("expected user_id 1, got %d", result.UserID)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.UserID)
 
 	// updated_atの検証
-	expectedRecordUpdatedAt := now
-	if !result.Records.UpdatedAt.Equal(expectedRecordUpdatedAt) {
-		t.Fatalf("expected updated_at to be %v, got %v", expectedRecordUpdatedAt, result.Records.UpdatedAt)
-	}
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
 
 	// 各スロットの長さを検証
-	if len(result.Records.Best) != 1 {
-		t.Fatalf("expected 1 record for best, got %d", len(result.Records.Best))
-	}
-	if len(result.Records.NewCandidate) != 1 {
-		t.Fatalf("expected 1 record for new_candidate, got %d", len(result.Records.NewCandidate))
-	}
-	if len(result.Records.BestCandidate) != 0 {
-		t.Fatalf("expected 0 records for best_candidate, got %d", len(result.Records.BestCandidate))
-	}
-	if len(result.Records.New) != 0 {
-		t.Fatalf("expected 0 records for new, got %d", len(result.Records.New))
-	}
-	if len(result.Records.All) != 2 {
-		t.Fatalf("expected 2 records for all, got %d", len(result.Records.All))
-	}
+	require.Len(t, result.Records.Best, 1)
+	assert.Len(t, result.Records.NewCandidate, 1)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Empty(t, result.Records.New)
+	assert.Len(t, result.Records.All, 2)
 
 	bestRecord := result.Records.Best[0]
-	if bestRecord.Const != chartConst {
-		t.Fatalf("expected chart const to be %v, got %v", chartConst, bestRecord.Const)
-	}
-	if bestRecord.Slot == nil || *bestRecord.Slot != "best" {
-		t.Fatalf("expected slot name best, got %v", bestRecord.Slot)
-	}
-	if bestRecord.Difficulty != "EXPERT" {
-		t.Fatalf("expected difficulty EXPERT, got %v", bestRecord.Difficulty)
-	}
+	assert.Equal(t, chartConst, bestRecord.Const)
+	require.NotNil(t, bestRecord.Slot)
+	assert.Equal(t, "best", *bestRecord.Slot)
+	assert.Equal(t, "EXPERT", bestRecord.Difficulty)
 }
 
 func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
@@ -377,51 +351,24 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(result.Records.All) != 2 {
-		t.Fatalf("expected 2 all records, got %d", len(result.Records.All))
-	}
-	if result.Records.All[0].IsPlayed != true {
-		t.Fatal("expected first record is played")
-	}
-	if result.Records.All[1].IsPlayed != false {
-		t.Fatal("expected second record is unplayed")
-	}
-	if len(result.Records.Best) != 0 {
-		t.Fatalf("expected 0 best records, got %d", len(result.Records.Best))
-	}
-	if len(result.Records.New) != 0 {
-		t.Fatalf("expected 0 new records, got %d", len(result.Records.New))
-	}
-	if len(result.Records.NewCandidate) != 0 {
-		t.Fatalf("expected 0 new_candidate records, got %d", len(result.Records.NewCandidate))
-	}
-	if len(result.Records.BestCandidate) != 0 {
-		t.Fatalf("expected 0 best_candidate records, got %d", len(result.Records.BestCandidate))
-	}
-	if result.Records.All[1].UpdatedAt != nil {
-		t.Fatal("expected unplayed updated_at nil")
-	}
-	if result.Records.All[1].ClearLamp != nil {
-		t.Fatal("expected unplayed clear_lamp nil")
-	}
-	if result.Records.All[0].Difficulty != "EXPERT" || result.Records.All[1].Difficulty != "MASTER" {
-		t.Fatalf("expected uppercase difficulties, got %s and %s", result.Records.All[0].Difficulty, result.Records.All[1].Difficulty)
-	}
-	if len(result.Records.WorldsEnd) != 1 {
-		t.Fatalf("expected 1 worldsend record, got %d", len(result.Records.WorldsEnd))
-	}
-	if result.Records.WorldsEnd[0].IsPlayed {
-		t.Fatal("expected worldsend completion record is unplayed")
-	}
+	require.Len(t, result.Records.All, 2)
+	assert.True(t, result.Records.All[0].IsPlayed, "expected first record is played")
+	assert.False(t, result.Records.All[1].IsPlayed, "expected second record is unplayed")
+	assert.Empty(t, result.Records.Best)
+	assert.Empty(t, result.Records.New)
+	assert.Empty(t, result.Records.NewCandidate)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Nil(t, result.Records.All[1].UpdatedAt, "expected unplayed updated_at nil")
+	assert.Nil(t, result.Records.All[1].ClearLamp, "expected unplayed clear_lamp nil")
+	assert.Equal(t, "EXPERT", result.Records.All[0].Difficulty)
+	assert.Equal(t, "MASTER", result.Records.All[1].Difficulty)
+	require.Len(t, result.Records.WorldsEnd, 1)
+	assert.False(t, result.Records.WorldsEnd[0].IsPlayed, "expected worldsend completion record is unplayed")
 
 	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
-	if len(result.Records.All) > 0 && result.Records.All[0].Slot != nil {
-		t.Fatalf("expected all record slot nil, got %v", result.Records.All[0].Slot)
-	}
+	assert.Nil(t, result.Records.All[0].Slot, "expected all record slot nil")
 }
 
 func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
@@ -505,27 +452,149 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{ratingRecords: records}, nil, &stubPlayerService{player: player}, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	require.NoError(t, err)
+
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
+	assert.Len(t, result.Records.Best, 1)
+	assert.Len(t, result.Records.NewCandidate, 1)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Empty(t, result.Records.New)
+}
+
+func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
+	now := time.Now()
+	scorePlayed, _ := score.NewScore(1000000)
+	chartConst, _ := chartconstant.NewChartConstant(12.4)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: now.Add(-time.Hour)}
+	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
+	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
+	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
+	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			ChartID:         1001,
+			Score:           scorePlayed,
+			UpdatedAt:       now,
+			Chart:           playedSong.Charts[0],
+			Song:            playedSong,
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
+		}}},
+		&stubWorldsendRecordRepository{},
+		&stubPlayerService{player: player},
+		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
+		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}}},
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)
+	require.NoError(t, err)
+
+	require.NotNil(t, result)
+	require.NotNil(t, result.Records)
+	require.Len(t, result.Records.All, 2)
+	assert.True(t, result.Records.All[0].IsPlayed, "expected first record is played")
+	assert.False(t, result.Records.All[1].IsPlayed, "expected second record is unplayed")
+	assert.Nil(t, result.Records.All[1].UpdatedAt, "expected unplayed updated_at nil")
+	assert.Nil(t, result.Records.All[1].ClearLamp, "expected unplayed clear_lamp nil")
+	assert.Equal(t, "EXPERT", result.Records.All[0].Difficulty)
+	assert.Equal(t, "MASTER", result.Records.All[1].Difficulty)
+
+	require.Len(t, result.Records.Worldsend, 1)
+	assert.False(t, result.Records.Worldsend[0].IsPlayed, "expected worldsend completion record is unplayed")
+}
+
+func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerUpdatedAt(t *testing.T) {
+	now := time.Now()
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: now}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
+}
+
+func TestUserService_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
 	}
 
-	expectedRecordUpdatedAt := now
-	if !result.Records.UpdatedAt.Equal(expectedRecordUpdatedAt) {
-		t.Fatalf("expected updated_at to be %v, got %v", expectedRecordUpdatedAt, result.Records.UpdatedAt)
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
+}
+
+func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
 	}
 
-	if len(result.Records.Best) != 1 {
-		t.Fatalf("expected 1 record for best, got %d", len(result.Records.Best))
-	}
-	if len(result.Records.NewCandidate) != 1 {
-		t.Fatalf("expected 1 record for new_candidate, got %d", len(result.Records.NewCandidate))
-	}
-	if len(result.Records.BestCandidate) != 0 {
-		t.Fatalf("expected 0 records for best_candidate, got %d", len(result.Records.BestCandidate))
-	}
-	if len(result.Records.New) != 0 {
-		t.Fatalf("expected 0 records for new, got %d", len(result.Records.New))
-	}
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		&stubPlayerService{player: player},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
 }
 
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {
@@ -566,35 +635,21 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(list) != 2 {
-		t.Fatalf("expected 2 users, got %d", len(list))
-	}
+	require.Len(t, list, 2)
 
 	// Verify User 1
-	if list[0].UserName != "user1" {
-		t.Errorf("expected username user1, got %s", list[0].UserName)
-	}
-	if list[0].PlayerName != "プレイヤー１" {
-		t.Errorf("expected player name プレイヤー１, got %s", list[0].PlayerName)
-	}
-	if list[0].Rating == nil || *list[0].Rating != 15.0 {
-		t.Errorf("expected rating 15.0, got %v", list[0].Rating)
-	}
-	if list[0].OverPowerValue == nil || *list[0].OverPowerValue != 10.0 {
-		t.Errorf("expected overpower 10.0, got %v", list[0].OverPowerValue)
-	}
+	assert.Equal(t, "user1", list[0].UserName)
+	assert.Equal(t, "プレイヤー１", list[0].PlayerName)
+	require.NotNil(t, list[0].Rating)
+	assert.Equal(t, 15.0, *list[0].Rating)
+	require.NotNil(t, list[0].OverPowerValue)
+	assert.Equal(t, 10.0, *list[0].OverPowerValue)
 
 	// Verify User 2 (No player)
-	if list[1].UserName != "user2" {
-		t.Errorf("expected username user2, got %s", list[1].UserName)
-	}
-	if list[1].PlayerName != "" {
-		t.Errorf("expected empty player name, got %s", list[1].PlayerName)
-	}
+	assert.Equal(t, "user2", list[1].UserName)
+	assert.Equal(t, "", list[1].PlayerName)
 }
 
 func intPointer(v int) *int {
@@ -613,17 +668,11 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Saveに渡されたエンティティの状態を検証
-	if repo.savedUser == nil {
-		t.Fatal("expected user to be saved")
-	}
-	if !repo.savedUser.IsDeleted {
-		t.Error("expected user to be marked as deleted")
-	}
+	require.NotNil(t, repo.savedUser, "expected user to be saved")
+	assert.True(t, repo.savedUser.IsDeleted, "expected user to be marked as deleted")
 }
 
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
@@ -632,9 +681,7 @@ func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "missing")
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
 func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
@@ -649,9 +696,7 @@ func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "deleteduser")
-	if !errors.Is(err, ErrUserAlreadyDeleted) {
-		t.Fatalf("expected ErrUserAlreadyDeleted, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrUserAlreadyDeleted)
 }
 
 func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
@@ -659,9 +704,7 @@ func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), normalUser, "testuser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserService_DeleteUser_UnknownRoleRejected(t *testing.T) {
@@ -669,18 +712,14 @@ func TestUserService_DeleteUser_UnknownRoleRejected(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), unknownRoleUser, "testuser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserService_DeleteUser_NilRequester(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserService_RestoreUser_Success(t *testing.T) {
@@ -695,17 +734,11 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "deleteduser")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Saveに渡されたエンティティの状態を検証
-	if repo.savedUser == nil {
-		t.Fatal("expected user to be saved")
-	}
-	if repo.savedUser.IsDeleted {
-		t.Error("expected user to be restored (not deleted)")
-	}
+	require.NotNil(t, repo.savedUser, "expected user to be saved")
+	assert.False(t, repo.savedUser.IsDeleted, "expected user to be restored (not deleted)")
 }
 
 func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
@@ -714,9 +747,7 @@ func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "missing")
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
 func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
@@ -731,9 +762,7 @@ func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
 	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "activeuser")
-	if !errors.Is(err, ErrUserNotDeleted) {
-		t.Fatalf("expected ErrUserNotDeleted, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrUserNotDeleted)
 }
 
 func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
@@ -741,9 +770,7 @@ func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), normalUser, "deleteduser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserService_RestoreUser_UnknownRoleRejected(t *testing.T) {
@@ -751,16 +778,12 @@ func TestUserService_RestoreUser_UnknownRoleRejected(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), unknownRoleUser, "deleteduser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserService_RestoreUser_NilRequester(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{}, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), nil, "deleteduser")
-	if !errors.Is(err, ErrAdminRequired) {
-		t.Fatalf("expected ErrAdminRequired, got %v", err)
-	}
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
