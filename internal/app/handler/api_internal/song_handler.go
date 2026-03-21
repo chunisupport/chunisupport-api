@@ -41,11 +41,11 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	// DTOに変換
