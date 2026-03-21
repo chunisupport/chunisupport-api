@@ -12,6 +12,7 @@ import (
 const authCookieName = "token"
 
 func newAuthCookie(cookieSecure bool, cookieSameSite http.SameSite, value string, maxAge int) *http.Cookie {
+	// #nosec G124 本番環境では Secure=true を設定し、ローカル開発環境のみ設定値で false を許容します。
 	cookie := &http.Cookie{
 		Name:     authCookieName,
 		Value:    value,
