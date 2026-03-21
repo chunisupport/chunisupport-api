@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -322,6 +323,10 @@ func TestGetSongs(t *testing.T) {
 		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
+		GetSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+			updatedAt := time.Date(2026, 3, 22, 15, 4, 5, 0, time.UTC)
+			return &updatedAt, nil
+		},
 	}
 
 	// ハンドラーの準備
@@ -355,6 +360,10 @@ func TestGetSongs(t *testing.T) {
 
 	if len(response.Songs) != 1 {
 		t.Errorf("Songs count = %d, want %d", len(response.Songs), 1)
+	}
+
+	if response.UpdatedAt == nil {
+		t.Fatal("UpdatedAt should not be nil")
 	}
 
 	if len(response.Songs) > 0 && response.Songs[0].DisplayID != "test123456789012" {

@@ -47,6 +47,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			jacket TEXT,
 			is_worldsend INTEGER NOT NULL DEFAULT 0,
 			is_deleted INTEGER NOT NULL DEFAULT 0,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (genre_id) REFERENCES genres(id)
 		);
 
@@ -57,6 +58,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			const REAL NOT NULL,
 			is_const_unknown INTEGER NOT NULL DEFAULT 1,
 			notes INTEGER,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
 			FOREIGN KEY (difficulty_id) REFERENCES difficulties(id),
 			UNIQUE (song_id, difficulty_id)

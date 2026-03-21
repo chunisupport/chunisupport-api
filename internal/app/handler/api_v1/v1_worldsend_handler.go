@@ -35,10 +35,15 @@ func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
+	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), false, nil)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	songDTOs := h.convertToV1WorldsendSongDTOs(songsWithCharts)
 	return c.JSON(http.StatusOK, &api_v1.V1WorldsendSongsResponse{
-		Songs: songDTOs,
+		Songs:     songDTOs,
+		UpdatedAt: updatedAt,
 	})
 }
 

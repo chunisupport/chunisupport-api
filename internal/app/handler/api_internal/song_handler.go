@@ -43,12 +43,17 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
 
 	// DTOに変換
 	songDTOs := h.convertToSongDTOs(songsWithCharts)
 
 	result := &api_internal.SongsResponse{
-		Songs: songDTOs,
+		Songs:     songDTOs,
+		UpdatedAt: updatedAt,
 	}
 
 	return c.JSON(http.StatusOK, result)
@@ -76,9 +81,14 @@ func (h *SongHandler) GetEditorSongs(c echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorSongsResponse{
-		Songs: h.convertToEditorSongDTOs(songsWithCharts),
+		Songs:     h.convertToEditorSongDTOs(songsWithCharts),
+		UpdatedAt: updatedAt,
 	})
 }
 

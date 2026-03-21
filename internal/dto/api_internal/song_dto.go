@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -77,7 +78,8 @@ type SongDTO struct {
 
 // SongsResponse は楽曲一覧のレスポンスを表します。
 type SongsResponse struct {
-	Songs []*SongDTO `json:"songs"`
+	Songs     []*SongDTO `json:"songs"`
+	UpdatedAt *time.Time `json:"updated_at"`
 }
 
 // EditorSongDTO は編集者向けの楽曲情報DTOです。
@@ -88,7 +90,8 @@ type EditorSongDTO struct {
 
 // EditorSongsResponse は編集者向け楽曲一覧のレスポンスを表します。
 type EditorSongsResponse struct {
-	Songs []*EditorSongDTO `json:"songs"`
+	Songs     []*EditorSongDTO `json:"songs"`
+	UpdatedAt *time.Time       `json:"updated_at"`
 }
 
 // UpdateChartRequest は譜面更新リクエストを表します。

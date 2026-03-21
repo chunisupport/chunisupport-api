@@ -123,6 +123,10 @@ func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec
 	return s.songs, nil
 }
 
+func (s *stubSongRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
+	return nil, nil
+}
+
 func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	return nil, errors.New("not implemented")
 }
@@ -157,6 +161,10 @@ func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec reposit
 		return nil, s.err
 	}
 	return s.records, nil
+}
+
+func (s *stubWorldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
+	return nil, nil
 }
 
 func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {

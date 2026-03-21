@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -14,6 +15,10 @@ type SongRepository interface {
 	// includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindAllExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Song, error)
+
+	// GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
+	// includeDeletedがfalseの場合、削除済み楽曲は除外されます。
+	GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) (*time.Time, error)
 
 	// FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 	// 削除済み楽曲も取得します。

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -12,6 +13,10 @@ type SongUsecase interface {
 	// GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
+
+	// GetSongsLastUpdatedAt はWORLD'S END以外の楽曲一覧全体の最終更新日時を取得します。
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
+	GetSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
 
 	// GetSongByDisplayID は指定されたDisplayIDの楽曲を取得します。
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。

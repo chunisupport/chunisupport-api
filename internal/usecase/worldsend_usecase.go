@@ -44,6 +44,10 @@ type WorldsendUsecase interface {
 	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
 
+	// GetWorldsendSongsLastUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を取得します。
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
+	GetWorldsendSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
+
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
@@ -77,12 +81,7 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
-	// 削除済み楽曲を含める場合はEDITOR権限が必要
-	if includeDeleted {
-		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
-			includeDeleted = false
-		}
-	}
+	includeDeleted = normalizeWorldsendIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
@@ -91,6 +90,19 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 	}
 
 	return songsWithCharts, nil
+}
+
+// GetWorldsendSongsLastUpdatedAt は全 WORLD'S END 楽曲一覧の最終更新日時を取得します。
+func (s *worldsendUsecase) GetWorldsendSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+	includeDeleted = normalizeWorldsendIncludeDeleted(includeDeleted, requesterAccountTypeID)
+
+	updatedAt, err := s.worldsendChartRepo.GetLatestUpdatedAt(ctx, s.defaultExecutor, includeDeleted)
+	if err != nil {
+		slog.Error("failed to get latest updated_at for worldsend songs", "error", err)
+		return nil, err
+	}
+
+	return updatedAt, nil
 }
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
@@ -188,6 +200,18 @@ func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, ma
 	}
 
 	return updates, nil
+}
+
+func normalizeWorldsendIncludeDeleted(includeDeleted bool, requesterAccountTypeID *int) bool {
+	if !includeDeleted {
+		return false
+	}
+
+	if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
+		return false
+	}
+
+	return true
 }
 
 func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*repository.WorldsendUpdate, error) {

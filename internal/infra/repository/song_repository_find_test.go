@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -218,4 +219,57 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	require.Len(t, song.Charts, 2)
 	assert.InDelta(t, 13.8, song.MaxChartConst, 0.001)
 	assert.False(t, song.IsMaxOPUnknown)
+}
+
+func TestGetLatestUpdatedAtExcludingWorldsend(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	activeSongUpdatedAt := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
+	activeChartUpdatedAt := activeSongUpdatedAt.Add(2 * time.Hour)
+	deletedSongUpdatedAt := activeChartUpdatedAt.Add(2 * time.Hour)
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at)
+		VALUES
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, ?),
+			(2, 'DISPLAY002', 'Song 2', 'Artist 2', 1, 180, NULL, 'IDX002', NULL, 0, 1, ?)
+	`, activeSongUpdatedAt.Format(time.RFC3339Nano), deletedSongUpdatedAt.Format(time.RFC3339Nano))
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, updated_at)
+		VALUES
+			(1, 4, 13.8, 0, 1050, ?),
+			(2, 4, 14.0, 0, 1200, ?)
+	`, activeChartUpdatedAt.Format(time.RFC3339Nano), deletedSongUpdatedAt.Add(time.Hour).Format(time.RFC3339Nano))
+	require.NoError(t, err)
+
+	repo := &songRepository{db: db}
+
+	t.Run("削除済み除外時は公開対象の最大時刻を返す", func(t *testing.T) {
+		updatedAt, err := repo.GetLatestUpdatedAtExcludingWorldsend(ctx, db, false)
+		require.NoError(t, err)
+		require.NotNil(t, updatedAt)
+		assert.True(t, activeChartUpdatedAt.Equal(updatedAt.UTC()))
+	})
+
+	t.Run("削除済み含む時は削除済みも含めた最大時刻を返す", func(t *testing.T) {
+		updatedAt, err := repo.GetLatestUpdatedAtExcludingWorldsend(ctx, db, true)
+		require.NoError(t, err)
+		require.NotNil(t, updatedAt)
+		expected := deletedSongUpdatedAt.Add(time.Hour)
+		assert.True(t, expected.Equal(updatedAt.UTC()))
+	})
+
+	t.Run("対象データがない場合はnilを返す", func(t *testing.T) {
+		emptyDB := setupTestDB(t)
+		defer emptyDB.Close()
+
+		repo := &songRepository{db: emptyDB}
+		updatedAt, err := repo.GetLatestUpdatedAtExcludingWorldsend(ctx, emptyDB, false)
+		require.NoError(t, err)
+		assert.Nil(t, updatedAt)
+	})
 }

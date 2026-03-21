@@ -2,6 +2,7 @@ package api_v1
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -77,7 +78,8 @@ type V1SongDTO struct {
 
 // V1SongsResponse は外部API v1 用の楽曲一覧レスポンスです。
 type V1SongsResponse struct {
-	Songs []*V1SongDTO `json:"songs"`
+	Songs     []*V1SongDTO `json:"songs"`
+	UpdatedAt *time.Time   `json:"updated_at"`
 }
 
 // ToV1ChartDTO はChartエンティティから V1ChartDTO へ変換します。

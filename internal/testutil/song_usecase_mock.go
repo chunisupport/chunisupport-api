@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -10,6 +11,7 @@ import (
 // MockSongUsecase は楽曲ユースケースのテスト用モックです。
 type MockSongUsecase struct {
 	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
+	GetSongsLastUpdatedAtFunc         func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
 	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
@@ -20,6 +22,13 @@ type MockSongUsecase struct {
 func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 	if m.GetAllSongsExcludingWorldsendFunc != nil {
 		return m.GetAllSongsExcludingWorldsendFunc(ctx, includeDeleted, requesterAccountTypeID)
+	}
+	return nil, nil
+}
+
+func (m *MockSongUsecase) GetSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+	if m.GetSongsLastUpdatedAtFunc != nil {
+		return m.GetSongsLastUpdatedAtFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}
 	return nil, nil
 }

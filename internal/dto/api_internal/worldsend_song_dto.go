@@ -1,6 +1,8 @@
 package api_internal
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
@@ -28,7 +30,8 @@ type WorldsendSongDTO struct {
 
 // WorldsendSongsResponse は WORLD'S END 楽曲一覧のレスポンスを表します。
 type WorldsendSongsResponse struct {
-	Songs []*WorldsendSongDTO `json:"songs"`
+	Songs     []*WorldsendSongDTO `json:"songs"`
+	UpdatedAt *time.Time          `json:"updated_at"`
 }
 
 // EditorWorldsendSongDTO は編集者向けの WORLD'S END 楽曲情報DTOです。
@@ -39,7 +42,8 @@ type EditorWorldsendSongDTO struct {
 
 // EditorWorldsendSongsResponse は編集者向け WORLD'S END 楽曲一覧のレスポンスを表します。
 type EditorWorldsendSongsResponse struct {
-	Songs []*EditorWorldsendSongDTO `json:"songs"`
+	Songs     []*EditorWorldsendSongDTO `json:"songs"`
+	UpdatedAt *time.Time                `json:"updated_at"`
 }
 
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。

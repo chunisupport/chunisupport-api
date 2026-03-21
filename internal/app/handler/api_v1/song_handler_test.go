@@ -1,12 +1,19 @@
 package api_v1
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	api_v1_dto "github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/labstack/echo/v4"
 )
 
 // TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
@@ -137,5 +144,44 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Error("ULTIMA key not found in map")
 	} else if ultimaChart != nil {
 		t.Error("ULTIMA chart should be nil")
+	}
+}
+
+func TestGetSongs(t *testing.T) {
+	masterCache := &masterdata.Cache{
+		GenreNamesByID:      map[int]string{1: "POPS & ANIME"},
+		DifficultyNamesByID: map[int]string{1: "BASIC"},
+	}
+	updatedAt := time.Date(2026, 3, 22, 15, 4, 5, 0, time.UTC)
+
+	handler := &V1SongHandler{
+		songUsecase: &testutil.MockSongUsecase{
+			GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+				return []*entity.Song{{DisplayID: "v1songs123456789", Title: "曲", Artist: "作者", Charts: []*entity.Chart{}}}, nil
+			},
+			GetSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+				return &updatedAt, nil
+			},
+		},
+		masterCache: masterCache,
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.GetSongs(c)
+	if err != nil {
+		t.Fatalf("GetSongs returned error: %v", err)
+	}
+
+	var response api_v1_dto.V1SongsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response.UpdatedAt == nil {
+		t.Fatal("UpdatedAt should not be nil")
 	}
 }

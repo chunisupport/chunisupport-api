@@ -38,10 +38,15 @@ func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
+	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	songDTOs := h.convertToWorldsendSongDTOs(songsWithCharts)
 	return c.JSON(http.StatusOK, &api_internal.WorldsendSongsResponse{
-		Songs: songDTOs,
+		Songs:     songDTOs,
+		UpdatedAt: updatedAt,
 	})
 }
 
@@ -65,9 +70,14 @@ func (h *WorldsendHandler) GetEditorWorldsendSongs(c echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
+	updatedAt, err := h.worldsendUsecase.GetWorldsendSongsLastUpdatedAt(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorWorldsendSongsResponse{
-		Songs: h.convertToEditorWorldsendSongDTOs(songsWithCharts),
+		Songs:     h.convertToEditorWorldsendSongDTOs(songsWithCharts),
+		UpdatedAt: updatedAt,
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -76,6 +77,32 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 	}
 
 	return results, rows.Err()
+}
+
+// GetLatestUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を返します。
+func (r *worldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
+	query := `
+		SELECT MAX(updated_at) FROM (
+			SELECT s.updated_at AS updated_at
+			FROM songs s
+			WHERE s.is_worldsend = 1`
+	if !includeDeleted {
+		query += ` AND s.is_deleted = 0`
+	}
+	query += `
+			UNION ALL
+			SELECT wc.updated_at AS updated_at
+			FROM worldsend_charts wc
+			INNER JOIN songs s ON s.id = wc.song_id
+			WHERE s.is_worldsend = 1`
+	if !includeDeleted {
+		query += ` AND s.is_deleted = 0`
+	}
+	query += `
+		) latest_updates
+	`
+
+	return scanNullableTime(ctx, exec, query)
 }
 
 // FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。

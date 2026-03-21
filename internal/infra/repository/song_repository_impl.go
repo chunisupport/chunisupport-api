@@ -126,6 +126,77 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	return results, nil
 }
 
+// GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
+func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
+	query := `
+		SELECT MAX(updated_at) FROM (
+			SELECT s.updated_at AS updated_at
+			FROM songs s
+			WHERE s.is_worldsend = 0`
+	if !includeDeleted {
+		query += ` AND s.is_deleted = 0`
+	}
+	query += `
+			UNION ALL
+			SELECT c.updated_at AS updated_at
+			FROM charts c
+			INNER JOIN songs s ON s.id = c.song_id
+			WHERE s.is_worldsend = 0`
+	if !includeDeleted {
+		query += ` AND s.is_deleted = 0`
+	}
+	query += `
+		) latest_updates
+	`
+
+	return scanNullableTime(ctx, exec, query)
+}
+
+func scanNullableTime(ctx context.Context, exec repository.Executor, query string, args ...any) (*time.Time, error) {
+	var raw any
+	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&raw); err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, nil
+	}
+
+	switch value := raw.(type) {
+	case time.Time:
+		updatedAt := value
+		return &updatedAt, nil
+	case []byte:
+		return parseTimeString(string(value))
+	case string:
+		return parseTimeString(value)
+	default:
+		return nil, fmt.Errorf("unsupported updated_at type: %T", raw)
+	}
+}
+
+func parseTimeString(value string) (*time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	layouts := []string{
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+	}
+	for _, layout := range layouts {
+		parsed, err := time.Parse(layout, trimmed)
+		if err == nil {
+			return &parsed, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to parse updated_at: %s", trimmed)
+}
+
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song := entity.NewSong()
 	song.ID = row.ID

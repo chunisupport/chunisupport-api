@@ -100,6 +100,7 @@ func setupWorldsendUpdateDB(t *testing.T) *sqlx.DB {
 			level_star INTEGER,
 			attribute TEXT,
 			notes INTEGER,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
 			UNIQUE(song_id)
 		)

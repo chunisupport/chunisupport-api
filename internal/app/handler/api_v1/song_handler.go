@@ -39,12 +39,17 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), false, nil)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	// V1DTOに変換
 	v1Songs := h.convertToV1SongDTOs(songsWithCharts)
 
 	return c.JSON(http.StatusOK, &api_v1.V1SongsResponse{
-		Songs: v1Songs,
+		Songs:     v1Songs,
+		UpdatedAt: updatedAt,
 	})
 }
 

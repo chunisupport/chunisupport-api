@@ -1,6 +1,8 @@
 package api_v1
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
@@ -28,7 +30,8 @@ type V1WorldsendSongDTO struct {
 
 // V1WorldsendSongsResponse は外部API v1 用の WORLD'S END 楽曲一覧レスポンスです。
 type V1WorldsendSongsResponse struct {
-	Songs []*V1WorldsendSongDTO `json:"songs"`
+	Songs     []*V1WorldsendSongDTO `json:"songs"`
+	UpdatedAt *time.Time            `json:"updated_at"`
 }
 
 // ToV1WorldsendChartDTO は WorldsendChart エンティティから V1WorldsendChartDTO へ変換します。

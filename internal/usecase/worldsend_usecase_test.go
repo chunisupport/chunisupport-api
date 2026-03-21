@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -25,6 +26,15 @@ func (m *MockWorldsendChartRepository) FindAll(ctx context.Context, exec reposit
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*repository.WorldsendSongWithChart), args.Error(1)
+}
+
+func (m *MockWorldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
+	args := m.Called(ctx, exec, includeDeleted)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	timeVal := args.Get(0).(time.Time)
+	return &timeVal, args.Error(1)
 }
 
 func (m *MockWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
@@ -201,6 +211,48 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantResult, result)
 			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestGetWorldsendSongsLastUpdatedAt_WithDeletedSongs_RequiresEditorPermission(t *testing.T) {
+	tests := []struct {
+		name                   string
+		includeDeleted         bool
+		requesterAccountTypeID *int
+		expectedIncludeDeleted bool
+	}{
+		{
+			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
+			includeDeleted:         true,
+			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
+			expectedIncludeDeleted: true,
+		},
+		{
+			name:                   "権限なし_includeDeleted=true_削除済みを除外",
+			includeDeleted:         true,
+			requesterAccountTypeID: nil,
+			expectedIncludeDeleted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockWorldsendChartRepository)
+			mockTM := new(MockTransactionManager)
+			mockExec := new(MockExecutor)
+			uc := newWorldsendUsecaseForTest(mockRepo, mockTM, mockExec)
+			ctx := context.Background()
+			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
+
+			mockRepo.On("GetLatestUpdatedAt", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
+
+			result, err := uc.GetWorldsendSongsLastUpdatedAt(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.True(t, expectedUpdatedAt.Equal(*result))
 			mockRepo.AssertExpectations(t)
 		})
 	}

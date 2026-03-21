@@ -1201,6 +1201,7 @@ curl -X POST \
 **レスポンス例**:
 ```json
 {
+  "updated_at": "2026-03-22T15:04:05Z",
   "songs": [
     {
       "id": "0123456789abcdef",
@@ -1234,6 +1235,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `updated_at` | string \| null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
 | `songs` | SongDTO[] | 楽曲情報の配列 |
 
 **SongDTO**:
@@ -1495,6 +1497,7 @@ curl -X POST \
 
 ```json
 {
+  "updated_at": "2026-03-22T15:04:05Z",
   "songs": [
     {
       "id": "0123456789abcdef",
@@ -1516,6 +1519,13 @@ curl -X POST \
   ]
 }
 ```
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
+| `songs` | WorldsendSongDTO[] | WORLD'S END 楽曲情報の配列 |
 
 **WorldsendSongDTO フィールド**:
 
@@ -1680,6 +1690,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `updated_at` | string \| null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
 | `songs` | EditorSongDTO[] | 楽曲情報の配列 |
 
 **EditorSongDTO**:
@@ -1720,6 +1731,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `updated_at` | string \| null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
 | `songs` | EditorWorldsendSongDTO[] | WORLD'S END 楽曲情報の配列 |
 
 **EditorWorldsendSongDTO**:
@@ -1846,6 +1858,7 @@ curl -X POST \
 
 ```json
 {
+  "updated_at": "2026-03-22T15:04:05Z",
   "songs": [
     {
       "id": "0000000000000001",
@@ -1877,6 +1890,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `updated_at` | string\|null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
 | `songs` | array | 楽曲オブジェクトの配列 |
 | `songs[].id` | string | 楽曲の識別ID（16桁） |
 | `songs[].title` | string | 楽曲名 |
@@ -1905,6 +1919,7 @@ curl -X POST \
 
 ```json
 {
+  "updated_at": "2026-03-22T15:04:05Z",
   "songs": [
     {
       "id": "0123456789abcdef",
@@ -1926,6 +1941,13 @@ curl -X POST \
   ]
 }
 ```
+
+**レスポンスフィールド（トップレベル）**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | この一覧の母集団に含まれる楽曲・譜面の最終更新日時（ISO8601）。対象データがない場合は null |
+| `songs` | WorldsendSongDTO[] | WORLD'S END 楽曲情報の配列 |
 
 **WorldsendSongDTO フィールド**:
 

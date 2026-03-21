@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"time"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -10,16 +11,24 @@ import (
 
 // MockWorldsendUsecase は WORLD'S END 楽曲ユースケースのテスト用モックです。
 type MockWorldsendUsecase struct {
-	GetAllWorldsendSongsFunc        func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
-	GetWorldsendSongByDisplayIDFunc func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
-	DeleteWorldsendSongFunc         func(ctx context.Context, displayID string) error
-	RestoreWorldsendSongFunc        func(ctx context.Context, displayID string) error
-	UpdateWorldsendSongsFunc        func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
+	GetAllWorldsendSongsFunc           func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
+	GetWorldsendSongsLastUpdatedAtFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
+	GetWorldsendSongByDisplayIDFunc    func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
+	DeleteWorldsendSongFunc            func(ctx context.Context, displayID string) error
+	RestoreWorldsendSongFunc           func(ctx context.Context, displayID string) error
+	UpdateWorldsendSongsFunc           func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
 }
 
 func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
 	if m.GetAllWorldsendSongsFunc != nil {
 		return m.GetAllWorldsendSongsFunc(ctx, includeDeleted, requesterAccountTypeID)
+	}
+	return nil, nil
+}
+
+func (m *MockWorldsendUsecase) GetWorldsendSongsLastUpdatedAt(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+	if m.GetWorldsendSongsLastUpdatedAtFunc != nil {
+		return m.GetWorldsendSongsLastUpdatedAtFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}
 	return nil, nil
 }
