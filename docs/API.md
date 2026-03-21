@@ -1016,8 +1016,8 @@ curl -X POST \
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
-    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。
-    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。
+    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`all`/`worldsend` のみを返します。
+    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。
 
 #### レスポンス例

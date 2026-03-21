@@ -40,6 +40,13 @@ func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	}
 
 	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+	if view == "record" {
+		result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester, includeNoPlay)
+		if err != nil {
+			return h.handleUserProfileError(err, username, "user profile record view")
+		}
+		return c.JSON(http.StatusOK, result)
+	}
 
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
 	if err != nil {

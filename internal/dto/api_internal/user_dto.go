@@ -25,12 +25,27 @@ type UserRatingRecordResponseDTO struct {
 	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
 }
 
+// UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
+type UserRecordViewResponseDTO struct {
+	UpdatedAt time.Time                 `json:"updated_at"`
+	All       []*dto.PlayerRecordDTO    `json:"all"`
+	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+}
+
 // UserProfileRatingViewDTO はレーティングビュー用のユーザープロファイルDTOです。
 type UserProfileRatingViewDTO struct {
 	Username  string                       `json:"username"`
 	Player    *dto.PlayerDTO               `json:"player"`
 	Records   *UserRatingRecordResponseDTO `json:"records"`
 	UpdatedAt *time.Time                   `json:"updated_at"` // プレイヤーデータの最終更新日時
+}
+
+// UserProfileRecordViewDTO はレコードビュー用のユーザープロファイルDTOです。
+type UserProfileRecordViewDTO struct {
+	Username  string                     `json:"username"`
+	Player    *dto.PlayerDTO             `json:"player"`
+	Records   *UserRecordViewResponseDTO `json:"records"`
+	UpdatedAt *time.Time                 `json:"updated_at"` // プレイヤーデータの最終更新日時
 }
 
 // UserDTO はユーザー情報を外部に公開するためのDTOです。

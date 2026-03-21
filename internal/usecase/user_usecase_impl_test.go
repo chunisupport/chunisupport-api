@@ -528,6 +528,67 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 	}
 }
 
+func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
+	now := time.Now()
+	scorePlayed, _ := score.NewScore(1000000)
+	chartConst, _ := chartconstant.NewChartConstant(12.4)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &dto.PlayerDTO{Name: "TestPlayer", Level: 1, UpdatedAt: now.Add(-time.Hour)}
+	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
+	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
+	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
+	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
+
+	service := NewUserService(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			ChartID:         1001,
+			Score:           scorePlayed,
+			UpdatedAt:       now,
+			Chart:           playedSong.Charts[0],
+			Song:            playedSong,
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
+		}}},
+		&stubWorldsendRecordRepository{},
+		&stubPlayerService{player: player},
+		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
+		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}}},
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Records.All) != 2 {
+		t.Fatalf("expected 2 all records, got %d", len(result.Records.All))
+	}
+	if result.Records.All[0].IsPlayed != true {
+		t.Fatal("expected first record is played")
+	}
+	if result.Records.All[1].IsPlayed != false {
+		t.Fatal("expected second record is unplayed")
+	}
+	if result.Records.All[1].UpdatedAt != nil {
+		t.Fatal("expected unplayed updated_at nil")
+	}
+	if result.Records.All[1].ClearLamp != nil {
+		t.Fatal("expected unplayed clear_lamp nil")
+	}
+	if result.Records.All[0].Difficulty != "EXPERT" || result.Records.All[1].Difficulty != "MASTER" {
+		t.Fatalf("expected uppercase difficulties, got %s and %s", result.Records.All[0].Difficulty, result.Records.All[1].Difficulty)
+	}
+	if len(result.Records.Worldsend) != 1 {
+		t.Fatalf("expected 1 worldsend record, got %d", len(result.Records.Worldsend))
+	}
+	if result.Records.Worldsend[0].IsPlayed {
+		t.Fatal("expected worldsend completion record is unplayed")
+	}
+}
+
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
