@@ -127,7 +127,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	return &repository.SongListResult{
 		Songs:     results,
-		UpdatedAt: maxSongListUpdatedAt(songRows, chartRows),
+		UpdatedAt: nil,
 	}, nil
 }
 
@@ -158,19 +158,6 @@ func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Contex
 	`, chartsWhereClause)
 
 	return scanNullableTime(ctx, exec, query)
-}
-
-func maxSongListUpdatedAt(songRows []songRow, chartRows []chartRow) *time.Time {
-	var maxUpdatedAt *time.Time
-
-	for _, row := range songRows {
-		maxUpdatedAt = maxTimePtr(maxUpdatedAt, row.UpdatedAt)
-	}
-	for _, row := range chartRows {
-		maxUpdatedAt = maxTimePtr(maxUpdatedAt, row.UpdatedAt)
-	}
-
-	return maxUpdatedAt
 }
 
 func maxTimePtr(current *time.Time, candidate *time.Time) *time.Time {

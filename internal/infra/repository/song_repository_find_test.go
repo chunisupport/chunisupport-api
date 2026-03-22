@@ -221,6 +221,37 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	assert.False(t, song.IsMaxOPUnknown)
 }
 
+func TestFindAllExcludingWorldsend_DoesNotCalculateUpdatedAt(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	songUpdatedAt := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
+	chartUpdatedAt := songUpdatedAt.Add(2 * time.Hour)
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at)
+		VALUES
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, ?)
+	`, songUpdatedAt.Format(time.RFC3339Nano))
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, updated_at)
+		VALUES
+			(1, 4, 13.8, 0, 1050, ?)
+	`, chartUpdatedAt.Format(time.RFC3339Nano))
+	require.NoError(t, err)
+
+	repo := &songRepository{db: db}
+
+	result, err := repo.FindAllExcludingWorldsend(ctx, db, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.UpdatedAt)
+	require.Len(t, result.Songs, 1)
+}
+
 func TestGetLatestUpdatedAtExcludingWorldsend(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
