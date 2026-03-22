@@ -88,49 +88,42 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 		includeDeleted         bool
 		requesterAccountTypeID *int
 		expectedIncludeDeleted bool
-		description            string
 	}{
 		{
 			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
 			expectedIncludeDeleted: true,
-			description:            "EDITOR権限がある場合、includeDeleted=trueで削除済み楽曲を取得できる",
 		},
 		{
 			name:                   "ADMIN権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
 			expectedIncludeDeleted: true,
-			description:            "ADMIN権限がある場合、includeDeleted=trueで削除済み楽曲を取得できる",
 		},
 		{
 			name:                   "PLAYER権限のみ_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
 			expectedIncludeDeleted: false,
-			description:            "PLAYER権限の場合、includeDeleted=trueでも削除済み楽曲は除外される",
 		},
 		{
 			name:                   "未知ロール_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(4),
 			expectedIncludeDeleted: false,
-			description:            "未知ロールIDは権限なしとして扱われ、削除済み楽曲は除外される",
 		},
 		{
 			name:                   "権限なし_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
-			description:            "権限がない場合、includeDeleted=trueでも削除済み楽曲は除外される",
 		},
 		{
 			name:                   "権限なし_includeDeleted=false_削除済みを除外",
 			includeDeleted:         false,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
-			description:            "includeDeleted=falseの場合、削除済み楽曲は除外される",
 		},
 	}
 
