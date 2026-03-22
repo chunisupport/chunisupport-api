@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFindAll_UpdatedAtはnilを返す(t *testing.T) {
+func TestFindAll_正常系(t *testing.T) {
 	db := setupWorldsendUpdateDB(t)
 	defer db.Close()
 
