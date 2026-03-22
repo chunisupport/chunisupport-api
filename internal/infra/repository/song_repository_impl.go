@@ -160,18 +160,6 @@ func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Contex
 	return scanNullableTime(ctx, exec, query)
 }
 
-func maxTimePtr(current *time.Time, candidate *time.Time) *time.Time {
-	if candidate == nil {
-		return current
-	}
-	if current == nil || candidate.After(*current) {
-		value := *candidate
-		return &value
-	}
-
-	return current
-}
-
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song := entity.NewSong()
 	song.ID = row.ID
