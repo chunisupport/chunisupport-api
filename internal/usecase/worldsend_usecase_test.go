@@ -121,7 +121,13 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 				Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
 				Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
 			}}
-			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.WorldsendSongListResult{Songs: expectedSongs}, nil)
+			findAllUpdatedAt := time.Date(2026, 3, 22, 11, 0, 0, 0, time.UTC)
+			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
+			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.WorldsendSongListResult{
+				Songs:     expectedSongs,
+				UpdatedAt: &findAllUpdatedAt,
+			}, nil)
+			mockRepo.On("GetLatestUpdatedAt", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
 
 			// When
 			result, err := uc.GetAllWorldsendSongs(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
@@ -129,6 +135,8 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			// Then
 			assert.NoError(t, err)
 			assert.Equal(t, expectedSongs, result.Songs)
+			assert.NotNil(t, result.UpdatedAt)
+			assert.True(t, expectedUpdatedAt.Equal(*result.UpdatedAt))
 			mockRepo.AssertExpectations(t)
 		})
 	}

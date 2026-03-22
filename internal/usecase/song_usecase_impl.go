@@ -50,9 +50,14 @@ func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, inc
 		return nil, err
 	}
 
+	updatedAt, err := s.songRepo.GetLatestUpdatedAtExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SongListResult{
 		Songs:     result.Songs,
-		UpdatedAt: result.UpdatedAt,
+		UpdatedAt: updatedAt,
 	}, nil
 }
 

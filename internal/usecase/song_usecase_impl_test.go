@@ -157,8 +157,15 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 				},
 			}
 
+			findAllUpdatedAt := time.Date(2026, 3, 22, 11, 0, 0, 0, time.UTC)
+			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
+
 			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
-			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.SongListResult{Songs: expectedSongs}, nil)
+			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.SongListResult{
+				Songs:     expectedSongs,
+				UpdatedAt: &findAllUpdatedAt,
+			}, nil)
+			mockRepo.On("GetLatestUpdatedAtExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
 
 			// When
 			result, err := usecase.GetAllSongsExcludingWorldsend(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
@@ -167,6 +174,8 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 			assert.Equal(t, expectedSongs, result.Songs)
+			assert.NotNil(t, result.UpdatedAt)
+			assert.True(t, expectedUpdatedAt.Equal(*result.UpdatedAt))
 			mockRepo.AssertExpectations(t)
 		})
 	}

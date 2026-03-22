@@ -94,9 +94,15 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 		return nil, err
 	}
 
+	updatedAt, err := s.worldsendChartRepo.GetLatestUpdatedAt(ctx, s.defaultExecutor, includeDeleted)
+	if err != nil {
+		slog.Error("failed to get latest updated_at for worldsend songs", "error", err)
+		return nil, err
+	}
+
 	return &WorldsendSongListResult{
 		Songs:     result.Songs,
-		UpdatedAt: result.UpdatedAt,
+		UpdatedAt: updatedAt,
 	}, nil
 }
 
