@@ -136,12 +136,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
 	// songs は includeDeleted に関わらず全楽曲対象（削除操作の検知のため、is_deleted フィルタなし）
 	// charts は公開楽曲（is_deleted=0）に属するもののみを対象とする
-	var chartsWhereClause string
-	if !includeDeleted {
-		chartsWhereClause = ` AND s.is_deleted = 0`
-	}
-
-	query := fmt.Sprintf(`
+	query := `
 		SELECT MAX(updated_at) FROM (
 			SELECT s.updated_at AS updated_at
 			FROM songs s
@@ -150,11 +145,12 @@ func (r *songRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Contex
 			SELECT c.updated_at AS updated_at
 			FROM charts c
 			INNER JOIN songs s ON s.id = c.song_id
-			WHERE s.is_worldsend = 0%s
+			WHERE s.is_worldsend = 0
+			  AND (? OR s.is_deleted = 0)
 		) latest_updates
-	`, chartsWhereClause)
+	`
 
-	return scanNullableTime(ctx, exec, query)
+	return scanNullableTime(ctx, exec, query, includeDeleted)
 }
 
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
@@ -480,27 +476,34 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		placeholders[i] = "?"
 	}
 
-	query := fmt.Sprintf(`
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
 		UPDATE songs SET
-			title = CASE %s END,
-			artist = CASE %s END,
-			genre_id = CASE %s END,
-			bpm = CASE %s END,
-			released_at = CASE %s END,
-			jacket = CASE %s END
-		WHERE id IN (%s)
+			title = CASE `)
+	queryBuilder.WriteString(strings.Join(titleCases, " "))
+	queryBuilder.WriteString(` END,
+			artist = CASE `)
+	queryBuilder.WriteString(strings.Join(artistCases, " "))
+	queryBuilder.WriteString(` END,
+			genre_id = CASE `)
+	queryBuilder.WriteString(strings.Join(genreCases, " "))
+	queryBuilder.WriteString(` END,
+			bpm = CASE `)
+	queryBuilder.WriteString(strings.Join(bpmCases, " "))
+	queryBuilder.WriteString(` END,
+			released_at = CASE `)
+	queryBuilder.WriteString(strings.Join(releasedCases, " "))
+	queryBuilder.WriteString(` END,
+			jacket = CASE `)
+	queryBuilder.WriteString(strings.Join(jacketCases, " "))
+	queryBuilder.WriteString(` END
+		WHERE id IN (`)
+	queryBuilder.WriteString(strings.Join(placeholders, ","))
+	queryBuilder.WriteString(`)
 		  AND is_worldsend = 0
-	`,
-		strings.Join(titleCases, " "),
-		strings.Join(artistCases, " "),
-		strings.Join(genreCases, " "),
-		strings.Join(bpmCases, " "),
-		strings.Join(releasedCases, " "),
-		strings.Join(jacketCases, " "),
-		strings.Join(placeholders, ","),
-	)
+	`)
 
-	_, err := exec.ExecContext(ctx, query, args...)
+	_, err := exec.ExecContext(ctx, queryBuilder.String(), args...)
 	return err
 }
 
@@ -569,20 +572,24 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 	args = append(args, notesArgs...)
 	args = append(args, whereArgs...)
 
-	query := fmt.Sprintf(`
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
 		UPDATE charts SET
-			const = CASE %s END,
-			is_const_unknown = CASE %s END,
-			notes = CASE %s END
-		WHERE (%s)
+			const = CASE `)
+	queryBuilder.WriteString(strings.Join(constCases, " "))
+	queryBuilder.WriteString(` END,
+			is_const_unknown = CASE `)
+	queryBuilder.WriteString(strings.Join(unknownCases, " "))
+	queryBuilder.WriteString(` END,
+			notes = CASE `)
+	queryBuilder.WriteString(strings.Join(notesCases, " "))
+	queryBuilder.WriteString(` END
+		WHERE (`)
+	queryBuilder.WriteString(strings.Join(wherePairs, " OR "))
+	queryBuilder.WriteString(`)
 		  AND song_id IN (SELECT id FROM songs WHERE is_worldsend = 0)
-	`,
-		strings.Join(constCases, " "),
-		strings.Join(unknownCases, " "),
-		strings.Join(notesCases, " "),
-		strings.Join(wherePairs, " OR "),
-	)
+	`)
 
-	_, err := exec.ExecContext(ctx, query, args...)
+	_, err := exec.ExecContext(ctx, queryBuilder.String(), args...)
 	return err
 }

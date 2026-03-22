@@ -83,12 +83,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 // 削除済み楽曲の updated_at も MAX 計算に含める必要があるためです。
 // 一方 worldsend_charts の updated_at は公開楽曲（is_deleted=0）に属するもののみを対象とします。
 func (r *worldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
-	var chartsWhereClause string
-	if !includeDeleted {
-		chartsWhereClause = ` AND s.is_deleted = 0`
-	}
-
-	query := fmt.Sprintf(`
+	query := `
 		SELECT MAX(updated_at) FROM (
 			SELECT s.updated_at AS updated_at
 			FROM songs s
@@ -97,11 +92,12 @@ func (r *worldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec 
 			SELECT wc.updated_at AS updated_at
 			FROM worldsend_charts wc
 			INNER JOIN songs s ON s.id = wc.song_id
-			WHERE s.is_worldsend = 1%s
+			WHERE s.is_worldsend = 1
+			  AND (? OR s.is_deleted = 0)
 		) latest_updates
-	`, chartsWhereClause)
+	`
 
-	return scanNullableTime(ctx, exec, query)
+	return scanNullableTime(ctx, exec, query, includeDeleted)
 }
 
 // FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
@@ -332,26 +328,33 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		args = append(args, id)
 	}
 
-	query := fmt.Sprintf(`
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
 		UPDATE songs SET
-			title = CASE %s END,
-			artist = CASE %s END,
-			genre_id = CASE %s END,
-			bpm = CASE %s END,
-			released_at = CASE %s END,
-			jacket = CASE %s END
-		WHERE is_worldsend = 1 AND id IN (%s)
-	`,
-		strings.Join(titleCases, " "),
-		strings.Join(artistCases, " "),
-		strings.Join(genreCases, " "),
-		strings.Join(bpmCases, " "),
-		strings.Join(releasedCases, " "),
-		strings.Join(jacketCases, " "),
-		strings.Join(placeholders, ","),
-	)
+			title = CASE `)
+	queryBuilder.WriteString(strings.Join(titleCases, " "))
+	queryBuilder.WriteString(` END,
+			artist = CASE `)
+	queryBuilder.WriteString(strings.Join(artistCases, " "))
+	queryBuilder.WriteString(` END,
+			genre_id = CASE `)
+	queryBuilder.WriteString(strings.Join(genreCases, " "))
+	queryBuilder.WriteString(` END,
+			bpm = CASE `)
+	queryBuilder.WriteString(strings.Join(bpmCases, " "))
+	queryBuilder.WriteString(` END,
+			released_at = CASE `)
+	queryBuilder.WriteString(strings.Join(releasedCases, " "))
+	queryBuilder.WriteString(` END,
+			jacket = CASE `)
+	queryBuilder.WriteString(strings.Join(jacketCases, " "))
+	queryBuilder.WriteString(` END
+		WHERE is_worldsend = 1 AND id IN (`)
+	queryBuilder.WriteString(strings.Join(placeholders, ","))
+	queryBuilder.WriteString(`)
+	`)
 
-	result, err := exec.ExecContext(ctx, query, args...)
+	result, err := exec.ExecContext(ctx, queryBuilder.String(), args...)
 	if err != nil {
 		return 0, err
 	}
@@ -419,20 +422,24 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		args = append(args, id)
 	}
 
-	query := fmt.Sprintf(`
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
 		UPDATE worldsend_charts SET
-			level_star = CASE %s END,
-			attribute = CASE %s END,
-			notes = CASE %s END
-		WHERE id IN (%s)
-	`,
-		strings.Join(levelCases, " "),
-		strings.Join(attributeCases, " "),
-		strings.Join(notesCases, " "),
-		strings.Join(placeholders, ","),
-	)
+			level_star = CASE `)
+	queryBuilder.WriteString(strings.Join(levelCases, " "))
+	queryBuilder.WriteString(` END,
+			attribute = CASE `)
+	queryBuilder.WriteString(strings.Join(attributeCases, " "))
+	queryBuilder.WriteString(` END,
+			notes = CASE `)
+	queryBuilder.WriteString(strings.Join(notesCases, " "))
+	queryBuilder.WriteString(` END
+		WHERE id IN (`)
+	queryBuilder.WriteString(strings.Join(placeholders, ","))
+	queryBuilder.WriteString(`)
+	`)
 
-	result, err := exec.ExecContext(ctx, query, args...)
+	result, err := exec.ExecContext(ctx, queryBuilder.String(), args...)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -457,15 +464,18 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 		args = append(args, target.SongID, target.ChartID)
 	}
 
-	query := fmt.Sprintf(`
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
 		SELECT COUNT(*)
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
-		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND (%s)
-	`, strings.Join(pairConditions, " OR "))
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0 AND (`)
+	queryBuilder.WriteString(strings.Join(pairConditions, " OR "))
+	queryBuilder.WriteString(`)
+	`)
 
 	var count int
-	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
+	if err := exec.QueryRowxContext(ctx, queryBuilder.String(), args...).Scan(&count); err != nil {
 		return false, err
 	}
 

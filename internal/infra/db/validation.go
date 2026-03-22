@@ -3,9 +3,12 @@ package db
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/jmoiron/sqlx"
 )
+
+var allowedValidationTables = []string{"songs", "charts", "genres", "song_difficulties", "users"}
 
 // ValidateRequiredData はアプリケーションが正常に動作するために必要なデータが
 // データベースに存在するかをチェックします。
@@ -29,8 +32,12 @@ func ValidateRequiredData(db *sqlx.DB) error {
 
 // checkTableHasData は指定されたテーブルにデータが存在するかをチェックします。
 func checkTableHasData(db *sqlx.DB, tableName string) error {
+	if !slices.Contains(allowedValidationTables, tableName) {
+		return fmt.Errorf("table %s is not allowed for validation", tableName)
+	}
+
 	var count int
-	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
+	query := "SELECT COUNT(*) FROM " + tableName
 
 	slog.Debug("Checking data existence", "table", tableName)
 
@@ -52,8 +59,13 @@ func GetTableStats(db *sqlx.DB) (map[string]int, error) {
 	stats := make(map[string]int)
 
 	for _, table := range tables {
+		if !slices.Contains(allowedValidationTables, table) {
+			stats[table] = -1
+			continue
+		}
+
 		var count int
-		query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
+		query := "SELECT COUNT(*) FROM " + table
 		if err := db.Get(&count, query); err != nil {
 			slog.Warn("Failed to get count for table", "table", table, "error", err)
 			stats[table] = -1 // エラーを示すために -1 を設定
