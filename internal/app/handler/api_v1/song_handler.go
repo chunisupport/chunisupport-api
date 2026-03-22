@@ -33,19 +33,19 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
 func (h *V1SongHandler) GetSongs(c echo.Context) error {
-	// 公開APIでは削除済み楽曲は含めない。requesterAccountTypeIDはnilを渡す。
-	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
-		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 
-	// V1DTOに変換
-	v1Songs := h.convertToV1SongDTOs(listResult.Songs)
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), false, nil)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
 
 	return c.JSON(http.StatusOK, &api_v1.V1SongsResponse{
-		Songs:     v1Songs,
-		UpdatedAt: listResult.UpdatedAt,
+		Songs:     h.convertToV1SongDTOs(songs),
+		UpdatedAt: updatedAt,
 	})
 }
 
@@ -55,14 +55,10 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
-		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 
-	// V1DTOに変換
-	v1SongDTO := h.convertToV1SongDTO(song)
-
-	return c.JSON(http.StatusOK, v1SongDTO)
+	return c.JSON(http.StatusOK, h.convertToV1SongDTO(song))
 }
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
@@ -70,7 +66,6 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	displayID := c.Param("displayid")
 	difficultyPath := c.Param("difficulty")
 
-	// パスパラメータを内部難易度名に変換
 	difficultyName, ok := handler.ParseDifficultyPath(difficultyPath)
 	if !ok {
 		return apierror.ErrInvalidDifficulty
@@ -79,14 +74,10 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName, requesterAccountTypeID)
 	if err != nil {
-		// usecaseからのエラーをAPIエラーに変換
 		return apierror.FromUsecaseError(err)
 	}
 
-	// rating_bandsはキャッシュから取得
-	ratingBands := h.staticMasterCache.RatingBands
-
-	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
+	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, h.staticMasterCache.RatingBands))
 }
 
 // convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。
@@ -104,8 +95,6 @@ func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1So
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)
-
-	// 難易度IDから文字列へのマッピング（マスターデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
 	v1SongDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {

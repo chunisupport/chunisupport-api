@@ -42,7 +42,7 @@ func NewSongService(
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を持たない場合、
 // 削除済み楽曲は含められません。
-func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*SongListResult, error) {
+func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
 	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
@@ -50,15 +50,7 @@ func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, inc
 		return nil, err
 	}
 
-	updatedAt, err := s.songRepo.GetLatestUpdatedAtExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
-	if err != nil {
-		return nil, err
-	}
-
-	return &SongListResult{
-		Songs:     songs,
-		UpdatedAt: updatedAt,
-	}, nil
+	return songs, nil
 }
 
 // GetSongsLastUpdatedAt はWORLD'S END以外の楽曲一覧全体の最終更新日時を取得します。

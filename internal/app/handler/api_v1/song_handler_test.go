@@ -13,7 +13,6 @@ import (
 	api_v1_dto "github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
@@ -44,7 +43,7 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	song := &entity.Song{
 		DisplayID:      "v1test1234567890",
 		Title:          "V1テスト楽曲",
-		Artist:         "V1アーティスト",
+		Artist:         "V1テストアーティスト",
 		GenreID:        &genreID,
 		BPM:            &bpm,
 		Jacket:         &imgURL,
@@ -128,11 +127,16 @@ func TestGetSongs(t *testing.T) {
 
 	handler := &V1SongHandler{
 		songUsecase: &testutil.MockSongUsecase{
-			GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.SongListResult, error) {
-				return &usecase.SongListResult{
-					Songs:     []*entity.Song{{DisplayID: "v1songs123456789", Title: "楽曲", Artist: "アーティスト", Charts: []*entity.Chart{}}},
-					UpdatedAt: &updatedAt,
-				}, nil
+			GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+				return []*entity.Song{{
+					DisplayID: "v1songs123456789",
+					Title:     "楽曲",
+					Artist:    "アーティスト",
+					Charts:    []*entity.Chart{},
+				}}, nil
+			},
+			GetSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
+				return &updatedAt, nil
 			},
 		},
 		masterCache: masterCache,

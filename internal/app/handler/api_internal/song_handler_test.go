@@ -16,7 +16,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
@@ -321,12 +320,12 @@ func TestGetSongs(t *testing.T) {
 
 	// モックUsecaseの準備
 	mockUsecase := &testutil.MockSongUsecase{
-		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.SongListResult, error) {
+		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+			return testSongs, nil
+		},
+		GetSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
 			updatedAt := time.Date(2026, 3, 22, 15, 4, 5, 0, time.UTC)
-			return &usecase.SongListResult{
-				Songs:     testSongs,
-				UpdatedAt: &updatedAt,
-			}, nil
+			return &updatedAt, nil
 		},
 	}
 

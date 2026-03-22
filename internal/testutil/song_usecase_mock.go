@@ -6,12 +6,11 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
-	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 // MockSongUsecase は楽曲ユースケースのテスト用モックです。
 type MockSongUsecase struct {
-	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.SongListResult, error)
+	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
 	GetSongsLastUpdatedAtFunc         func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error)
 	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
@@ -20,7 +19,7 @@ type MockSongUsecase struct {
 	CalcSongMaxOPFunc                 func(song *entity.Song) float64
 }
 
-func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*usecase.SongListResult, error) {
+func (m *MockSongUsecase) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 	if m.GetAllSongsExcludingWorldsendFunc != nil {
 		return m.GetAllSongsExcludingWorldsendFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}

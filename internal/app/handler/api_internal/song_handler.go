@@ -39,20 +39,20 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
-	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// DTOに変換
-	songDTOs := h.convertToSongDTOs(listResult.Songs)
-
-	result := &api_internal.SongsResponse{
-		Songs:     songDTOs,
-		UpdatedAt: listResult.UpdatedAt,
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), includeDeleted, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, &api_internal.SongsResponse{
+		Songs:     h.convertToSongDTOs(songs),
+		UpdatedAt: updatedAt,
+	})
 }
 
 // GetSong は指定されたDisplayIDの楽曲を取得します。
@@ -64,23 +64,25 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// DTOに変換
-	songDTO := h.convertToSongDTO(song)
-
-	return c.JSON(http.StatusOK, songDTO)
+	return c.JSON(http.StatusOK, h.convertToSongDTO(song))
 }
 
 // GetEditorSongs は編集者向けにWORLD'S END以外の全楽曲を取得します。
 func (h *SongHandler) GetEditorSongs(c echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
-	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	updatedAt, err := h.songUsecase.GetSongsLastUpdatedAt(c.Request().Context(), true, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorSongsResponse{
-		Songs:     h.convertToEditorSongDTOs(listResult.Songs),
-		UpdatedAt: listResult.UpdatedAt,
+		Songs:     h.convertToEditorSongDTOs(songs),
+		UpdatedAt: updatedAt,
 	})
 }
 
@@ -101,7 +103,6 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	displayID := c.Param("displayid")
 	difficultyPath := c.Param("difficulty")
 
-	// パスパラメータを内部難易度名に変換
 	difficultyName, ok := handler.ParseDifficultyPath(difficultyPath)
 	if !ok {
 		return apierror.ErrInvalidDifficulty
@@ -113,10 +114,7 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// rating_bands はキャッシュから取得
-	ratingBands := h.staticMasterCache.RatingBands
-
-	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
+	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, h.staticMasterCache.RatingBands))
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
@@ -147,7 +145,6 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
 	}
 
-	// バリデーション
 	for idx, req := range requests {
 		if req == nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
@@ -162,7 +159,6 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 		}
 	}
 
-	// ユースケース層での更新処理
 	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -185,8 +181,6 @@ func (h *SongHandler) convertToSongDTOs(songs []*entity.Song) []*api_internal.So
 func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO {
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
-
-	// 難易度IDから文字列へのマッピング（マスターデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
 	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {
@@ -209,10 +203,8 @@ func (h *SongHandler) convertToEditorSongDTO(song *entity.Song) *api_internal.Ed
 	if song == nil {
 		return nil
 	}
-	base := h.convertToSongDTO(song)
-
 	return &api_internal.EditorSongDTO{
-		SongDTO:   base,
+		SongDTO:   h.convertToSongDTO(song),
 		IsDeleted: song.IsDeleted,
 	}
 }

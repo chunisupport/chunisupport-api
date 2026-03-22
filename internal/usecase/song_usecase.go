@@ -8,17 +8,11 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
-type SongListResult struct {
-	Songs     []*entity.Song
-	UpdatedAt *time.Time
-}
-
-// SongUsecase は楽曲に関するユースケースを定義します。
 type SongUsecase interface {
 	// GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を持たない場合、
 	// 削除済み楽曲は含められません。
-	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*SongListResult, error)
+	GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
 
 	// GetSongsLastUpdatedAt はWORLD'S END以外の楽曲一覧全体の最終更新日時を取得します。
 	// 互換性のため残しています。

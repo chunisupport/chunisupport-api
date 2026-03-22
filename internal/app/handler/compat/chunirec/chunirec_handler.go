@@ -35,31 +35,23 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
-	listResult, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}
 
-	// DTOに変換
-	masters := h.masterCache.SongMasters()
-	response := ToMusicShowAllResponse(listResult.Songs, masters)
-
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, ToMusicShowAllResponse(songs, h.masterCache.SongMasters()))
 }
 
 // GetMusicShow は指定されたDisplay IDの楽曲情報をchunirec互換形式で返します
 // GET /compat/chunirec/2.0/music/show?id=xxx
 func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	ctx := c.Request().Context()
-
-	// クエリパラメータ id を取得
 	displayID := c.QueryParam("id")
 	if displayID == "" {
 		return apierror.ErrValidationFailed
 	}
 
-	// 楽曲を取得
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID, requesterAccountTypeID)
 	if err != nil {
@@ -70,48 +62,36 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
-	// DTOに変換
-	masters := h.masterCache.SongMasters()
-	response := ToMusicShowResponse(song, masters)
-
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, ToMusicShowResponse(song, h.masterCache.SongMasters()))
 }
 
 // GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
 // GET /compat/chunirec/2.0/users/show
 func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 	ctx := c.Request().Context()
-
-	// クエリパラメータ user_name を取得
 	username := c.QueryParam("user_name")
 
-	// user_name が指定されていない場合、APIトークン所有者のユーザー名を使用
 	if username == "" {
 		if userEntity, ok := c.Get("userEntity").(*entity.User); ok && userEntity != nil {
 			username = userEntity.Username.String()
 		} else {
-			// APIトークン認証必須のエンドポイントなので、ここには到達しないはず
 			return apierror.ErrUnauthorized
 		}
 	}
 
-	// requester はAPIトークン所有者（非公開ユーザーの本人アクセス判定用）
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
 
-	// ユーザープロファイルとレコードを取得
 	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester, false)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
 			return apierror.ErrUserNotFound
 		case errors.Is(err, usecase.ErrUserPrivate):
-			// セキュリティ: 非公開と未発見を区別しない
 			return apierror.ErrUserNotFound
 		case errors.Is(err, usecase.ErrPlayerNotLinked):
-			// セキュリティ: プレイヤー未紐付も404で隠蔽
 			return apierror.ErrUserNotFound
 		default:
 			slog.Error("failed to get user profile", "username", username, "error", err)
@@ -119,8 +99,5 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 		}
 	}
 
-	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, h.masterCache)
-
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, ToChunirecUserDTO(result, h.masterCache))
 }

@@ -90,37 +90,37 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 		expectedIncludeDeleted bool
 	}{
 		{
-			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
+			name:                   "editor権限なら削除済みを取得できる",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
 			expectedIncludeDeleted: true,
 		},
 		{
-			name:                   "ADMIN権限あり_includeDeleted=true_削除済みを含む",
+			name:                   "admin権限なら削除済みを取得できる",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
 			expectedIncludeDeleted: true,
 		},
 		{
-			name:                   "PLAYER権限のみ_includeDeleted=true_削除済みを除外",
+			name:                   "player権限では削除済み取得を無効化する",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
 			expectedIncludeDeleted: false,
 		},
 		{
-			name:                   "未知ロール_includeDeleted=true_削除済みを除外",
+			name:                   "未知の権限では削除済み取得を無効化する",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(4),
 			expectedIncludeDeleted: false,
 		},
 		{
-			name:                   "権限なし_includeDeleted=true_削除済みを除外",
+			name:                   "権限なしでは削除済み取得を無効化する",
 			includeDeleted:         true,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
 		},
 		{
-			name:                   "権限なし_includeDeleted=false_削除済みを除外",
+			name:                   "includeDeletedがfalseならそのままfalseになる",
 			includeDeleted:         false,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
@@ -129,42 +129,27 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given
 			mockRepo := new(MockSongRepository)
 			mockMasterCache := new(MockSongMasterProvider)
 			mockTM := new(MockTransactionManager)
 			mockExec := new(MockExecutor)
 
-			usecase := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
-
+			uc := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
 			ctx := context.Background()
+			expectedSongs := []*entity.Song{{
+				ID:          1,
+				DisplayID:   "S001",
+				Title:       "Active Song",
+				IsWorldsend: false,
+				IsDeleted:   false,
+			}}
 
-			// 期待されるリポジトリの呼び出し
-			expectedSongs := []*entity.Song{
-				{
-					ID:          1,
-					DisplayID:   "S001",
-					Title:       "Active Song",
-					IsWorldsend: false,
-					IsDeleted:   false,
-				},
-			}
-
-			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
-
-			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
 			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
-			mockRepo.On("GetLatestUpdatedAtExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
 
-			// When
-			result, err := usecase.GetAllSongsExcludingWorldsend(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
+			result, err := uc.GetAllSongsExcludingWorldsend(ctx, tt.includeDeleted, tt.requesterAccountTypeID)
 
-			// Then
 			assert.NoError(t, err)
-			assert.NotNil(t, result)
-			assert.Equal(t, expectedSongs, result.Songs)
-			assert.NotNil(t, result.UpdatedAt)
-			assert.True(t, expectedUpdatedAt.Equal(*result.UpdatedAt))
+			assert.Equal(t, expectedSongs, result)
 			mockRepo.AssertExpectations(t)
 		})
 	}
@@ -187,53 +172,51 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		// Given
+		name                   string
 		displayID              string
 		requesterAccountTypeID *int
 		repoReturn             *entity.Song
 		repoErr                error
-		// Then
-		wantResult *entity.Song
-		wantErr    error
+		wantResult             *entity.Song
+		wantErr                error
 	}{
 		{
-			name:                   "有効な楽曲は誰でも取得できる",
+			name:                   "通常楽曲は誰でも取得できる",
 			displayID:              "S001",
 			requesterAccountTypeID: nil,
 			repoReturn:             activeSong,
 			wantResult:             activeSong,
 		},
 		{
-			name:                   "削除済み楽曲はEDITOR権限で取得できる",
+			name:                   "削除済み楽曲はeditorなら取得できる",
 			displayID:              "S002",
 			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
 			repoReturn:             deletedSong,
 			wantResult:             deletedSong,
 		},
 		{
-			name:                   "削除済み楽曲はPLAYER権限ではErrSongNotFoundになる",
+			name:                   "削除済み楽曲はplayerなら見つからない扱いになる",
 			displayID:              "S002",
 			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
-			name:                   "削除済み楽曲は未知ロールではErrSongNotFoundになる",
+			name:                   "削除済み楽曲は未知の権限なら見つからない扱いになる",
 			displayID:              "S002",
 			requesterAccountTypeID: intPtr(4),
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
-			name:                   "削除済み楽曲は権限なしではErrSongNotFoundになる",
+			name:                   "削除済み楽曲は権限なしなら見つからない扱いになる",
 			displayID:              "S002",
 			requesterAccountTypeID: nil,
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
-			name:                   "存在しない楽曲はErrSongNotFoundを返す",
+			name:                   "存在しない楽曲は見つからないエラーを返す",
 			displayID:              "S999",
 			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
 			repoErr:                repository.ErrSongNotFound,
@@ -243,7 +226,6 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Given
 			mockRepo := new(MockSongRepository)
 			mockMasterCache := new(MockSongMasterProvider)
 			mockTM := new(MockTransactionManager)
@@ -254,10 +236,8 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 
 			mockRepo.On("FindByDisplayID", ctx, mockExec, tt.displayID).Return(tt.repoReturn, tt.repoErr)
 
-			// When
 			result, err := uc.GetSongByDisplayID(ctx, tt.displayID, tt.requesterAccountTypeID)
 
-			// Then
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, result)
@@ -278,13 +258,13 @@ func TestGetSongsLastUpdatedAt_WithDeletedSongs_RequiresEditorPermission(t *test
 		expectedIncludeDeleted bool
 	}{
 		{
-			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
+			name:                   "editor権限なら削除済みを含めて最終更新日時を取得する",
 			includeDeleted:         true,
 			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
 			expectedIncludeDeleted: true,
 		},
 		{
-			name:                   "権限なし_includeDeleted=true_削除済みを除外",
+			name:                   "権限なしでは削除済みを含めずに最終更新日時を取得する",
 			includeDeleted:         true,
 			requesterAccountTypeID: nil,
 			expectedIncludeDeleted: false,
@@ -315,7 +295,6 @@ func TestGetSongsLastUpdatedAt_WithDeletedSongs_RequiresEditorPermission(t *test
 }
 
 func TestDeleteSong_SavesDeletedState(t *testing.T) {
-	// Given
 	mockRepo := new(MockSongRepository)
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
@@ -334,17 +313,14 @@ func TestDeleteSong_SavesDeletedState(t *testing.T) {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()
 
-	// When
 	err := uc.DeleteSong(ctx, "S010")
 
-	// Then
 	assert.NoError(t, err)
 	assert.True(t, song.IsDeleted)
 	mockRepo.AssertExpectations(t)
 }
 
 func TestRestoreSong_SavesRestoredState(t *testing.T) {
-	// Given
 	mockRepo := new(MockSongRepository)
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
@@ -363,10 +339,8 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 		return saved == song && !saved.IsDeleted
 	})).Return(nil).Once()
 
-	// When
 	err := uc.RestoreSong(ctx, "S011")
 
-	// Then
 	assert.NoError(t, err)
 	assert.False(t, song.IsDeleted)
 	mockRepo.AssertExpectations(t)
