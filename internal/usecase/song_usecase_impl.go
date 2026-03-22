@@ -45,7 +45,7 @@ func NewSongService(
 func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*SongListResult, error) {
 	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
-	result, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
+	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, inc
 	}
 
 	return &SongListResult{
-		Songs:     result.Songs,
+		Songs:     songs,
 		UpdatedAt: updatedAt,
 	}, nil
 }

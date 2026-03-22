@@ -18,12 +18,12 @@ type MockSongRepository struct {
 	mock.Mock
 }
 
-func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.SongListResult, error) {
+func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	args := m.Called(ctx, exec, includeDeleted)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*repository.SongListResult), args.Error(1)
+	return args.Get(0).([]*entity.Song), args.Error(1)
 }
 
 func (m *MockSongRepository) GetLatestUpdatedAtExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
@@ -157,14 +157,10 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 				},
 			}
 
-			findAllUpdatedAt := time.Date(2026, 3, 22, 11, 0, 0, 0, time.UTC)
 			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
 
 			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
-			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.SongListResult{
-				Songs:     expectedSongs,
-				UpdatedAt: &findAllUpdatedAt,
-			}, nil)
+			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
 			mockRepo.On("GetLatestUpdatedAtExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
 
 			// When

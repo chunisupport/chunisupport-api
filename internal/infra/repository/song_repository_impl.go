@@ -56,7 +56,7 @@ type chartRow struct {
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
-func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.SongListResult, error) {
+func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
@@ -74,7 +74,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	}
 
 	if len(songRows) == 0 {
-		return &repository.SongListResult{Songs: []*entity.Song{}}, nil
+		return []*entity.Song{}, nil
 	}
 
 	// 2. 取得した楽曲のIDを収集
@@ -125,10 +125,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		service.ApplyAggregation(song)
 	}
 
-	return &repository.SongListResult{
-		Songs:     results,
-		UpdatedAt: nil,
-	}, nil
+	return results, nil
 }
 
 // GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。

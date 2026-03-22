@@ -7,11 +7,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
-type SongListResult struct {
-	Songs     []*entity.Song
-	UpdatedAt *time.Time
-}
-
 // SongRepository は楽曲に関する永続化処理を定義するリポジトリです。
 // 個々のリポジトリと同様に、メソッドではExecutorを明示的に受け取り、
 // UseCase側からのトランザクション制御を可能にします。
@@ -19,7 +14,7 @@ type SongRepository interface {
 	// FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 	// includeDeleted=false の場合、削除済み楽曲は除外されます。
 	// 各楽曲には関連する譜面情報が含まれます。
-	FindAllExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) (*SongListResult, error)
+	FindAllExcludingWorldsend(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Song, error)
 
 	// GetLatestUpdatedAtExcludingWorldsend はWORLD'S END以外の楽曲一覧全体の最終更新日時を返します。
 	// includeDeleted=false の場合でも、削除済み楽曲のチャート更新は考慮されますが、

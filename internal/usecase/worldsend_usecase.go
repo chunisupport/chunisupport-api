@@ -88,7 +88,7 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*WorldsendSongListResult, error) {
 	includeDeleted = normalizeIncludeDeleted(includeDeleted, requesterAccountTypeID)
 
-	result, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
+	songs, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)
 		return nil, err
@@ -101,7 +101,7 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 	}
 
 	return &WorldsendSongListResult{
-		Songs:     result.Songs,
+		Songs:     songs,
 		UpdatedAt: updatedAt,
 	}, nil
 }

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +32,5 @@ func TestFindAll_UpdatedAtはnilを返す(t *testing.T) {
 	got, err := repo.FindAll(context.Background(), db, false)
 
 	require.NoError(t, err)
-	require.NotNil(t, got)
-	require.Len(t, got.Songs, 1)
-	assert.Nil(t, got.UpdatedAt)
+	require.Len(t, got, 1)
 }

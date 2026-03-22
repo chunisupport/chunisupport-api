@@ -339,7 +339,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 		return records, nil
 	}
 
-	songListResult, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
+	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
 	if err != nil {
 		slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
 		return nil, err
@@ -353,7 +353,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 		}
 	}
 
-	return s.recordCompletionSvc.CompletePlayerRecords(records, songListResult.Songs, difficultyNamesByID), nil
+	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID), nil
 }
 
 func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.WorldsendRecordDTO, error) {
@@ -390,14 +390,14 @@ func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int
 		return records, nil
 	}
 
-	worldsendSongListResult, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
+	worldsendSongs, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
 	if err != nil {
 		slog.Error("failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
 		return nil, err
 	}
 
-	pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongListResult.Songs))
-	for _, worldsendSong := range worldsendSongListResult.Songs {
+	pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
+	for _, worldsendSong := range worldsendSongs {
 		if worldsendSong == nil {
 			continue
 		}

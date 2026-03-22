@@ -26,7 +26,7 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 }
 
 // FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
-func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.WorldsendSongListResult, error) {
+func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
@@ -74,10 +74,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 		return nil, err
 	}
 
-	return &repository.WorldsendSongListResult{
-		Songs:     results,
-		UpdatedAt: nil,
-	}, nil
+	return results, nil
 }
 
 // GetLatestUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を返します。

@@ -221,7 +221,7 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	assert.False(t, song.IsMaxOPUnknown)
 }
 
-func TestFindAllExcludingWorldsend_DoesNotCalculateUpdatedAt(t *testing.T) {
+func TestFindAllExcludingWorldsend_ReturnsSongsOnly(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -247,9 +247,7 @@ func TestFindAllExcludingWorldsend_DoesNotCalculateUpdatedAt(t *testing.T) {
 
 	result, err := repo.FindAllExcludingWorldsend(ctx, db, false)
 	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Nil(t, result.UpdatedAt)
-	require.Len(t, result.Songs, 1)
+	require.Len(t, result, 1)
 }
 
 func TestGetLatestUpdatedAtExcludingWorldsend(t *testing.T) {

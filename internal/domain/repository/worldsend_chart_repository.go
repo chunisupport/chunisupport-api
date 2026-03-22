@@ -14,11 +14,6 @@ type WorldsendSongWithChart struct {
 	Chart *entity.WorldsendChart
 }
 
-type WorldsendSongListResult struct {
-	Songs     []*WorldsendSongWithChart
-	UpdatedAt *time.Time
-}
-
 // WorldsendUpdate は WORLD'S END 楽曲と譜面の更新情報を表現します。
 // Chart が nil の場合は楽曲情報のみ更新します。
 type WorldsendUpdate struct {
@@ -30,7 +25,7 @@ type WorldsendUpdate struct {
 type WorldsendChartRepository interface {
 	// FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
 	// includeDeleted が false の場合、削除済み楽曲は除外されます。
-	FindAll(ctx context.Context, exec Executor, includeDeleted bool) (*WorldsendSongListResult, error)
+	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*WorldsendSongWithChart, error)
 
 	// GetLatestUpdatedAt は WORLD'S END 楽曲一覧全体の最終更新日時を返します。
 	GetLatestUpdatedAt(ctx context.Context, exec Executor, includeDeleted bool) (*time.Time, error)

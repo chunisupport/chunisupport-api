@@ -20,12 +20,12 @@ type MockWorldsendChartRepository struct {
 	mock.Mock
 }
 
-func (m *MockWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) (*repository.WorldsendSongListResult, error) {
+func (m *MockWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	args := m.Called(ctx, exec, includeDeleted)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*repository.WorldsendSongListResult), args.Error(1)
+	return args.Get(0).([]*repository.WorldsendSongWithChart), args.Error(1)
 }
 
 func (m *MockWorldsendChartRepository) GetLatestUpdatedAt(ctx context.Context, exec repository.Executor, includeDeleted bool) (*time.Time, error) {
@@ -121,12 +121,8 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 				Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
 				Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
 			}}
-			findAllUpdatedAt := time.Date(2026, 3, 22, 11, 0, 0, 0, time.UTC)
 			expectedUpdatedAt := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
-			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(&repository.WorldsendSongListResult{
-				Songs:     expectedSongs,
-				UpdatedAt: &findAllUpdatedAt,
-			}, nil)
+			mockRepo.On("FindAll", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
 			mockRepo.On("GetLatestUpdatedAt", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedUpdatedAt, nil)
 
 			// When
