@@ -33,9 +33,6 @@ func TestGetWorldsendSongs(t *testing.T) {
 				Chart: &entity.WorldsendChart{},
 			}}, UpdatedAt: &updatedAt}, nil
 		},
-		GetWorldsendSongsLastUpdatedAtFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) (*time.Time, error) {
-			return &updatedAt, nil
-		},
 	}
 
 	handler := NewWorldsendHandler(mockUsecase, &masterdata.Cache{GenreNamesByID: map[int]string{}})
