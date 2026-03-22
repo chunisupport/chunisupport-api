@@ -35,7 +35,7 @@ func scanNullableTime(ctx context.Context, exec repository.Executor, query strin
 
 // parseTimeString はtime.Localを使って時刻文字列をパースします。
 func parseTimeString(value string) (*time.Time, error) {
-	return parseTimeStringInLocation(value, time.Local)
+	return parseTimeStringInLocation(value, time.UTC)
 }
 
 // parseTimeStringInLocation は指定したロケーションで時刻文字列をパースします。
