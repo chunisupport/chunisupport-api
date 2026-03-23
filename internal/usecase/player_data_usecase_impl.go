@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -131,6 +132,11 @@ type playerDataMaster struct {
 	worldsendBySongID map[int]entity.PlayerDataWorldsendChart
 }
 
+type calculatedOverpowerSummary struct {
+	Value   *float64
+	Percent *float64
+}
+
 // playerDataUsecase は PlayerDataUsecase の実装です。
 type playerDataUsecase struct {
 	tm               TransactionManager
@@ -204,16 +210,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
-	overpowerValue := payload.Overpower.Value
-	overpowerPercent := payload.Overpower.Percentage
-
 	summaryInput := &PlayerDataSummaryInput{
-		Name:             nameVO.String(),
-		Level:            payload.Level,
-		OfficialRating:   payload.Rating,
-		LastPlayedAt:     lastPlayedAt,
-		OverpowerValue:   &overpowerValue,
-		OverpowerPercent: &overpowerPercent,
+		Name:           nameVO.String(),
+		Level:          payload.Level,
+		OfficialRating: payload.Rating,
+		LastPlayedAt:   lastPlayedAt,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -239,14 +240,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return ensureErr
 		}
 		result.PlayerID = playerID
-		result.Summary = api_internal.PlayerDataSummary{
-			Name:             summaryInput.Name,
-			Level:            summaryInput.Level,
-			Rating:           summaryInput.OfficialRating,
-			LastPlayedAt:     summaryInput.LastPlayedAt,
-			OverpowerValue:   summaryInput.OverpowerValue,
-			OverpowerPercent: summaryInput.OverpowerPercent,
-		}
 
 		skippedRecords := make([]api_internal.SkippedRecord, 0, 4)
 
@@ -256,11 +249,19 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
 		if scoreErr != nil {
 			return scoreErr
 		}
 		skippedRecords = append(skippedRecords, scoreSkipped...)
+		summaryInput.OverpowerValue = overpowerSummary.Value
+		summaryInput.OverpowerPercent = overpowerSummary.Percent
+
+		playerID, ensureErr = us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		if ensureErr != nil {
+			return ensureErr
+		}
+		result.PlayerID = playerID
 
 		// レーティングを再計算して更新
 		ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
@@ -270,6 +271,14 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
+		result.Summary = api_internal.PlayerDataSummary{
+			Name:             summaryInput.Name,
+			Level:            summaryInput.Level,
+			Rating:           summaryInput.OfficialRating,
+			LastPlayedAt:     summaryInput.LastPlayedAt,
+			OverpowerValue:   summaryInput.OverpowerValue,
+			OverpowerPercent: summaryInput.OverpowerPercent,
+		}
 		if len(skippedRecords) > 0 {
 			result.SkippedRecords = skippedRecords
 		}
@@ -516,7 +525,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, error) {
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, calculatedOverpowerSummary, error) {
 	counts := api_internal.PlayerDataCounts{}
 	skipped := make([]api_internal.SkippedRecord, 0, 4)
 
@@ -698,10 +707,69 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
 	}); err != nil {
-		return counts, skipped, err
+		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	return counts, skipped, nil
+	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID), nil
+}
+
+func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart) calculatedOverpowerSummary {
+	type songBestRecord struct {
+		overpower  float64
+		chartConst float64
+	}
+
+	bestBySongID := make(map[int]songBestRecord, len(fullRecords))
+
+	for _, record := range fullRecords {
+		chart, ok := chartsByID[record.ChartID]
+		if !ok {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(uint32(record.State.Score), float64(chart.Const), record.State.ComboLampID)
+		best, exists := bestBySongID[chart.SongID]
+		if !exists || overpower > best.overpower {
+			bestBySongID[chart.SongID] = songBestRecord{
+				overpower:  overpower,
+				chartConst: float64(chart.Const),
+			}
+		}
+	}
+
+	totalOverpower := 0.0
+	totalChartConst := 0.0
+	for _, best := range bestBySongID {
+		totalOverpower += best.overpower
+		totalChartConst += best.chartConst
+	}
+
+	chartCount := len(bestBySongID)
+	if chartCount == 0 {
+		value := 0.0
+		percent := 0.0
+		return calculatedOverpowerSummary{
+			Value:   &value,
+			Percent: &percent,
+		}
+	}
+
+	theoreticalTotal := info.CalcTheoreticalOverpowerTotal(totalChartConst, chartCount)
+	value := max(roundFloat(totalOverpower, 3), 0.0)
+	percent := 0.0
+	if theoreticalTotal > 0 {
+		percent = min(max(roundFloat(totalOverpower/theoreticalTotal*100, 4), 0.0), 100.0)
+	}
+
+	return calculatedOverpowerSummary{
+		Value:   &value,
+		Percent: &percent,
+	}
+}
+
+func roundFloat(value float64, scale int) float64 {
+	factor := math.Pow10(scale)
+	return math.Round(value*factor) / factor
 }
 
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {
