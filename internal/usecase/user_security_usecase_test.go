@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -138,6 +139,28 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 		assert.Equal(t, "testuser", userDTO.Username)
 		assert.Equal(t, "PLAYER", userDTO.AccountType)
 		assert.False(t, userDTO.IsPrivate)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetUser_正常系_PlayerIDがある場合は最終スコア更新日時を含む", func(t *testing.T) {
+		playerID := 10
+		lastScoreUpdate := time.Now()
+		mockUserRepo := new(MockUserRepository)
+		playerRecordRepo := &stubPlayerRecordRepository{lastScoreUpdate: &lastScoreUpdate}
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo, "test-pepper")
+
+		un, _ := username.NewUserName("playeruser")
+		mockUser := &entity.User{ID: 2, Username: un, IsPrivate: true, AccountTypeID: 1, PlayerID: &playerID}
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(mockUser, nil).Once()
+
+		userDTO, err := userCredentialUsecase.GetUser(context.Background(), 2)
+		assert.NoError(t, err)
+		assert.NotNil(t, userDTO)
+		assert.Equal(t, "playeruser", userDTO.Username)
+		assert.True(t, userDTO.IsPrivate)
+		if assert.NotNil(t, userDTO.LastScoreUpdate) {
+			assert.True(t, userDTO.LastScoreUpdate.Equal(lastScoreUpdate))
+		}
 		mockUserRepo.AssertExpectations(t)
 	})
 }
