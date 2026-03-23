@@ -28,7 +28,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 		wantErr         error
 	}{
 		{
-			name:            "ChangePassword_正常系_パスワード変更が成功する",
+			name:            "パスワード変更に成功する",
 			userID:          1,
 			currentPassword: "old-password",
 			newPassword:     "new-password",
@@ -42,7 +42,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			},
 		},
 		{
-			name:            "ChangePassword_異常系_ユーザーが見つからない",
+			name:            "ユーザーが見つからない場合はErrUserNotFoundを返す",
 			userID:          2,
 			currentPassword: "old-password",
 			newPassword:     "new-password",
@@ -52,7 +52,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			wantErr: ErrUserNotFound,
 		},
 		{
-			name:            "ChangePassword_異常系_ユーザー検索時にデータベースエラー",
+			name:            "ユーザー取得でDBエラーが発生した場合はそのまま返す",
 			userID:          1,
 			currentPassword: "old-password",
 			newPassword:     "new-password",
@@ -62,7 +62,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			wantErr: errDB,
 		},
 		{
-			name:            "ChangePassword_異常系_現在のパスワードが間違っている",
+			name:            "現在のパスワードが誤っている場合はErrIncorrectPasswordを返す",
 			userID:          1,
 			currentPassword: "wrong-password",
 			newPassword:     "new-password",
@@ -76,7 +76,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			wantErr: ErrIncorrectPassword,
 		},
 		{
-			name:            "ChangePassword_異常系_パスワード更新時にデータベースエラー",
+			name:            "保存時にDBエラーが発生した場合はそのまま返す",
 			userID:          1,
 			currentPassword: "old-password",
 			newPassword:     "new-password",
@@ -91,7 +91,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 			wantErr: errDB,
 		},
 		{
-			name:            "ChangePassword_異常系_新しいパスワードが現在と同じ",
+			name:            "新しいパスワードが現在のものと同じ場合はErrInvalidPasswordを返す",
 			userID:          1,
 			currentPassword: "old-password",
 			newPassword:     "old-password",
@@ -128,7 +128,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
-	t.Run("GetUser_正常系_ユーザー取得が成功する", func(t *testing.T) {
+	t.Run("ユーザー取得に成功する", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false, AccountTypeID: 1}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
@@ -142,7 +142,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 
-	t.Run("GetUser_正常系_PlayerIDがある場合は最終スコア更新日時を含む", func(t *testing.T) {
+	t.Run("PlayerIDがある場合は最終スコア更新日時を含める", func(t *testing.T) {
 		playerID := 10
 		lastScoreUpdate := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 		mockUserRepo := new(MockUserRepository)
@@ -163,12 +163,28 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 		}
 		mockUserRepo.AssertExpectations(t)
 	})
+
+	t.Run("PlayerIDがある場合に最終スコア更新日時取得が失敗したらエラーを返す", func(t *testing.T) {
+		playerID := 11
+		mockUserRepo := new(MockUserRepository)
+		playerRecordRepo := &stubPlayerRecordRepository{err: errors.New("db error")}
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo, "test-pepper")
+
+		un, _ := username.NewUserName("playeruser2")
+		mockUser := &entity.User{ID: 3, Username: un, PlayerID: &playerID}
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 3).Return(mockUser, nil).Once()
+
+		userDTO, err := userCredentialUsecase.GetUser(context.Background(), 3)
+		assert.Error(t, err)
+		assert.Nil(t, userDTO)
+		mockUserRepo.AssertExpectations(t)
+	})
 }
 
 func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
 
-	t.Run("DeleteUser_正常系_論理削除が成功する", func(t *testing.T) {
+	t.Run("アカウント削除に成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
@@ -181,7 +197,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 
-	t.Run("DeleteUser_異常系_リポジトリエラー", func(t *testing.T) {
+	t.Run("保存時にDBエラーが発生した場合はエラーを返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
@@ -195,7 +211,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 
-	t.Run("DeleteUser_異常系_既に削除済みのユーザー", func(t *testing.T) {
+	t.Run("既に削除済みのユーザーはErrUserAlreadyDeletedを返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
