@@ -144,7 +144,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 
 	t.Run("GetUser_正常系_PlayerIDがある場合は最終スコア更新日時を含む", func(t *testing.T) {
 		playerID := 10
-		lastScoreUpdate := time.Now()
+		lastScoreUpdate := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 		mockUserRepo := new(MockUserRepository)
 		playerRecordRepo := &stubPlayerRecordRepository{lastScoreUpdate: &lastScoreUpdate}
 		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo, "test-pepper")
