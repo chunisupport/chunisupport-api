@@ -151,7 +151,6 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendBranch(t *testing.T) {
 	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
 	worldsendSong := &entity.Song{DisplayID: "WE001", IsWorldsend: true}
-	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(worldsendSong, nil)
 	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&repository.WorldsendSongWithChart{Song: worldsendSong, Chart: &entity.WorldsendChart{ID: 301}}, nil)
 	mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{301}).Return([]*entity.ChartStatsByRatingBand{{ChartID: 301, RatingBandID: 1}, {ChartID: 301, RatingBandID: 2}}, nil)
 
@@ -229,6 +228,69 @@ func TestGetChartStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.
 			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
 			result, err := u.GetChartStatsByDisplayIDAndDifficulty(ctx, "S002", "MASTER", tt.accountTypeID)
+
+			tt.expectedErrChecker(t, err)
+			tt.assertResult(t, result)
+		})
+	}
+}
+
+func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendDeletedSongPermission(t *testing.T) {
+	tests := []struct {
+		name               string
+		accountTypeID      *int
+		shouldSucceed      bool
+		expectedErrChecker assert.ErrorAssertionFunc
+		assertResult       func(t *testing.T, result *entity.SingleChartStats)
+	}{
+		{
+			name:          "権限がない場合は削除済みWORLD'S END楽曲が取得できない",
+			accountTypeID: nil,
+			expectedErrChecker: func(t assert.TestingT, err error, _ ...any) bool {
+				return assert.ErrorIs(t, err, repository.ErrSongNotFound)
+			},
+			assertResult: func(t *testing.T, result *entity.SingleChartStats) {
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name: "EDITOR権限がある場合は削除済みWORLD'S END楽曲を取得できる",
+			accountTypeID: func() *int {
+				editor := info.AccountTypeEditor
+				return &editor
+			}(),
+			shouldSucceed:      true,
+			expectedErrChecker: assert.NoError,
+			assertResult: func(t *testing.T, result *entity.SingleChartStats) {
+				assert.NotNil(t, result)
+				assert.Equal(t, info.StatsDifficultyWorldsend, result.Difficulty)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			mockSongRepo := new(MockSongRepository)
+			mockWorldsendRepo := new(MockWorldsendChartRepository)
+			mockStatsRepo := new(MockChartStatsRepository)
+			mockSongMasterProvider := new(MockSongMasterProvider)
+			mockExec := new(MockExecutor)
+			stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 1}}}
+
+			deletedWorldsendSong := &entity.Song{DisplayID: "WE002", IsWorldsend: true, IsDeleted: true}
+			mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE002").Return(&repository.WorldsendSongWithChart{
+				Song:  deletedWorldsendSong,
+				Chart: &entity.WorldsendChart{ID: 401},
+			}, nil).Once()
+
+			if tt.shouldSucceed {
+				mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{401}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
+			}
+
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+
+			result, err := u.GetChartStatsByDisplayIDAndDifficulty(ctx, "WE002", info.StatsDifficultyWorldsend, tt.accountTypeID)
 
 			tt.expectedErrChecker(t, err)
 			tt.assertResult(t, result)

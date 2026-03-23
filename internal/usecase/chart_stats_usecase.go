@@ -148,6 +148,11 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 // GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 // requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error) {
+	// WORLD'S ENDはsongRepo.FindByDisplayIDで取得できないため、専用フローで処理する。
+	if difficultyName == info.StatsDifficultyWorldsend {
+		return u.getWorldsendSingleChartStats(ctx, displayID, requesterAccountTypeID)
+	}
+
 	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
 	if err != nil {
 		return nil, err
@@ -161,7 +166,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 
 	ratingBands := u.masterProvider.RatingBands()
 
-	entry, err := u.findChartEntryByDifficulty(ctx, song, difficultyName)
+	entry, err := u.findChartEntryByDifficulty(song, difficultyName)
 	if err != nil {
 		return nil, err
 	}
@@ -183,26 +188,43 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 	return &entity.SingleChartStats{SongID: song.DisplayID, Difficulty: entry.key, Stats: statsRows}, nil
 }
 
-// findChartEntryByDifficulty は指定難易度の譜面エントリを検索します。
-func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(ctx context.Context, song *entity.Song, difficultyName string) (*chartEntry, error) {
-	if difficultyName == info.StatsDifficultyWorldsend {
-		if !song.IsWorldsend {
-			return nil, ErrChartNotFound
-		}
-		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, song.DisplayID)
-		if err != nil {
-			if errors.Is(err, repository.ErrSongNotFound) {
-				return nil, ErrChartNotFound
-			}
-			return nil, err
-		}
-		return &chartEntry{id: worldsend.Chart.ID, key: info.StatsDifficultyWorldsend}, nil
+// getWorldsendSingleChartStats はWORLD'S END譜面の統計をworldsendChartRepo経由で取得します。
+// songRepo.FindByDisplayIDがWORLD'S END楽曲を除外するため、専用メソッドで処理します。
+func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SingleChartStats, error) {
+	worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	if err != nil {
+		return nil, err
 	}
 
-	if song.IsWorldsend {
-		return nil, ErrChartNotFound
+	// 削除済み楽曲は権限に応じて公開可否を制御する。
+	if !worldsend.Song.IsActive() {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
+			return nil, repository.ErrSongNotFound
+		}
 	}
 
+	ratingBands := u.masterProvider.RatingBands()
+
+	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, []int{worldsend.Chart.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	bandOrder := make(map[int]int, len(ratingBands))
+	for _, band := range ratingBands {
+		bandOrder[band.ID] = band.SortOrder
+	}
+
+	sort.Slice(statsRows, func(i, j int) bool {
+		return bandOrder[statsRows[i].RatingBandID] < bandOrder[statsRows[j].RatingBandID]
+	})
+
+	return &entity.SingleChartStats{SongID: worldsend.Song.DisplayID, Difficulty: info.StatsDifficultyWorldsend, Stats: statsRows}, nil
+}
+
+// findChartEntryByDifficulty は通常難易度（WORLD'S END以外）の譜面エントリを検索します。
+// WORLD'S ENDはGetChartStatsByDisplayIDAndDifficultyで事前に処理されるため、ここには到達しません。
+func (u *chartStatsUsecaseImpl) findChartEntryByDifficulty(song *entity.Song, difficultyName string) (*chartEntry, error) {
 	masters := u.masterCache.SongMasters()
 	if masters == nil {
 		return nil, fmt.Errorf("master cache is not initialized")
