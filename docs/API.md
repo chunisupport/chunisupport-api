@@ -304,6 +304,8 @@
 | `is_private` | bool | 非公開設定 (true: 非公開, false: 公開) |
 | `last_score_update` | string \| null | プレイヤースコアの最終更新日時 (ISO8601)。プレイヤーが紐付いていない場合やレコードが存在しない場合は null |
 
+- 最終スコア更新日時の取得に失敗した場合、このエンドポイントは成功レスポンスを返さずエラーを返します。
+
 ### PUT `/internal/me/privacy`
 - **認証**: Cookie 必須
 - **リクエストボディ**:

@@ -19,10 +19,9 @@ import (
 func TestRecoveryUsecase_IssueRecoveryCodes(t *testing.T) {
 	t.Run("IssueRecoveryCodes_正常系_リカバリーコード再発行が成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		recoveryUsecase := newTestRecoveryUsecase(tm, mockUserRepo, mockRecoveryRepo, "test-pepper")
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
@@ -32,7 +31,7 @@ func TestRecoveryUsecase_IssueRecoveryCodes(t *testing.T) {
 			return len(codes) == info.RecoveryCodeCount
 		})).Return(nil).Once()
 
-		codes, err := authService.IssueRecoveryCodes(context.Background(), 1)
+		codes, err := recoveryUsecase.IssueRecoveryCodes(context.Background(), 1)
 		assert.NoError(t, err)
 		assert.Len(t, codes, info.RecoveryCodeCount)
 		for _, code := range codes {
@@ -48,31 +47,29 @@ func TestRecoveryUsecase_IssueRecoveryCodes(t *testing.T) {
 
 	t.Run("IssueRecoveryCodes_異常系_ユーザーが存在しない", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		recoveryUsecase := newTestRecoveryUsecase(tm, mockUserRepo, mockRecoveryRepo, "test-pepper")
 
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, sql.ErrNoRows).Once()
 
-		_, err := authService.IssueRecoveryCodes(context.Background(), 1)
+		_, err := recoveryUsecase.IssueRecoveryCodes(context.Background(), 1)
 		assert.ErrorIs(t, err, ErrUserNotFound)
 		mockUserRepo.AssertExpectations(t)
 	})
 
 	t.Run("IssueRecoveryCodes_異常系_リカバリーコード削除に失敗する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
-		authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		recoveryUsecase := newTestRecoveryUsecase(tm, mockUserRepo, mockRecoveryRepo, "test-pepper")
 
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
 		mockRecoveryRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(errors.New("delete error")).Once()
 
-		_, err := authService.IssueRecoveryCodes(context.Background(), 1)
+		_, err := recoveryUsecase.IssueRecoveryCodes(context.Background(), 1)
 		assert.Error(t, err)
 		mockUserRepo.AssertExpectations(t)
 		mockRecoveryRepo.AssertExpectations(t)
@@ -173,13 +170,12 @@ func TestRecoveryUsecase_RecoverWithRecoveryCode(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockUserRepo := new(MockUserRepository)
-			mockSessionRepo := new(MockSessionRepository)
 			mockRecoveryRepo := new(MockRecoveryCodeRepository)
 			tm := &mockTransactionManager{}
-			authService := NewAuthService(nil, tm, mockUserRepo, mockSessionRepo, mockRecoveryRepo, nil, "test-secret", 24, 24, pepper, newMockMasterCache())
+			recoveryUsecase := newTestRecoveryUsecase(tm, mockUserRepo, mockRecoveryRepo, pepper)
 
 			tc.setupMock(mockUserRepo, mockRecoveryRepo)
-			err := authService.RecoverWithRecoveryCode(context.Background(), recoveryCode, tc.newPassword)
+			err := recoveryUsecase.RecoverWithRecoveryCode(context.Background(), recoveryCode, tc.newPassword)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 			} else {

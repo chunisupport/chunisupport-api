@@ -68,9 +68,10 @@ func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor,
 }
 
 type stubPlayerRecordRepository struct {
-	records       []*entity.PlayerRecord
-	ratingRecords []*entity.PlayerRecord
-	err           error
+	records         []*entity.PlayerRecord
+	ratingRecords   []*entity.PlayerRecord
+	lastScoreUpdate *time.Time
+	err             error
 }
 
 func (s *stubPlayerRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
@@ -91,7 +92,10 @@ func (s *stubPlayerRecordRepository) FindByPlayerIDForRating(ctx context.Context
 }
 
 func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
-	return nil, nil
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.lastScoreUpdate, nil
 }
 
 type stubPlayerService struct {

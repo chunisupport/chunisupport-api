@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -42,7 +41,7 @@ func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_i
 	if user.PlayerID != nil {
 		lastScoreUpdate, err = s.playerRecordRepo.GetLastScoreUpdate(ctx, s.db, *user.PlayerID)
 		if err != nil {
-			slog.Error("failed to get last score update", "player_id", *user.PlayerID, "error", err)
+			return nil, err
 		}
 	}
 	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
