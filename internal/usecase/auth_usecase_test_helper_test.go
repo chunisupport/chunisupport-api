@@ -159,3 +159,15 @@ type mockTransactionManager struct {
 func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx repository.Executor) error) error {
 	return f(m.exec)
 }
+
+func newTestAuthUsecase(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, pepper string) AuthUsecase {
+	return NewAuthUsecase(nil, userRepo, sessionRepo, "test-secret", 24, 24, pepper, newMockMasterCache())
+}
+
+func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string) UserCredentialUsecase {
+	return NewUserCredentialUsecase(nil, userRepo, playerRecordRepo, pepper, newMockMasterCache())
+}
+
+func newTestRecoveryUsecase(tm TransactionManager, userRepo repository.UserRepository, recoveryRepo repository.RecoveryCodeRepository, pepper string) RecoveryUsecase {
+	return NewRecoveryUsecase(nil, tm, userRepo, recoveryRepo, pepper)
+}

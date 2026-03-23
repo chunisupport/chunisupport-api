@@ -108,11 +108,10 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockUserRepo := new(MockUserRepository)
-			mockSessionRepo := new(MockSessionRepository)
-			authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, pepper, newMockMasterCache())
+			userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, pepper)
 
 			tc.setupMock(mockUserRepo)
-			err := authService.ChangePassword(context.Background(), tc.userID, tc.currentPassword, tc.newPassword)
+			err := userCredentialUsecase.ChangePassword(context.Background(), tc.userID, tc.currentPassword, tc.newPassword)
 
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
@@ -126,15 +125,14 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 
 func TestUserSecurityUsecase_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
-	mockSessionRepo := new(MockSessionRepository)
-	authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+	userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
 	t.Run("GetUser_正常系_ユーザー取得が成功する", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
 		mockUser := &entity.User{ID: 1, Username: un, IsPrivate: false, AccountTypeID: 1}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
 
-		userDTO, err := authService.GetUser(context.Background(), 1)
+		userDTO, err := userCredentialUsecase.GetUser(context.Background(), 1)
 		assert.NoError(t, err)
 		assert.NotNil(t, userDTO)
 		assert.Equal(t, "testuser", userDTO.Username)
@@ -149,28 +147,26 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("DeleteUser_正常系_論理削除が成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
 		user := &entity.User{ID: 1, Username: un}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		err := authService.DeleteUser(context.Background(), 1)
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1)
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser_異常系_リポジトリエラー", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
 		user := &entity.User{ID: 2, Username: un}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("db error")).Once()
 
-		err := authService.DeleteUser(context.Background(), 2)
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2)
 		assert.Error(t, err)
 		assert.Equal(t, "db error", err.Error())
 		mockUserRepo.AssertExpectations(t)
@@ -178,13 +174,12 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("DeleteUser_異常系_既に削除済みのユーザー", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		authService := NewAuthService(nil, nil, mockUserRepo, mockSessionRepo, nil, nil, "test-secret", 24, 24, "test-pepper", newMockMasterCache())
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
 		deletedUser := &entity.User{ID: 3, Username: un, IsDeleted: true}
 		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 3).Return(deletedUser, nil).Once()
 
-		err := authService.DeleteUser(context.Background(), 3)
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3)
 		assert.ErrorIs(t, err, ErrUserAlreadyDeleted)
 		mockUserRepo.AssertExpectations(t)
 	})
