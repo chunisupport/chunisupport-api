@@ -13,4 +13,6 @@ type ChartStatsRepository interface {
 	FindRatingBands(ctx context.Context, exec Executor) ([]*ratingband.RatingBand, error)
 	// FindChartStatsByChartIDs は譜面ID一覧に対する統計を返します。
 	FindChartStatsByChartIDs(ctx context.Context, exec Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error)
+	// FindWorldsendChartStatsByChartIDs はWORLD'S END譜面ID一覧に対する統計を返します。
+	FindWorldsendChartStatsByChartIDs(ctx context.Context, exec Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error)
 }

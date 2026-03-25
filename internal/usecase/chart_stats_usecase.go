@@ -88,7 +88,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		chartIDs = append(chartIDs, entry.id)
 	}
 
-	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
+	statsRows, err := u.findStatsRows(ctx, song.IsWorldsend, chartIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +143,14 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 	}
 
 	return entries, nil
+}
+
+func (u *chartStatsUsecaseImpl) findStatsRows(ctx context.Context, isWorldsend bool, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+	if isWorldsend {
+		return u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
+	}
+
+	return u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
 }
 
 // GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
@@ -205,7 +213,7 @@ func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context
 
 	ratingBands := u.masterProvider.RatingBands()
 
-	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, []int{worldsend.Chart.ID})
+	statsRows, err := u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.statsExecutor, []int{worldsend.Chart.ID})
 	if err != nil {
 		return nil, err
 	}

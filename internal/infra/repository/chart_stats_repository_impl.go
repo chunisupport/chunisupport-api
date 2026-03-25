@@ -51,72 +51,19 @@ type chartStatsRow struct {
 	PlayerCount      int      `db:"player_count"`
 }
 
-// FindRatingBands はレーティング帯マスタ一覧を返します。
-func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
-	const query = `
-		SELECT id, label, min_inclusive, max_exclusive, sort_order
-		FROM rating_bands
-		ORDER BY sort_order
-	`
-
-	var rows []ratingBandRow
-	if err := exec.SelectContext(ctx, &rows, query); err != nil {
-		return nil, err
-	}
-
-	results := make([]*ratingband.RatingBand, 0, len(rows))
-	for _, row := range rows {
-		results = append(results, &ratingband.RatingBand{
-			ID:           row.ID,
-			Label:        row.Label,
-			MinInclusive: row.MinInclusive,
-			MaxExclusive: row.MaxExclusive,
-			SortOrder:    row.SortOrder,
-		})
-	}
-	return results, nil
-}
-
-// FindChartStatsByChartIDs は譜面ID一覧に対する統計を返します。
-func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exec repository.Executor, query string, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
 	if len(chartIDs) == 0 {
 		return []*entity.ChartStatsByRatingBand{}, nil
 	}
 
-	query, args, err := sqlx.In(`
-		SELECT
-			chart_id,
-			rating_band_id,
-			rank_aaal,
-			rank_s,
-			rank_sp,
-			rank_ss,
-			rank_ssp,
-			rank_sss,
-			rank_sssp,
-			rank_max,
-			combo_none,
-			combo_fc,
-			combo_aj,
-			clear_failed,
-			clear_clear,
-			clear_hard,
-			clear_brave,
-			clear_absolute,
-			clear_catastrophy,
-			average_score,
-			player_count
-		FROM chart_stats_by_rating_band
-		WHERE chart_id IN (?)
-		ORDER BY chart_id, rating_band_id
-	`, chartIDs)
+	boundQuery, args, err := sqlx.In(query, chartIDs)
 	if err != nil {
 		return nil, err
 	}
-	query = exec.Rebind(query)
+	boundQuery = exec.Rebind(boundQuery)
 
 	var rows []chartStatsRow
-	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
+	if err := exec.SelectContext(ctx, &rows, boundQuery, args...); err != nil {
 		return nil, err
 	}
 
@@ -154,4 +101,92 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 	}
 
 	return results, nil
+}
+
+// FindRatingBands はレーティング帯マスタ一覧を返します。
+func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
+	const query = `
+		SELECT id, label, min_inclusive, max_exclusive, sort_order
+		FROM rating_bands
+		ORDER BY sort_order
+	`
+
+	var rows []ratingBandRow
+	if err := exec.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+
+	results := make([]*ratingband.RatingBand, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, &ratingband.RatingBand{
+			ID:           row.ID,
+			Label:        row.Label,
+			MinInclusive: row.MinInclusive,
+			MaxExclusive: row.MaxExclusive,
+			SortOrder:    row.SortOrder,
+		})
+	}
+	return results, nil
+}
+
+// FindChartStatsByChartIDs は譜面ID一覧に対する統計を返します。
+func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+	return r.findChartStatsByChartIDs(ctx, exec, `
+		SELECT
+			chart_id,
+			rating_band_id,
+			rank_aaal,
+			rank_s,
+			rank_sp,
+			rank_ss,
+			rank_ssp,
+			rank_sss,
+			rank_sssp,
+			rank_max,
+			combo_none,
+			combo_fc,
+			combo_aj,
+			clear_failed,
+			clear_clear,
+			clear_hard,
+			clear_brave,
+			clear_absolute,
+			clear_catastrophy,
+			average_score,
+			player_count
+		FROM chart_stats_by_rating_band
+		WHERE chart_id IN (?)
+		ORDER BY chart_id, rating_band_id
+	`, chartIDs)
+}
+
+// FindWorldsendChartStatsByChartIDs はWORLD'S END譜面ID一覧に対する統計を返します。
+func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
+	return r.findChartStatsByChartIDs(ctx, exec, `
+		SELECT
+			worldsend_chart_id AS chart_id,
+			rating_band_id,
+			rank_aaal,
+			rank_s,
+			rank_sp,
+			rank_ss,
+			rank_ssp,
+			rank_sss,
+			rank_sssp,
+			rank_max,
+			combo_none,
+			combo_fc,
+			combo_aj,
+			clear_failed,
+			clear_clear,
+			clear_hard,
+			clear_brave,
+			clear_absolute,
+			clear_catastrophy,
+			average_score,
+			player_count
+		FROM worldsend_chart_stats_by_rating_band
+		WHERE worldsend_chart_id IN (?)
+		ORDER BY worldsend_chart_id, rating_band_id
+	`, chartIDs)
 }
