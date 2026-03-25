@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年03月05日
+**最終更新日**: 2026年03月25日
 
 ## ベースURLと環境
 
@@ -113,6 +113,7 @@
 | `/internal/me/goals/:id` | PUT | Cookie | 目標を更新。 |
 | `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除。 |
 | `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・削除済み・プレイヤー未紐付けを含む）。 |
+| `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得。 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得。 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除。 |
 | `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活。 |
@@ -131,6 +132,7 @@
 | `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted` を含む）。 |
 | `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む）。 |
 | `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む）。 |
+| `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得。 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
@@ -2404,7 +2406,6 @@ interface PlayerDataResult {
   imported_at: string;
   summary: PlayerDataSummary;
   counts: PlayerDataCounts;
-  diff_records: PlayerDataDiffSet;
   skipped_records: SkippedRecord[];
 }
 
@@ -2420,34 +2421,9 @@ interface PlayerDataSummary {
 interface PlayerDataCounts {
   full_records_upserted: number;
   worldsend_records_upserted: number;
-  full_records_changed: number;
-  worldsend_records_changed: number;
   full_records_skipped: number;
   worldsend_records_skipped: number;
   honors_skipped: number;
-}
-
-interface PlayerDataDiffSet {
-  full: PlayerDataDiff[];
-  worldsend: PlayerDataDiff[];
-}
-
-// レスポンスサイズ削減のため、PlayerRecordDTOより軽量な専用型
-interface PlayerDataDiffRecord {
-  difficulty: string;
-  title: string;
-  const: number;
-  is_const_unknown: boolean;
-  score: number;
-  clear_lamp: string;
-  combo_lamp: string | null;  // マスタ値が「NONE」の場合はnull
-  full_chain: string | null;  // マスタ値が「NONE」の場合はnull
-}
-
-interface PlayerDataDiff {
-  before: PlayerDataDiffRecord | null;
-  after: PlayerDataDiffRecord;
-  changed_fields: string[];
 }
 
 interface SkippedRecord {

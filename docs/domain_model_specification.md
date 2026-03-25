@@ -87,7 +87,7 @@
 #### 不変条件
 
 - `Username` は5文字以上50文字以内の小文字英数字
-- `PasswordHash` はbcryptハッシュ形式
+- `PasswordHash` は空文字列不可のハッシュ文字列
 - 削除済みユーザー（`IsDeleted = true`）は無効とみなされる
 
 ---
@@ -192,9 +192,9 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | Artist | string | ✓ | アーティスト名 |
 | GenreID | *int | - | ジャンルID |
 | BPM | *int | - | BPM（テンポ） |
-| ReleaseDate | *time.Time | - | リリース日 |
-| OfficialIdx | *string | - | 公式インデックス |
-| Img | *string | - | ジャケット画像URL |
+| ReleasedAt | *time.Time | - | リリース日 |
+| OfficialIdx | string | ✓ | 公式インデックス |
+| Jacket | *string | - | ジャケット画像URL |
 | Charts | []*Chart | - | この楽曲に紐づく譜面リスト |
 | MaxChartConst | float64 | - | 全譜面のうち最大の譜面定数（ドメインサービスで算出） |
 | IsMaxOPUnknown | bool | ✓ | MASTER/ULTIMAに未判明定数が含まれる場合true（ドメインサービスで算出） |
@@ -203,7 +203,21 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 #### 振る舞い（メソッド）
 
-現在、振る舞いメソッドなし（データ保持のみ）。
+##### クエリメソッド
+
+- **IsActive() bool**
+  - 楽曲が有効（削除されていない）かを判定
+  - 返り値: `!IsDeleted`
+
+##### コマンドメソッド
+
+- **Delete()**
+  - 楽曲を論理削除
+  - 副作用: `IsDeleted = true`
+
+- **Restore()**
+  - 楽曲の論理削除を解除
+  - 副作用: `IsDeleted = false`
 
 #### 不変条件
 
@@ -224,7 +238,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 |------------|-----|-----|------|
 | ID | int | ✓ | 譜面ID（主キー） |
 | SongID | int | ✓ | 楽曲ID（外部キー） |
-| DifficultyID | int | ✓ | 難易度ID（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END） |
+| DifficultyID | int | ✓ | 難易度ID（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA） |
 | Const | chartconstant.ChartConstant | ✓ | 譜面定数（値オブジェクト） |
 | IsConstUnknown | bool | ✓ | 譜面定数が未確定かどうか |
 | Notes | *notes.Notes | - | ノーツ数（値オブジェクト） |
@@ -241,12 +255,39 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 ---
 
+### WorldsendChart（WORLD'S END譜面エンティティ）
+
+#### 概要
+WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。通常譜面の `Chart` とは別に管理します。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| ID | int | ✓ | WORLD'S END譜面ID（主キー） |
+| SongID | int | ✓ | 楽曲ID（外部キー） |
+| LevelStar | *levelstar.LevelStar | - | WORLD'S ENDレベル（1〜5） |
+| Attribute | *string | - | WORLD'S END属性 |
+| Notes | *notes.Notes | - | ノーツ数 |
+
+#### 振る舞い（メソッド）
+
+現在、振る舞いメソッドなし（データ保持のみ）。
+
+#### 不変条件
+
+- WORLD'S END は1曲につき1譜面のみ
+- `LevelStar` は 1〜5 の範囲
+- `Notes` は正の整数
+
+---
+
 ### その他のエンティティ
 
 以下のエンティティは主にマスターデータとして機能します：
 
 - **AccountType**: アカウント種別（一般、管理者など）
-- **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END）
+- **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）
 - **ClearLampType**: クリアランプ種別（FAILED, CLEAR, HARD, AB, AJなど）
 - **ComboLampType**: コンボランプ種別（NONE, FC, AJ）
 - **FullChainType**: フルチェーン種別（NONE, FULL CHAIN, FULL CHAIN PLATINUM）
@@ -506,24 +547,21 @@ CHUNITHM の楽曲情報を表すエンティティ。
 ### passwordhash.PasswordHash
 
 #### 概要
-bcryptハッシュ化されたパスワードを表す値オブジェクト。
+パスワードハッシュ文字列を表す値オブジェクト。
 
 #### 制約
 
-- bcrypt形式（`$2a$`で始まる60文字のハッシュ）
 - 空文字列は不可
 
 #### ファクトリメソッド
 
 - `NewPasswordHash(hash string) (PasswordHash, error)`: バリデーション付き生成
-- `HashFromPassword(password string) (PasswordHash, error)`: 平文パスワードからハッシュ生成
 
 #### メソッド
 
 - `String() string`
 - `Value() (driver.Value, error)`
 - `Scan(src any) error`
-- `ComparePassword(password string) bool`: パスワード一致検証
 
 ---
 
