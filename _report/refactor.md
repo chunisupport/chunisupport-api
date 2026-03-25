@@ -44,7 +44,7 @@
 | **REF-G02** | 入力検証・エラー変換の境界統一 | HDL-002, HDL-003, HDL-004, UC-005, DTO-001 | HTTP境界での入力検証不足と、層間エラー変換の不整合は同じ「境界責務」の問題。バリデーション方針とエラー変換規約を同時整備する。 |
 | **REF-G03** | ドメイン純粋性の回復（インフラ依存排除） | DOM-006, DOM-017, ARCH-002 | ドメイン/DTO側にインフラ都合（dbタグ、JSONバイト生保持）が混入。モデルの責務分離を同時実施して依存方向を正す。 |
 | **REF-G04** | 値オブジェクトの整合性・型安全性向上 | DOM-007, DOM-008, INFRA-009, INFRA-016 | VOバリデーション迂回・危険な型変換・エラー無視が連鎖している。VOの生成/変換/永続化パスを一体で修正する。 |
-| **REF-G05** | リポジトリエラーとユースケース依存の是正 | QUAL-009, DOM-018, QUAL-010 | Usecaseが `sql.ErrNoRows` を直接参照する原因は、Repositoryのドメインエラー設計不足とDomain層のsqlx依存。同時改修でクリーンアーキテクチャ違反を解消。 |
+| **REF-G05** | リポジトリエラーとユースケース依存の是正 | QUAL-009, QUAL-010 | Usecaseが `sql.ErrNoRows` を直接参照する状態と、Domain層のsqlx依存を同時に整理する。not found系の変換方針をRepository境界へ寄せ、クリーンアーキテクチャ違反を解消する。 |
 | **REF-G07** | トランザクション整合性と実行器契約の統一 | UC-004, UC-013, INFRA-011 | トランザクション欠如と暗黙フォールバックは同系統の整合性リスク。境界をまたぐ処理を「必ずTxで完結」に統一する。 |
 | **REF-G08** | クエリ負荷・N+1・バルク処理最適化 | PERF-003, PERF-004, PERF-006, INFRA-004, INFRA-010, INFRA-012 | 全件取得・N+1・巨大IN句・無分割バルクなど、DB負荷起因の課題群。取得戦略とチャンク戦略を同時に最適化する。 |
 | **REF-G09** | 監視性・運用信頼性の標準化 | OPS-001, OPS-002, INFRA-005, UC-014, HDL-009, LIB-004 | リクエスト追跡、タイムアウト、キャンセルログ、ログ運用の課題をまとめて扱い、運用観測性を標準化する。 |
@@ -123,19 +123,20 @@
 - **現状の`#nosec`箇所一覧**:
   | ファイル | 行 | 抑制内容 | 根拠の有無 |
   |---|---|---|---|
-  | `internal/app/apierror/codes.go` | 12-15, 39 | G101（ハードコードされたクレデンシャル疑い） | △（エラーコード定数であり実際のクレデンシャルではないが、コメントなし） |
-  | `internal/config/config.go` | 77 | G304（ファイルパス挿入） | ○（「LogPaths.Echo comes from trusted configuration」とコメントあり） |
-  | `internal/app/router.go` | 381 | G304（ファイルパス挿入） | ○（「comes from trusted configuration」とコメントあり） |
+  | `internal/app/apierror/codes.go` | 12-15, 40 | G101（ハードコードされたクレデンシャル疑い） | △（エラーコード定数であり実際のクレデンシャルではないが、コメントなし） |
+  | `internal/config/config.go` | 44 | G117（ハードコードされたパスワード疑い） | ○（JWTシークレットを環境変数から読み込むフィールドであり、値はコードに埋め込まれていない） |
+  | `internal/config/config.go` | 94 | G703, G304（ファイルパス挿入） | ○（`APP_ENV` は `validateEnv` で許可値に制限済み） |
+  | `internal/app/router.go` | 431 | G304（ファイルパス挿入） | ○（「LogPaths.Echo comes from trusted configuration」とコメントあり） |
   | `internal/infra/logger/handler.go` | 59 | G304（ファイルパス挿入） | ○（「logDir comes from trusted configuration」とコメントあり） |
-  | `internal/dto/worldsend_dto.go` | 36 | G115（整数オーバーフロー） | ○（「Score value is guaranteed to be within uint32 range by domain VO」とコメントあり） |
-  | `internal/infra/models/player_record_model.go` | 49 | G115（整数オーバーフロー） | ○（同上） |
-  | `internal/infra/models/player_worldsend_record_model.go` | 45 | G115（整数オーバーフロー） | ○（同上） |
-  | `internal/usecase/player_data_usecase_impl.go` | 841 | G115（整数オーバーフロー） | △（コメントなし） |
+  | `internal/dto/worldsend_dto.go` | 38 | G115（整数オーバーフロー） | ○（「Score value is guaranteed to be within uint32 range by domain VO」とコメントあり） |
+  | `internal/infra/models/player_record_model.go` | 48 | G115（整数オーバーフロー） | ○（同上） |
+  | `internal/infra/models/player_worldsend_record_model.go` | 43 | G115（整数オーバーフロー） | ○（同上） |
+  | `internal/usecase/player_data_usecase_impl.go` | 913 | G115（整数オーバーフロー） | △（コメントなし） |
 - **影響範囲**:
   - 実際の脆弱性（パス・トラバーサル、整数オーバーフローなど）を見逃す可能性。
 - **修正案**:
   - `internal/app/apierror/codes.go`：エラーコード定数であり実際のクレデンシャルではないことを明記（例: `// #nosec G101 -- これはエラーコード定数であり、実際のクレデンシャルではない`）
-  - `internal/usecase/player_data_usecase_impl.go:841`：根拠コメントを追加
+  - `internal/usecase/player_data_usecase_impl.go:913`：根拠コメントを追加
   - その他の箇所は適切な根拠コメントあり
 - **追加で確認したい点**:
   - 利用中の静的解析ツールとCI連携の有無。
@@ -174,7 +175,8 @@
 - **現状のTODO箇所一覧**:
   | ファイル | 行 | 内容 |
   |---|---|---|
-  | `internal/usecase/user_usecase_impl.go` | 50 | `// TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。` |
+  | `internal/usecase/user_usecase_impl.go` | 56 | `// TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。` |
+  | `internal/usecase/auth_usecase_impl.go` | 150 | `// TODO: internal/domain/vo/username パッケージでエラー変数を公開し、errors.Is() を使った判定に切り替える。` |
 - **修正案**:
   - 解消またはIssue化。
 
@@ -182,16 +184,18 @@
 
 ### QUAL-009: Usecase層でのインフラ層エラー直接参照
 - **根拠**:
-  - `internal/usecase/worldsend_usecase.go`, `internal/usecase/auth_usecase.go` 等で `database/sql` パッケージの `sql.ErrNoRows` を直接 `errors.Is()` で判定している。
+  - `internal/usecase/auth_usecase_impl.go`, `internal/usecase/user_usecase_impl.go` 等で `database/sql` パッケージの `sql.ErrNoRows` を直接 `errors.Is()` で判定している。
   - 例: `if errors.Is(err, sql.ErrNoRows) { return repository.ErrSongNotFound }`
 - **現状の該当箇所**:
   | ファイル | 該当箇所数 |
   |---|---|
-  | `internal/usecase/auth_usecase.go` | 10箇所以上 |
+  | `internal/usecase/auth_usecase_impl.go` | 4箇所 |
   | `internal/usecase/user_usecase_impl.go` | 4箇所 |
-  | `internal/usecase/worldsend_usecase.go` | 3箇所 |
   | `internal/usecase/api_token_usecase_impl.go` | 2箇所 |
-  | `internal/infra/repository/worldsend_chart_repository_impl.go` | 3箇所（リポジトリ層で変換せず直接返している） |
+  | `internal/usecase/goal_usecase_impl.go` | 3箇所 |
+  | `internal/usecase/recovery_usecase.go` | 3箇所 |
+- **補足**:
+  - `internal/infra/repository/worldsend_chart_repository_impl.go` の `FindByDisplayID` は既に `sql.ErrNoRows` を `repository.ErrSongNotFound` に変換しており、この点は解消済み。
 - **影響範囲**:
   - Usecase層がインフラ層の実装詳細（SQLドライバーのエラー型）に依存しており、クリーンアーキテクチャの依存方向に違反。
   - リポジトリ実装を別のストレージ（NoSQL等）に変更した場合、Usecase層も修正が必要になる。
@@ -216,7 +220,7 @@
 
 ### UC-004: Register でのトランザクション未使用
 - **根拠**:
-  - `internal/usecase/auth_usecase.go` の `Register` でユーザー作成（`Create`）とセッション作成（`createSessionAndToken`）が非トランザクションで連続実行。
+  - `internal/usecase/auth_usecase_impl.go` の `Register` でユーザー作成（`Create`）とセッション作成（`createSessionAndToken`）が非トランザクションで連続実行。
 - **影響範囲**:
   - ユーザー作成成功後にセッション作成が失敗すると、ログインできないユーザーが作成される。
 - **修正案**:
@@ -226,7 +230,7 @@
 
 ### UC-005: `convertUsernameError` の文字列比較によるエラー変換
 - **根拠**:
-  - `internal/usecase/auth_usecase.go` の `convertUsernameError` がVOのエラーメッセージ文字列と直接比較してusecase層のエラーに変換。
+  - `internal/usecase/auth_usecase_impl.go` の `convertUsernameError` がVOのエラーメッセージ文字列と直接比較してusecase層のエラーに変換。
   - 例: `errMsg == "username cannot be empty"` → `return ErrUsernameEmpty`
 - **影響範囲**:
   - VO側のメッセージが変更されると変換が壊れ、適切なusecase層エラーが返されなくなる。
@@ -254,6 +258,7 @@
     - `api_internal/song_handler.go`: `DeleteSong`, `RestoreSong`
     - `api_internal/api_token_handler.go`: `Generate`, `Delete`
     - `api_internal/auth_handler.go`: `Logout`
+    - `api_internal/profile_handler.go`: `UpdatePrivacy`
   - 他のハンドラ（WorldsendHandler等）は正しく `FromUsecaseError()` を使用しており不整合。
 - **影響範囲**:
   - 404系エラー（楽曲/トークン/ユーザー未発見）が500で返されてしまい、クライアント側の適切なエラーハンドリングが困難。
@@ -264,7 +269,7 @@
 
 ### SEC-05: ログイン失敗時のタイミング攻撃リスク
 - **根拠**:
-  - `internal/usecase/auth_usecase.go` の `Login` メソッドで、ユーザーが存在しない場合はハッシュ比較を行わずに即座にエラーを返す。パスワード不一致の場合はArgon2idハッシュ比較が実行されるため、レスポンス時間に有意な差が生じる。
+  - `internal/usecase/auth_usecase_impl.go` の `Login` メソッドで、ユーザーが存在しない場合はハッシュ比較を行わずに即座にエラーを返す。パスワード不一致の場合はArgon2idハッシュ比較が実行されるため、レスポンス時間に有意な差が生じる。
 - **影響範囲**:
   - 攻撃者がレスポンス時間の差からユーザー名の存在有無を推定できる（ユーザー列挙攻撃）。
 - **修正案**:
@@ -295,7 +300,6 @@
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり。方針を統一すべき。 |
 | **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.26で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
-| **DOM-018** | **Medium** | `repository.errors.go` のエラー定義不足 | `ErrSongNotFound` のみで `ErrUserNotFound` 等はusecase層に定義。リポジトリが適切なドメインエラーを返せず、QUAL-009の根本原因となっている。 |
 | **DOM-021** | **Low** | Deprecated関数が残存 | `rating_service.go` の `CalcBestAverageRating`, `CalcNewAverageRating`, `CalcPlayerRating`。テストでまだ使用中。移行完了後に削除すべき。 |
 | **DOM-010** | **Low** | `WorldsendChart.Validate` が構築済みVOを冗長に再検証 | `notes.NewNotes(int(*w.Notes))` で既に構築済みの `Notes` VOを再バリデーション。VOの不変性を信頼する設計にすべき。 |
 
@@ -345,7 +349,7 @@
 | **HDL-001** | **Medium** | IPスプーフィングリスク | `c.RealIP()` のIP取得方法が未設定。リバースプロキシ構成で `X-Forwarded-For` 偽装によりIPベースレートリミット回避可能。`router.go` で `e.IPExtractor` を適切に設定すべき。 |
 | **HDL-002** | **Medium** | `displayid` パスパラメータの未検証 | GET/DELETE/Restore等のハンドラで `displayid` を検証せずユースケースに渡している。`UpdateSongRequest` では `validate:"required,len=16"` があるのに不整合。ヘルパー関数で統一検証すべき。 |
 | **HDL-003** | **Medium** | `username` パスパラメータの未検証 | 全ハンドラで `username` パスパラメータが無検証。極端に長い文字列や特殊文字がそのままDB検索に到達。 |
-| **HDL-004** | **Medium** | エラーハンドリングが粗い箇所の複数存在 | `DeleteSong`/`RestoreSong`, `APITokenHandler`, `DeleteAccount`, `Logout`, `UpdatePrivacy` でエラーを一律 `ErrInternalError` にしている。`FromUsecaseError()` を使って適切な HTTP ステータスに変換すべき。 |
+| **HDL-004** | **Medium** | エラーハンドリングが粗い箇所の複数存在 | `DeleteSong`/`RestoreSong`, `APITokenHandler`, `Logout`, `UpdatePrivacy` でエラーを一律 `ErrInternalError` にしている。`FromUsecaseError()` を使って適切な HTTP ステータスに変換すべき。 |
 | **HDL-005** | **Low** | ユーザープロファイルエラーハンドリングの3箇所重複 | `api_internal/user_handler`, `api_v1/user_handler`, `chunirec_handler` で同一パターン。共通ヘルパーに抽出すべき。 |
 | **HDL-006** | **Low** | `OrderedChartsMap.MarshalJSON` のロジック重複＋非効率 | `api_internal/song_dto.go` と `api_v1/song_dto.go` でほぼ同一。文字列連結でJSON構築も非効率。共通ヘルパーに抽出し `strings.Builder` を使用すべき。 |
 | **HDL-008** | **Low** | `sanitizeLogValue` 関数の重複 | `middleware/error_handler.go` と `chunirec/error_handler.go` に同一定義。共通ユーティリティに抽出すべき。 |
