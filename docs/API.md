@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年03月25日
+**最終更新日**: 2026年03月26日
 
 ## ベースURLと環境
 
@@ -106,6 +106,7 @@
 | `/internal/me` | DELETE | Cookie | アカウント論理削除。 |
 | `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録。 |
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除。 |
+| `/internal/me/overpower-summary` | GET | Cookie | 自身の OVER POWER 集計を取得。 |
 | `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得。 |
 | `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト。 |
 | `/internal/me/goals` | GET | Cookie | 目標一覧を取得。 |
@@ -390,6 +391,126 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### GET `/internal/me/overpower-summary`
+- **認証**: Cookie 必須
+- **説明**: 認証済みユーザー自身の OVER POWER 集計を返します。未解禁曲は考慮せず、通常楽曲と通常譜面のみを対象に集計します。
+- **リクエストボディ**: なし
+- **集計単位**:
+  - `overall` / `genres`: 楽曲単位。同一楽曲内で現在の単譜面 OVER POWER が最大の1譜面だけを採用
+  - `difficulties` / `levels`: 譜面単位。対象譜面の単譜面 OVER POWER をそのまま合算
+- **レベル別分類**: `floor(const * 2) / 2` で 0.5 刻みに切り下げ、`10` から `15+` までに分類します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "updated_at": "2026-03-25T12:34:56Z",
+  "overall": {
+    "current_op": 12345.67,
+    "max_op": 23456.78,
+    "percent": 52.63,
+    "target_count": 1234,
+    "played_count": 1200
+  },
+  "genres": {
+    "POPS & ANIME": {
+      "current_op": 2345.67,
+      "max_op": 3456.78,
+      "percent": 67.85,
+      "target_count": 210,
+      "played_count": 205
+    },
+    "niconico": {
+      "current_op": 0,
+      "max_op": 0,
+      "percent": 0,
+      "target_count": 0,
+      "played_count": 0
+    }
+  },
+  "difficulties": {
+    "MASTER": {
+      "current_op": 4567.89,
+      "max_op": 5678.9,
+      "percent": 80.43,
+      "target_count": 420,
+      "played_count": 400
+    }
+  },
+  "levels": {
+    "14+": {
+      "current_op": 3456.78,
+      "max_op": 4567.89,
+      "percent": 75.68,
+      "target_count": 180,
+      "played_count": 170
+    }
+  }
+}
+```
+
+#### レスポンススキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string | 集計対象プレイヤーデータの最終更新日時 (ISO8601) |
+| `overall` | object | 全曲集計 |
+| `genres` | object | ジャンル別集計 |
+| `difficulties` | object | 難易度別集計 |
+| `levels` | object | レベル別集計 |
+
+#### 集計項目スキーマ
+
+`overall` と、`genres` / `difficulties` / `levels` の各値は共通で以下の構造です。
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `current_op` | number | 現在の OVER POWER 合計 |
+| `max_op` | number | 理論最大 OVER POWER 合計 |
+| `percent` | number | `current_op / max_op * 100`。`max_op = 0` の場合は `0` |
+| `target_count` | number | 集計対象数。`overall` / `genres` は楽曲数、`difficulties` / `levels` は譜面数 |
+| `played_count` | number | プレイ済み数。`overall` / `genres` は1譜面以上プレイ済みの楽曲数、`difficulties` / `levels` はプレイ済み譜面数 |
+
+#### `genres` のキー
+
+- `POPS & ANIME`
+- `niconico`
+- `東方Project`
+- `VARIETY`
+- `イロドリミドリ`
+- `ゲキマイ`
+- `ORIGINAL`
+
+#### `difficulties` のキー
+
+- `BASIC`
+- `ADVANCED`
+- `EXPERT`
+- `MASTER`
+- `ULTIMA`
+
+#### `levels` のキー
+
+- `10`
+- `10+`
+- `11`
+- `11+`
+- `12`
+- `12+`
+- `13`
+- `13+`
+- `14`
+- `14+`
+- `15`
+- `15+`
+
+対象件数が0のカテゴリもキーは省略されません。
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`player_not_linked`): プレイヤーが紐付いていない
+  - 404 Not Found (`player_not_found`): プレイヤー実体が見つからない
+  - 500 Internal Server Error (`internal_error`): 集計処理またはデータ取得に失敗
 
 ### GET `/internal/me/sessions`
 - **認証**: Cookie 必須
@@ -2430,6 +2551,22 @@ interface SkippedRecord {
   record_type: 'full' | 'worldsend' | 'honor';
   reason: string;
   details: string;
+}
+
+interface OverpowerSummaryItem {
+  current_op: number;
+  max_op: number;
+  percent: number;
+  target_count: number;
+  played_count: number;
+}
+
+interface OverpowerSummaryResponse {
+  updated_at: string;
+  overall: OverpowerSummaryItem;
+  genres: Record<string, OverpowerSummaryItem>;
+  difficulties: Record<string, OverpowerSummaryItem>;
+  levels: Record<string, OverpowerSummaryItem>;
 }
 ```
 

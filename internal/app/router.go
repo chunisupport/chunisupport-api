@@ -72,18 +72,19 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Auth       *api_internal.AuthHandler
-	Recovery   *api_internal.RecoveryHandler
-	Profile    *api_internal.ProfileHandler
-	User       *api_internal.UserHandler
-	AdminUser  *api_internal.AdminUserHandler
-	Song       *api_internal.SongHandler
-	Worldsend  *api_internal.WorldsendHandler
-	APIToken   *api_internal.APITokenHandler
-	Me         *api_internal.MeHandler
-	MasterData *api_internal.MasterDataHandler
-	Session    *api_internal.SessionHandler
-	Goal       *api_internal.GoalHandler
+	Auth             *api_internal.AuthHandler
+	Recovery         *api_internal.RecoveryHandler
+	Profile          *api_internal.ProfileHandler
+	User             *api_internal.UserHandler
+	AdminUser        *api_internal.AdminUserHandler
+	Song             *api_internal.SongHandler
+	Worldsend        *api_internal.WorldsendHandler
+	APIToken         *api_internal.APITokenHandler
+	Me               *api_internal.MeHandler
+	OverpowerSummary *api_internal.OverpowerSummaryHandler
+	MasterData       *api_internal.MasterDataHandler
+	Session          *api_internal.SessionHandler
+	Goal             *api_internal.GoalHandler
 	// 外部API v1 用ハンドラ
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
@@ -163,22 +164,24 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	overpowerSummaryUsecase := usecase.NewOverpowerSummaryUsecase(playerRepo, playerRecordRepo, songRepo, masterCache, db)
 
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
-		Recovery:   api_internal.NewRecoveryHandler(recoveryUsecase),
-		Profile:    api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
-		User:       api_internal.NewUserHandler(userUsecase),
-		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
-		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
-		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
-		Me:         api_internal.NewMeHandler(playerDataUsecase),
-		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
-		Session:    api_internal.NewSessionHandler(sessionUsecase),
-		Goal:       api_internal.NewGoalHandler(goalUsecase),
+		Auth:             api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
+		Recovery:         api_internal.NewRecoveryHandler(recoveryUsecase),
+		Profile:          api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
+		User:             api_internal.NewUserHandler(userUsecase),
+		AdminUser:        api_internal.NewAdminUserHandler(userUsecase),
+		Song:             api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Worldsend:        api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
+		APIToken:         api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:               api_internal.NewMeHandler(playerDataUsecase),
+		OverpowerSummary: api_internal.NewOverpowerSummaryHandler(overpowerSummaryUsecase),
+		MasterData:       api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
+		Session:          api_internal.NewSessionHandler(sessionUsecase),
+		Goal:             api_internal.NewGoalHandler(goalUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -257,6 +260,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
+		meGroup.GET("/overpower-summary", handlers.OverpowerSummary.Get)
 		// セッション管理
 		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
 		meGroup.DELETE("/sessions", handlers.Session.LogoutOtherSessions)
