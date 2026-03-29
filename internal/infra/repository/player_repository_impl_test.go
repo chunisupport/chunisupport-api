@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -59,6 +60,34 @@ func (e *noRowsWrappedExecutor) GetContext(ctx context.Context, dest any, query 
 
 var _ domainrepo.Executor = (*noRowsWrappedExecutor)(nil)
 
+type rowsAffectedResult struct {
+	lastInsertID int64
+	rowsAffected int64
+}
+
+func (r rowsAffectedResult) LastInsertId() (int64, error) {
+	return r.lastInsertID, nil
+}
+
+func (r rowsAffectedResult) RowsAffected() (int64, error) {
+	return r.rowsAffected, nil
+}
+
+type execResultExecutor struct {
+	baseExecutor
+	result sql.Result
+	err    error
+}
+
+func (e *execResultExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if e.err != nil {
+		return nil, e.err
+	}
+	return e.result, nil
+}
+
+var _ domainrepo.Executor = (*execResultExecutor)(nil)
+
 func TestFindByUserID_ReturnsNilWhenWrappedNoRows(t *testing.T) {
 	repo := &playerRepository{}
 	exec := &noRowsWrappedExecutor{}
@@ -66,6 +95,76 @@ func TestFindByUserID_ReturnsNilWhenWrappedNoRows(t *testing.T) {
 	player, err := repo.FindByUserID(context.Background(), exec, 10)
 	require.NoError(t, err)
 	require.Nil(t, player)
+}
+
+func TestFindByID_ReturnsErrPlayerNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &playerRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	player, err := repo.FindByID(context.Background(), exec, 10)
+	require.ErrorIs(t, err, domainrepo.ErrPlayerNotFound)
+	require.Nil(t, player)
+}
+
+func TestSessionFindByID_ReturnsErrSessionNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &sessionRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	session, err := repo.FindByID(context.Background(), exec, "550e8400-e29b-41d4-a716-446655440000")
+	require.ErrorIs(t, err, domainrepo.ErrSessionNotFound)
+	require.Nil(t, session)
+}
+
+func TestRecoveryCodeFindByHash_ReturnsErrRecoveryCodeNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &recoveryCodeRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	code, err := repo.FindByHash(context.Background(), exec, []byte("hash"))
+	require.ErrorIs(t, err, domainrepo.ErrRecoveryCodeNotFound)
+	require.Nil(t, code)
+}
+
+func TestRecoveryCodeFindByHashForUpdate_ReturnsErrRecoveryCodeNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &recoveryCodeRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	code, err := repo.FindByHashForUpdate(context.Background(), exec, []byte("hash"))
+	require.ErrorIs(t, err, domainrepo.ErrRecoveryCodeNotFound)
+	require.Nil(t, code)
+}
+
+func TestAPITokenFindByHashedToken_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &apiTokenRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	token, err := repo.FindByHashedToken(context.Background(), exec, "hashed-token")
+	require.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
+	require.Nil(t, token)
+}
+
+func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &goalRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	goal, err := repo.FindByIDAndUserID(context.Background(), exec, 1, 1)
+	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
+	require.Nil(t, goal)
+}
+
+func TestGoalUpdate_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
+	repo := &goalRepository{}
+	exec := &execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+
+	err := repo.Update(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
+	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
+}
+
+func TestGoalDelete_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
+	repo := &goalRepository{}
+	exec := &execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+
+	err := repo.DeleteByIDAndUserID(context.Background(), exec, 1, 1)
+	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
 }
 
 func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
@@ -196,6 +295,6 @@ func TestFindByIDWithHonors_ReturnsNoRowsWhenPlayerMissing(t *testing.T) {
 	repo := &playerRepository{}
 
 	result, err := repo.FindByIDWithHonors(context.Background(), db, 999)
-	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.ErrorIs(t, err, domainrepo.ErrPlayerNotFound)
 	require.Nil(t, result)
 }

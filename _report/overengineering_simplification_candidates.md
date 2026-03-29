@@ -9,24 +9,22 @@
 
 ## 結論
 
-現時点で優先して整理したい候補は次の2件です。
+現時点で優先して整理したい候補は次の1件です。
 
-1. Usecase 層での `sql.ErrNoRows` 判定の削減
-2. `Executor` 抽象の整理
+1. `Executor` 抽象の整理
 
-まずは 1 を先に進め、その後に 2 を検討するのが安全です。
+Usecase 層での `sql.ErrNoRows` 直接判定は解消済みです。
 `Executor` は価値のある見直し候補ですが、影響範囲が広く、先に周辺の責務整理を進めた方が差分を抑えられます。
 
 ## 要約表
 
 | 優先順位 | 候補 | 現状の問題 | 効果 | 影響範囲 | 着手しやすさ |
 |---|---|---|---|---|---|
-| 1 | `sql.ErrNoRows` 判定削減 | Usecase が infra 由来エラーを知っている | 中 | 中 | 中 |
-| 2 | `Executor` 整理 | 抽象の割に `sqlx` 依存を隠し切れていない | 高い | 大きい | 低い |
+| 1 | `Executor` 整理 | 抽象の割に `sqlx` 依存を隠し切れていない | 高い | 大きい | 低い |
 
 ---
 
-## 優先度1: Usecase 層での `sql.ErrNoRows` 判定の削減
+## 解決済み: Usecase 層での `sql.ErrNoRows` 判定の削減
 
 ### 対象
 
@@ -39,31 +37,31 @@
 
 ### 現状
 
-Usecase 層で `errors.Is(err, sql.ErrNoRows)` を直接判定している箇所がまだ複数残っています。
-一方で一部の Repository 実装では `repository.ErrUserNotFound` などへの変換が始まっており、方針が混在しています。
+Repository 実装で not found 系エラーへ変換し、Usecase 層から `errors.Is(err, sql.ErrNoRows)` の直接判定を除去しました。
+Usecase は `repository.ErrUserNotFound` などの repository エラーのみを扱う構成に統一しています。
 
 ### 過剰実装と判断した理由
 
-- Usecase が infra 由来のエラー知識を持っている
-- Repository 境界で吸収すべき責務が Usecase へ漏れている
-- 一部だけ変換済みのため、読み手がどこで何を判定すべきか迷いやすい
+- Usecase が infra 由来のエラー知識を持たなくなった
+- Repository 境界で吸収すべき責務を明確化できた
+- not found 判定の置き場所が統一された
 
 ### 推奨方針
 
-- not found 系は Repository 実装で domain / repository エラーへ変換する
+- not found 系は Repository 実装で repository エラーへ変換済み
 - Usecase は repository 層で定義されたエラーのみを扱う
-- テストも `sql.ErrNoRows` 前提から repository エラー前提へ寄せる
+- テストも repository エラー前提へ寄せた
 
 ### 期待効果
 
-- エラー責務が整理される
-- Usecase 実装が読みやすくなる
-- DB 実装の詳細が上位層に漏れにくくなる
+- エラー責務が整理された
+- Usecase 実装が読みやすくなった
+- DB 実装の詳細が上位層に漏れにくくなった
 
 ### 注意点
 
-- 1件ごとの差分は小さいが、横断的に揃えないと中途半端になりやすい
-- `ErrUserNotFound` 以外の not found 系エラーの置き場所を先に決めた方がよい
+- `FindByUserID` のように「見つからない場合は `nil, nil`」を契約にしている箇所はそのまま維持する
+- 今後も not found をエラーで返す Repository は repository エラーへ変換する
 
 ### 完了条件
 
@@ -73,7 +71,7 @@ Usecase 層で `errors.Is(err, sql.ErrNoRows)` を直接判定している箇所
 
 ---
 
-## 優先度2: `Executor` 抽象の整理
+## 優先度1: `Executor` 抽象の整理
 
 ### 対象
 
@@ -140,13 +138,8 @@ Usecase 層で `errors.Is(err, sql.ErrNoRows)` を直接判定している箇所
 
 ### フェーズ1
 
-`sql.ErrNoRows` の扱いを Repository 側へ寄せます。
-Usecase の見通しがよくなり、局所的な差分で進めやすい候補です。
-
-### フェーズ2
-
 最後に `Executor` を整理します。
-ここは横断的な変更なので、周辺責務を先に整えてから着手する方が安全です。
+ここは横断的な変更なので、周辺責務を先に整えた現状から着手する方が安全です。
 
 ---
 

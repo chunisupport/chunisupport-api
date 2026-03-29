@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -67,6 +69,9 @@ func (r *recoveryCodeRepository) FindByHash(ctx context.Context, exec repository
 	var model models.RecoveryCodeModel
 	query := `SELECT id, user_id, code_hash, created_at FROM user_recovery_codes WHERE code_hash = ?`
 	if err := exec.GetContext(ctx, &model, query, codeHash); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrRecoveryCodeNotFound, err)
+		}
 		return nil, err
 	}
 	return model.ToEntity(), nil
@@ -77,6 +82,9 @@ func (r *recoveryCodeRepository) FindByHashForUpdate(ctx context.Context, exec r
 	var model models.RecoveryCodeModel
 	query := `SELECT id, user_id, code_hash, created_at FROM user_recovery_codes WHERE code_hash = ? FOR UPDATE`
 	if err := exec.GetContext(ctx, &model, query, codeHash); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrRecoveryCodeNotFound, err)
+		}
 		return nil, err
 	}
 	return model.ToEntity(), nil

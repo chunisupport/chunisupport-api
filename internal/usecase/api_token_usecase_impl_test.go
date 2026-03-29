@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 
@@ -33,10 +32,10 @@ func (s *stubAPITokenRepository) FindByHashedToken(ctx context.Context, exec rep
 		return nil, s.lookupErr
 	}
 	if s.lookupToken == nil {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrAPITokenNotFound
 	}
 	if s.lookupToken.HashedToken != hashedToken {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrAPITokenNotFound
 	}
 	tokenCopy := *s.lookupToken
 	return &tokenCopy, nil
@@ -60,7 +59,7 @@ func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.
 		return nil, s.findErr
 	}
 	if s.user == nil {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrUserNotFound
 	}
 	userCopy := *s.user
 	return &userCopy, nil

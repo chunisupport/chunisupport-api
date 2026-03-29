@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -64,7 +63,7 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 	hashed := hashToken(rawToken)
 	token, err := us.tokenRepo.FindByHashedToken(ctx, us.db, hashed)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrAPITokenNotFound) {
 			return nil, nil, ErrInvalidAPIToken
 		}
 		return nil, nil, err
@@ -72,7 +71,7 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 
 	user, err := us.userRepo.FindByID(ctx, us.db, token.UserID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, nil, ErrInvalidAPIToken
 		}
 		return nil, nil, err

@@ -2,12 +2,12 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -51,7 +51,7 @@ func TestRecoveryUsecase_IssueRecoveryCodes(t *testing.T) {
 		tm := &mockTransactionManager{}
 		recoveryUsecase := newTestRecoveryUsecase(tm, mockUserRepo, mockRecoveryRepo, "test-pepper")
 
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, sql.ErrNoRows).Once()
+		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, repository.ErrUserNotFound).Once()
 
 		_, err := recoveryUsecase.IssueRecoveryCodes(context.Background(), 1)
 		assert.ErrorIs(t, err, ErrUserNotFound)
@@ -113,7 +113,7 @@ func TestRecoveryUsecase_RecoverWithRecoveryCode(t *testing.T) {
 			name:        "RecoverWithRecoveryCode_異常系_リカバリーコードが見つからない",
 			newPassword: "new-password",
 			setupMock: func(userRepo *MockUserRepository, recoveryRepo *MockRecoveryCodeRepository) {
-				recoveryRepo.On("FindByHashForUpdate", mock.Anything, mock.Anything, hash).Return(nil, sql.ErrNoRows).Once()
+				recoveryRepo.On("FindByHashForUpdate", mock.Anything, mock.Anything, hash).Return(nil, repository.ErrRecoveryCodeNotFound).Once()
 			},
 			wantErr: ErrInvalidRecoveryCredentials,
 		},
@@ -122,7 +122,7 @@ func TestRecoveryUsecase_RecoverWithRecoveryCode(t *testing.T) {
 			newPassword: "new-password",
 			setupMock: func(userRepo *MockUserRepository, recoveryRepo *MockRecoveryCodeRepository) {
 				recoveryRepo.On("FindByHashForUpdate", mock.Anything, mock.Anything, hash).Return(newTestCode(), nil).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, sql.ErrNoRows).Once()
+				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, repository.ErrUserNotFound).Once()
 			},
 			wantErr: ErrInvalidRecoveryCredentials,
 		},

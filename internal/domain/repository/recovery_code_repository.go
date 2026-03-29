@@ -14,8 +14,8 @@ type RecoveryCodeRepository interface {
 	DeleteByUserID(ctx context.Context, exec Executor, userID int) error
 	// DeleteByID はリカバリーコードを削除します。
 	DeleteByID(ctx context.Context, exec Executor, id uint32) error
-	// FindByHash はハッシュでリカバリーコードを検索します。
+	// FindByHash はハッシュでリカバリーコードを検索します。対象が存在しない場合は ErrRecoveryCodeNotFound を返します。
 	FindByHash(ctx context.Context, exec Executor, codeHash []byte) (*entity.RecoveryCode, error)
-	// FindByHashForUpdate はハッシュでリカバリーコードを検索し、ロックします。
+	// FindByHashForUpdate はハッシュでリカバリーコードを検索し、ロックします。対象が存在しない場合は ErrRecoveryCodeNotFound を返します。
 	FindByHashForUpdate(ctx context.Context, exec Executor, codeHash []byte) (*entity.RecoveryCode, error)
 }

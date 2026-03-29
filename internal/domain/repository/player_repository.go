@@ -21,9 +21,9 @@ type PlayerWithHonors struct {
 
 // PlayerRepository はプレイヤーに関する永続化を扱うリポジトリです。
 type PlayerRepository interface {
-	// FindByID はIDでプレイヤーを検索します。
+	// FindByID はIDでプレイヤーを検索します。対象が存在しない場合は ErrPlayerNotFound を返します。
 	FindByID(ctx context.Context, exec Executor, id int) (*entity.Player, error)
-	// FindByIDWithHonors はIDでプレイヤーと称号情報をまとめて検索します。
+	// FindByIDWithHonors はIDでプレイヤーと称号情報をまとめて検索します。対象が存在しない場合は ErrPlayerNotFound を返します。
 	FindByIDWithHonors(ctx context.Context, exec Executor, id int) (*PlayerWithHonors, error)
 	// FindByUserID はユーザーIDでプレイヤーを検索します。見つからない場合は(nil, nil)を返します。
 	FindByUserID(ctx context.Context, exec Executor, userID int) (*entity.Player, error)

@@ -10,9 +10,12 @@ import (
 // GoalRepository は目標の永続化を扱います。
 type GoalRepository interface {
 	ListByUserID(ctx context.Context, exec Executor, userID int) ([]*entity.Goal, error)
+	// FindByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	FindByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) (*entity.Goal, error)
 	Create(ctx context.Context, exec Executor, goal *entity.Goal) error
+	// Update は対象が存在しない場合に ErrGoalNotFound を返します。
 	Update(ctx context.Context, exec Executor, goal *entity.Goal) error
+	// DeleteByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	DeleteByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) error
 	CountByUserID(ctx context.Context, exec Executor, userID int) (int, error)
 	LockUserByID(ctx context.Context, exec Executor, userID int) error
