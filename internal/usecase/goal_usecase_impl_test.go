@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executo
 }
 func (s *stubGoalRepo) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
 	if s.goal == nil || s.goal.ID != id {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrGoalNotFound
 	}
 	return s.goal, nil
 }
@@ -45,7 +44,7 @@ func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goa
 }
 func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
 	if s.goal == nil || s.goal.ID != id {
-		return sql.ErrNoRows
+		return repository.ErrGoalNotFound
 	}
 	s.goal = nil
 	return nil
@@ -158,7 +157,7 @@ func TestGoalUsecase_DeleteNotFound(t *testing.T) {
 }
 
 func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
-	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}, updateErr: sql.ErrNoRows}
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}, updateErr: repository.ErrGoalNotFound}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	_, err := u.Update(context.Background(), 1, 1, &GoalInput{
 		Title:             "updated",

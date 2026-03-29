@@ -35,6 +35,9 @@ func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executo
 	`
 	var playerModel models.PlayerModel
 	if err := exec.GetContext(ctx, &playerModel, query, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrPlayerNotFound, err)
+		}
 		return nil, err
 	}
 	return playerModel.ToEntity()
@@ -109,7 +112,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 	}
 
 	if result == nil {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrPlayerNotFound
 	}
 
 	return result, nil

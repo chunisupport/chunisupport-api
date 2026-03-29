@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -43,6 +45,9 @@ func (r *apiTokenRepository) FindByHashedToken(ctx context.Context, exec reposit
 	var tokenModel models.APITokenModel
 	query := `SELECT id, user_id, hashed_token, created_at FROM api_tokens WHERE hashed_token = ?`
 	if err := exec.GetContext(ctx, &tokenModel, query, hashedToken); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrAPITokenNotFound, err)
+		}
 		return nil, err
 	}
 	return tokenModel.ToEntity(), nil

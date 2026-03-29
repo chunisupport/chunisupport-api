@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"time"
@@ -200,7 +199,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 	// 1. ユーザーを取得
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		slog.Error("failed to find user by username", "username", username, "error", err)
@@ -234,7 +233,7 @@ func (s *userUsecase) RestoreUser(ctx context.Context, requester *entity.User, u
 	// 1. ユーザーを取得
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		slog.Error("failed to find user by username", "username", username, "error", err)
@@ -474,7 +473,7 @@ func initializeRatingSlotMap() map[string][]*dto.PlayerRecordDTO {
 func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, requester *entity.User) (*entity.User, *dto.PlayerDTO, error) {
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, nil, ErrUserNotFound
 		}
 		slog.Error("failed to find user by username", "username", username, "error", err)
@@ -495,7 +494,7 @@ func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, req
 
 	playerWithHonors, err := s.playerRepo.FindByIDWithHonors(ctx, s.db, *user.PlayerID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrPlayerNotFound) {
 			return nil, nil, ErrPlayerNotLinked
 		}
 		if errors.Is(err, context.Canceled) {

@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -212,7 +211,7 @@ func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec rep
 }
 
 func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{err: sql.ErrNoRows}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil, false)
 	require.ErrorIs(t, err, ErrUserNotFound)
@@ -254,7 +253,7 @@ func TestUserService_GetUserProfileWithRecords_PlayerRepositoryNoRows(t *testing
 		Username: un,
 		PlayerID: intPointer(1),
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: sql.ErrNoRows}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
 	require.ErrorIs(t, err, ErrPlayerNotLinked)
@@ -724,7 +723,7 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{err: sql.ErrNoRows}
+	repo := &stubUserRepository{err: repository.ErrUserNotFound}
 	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "missing")
@@ -790,7 +789,7 @@ func TestUserService_RestoreUser_Success(t *testing.T) {
 
 func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{err: sql.ErrNoRows}
+	repo := &stubUserRepository{err: repository.ErrUserNotFound}
 	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	err := service.RestoreUser(context.Background(), adminRequester, "missing")
