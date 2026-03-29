@@ -23,6 +23,10 @@ func (s *stubPlayerRepositoryForPlayerData) FindByID(ctx context.Context, exec r
 	return nil, nil
 }
 
+func (s *stubPlayerRepositoryForPlayerData) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
+	return nil, nil
+}
+
 func (s *stubPlayerRepositoryForPlayerData) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
 	return s.foundPlayer, nil
 }

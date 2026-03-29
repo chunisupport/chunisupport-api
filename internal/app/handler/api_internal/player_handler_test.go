@@ -33,14 +33,6 @@ func (m *mockPlayerService) CreatePlayer(ctx context.Context, userID int, name s
 	return args.Get(0).(*dto.PlayerDTO), args.Error(1)
 }
 
-func (m *mockPlayerService) GetPlayerByID(ctx context.Context, id int) (*dto.PlayerDTO, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*dto.PlayerDTO), args.Error(1)
-}
-
 func TestPlayerHandler_CreatePlayer(t *testing.T) {
 	// Setup
 	e := echo.New()
