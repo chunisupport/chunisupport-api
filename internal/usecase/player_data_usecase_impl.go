@@ -17,6 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
@@ -783,11 +784,15 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 }
 
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
-	score, err := domain.NewScore(scoreValue)
+	if scoreValue < 0 {
+		return 0, false
+	}
+
+	score, err := score.NewScore(uint32(scoreValue))
 	if err != nil {
 		return 0, false
 	}
-	return uint32(score.Value()), true
+	return uint32(score), true
 }
 
 func roundFloat(value float64, scale int) float64 {
