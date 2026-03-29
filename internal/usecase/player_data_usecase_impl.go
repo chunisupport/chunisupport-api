@@ -546,6 +546,16 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
+		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
+				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
+			})
+			continue
+		}
+
 		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
 		if err != nil {
 			counts.FullRecordsSkipped++
@@ -727,7 +737,12 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 			continue
 		}
 
-		overpower := service.CalcSingleOverpower(uint32(record.State.Score), float64(chart.Const), record.State.ComboLampID)
+		scoreValue, ok := validatedScoreUint32(record.State.Score)
+		if !ok {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(scoreValue, float64(chart.Const), record.State.ComboLampID)
 		best, exists := bestBySongID[chart.SongID]
 		if !exists || overpower > best.overpower {
 			bestBySongID[chart.SongID] = songBestRecord{
@@ -765,6 +780,14 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 		Value:   &value,
 		Percent: &percent,
 	}
+}
+
+func validatedScoreUint32(scoreValue int) (uint32, bool) {
+	if scoreValue < minScoreValue || scoreValue > maxScoreValue {
+		return 0, false
+	}
+
+	return uint32(scoreValue), true
 }
 
 func roundFloat(value float64, scale int) float64 {
