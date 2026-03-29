@@ -263,6 +263,31 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 			wantValue:   0,
 			wantPercent: 0,
 		},
+		{
+			name: "範囲外スコアのレコードは集計から除外する",
+			fullRecords: []repository.PlayerRecordForUpsert{
+				{
+					ChartID: 1,
+					State: repository.PlayerRecordState{
+						Score:       -1,
+						ComboLampID: 3,
+					},
+				},
+				{
+					ChartID: 2,
+					State: repository.PlayerRecordState{
+						Score:       1010001,
+						ComboLampID: 3,
+					},
+				},
+			},
+			chartsByID: map[int]entity.PlayerDataChart{
+				1: {ID: 1, SongID: 1, Const: 15.0},
+				2: {ID: 2, SongID: 2, Const: 14.5},
+			},
+			wantValue:   0,
+			wantPercent: 0,
+		},
 	}
 
 	for _, tt := range tests {

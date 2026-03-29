@@ -14,10 +14,17 @@ type PlayerHonor struct {
 	ImageURL *string // 称号画像URL
 }
 
+type PlayerWithHonors struct {
+	Player *entity.Player
+	Honors []*PlayerHonor
+}
+
 // PlayerRepository はプレイヤーに関する永続化を扱うリポジトリです。
 type PlayerRepository interface {
 	// FindByID はIDでプレイヤーを検索します。
 	FindByID(ctx context.Context, exec Executor, id int) (*entity.Player, error)
+	// FindByIDWithHonors はIDでプレイヤーと称号情報をまとめて検索します。
+	FindByIDWithHonors(ctx context.Context, exec Executor, id int) (*PlayerWithHonors, error)
 	// FindByUserID はユーザーIDでプレイヤーを検索します。見つからない場合は(nil, nil)を返します。
 	FindByUserID(ctx context.Context, exec Executor, userID int) (*entity.Player, error)
 	// FindHonorsByPlayerID はプレイヤーIDで称号情報を取得します。スロット順（1,2,3）でソートされます。

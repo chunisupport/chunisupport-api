@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 func TestUserService_GetUserUpdatedAt_Success(t *testing.T) {
@@ -19,12 +20,13 @@ func TestUserService_GetUserUpdatedAt_Success(t *testing.T) {
 		Username: un,
 		PlayerID: intPointer(1),
 	}
-	player := &dto.PlayerDTO{
-		Name:      "TestPlayer",
+	player := &entity.Player{
+		ID:        1,
+		Name:      playername.MustNewPlayerName("テストプレイヤー"),
 		Level:     10,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{player: player}, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
 	if err != nil {
@@ -44,12 +46,13 @@ func TestUserService_GetUserUpdatedAt_PrivateUserBlocked(t *testing.T) {
 		PlayerID:  intPointer(1),
 		IsPrivate: true,
 	}
-	player := &dto.PlayerDTO{
-		Name:      "PrivatePlayer",
+	player := &entity.Player{
+		ID:        1,
+		Name:      playername.MustNewPlayerName("プライベ"),
 		Level:     1,
 		UpdatedAt: time.Now(),
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, nil, &stubPlayerService{player: player}, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserUpdatedAt(context.Background(), "privateuser", nil)
 	if !errors.Is(err, ErrUserPrivate) {

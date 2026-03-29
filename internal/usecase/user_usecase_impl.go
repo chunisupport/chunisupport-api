@@ -19,13 +19,13 @@ import (
 type userUsecase struct {
 	db                  repository.Executor
 	userRepo            repository.UserRepository
+	playerRepo          repository.PlayerRepository
 	playerRecordRepo    repository.PlayerRecordRepository
 	worldsendRecordRepo repository.WorldsendRecordRepository
 	songRepo            repository.SongRepository
 	worldsendChartRepo  repository.WorldsendChartRepository
 	recordCompletionSvc *service.RecordCompletionService
 	songMasterProvider  repository.SongMasterProvider
-	playerUsecase       PlayerUsecase
 }
 
 type userProfilePlayerRecords struct {
@@ -35,26 +35,23 @@ type userProfilePlayerRecords struct {
 }
 
 // NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, playerUsecase PlayerUsecase, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
+func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
+		playerRepo:          playerRepo,
 		playerRecordRepo:    playerRecordRepo,
 		worldsendRecordRepo: worldsendRecordRepo,
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		songMasterProvider:  songMasterProvider,
-		playerUsecase:       playerUsecase,
 	}
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 // 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
 // プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
-//
-// TODO: 最適化の余地あり - 現在はユーザー→プレイヤー→称号→レコードで4回クエリを発行している。
-// PlayerRepository.FindByIDWithHonors() のようなJOINクエリを作成して3回に削減できる可能性がある。
 func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {
 	user, player, err := s.getUserAndPlayer(ctx, username, requester)
 	if err != nil {
@@ -440,6 +437,21 @@ func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecord
 	return playerRecordsUpdatedAt
 }
 
+func buildPlayerDTO(playerWithHonors *repository.PlayerWithHonors) *dto.PlayerDTO {
+	playerDTO := dto.ToPlayerDTO(playerWithHonors.Player)
+	honors := make([]*dto.HonorDTO, len(playerWithHonors.Honors))
+	for i, honor := range playerWithHonors.Honors {
+		honors[i] = &dto.HonorDTO{
+			Slot:     honor.Slot,
+			Name:     honor.Name,
+			TypeName: honor.TypeName,
+			ImageURL: honor.ImageURL,
+		}
+	}
+	playerDTO.Honors = honors
+	return playerDTO
+}
+
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
 func initializeSlotMap() map[string][]*dto.PlayerRecordDTO {
 	slots := []string{"best", "best_candidate", "new", "new_candidate"}
@@ -481,7 +493,7 @@ func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, req
 		return nil, nil, ErrPlayerNotLinked
 	}
 
-	player, err := s.playerUsecase.GetPlayerByID(ctx, *user.PlayerID)
+	playerWithHonors, err := s.playerRepo.FindByIDWithHonors(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, ErrPlayerNotLinked
@@ -494,5 +506,5 @@ func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, req
 		return nil, nil, err
 	}
 
-	return user, player, nil
+	return user, buildPlayerDTO(playerWithHonors), nil
 }

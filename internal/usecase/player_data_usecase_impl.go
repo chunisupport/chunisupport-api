@@ -17,6 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
@@ -546,6 +547,16 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
+		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
+				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
+			})
+			continue
+		}
+
 		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
 		if err != nil {
 			counts.FullRecordsSkipped++
@@ -727,7 +738,12 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 			continue
 		}
 
-		overpower := service.CalcSingleOverpower(uint32(record.State.Score), float64(chart.Const), record.State.ComboLampID)
+		scoreValue, ok := validatedScoreUint32(record.State.Score)
+		if !ok {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(scoreValue, float64(chart.Const), record.State.ComboLampID)
 		best, exists := bestBySongID[chart.SongID]
 		if !exists || overpower > best.overpower {
 			bestBySongID[chart.SongID] = songBestRecord{
@@ -765,6 +781,18 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 		Value:   &value,
 		Percent: &percent,
 	}
+}
+
+func validatedScoreUint32(scoreValue int) (uint32, bool) {
+	if scoreValue < 0 || uint64(scoreValue) > math.MaxUint32 {
+		return 0, false
+	}
+
+	score, err := score.NewScore(uint32(scoreValue))
+	if err != nil {
+		return 0, false
+	}
+	return uint32(score), true
 }
 
 func roundFloat(value float64, scale int) float64 {
