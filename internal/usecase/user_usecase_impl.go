@@ -439,14 +439,16 @@ func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecord
 
 func buildPlayerDTO(playerWithHonors *repository.PlayerWithHonors) *dto.PlayerDTO {
 	playerDTO := dto.ToPlayerDTO(playerWithHonors.Player)
-	for _, honor := range playerWithHonors.Honors {
-		playerDTO.Honors = append(playerDTO.Honors, &dto.HonorDTO{
+	honors := make([]*dto.HonorDTO, len(playerWithHonors.Honors))
+	for i, honor := range playerWithHonors.Honors {
+		honors[i] = &dto.HonorDTO{
 			Slot:     honor.Slot,
 			Name:     honor.Name,
 			TypeName: honor.TypeName,
 			ImageURL: honor.ImageURL,
-		})
+		}
 	}
+	playerDTO.Honors = honors
 	return playerDTO
 }
 
