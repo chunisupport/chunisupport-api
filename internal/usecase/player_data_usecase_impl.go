@@ -784,7 +784,7 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 }
 
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
-	if scoreValue < 0 {
+	if scoreValue < 0 || uint64(scoreValue) > math.MaxUint32 {
 		return 0, false
 	}
 
