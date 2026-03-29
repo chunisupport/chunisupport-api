@@ -783,11 +783,11 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 }
 
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
-	if scoreValue < minScoreValue || scoreValue > maxScoreValue {
+	score, err := domain.NewScore(scoreValue)
+	if err != nil {
 		return 0, false
 	}
-
-	return uint32(scoreValue), true
+	return uint32(score.Value()), true
 }
 
 func roundFloat(value float64, scale int) float64 {
