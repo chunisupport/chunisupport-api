@@ -37,7 +37,7 @@ func FromUsecaseError(err error) *APIError {
 	case errors.Is(err, usecase.ErrUserPrivate):
 		return ErrUserNotFound.WithInternal(err) // 403 → 404 でユーザー存在を隠蔽
 	case errors.Is(err, usecase.ErrPlayerNotLinked):
-		return ErrUserNotFound.WithInternal(err) // プレイヤー未紐付も404で隠蔽
+		return ErrPlayerNotLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrPlayerNotFound):
 		return ErrPlayerNotFound.WithInternal(err) // players実体欠損（データ不整合）
 	case errors.Is(err, usecase.ErrUserAlreadyDeleted):
