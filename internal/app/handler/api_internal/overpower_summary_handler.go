@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -27,6 +28,9 @@ func (h *OverpowerSummaryHandler) Get(c echo.Context) error {
 
 	resp, err := h.overpowerSummaryUsecase.Get(c.Request().Context(), user)
 	if err != nil {
+		if errors.Is(err, usecase.ErrPlayerNotLinked) {
+			return apierror.ErrPlayerNotLinked.WithInternal(err)
+		}
 		return apierror.FromUsecaseError(err)
 	}
 

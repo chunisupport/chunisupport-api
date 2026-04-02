@@ -97,7 +97,8 @@ func TestOverpowerSummaryHandlerGet(t *testing.T) {
 
 		var apiErr *apierror.APIError
 		if assert.ErrorAs(t, err, &apiErr) {
-			assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
+			assert.Equal(t, apierror.CodePlayerNotLinked, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 		}
 		mockUsecase.AssertExpectations(t)
 	})
