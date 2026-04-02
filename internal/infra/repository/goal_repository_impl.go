@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -39,6 +40,9 @@ func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.
 	var m models.GoalModel
 	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, created_at FROM goals WHERE id = ? AND user_id = ?`
 	if err := exec.GetContext(ctx, &m, query, id, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrGoalNotFound, err)
+		}
 		return nil, err
 	}
 	return m.ToEntity(), nil
@@ -72,7 +76,7 @@ func (r *goalRepository) Update(ctx context.Context, exec repository.Executor, g
 		return err
 	}
 	if affected == 0 {
-		return sql.ErrNoRows
+		return repository.ErrGoalNotFound
 	}
 	return nil
 }
@@ -88,7 +92,7 @@ func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repositor
 		return err
 	}
 	if affected == 0 {
-		return sql.ErrNoRows
+		return repository.ErrGoalNotFound
 	}
 	return nil
 }

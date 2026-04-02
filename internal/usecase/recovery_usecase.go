@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
@@ -37,7 +36,7 @@ func NewRecoveryUsecase(db repository.Executor, tm TransactionManager, userRepo 
 
 func (s *recoveryUsecaseImpl) IssueRecoveryCodes(ctx context.Context, userID int) ([]string, error) {
 	if _, err := s.userRepo.FindByID(ctx, s.db, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -86,14 +85,14 @@ func (s *recoveryUsecaseImpl) RecoverWithRecoveryCode(ctx context.Context, recov
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		code, err := s.recoveryCodeRepo.FindByHashForUpdate(ctx, tx, hashBytes)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, repository.ErrRecoveryCodeNotFound) {
 				return ErrInvalidRecoveryCredentials
 			}
 			return err
 		}
 		user, err := s.userRepo.FindByID(ctx, tx, code.UserID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, repository.ErrUserNotFound) {
 				return ErrInvalidRecoveryCredentials
 			}
 			return err

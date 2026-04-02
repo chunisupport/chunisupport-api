@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -97,7 +96,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 	}
 	goal, err := u.goalRepo.FindByIDAndUserID(ctx, u.db, id, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrGoalNotFound) {
 			return nil, ErrGoalNotFound
 		}
 		return nil, err
@@ -108,7 +107,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 	goal.Attributes = validated.Attributes
 	goal.Invert = validated.Invert
 	if err := u.goalRepo.Update(ctx, u.db, goal); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrGoalNotFound) {
 			return nil, ErrGoalNotFound
 		}
 		return nil, err
@@ -122,7 +121,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 
 func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
 	err := u.goalRepo.DeleteByIDAndUserID(ctx, u.db, id, userID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, repository.ErrGoalNotFound) {
 		return ErrGoalNotFound
 	}
 	return err

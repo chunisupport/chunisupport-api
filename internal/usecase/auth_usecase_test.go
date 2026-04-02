@@ -2,11 +2,11 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -22,7 +22,7 @@ func TestAuthUsecase_Register(t *testing.T) {
 	authUsecase := newTestAuthUsecase(mockUserRepo, mockSessionRepo, "test-pepper")
 
 	t.Run("Register_正常系_ユーザー登録が成功する", func(t *testing.T) {
-		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, sql.ErrNoRows).Once()
+		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, repository.ErrUserNotFound).Once()
 		mockUserRepo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
 		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
@@ -126,7 +126,7 @@ func TestAuthUsecase_Authenticate(t *testing.T) {
 		mockSessionRepo := new(MockSessionRepository)
 		authUsecase := newTestAuthUsecase(mockUserRepo, mockSessionRepo, "test-pepper")
 
-		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, "invalidsession").Return(nil, sql.ErrNoRows).Once()
+		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, "invalidsession").Return(nil, repository.ErrSessionNotFound).Once()
 
 		_, err := authUsecase.Authenticate(context.Background(), mockUser.ID, "invalidsession")
 		assert.ErrorIs(t, err, ErrInvalidSession)

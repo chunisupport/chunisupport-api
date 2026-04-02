@@ -2,13 +2,13 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/auth"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -27,7 +27,7 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 
 	if _, err := s.userRepo.FindByUsername(ctx, s.db, usernameStr); err == nil {
 		return nil, "", ErrUsernameTaken
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(err, repository.ErrUserNotFound) {
 		slog.Error("failed to find user by username", "username", usernameStr, "error", err)
 		return nil, "", err
 	}
@@ -64,7 +64,7 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 func (s *authUsecaseImpl) Login(ctx context.Context, usernameStr, password string) (string, error) {
 	user, err := s.userRepo.FindByUsername(ctx, s.db, usernameStr)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return "", ErrInvalidCredentials
 		}
 		slog.Error("failed to find user by username", "username", usernameStr, "error", err)
@@ -110,7 +110,7 @@ func (s *authUsecaseImpl) Logout(ctx context.Context, sessionID string) error {
 func (s *authUsecaseImpl) Authenticate(ctx context.Context, userID int, sessionID string) (*entity.User, error) {
 	session, err := s.sessionRepo.FindByID(ctx, s.db, sessionID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrSessionNotFound) {
 			return nil, ErrInvalidSession
 		}
 		slog.Error("failed to find session by id", "session_id", sessionID, "error", err)
@@ -128,7 +128,7 @@ func (s *authUsecaseImpl) Authenticate(ctx context.Context, userID int, sessionI
 
 	user, err := s.userRepo.FindByID(ctx, s.db, userID)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, repository.ErrUserNotFound) {
 			slog.Error("failed to find user by id", "user_id", userID, "error", err)
 			return nil, err
 		}

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -39,6 +41,9 @@ func (r *sessionRepository) FindByID(ctx context.Context, exec repository.Execut
 	var sessionModel models.SessionModel
 	query := `SELECT id, user_id, expires_at, created_at FROM sessions WHERE id = ?`
 	if err := exec.GetContext(ctx, &sessionModel, query, model.ID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrSessionNotFound, err)
+		}
 		return nil, err
 	}
 	return sessionModel.ToEntity()

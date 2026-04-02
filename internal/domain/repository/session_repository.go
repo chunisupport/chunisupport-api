@@ -10,7 +10,7 @@ import (
 type SessionRepository interface {
 	// Create は新しいセッションを保存します。
 	Create(ctx context.Context, exec Executor, session *entity.Session) error
-	// FindByID はセッションIDでセッションを検索します。
+	// FindByID はセッションIDでセッションを検索します。対象が存在しない場合は ErrSessionNotFound を返します。
 	FindByID(ctx context.Context, exec Executor, id string) (*entity.Session, error)
 	// Delete はセッションIDでセッションを削除します。
 	Delete(ctx context.Context, exec Executor, id string) error

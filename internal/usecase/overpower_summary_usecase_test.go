@@ -29,6 +29,13 @@ func (s *stubOverpowerSummaryPlayerRepository) FindByID(ctx context.Context, exe
 	return s.player, nil
 }
 
+func (s *stubOverpowerSummaryPlayerRepository) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &repository.PlayerWithHonors{Player: s.player}, nil
+}
+
 func (s *stubOverpowerSummaryPlayerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
 	return nil, nil
 }
