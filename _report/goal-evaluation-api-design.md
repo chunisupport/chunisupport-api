@@ -112,6 +112,8 @@
 
 ## 5. achievement_type別 判定仕様
 
+既存のachievement_typeに準拠。なお、invert: true の場合は判定式および remaining の計算ロジックが反転する。
+
 既存のachievement_typeに準拠。
 
 - `rank_count` / `score_count`
