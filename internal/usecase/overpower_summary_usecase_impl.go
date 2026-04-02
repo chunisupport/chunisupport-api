@@ -92,12 +92,14 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 	player, err := u.playerRepo.FindByID(ctx, u.defaultExecutor, *user.PlayerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrPlayerNotLinked
+			// player_id は存在するが players 実体がないデータ不整合のため ErrPlayerNotFound を返す
+			return nil, ErrPlayerNotFound
 		}
 		return nil, err
 	}
 	if player == nil {
-		return nil, ErrPlayerNotLinked
+		// 同上: nil は players 実体欠損を意味する
+		return nil, ErrPlayerNotFound
 	}
 
 	records, err := u.playerRecordRepo.FindByPlayerID(ctx, u.defaultExecutor, player.ID)
