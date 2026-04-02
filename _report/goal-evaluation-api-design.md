@@ -112,14 +112,11 @@
 
 ## 5. achievement_type別 判定仕様
 
-既存のachievement_typeに準拠。なお、invert: true の場合は判定式および remaining の計算ロジックが反転する。
-
-既存のachievement_typeに準拠。
+既存のachievement_typeに準拠。なお、`invert: true` の場合は判定式および `remaining` の計算ロジックが反転する。
 
 - `rank_count` / `score_count`
   - actual: `{ "count": int }`
   - 判定: `actual.count >= target.count`
-- `avg_score`
 - `avg_score`
   - actual: `{ "score": int }`（平均の小数以下は既存仕様に合わせて切り捨て）
   - 判定: `actual.score >= target.score`（remaining は一般ルールに従い、理論最大値からの差分ではなくターゲットしきい値との差分として計算する）
@@ -145,7 +142,7 @@
 - `goal_not_found` (404)
 - `goal_evaluation_unavailable` (409)
   - 例: プレイヤーデータ未連携、必要な判定元データが存在しない
-- `internal_server_error` (500)
+- `internal_error` (500)
 
 `goal_evaluation_unavailable` は「入力不正」ではなく「評価前提の不足」を示す。
 
@@ -252,4 +249,3 @@
 - 判定結果永続化（`achieved_at`, `last_evaluated_at`）の要否
 - 一覧APIにページングを設けるか
 - progress_rateの丸め桁規約
-
