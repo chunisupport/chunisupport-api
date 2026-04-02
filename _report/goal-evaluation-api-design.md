@@ -153,7 +153,8 @@
 
 - `goal_not_found` (404)
 - `goal_evaluation_unavailable` (409)
-  - 例: プレイヤーデータ未連携、必要な判定元データが存在しない
+  - 発生条件: 評価に必要な前提が欠けている場合のみ（例: プレイヤーデータ未連携）
+  - 非発生条件: 対象プレイ記録が0件でもエラーにはせず、`actual=0` / `remaining=target` / `progress_rate=0` として正常レスポンスを返す
 - `internal_error` (500)
 
 `goal_evaluation_unavailable` は「入力不正」ではなく「評価前提の不足」を示す。
