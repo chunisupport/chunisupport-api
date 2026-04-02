@@ -3,10 +3,12 @@ package usecase
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"math"
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	dtoapiinternal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -122,7 +124,7 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 		recordByChartID[record.ChartID] = record
 	}
 
-	overall := overpowerSummaryAccumulator{}
+	overall := &overpowerSummaryAccumulator{}
 	genres := newAccumulatorMap(overpowerSummaryGenreOrder)
 	difficulties := newAccumulatorMap(overpowerSummaryDifficultyOrder)
 	levels := newAccumulatorMap(overpowerSummaryLevelOrder)
@@ -146,46 +148,22 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 			songMaxOP = max(songMaxOP, chartMaxOP)
 			songPlayed = songPlayed || played
 
-			if difficultyName, ok := masters.DifficultyNamesByID[chart.DifficultyID]; ok {
-				acc := difficulties[difficultyName]
-				acc.currentOP += chartCurrentOP
-				acc.maxOP += chartMaxOP
-				acc.targetCount++
-				if played {
-					acc.playedCount++
-				}
-				difficulties[difficultyName] = acc
+			if acc := difficultyAccumulator(difficulties, masters, chart.DifficultyID); acc != nil {
+				accumulateChartStats(acc, chartCurrentOP, chartMaxOP, played)
 			}
 
 			if levelName, ok := classifyOverpowerSummaryLevel(float64(chart.Const)); ok {
-				acc := levels[levelName]
-				acc.currentOP += chartCurrentOP
-				acc.maxOP += chartMaxOP
-				acc.targetCount++
-				if played {
-					acc.playedCount++
+				if acc := levels[levelName]; acc != nil {
+					accumulateChartStats(acc, chartCurrentOP, chartMaxOP, played)
 				}
-				levels[levelName] = acc
 			}
 		}
 
-		overall.currentOP += songCurrentOP
-		overall.maxOP += songMaxOP
-		overall.targetCount++
-		if songPlayed {
-			overall.playedCount++
-		}
+		accumulateSongStats(overall, songCurrentOP, songMaxOP, songPlayed)
 
 		if song.GenreID != nil {
-			if genreName, ok := masters.GenreNamesByID[*song.GenreID]; ok {
-				acc := genres[genreName]
-				acc.currentOP += songCurrentOP
-				acc.maxOP += songMaxOP
-				acc.targetCount++
-				if songPlayed {
-					acc.playedCount++
-				}
-				genres[genreName] = acc
+			if acc := genreAccumulator(genres, masters, *song.GenreID, song.DisplayID); acc != nil {
+				accumulateSongStats(acc, songCurrentOP, songMaxOP, songPlayed)
 			}
 		}
 	}
@@ -199,15 +177,78 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 	}, nil
 }
 
-func newAccumulatorMap(keys []string) map[string]overpowerSummaryAccumulator {
-	result := make(map[string]overpowerSummaryAccumulator, len(keys))
+func accumulateChartStats(acc *overpowerSummaryAccumulator, chartCurrentOP, chartMaxOP float64, played bool) {
+	acc.currentOP += chartCurrentOP
+	acc.maxOP += chartMaxOP
+	acc.targetCount++
+	if played {
+		acc.playedCount++
+	}
+}
+
+func accumulateSongStats(acc *overpowerSummaryAccumulator, songCurrentOP, songMaxOP float64, songPlayed bool) {
+	acc.currentOP += songCurrentOP
+	acc.maxOP += songMaxOP
+	acc.targetCount++
+	if songPlayed {
+		acc.playedCount++
+	}
+}
+
+func newAccumulatorMap(keys []string) map[string]*overpowerSummaryAccumulator {
+	result := make(map[string]*overpowerSummaryAccumulator, len(keys))
 	for _, key := range keys {
-		result[key] = overpowerSummaryAccumulator{}
+		result[key] = &overpowerSummaryAccumulator{}
 	}
 	return result
 }
 
-func toOverpowerSummaryItems(items map[string]overpowerSummaryAccumulator, order []string) map[string]dtoapiinternal.OverpowerSummaryItem {
+func difficultyAccumulator(accumulators map[string]*overpowerSummaryAccumulator, masters *masterdata.SongMasters, difficultyID int) *overpowerSummaryAccumulator {
+	difficultyName, ok := masters.DifficultyNamesByID[difficultyID]
+	if !ok {
+		slog.Warn("difficulty name not found for overpower summary", "difficulty_id", difficultyID)
+		return nil
+	}
+
+	return findAccumulatorByName(
+		accumulators,
+		difficultyName,
+		"difficulty accumulator not found for overpower summary",
+		"difficulty_id",
+		difficultyID,
+	)
+}
+
+func genreAccumulator(accumulators map[string]*overpowerSummaryAccumulator, masters *masterdata.SongMasters, genreID int, songDisplayID string) *overpowerSummaryAccumulator {
+	genreName, ok := masters.GenreNamesByID[genreID]
+	if !ok {
+		slog.Warn("genre name not found for overpower summary", "genre_id", genreID, "song_display_id", songDisplayID)
+		return nil
+	}
+
+	return findAccumulatorByName(
+		accumulators,
+		genreName,
+		"genre accumulator not found for overpower summary",
+		"genre_id",
+		genreID,
+		"song_display_id",
+		songDisplayID,
+	)
+}
+
+func findAccumulatorByName(accumulators map[string]*overpowerSummaryAccumulator, name string, message string, args ...any) *overpowerSummaryAccumulator {
+	acc, ok := accumulators[name]
+	if !ok {
+		logArgs := append([]any{"name", name}, args...)
+		slog.Warn(message, logArgs...)
+		return nil
+	}
+
+	return acc
+}
+
+func toOverpowerSummaryItems(items map[string]*overpowerSummaryAccumulator, order []string) map[string]dtoapiinternal.OverpowerSummaryItem {
 	result := make(map[string]dtoapiinternal.OverpowerSummaryItem, len(order))
 	for _, key := range order {
 		result[key] = toOverpowerSummaryItem(items[key])
@@ -215,7 +256,11 @@ func toOverpowerSummaryItems(items map[string]overpowerSummaryAccumulator, order
 	return result
 }
 
-func toOverpowerSummaryItem(acc overpowerSummaryAccumulator) dtoapiinternal.OverpowerSummaryItem {
+func toOverpowerSummaryItem(acc *overpowerSummaryAccumulator) dtoapiinternal.OverpowerSummaryItem {
+	if acc == nil {
+		return dtoapiinternal.OverpowerSummaryItem{}
+	}
+
 	percent := 0.0
 	if acc.maxOP > 0 {
 		percent = acc.currentOP / acc.maxOP * 100
