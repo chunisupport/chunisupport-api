@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"math"
+	"sort"
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -13,16 +14,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	dtoapiinternal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
-
-var overpowerSummaryGenreOrder = []string{
-	"POPS & ANIME",
-	"niconico",
-	"東方Project",
-	"VARIETY",
-	"イロドリミドリ",
-	"ゲキマイ",
-	"ORIGINAL",
-}
 
 var overpowerSummaryDifficultyOrder = []string{
 	"BASIC",
@@ -127,7 +118,8 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 	}
 
 	overall := &overpowerSummaryAccumulator{}
-	genres := newAccumulatorMap(overpowerSummaryGenreOrder)
+	genreOrder := newOverpowerSummaryGenreOrder(masters)
+	genres := newAccumulatorMap(genreOrder)
 	difficulties := newAccumulatorMap(overpowerSummaryDifficultyOrder)
 	levels := newAccumulatorMap(overpowerSummaryLevelOrder)
 
@@ -173,10 +165,34 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 	return &dtoapiinternal.OverpowerSummaryResponse{
 		UpdatedAt:    player.UpdatedAt,
 		Overall:      toOverpowerSummaryItem(overall),
-		Genres:       toOverpowerSummaryItems(genres, overpowerSummaryGenreOrder),
+		Genres:       toOverpowerSummaryItems(genres, genreOrder),
 		Difficulties: toOverpowerSummaryItems(difficulties, overpowerSummaryDifficultyOrder),
 		Levels:       toOverpowerSummaryItems(levels, overpowerSummaryLevelOrder),
 	}, nil
+}
+
+func newOverpowerSummaryGenreOrder(masters *masterdata.SongMasters) []string {
+	if masters == nil || len(masters.GenreNamesByID) == 0 {
+		return nil
+	}
+
+	genreIDs := make([]int, 0, len(masters.GenreNamesByID))
+	for genreID := range masters.GenreNamesByID {
+		genreIDs = append(genreIDs, genreID)
+	}
+	sort.Ints(genreIDs)
+
+	genreOrder := make([]string, 0, len(genreIDs))
+	seen := make(map[string]struct{}, len(genreIDs))
+	for _, genreID := range genreIDs {
+		genreName := masters.GenreNamesByID[genreID]
+		if _, exists := seen[genreName]; exists {
+			continue
+		}
+		seen[genreName] = struct{}{}
+		genreOrder = append(genreOrder, genreName)
+	}
+	return genreOrder
 }
 
 func accumulateChartStats(acc *overpowerSummaryAccumulator, chartCurrentOP, chartMaxOP float64, played bool) {
