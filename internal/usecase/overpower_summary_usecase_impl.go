@@ -288,10 +288,6 @@ func classifyOverpowerSummaryLevel(chartConst float64) (string, bool) {
 	}
 
 	level := int(bucket)
-	if level < 10 {
-		return "", false
-	}
-
 	if bucket-float64(level) >= 0.5 {
 		return strconv.Itoa(level) + "+", true
 	}
