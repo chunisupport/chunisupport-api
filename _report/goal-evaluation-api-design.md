@@ -120,8 +120,9 @@
   - actual: `{ "count": int }`
   - 判定: `actual.count >= target.count`
 - `avg_score`
+- `avg_score`
   - actual: `{ "score": int }`（平均の小数以下は既存仕様に合わせて切り捨て）
-  - 判定: `actual.score >= target.score`
+  - 判定: `actual.score >= target.score`（remaining は一般ルールに従い、理論最大値からの差分ではなくターゲットしきい値との差分として計算する）
 - `hardlamp_count` / `combolamp_count`
   - actual: `{ "count": int }`
   - 判定: `actual.count >= target.count`
