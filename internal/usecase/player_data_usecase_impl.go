@@ -727,7 +727,12 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 			continue
 		}
 
-		overpower := service.CalcSingleOverpower(uint32(record.State.Score), float64(chart.Const), record.State.ComboLampID)
+		score, ok := scoreToUint32(record.State.Score)
+		if !ok {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(score, float64(chart.Const), record.State.ComboLampID)
 		best, exists := bestBySongID[chart.SongID]
 		if !exists || overpower > best.overpower {
 			bestBySongID[chart.SongID] = songBestRecord{
@@ -765,6 +770,13 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 		Value:   &value,
 		Percent: &percent,
 	}
+}
+
+func scoreToUint32(value int) (uint32, bool) {
+	if value < minScoreValue || value > maxScoreValue {
+		return 0, false
+	}
+	return uint32(value), true
 }
 
 func roundFloat(value float64, scale int) float64 {
