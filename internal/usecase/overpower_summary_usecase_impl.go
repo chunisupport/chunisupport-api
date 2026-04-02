@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"log/slog"
 	"math"
 	"sort"
@@ -12,6 +14,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	dtoapiinternal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
@@ -129,12 +133,22 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 		songPlayed := false
 
 		for _, chart := range song.Charts {
-			chartMaxOP := service.CalcSingleOverpower(overpowerSummaryTheoreticalScore, float64(chart.Const), overpowerSummaryAllJusticeComboID)
+			chartConst, err := chartConstantValue(chart.Const)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve chart constant: %w", err)
+			}
+
+			chartMaxOP := service.CalcSingleOverpower(overpowerSummaryTheoreticalScore, chartConst, overpowerSummaryAllJusticeComboID)
 			chartCurrentOP := 0.0
 			played := false
 
 			if record, ok := recordByChartID[chart.ID]; ok {
-				chartCurrentOP = service.CalcSingleOverpower(uint32(record.Score), float64(chart.Const), record.ComboLampID)
+				scoreUint32, err := scoreValue(record.Score)
+				if err != nil {
+					return nil, fmt.Errorf("failed to resolve score value: %w", err)
+				}
+
+				chartCurrentOP = service.CalcSingleOverpower(scoreUint32, chartConst, record.ComboLampID)
 				played = true
 			}
 
@@ -146,7 +160,7 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 				accumulateStats(acc, chartCurrentOP, chartMaxOP, played)
 			}
 
-			if levelName, ok := classifyOverpowerSummaryLevel(float64(chart.Const)); ok {
+			if levelName, ok := classifyOverpowerSummaryLevel(chartConst); ok {
 				if acc := levels[levelName]; acc != nil {
 					accumulateStats(acc, chartCurrentOP, chartMaxOP, played)
 				}
@@ -255,6 +269,55 @@ func findAccumulatorByName(accumulators map[string]*overpowerSummaryAccumulator,
 	}
 
 	return acc
+}
+
+func chartConstantValue(chartConst chartconstant.ChartConstant) (float64, error) {
+	value, err := chartConst.Value()
+	if err != nil {
+		return 0, err
+	}
+
+	stringValue, ok := value.(string)
+	if !ok {
+		return 0, fmt.Errorf("unexpected chart constant value type: %T", value)
+	}
+
+	floatValue, err := strconv.ParseFloat(stringValue, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse chart constant: %w", err)
+	}
+
+	return floatValue, nil
+}
+
+func scoreValue(recordScore score.Score) (uint32, error) {
+	value, err := recordScore.Value()
+	if err != nil {
+		return 0, err
+	}
+
+	intValue, err := toInt64(value)
+	if err != nil {
+		return 0, err
+	}
+	if intValue < 0 || intValue > math.MaxUint32 {
+		return 0, fmt.Errorf("score is out of range: %d", intValue)
+	}
+
+	return uint32(intValue), nil
+}
+
+func toInt64(value driver.Value) (int64, error) {
+	switch v := value.(type) {
+	case int64:
+		return v, nil
+	case int32:
+		return int64(v), nil
+	case int:
+		return int64(v), nil
+	default:
+		return 0, fmt.Errorf("unexpected numeric value type: %T", value)
+	}
 }
 
 func toOverpowerSummaryItems(items map[string]*overpowerSummaryAccumulator, order []string) map[string]dtoapiinternal.OverpowerSummaryItem {
