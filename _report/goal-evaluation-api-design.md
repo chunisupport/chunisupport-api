@@ -112,26 +112,38 @@
 
 ## 5. achievement_type別 判定仕様
 
-既存のachievement_typeに準拠。なお、`invert: true` の場合は判定式および `remaining` の計算ロジックが反転する。
+既存のachievement_typeに準拠し、`remaining` と `progress_rate` は以下の共通式で計算する。
+
+- `invert: false`（目標値以上を目指す）
+  - 判定: `actual >= target`
+  - `remaining`: `max(target - actual, 0)`
+  - `progress_rate`: `min(actual / target, 1.0)`（`target=0` の場合は `1.0` 扱い）
+- `invert: true`（目標値以下を目指す）
+  - 判定: `actual <= target`
+  - `remaining`: `max(actual - target, 0)`（= 目標値をどれだけ上回っているか）
+  - `progress_rate`: `min(target / max(actual, 1), 1.0)`（`actual=0` かつ判定達成時は `1.0`）
+
+`avg_score` の `invert: true` では、UI表示用の反転値を理論最大値との差分ではなく、必ず `threshold - current_avg_score`（= `target.score - actual.score`）基準で扱う。
 
 - `rank_count` / `score_count`
   - actual: `{ "count": int }`
-  - 判定: `actual.count >= target.count`
+  - 判定: `invert=false` の場合は `actual.count >= target.count`、`invert=true` の場合は `actual.count <= target.count`
 - `avg_score`
   - actual: `{ "score": int }`（平均の小数以下は既存仕様に合わせて切り捨て）
-  - 判定: `actual.score >= target.score`（remaining は一般ルールに従い、理論最大値からの差分ではなくターゲットしきい値との差分として計算する）
+  - 判定: `invert=false` の場合は `actual.score >= target.score`、`invert=true` の場合は `actual.score <= target.score`
+  - `remaining`: `invert=false` は `max(target.score - actual.score, 0)`、`invert=true` は `max(actual.score - target.score, 0)`
 - `hardlamp_count` / `combolamp_count`
   - actual: `{ "count": int }`
-  - 判定: `actual.count >= target.count`
+  - 判定: `invert=false` の場合は `actual.count >= target.count`、`invert=true` の場合は `actual.count <= target.count`
 - `total_score`
   - actual: `{ "total": int }`
-  - 判定: `actual.total >= target.total`
+  - 判定: `invert=false` の場合は `actual.total >= target.total`、`invert=true` の場合は `actual.total <= target.total`
 - `overpower_value`
   - actual: `{ "total": float64 }`
-  - 判定: `actual.total >= target.total`
+  - 判定: `invert=false` の場合は `actual.total >= target.total`、`invert=true` の場合は `actual.total <= target.total`
 - `overpower_percent`
-  - actual: `{ "total": float64 }`
-  - 判定: `actual.total >= target.total`
+  - actual: `{ "percent": float64 }`
+  - 判定: `invert=false` の場合は `actual.percent >= target.percent`、`invert=true` の場合は `actual.percent <= target.percent`
 
 ---
 
