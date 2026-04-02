@@ -91,57 +91,57 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します。 |
-| `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック。 |
-| `/internal/auth/register` | POST | 不要 | ユーザー登録。 |
-| `/internal/auth/login` | POST | 不要 | ログインしてCookieを発行。 |
-| `/internal/auth/logout` | POST | Cookie | セッション失効。 |
-| `/internal/auth/recovery-codes` | POST | 不要 | リカバリーコードでパスワード再設定。 |
-| `/internal/auth/api-tokens` | POST | Cookie | APIトークン発行。 |
-| `/internal/auth/api-tokens` | DELETE | Cookie | APIトークン削除。 |
-| `/internal/me` | GET | Cookie | 自身のユーザー情報。 |
-| `/internal/me/privacy` | PUT | Cookie | 非公開設定更新。 |
-| `/internal/me/password` | PUT | Cookie | パスワード変更。 |
-| `/internal/me/recovery-codes` | POST | Cookie | リカバリーコード発行。 |
-| `/internal/me` | DELETE | Cookie | アカウント論理削除。 |
-| `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録。 |
-| `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除。 |
-| `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得。 |
-| `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト。 |
-| `/internal/me/goals` | GET | Cookie | 目標一覧を取得。 |
-| `/internal/me/goals` | POST | Cookie | 目標を作成。 |
-| `/internal/me/goals/:id` | PUT | Cookie | 目標を更新。 |
-| `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除。 |
-| `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・削除済み・プレイヤー未紐付けを含む）。 |
-| `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得。 |
-| `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得。 |
-| `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除。 |
-| `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活。 |
-| `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得。 |
-| `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得。 |
-| `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得。 |
-| `/internal/songs` | PUT | Cookie (EDITOR+) | 楽曲情報と譜面情報の一括更新。 |
-| `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除。 |
-| `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活。 |
-| `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得。 |
-| `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得。 |
-| `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新。 |
-| `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除。 |
-| `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活。 |
-| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted` を含む）。 |
-| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted` を含む）。 |
-| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む）。 |
-| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む）。 |
-| `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得。 |
-| `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く）。 |
-| `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得。 |
-| `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得。 |
-| `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得。 |
-| `/v1/songs/worldsend/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得。 |
-| `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得。 |
-| `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得。 |
-| `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得。 |
-| `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得。 |
+| `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
+| `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
+| `/internal/auth/register` | POST | 不要 | ユーザー登録 |
+| `/internal/auth/login` | POST | 不要 | ログインしてCookieを発行 |
+| `/internal/auth/logout` | POST | Cookie | セッション失効 |
+| `/internal/auth/recovery-codes` | POST | 不要 | リカバリーコードでパスワード再設定 |
+| `/internal/auth/api-tokens` | POST | Cookie | APIトークン発行 |
+| `/internal/auth/api-tokens` | DELETE | Cookie | APIトークン削除 |
+| `/internal/me` | GET | Cookie | 自身のユーザー情報 |
+| `/internal/me/privacy` | PUT | Cookie | 非公開設定更新 |
+| `/internal/me/password` | PUT | Cookie | パスワード変更 |
+| `/internal/me/recovery-codes` | POST | Cookie | リカバリーコード発行 |
+| `/internal/me` | DELETE | Cookie | アカウント論理削除 |
+| `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
+| `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得 |
+| `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト |
+| `/internal/me/goals` | GET | Cookie | 目標一覧を取得 |
+| `/internal/me/goals` | POST | Cookie | 目標を作成 |
+| `/internal/me/goals/:id` | PUT | Cookie | 目標を更新 |
+| `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除 |
+| `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・削除済み・プレイヤー未紐付けを含む） |
+| `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
+| `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
+| `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除 |
+| `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活 |
+| `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得 |
+| `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得 |
+| `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs` | PUT | Cookie (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
+| `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除 |
+| `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活 |
+| `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得 |
+| `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
+| `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除 |
+| `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活 |
+| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted` を含む） |
+| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted` を含む） |
+| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む） |
+| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む） |
+| `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得 |
+| `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
+| `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
+| `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
+| `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
+| `/v1/songs/worldsend/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
+| `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
+| `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
+| `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
+| `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
 
 ---
 
