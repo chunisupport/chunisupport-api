@@ -143,21 +143,21 @@ func (u *overpowerSummaryUsecase) Get(ctx context.Context, user *entity.User) (*
 			songPlayed = songPlayed || played
 
 			if acc := difficultyAccumulator(difficulties, masters, chart.DifficultyID); acc != nil {
-				accumulateChartStats(acc, chartCurrentOP, chartMaxOP, played)
+				accumulateStats(acc, chartCurrentOP, chartMaxOP, played)
 			}
 
 			if levelName, ok := classifyOverpowerSummaryLevel(float64(chart.Const)); ok {
 				if acc := levels[levelName]; acc != nil {
-					accumulateChartStats(acc, chartCurrentOP, chartMaxOP, played)
+					accumulateStats(acc, chartCurrentOP, chartMaxOP, played)
 				}
 			}
 		}
 
-		accumulateSongStats(overall, songCurrentOP, songMaxOP, songPlayed)
+		accumulateStats(overall, songCurrentOP, songMaxOP, songPlayed)
 
 		if song.GenreID != nil {
 			if acc := genreAccumulator(genres, masters, *song.GenreID, song.DisplayID); acc != nil {
-				accumulateSongStats(acc, songCurrentOP, songMaxOP, songPlayed)
+				accumulateStats(acc, songCurrentOP, songMaxOP, songPlayed)
 			}
 		}
 	}
@@ -195,20 +195,11 @@ func newOverpowerSummaryGenreOrder(masters *masterdata.SongMasters) []string {
 	return genreOrder
 }
 
-func accumulateChartStats(acc *overpowerSummaryAccumulator, chartCurrentOP, chartMaxOP float64, played bool) {
-	acc.currentOP += chartCurrentOP
-	acc.maxOP += chartMaxOP
+func accumulateStats(acc *overpowerSummaryAccumulator, currentOP, maxOP float64, played bool) {
+	acc.currentOP += currentOP
+	acc.maxOP += maxOP
 	acc.targetCount++
 	if played {
-		acc.playedCount++
-	}
-}
-
-func accumulateSongStats(acc *overpowerSummaryAccumulator, songCurrentOP, songMaxOP float64, songPlayed bool) {
-	acc.currentOP += songCurrentOP
-	acc.maxOP += songMaxOP
-	acc.targetCount++
-	if songPlayed {
 		acc.playedCount++
 	}
 }
