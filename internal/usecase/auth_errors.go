@@ -5,6 +5,7 @@ import "errors"
 var (
 	ErrUsernameTaken      = errors.New("this username is already taken")
 	ErrInvalidCredentials = errors.New("invalid username or password")
+	ErrInvalidIDToken     = errors.New("invalid firebase id token")
 	ErrUserIDMismatch     = errors.New("user ID mismatch")
 	ErrInvalidSession     = errors.New("session invalid or expired")
 	ErrUserDeleted        = errors.New("user deleted")
