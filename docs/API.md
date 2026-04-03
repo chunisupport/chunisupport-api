@@ -1,20 +1,21 @@
 # chunisupport-api API仕様書
 
-このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)と公開API(`/v1` プレフィックス)の仕様をまとめたものです。
+このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年03月25日
+**最終更新日**: 2026年04月03日
 
 ## ベースURLと環境
 
-アプリケーションは `.config/<environment>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。
+アプリケーションは `.config/<APP_ENV>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。
 
-ローカル開発の例: `http://localhost:${APP_PORT}`
+ローカル開発の例: `.config/<APP_ENV>.settings.json` で `app_port: 3002` を指定している場合、`http://localhost:3002`
 
 主要なパス構成:
 
-- 監視用API: `http://localhost:${APP_PORT}/`
-- 内部向けAPI: `http://localhost:${APP_PORT}/internal`
-- 公開API (APIトークン認証): `http://localhost:${APP_PORT}/v1`
+- 監視用API: `http://localhost:<app_port>/`
+- 内部向けAPI: `http://localhost:<app_port>/internal`
+- 公開API (APIトークン認証): `http://localhost:<app_port>/v1`
+- chunirec互換API (APIトークン認証): `http://localhost:<app_port>/compat/chunirec/2.0`
 
 ## CORS
 
@@ -28,9 +29,10 @@
 - 認証必須エンドポイントでは Cookie を検証し、ユーザー情報をリクエストコンテキストに格納します。
 - Cookie 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
 
-### 公開API (`/v1`)
+### 公開API (`/v1`, `/compat/chunirec/2.0`)
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
+- `/v1` と `/compat/chunirec/2.0` はどちらも API トークン認証です。
 - トークンは `/internal/auth/api-tokens` で発行します。
 
 ## 共通レスポンス仕様

@@ -1,8 +1,10 @@
 # 設定ファイル概要
 
-アプリケーションは `.env` と `.config/<環境>.settings.json` を読み込みます。最低限必要な項目だけを記載しています。
+アプリケーションは `.env` が存在すればそれを読み込み、そのうえで `APP_ENV` に対応する `.config/<APP_ENV>.settings.json` を読み込みます。最低限必要な項目だけを記載しています。
 
-## `.env` (必須)
+## `.env` (任意、開発時に推奨)
+
+`.env` ファイル自体は必須ではありませんが、以下の環境変数は `.env` または実行環境の環境変数として必ず設定してください。
 
 - `APP_ENV` (例: `develop`)
 - `JWT_SECRET` (32文字以上)
@@ -13,7 +15,9 @@
 - `DB_USER`
 - `DB_PASS`
 
-## `.config/<環境>.settings.json` (必須)
+`APP_ENV` は読み込む設定ファイル名を決める値で、`.config/<APP_ENV>.settings.json` が参照されます。
+
+## `.config/<APP_ENV>.settings.json` (必須)
 
 最低限、以下のキーを持つJSONを用意してください。
 
