@@ -78,6 +78,14 @@ func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor,
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
+	args := m.Called(ctx, exec, uid)
+	if u, ok := args.Get(0).(*entity.User); ok {
+		return u, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // MockSessionRepository はSessionRepositoryのモックです。
 type MockSessionRepository struct {
 	mock.Mock

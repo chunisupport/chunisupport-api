@@ -53,6 +53,20 @@ func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Exe
 	return userModel.ToEntity()
 }
 
+// FindByFirebaseUID はFirebase UIDでユーザーを検索します。
+func (r *userRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
+	var userModel models.UserModel
+	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE firebase_uid = ?`
+	err := exec.GetContext(ctx, &userModel, query, uid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
+		return nil, err
+	}
+	return userModel.ToEntity()
+}
+
 // FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。
 // 通常のユーザー一覧取得用で、プライベート・削除済み・プレイヤー未紐付けアカウントを除外します。
 func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {

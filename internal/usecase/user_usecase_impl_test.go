@@ -65,6 +65,10 @@ func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor,
 	return nil
 }
 
+func (s *stubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
 type stubPlayerRecordRepository struct {
 	records         []*entity.PlayerRecord
 	ratingRecords   []*entity.PlayerRecord

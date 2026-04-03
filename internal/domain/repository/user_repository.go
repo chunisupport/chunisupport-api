@@ -18,6 +18,8 @@ type UserRepository interface {
 	// FindAllWithPlayerForAdmin はADMIN用にすべてのユーザー一覧をプレイヤー情報付きで取得します。
 	// プライベート・削除済み・プレイヤー未紐付けアカウントを含みます。
 	FindAllWithPlayerForAdmin(ctx context.Context, exec Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error)
+	// FindByFirebaseUID はFirebase UIDでユーザーを検索します。
+	FindByFirebaseUID(ctx context.Context, exec Executor, uid string) (*entity.User, error)
 	// Create は新しいユーザーを作成します。
 	Create(ctx context.Context, exec Executor, user *entity.User) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。

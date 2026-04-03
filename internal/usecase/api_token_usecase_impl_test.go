@@ -85,6 +85,10 @@ func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Exec
 	return errors.New("not implemented")
 }
 
+func (s *tokenStubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestAPITokenService_Generate(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
