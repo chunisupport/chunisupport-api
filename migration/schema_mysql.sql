@@ -333,6 +333,7 @@ CREATE TABLE `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uq_users_player_id` (`player_id`),
+  UNIQUE KEY `uk_users_firebase_uid` (`firebase_uid`),
   KEY `account_type_id` (`account_type_id`),
   KEY `idx_users_deleted_private` (`is_deleted`,`is_private`,`player_id`),
   CONSTRAINT `fk_users_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
