@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
@@ -11,6 +12,7 @@ import (
 type User struct {
 	ID            int
 	Username      username.UserName
+	FirebaseUID   *string
 	PasswordHash  passwordhash.PasswordHash
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -35,6 +37,11 @@ func (u *User) HasLinkedPlayer() bool {
 	return u.PlayerID != nil
 }
 
+// HasLinkedFirebase はユーザーに Firebase UID が紐づいているかを判定します。
+func (u *User) HasLinkedFirebase() bool {
+	return u.FirebaseUID != nil && *u.FirebaseUID != ""
+}
+
 // ChangePrivacy はユーザーの公開/非公開設定を変更します。
 func (u *User) ChangePrivacy(isPrivate bool) {
 	u.IsPrivate = isPrivate
@@ -44,6 +51,17 @@ func (u *User) ChangePrivacy(isPrivate bool) {
 // ChangePassword はユーザーのパスワードハッシュを変更します。
 func (u *User) ChangePassword(hash passwordhash.PasswordHash) {
 	u.PasswordHash = hash
+	u.UpdatedAt = time.Now()
+}
+
+// LinkFirebaseUID はユーザーに Firebase UID を紐付けます。
+func (u *User) LinkFirebaseUID(uid string) {
+	normalizedUID := strings.TrimSpace(uid)
+	if normalizedUID == "" {
+		u.FirebaseUID = nil
+	} else {
+		u.FirebaseUID = &normalizedUID
+	}
 	u.UpdatedAt = time.Now()
 }
 

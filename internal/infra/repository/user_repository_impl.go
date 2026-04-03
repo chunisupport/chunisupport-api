@@ -28,7 +28,7 @@ func NewUserRepository(db *sqlx.DB) repository.UserRepository {
 // FindByID はIDでユーザーを検索します。
 func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE id = ?`
+	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE id = ?`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -42,7 +42,7 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 // FindByUsername はユーザー名でユーザーを検索します。
 func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE username = ?`
+	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE username = ?`
 	err := exec.GetContext(ctx, &userModel, query, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -56,7 +56,7 @@ func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Exe
 // FindByFirebaseUID はFirebase UIDでユーザーを検索します。
 func (r *userRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE firebase_uid = ?`
+	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE firebase_uid = ?`
 	err := exec.GetContext(ctx, &userModel, query, uid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -262,10 +262,10 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 
 	if user.ID == 0 {
 		// 新規作成
-		query := `INSERT INTO users (username, password_hash, account_type_id, is_deleted, is_private) VALUES (?, ?, ?, ?, ?)`
-		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsDeleted, userModel.IsPrivate)
+		query := `INSERT INTO users (username, firebase_uid, password_hash, account_type_id, is_deleted, is_private) VALUES (?, ?, ?, ?, ?, ?)`
+		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsDeleted, userModel.IsPrivate)
 		if err != nil {
-			return err
+			return wrapFirebaseUIDDuplicateError(err)
 		}
 		id, err := result.LastInsertId()
 		if err != nil {
@@ -276,7 +276,7 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	}
 
 	// 更新
-	query := `UPDATE users SET username = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
-	return err
+	query := `UPDATE users SET username = ?, firebase_uid = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
+	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
+	return wrapFirebaseUIDDuplicateError(err)
 }

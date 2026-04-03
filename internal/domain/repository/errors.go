@@ -28,4 +28,7 @@ var (
 
 	// ErrDuplicateDisplayID はリクエスト内に重複したdisplay_idが含まれる場合に返されるエラーです。
 	ErrDuplicateDisplayID = errors.New("duplicate display_id")
+
+	// ErrFirebaseUIDAlreadyLinked は Firebase UID が他ユーザーへ既に紐付いている場合に返されるエラーです。
+	ErrFirebaseUIDAlreadyLinked = errors.New("firebase uid already linked")
 )

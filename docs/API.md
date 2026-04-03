@@ -72,6 +72,7 @@
 | `missing_token` | トークン未指定 |
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | ユーザー名またはパスワード不正 |
+| `firebase_uid_already_linked` | Firebase UID が他ユーザーに連携済み |
 | `invalid_recovery_credentials` | リカバリーコード不正/使用済み |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
@@ -97,6 +98,7 @@
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
 | `/internal/auth/register` | POST | 不要 | ユーザー登録 |
 | `/internal/auth/login` | POST | 不要 | ログインしてCookieを発行 |
+| `/internal/auth/firebase/login` | POST | 不要 | Firebase IDトークンでログインしてCookieを発行 |
 | `/internal/auth/logout` | POST | Cookie | セッション失効 |
 | `/internal/auth/recovery-codes` | POST | 不要 | リカバリーコードでパスワード再設定 |
 | `/internal/auth/api-tokens` | POST | Cookie | APIトークン発行 |
@@ -108,6 +110,7 @@
 | `/internal/me` | DELETE | Cookie | アカウント論理削除 |
 | `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/me/firebase/link` | POST | Cookie | Firebase UID を現在のユーザーへ連携 |
 | `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得 |
 | `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト |
 | `/internal/me/goals` | GET | Cookie | 目標一覧を取得 |
@@ -231,6 +234,28 @@
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`invalid_credentials`): ユーザー名またはパスワードが不正
+
+### POST `/internal/auth/firebase/login`
+- **認証**: 不要
+- **リクエストボディ**:
+
+```json
+{
+  "id_token": "<Firebase ID Token>"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `id_token` | string | ✓ | 必須 |
+
+- **レスポンス**: 204 No Content。ボディは空で、`token` Cookie が設定されます。
+- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
+- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、新しいセッションを作成すると最も古いセッションから自動的に削除されます。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正、失効済み、またはユーザーに未連携
+  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/logout`
 - **認証**: Cookie 必須
@@ -392,6 +417,30 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### POST `/internal/me/firebase/link`
+- **認証**: Cookie 必須
+- **リクエストボディ**:
+
+```json
+{
+  "id_token": "<Firebase ID Token>"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `id_token` | string | ✓ | 必須 |
+
+- **レスポンス**: 204 No Content。
+- **挙動**:
+  - 同一ユーザーに同じ Firebase UID を再連携した場合は、冪等に成功します。
+  - 他ユーザーに既に連携されている Firebase UID は連携できません。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
+  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーに連携済み
+  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### GET `/internal/me/sessions`
 - **認証**: Cookie 必須

@@ -22,6 +22,7 @@
 | `invalid_session` | セッション無効 |
 | `invalid_recovery_credentials` | リカバリ認証情報不正 |
 | `forbidden` | 権限不足 |
+| `firebase_uid_already_linked` | Firebase UID が他ユーザーに連携済み |
 | `registration_failed` | ユーザー登録失敗 |
 | `user_not_found` | ユーザー未検出 |
 | `operation_failed` | 操作失敗 |

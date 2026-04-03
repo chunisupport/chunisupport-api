@@ -59,14 +59,15 @@ var (
 	ErrInternalError = New(CodeInternalError, http.StatusInternalServerError)
 
 	// 認証・認可エラー
-	ErrUnauthorized       = New(CodeUnauthorized, http.StatusUnauthorized)
-	ErrInvalidCredentials = New(CodeInvalidCredentials, http.StatusUnauthorized)
-	ErrInvalidToken       = New(CodeInvalidToken, http.StatusUnauthorized)
-	ErrTokenExpired       = New(CodeTokenExpired, http.StatusUnauthorized)
-	ErrMissingToken       = New(CodeMissingToken, http.StatusUnauthorized)
-	ErrInvalidSession     = New(CodeInvalidSession, http.StatusUnauthorized) // セッション無効/期限切れ統一
-	ErrInvalidRecovery    = New(CodeInvalidRecovery, http.StatusUnauthorized)
-	ErrForbidden          = New(CodeForbidden, http.StatusForbidden)
+	ErrUnauthorized             = New(CodeUnauthorized, http.StatusUnauthorized)
+	ErrInvalidCredentials       = New(CodeInvalidCredentials, http.StatusUnauthorized)
+	ErrInvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized)
+	ErrTokenExpired             = New(CodeTokenExpired, http.StatusUnauthorized)
+	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
+	ErrInvalidSession           = New(CodeInvalidSession, http.StatusUnauthorized) // セッション無効/期限切れ統一
+	ErrInvalidRecovery          = New(CodeInvalidRecovery, http.StatusUnauthorized)
+	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
+	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)
 
 	// ユーザー関連エラー
 	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest) // 409→400に変更

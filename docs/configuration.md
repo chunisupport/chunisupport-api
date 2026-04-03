@@ -9,6 +9,7 @@
 - `APP_ENV` (例: `develop`)
 - `JWT_SECRET` (32文字以上)
 - `PW_PEPPER` (32文字以上)
+- `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `DB_NAME`
 - `DB_HOST`
 - `DB_PORT`
@@ -42,3 +43,12 @@
 `database.pool.*` はすべて必須です。いずれかが欠けている場合、アプリケーションは起動時にエラーで終了します。
 `0` を明示した場合は `sql.DB` と同様に「無制限/無効」として扱います。
 また、`max_open_conns` が 1 以上で `max_idle_conns` がそれを上回る場合は、`max_idle_conns` は `max_open_conns` へ丸められます。
+
+## Firebase 認証
+
+Firebase を使ったログイン・連携エンドポイントは常に有効です。
+
+- `.config/<APP_ENV>.settings.json` に Firebase 用のキーは不要です
+- 環境変数 `FIREBASE_CREDENTIALS_FILE` に Firebase サービスアカウント JSON のパスを設定してください
+
+`FIREBASE_CREDENTIALS_FILE` が未設定の場合、アプリケーションは起動時にエラーで終了します。

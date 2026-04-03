@@ -8,14 +8,15 @@ const (
 	CodeInternalError = "internal_error"
 
 	// 認証・認可エラー
-	CodeUnauthorized       = "unauthorized"
-	CodeInvalidCredentials = "invalid_credentials" // #nosec G101
-	CodeInvalidToken       = "invalid_token"       // #nosec G101
-	CodeTokenExpired       = "token_expired"       // #nosec G101
-	CodeMissingToken       = "missing_token"       // #nosec G101
-	CodeInvalidSession     = "invalid_session"     // セッション無効/期限切れを統一
-	CodeInvalidRecovery    = "invalid_recovery_credentials"
-	CodeForbidden          = "forbidden"
+	CodeUnauthorized             = "unauthorized"
+	CodeInvalidCredentials       = "invalid_credentials" // #nosec G101
+	CodeInvalidToken             = "invalid_token"       // #nosec G101
+	CodeTokenExpired             = "token_expired"       // #nosec G101
+	CodeMissingToken             = "missing_token"       // #nosec G101
+	CodeInvalidSession           = "invalid_session"     // セッション無効/期限切れを統一
+	CodeInvalidRecovery          = "invalid_recovery_credentials"
+	CodeForbidden                = "forbidden"
+	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
 
 	// ユーザー関連エラー
 	CodeRegistrationFailed = "registration_failed" // ユーザー登録失敗（詳細を隠蔽）

@@ -73,6 +73,7 @@ func (cv *CustomValidator) Validate(i any) error {
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
 	Auth       *api_internal.AuthHandler
+	Firebase   *api_internal.FirebaseHandler
 	Recovery   *api_internal.RecoveryHandler
 	Profile    *api_internal.ProfileHandler
 	User       *api_internal.UserHandler
@@ -94,7 +95,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -165,8 +166,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
+	sessionIssuer := usecase.NewSessionIssuer(db, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour)
+	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
+	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
 		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
+		Firebase:   firebaseHandler,
 		Recovery:   api_internal.NewRecoveryHandler(recoveryUsecase),
 		Profile:    api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
 		User:       api_internal.NewUserHandler(userUsecase),
@@ -228,6 +235,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 			Requests: info.LoginRateLimitRequests,
 			Window:   info.LoginRateLimitWindow,
 		}))
+		authGroup.POST("/firebase/login", handlers.Firebase.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.LoginRateLimitRequests,
+			Window:   info.LoginRateLimitWindow,
+		}))
 		authGroup.POST("/logout", handlers.Auth.Logout, jwtAuth)
 		// 登録: 1分間に5回まで
 		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
@@ -256,6 +267,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
+		meGroup.POST("/firebase/link", handlers.Firebase.Link)
 		// セッション管理
 		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
 		meGroup.DELETE("/sessions", handlers.Session.LogoutOtherSessions)
