@@ -51,6 +51,39 @@ func TestAuthUsecase_Register(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 
+	t.Run("Register_正常系_注入したSessionIssuerでトークン発行する", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		mockIssuer := new(authMockSessionIssuer)
+		authUsecase := newTestAuthUsecaseWithSessionIssuer(mockUserRepo, mockSessionRepo, mockIssuer, "test-pepper")
+
+		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, repository.ErrUserNotFound).Once()
+		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(nil).Once()
+		mockIssuer.On("IssueSession", mock.Anything, mock.AnythingOfType("*entity.User")).Return("issued-token", nil).Once()
+
+		userDTO, token, err := authUsecase.Register(context.Background(), "testuser", "password")
+		assert.NoError(t, err)
+		assert.NotNil(t, userDTO)
+		assert.Equal(t, "issued-token", token)
+		mockUserRepo.AssertExpectations(t)
+		mockIssuer.AssertExpectations(t)
+		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Register_異常系_SessionIssuerがnilなら保存前に内部エラー", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		authUsecase := newTestAuthUsecaseWithSessionIssuer(mockUserRepo, mockSessionRepo, nil, "test-pepper")
+
+		userDTO, token, err := authUsecase.Register(context.Background(), "testuser", "password")
+		assert.ErrorIs(t, err, ErrInternalError)
+		assert.Nil(t, userDTO)
+		assert.Empty(t, token)
+		mockUserRepo.AssertNotCalled(t, "FindByUsername", mock.Anything, mock.Anything, mock.Anything)
+		mockUserRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 }
 
 func TestAuthUsecase_Login(t *testing.T) {
@@ -73,6 +106,35 @@ func TestAuthUsecase_Login(t *testing.T) {
 		assert.NotEmpty(t, token)
 		mockUserRepo.AssertExpectations(t)
 		mockSessionRepo.AssertExpectations(t)
+	})
+
+	t.Run("Login_正常系_注入したSessionIssuerでトークン発行する", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		mockIssuer := new(authMockSessionIssuer)
+		authUsecase := newTestAuthUsecaseWithSessionIssuer(mockUserRepo, mockSessionRepo, mockIssuer, "test-pepper")
+
+		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(mockUser, nil).Once()
+		mockIssuer.On("IssueSession", mock.Anything, mockUser).Return("issued-token", nil).Once()
+
+		token, err := authUsecase.Login(context.Background(), "testuser", "password")
+		assert.NoError(t, err)
+		assert.Equal(t, "issued-token", token)
+		mockUserRepo.AssertExpectations(t)
+		mockIssuer.AssertExpectations(t)
+		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Login_異常系_SessionIssuerがnilなら内部エラー", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		authUsecase := newTestAuthUsecaseWithSessionIssuer(mockUserRepo, mockSessionRepo, nil, "test-pepper")
+
+		token, err := authUsecase.Login(context.Background(), "testuser", "password")
+		assert.ErrorIs(t, err, ErrInternalError)
+		assert.Empty(t, token)
+		mockUserRepo.AssertNotCalled(t, "FindByUsername", mock.Anything, mock.Anything, mock.Anything)
+		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Login_異常系_論理削除されたユーザーはログインできない", func(t *testing.T) {

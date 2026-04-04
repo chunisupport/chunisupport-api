@@ -177,8 +177,22 @@ func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx re
 	return f(m.exec)
 }
 
+type authMockSessionIssuer struct {
+	mock.Mock
+}
+
+func (m *authMockSessionIssuer) IssueSession(ctx context.Context, user *entity.User) (string, error) {
+	args := m.Called(ctx, user)
+	return args.String(0), args.Error(1)
+}
+
+func newTestAuthUsecaseWithSessionIssuer(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, sessionIssuer SessionIssuer, pepper string) AuthUsecase {
+	return NewAuthUsecase(nil, userRepo, sessionRepo, sessionIssuer, pepper, newMockMasterCache())
+}
+
 func newTestAuthUsecase(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, pepper string) AuthUsecase {
-	return NewAuthUsecase(nil, userRepo, sessionRepo, "test-secret", 24, 24, pepper, newMockMasterCache())
+	sessionIssuer := NewSessionIssuer(nil, sessionRepo, "test-secret", 24, 24)
+	return newTestAuthUsecaseWithSessionIssuer(userRepo, sessionRepo, sessionIssuer, pepper)
 }
 
 func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string) UserCredentialUsecase {

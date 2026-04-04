@@ -16,6 +16,10 @@ import (
 )
 
 func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password string) (*api_internal.UserDTO, string, error) {
+	if err := s.ensureSessionIssuer(); err != nil {
+		return nil, "", err
+	}
+
 	if len(password) < info.PasswordMinLength {
 		return nil, "", ErrPasswordTooShort
 	}
@@ -49,7 +53,7 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 		return nil, "", err
 	}
 
-	token, err := s.sessionIssuer.IssueSession(ctx, user)
+	token, err := s.issueSession(ctx, user)
 	if err != nil {
 		slog.Error("failed to create session after registration", "user_id", user.ID, "error", err)
 		return nil, "", err
@@ -60,6 +64,10 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 }
 
 func (s *authUsecaseImpl) Login(ctx context.Context, usernameStr, password string) (string, error) {
+	if err := s.ensureSessionIssuer(); err != nil {
+		return "", err
+	}
+
 	user, err := s.userRepo.FindByUsername(ctx, s.db, usernameStr)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -74,6 +82,22 @@ func (s *authUsecaseImpl) Login(ctx context.Context, usernameStr, password strin
 	if !utils.CheckPasswordHashWithPepper(password, s.pepper, user.PasswordHash.String()) {
 		return "", ErrInvalidCredentials
 	}
+	return s.issueSession(ctx, user)
+}
+
+func (s *authUsecaseImpl) ensureSessionIssuer() error {
+	if s.sessionIssuer == nil {
+		return errors.Join(ErrInternalError, errors.New("session issuer is nil"))
+	}
+
+	return nil
+}
+
+func (s *authUsecaseImpl) issueSession(ctx context.Context, user *entity.User) (string, error) {
+	if err := s.ensureSessionIssuer(); err != nil {
+		return "", err
+	}
+
 	return s.sessionIssuer.IssueSession(ctx, user)
 }
 
