@@ -48,7 +48,16 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 
 	linkedUser, err := u.userRepo.FindByFirebaseUID(ctx, u.db, uid)
 	if err == nil {
-		if linkedUser != nil && linkedUser.ID == userID {
+		if linkedUser == nil {
+			return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
+		}
+		if linkedUser.ID == userID && !linkedUser.IsActive() {
+			return ErrUserDeleted
+		}
+		if !linkedUser.IsActive() {
+			return ErrFirebaseUIDAlreadyLinked
+		}
+		if linkedUser.ID == userID {
 			return nil
 		}
 		return ErrFirebaseUIDAlreadyLinked

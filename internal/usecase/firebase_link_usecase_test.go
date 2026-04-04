@@ -71,6 +71,38 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
+			name:    "削除済み他ユーザーに紐付いているUIDは再利用できない",
+			userID:  12,
+			idToken: "deleted-linked-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "deleted-linked-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 99, IsDeleted: true}, nil).Once()
+			},
+			wantErr: ErrFirebaseUIDAlreadyLinked,
+			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.AssertExpectations(t)
+				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name:    "削除済みの自分に既存UIDがあっても連携成功にしない",
+			userID:  10,
+			idToken: "deleted-same-user-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "deleted-same-user-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 10, IsDeleted: true}, nil).Once()
+			},
+			wantErr: ErrUserDeleted,
+			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.AssertExpectations(t)
+				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
 			name:    "無効なトークンはErrInvalidIDTokenを返す",
 			userID:  1,
 			idToken: "invalid-token",
@@ -96,6 +128,22 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name:    "FindByFirebaseUIDがnilユーザーを返した場合は内部エラーにする",
+			userID:  1,
+			idToken: "nil-linked-user-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "nil-linked-user-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, nil).Once()
+			},
+			wantErr: ErrInternalError,
+			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.AssertExpectations(t)
+				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
 				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 			},
 		},

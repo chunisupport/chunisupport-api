@@ -72,7 +72,7 @@
 | `missing_token` | トークン未指定 |
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | ユーザー名またはパスワード不正 |
-| `firebase_uid_already_linked` | Firebase UID が他ユーザーに連携済み |
+| `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
 | `invalid_recovery_credentials` | リカバリーコード不正/使用済み |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
@@ -436,10 +436,12 @@
 - **挙動**:
   - 同一ユーザーに同じ Firebase UID を再連携した場合は、冪等に成功します。
   - 他ユーザーに既に連携されている Firebase UID は連携できません。
+  - 論理削除済みユーザーに紐付いた Firebase UID も再利用できません。
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
-  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーに連携済み
+  - 401 Unauthorized (`unauthorized`): 削除済みユーザー
+  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーまたは削除済みユーザーに連携済み
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### GET `/internal/me/sessions`
