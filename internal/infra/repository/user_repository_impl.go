@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -28,7 +29,7 @@ func NewUserRepository(db *sqlx.DB) repository.UserRepository {
 // FindByID はIDでユーザーを検索します。
 func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE id = ?`
+	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_deleted, is_private FROM users WHERE id = ?`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -42,7 +43,7 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 // FindByUsername はユーザー名でユーザーを検索します。
 func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_deleted, is_private FROM users WHERE username = ?`
 	err := exec.GetContext(ctx, &userModel, query, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -145,6 +146,9 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 			u.id AS user_id,
 			u.username,
 			u.player_id AS user_player_id,
+			u.created_at AS user_created_at,
+			u.updated_at AS user_updated_at,
+			u.is_suspicious AS user_is_suspicious,
 			u.is_private AS user_is_private,
 			u.is_deleted AS user_is_deleted,
 			p.id AS player_id,
@@ -180,8 +184,11 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	for rows.Next() {
 		var row struct {
 			models.UserWithPlayerRow
-			UserIsPrivate *bool `db:"user_is_private"`
-			UserIsDeleted *bool `db:"user_is_deleted"`
+			UserCreatedAt    time.Time `db:"user_created_at"`
+			UserUpdatedAt    time.Time `db:"user_updated_at"`
+			UserIsSuspicious *bool     `db:"user_is_suspicious"`
+			UserIsPrivate    *bool     `db:"user_is_private"`
+			UserIsDeleted    *bool     `db:"user_is_deleted"`
 		}
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("scan error: %w", err)
@@ -195,11 +202,14 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 
 		result := entity.UserWithPlayer{
 			User: entity.User{
-				ID:        row.UserID,
-				Username:  uname,
-				PlayerID:  row.UserPlayerID,
-				IsPrivate: row.UserIsPrivate != nil && *row.UserIsPrivate,
-				IsDeleted: row.UserIsDeleted != nil && *row.UserIsDeleted,
+				ID:           row.UserID,
+				Username:     uname,
+				CreatedAt:    row.UserCreatedAt,
+				UpdatedAt:    row.UserUpdatedAt,
+				PlayerID:     row.UserPlayerID,
+				IsSuspicious: row.UserIsSuspicious != nil && *row.UserIsSuspicious,
+				IsPrivate:    row.UserIsPrivate != nil && *row.UserIsPrivate,
+				IsDeleted:    row.UserIsDeleted != nil && *row.UserIsDeleted,
 			},
 		}
 
@@ -229,8 +239,8 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 
 // Create は新しいユーザーをデータベースに保存します。保存後、user.IDに自動採番されたIDが設定されます。
 func (r *userRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	query := `INSERT INTO users (username, password_hash, account_type_id) VALUES (?, ?, ?)`
-	result, err := exec.ExecContext(ctx, query, user.Username, user.PasswordHash, user.AccountTypeID)
+	query := `INSERT INTO users (username, password_hash, account_type_id, is_suspicious) VALUES (?, ?, ?, ?)`
+	result, err := exec.ExecContext(ctx, query, user.Username, user.PasswordHash, user.AccountTypeID, user.IsSuspicious)
 	if err != nil {
 		return err
 	}
@@ -248,8 +258,8 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 
 	if user.ID == 0 {
 		// 新規作成
-		query := `INSERT INTO users (username, password_hash, account_type_id, is_deleted, is_private) VALUES (?, ?, ?, ?, ?)`
-		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsDeleted, userModel.IsPrivate)
+		query := `INSERT INTO users (username, password_hash, account_type_id, is_suspicious, is_deleted, is_private) VALUES (?, ?, ?, ?, ?, ?)`
+		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate)
 		if err != nil {
 			return err
 		}
@@ -262,7 +272,7 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	}
 
 	// 更新
-	query := `UPDATE users SET username = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
+	query := `UPDATE users SET username = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_suspicious = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
+	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
 	return err
 }

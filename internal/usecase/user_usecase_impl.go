@@ -173,9 +173,12 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 	responses := make([]api_internal.AdminUserListResponse, 0, len(users))
 	for _, u := range users {
 		resp := api_internal.AdminUserListResponse{
-			UserName:  u.User.Username.String(),
-			IsPrivate: u.User.IsPrivate,
-			IsDeleted: u.User.IsDeleted,
+			UserName:     u.User.Username.String(),
+			CreatedAt:    u.User.CreatedAt,
+			UpdatedAt:    u.User.UpdatedAt,
+			IsSuspicious: u.User.IsSuspicious,
+			IsPrivate:    u.User.IsPrivate,
+			IsDeleted:    u.User.IsDeleted,
 		}
 		if u.Player != nil {
 			resp.PlayerName = u.Player.Name.String()

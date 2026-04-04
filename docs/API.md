@@ -979,25 +979,34 @@ curl -X POST \
 [
   {
     "username": "user1",
+    "created_at": "2025-11-27T12:00:00+09:00",
+    "updated_at": "2025-11-28T22:23:32+09:00",
     "player_name": "player1",
     "rating": 17.25,
     "overpower_value": 9500.00,
+    "is_suspicious": false,
     "is_private": false,
     "is_deleted": false
   },
   {
     "username": "user2",
+    "created_at": "2025-11-20T09:30:00+09:00",
+    "updated_at": "2025-11-21T08:15:00+09:00",
     "player_name": "",
     "rating": null,
     "overpower_value": null,
+    "is_suspicious": true,
     "is_private": true,
     "is_deleted": false
   },
   {
     "username": "deleted_user",
+    "created_at": "2025-10-01T00:00:00+09:00",
+    "updated_at": "2025-10-15T18:45:00+09:00",
     "player_name": "deleted_player",
     "rating": 15.00,
     "overpower_value": 7500.00,
+    "is_suspicious": false,
     "is_private": false,
     "is_deleted": true
   }
@@ -1009,9 +1018,12 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
+| `created_at` | string | ユーザー作成日時 (ISO8601) |
+| `updated_at` | string | ユーザー更新日時 (ISO8601) |
 | `player_name` | string | プレイヤー名（未連携の場合は空文字） |
 | `rating` | number \| null | レーティング（未連携の場合は null） |
 | `overpower_value` | number \| null | オーバーパワー値（未連携の場合は null） |
+| `is_suspicious` | boolean | 不審アカウントフラグ |
 | `is_private` | boolean | プライベートアカウントかどうか |
 | `is_deleted` | boolean | 削除済みアカウントかどうか |
 
@@ -2305,9 +2317,12 @@ interface UserDTO {
 // ユーザー一覧レスポンス（ADMIN用）
 interface AdminUserListResponse {
   username: string;
+  created_at: string;
+  updated_at: string;
   player_name: string;
   rating: number | null;
   overpower_value: number | null;
+  is_suspicious: boolean;
   is_private: boolean;
   is_deleted: boolean;
 }

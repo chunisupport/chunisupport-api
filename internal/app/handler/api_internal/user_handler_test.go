@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -244,6 +245,57 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	assert.False(t, hasBest)
 	assert.False(t, hasNew)
 	mockService.AssertExpectations(t)
+}
+
+func TestAdminUserHandler_GetAllUsers(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewAdminUserHandler(mockService)
+	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	updatedAt := createdAt.Add(2 * time.Hour)
+
+	expected := []dto_internal.AdminUserListResponse{
+		{
+			UserName:       "user1",
+			CreatedAt:      createdAt,
+			UpdatedAt:      updatedAt,
+			PlayerName:     "player1",
+			Rating:         float64Ptr(17.25),
+			OverPowerValue: float64Ptr(9500),
+			IsSuspicious:   true,
+			IsPrivate:      false,
+			IsDeleted:      false,
+		},
+	}
+
+	mockService.On("GetAllUsersForAdmin", mock.Anything, 2, info.DefaultUserListLimit, "user").Return(expected, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/users?page=2&name=user", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.GetAllUsers(c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var body []map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "user1", body[0]["username"])
+	assert.Equal(t, createdAt.Format(time.RFC3339), body[0]["created_at"])
+	assert.Equal(t, updatedAt.Format(time.RFC3339), body[0]["updated_at"])
+	assert.Equal(t, "player1", body[0]["player_name"])
+	assert.Equal(t, 17.25, body[0]["rating"])
+	assert.Equal(t, 9500.0, body[0]["overpower_value"])
+	assert.Equal(t, true, body[0]["is_suspicious"])
+	assert.Equal(t, false, body[0]["is_private"])
+	assert.Equal(t, false, body[0]["is_deleted"])
+	mockService.AssertExpectations(t)
+}
+
+func float64Ptr(v float64) *float64 {
+	return &v
 }
 
 func TestUserHandler_DeleteUser(t *testing.T) {

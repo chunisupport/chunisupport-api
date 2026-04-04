@@ -16,6 +16,7 @@ type User struct {
 	UpdatedAt     time.Time
 	PlayerID      *int
 	AccountTypeID int
+	IsSuspicious  bool
 	IsDeleted     bool
 	IsPrivate     bool
 }

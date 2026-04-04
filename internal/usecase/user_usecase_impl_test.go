@@ -648,15 +648,22 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
 	rating1 := 15.0
 	op1 := 10.0
+	createdAt1 := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	updatedAt1 := createdAt1.Add(2 * time.Hour)
 
 	un2, _ := username.NewUserName("user2")
+	createdAt2 := time.Date(2025, 2, 3, 4, 5, 6, 0, time.UTC)
+	updatedAt2 := createdAt2.Add(3 * time.Hour)
 
 	usersWithPlayer := []entity.UserWithPlayer{
 		{
 			User: entity.User{
-				ID:       1,
-				Username: un1,
-				PlayerID: intPointer(1),
+				ID:           1,
+				Username:     un1,
+				CreatedAt:    createdAt1,
+				UpdatedAt:    updatedAt1,
+				PlayerID:     intPointer(1),
+				IsSuspicious: true,
 			},
 			Player: &entity.Player{
 				ID:             1,
@@ -667,9 +674,12 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 		},
 		{
 			User: entity.User{
-				ID:       2,
-				Username: un2,
-				PlayerID: nil,
+				ID:           2,
+				Username:     un2,
+				CreatedAt:    createdAt2,
+				UpdatedAt:    updatedAt2,
+				PlayerID:     nil,
+				IsSuspicious: false,
 			},
 			Player: nil,
 		},
@@ -687,6 +697,9 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 
 	// Verify User 1
 	assert.Equal(t, "user1", list[0].UserName)
+	assert.True(t, list[0].CreatedAt.Equal(createdAt1))
+	assert.True(t, list[0].UpdatedAt.Equal(updatedAt1))
+	assert.True(t, list[0].IsSuspicious)
 	assert.Equal(t, "プレイヤー１", list[0].PlayerName)
 	require.NotNil(t, list[0].Rating)
 	assert.Equal(t, 15.0, *list[0].Rating)
@@ -695,6 +708,9 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 
 	// Verify User 2 (No player)
 	assert.Equal(t, "user2", list[1].UserName)
+	assert.True(t, list[1].CreatedAt.Equal(createdAt2))
+	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
+	assert.False(t, list[1].IsSuspicious)
 	assert.Equal(t, "", list[1].PlayerName)
 }
 
