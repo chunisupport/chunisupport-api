@@ -67,7 +67,7 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 			return err
 		}
 
-		user, err := u.userRepo.FindByID(ctx, tx, userID)
+		user, err := u.userRepo.FindByIDForUpdate(ctx, tx, userID)
 		if err != nil {
 			if errors.Is(err, repository.ErrUserNotFound) {
 				return ErrUserNotFound
