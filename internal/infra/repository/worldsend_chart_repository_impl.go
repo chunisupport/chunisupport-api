@@ -24,12 +24,6 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 	return &worldsendChartRepository{db: db}
 }
 
-// worldsendSongChartRow は DB から WORLD'S END 楽曲と譜面の JOIN 結果をマッピングする構造体です。
-type worldsendSongChartRow struct {
-	models.SongModel
-	models.WorldsendChartModel
-}
-
 // FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
 func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	query := `

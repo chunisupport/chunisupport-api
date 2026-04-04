@@ -145,6 +145,7 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 		SELECT
 			u.id AS user_id,
 			u.username,
+			u.account_type_id AS user_account_type_id,
 			u.player_id AS user_player_id,
 			u.created_at AS user_created_at,
 			u.updated_at AS user_updated_at,
@@ -184,11 +185,12 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	for rows.Next() {
 		var row struct {
 			models.UserWithPlayerRow
-			UserCreatedAt    time.Time `db:"user_created_at"`
-			UserUpdatedAt    time.Time `db:"user_updated_at"`
-			UserIsSuspicious *bool     `db:"user_is_suspicious"`
-			UserIsPrivate    *bool     `db:"user_is_private"`
-			UserIsDeleted    *bool     `db:"user_is_deleted"`
+			UserAccountTypeID int       `db:"user_account_type_id"`
+			UserCreatedAt     time.Time `db:"user_created_at"`
+			UserUpdatedAt     time.Time `db:"user_updated_at"`
+			UserIsSuspicious  *bool     `db:"user_is_suspicious"`
+			UserIsPrivate     *bool     `db:"user_is_private"`
+			UserIsDeleted     *bool     `db:"user_is_deleted"`
 		}
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("scan error: %w", err)
@@ -202,14 +204,15 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 
 		result := entity.UserWithPlayer{
 			User: entity.User{
-				ID:           row.UserID,
-				Username:     uname,
-				CreatedAt:    row.UserCreatedAt,
-				UpdatedAt:    row.UserUpdatedAt,
-				PlayerID:     row.UserPlayerID,
-				IsSuspicious: row.UserIsSuspicious != nil && *row.UserIsSuspicious,
-				IsPrivate:    row.UserIsPrivate != nil && *row.UserIsPrivate,
-				IsDeleted:    row.UserIsDeleted != nil && *row.UserIsDeleted,
+				ID:            row.UserID,
+				Username:      uname,
+				AccountTypeID: row.UserAccountTypeID,
+				CreatedAt:     row.UserCreatedAt,
+				UpdatedAt:     row.UserUpdatedAt,
+				PlayerID:      row.UserPlayerID,
+				IsSuspicious:  row.UserIsSuspicious != nil && *row.UserIsSuspicious,
+				IsPrivate:     row.UserIsPrivate != nil && *row.UserIsPrivate,
+				IsDeleted:     row.UserIsDeleted != nil && *row.UserIsDeleted,
 			},
 		}
 

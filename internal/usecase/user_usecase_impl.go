@@ -24,7 +24,12 @@ type userUsecase struct {
 	songRepo            repository.SongRepository
 	worldsendChartRepo  repository.WorldsendChartRepository
 	recordCompletionSvc *service.RecordCompletionService
-	songMasterProvider  repository.SongMasterProvider
+	masterProvider      userMasterProvider
+}
+
+type userMasterProvider interface {
+	repository.SongMasterProvider
+	repository.AccountTypeMasterProvider
 }
 
 type userProfilePlayerRecords struct {
@@ -34,7 +39,7 @@ type userProfilePlayerRecords struct {
 }
 
 // NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, songMasterProvider repository.SongMasterProvider) UserUsecase {
+func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
@@ -44,7 +49,7 @@ func NewUserService(db repository.Executor, userRepo repository.UserRepository, 
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
-		songMasterProvider:  songMasterProvider,
+		masterProvider:      masterProvider,
 	}
 }
 
@@ -172,8 +177,14 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 
 	responses := make([]api_internal.AdminUserListResponse, 0, len(users))
 	for _, u := range users {
+		accountTypeName := "UNKNOWN"
+		if s.masterProvider != nil {
+			accountTypeName = s.masterProvider.GetAccountTypeNameByID(u.User.AccountTypeID)
+		}
+
 		resp := api_internal.AdminUserListResponse{
 			UserName:     u.User.Username.String(),
+			AccountType:  accountTypeName,
 			CreatedAt:    u.User.CreatedAt,
 			UpdatedAt:    u.User.UpdatedAt,
 			IsSuspicious: u.User.IsSuspicious,
@@ -181,7 +192,8 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 			IsDeleted:    u.User.IsDeleted,
 		}
 		if u.Player != nil {
-			resp.PlayerName = u.Player.Name.String()
+			playerName := u.Player.Name.String()
+			resp.PlayerName = &playerName
 			resp.Rating = u.Player.OfficialRating
 			resp.OverPowerValue = u.Player.OverpowerValue
 		}
@@ -345,8 +357,8 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	}
 
 	var difficultyNamesByID map[int]string
-	if s.songMasterProvider != nil {
-		masters := s.songMasterProvider.SongMasters()
+	if s.masterProvider != nil {
+		masters := s.masterProvider.SongMasters()
 		if masters != nil {
 			difficultyNamesByID = masters.DifficultyNamesByID
 		}

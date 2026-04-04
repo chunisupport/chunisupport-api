@@ -257,13 +257,26 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	expected := []dto_internal.AdminUserListResponse{
 		{
 			UserName:       "user1",
+			AccountType:    "EDITOR",
 			CreatedAt:      createdAt,
 			UpdatedAt:      updatedAt,
-			PlayerName:     "player1",
-			Rating:         float64Ptr(17.25),
-			OverPowerValue: float64Ptr(9500),
+			PlayerName:     new("player1"),
+			Rating:         new(17.25),
+			OverPowerValue: new(float64(9500)),
 			IsSuspicious:   true,
 			IsPrivate:      false,
+			IsDeleted:      false,
+		},
+		{
+			UserName:       "user2",
+			AccountType:    "PLAYER",
+			CreatedAt:      createdAt.Add(time.Hour),
+			UpdatedAt:      updatedAt.Add(time.Hour),
+			PlayerName:     nil,
+			Rating:         nil,
+			OverPowerValue: nil,
+			IsSuspicious:   false,
+			IsPrivate:      true,
 			IsDeleted:      false,
 		},
 	}
@@ -281,8 +294,9 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 
 	var body []map[string]any
 	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Len(t, body, 1)
+	assert.Len(t, body, 2)
 	assert.Equal(t, "user1", body[0]["username"])
+	assert.Equal(t, "EDITOR", body[0]["account_type"])
 	assert.Equal(t, createdAt.Format(time.RFC3339), body[0]["created_at"])
 	assert.Equal(t, updatedAt.Format(time.RFC3339), body[0]["updated_at"])
 	assert.Equal(t, "player1", body[0]["player_name"])
@@ -291,11 +305,17 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
 	assert.Equal(t, false, body[0]["is_deleted"])
+	assert.Equal(t, "user2", body[1]["username"])
+	assert.Equal(t, "PLAYER", body[1]["account_type"])
+	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
+	assert.Equal(t, updatedAt.Add(time.Hour).Format(time.RFC3339), body[1]["updated_at"])
+	assert.Nil(t, body[1]["player_name"])
+	assert.Nil(t, body[1]["rating"])
+	assert.Nil(t, body[1]["overpower_value"])
+	assert.Equal(t, false, body[1]["is_suspicious"])
+	assert.Equal(t, true, body[1]["is_private"])
+	assert.Equal(t, false, body[1]["is_deleted"])
 	mockService.AssertExpectations(t)
-}
-
-func float64Ptr(v float64) *float64 {
-	return &v
 }
 
 func TestUserHandler_DeleteUser(t *testing.T) {
