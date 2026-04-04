@@ -10,6 +10,8 @@ import (
 type UserRepository interface {
 	// FindByID はIDでユーザーを検索します。
 	FindByID(ctx context.Context, exec Executor, id int) (*entity.User, error)
+	// FindByIDForUpdate はIDでユーザーを検索し、更新用に行ロックします。
+	FindByIDForUpdate(ctx context.Context, exec Executor, id int) (*entity.User, error)
 	// FindByUsername はユーザー名でユーザーを検索します。
 	FindByUsername(ctx context.Context, exec Executor, username string) (*entity.User, error)
 	// FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。

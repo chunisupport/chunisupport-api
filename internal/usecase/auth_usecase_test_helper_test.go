@@ -44,6 +44,14 @@ func (m *MockUserRepository) FindByID(ctx context.Context, exec repository.Execu
 	return args.Get(0).(*entity.User), args.Error(1)
 }
 
+func (m *MockUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	args := m.Called(ctx, exec, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
 func (m *MockUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	args := m.Called(ctx, exec, username)
 	if args.Get(0) == nil {

@@ -65,6 +65,10 @@ func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.
 	return &userCopy, nil
 }
 
+func (s *tokenStubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return s.FindByID(ctx, exec, id)
+}
+
 func (s *tokenStubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	return nil, errors.New("not implemented")
 }

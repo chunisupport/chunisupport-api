@@ -33,6 +33,10 @@ func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Execu
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *stubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	if s.err != nil {
 		return nil, s.err

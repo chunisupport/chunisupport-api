@@ -55,6 +55,25 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
+			name:    "自分に別のUIDが既に紐付いていれば新しいUIDへ更新できる",
+			userID:  10,
+			idToken: "replace-user-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				existingUID := "old-firebase-uid"
+				user := &entity.User{ID: 10, FirebaseUID: &existingUID}
+				verifier.On("VerifyIDToken", mock.Anything, "replace-user-token").Return("new-firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "new-firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
+				userRepo.On("FindByID", mock.Anything, mock.Anything, 10).Return(user, nil).Once()
+				userRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
+					return user.FirebaseUID != nil && *user.FirebaseUID == "new-firebase-uid"
+				})).Return(nil).Once()
+			},
+			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.AssertExpectations(t)
+				userRepo.AssertExpectations(t)
+			},
+		},
+		{
 			name:    "他ユーザーに紐付いているUIDは409相当のエラーを返す",
 			userID:  11,
 			idToken: "linked-token",
@@ -148,6 +167,22 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
+			name:    "FindByIDがnilユーザーを返した場合は内部エラーにする",
+			userID:  1,
+			idToken: "nil-user-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "nil-user-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
+				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, nil).Once()
+			},
+			wantErr: ErrInternalError,
+			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.AssertExpectations(t)
+				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
 			name:    "保存時のUNIQUE制約違反は409相当のエラーを返す",
 			userID:  1,
 			idToken: "duplicate-save-token",
@@ -171,7 +206,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			// Given
 			verifier := new(mockTokenVerifier)
 			userRepo := new(MockUserRepository)
-			service := NewFirebaseLinkUsecase(nil, userRepo, verifier)
+			tm := &mockTransactionManager{}
+			service := NewFirebaseLinkUsecase(tm, userRepo, verifier)
 			tt.setup(verifier, userRepo)
 
 			// When

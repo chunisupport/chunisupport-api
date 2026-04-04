@@ -40,6 +40,20 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 	return userModel.ToEntity()
 }
 
+// FindByIDForUpdate はIDでユーザーを検索し、更新用に行ロックします。
+func (r *userRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	var userModel models.UserModel
+	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_deleted, is_private FROM users WHERE id = ? FOR UPDATE`
+	err := exec.GetContext(ctx, &userModel, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
+		return nil, err
+	}
+	return userModel.ToEntity()
+}
+
 // FindByUsername はユーザー名でユーザーを検索します。
 func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	var userModel models.UserModel

@@ -14,15 +14,15 @@ type FirebaseLinkUsecase interface {
 }
 
 type firebaseLinkUsecase struct {
-	db            repository.Executor
+	tm            TransactionManager
 	userRepo      repository.UserRepository
 	tokenVerifier TokenVerifier
 }
 
 // NewFirebaseLinkUsecase は Firebase 連携ユースケースを生成します。
-func NewFirebaseLinkUsecase(db repository.Executor, userRepo repository.UserRepository, tokenVerifier TokenVerifier) FirebaseLinkUsecase {
+func NewFirebaseLinkUsecase(tm TransactionManager, userRepo repository.UserRepository, tokenVerifier TokenVerifier) FirebaseLinkUsecase {
 	return &firebaseLinkUsecase{
-		db:            db,
+		tm:            tm,
 		userRepo:      userRepo,
 		tokenVerifier: tokenVerifier,
 	}
@@ -32,6 +32,9 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 	idToken = strings.TrimSpace(idToken)
 	if idToken == "" {
 		return ErrInvalidIDToken
+	}
+	if u.tm == nil {
+		return errors.Join(ErrInternalError, errors.New("transaction manager is nil"))
 	}
 	if u.tokenVerifier == nil {
 		return errors.Join(ErrInternalError, errors.New("token verifier is nil"))
@@ -46,49 +49,48 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 		return errors.Join(ErrInternalError, errors.New("firebase uid is empty"))
 	}
 
-	linkedUser, err := u.userRepo.FindByFirebaseUID(ctx, u.db, uid)
-	if err == nil {
-		if linkedUser == nil {
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		linkedUser, err := u.userRepo.FindByFirebaseUID(ctx, tx, uid)
+		if err == nil {
+			if linkedUser == nil {
+				return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
+			}
+			if linkedUser.ID == userID {
+				if !linkedUser.IsActive() {
+					return ErrUserDeleted
+				}
+				return nil
+			}
+			return ErrFirebaseUIDAlreadyLinked
+		}
+		if !errors.Is(err, repository.ErrUserNotFound) {
+			return err
+		}
+
+		user, err := u.userRepo.FindByID(ctx, tx, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
+		}
+		if user == nil {
 			return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
 		}
-		if linkedUser.ID == userID && !linkedUser.IsActive() {
+		if !user.IsActive() {
 			return ErrUserDeleted
 		}
-		if !linkedUser.IsActive() {
-			return ErrFirebaseUIDAlreadyLinked
-		}
-		if linkedUser.ID == userID {
-			return nil
-		}
-		return ErrFirebaseUIDAlreadyLinked
-	}
-	if !errors.Is(err, repository.ErrUserNotFound) {
-		return err
-	}
 
-	user, err := u.userRepo.FindByID(ctx, u.db, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
+		user.LinkFirebaseUID(uid)
+		if err := u.userRepo.Save(ctx, tx, user); err != nil {
+			if errors.Is(err, repository.ErrFirebaseUIDAlreadyLinked) {
+				return ErrFirebaseUIDAlreadyLinked
+			}
+			return err
 		}
-		return err
-	}
-	if !user.IsActive() {
-		return ErrUserDeleted
-	}
-	if user.FirebaseUID != nil && *user.FirebaseUID == uid {
+
 		return nil
-	}
-
-	user.LinkFirebaseUID(uid)
-	if err := u.userRepo.Save(ctx, u.db, user); err != nil {
-		if errors.Is(err, repository.ErrFirebaseUIDAlreadyLinked) {
-			return ErrFirebaseUIDAlreadyLinked
-		}
-		return err
-	}
-
-	return nil
+	})
 }
 
 var _ FirebaseLinkUsecase = (*firebaseLinkUsecase)(nil)

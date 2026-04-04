@@ -168,7 +168,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	sessionIssuer := usecase.NewSessionIssuer(db, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour)
 	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
-	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(tm, userRepo, firebaseTokenVerifier)
 	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
 	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
