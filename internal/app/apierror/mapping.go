@@ -20,6 +20,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
 	case errors.Is(err, usecase.ErrInvalidCredentials):
 		return ErrInvalidCredentials.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidIDToken):
+		return ErrInvalidToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrIncorrectPassword):
 		return ErrInvalidCredentials.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidPassword):
@@ -28,6 +30,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidSession):
 		return ErrInvalidSession.WithInternal(err) // セッション系を統合
+	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
+		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserDeleted):
 		return ErrUnauthorized.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):

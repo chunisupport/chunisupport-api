@@ -31,6 +31,10 @@ type LogPaths struct {
 	Echo string `json:"echo"`
 }
 
+type Firebase struct {
+	CredentialsFile string
+}
+
 type Config struct {
 	AppPort  int      `json:"app_port"`
 	LogLevel string   `json:"log_level"`
@@ -45,6 +49,7 @@ type Config struct {
 	JWTSecret string
 	Auth      Auth     `json:"auth"`
 	CORS      CORS     `json:"cors"`
+	Firebase  Firebase // 環境変数から読み込み
 	Database  Database // 環境変数から読み込み
 }
 
@@ -138,6 +143,11 @@ func LoadConfig() (Config, error) {
 		errors = append(errors, "PW_PEPPER environment variable is required")
 	}
 
+	config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))
+	if err := normalizeAndValidateFirebaseConfig(&config.Firebase); err != nil {
+		errors = append(errors, err.Error())
+	}
+
 	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
@@ -189,6 +199,19 @@ func LoadConfig() (Config, error) {
 	}
 
 	return config, nil
+}
+
+func normalizeAndValidateFirebaseConfig(firebase *Firebase) error {
+	if firebase == nil {
+		return fmt.Errorf("firebase configuration is required")
+	}
+
+	firebase.CredentialsFile = strings.TrimSpace(firebase.CredentialsFile)
+	if firebase.CredentialsFile == "" {
+		return fmt.Errorf("FIREBASE_CREDENTIALS_FILE environment variable is required")
+	}
+
+	return nil
 }
 
 // normalizeAndValidateDatabasePoolConfig はデータベースプール設定の検証と正規化を行います。

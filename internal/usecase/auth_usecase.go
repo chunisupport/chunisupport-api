@@ -21,26 +21,22 @@ type AuthUsecase interface {
 }
 
 type authUsecaseImpl struct {
-	db                    repository.Executor
-	userRepo              repository.UserRepository
-	sessionRepo           repository.SessionRepository
-	jwtSecret             string
-	jwtExpirationHour     int
-	sessionExpirationHour int
-	pepper                string
-	masterCache           AccountTypeProvider
+	db            repository.Executor
+	userRepo      repository.UserRepository
+	sessionRepo   repository.SessionRepository
+	sessionIssuer SessionIssuer
+	pepper        string
+	masterCache   AccountTypeProvider
 }
 
 // NewAuthUsecase は新しいAuthUsecaseを生成します。
-func NewAuthUsecase(db repository.Executor, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, jwtSecret string, jwtExpirationHour int, sessionExpirationHour int, pepper string, masterCache AccountTypeProvider) AuthUsecase {
+func NewAuthUsecase(db repository.Executor, userRepo repository.UserRepository, sessionRepo repository.SessionRepository, sessionIssuer SessionIssuer, pepper string, masterCache AccountTypeProvider) AuthUsecase {
 	return &authUsecaseImpl{
-		db:                    db,
-		userRepo:              userRepo,
-		sessionRepo:           sessionRepo,
-		jwtSecret:             jwtSecret,
-		jwtExpirationHour:     jwtExpirationHour,
-		sessionExpirationHour: sessionExpirationHour,
-		pepper:                pepper,
-		masterCache:           masterCache,
+		db:            db,
+		userRepo:      userRepo,
+		sessionRepo:   sessionRepo,
+		sessionIssuer: sessionIssuer,
+		pepper:        pepper,
+		masterCache:   masterCache,
 	}
 }

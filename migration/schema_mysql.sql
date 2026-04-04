@@ -321,6 +321,7 @@ CREATE TABLE `user_recovery_codes` (
 CREATE TABLE `users` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `firebase_uid` varchar(128) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -332,6 +333,7 @@ CREATE TABLE `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uq_users_player_id` (`player_id`),
+  UNIQUE KEY `uk_users_firebase_uid` (`firebase_uid`),
   KEY `account_type_id` (`account_type_id`),
   KEY `idx_users_deleted_private` (`is_deleted`,`is_private`,`player_id`),
   CONSTRAINT `fk_users_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,

@@ -12,6 +12,7 @@ import (
 type UserModel struct {
 	ID            int       `db:"id"`
 	Username      string    `db:"username"`
+	FirebaseUID   *string   `db:"firebase_uid"`
 	PasswordHash  string    `db:"password_hash"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`
@@ -36,6 +37,7 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 	return &entity.User{
 		ID:            m.ID,
 		Username:      uname,
+		FirebaseUID:   m.FirebaseUID,
 		PasswordHash:  phash,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
@@ -52,6 +54,7 @@ func FromUserEntity(e *entity.User) *UserModel {
 	return &UserModel{
 		ID:            e.ID,
 		Username:      e.Username.String(),
+		FirebaseUID:   e.FirebaseUID,
 		PasswordHash:  e.PasswordHash.String(),
 		CreatedAt:     e.CreatedAt,
 		UpdatedAt:     e.UpdatedAt,

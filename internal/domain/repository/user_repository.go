@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -10,6 +11,8 @@ import (
 type UserRepository interface {
 	// FindByID はIDでユーザーを検索します。
 	FindByID(ctx context.Context, exec Executor, id int) (*entity.User, error)
+	// FindByIDForUpdate はIDでユーザーを検索し、更新用に行ロックします。
+	FindByIDForUpdate(ctx context.Context, exec Executor, id int) (*entity.User, error)
 	// FindByUsername はユーザー名でユーザーを検索します。
 	FindByUsername(ctx context.Context, exec Executor, username string) (*entity.User, error)
 	// FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。
@@ -18,8 +21,10 @@ type UserRepository interface {
 	// FindAllWithPlayerForAdmin はADMIN用にすべてのユーザー一覧をプレイヤー情報付きで取得します。
 	// プライベート・削除済み・プレイヤー未紐付けアカウントを含みます。
 	FindAllWithPlayerForAdmin(ctx context.Context, exec Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error)
-	// Create は新しいユーザーを作成します。
-	Create(ctx context.Context, exec Executor, user *entity.User) error
+	// FindByFirebaseUID はFirebase UIDでユーザーを検索します。
+	FindByFirebaseUID(ctx context.Context, exec Executor, uid string) (*entity.User, error)
+	// LinkFirebaseUID は現在値が一致する場合のみ Firebase UID を更新します。
+	LinkFirebaseUID(ctx context.Context, exec Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 	Save(ctx context.Context, exec Executor, user *entity.User) error
 }

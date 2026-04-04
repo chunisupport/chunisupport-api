@@ -68,3 +68,6 @@ Taskfile.yml
 
 # Logs
 .log/
+
+# 認証データなど
+.auth/

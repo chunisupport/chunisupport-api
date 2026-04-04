@@ -8,6 +8,9 @@ var (
 	// ErrUserNotFound はユーザーが見つからなかった場合に返されるエラーです。
 	ErrUserNotFound = errors.New("user not found")
 
+	// ErrUserConflict はユーザー更新時の前提条件が一致しなかった場合に返されるエラーです。
+	ErrUserConflict = errors.New("user conflict")
+
 	// ErrSessionNotFound はセッションが見つからなかった場合に返されるエラーです。
 	ErrSessionNotFound = errors.New("session not found")
 
@@ -28,4 +31,11 @@ var (
 
 	// ErrDuplicateDisplayID はリクエスト内に重複したdisplay_idが含まれる場合に返されるエラーです。
 	ErrDuplicateDisplayID = errors.New("duplicate display_id")
+
+	// ErrFirebaseUIDAlreadyLinked は Firebase UID が他ユーザーへ既に紐付いている場合に返されるエラーです。
+	ErrFirebaseUIDAlreadyLinked = errors.New("firebase uid already linked")
+
+	// ErrDuplicateUsername はユーザー名が既に使用されている場合に返されるエラーです。
+	// 事前チェックをすり抜けた競合状態でのINSERT失敗時に使用します。
+	ErrDuplicateUsername = errors.New("username already taken")
 )

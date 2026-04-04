@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -65,6 +66,10 @@ func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.
 	return &userCopy, nil
 }
 
+func (s *tokenStubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return s.FindByID(ctx, exec, id)
+}
+
 func (s *tokenStubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	return nil, errors.New("not implemented")
 }
@@ -77,12 +82,16 @@ func (s *tokenStubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context,
 	return nil, errors.New("not implemented")
 }
 
-func (s *tokenStubUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
+func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	return errors.New("not implemented")
 }
 
-func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
+func (s *tokenStubUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
 	return errors.New("not implemented")
+}
+
+func (s *tokenStubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestAPITokenService_Generate(t *testing.T) {

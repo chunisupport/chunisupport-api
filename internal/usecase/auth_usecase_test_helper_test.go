@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -44,6 +45,14 @@ func (m *MockUserRepository) FindByID(ctx context.Context, exec repository.Execu
 	return args.Get(0).(*entity.User), args.Error(1)
 }
 
+func (m *MockUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	args := m.Called(ctx, exec, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
 func (m *MockUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	args := m.Called(ctx, exec, username)
 	if args.Get(0) == nil {
@@ -68,14 +77,22 @@ func (m *MockUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 	return args.Get(0).([]entity.UserWithPlayer), args.Error(1)
 }
 
-func (m *MockUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
+func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	args := m.Called(ctx, exec, user)
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	args := m.Called(ctx, exec, user)
+func (m *MockUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	args := m.Called(ctx, exec, userID, currentUID, newUID, updatedAt)
 	return args.Error(0)
+}
+
+func (m *MockUserRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
+	args := m.Called(ctx, exec, uid)
+	if u, ok := args.Get(0).(*entity.User); ok {
+		return u, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // MockSessionRepository はSessionRepositoryのモックです。
@@ -160,8 +177,22 @@ func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx re
 	return f(m.exec)
 }
 
+type authMockSessionIssuer struct {
+	mock.Mock
+}
+
+func (m *authMockSessionIssuer) IssueSession(ctx context.Context, user *entity.User) (string, error) {
+	args := m.Called(ctx, user)
+	return args.String(0), args.Error(1)
+}
+
+func newTestAuthUsecaseWithSessionIssuer(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, sessionIssuer SessionIssuer, pepper string) AuthUsecase {
+	return NewAuthUsecase(nil, userRepo, sessionRepo, sessionIssuer, pepper, newMockMasterCache())
+}
+
 func newTestAuthUsecase(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, pepper string) AuthUsecase {
-	return NewAuthUsecase(nil, userRepo, sessionRepo, "test-secret", 24, 24, pepper, newMockMasterCache())
+	sessionIssuer := NewSessionIssuer(nil, sessionRepo, "test-secret", 24, 24)
+	return newTestAuthUsecaseWithSessionIssuer(userRepo, sessionRepo, sessionIssuer, pepper)
 }
 
 func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string) UserCredentialUsecase {

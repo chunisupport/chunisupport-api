@@ -33,6 +33,10 @@ func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Execu
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *stubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	if s.err != nil {
 		return nil, s.err
@@ -54,16 +58,20 @@ func (s *stubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 	return s.usersWithPlayer, nil
 }
 
-func (s *stubUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	return errors.New("not implemented")
-}
-
 func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	if s.saveErr != nil {
 		return s.saveErr
 	}
 	s.savedUser = user
 	return nil
+}
+
+func (s *stubUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
 }
 
 type stubPlayerRecordRepository struct {

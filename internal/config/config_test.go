@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func intPtr(v int) *int {
@@ -147,5 +149,34 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleInvalidValues(t *testing
 		if !strings.Contains(errMsg, expected) {
 			t.Errorf("error message should contain %q, but got: %s", expected, errMsg)
 		}
+	}
+}
+
+func TestNormalizeAndValidateFirebaseConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Firebase
+		wantErr bool
+	}{
+		{
+			name:    "資格情報ファイルがなければエラーになる",
+			config:  Firebase{},
+			wantErr: true,
+		},
+		{
+			name:    "資格情報ファイルがあれば通る",
+			config:  Firebase{CredentialsFile: "  /tmp/firebase.json  "},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := normalizeAndValidateFirebaseConfig(&tt.config)
+			assert.Equal(t, tt.wantErr, err != nil)
+			if !tt.wantErr {
+				assert.Equal(t, strings.TrimSpace(tt.config.CredentialsFile), tt.config.CredentialsFile)
+			}
+		})
 	}
 }
