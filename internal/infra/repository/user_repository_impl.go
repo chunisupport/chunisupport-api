@@ -82,6 +82,21 @@ func (r *userRepository) FindByFirebaseUID(ctx context.Context, exec repository.
 	return userModel.ToEntity()
 }
 
+// LinkFirebaseUID は現在の Firebase UID が一致する場合のみ更新します。
+func (r *userRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	whereClause, whereArgs := userFirebaseUIDWhereClause(currentUID)
+	query := fmt.Sprintf("UPDATE users SET firebase_uid = ?, updated_at = ? WHERE id = ? AND %s", whereClause)
+	args := []any{newUID, updatedAt, userID}
+	args = append(args, whereArgs...)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return wrapFirebaseUIDDuplicateError(err)
+	}
+
+	return r.validateSingleUserUpdate(ctx, exec, userID, result)
+}
+
 // FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。
 // 通常のユーザー一覧取得用で、プライベート・削除済み・プレイヤー未紐付けアカウントを除外します。
 func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
@@ -268,29 +283,14 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	return results, nil
 }
 
-// Create は新しいユーザーをデータベースに保存します。保存後、user.IDに自動採番されたIDが設定されます。
-func (r *userRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	query := `INSERT INTO users (username, password_hash, account_type_id, is_suspicious) VALUES (?, ?, ?, ?)`
-	result, err := exec.ExecContext(ctx, query, user.Username, user.PasswordHash, user.AccountTypeID, user.IsSuspicious)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	user.ID = int(id)
-	return nil
-}
-
 // Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 func (r *userRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	userModel := models.FromUserEntity(user)
 
 	if user.ID == 0 {
 		// 新規作成
-		query := `INSERT INTO users (username, firebase_uid, password_hash, account_type_id, is_suspicious, is_deleted, is_private) VALUES (?, ?, ?, ?, ?, ?, ?)`
-		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate)
+		query := `INSERT INTO users (username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_deleted, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate)
 		if err != nil {
 			return wrapFirebaseUIDDuplicateError(err)
 		}
@@ -302,8 +302,45 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return nil
 	}
 
-	// 更新
-	query := `UPDATE users SET username = ?, firebase_uid = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_suspicious = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
-	return wrapFirebaseUIDDuplicateError(err)
+	// 更新。部分取得エンティティで取りこぼし得る不変項目は更新前提としてのみ扱います。
+	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
+	query := fmt.Sprintf("UPDATE users SET password_hash = ?, player_id = ?, is_suspicious = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND %s", whereClause)
+	args := []any{userModel.PasswordHash, userModel.PlayerID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, userModel.AccountTypeID}
+	args = append(args, whereArgs...)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return r.validateSingleUserUpdate(ctx, exec, userModel.ID, result)
+}
+
+func userFirebaseUIDWhereClause(firebaseUID *string) (string, []any) {
+	if firebaseUID == nil {
+		return "firebase_uid IS NULL", nil
+	}
+
+	return "firebase_uid = ?", []any{*firebaseUID}
+}
+
+func (r *userRepository) validateSingleUserUpdate(ctx context.Context, exec repository.Executor, userID int, result sql.Result) error {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected > 0 {
+		return nil
+	}
+
+	var exists int
+	err = exec.GetContext(ctx, &exists, `SELECT 1 FROM users WHERE id = ?`, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return repository.ErrUserNotFound
+		}
+		return err
+	}
+
+	return repository.ErrUserConflict
 }

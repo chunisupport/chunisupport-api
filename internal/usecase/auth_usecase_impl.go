@@ -44,8 +44,8 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 		return nil, "", err
 	}
 
-	user := &entity.User{Username: un, PasswordHash: ph, AccountTypeID: 1}
-	if err := s.userRepo.Create(ctx, s.db, user); err != nil {
+	user := entity.NewUser(un, ph, info.AccountTypePlayer)
+	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
 		return nil, "", err
 	}
 

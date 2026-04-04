@@ -4,9 +4,38 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewUser(t *testing.T) {
+	// Given
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	hash, err := passwordhash.NewPasswordHash("hashed-password")
+	require.NoError(t, err)
+
+	// When
+	user := NewUser(userName, hash, info.AccountTypePlayer)
+
+	// Then
+	require.NotNil(t, user)
+	assert.Equal(t, userName, user.Username)
+	assert.Equal(t, hash, user.PasswordHash)
+	assert.Equal(t, info.AccountTypePlayer, user.AccountTypeID)
+	assert.False(t, user.CreatedAt.IsZero())
+	assert.False(t, user.UpdatedAt.IsZero())
+	assert.True(t, user.CreatedAt.Equal(user.UpdatedAt))
+	assert.Zero(t, user.ID)
+	assert.Nil(t, user.FirebaseUID)
+	assert.Nil(t, user.PlayerID)
+	assert.False(t, user.IsSuspicious)
+	assert.False(t, user.IsDeleted)
+	assert.False(t, user.IsPrivate)
+}
 
 func TestUser_LinkFirebaseUID(t *testing.T) {
 	baseTime := time.Date(2026, 4, 3, 12, 0, 0, 0, time.UTC)

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -76,13 +77,13 @@ func (m *MockUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 	return args.Get(0).([]entity.UserWithPlayer), args.Error(1)
 }
 
-func (m *MockUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
+func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	args := m.Called(ctx, exec, user)
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	args := m.Called(ctx, exec, user)
+func (m *MockUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	args := m.Called(ctx, exec, userID, currentUID, newUID, updatedAt)
 	return args.Error(0)
 }
 

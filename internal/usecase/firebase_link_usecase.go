@@ -81,8 +81,9 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 			return ErrUserDeleted
 		}
 
+		currentFirebaseUID := user.FirebaseUID
 		user.LinkFirebaseUID(uid)
-		if err := u.userRepo.Save(ctx, tx, user); err != nil {
+		if err := u.userRepo.LinkFirebaseUID(ctx, tx, user.ID, currentFirebaseUID, uid, user.UpdatedAt); err != nil {
 			if errors.Is(err, repository.ErrFirebaseUIDAlreadyLinked) {
 				return ErrFirebaseUIDAlreadyLinked
 			}

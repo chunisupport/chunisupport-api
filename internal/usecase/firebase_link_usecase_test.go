@@ -29,10 +29,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 				user := &entity.User{ID: 1}
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
-				userRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
-					return user.FirebaseUID != nil && *user.FirebaseUID == "firebase-uid"
-				})).Return(nil).Once()
+				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+				userRepo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, (*string)(nil), "firebase-uid", mock.AnythingOfType("time.Time")).Return(nil).Once()
 			},
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
@@ -50,8 +48,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -63,10 +61,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 				user := &entity.User{ID: 10, FirebaseUID: &existingUID}
 				verifier.On("VerifyIDToken", mock.Anything, "replace-user-token").Return("new-firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "new-firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 10).Return(user, nil).Once()
-				userRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
-					return user.FirebaseUID != nil && *user.FirebaseUID == "new-firebase-uid"
-				})).Return(nil).Once()
+				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 10).Return(user, nil).Once()
+				userRepo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 10, &existingUID, "new-firebase-uid", mock.AnythingOfType("time.Time")).Return(nil).Once()
 			},
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
@@ -85,8 +81,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -101,8 +97,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -117,8 +113,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -141,13 +137,13 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.On("VerifyIDToken", mock.Anything, "deleted-user-token").Return("firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, IsDeleted: true}, nil).Once()
+				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, IsDeleted: true}, nil).Once()
 			},
 			wantErr: ErrUserDeleted,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -162,8 +158,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -173,13 +169,13 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.On("VerifyIDToken", mock.Anything, "nil-user-token").Return("firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, nil).Once()
+				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(nil, nil).Once()
 			},
 			wantErr: ErrInternalError,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -190,8 +186,8 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 				user := &entity.User{ID: 1}
 				verifier.On("VerifyIDToken", mock.Anything, "duplicate-save-token").Return("firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
-				userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
+				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+				userRepo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, (*string)(nil), "firebase-uid", mock.AnythingOfType("time.Time")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 			},
 			wantErr: ErrFirebaseUIDAlreadyLinked,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {

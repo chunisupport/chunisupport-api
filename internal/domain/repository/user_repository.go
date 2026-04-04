@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -22,8 +23,8 @@ type UserRepository interface {
 	FindAllWithPlayerForAdmin(ctx context.Context, exec Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error)
 	// FindByFirebaseUID はFirebase UIDでユーザーを検索します。
 	FindByFirebaseUID(ctx context.Context, exec Executor, uid string) (*entity.User, error)
-	// Create は新しいユーザーを作成します。
-	Create(ctx context.Context, exec Executor, user *entity.User) error
+	// LinkFirebaseUID は現在値が一致する場合のみ Firebase UID を更新します。
+	LinkFirebaseUID(ctx context.Context, exec Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 	Save(ctx context.Context, exec Executor, user *entity.User) error
 }

@@ -23,7 +23,14 @@ func TestAuthUsecase_Register(t *testing.T) {
 
 	t.Run("Register_正常系_ユーザー登録が成功する", func(t *testing.T) {
 		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, repository.ErrUserNotFound).Once()
-		mockUserRepo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
+			return user != nil &&
+				user.ID == 0 &&
+				user.Username.String() == "testuser" &&
+				user.AccountTypeID == info.AccountTypePlayer &&
+				!user.CreatedAt.IsZero() &&
+				user.CreatedAt.Equal(user.UpdatedAt)
+		})).Return(nil).Once()
 		mockSessionRepo.On("Create", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.Session")).Return(nil).Once()
 		mockSessionRepo.On("DeleteOldestSessionsOverLimit", mock.Anything, mock.Anything, mock.Anything, info.MaxSessionsPerUser).Return(nil).Once()
 

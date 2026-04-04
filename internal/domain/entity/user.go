@@ -23,6 +23,19 @@ type User struct {
 	IsPrivate     bool
 }
 
+// NewUser は必須項目が設定された新規ユーザーを生成します。
+func NewUser(userName username.UserName, hash passwordhash.PasswordHash, accountTypeID int) *User {
+	now := time.Now()
+
+	return &User{
+		Username:      userName,
+		PasswordHash:  hash,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		AccountTypeID: accountTypeID,
+	}
+}
+
 // IsActive はユーザーが有効（削除されていない）かを判定します。
 func (u *User) IsActive() bool {
 	return !u.IsDeleted
