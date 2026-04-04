@@ -84,6 +84,21 @@ func TestAuthUsecase_Register(t *testing.T) {
 		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
 	})
 
+	t.Run("Register_異常系_競合状態でDBのUNIQUE制約違反が発生した場合はErrUsernameTakenになる", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockSessionRepo := new(MockSessionRepository)
+		authUsecase := newTestAuthUsecase(mockUserRepo, mockSessionRepo, "test-pepper")
+
+		// FindByUsername では存在しないと判定されたが、INSERTで競合
+		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "raceduser").Return(nil, repository.ErrUserNotFound).Once()
+		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrDuplicateUsername).Once()
+
+		_, _, err := authUsecase.Register(context.Background(), "raceduser", "password")
+		assert.ErrorIs(t, err, ErrUsernameTaken)
+		mockUserRepo.AssertExpectations(t)
+		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 }
 
 func TestAuthUsecase_Login(t *testing.T) {

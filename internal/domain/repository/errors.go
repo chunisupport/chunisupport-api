@@ -34,4 +34,8 @@ var (
 
 	// ErrFirebaseUIDAlreadyLinked は Firebase UID が他ユーザーへ既に紐付いている場合に返されるエラーです。
 	ErrFirebaseUIDAlreadyLinked = errors.New("firebase uid already linked")
+
+	// ErrDuplicateUsername はユーザー名が既に使用されている場合に返されるエラーです。
+	// 事前チェックをすり抜けた競合状態でのINSERT失敗時に使用します。
+	ErrDuplicateUsername = errors.New("username already taken")
 )

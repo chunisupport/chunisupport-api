@@ -50,6 +50,9 @@ func (s *authUsecaseImpl) Register(ctx context.Context, usernameStr, password st
 
 	user := entity.NewUser(un, ph, info.AccountTypePlayer)
 	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
+		if errors.Is(err, repository.ErrDuplicateUsername) {
+			return nil, "", ErrUsernameTaken
+		}
 		return nil, "", err
 	}
 

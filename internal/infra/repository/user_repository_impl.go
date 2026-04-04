@@ -292,7 +292,9 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		query := `INSERT INTO users (username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_deleted, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsDeleted, userModel.IsPrivate)
 		if err != nil {
-			return wrapFirebaseUIDDuplicateError(err)
+			err = wrapFirebaseUIDDuplicateError(err)
+			err = wrapUsernameDuplicateError(err)
+			return err
 		}
 		id, err := result.LastInsertId()
 		if err != nil {

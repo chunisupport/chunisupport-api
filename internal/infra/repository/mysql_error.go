@@ -19,6 +19,14 @@ func wrapFirebaseUIDDuplicateError(err error) error {
 	return fmt.Errorf("%w: %v", domainrepo.ErrFirebaseUIDAlreadyLinked, err)
 }
 
+func wrapUsernameDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "username") {
+		return err
+	}
+
+	return fmt.Errorf("%w: %v", domainrepo.ErrDuplicateUsername, err)
+}
+
 func isMySQLDuplicateEntryForKey(err error, key string) bool {
 	var mysqlErr *mysql.MySQLError
 	if !errors.As(err, &mysqlErr) {
