@@ -18,6 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 type stubUserRepository struct {
@@ -188,6 +189,19 @@ type stubSongMasterProvider struct {
 
 func (s *stubSongMasterProvider) SongMasters() *masterdata.SongMasters {
 	return s.masters
+}
+
+func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
+	switch id {
+	case info.AccountTypePlayer:
+		return "PLAYER"
+	case info.AccountTypeEditor:
+		return "EDITOR"
+	case info.AccountTypeAdmin:
+		return "ADMIN"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 type stubWorldsendChartRepository struct {
@@ -652,15 +666,23 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
 	rating1 := 15.0
 	op1 := 10.0
+	createdAt1 := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	updatedAt1 := createdAt1.Add(2 * time.Hour)
 
 	un2, _ := username.NewUserName("user2")
+	createdAt2 := time.Date(2025, 2, 3, 4, 5, 6, 0, time.UTC)
+	updatedAt2 := createdAt2.Add(3 * time.Hour)
 
 	usersWithPlayer := []entity.UserWithPlayer{
 		{
 			User: entity.User{
-				ID:       1,
-				Username: un1,
-				PlayerID: intPointer(1),
+				ID:            1,
+				Username:      un1,
+				AccountTypeID: info.AccountTypeAdmin,
+				CreatedAt:     createdAt1,
+				UpdatedAt:     updatedAt1,
+				PlayerID:      intPointer(1),
+				IsSuspicious:  true,
 			},
 			Player: &entity.Player{
 				ID:             1,
@@ -671,9 +693,13 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 		},
 		{
 			User: entity.User{
-				ID:       2,
-				Username: un2,
-				PlayerID: nil,
+				ID:            2,
+				Username:      un2,
+				AccountTypeID: info.AccountTypePlayer,
+				CreatedAt:     createdAt2,
+				UpdatedAt:     updatedAt2,
+				PlayerID:      nil,
+				IsSuspicious:  false,
 			},
 			Player: nil,
 		},
@@ -682,7 +708,7 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	repo := &stubUserRepository{
 		usersWithPlayer: usersWithPlayer,
 	}
-	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, &stubSongMasterProvider{})
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
 	require.NoError(t, err)
@@ -691,7 +717,12 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 
 	// Verify User 1
 	assert.Equal(t, "user1", list[0].UserName)
-	assert.Equal(t, "プレイヤー１", list[0].PlayerName)
+	assert.Equal(t, "ADMIN", list[0].AccountType)
+	assert.True(t, list[0].CreatedAt.Equal(createdAt1))
+	assert.True(t, list[0].UpdatedAt.Equal(updatedAt1))
+	assert.True(t, list[0].IsSuspicious)
+	require.NotNil(t, list[0].PlayerName)
+	assert.Equal(t, "プレイヤー１", *list[0].PlayerName)
 	require.NotNil(t, list[0].Rating)
 	assert.Equal(t, 15.0, *list[0].Rating)
 	require.NotNil(t, list[0].OverPowerValue)
@@ -699,7 +730,11 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 
 	// Verify User 2 (No player)
 	assert.Equal(t, "user2", list[1].UserName)
-	assert.Equal(t, "", list[1].PlayerName)
+	assert.Equal(t, "PLAYER", list[1].AccountType)
+	assert.True(t, list[1].CreatedAt.Equal(createdAt2))
+	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
+	assert.False(t, list[1].IsSuspicious)
+	assert.Nil(t, list[1].PlayerName)
 }
 
 func intPointer(v int) *int {
