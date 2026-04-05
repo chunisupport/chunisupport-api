@@ -31,7 +31,7 @@ type Cache struct {
 	AccountTypes         map[string]master.AccountType
 	Versions             map[string]Version
 	VersionsByID         map[int]Version
-	AchievementTypes     map[string]master.BaseMasterVO
+	AchievementTypes     map[string]domainmasterdata.Item
 	AchievementTypesByID map[int]string
 }
 
@@ -172,10 +172,10 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
 	}
-	achievementTypes := make(map[string]master.BaseMasterVO, len(achievementTypeRows))
+	achievementTypes := make(map[string]domainmasterdata.Item, len(achievementTypeRows))
 	achievementTypesByID := make(map[int]string, len(achievementTypeRows))
 	for _, row := range achievementTypeRows {
-		achievementTypes[row.Code] = master.BaseMasterVO{ID: row.ID, Name: row.Code}
+		achievementTypes[row.Code] = domainmasterdata.Item{ID: row.ID, Name: row.Code}
 		achievementTypesByID[row.ID] = row.Code
 	}
 
