@@ -154,7 +154,8 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - `combo_lamp_types`: コンボランプ種別マスタ。
 - `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM）。
 - `class_emblems`: クラスエンブレムマスタ（1、2、3、4、5、inf）。
-- `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5）。
+- `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5、inf）。
+- `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
@@ -173,3 +174,8 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 ### マイグレーション履歴
 - **000001**: 初期スキーマ。全マスタテーブル（genres, difficulties, class_emblems, clear_lamp_types, combo_lamp_types, slots, full_chain_types, honor_types, account_types, versions等）、楽曲・譜面関連テーブル（songs, charts, worldsend_charts）、ユーザー・認証関連テーブル（users, sessions, api_tokens, user_recovery_codes）、プレイヤー関連テーブル（players, player_records, player_worldsend_records, player_honors）、および各種インデックスを含む。
 - **000002**: セッション自動クリーンアップイベントの追加。1時間ごとに期限切れのセッション（`expires_at < NOW()`）を削除するMySQLイベントスケジューラー（`cleanup_expired_sessions`）を設定。運用時は `event_scheduler = ON` の設定が必要。
+- **000003**: `players.user_id` と `users.player_id` に外部キー制約を追加。
+- **000004**: `worldsend_charts` の WORLD'S END 関連カラムを `we_kanji` / `we_star` から `attribute` / `level_star` へリネームし、CHECK制約を再作成。
+- **000005**: `achievement_types` と `goals` テーブルを追加。
+- **000006**: `users` テーブルに `firebase_uid` カラムとユニークインデックスを追加。
+- **000007**: 順序を持つマスタテーブル（`difficulties`, `class_emblems`, `class_emblem_bases`, `clear_lamp_types`, `combo_lamp_types`, `full_chain_types`）に `sort_order` カラムを追加し、既存データへ明示的に表示順を投入。

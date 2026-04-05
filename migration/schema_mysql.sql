@@ -53,6 +53,7 @@ CREATE TABLE `charts` (
 CREATE TABLE `class_emblem_bases` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -62,6 +63,7 @@ CREATE TABLE `class_emblem_bases` (
 CREATE TABLE `class_emblems` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -71,6 +73,7 @@ CREATE TABLE `class_emblems` (
 CREATE TABLE `clear_lamp_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -80,6 +83,7 @@ CREATE TABLE `clear_lamp_types` (
 CREATE TABLE `combo_lamp_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -89,6 +93,7 @@ CREATE TABLE `combo_lamp_types` (
 CREATE TABLE `difficulties` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -98,6 +103,7 @@ CREATE TABLE `difficulties` (
 CREATE TABLE `full_chain_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

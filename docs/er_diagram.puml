@@ -144,30 +144,35 @@ entity "difficulties" as difficulties {
   + id: TINYINT [PK]
   --
   name: VARCHAR(30) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "class_emblems" as class_emblems {
   + id: TINYINT [PK]
   --
   name: VARCHAR(10) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "class_emblem_bases" as class_emblem_bases {
   + id: TINYINT [PK]
   --
   name: VARCHAR(10) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "clear_lamp_types" as clear_lamp_types {
   + id: TINYINT [PK]
   --
   name: VARCHAR(20) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "combo_lamp_types" as combo_lamp_types {
   + id: TINYINT [PK]
   --
   name: VARCHAR(20) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "slots" as slots {
@@ -180,6 +185,7 @@ entity "full_chain_types" as full_chain_types {
   + id: TINYINT [PK]
   --
   name: VARCHAR(20) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "honor_types" as honor_types {
