@@ -75,7 +75,7 @@ func (u *firebaseRegisterUsecase) RegisterWithFirebase(ctx context.Context, idTo
 		}
 
 		// ユーザー名が使用済みでないか確認
-		if _, err := u.userRepo.FindByUsername(ctx, tx, usernameStr); err == nil {
+		if _, err := u.userRepo.FindByUsername(ctx, tx, un.String()); err == nil {
 			return ErrUsernameTaken
 		} else if !errors.Is(err, repository.ErrUserNotFound) {
 			return err
