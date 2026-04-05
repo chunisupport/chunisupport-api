@@ -35,10 +35,16 @@ type Cache struct {
 	AchievementTypesByID map[int]string
 }
 
-// simpleRow は sort_order を持たないマスタテーブルの行を表します。
-type simpleRow struct {
+// namedRow は name カラムを持つマスタテーブルの行を表します。
+type namedRow struct {
 	ID   int    `db:"id"`
 	Name string `db:"name"`
+}
+
+// achievementTypeRow は achievement_types テーブルの行を表します。
+type achievementTypeRow struct {
+	ID   int    `db:"id"`
+	Code string `db:"code"`
 }
 
 // sortedRow は sort_order カラムを持つマスタテーブルの行を表します。
@@ -101,7 +107,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		fullChainNamesByID[row.ID] = row.Name
 	}
 
-	slotRows, err := loadSimpleRows(ctx, db, "SELECT id, name FROM slots")
+	slotRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM slots")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload slots: %w", err)
 	}
@@ -112,7 +118,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		slotNamesByID[row.ID] = row.Name
 	}
 
-	honorTypeRows, err := loadSimpleRows(ctx, db, "SELECT id, name FROM honor_types")
+	honorTypeRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM honor_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload honor_types: %w", err)
 	}
@@ -133,7 +139,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		difficultyNamesByID[row.ID] = row.Name
 	}
 
-	genreRows, err := loadSimpleRows(ctx, db, "SELECT id, name FROM genres")
+	genreRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM genres")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload genres: %w", err)
 	}
@@ -144,7 +150,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		genreNamesByID[row.ID] = row.Name
 	}
 
-	accountTypeRows, err := loadSimpleRows(ctx, db, "SELECT id, name FROM account_types")
+	accountTypeRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM account_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload account_types: %w", err)
 	}
@@ -162,16 +168,15 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		versionsByID[int(item.ID)] = item
 	}
 
-	// achievement_types は name 列を持たず、code 列を成果種別コードとしてそのまま扱う。
-	achievementTypeRows, err := loadSimpleRows(ctx, db, "SELECT id, code AS name FROM achievement_types")
+	achievementTypeRows, err := loadAchievementTypeRows(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
 	}
 	achievementTypes := make(map[string]Item, len(achievementTypeRows))
 	achievementTypesByID := make(map[int]string, len(achievementTypeRows))
 	for _, row := range achievementTypeRows {
-		achievementTypes[row.Name] = Item{ID: row.ID, Name: row.Name}
-		achievementTypesByID[row.ID] = row.Name
+		achievementTypes[row.Code] = Item{ID: row.ID, Name: row.Code}
+		achievementTypesByID[row.ID] = row.Code
 	}
 
 	return &Cache{
@@ -198,8 +203,20 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	}, nil
 }
 
-func loadSimpleRows(ctx context.Context, db *sqlx.DB, query string) ([]simpleRow, error) {
-	var rows []simpleRow
+// loadNamedRows は name カラムをそのまま使うマスタに限定して使用します。
+func loadNamedRows(ctx context.Context, db *sqlx.DB, query string) ([]namedRow, error) {
+	var rows []namedRow
+	if err := db.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// loadAchievementTypeRows は code カラムを持つ achievement_types 専用ローダです。
+func loadAchievementTypeRows(ctx context.Context, db *sqlx.DB) ([]achievementTypeRow, error) {
+	const query = "SELECT id, code FROM achievement_types"
+
+	var rows []achievementTypeRow
 	if err := db.SelectContext(ctx, &rows, query); err != nil {
 		return nil, err
 	}
