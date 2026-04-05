@@ -172,7 +172,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
 	}
-	achievementTypes := make(map[string]Item, len(achievementTypeRows))
+	achievementTypes := make(map[string]master.BaseMasterVO, len(achievementTypeRows))
 	achievementTypesByID := make(map[int]string, len(achievementTypeRows))
 	for _, row := range achievementTypeRows {
 		achievementTypes[row.Code] = Item{ID: row.ID, Name: row.Code}
