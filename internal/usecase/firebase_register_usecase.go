@@ -27,7 +27,20 @@ type firebaseRegisterUsecase struct {
 }
 
 // NewFirebaseRegisterUsecase は Firebase 登録ユースケースを生成します。
+// 依存関係が nil の場合はプログラムの設定ミスであるため、起動時にパニックします。
 func NewFirebaseRegisterUsecase(tm TransactionManager, userRepo repository.UserRepository, tokenVerifier TokenVerifier, sessionIssuer SessionIssuer) FirebaseRegisterUsecase {
+	if tm == nil {
+		panic("firebaseRegisterUsecase: TransactionManager is nil")
+	}
+	if userRepo == nil {
+		panic("firebaseRegisterUsecase: UserRepository is nil")
+	}
+	if tokenVerifier == nil {
+		panic("firebaseRegisterUsecase: TokenVerifier is nil")
+	}
+	if sessionIssuer == nil {
+		panic("firebaseRegisterUsecase: SessionIssuer is nil")
+	}
 	return &firebaseRegisterUsecase{
 		tm:            tm,
 		userRepo:      userRepo,
@@ -40,15 +53,6 @@ func (u *firebaseRegisterUsecase) RegisterWithFirebase(ctx context.Context, idTo
 	idToken = strings.TrimSpace(idToken)
 	if idToken == "" {
 		return "", ErrInvalidIDToken
-	}
-	if u.tm == nil {
-		return "", errors.Join(ErrInternalError, errors.New("transaction manager is nil"))
-	}
-	if u.tokenVerifier == nil {
-		return "", errors.Join(ErrInternalError, errors.New("token verifier is nil"))
-	}
-	if u.sessionIssuer == nil {
-		return "", errors.Join(ErrInternalError, errors.New("session issuer is nil"))
 	}
 
 	uid, err := u.tokenVerifier.VerifyIDToken(ctx, idToken)
