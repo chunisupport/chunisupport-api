@@ -87,6 +87,8 @@ func sortedByID[V any](m map[string]V, toItem func(V) masterdata.Item) []masterd
 }
 
 // sortedVersionsByReleasedAt はバージョンをリリース日昇順でソートしたスライスを返します。
+// versions テーブルの released_at は一意制約により同一値を持つレコードが存在しないため、
+// 不安定ソートで問題ありません。
 func sortedVersionsByReleasedAt(versions map[int]masterdata.Version) []masterdata.Version {
 	items := make([]masterdata.Version, 0, len(versions))
 	for _, v := range versions {
