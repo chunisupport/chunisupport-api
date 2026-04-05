@@ -33,3 +33,8 @@ type ChartStatsMasterProvider interface {
 type GoalMasterProvider interface {
 	GoalMasters() *masterdata.GoalMasters
 }
+
+// MasterDataMasterProvider はマスタデータAPIで必要なマスタデータを提供します。
+type MasterDataMasterProvider interface {
+	MasterDataMasters() *masterdata.MasterDataMasters
+}

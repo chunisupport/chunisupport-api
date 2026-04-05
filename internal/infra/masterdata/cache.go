@@ -7,127 +7,176 @@ import (
 	"strings"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/jmoiron/sqlx"
 )
 
 // Cache は起動時にプリロードされるマスタのセットです。
 type Cache struct {
-	ClassEmblems         map[string]Item
-	ClassEmblemBases     map[string]Item
-	ClearLamps           map[string]Item
+	ClassEmblems         map[string]master.ClassEmblem
+	ClassEmblemBases     map[string]master.ClassEmblemBase
+	ClearLamps           map[string]master.ClearLampType
 	ClearLampNamesByID   map[int]string
-	ComboLamps           map[string]Item
+	ComboLamps           map[string]master.ComboLampType
 	ComboLampNamesByID   map[int]string
-	FullChains           map[string]Item
+	FullChains           map[string]master.FullChainType
 	FullChainNamesByID   map[int]string
-	Slots                map[string]Item
+	Slots                map[string]master.Slot
 	SlotNamesByID        map[int]string
-	HonorTypes           map[string]Item
-	Difficulties         map[string]Item
+	HonorTypes           map[string]master.HonorType
+	Difficulties         map[string]master.ChartDifficulty
 	DifficultyNamesByID  map[int]string
-	Genres               map[string]Item
+	Genres               map[string]master.Genre
 	GenreNamesByID       map[int]string
-	AccountTypes         map[string]Item
+	AccountTypes         map[string]master.AccountType
 	Versions             map[string]Version
 	VersionsByID         map[int]Version
-	AchievementTypes     map[string]Item
+	AchievementTypes     map[string]domainmasterdata.Item
 	AchievementTypesByID map[int]string
+}
+
+// namedRow は name カラムを持つマスタテーブルの行を表します。
+type namedRow struct {
+	ID   int    `db:"id"`
+	Name string `db:"name"`
+}
+
+// achievementTypeRow は achievement_types テーブルの行を表します。
+type achievementTypeRow struct {
+	ID   int    `db:"id"`
+	Code string `db:"code"`
+}
+
+// sortedRow は sort_order カラムを持つマスタテーブルの行を表します。
+type sortedRow struct {
+	ID        int    `db:"id"`
+	Name      string `db:"name"`
+	SortOrder int    `db:"sort_order"`
 }
 
 // Preload は固定値が INSERT されているマスタを読み込み、キャッシュを構築します。
 func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
-	classEmblems, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM class_emblems", false)
+	classEmblemRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM class_emblems")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload class_emblems: %w", err)
 	}
+	classEmblems := make(map[string]master.ClassEmblem, len(classEmblemRows))
+	for _, row := range classEmblemRows {
+		classEmblems[row.Name] = master.ClassEmblem{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+	}
 
-	classEmblemBases, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM class_emblem_bases", false)
+	classEmblemBaseRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM class_emblem_bases")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload class_emblem_bases: %w", err)
 	}
+	classEmblemBases := make(map[string]master.ClassEmblemBase, len(classEmblemBaseRows))
+	for _, row := range classEmblemBaseRows {
+		classEmblemBases[row.Name] = master.ClassEmblemBase{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+	}
 
-	clearLamps, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM clear_lamp_types", true)
+	clearLampRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM clear_lamp_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload clear_lamp_types: %w", err)
 	}
-	clearLampNamesByID := make(map[int]string, len(clearLamps))
-	for _, item := range clearLamps {
-		clearLampNamesByID[item.ID] = item.Name
+	clearLamps := make(map[string]master.ClearLampType, len(clearLampRows))
+	clearLampNamesByID := make(map[int]string, len(clearLampRows))
+	for _, row := range clearLampRows {
+		clearLamps[strings.ToLower(row.Name)] = master.ClearLampType{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+		clearLampNamesByID[row.ID] = row.Name
 	}
 
-	comboLamps, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM combo_lamp_types", true)
+	comboLampRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM combo_lamp_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload combo_lamp_types: %w", err)
 	}
-	comboLampNamesByID := make(map[int]string, len(comboLamps))
-	for _, item := range comboLamps {
-		comboLampNamesByID[item.ID] = item.Name
+	comboLamps := make(map[string]master.ComboLampType, len(comboLampRows))
+	comboLampNamesByID := make(map[int]string, len(comboLampRows))
+	for _, row := range comboLampRows {
+		comboLamps[strings.ToLower(row.Name)] = master.ComboLampType{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+		comboLampNamesByID[row.ID] = row.Name
 	}
 
-	fullChains, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM full_chain_types", true)
+	fullChainRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM full_chain_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload full_chain_types: %w", err)
 	}
-	fullChainNamesByID := make(map[int]string, len(fullChains))
-	for _, item := range fullChains {
-		fullChainNamesByID[item.ID] = item.Name
+	fullChains := make(map[string]master.FullChainType, len(fullChainRows))
+	fullChainNamesByID := make(map[int]string, len(fullChainRows))
+	for _, row := range fullChainRows {
+		fullChains[strings.ToLower(row.Name)] = master.FullChainType{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+		fullChainNamesByID[row.ID] = row.Name
 	}
 
-	slots, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM slots", true)
+	slotRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM slots")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload slots: %w", err)
 	}
-	slotNamesByID := make(map[int]string, len(slots))
-	for _, item := range slots {
-		slotNamesByID[item.ID] = item.Name
+	slots := make(map[string]master.Slot, len(slotRows))
+	slotNamesByID := make(map[int]string, len(slotRows))
+	for _, row := range slotRows {
+		slots[strings.ToLower(row.Name)] = master.Slot{ID: row.ID, Name: row.Name}
+		slotNamesByID[row.ID] = row.Name
 	}
 
-	honorTypes, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM honor_types", true)
+	honorTypeRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM honor_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload honor_types: %w", err)
 	}
+	honorTypes := make(map[string]master.HonorType, len(honorTypeRows))
+	for _, row := range honorTypeRows {
+		honorTypes[strings.ToLower(row.Name)] = master.HonorType{ID: row.ID, Name: row.Name}
+	}
 
-	difficulties, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM difficulties", false)
+	difficultyRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM difficulties")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload difficulties: %w", err)
 	}
-	difficultyNamesByID := make(map[int]string, len(difficulties))
-	for _, item := range difficulties {
+	difficulties := make(map[string]master.ChartDifficulty, len(difficultyRows))
+	difficultyNamesByID := make(map[int]string, len(difficultyRows))
+	for _, row := range difficultyRows {
 		// 難易度名はデータベースの大文字表記をそのまま使用
-		difficultyNamesByID[item.ID] = item.Name
+		difficulties[row.Name] = master.ChartDifficulty{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+		difficultyNamesByID[row.ID] = row.Name
 	}
 
-	genres, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM genres", false)
+	genreRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM genres")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload genres: %w", err)
 	}
-	genreNamesByID := make(map[int]string, len(genres))
-	for _, item := range genres {
-		genreNamesByID[item.ID] = item.Name
+	genres := make(map[string]master.Genre, len(genreRows))
+	genreNamesByID := make(map[int]string, len(genreRows))
+	for _, row := range genreRows {
+		genres[row.Name] = master.Genre{ID: row.ID, Name: row.Name}
+		genreNamesByID[row.ID] = row.Name
 	}
 
-	accountTypes, err := loadSimpleMasters(ctx, db, "SELECT id, name FROM account_types", false)
+	accountTypeRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM account_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload account_types: %w", err)
+	}
+	accountTypes := make(map[string]master.AccountType, len(accountTypeRows))
+	for _, row := range accountTypeRows {
+		accountTypes[row.Name] = master.AccountType{ID: row.ID, Name: row.Name}
 	}
 
 	versions, err := loadVersionMasters(ctx, db, "SELECT id, name, released_at FROM versions")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
 	}
-
 	versionsByID := make(map[int]Version, len(versions))
 	for _, item := range versions {
 		versionsByID[int(item.ID)] = item
 	}
 
-	achievementTypes, err := loadSimpleMasters(ctx, db, "SELECT id, code FROM achievement_types", false)
+	achievementTypeRows, err := loadAchievementTypeRows(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
 	}
-	achievementTypesByID := make(map[int]string, len(achievementTypes))
-	for _, item := range achievementTypes {
-		achievementTypesByID[item.ID] = item.Name
+	achievementTypes := make(map[string]domainmasterdata.Item, len(achievementTypeRows))
+	achievementTypesByID := make(map[int]string, len(achievementTypeRows))
+	for _, row := range achievementTypeRows {
+		achievementTypes[strings.ToLower(row.Code)] = domainmasterdata.Item{ID: row.ID, Name: row.Code}
+		achievementTypesByID[row.ID] = row.Code
 	}
 
 	return &Cache{
@@ -154,31 +203,32 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	}, nil
 }
 
-func loadSimpleMasters(ctx context.Context, db *sqlx.DB, query string, normalize bool) (map[string]Item, error) {
-	rows, err := db.QueryxContext(ctx, query)
-	if err != nil {
+// loadNamedRows は name カラムをそのまま使うマスタに限定して使用します。
+func loadNamedRows(ctx context.Context, db *sqlx.DB, query string) ([]namedRow, error) {
+	var rows []namedRow
+	if err := db.SelectContext(ctx, &rows, query); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	return rows, nil
+}
 
-	masters := make(map[string]Item)
-	for rows.Next() {
-		var item Item
-		if scanErr := rows.Scan(&item.ID, &item.Name); scanErr != nil {
-			return nil, scanErr
-		}
-		key := item.Name
-		if normalize {
-			key = strings.ToLower(key)
-		}
-		masters[key] = item
-	}
+// loadAchievementTypeRows は code カラムを持つ achievement_types 専用ローダです。
+func loadAchievementTypeRows(ctx context.Context, db *sqlx.DB) ([]achievementTypeRow, error) {
+	const query = "SELECT id, code FROM achievement_types"
 
-	if err := rows.Err(); err != nil {
+	var rows []achievementTypeRow
+	if err := db.SelectContext(ctx, &rows, query); err != nil {
 		return nil, err
 	}
+	return rows, nil
+}
 
-	return masters, nil
+func loadSortedRows(ctx context.Context, db *sqlx.DB, query string) ([]sortedRow, error) {
+	var rows []sortedRow
+	if err := db.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func loadVersionMasters(ctx context.Context, db *sqlx.DB, query string) (map[string]Version, error) {
@@ -310,5 +360,29 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 		VersionsByID:           versionsByID,
 		ClearLampNamesByID:     maps.Clone(c.ClearLampNamesByID),
 		ComboLampNamesByID:     maps.Clone(c.ComboLampNamesByID),
+	}
+}
+
+// MasterDataMasters はマスタデータAPIで必要なマスタ集合を返します。
+func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
+	if c == nil {
+		return nil
+	}
+
+	versionsByID := make(map[int]domainmasterdata.Version, len(c.VersionsByID))
+	for k, v := range c.VersionsByID {
+		versionsByID[k] = domainmasterdata.Version{
+			ID:         v.ID,
+			Name:       v.Name,
+			ReleasedAt: v.ReleasedAt,
+		}
+	}
+
+	return &domainmasterdata.MasterDataMasters{
+		Genres:           maps.Clone(c.Genres),
+		Difficulties:     maps.Clone(c.Difficulties),
+		AccountTypes:     maps.Clone(c.AccountTypes),
+		Versions:         versionsByID,
+		AchievementTypes: maps.Clone(c.AchievementTypes),
 	}
 }

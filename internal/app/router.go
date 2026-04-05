@@ -164,6 +164,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
 	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
@@ -182,7 +183,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
 		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:         api_internal.NewMeHandler(playerDataUsecase),
-		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
+		MasterData: api_internal.NewMasterDataHandler(masterDataUsecase),
 		Session:    api_internal.NewSessionHandler(sessionUsecase),
 		Goal:       api_internal.NewGoalHandler(goalUsecase),
 		// 外部API v1 用ハンドラ

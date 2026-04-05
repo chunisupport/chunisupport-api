@@ -8,6 +8,7 @@ import (
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -265,7 +266,7 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
-	masters := &domainmasterdata.SongMasters{Genres: map[string]domainmasterdata.Item{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
+	masters := &domainmasterdata.SongMasters{Genres: map[string]master.Genre{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
 
 	requests := []*UpdateWorldsendSongInput{
 		{
@@ -412,7 +413,7 @@ func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	masters := &domainmasterdata.SongMasters{Genres: map[string]domainmasterdata.Item{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
+	masters := &domainmasterdata.SongMasters{Genres: map[string]master.Genre{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}}
 	requests := []*UpdateWorldsendSongInput{{
 		DisplayID: "1234567890abcdef",
 		Title:     "A",

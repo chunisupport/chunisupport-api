@@ -4,10 +4,17 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 )
 
-// MasterModel は全てのマスタテーブルで共通のモデル構造です。
+// MasterModel は sort_order を持たないマスタテーブルで共通のモデル構造です。
 type MasterModel struct {
 	ID   int    `db:"id"`
 	Name string `db:"name"`
+}
+
+// SortedMasterModel は sort_order カラムを持つマスタテーブルで共通のモデル構造です。
+type SortedMasterModel struct {
+	ID        int    `db:"id"`
+	Name      string `db:"name"`
+	SortOrder int    `db:"sort_order"`
 }
 
 // ToAccountType はMasterModelをmaster.AccountTypeに変換します。
@@ -18,27 +25,30 @@ func (m *MasterModel) ToAccountType() *master.AccountType {
 	}
 }
 
-// ToClearLampType はMasterModelをmaster.ClearLampTypeに変換します。
-func (m *MasterModel) ToClearLampType() *master.ClearLampType {
+// ToClearLampType はSortedMasterModelをmaster.ClearLampTypeに変換します。
+func (m *SortedMasterModel) ToClearLampType() *master.ClearLampType {
 	return &master.ClearLampType{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
-// ToComboLampType はMasterModelをmaster.ComboLampTypeに変換します。
-func (m *MasterModel) ToComboLampType() *master.ComboLampType {
+// ToComboLampType はSortedMasterModelをmaster.ComboLampTypeに変換します。
+func (m *SortedMasterModel) ToComboLampType() *master.ComboLampType {
 	return &master.ComboLampType{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
-// ToFullChainType はMasterModelをmaster.FullChainTypeに変換します。
-func (m *MasterModel) ToFullChainType() *master.FullChainType {
+// ToFullChainType はSortedMasterModelをmaster.FullChainTypeに変換します。
+func (m *SortedMasterModel) ToFullChainType() *master.FullChainType {
 	return &master.FullChainType{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
@@ -50,11 +60,12 @@ func (m *MasterModel) ToHonorType() *master.HonorType {
 	}
 }
 
-// ToChartDifficulty はMasterModelをmaster.ChartDifficultyに変換します。
-func (m *MasterModel) ToChartDifficulty() *master.ChartDifficulty {
+// ToChartDifficulty はSortedMasterModelをmaster.ChartDifficultyに変換します。
+func (m *SortedMasterModel) ToChartDifficulty() *master.ChartDifficulty {
 	return &master.ChartDifficulty{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
@@ -74,19 +85,21 @@ func (m *MasterModel) ToSlot() *master.Slot {
 	}
 }
 
-// ToClassEmblem はMasterModelをmaster.ClassEmblemに変換します。
-func (m *MasterModel) ToClassEmblem() *master.ClassEmblem {
+// ToClassEmblem はSortedMasterModelをmaster.ClassEmblemに変換します。
+func (m *SortedMasterModel) ToClassEmblem() *master.ClassEmblem {
 	return &master.ClassEmblem{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
-// ToClassEmblemBase はMasterModelをmaster.ClassEmblemBaseに変換します。
-func (m *MasterModel) ToClassEmblemBase() *master.ClassEmblemBase {
+// ToClassEmblemBase はSortedMasterModelをmaster.ClassEmblemBaseに変換します。
+func (m *SortedMasterModel) ToClassEmblemBase() *master.ClassEmblemBase {
 	return &master.ClassEmblemBase{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 
