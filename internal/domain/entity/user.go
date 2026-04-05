@@ -36,6 +36,21 @@ func NewUser(userName username.UserName, hash passwordhash.PasswordHash, account
 	}
 }
 
+// NewFirebaseUser はFirebase UID紐付け済みのパスワードなし新規ユーザーを生成します。
+func NewFirebaseUser(userName username.UserName, uid string, accountTypeID int) *User {
+	now := time.Now()
+	normalizedUID := strings.TrimSpace(uid)
+
+	return &User{
+		Username:      userName,
+		PasswordHash:  passwordhash.NewEmptyPasswordHash(),
+		FirebaseUID:   &normalizedUID,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		AccountTypeID: accountTypeID,
+	}
+}
+
 // IsActive はユーザーが有効（削除されていない）かを判定します。
 func (u *User) IsActive() bool {
 	return !u.IsDeleted

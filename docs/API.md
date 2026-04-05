@@ -99,6 +99,7 @@
 | `/internal/auth/register` | POST | 不要 | ユーザー登録 |
 | `/internal/auth/login` | POST | 不要 | ログインしてCookieを発行 |
 | `/internal/auth/firebase/login` | POST | 不要 | Firebase IDトークンでログインしてCookieを発行 |
+| `/internal/auth/firebase/register` | POST | 不要 | Firebase IDトークンで新規ユーザー登録してCookieを発行 |
 | `/internal/auth/logout` | POST | Cookie | セッション失効 |
 | `/internal/auth/recovery-codes` | POST | 不要 | リカバリーコードでパスワード再設定 |
 | `/internal/auth/api-tokens` | POST | Cookie | APIトークン発行 |
@@ -255,6 +256,33 @@
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正、失効済み、またはユーザーに未連携
+  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
+
+### POST `/internal/auth/firebase/register`
+- **認証**: 不要
+- **リクエストボディ**:
+
+```json
+{
+  "id_token": "<Firebase ID Token>",
+  "username": "<username>"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `id_token` | string | ✓ | 必須 |
+| `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
+
+- **レスポンス**: 201 Created。ボディは空で、`token` Cookie が設定されます。
+- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
+- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、超過時は最古のセッションから自動的に削除されます。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
+  - 400 Bad Request (`registration_failed`): username 重複などによりユーザー登録失敗（詳細隠蔽）
+  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
+  - 422 Unprocessable Entity (`validation_failed`): usernameバリデーション失敗
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/logout`

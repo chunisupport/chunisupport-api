@@ -171,7 +171,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(tm, userRepo, firebaseTokenVerifier)
 	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
-	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, cfg.Auth.CookieSecure, sameSite)
+	firebaseRegisterUsecase := usecase.NewFirebaseRegisterUsecase(tm, userRepo, firebaseTokenVerifier, sessionIssuer)
+	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, firebaseRegisterUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
 		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
 		Firebase:   firebaseHandler,
@@ -239,6 +240,11 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		authGroup.POST("/firebase/login", handlers.Firebase.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.LoginRateLimitRequests,
 			Window:   info.LoginRateLimitWindow,
+		}))
+		// Firebase経由の新規登録: 1分間に5回まで
+		authGroup.POST("/firebase/register", handlers.Firebase.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.RegisterRateLimitRequests,
+			Window:   info.RegisterRateLimitWindow,
 		}))
 		authGroup.POST("/logout", handlers.Auth.Logout, jwtAuth)
 		// 登録: 1分間に5回まで
