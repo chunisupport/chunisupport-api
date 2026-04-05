@@ -357,14 +357,16 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	}
 
 	var difficultyNamesByID map[int]string
+	var difficultySortOrderByID map[int]int
 	if s.masterProvider != nil {
 		masters := s.masterProvider.SongMasters()
 		if masters != nil {
 			difficultyNamesByID = masters.DifficultyNamesByID
+			difficultySortOrderByID = masters.DifficultySortOrderByID()
 		}
 	}
 
-	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID), nil
+	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID, difficultySortOrderByID), nil
 }
 
 func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.WorldsendRecordDTO, error) {

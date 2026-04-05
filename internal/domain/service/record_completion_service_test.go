@@ -1,8 +1,9 @@
 package service
 
 import (
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"testing"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -45,7 +46,7 @@ func TestRecordCompletionService_CompletePlayerRecords(t *testing.T) {
 		},
 	}
 
-	completed := svc.CompletePlayerRecords(records, songs, map[int]string{2: "ADVANCED", 4: "MASTER"})
+	completed := svc.CompletePlayerRecords(records, songs, map[int]string{2: "ADVANCED", 4: "MASTER"}, map[int]int{2: 1, 3: 2, 4: 3})
 
 	if len(completed) != 3 {
 		t.Fatalf("expected 3 records, got %d", len(completed))

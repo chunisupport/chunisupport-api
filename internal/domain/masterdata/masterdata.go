@@ -50,6 +50,19 @@ type SongMasters struct {
 	Difficulties   map[string]master.ChartDifficulty
 }
 
+// DifficultySortOrderByID は難易度ID→SortOrderのマップを返します。
+// レコード一覧をゲームの正規表示順（BASIC < ADVANCED < EXPERT < MASTER < ULTIMA）でソートする際に使用します。
+func (m *SongMasters) DifficultySortOrderByID() map[int]int {
+	if m == nil || len(m.Difficulties) == 0 {
+		return nil
+	}
+	result := make(map[int]int, len(m.Difficulties))
+	for _, d := range m.Difficulties {
+		result[d.ID] = d.SortOrder
+	}
+	return result
+}
+
 // GoalMasters は目標機能で必要になるマスタ集合です。
 type GoalMasters struct {
 	AchievementTypesByCode map[string]Item

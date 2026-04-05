@@ -419,7 +419,7 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
 		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
-		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
@@ -556,7 +556,7 @@ func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
 		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
-		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)

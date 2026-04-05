@@ -1,9 +1,10 @@
 package service
 
 import (
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"math"
 	"sort"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -23,7 +24,8 @@ func NewRecordCompletionService() *RecordCompletionService {
 }
 
 // CompletePlayerRecords は通常譜面レコードを未プレイ補完し、ソート済み配列を返します。
-func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.PlayerRecord, songs []*entity.Song, difficultyNamesByID map[int]string) []*entity.PlayerRecord {
+// difficultySortOrderByID はID→SortOrderのマップで、ゲームの正規表示順（BASIC<ADVANCED<EXPERT<MASTER<ULTIMA）でソートするために使用します。
+func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.PlayerRecord, songs []*entity.Song, difficultyNamesByID map[int]string, difficultySortOrderByID map[int]int) []*entity.PlayerRecord {
 	completed := make([]*entity.PlayerRecord, 0, len(records))
 	playedByChartID := make(map[int]struct{}, len(records))
 
@@ -51,8 +53,9 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 				Chart:   chart,
 				Song:    song,
 				ChartDifficulty: &master.ChartDifficulty{
-					ID:   chart.DifficultyID,
-					Name: difficultyNameByID(chart.DifficultyID, difficultyNamesByID),
+					ID:        chart.DifficultyID,
+					Name:      difficultyNameByID(chart.DifficultyID, difficultyNamesByID),
+					SortOrder: difficultySortOrder(chart.DifficultyID, difficultySortOrderByID),
 				},
 			})
 		}
@@ -64,7 +67,7 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 		if leftSongID != rightSongID {
 			return leftSongID < rightSongID
 		}
-		return playerRecordDifficultyID(completed[i]) < playerRecordDifficultyID(completed[j])
+		return playerRecordDifficultySortOrder(completed[i], difficultySortOrderByID) < playerRecordDifficultySortOrder(completed[j], difficultySortOrderByID)
 	})
 
 	return completed
@@ -116,6 +119,15 @@ func difficultyNameByID(difficultyID int, difficultyNamesByID map[int]string) st
 	return difficultyNamesByID[difficultyID]
 }
 
+// difficultySortOrder はID→SortOrderのマップから難易度ソート順を返します。
+// マスタデータに該当IDが存在しない場合は math.MaxInt を返し、データ不整合を検知するため警告ログを出力します。
+func difficultySortOrder(difficultyID int, difficultySortOrderByID map[int]int) int {
+	if order, ok := difficultySortOrderByID[difficultyID]; ok {
+		return order
+	}
+	return math.MaxInt
+}
+
 func playerRecordSongID(record *entity.PlayerRecord) int {
 	if record == nil || record.Song == nil {
 		return math.MaxInt
@@ -123,11 +135,17 @@ func playerRecordSongID(record *entity.PlayerRecord) int {
 	return record.Song.ID
 }
 
-func playerRecordDifficultyID(record *entity.PlayerRecord) int {
+// playerRecordDifficultySortOrder はレコードの難易度SortOrderを返します。
+// 未知の難易度IDの場合はmath.MaxIntを返し、末尾に回します。
+func playerRecordDifficultySortOrder(record *entity.PlayerRecord, difficultySortOrderByID map[int]int) int {
 	if record == nil || record.Chart == nil {
 		return math.MaxInt
 	}
-	return record.Chart.DifficultyID
+	order, ok := difficultySortOrderByID[record.Chart.DifficultyID]
+	if !ok {
+		return math.MaxInt
+	}
+	return order
 }
 
 func worldsendRecordSongID(record *entity.PlayerWorldsendRecord) int {
