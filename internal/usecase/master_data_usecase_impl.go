@@ -30,7 +30,12 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	masters := u.masterProvider.MasterDataMasters()
 	if masters == nil {
 		return &MasterDataOutput{
-			RatingBands: u.ratingBandProvider.RatingBands(),
+			Genres:           []masterdata.Item{},
+			Difficulties:     []masterdata.Item{},
+			AccountTypes:     []masterdata.Item{},
+			Versions:         []masterdata.Version{},
+			RatingBands:      u.ratingBandProvider.RatingBands(),
+			AchievementTypes: []masterdata.Item{},
 		}
 	}
 
