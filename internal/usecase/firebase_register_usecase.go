@@ -101,6 +101,11 @@ func (u *firebaseRegisterUsecase) RegisterWithFirebase(ctx context.Context, idTo
 		return "", err
 	}
 
+	// NOTE: セッション発行はトランザクション外で実行している。
+	// 理論上はユーザー作成が確定した後にセッション発行が失敗すると、
+	// ユーザーだけが存在する中途半端な状態になりうる。
+	// ただし、今後 Firebase に認証を一任し DB セッションを廃止する予定のため、
+	// トランザクションへの組み込みは行わず、この設計は移行時に解消する。
 	token, err := u.sessionIssuer.IssueSession(ctx, newUser)
 	if err != nil {
 		slog.Error("Firebase登録後のセッション発行に失敗しました", "user_id", newUser.ID, "error", err)
