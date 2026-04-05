@@ -65,5 +65,12 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		Versions:         versions,
 		RatingBands:      ratingBands,
 		AchievementTypes: achievementTypes,
+		ClassEmblems:     itemsToDTOs(out.ClassEmblems),
+		ClassEmblemBases: itemsToDTOs(out.ClassEmblemBases),
+		ClearLamps:       itemsToDTOs(out.ClearLamps),
+		ComboLamps:       itemsToDTOs(out.ComboLamps),
+		FullChains:       itemsToDTOs(out.FullChains),
+		Slots:            itemsToDTOs(out.Slots),
+		HonorTypes:       itemsToDTOs(out.HonorTypes),
 	})
 }

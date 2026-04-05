@@ -384,5 +384,12 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 		AccountTypes:     maps.Clone(c.AccountTypes),
 		Versions:         versionsByID,
 		AchievementTypes: maps.Clone(c.AchievementTypes),
+		ClassEmblems:     maps.Clone(c.ClassEmblems),
+		ClassEmblemBases: maps.Clone(c.ClassEmblemBases),
+		ClearLamps:       maps.Clone(c.ClearLamps),
+		ComboLamps:       maps.Clone(c.ComboLamps),
+		FullChains:       maps.Clone(c.FullChains),
+		Slots:            maps.Clone(c.Slots),
+		HonorTypes:       maps.Clone(c.HonorTypes),
 	}
 }

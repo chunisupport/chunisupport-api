@@ -1831,7 +1831,7 @@ curl -X POST \
 ### GET `/internal/master`
 
 - **認証**: Cookie 必須
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
 
@@ -1868,6 +1868,55 @@ curl -X POST \
     { "id": 1, "name": "rank_count" },
     { "id": 2, "name": "score_count" },
     { "id": 3, "name": "avg_score" }
+  ],
+  "class_emblems": [
+    { "id": 1, "name": "1" },
+    { "id": 2, "name": "2" },
+    { "id": 3, "name": "3" },
+    { "id": 4, "name": "4" },
+    { "id": 5, "name": "5" },
+    { "id": 6, "name": "inf" }
+  ],
+  "class_emblem_bases": [
+    { "id": 1, "name": "1" },
+    { "id": 2, "name": "2" },
+    { "id": 3, "name": "3" },
+    { "id": 4, "name": "4" },
+    { "id": 5, "name": "5" },
+    { "id": 6, "name": "inf" }
+  ],
+  "clear_lamps": [
+    { "id": 1, "name": "FAILED" },
+    { "id": 2, "name": "CLEAR" },
+    { "id": 3, "name": "HARD" },
+    { "id": 4, "name": "BRAVE" },
+    { "id": 5, "name": "ABSOLUTE" },
+    { "id": 6, "name": "CATASTROPHY" }
+  ],
+  "combo_lamps": [
+    { "id": 1, "name": "NONE" },
+    { "id": 2, "name": "FULL COMBO" },
+    { "id": 3, "name": "ALL JUSTICE" }
+  ],
+  "full_chains": [
+    { "id": 1, "name": "NONE" },
+    { "id": 2, "name": "FULL CHAIN GOLD" },
+    { "id": 3, "name": "FULL CHAIN PLATINUM" }
+  ],
+  "slots": [
+    { "id": 1, "name": "none" },
+    { "id": 2, "name": "best" },
+    { "id": 3, "name": "best_candidate" },
+    { "id": 4, "name": "new" },
+    { "id": 5, "name": "new_candidate" }
+  ],
+  "honor_types": [
+    { "id": 1, "name": "normal" },
+    { "id": 2, "name": "copper" },
+    { "id": 3, "name": "silver" },
+    { "id": 4, "name": "gold" },
+    { "id": 5, "name": "platina" },
+    { "id": 6, "name": "rainbow" }
   ]
 }
 ```
@@ -1882,6 +1931,13 @@ curl -X POST \
 | `versions` | VersionDTO[] | バージョン一覧（リリース日昇順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
+| `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`PlayerDTO.class_emblem_id` の解決に使用 |
+| `class_emblem_bases` | MasterItemDTO[] | クラスエンブレムベース一覧（sort_order順）。`PlayerDTO.class_emblem_base_id` の解決に使用 |
+| `clear_lamps` | MasterItemDTO[] | クリアランプ一覧（sort_order順）。`PlayerRecordDTO.clear_lamp` の取りうる値 |
+| `combo_lamps` | MasterItemDTO[] | コンボランプ一覧（sort_order順）。`PlayerRecordDTO.combo_lamp` の取りうる値 |
+| `full_chains` | MasterItemDTO[] | フルチェインランプ一覧（sort_order順）。`PlayerRecordDTO.full_chain` の取りうる値 |
+| `slots` | MasterItemDTO[] | スロット一覧（ID順）。`PlayerRecordDTO.slot` の取りうる値 |
+| `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID順）。`HonorDTO.type_name` の取りうる値 |
 
 **MasterItemDTO**:
 

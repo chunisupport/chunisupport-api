@@ -37,6 +37,13 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 			Versions:         []masterdata.Version{},
 			RatingBands:      u.ratingBandProvider.RatingBands(),
 			AchievementTypes: []masterdata.Item{},
+			ClassEmblems:     []masterdata.Item{},
+			ClassEmblemBases: []masterdata.Item{},
+			ClearLamps:       []masterdata.Item{},
+			ComboLamps:       []masterdata.Item{},
+			FullChains:       []masterdata.Item{},
+			Slots:            []masterdata.Item{},
+			HonorTypes:       []masterdata.Item{},
 		}
 	}
 
@@ -47,22 +54,44 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 		Versions:         sortedVersionsByReleasedAt(masters.Versions),
 		RatingBands:      u.ratingBandProvider.RatingBands(),
 		AchievementTypes: sortedByID(masters.AchievementTypes, func(i masterdata.Item) masterdata.Item { return i }),
+		ClassEmblems: sortedBySortOrder(masters.ClassEmblems, func(v master.ClassEmblem) (masterdata.Item, int) {
+			return masterdata.Item{ID: v.ID, Name: v.Name}, v.SortOrder
+		}),
+		ClassEmblemBases: sortedBySortOrder(masters.ClassEmblemBases, func(v master.ClassEmblemBase) (masterdata.Item, int) {
+			return masterdata.Item{ID: v.ID, Name: v.Name}, v.SortOrder
+		}),
+		ClearLamps: sortedBySortOrder(masters.ClearLamps, func(v master.ClearLampType) (masterdata.Item, int) {
+			return masterdata.Item{ID: v.ID, Name: v.Name}, v.SortOrder
+		}),
+		ComboLamps: sortedBySortOrder(masters.ComboLamps, func(v master.ComboLampType) (masterdata.Item, int) {
+			return masterdata.Item{ID: v.ID, Name: v.Name}, v.SortOrder
+		}),
+		FullChains: sortedBySortOrder(masters.FullChains, func(v master.FullChainType) (masterdata.Item, int) {
+			return masterdata.Item{ID: v.ID, Name: v.Name}, v.SortOrder
+		}),
+		Slots:      sortedByID(masters.Slots, func(v master.Slot) masterdata.Item { return masterdata.Item{ID: v.ID, Name: v.Name} }),
+		HonorTypes: sortedByID(masters.HonorTypes, func(v master.HonorType) masterdata.Item { return masterdata.Item{ID: v.ID, Name: v.Name} }),
 	}
 }
 
 // sortedDifficultiesBySortOrder は難易度をゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。
 // SortOrder はゲーム内の表示順序（BASIC < ADVANCED < EXPERT < MASTER < ULTIMA）を表します。
 func sortedDifficultiesBySortOrder(difficulties map[string]master.ChartDifficulty) []masterdata.Item {
+	return sortedBySortOrder(difficulties, func(d master.ChartDifficulty) (masterdata.Item, int) {
+		return masterdata.Item{ID: d.ID, Name: d.Name}, d.SortOrder
+	})
+}
+
+// sortedBySortOrder はマップの値を Item に変換し、SortOrder 昇順でソートしたスライスを返します。
+func sortedBySortOrder[V any](m map[string]V, toSortedItem func(V) (masterdata.Item, int)) []masterdata.Item {
 	type entry struct {
 		item      masterdata.Item
 		sortOrder int
 	}
-	entries := make([]entry, 0, len(difficulties))
-	for _, d := range difficulties {
-		entries = append(entries, entry{
-			item:      masterdata.Item{ID: d.ID, Name: d.Name},
-			sortOrder: d.SortOrder,
-		})
+	entries := make([]entry, 0, len(m))
+	for _, v := range m {
+		item, order := toSortedItem(v)
+		entries = append(entries, entry{item: item, sortOrder: order})
 	}
 	slices.SortFunc(entries, func(a, b entry) int {
 		return cmp.Compare(a.sortOrder, b.sortOrder)

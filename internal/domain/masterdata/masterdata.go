@@ -68,4 +68,11 @@ type MasterDataMasters struct {
 	AccountTypes     map[string]master.AccountType
 	Versions         map[int]Version
 	AchievementTypes map[string]Item
+	ClassEmblems     map[string]master.ClassEmblem
+	ClassEmblemBases map[string]master.ClassEmblemBase
+	ClearLamps       map[string]master.ClearLampType
+	ComboLamps       map[string]master.ComboLampType
+	FullChains       map[string]master.FullChainType
+	Slots            map[string]master.Slot
+	HonorTypes       map[string]master.HonorType
 }

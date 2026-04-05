@@ -21,6 +21,13 @@ type MasterDataResponse struct {
 	Versions         []*VersionDTO    `json:"versions"`
 	RatingBands      []*RatingBandDTO `json:"rating_bands"`
 	AchievementTypes []*MasterItemDTO `json:"achievement_types"`
+	ClassEmblems     []*MasterItemDTO `json:"class_emblems"`
+	ClassEmblemBases []*MasterItemDTO `json:"class_emblem_bases"`
+	ClearLamps       []*MasterItemDTO `json:"clear_lamps"`
+	ComboLamps       []*MasterItemDTO `json:"combo_lamps"`
+	FullChains       []*MasterItemDTO `json:"full_chains"`
+	Slots            []*MasterItemDTO `json:"slots"`
+	HonorTypes       []*MasterItemDTO `json:"honor_types"`
 }
 
 // RatingBandDTO はレーティング帯マスタのDTOです。
