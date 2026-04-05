@@ -30,7 +30,7 @@
 - `account_types`: `id`, `name`
 - `versions`: `id`, `name`, `released_at`
 - `rating_bands`: `id`, `label`, `min_inclusive`, `max_exclusive`, `sort_order`
-- `achievement_types`: `id`, `name`（実体は表示名というより achievement type のコード文字列）
+- `achievement_types`: APIレスポンス上は `id`, `name`。ただし `name` に入る実体は `achievement_types.code` のコード文字列
 
 根拠:
 
@@ -129,7 +129,7 @@
 - `difficulties`
 - `genres`
 - `versions`
-- `achievement_types`（`name` に achievement type のコード文字列が入る）
+- `achievement_types`（API上の `name` に achievement type のコード文字列が入る）
 
 ### 3-2. プレイヤーの class emblem 系は ID のまま返している
 
@@ -226,13 +226,13 @@
 2. ユーザー系APIで class emblem 名も同時に返す
 3. フロントが別の静的辞書を持つ
 
-## 6. 補足: 実装と仕様書の差分
+## 6. 補足: 実装と仕様書の同期状況
 
-`/internal/master` は実装上 `achievement_types` を返していますが、`docs/API.md` の当該レスポンス例とフィールド説明は完全には追随していません。
+2026-04-05 時点で `docs/API.md` の `/internal/master` セクションは更新済みです。
 
-- 見出し直下に「`achievement_types` が追加されます」とはある
-- ただしレスポンス例に `achievement_types` が載っていない
-- フィールド一覧にも `achievement_types` 行がない
+- `achievement_types` がレスポンス例に含まれる
+- フィールド一覧にも `achievement_types` 行がある
+- `MasterItemDTO.name` が `achievement_types` の場合はコード文字列であることが明記されている
 
 根拠:
 

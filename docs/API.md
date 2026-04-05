@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年04月03日
+**最終更新日**: 2026年04月05日
 
 ## ベースURLと環境
 
@@ -1830,10 +1830,9 @@ curl -X POST \
 
 ### GET `/internal/master`
 
-レスポンスに `achievement_types` が追加されます。
-
 - **認証**: Cookie 必須
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別）を返却します。
+- `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -1864,6 +1863,11 @@ curl -X POST \
     { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
     { "id": 2, "label": "15.0", "min_inclusive": 15.0, "max_exclusive": 15.1, "sort_order": 2 },
     { "id": 28, "label": "17.6+", "min_inclusive": 17.6, "max_exclusive": null, "sort_order": 28 }
+  ],
+  "achievement_types": [
+    { "id": 1, "name": "rank_count" },
+    { "id": 2, "name": "score_count" },
+    { "id": 3, "name": "avg_score" }
   ]
 }
 ```
@@ -1877,13 +1881,14 @@ curl -X POST \
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
 | `versions` | VersionDTO[] | バージョン一覧（ID順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
+| `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
 
 **MasterItemDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `id` | int | マスタID |
-| `name` | string | マスタ名称 |
+| `name` | string | マスタ名称。`achievement_types` の場合は表示名ではなく成果種別コード |
 
 **VersionDTO**:
 
