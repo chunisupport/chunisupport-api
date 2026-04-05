@@ -162,7 +162,8 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		versionsByID[int(item.ID)] = item
 	}
 
-	achievementTypeRows, err := loadSimpleRows(ctx, db, "SELECT id, code FROM achievement_types")
+	// achievement_types は name 列を持たず、code 列を成果種別コードとしてそのまま扱う。
+	achievementTypeRows, err := loadSimpleRows(ctx, db, "SELECT id, code AS name FROM achievement_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload achievement_types: %w", err)
 	}
