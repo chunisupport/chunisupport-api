@@ -1,7 +1,6 @@
 package service
 
 import (
-	"log/slog"
 	"math"
 	"sort"
 
@@ -126,7 +125,6 @@ func difficultySortOrder(difficultyID int, difficultySortOrderByID map[int]int) 
 	if order, ok := difficultySortOrderByID[difficultyID]; ok {
 		return order
 	}
-	slog.Warn("マスタデータに難易度ソート順が見つかりません", "difficulty_id", difficultyID)
 	return math.MaxInt
 }
 
