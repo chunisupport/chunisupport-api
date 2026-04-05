@@ -31,7 +31,7 @@ type Cache struct {
 	AccountTypes         map[string]master.AccountType
 	Versions             map[string]Version
 	VersionsByID         map[int]Version
-	AchievementTypes     map[string]Item
+	AchievementTypes     map[string]master.BaseMasterVO
 	AchievementTypesByID map[int]string
 }
 
