@@ -1,6 +1,8 @@
 package models
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -29,9 +31,18 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		return nil, err
 	}
 
-	phash, err := passwordhash.NewPasswordHash(m.PasswordHash)
-	if err != nil {
-		return nil, err
+	// 空のpassword_hashはFirebase認証専用ユーザーを表します。
+	var phash passwordhash.PasswordHash
+	if m.PasswordHash == "" {
+		if m.FirebaseUID == nil || strings.TrimSpace(*m.FirebaseUID) == "" {
+			return nil, errors.New("password hash cannot be empty")
+		}
+		phash = passwordhash.NewEmptyPasswordHash()
+	} else {
+		phash, err = passwordhash.NewPasswordHash(m.PasswordHash)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &entity.User{

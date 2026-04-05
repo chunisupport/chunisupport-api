@@ -35,12 +35,27 @@ func (m *mockFirebaseLoginUsecase) LoginWithFirebase(ctx context.Context, idToke
 	return args.String(0), args.Error(1)
 }
 
+type mockFirebaseRegisterUsecase struct {
+	mock.Mock
+}
+
+func (m *mockFirebaseRegisterUsecase) RegisterWithFirebase(ctx context.Context, idToken string, username string) (string, error) {
+	args := m.Called(ctx, idToken, username)
+	return args.String(0), args.Error(1)
+}
+
+func newFirebaseHandler() (*api_internal.FirebaseHandler, *mockFirebaseLinkUsecase, *mockFirebaseLoginUsecase, *mockFirebaseRegisterUsecase) {
+	linkUsecase := new(mockFirebaseLinkUsecase)
+	loginUsecase := new(mockFirebaseLoginUsecase)
+	registerUsecase := new(mockFirebaseRegisterUsecase)
+	h := api_internal.NewFirebaseHandler(linkUsecase, loginUsecase, registerUsecase, false, http.SameSiteLaxMode)
+	return h, linkUsecase, loginUsecase, registerUsecase
+}
+
 func TestFirebaseHandler_Link(t *testing.T) {
 	e := echo.New()
 	e.Validator = app.NewCustomValidator()
-	linkUsecase := new(mockFirebaseLinkUsecase)
-	loginUsecase := new(mockFirebaseLoginUsecase)
-	h := api_internal.NewFirebaseHandler(linkUsecase, loginUsecase, false, http.SameSiteLaxMode)
+	h, linkUsecase, _, _ := newFirebaseHandler()
 
 	t.Run("正常系: Firebase UID を連携する", func(t *testing.T) {
 		linkUsecase.On("LinkFirebaseUID", mock.Anything, 1, "firebase-id-token").Return(nil).Once()
@@ -81,9 +96,7 @@ func TestFirebaseHandler_Link(t *testing.T) {
 func TestFirebaseHandler_Login(t *testing.T) {
 	e := echo.New()
 	e.Validator = app.NewCustomValidator()
-	linkUsecase := new(mockFirebaseLinkUsecase)
-	loginUsecase := new(mockFirebaseLoginUsecase)
-	h := api_internal.NewFirebaseHandler(linkUsecase, loginUsecase, false, http.SameSiteLaxMode)
+	h, _, loginUsecase, _ := newFirebaseHandler()
 
 	t.Run("正常系: Firebase ログインで Cookie を発行する", func(t *testing.T) {
 		loginUsecase.On("LoginWithFirebase", mock.Anything, "firebase-id-token").Return("jwt-token", nil).Once()
@@ -121,5 +134,78 @@ func TestFirebaseHandler_Login(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeInvalidToken, apiErr.Code)
 		loginUsecase.AssertExpectations(t)
+	})
+}
+
+func TestFirebaseHandler_Register(t *testing.T) {
+	e := echo.New()
+	e.Validator = app.NewCustomValidator()
+	h, _, _, registerUsecase := newFirebaseHandler()
+
+	t.Run("正常系: 新規ユーザー登録で201と Cookie を返す", func(t *testing.T) {
+		registerUsecase.On("RegisterWithFirebase", mock.Anything, "firebase-id-token", "newuser").Return("jwt-token", nil).Once()
+
+		body := `{"id_token":"firebase-id-token","username":"newuser"}`
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/firebase/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Register(c)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, rec.Code)
+
+		cookies := rec.Result().Cookies()
+		assert.Len(t, cookies, 1)
+		assert.Equal(t, "token", cookies[0].Name)
+		assert.Equal(t, "jwt-token", cookies[0].Value)
+		registerUsecase.AssertExpectations(t)
+	})
+
+	t.Run("異常系: Firebase UID が既存ユーザーに紐付いている場合は409を返す", func(t *testing.T) {
+		registerUsecase.On("RegisterWithFirebase", mock.Anything, "linked-token", "newuser").Return("", usecase.ErrFirebaseUIDAlreadyLinked).Once()
+
+		body := `{"id_token":"linked-token","username":"newuser"}`
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/firebase/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Register(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeFirebaseUIDAlreadyLinked, apiErr.Code)
+		registerUsecase.AssertExpectations(t)
+	})
+
+	t.Run("異常系: usernameバリデーション失敗で422を返す", func(t *testing.T) {
+		body := `{"id_token":"firebase-id-token","username":"ab"}`
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/firebase/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Register(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	})
+
+	t.Run("異常系: id_tokenが未指定の場合は422を返す", func(t *testing.T) {
+		body := `{"username":"newuser"}`
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/firebase/register", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.Register(c)
+		assert.Error(t, err)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
 	})
 }

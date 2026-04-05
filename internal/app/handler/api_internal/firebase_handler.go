@@ -12,21 +12,28 @@ type firebaseRequest struct {
 	IDToken string `json:"id_token" validate:"required"`
 }
 
-// FirebaseHandler は Firebase ログイン・連携リクエストを処理します。
+type firebaseRegisterRequest struct {
+	IDToken  string `json:"id_token" validate:"required"`
+	Username string `json:"username" validate:"required,username"`
+}
+
+// FirebaseHandler は Firebase ログイン・連携・登録リクエストを処理します。
 type FirebaseHandler struct {
-	firebaseLinkUsecase  usecase.FirebaseLinkUsecase
-	firebaseLoginUsecase usecase.FirebaseLoginUsecase
-	cookieSecure         bool
-	cookieSameSite       http.SameSite
+	firebaseLinkUsecase     usecase.FirebaseLinkUsecase
+	firebaseLoginUsecase    usecase.FirebaseLoginUsecase
+	firebaseRegisterUsecase usecase.FirebaseRegisterUsecase
+	cookieSecure            bool
+	cookieSameSite          http.SameSite
 }
 
 // NewFirebaseHandler は FirebaseHandler を生成します。
-func NewFirebaseHandler(firebaseLinkUsecase usecase.FirebaseLinkUsecase, firebaseLoginUsecase usecase.FirebaseLoginUsecase, cookieSecure bool, cookieSameSite http.SameSite) *FirebaseHandler {
+func NewFirebaseHandler(firebaseLinkUsecase usecase.FirebaseLinkUsecase, firebaseLoginUsecase usecase.FirebaseLoginUsecase, firebaseRegisterUsecase usecase.FirebaseRegisterUsecase, cookieSecure bool, cookieSameSite http.SameSite) *FirebaseHandler {
 	return &FirebaseHandler{
-		firebaseLinkUsecase:  firebaseLinkUsecase,
-		firebaseLoginUsecase: firebaseLoginUsecase,
-		cookieSecure:         cookieSecure,
-		cookieSameSite:       cookieSameSite,
+		firebaseLinkUsecase:     firebaseLinkUsecase,
+		firebaseLoginUsecase:    firebaseLoginUsecase,
+		firebaseRegisterUsecase: firebaseRegisterUsecase,
+		cookieSecure:            cookieSecure,
+		cookieSameSite:          cookieSameSite,
 	}
 }
 
@@ -70,4 +77,24 @@ func (h *FirebaseHandler) Login(c echo.Context) error {
 	c.SetCookie(newAuthCookie(h.cookieSecure, h.cookieSameSite, token, 0))
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+// Register は Firebase ID トークンとユーザー名で新規ユーザーを登録し、認証 Cookie を発行します。
+func (h *FirebaseHandler) Register(c echo.Context) error {
+	req := new(firebaseRegisterRequest)
+	if err := c.Bind(req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(req); err != nil {
+		return err
+	}
+
+	token, err := h.firebaseRegisterUsecase.RegisterWithFirebase(c.Request().Context(), req.IDToken, req.Username)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	c.SetCookie(newAuthCookie(h.cookieSecure, h.cookieSameSite, token, 0))
+
+	return c.NoContent(http.StatusCreated)
 }

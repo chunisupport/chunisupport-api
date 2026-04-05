@@ -18,6 +18,12 @@ func NewPasswordHash(value string) (PasswordHash, error) {
 	return PasswordHash(value), nil
 }
 
+// NewEmptyPasswordHash はパスワードなし状態を表す空の PasswordHash を返します。
+// Firebase認証のみで登録したユーザーなど、パスワードを持たないユーザーに使用します。
+func NewEmptyPasswordHash() PasswordHash {
+	return PasswordHash("")
+}
+
 // MustNewPasswordHash はテストや固定値用のヘルパーです。
 // 警告: テストコード専用。本番コードでは使用禁止。
 func MustNewPasswordHash(value string) PasswordHash {
