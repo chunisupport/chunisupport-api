@@ -99,7 +99,7 @@ func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1So
 
 // convertToV1SongDTO は Song を V1SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
-// マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
+// マッピングルール: 難易度IDはマスタ参照で難易度名に変換する
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)

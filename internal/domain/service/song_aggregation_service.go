@@ -1,11 +1,14 @@
 package service
 
-import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
+import (
+	"strings"
 
-// MASTER/ULTIMA の難易度ID
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+)
+
 const (
-	difficultyIDMaster = 4
-	difficultyIDUltima = 5
+	difficultyNameMaster = "MASTER"
+	difficultyNameUltima = "ULTIMA"
 )
 
 // SongAggregation は楽曲の譜面集約結果を保持します。
@@ -18,9 +21,9 @@ type SongAggregation struct {
 //
 // 判定ルール:
 //   - MaxChartConst: 全譜面のうち最大の定数値
-//   - IsMaxOPUnknown: MASTER(4)またはULTIMA(5)の譜面に is_const_unknown=true が
+//   - IsMaxOPUnknown: MASTER または ULTIMA の譜面に is_const_unknown=true が
 //     1件でも含まれれば true。EXPERT以下のunknownは判定対象外。
-func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
+func AggregateSongCharts(charts []*entity.Chart, difficultyNamesByID map[int]string) SongAggregation {
 	var maxConst float64
 	isMaxOPUnknown := false
 
@@ -30,8 +33,12 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 			maxConst = constVal
 		}
 
-		// MASTER/ULTIMA の is_const_unknown をチェック
-		if (c.DifficultyID == difficultyIDMaster || c.DifficultyID == difficultyIDUltima) && c.IsConstUnknown {
+		difficultyName, ok := difficultyNamesByID[c.DifficultyID]
+		if !ok {
+			continue
+		}
+
+		if c.IsConstUnknown && isMasterOrUltimaDifficulty(difficultyName) {
 			isMaxOPUnknown = true
 		}
 	}
@@ -42,10 +49,15 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 	}
 }
 
+func isMasterOrUltimaDifficulty(difficultyName string) bool {
+	name := strings.ToUpper(difficultyName)
+	return name == difficultyNameMaster || name == difficultyNameUltima
+}
+
 // ApplyAggregation は楽曲エンティティの譜面リストから集約結果を計算し、
 // MaxChartConst と IsMaxOPUnknown をエンティティに適用します。
-func ApplyAggregation(song *entity.Song) {
-	agg := AggregateSongCharts(song.Charts)
+func ApplyAggregation(song *entity.Song, difficultyNamesByID map[int]string) {
+	agg := AggregateSongCharts(song.Charts, difficultyNamesByID)
 	song.MaxChartConst = agg.MaxChartConst
 	song.IsMaxOPUnknown = agg.IsMaxOPUnknown
 }

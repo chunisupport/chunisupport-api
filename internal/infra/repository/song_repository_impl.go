@@ -51,10 +51,38 @@ type chartRow struct {
 	Notes          *int    `db:"notes"`
 }
 
+func (r *songRepository) loadDifficultyNamesByID(ctx context.Context, exec repository.Executor) (map[int]string, error) {
+	rows := []struct {
+		ID   int    `db:"id"`
+		Name string `db:"name"`
+	}{}
+
+	const query = `
+		SELECT id, name
+		FROM difficulties
+	`
+	if err := exec.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+
+	difficultyNamesByID := make(map[int]string, len(rows))
+	for _, row := range rows {
+		difficultyNamesByID[row.ID] = row.Name
+	}
+
+	return difficultyNamesByID, nil
+}
+
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+	// 難易度名マスタを取得
+	difficultyNamesByID, err := r.loadDifficultyNamesByID(ctx, exec)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
@@ -88,7 +116,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
 		FROM charts
 		WHERE song_id IN (?)
-		ORDER BY song_id, difficulty_id
+		ORDER BY song_id, id
 	`, songIDs)
 	if err != nil {
 		return nil, err
@@ -120,7 +148,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
 	for _, song := range results {
-		service.ApplyAggregation(song)
+		service.ApplyAggregation(song, difficultyNamesByID)
 	}
 
 	return results, nil
@@ -169,6 +197,12 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		return []*entity.Song{}, nil
 	}
 
+	// 難易度名マスタを取得
+	difficultyNamesByID, err := r.loadDifficultyNamesByID(ctx, exec)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
@@ -203,7 +237,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
 		FROM charts
 		WHERE song_id IN (?)
-		ORDER BY song_id, difficulty_id
+		ORDER BY song_id, id
 	`, songIDs)
 	if err != nil {
 		return nil, err
@@ -235,7 +269,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
 	for _, song := range songs {
-		service.ApplyAggregation(song)
+		service.ApplyAggregation(song, difficultyNamesByID)
 	}
 
 	return songs, nil
@@ -244,6 +278,12 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 // FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 // 削除済み楽曲も取得します。
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	// 難易度名マスタを取得
+	difficultyNamesByID, err := r.loadDifficultyNamesByID(ctx, exec)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. 楽曲を取得
 	songQuery := `
 		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
@@ -265,7 +305,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
 		FROM charts
 		WHERE song_id = ?
-		ORDER BY difficulty_id
+		ORDER BY id
 	`
 	var chartRows []chartRow
 	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, songRow.ID); err != nil {
@@ -280,7 +320,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	song.Charts = charts
 
 	// 3. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
-	service.ApplyAggregation(song)
+	service.ApplyAggregation(song, difficultyNamesByID)
 
 	return song, nil
 }

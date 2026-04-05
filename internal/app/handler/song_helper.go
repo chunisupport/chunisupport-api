@@ -1,15 +1,20 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v4"
 )
 
-const (
-	MinDifficultyID = 1
-	MaxDifficultyID = 5
-)
+var normalDifficultyNameSet = map[string]struct{}{
+	"BASIC":    {},
+	"ADVANCED": {},
+	"EXPERT":   {},
+	"MASTER":   {},
+	"ULTIMA":   {},
+}
 
 // ParseDifficultyPath はパスパラメータを内部難易度名に変換します。
 // 無効なパラメータの場合は空文字とfalseを返します。
@@ -25,20 +30,28 @@ func BuildChartsMap[T any](
 	difficultyNames map[int]string,
 	converter func(*entity.Chart) T,
 ) map[string]T {
-	// Initialize map with nil for all difficulty levels
+	// Initialize map with zero value for all normal difficulty levels in master data.
 	chartsMap := make(map[string]T)
-	for diffID, diffName := range difficultyNames {
-		if diffID >= MinDifficultyID && diffID <= MaxDifficultyID {
-			var zero T
-			chartsMap[diffName] = zero
+	for _, diffName := range difficultyNames {
+		normalizedName := strings.ToUpper(diffName)
+		if _, ok := normalDifficultyNameSet[normalizedName]; !ok {
+			continue
 		}
+		var zero T
+		chartsMap[normalizedName] = zero
 	}
 
-	// Populate map with actual chart data
+	// Populate map with actual chart data.
 	for _, chart := range charts {
-		if diffName, ok := difficultyNames[chart.DifficultyID]; ok {
-			chartsMap[diffName] = converter(chart)
+		diffName, ok := difficultyNames[chart.DifficultyID]
+		if !ok {
+			continue
 		}
+		normalizedName := strings.ToUpper(diffName)
+		if _, ok := normalDifficultyNameSet[normalizedName]; !ok {
+			continue
+		}
+		chartsMap[normalizedName] = converter(chart)
 	}
 
 	return chartsMap

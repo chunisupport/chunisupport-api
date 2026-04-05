@@ -18,6 +18,16 @@ func helperChart(difficultyID int, constVal float64, isConstUnknown bool) *entit
 }
 
 func TestAggregateSongCharts(t *testing.T) {
+	difficultyNamesByID := map[int]string{
+		1:  "BASIC",
+		2:  "ADVANCED",
+		3:  "EXPERT",
+		4:  "MASTER",
+		5:  "ULTIMA",
+		99: "MASTER",
+		77: "ULTIMA",
+	}
+
 	tests := []struct {
 		name               string
 		charts             []*entity.Chart
@@ -120,11 +130,20 @@ func TestAggregateSongCharts(t *testing.T) {
 			wantMaxChartConst:  14.0,
 			wantIsMaxOPUnknown: true,
 		},
+		{
+			name: "MASTER/ULTIMAのIDが4/5以外でも難易度名でunknown判定できる",
+			charts: []*entity.Chart{
+				helperChart(99, 14.2, true), // MASTER unknown (非4)
+				helperChart(77, 14.7, false),
+			},
+			wantMaxChartConst:  14.7,
+			wantIsMaxOPUnknown: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			agg := AggregateSongCharts(tt.charts)
+			agg := AggregateSongCharts(tt.charts, difficultyNamesByID)
 
 			if agg.MaxChartConst != tt.wantMaxChartConst {
 				t.Errorf("MaxChartConst = %v, want %v", agg.MaxChartConst, tt.wantMaxChartConst)
@@ -145,7 +164,8 @@ func TestApplyAggregation(t *testing.T) {
 		},
 	}
 
-	ApplyAggregation(song)
+	difficultyNamesByID := map[int]string{4: "MASTER", 5: "ULTIMA"}
+	ApplyAggregation(song, difficultyNamesByID)
 
 	if song.MaxChartConst != 14.6 {
 		t.Errorf("MaxChartConst = %v, want %v", song.MaxChartConst, 14.6)
