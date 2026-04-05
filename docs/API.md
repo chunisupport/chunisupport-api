@@ -1877,7 +1877,7 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `genres` | MasterItemDTO[] | ジャンル一覧（ID順） |
-| `difficulties` | MasterItemDTO[] | 難易度一覧（ID順） |
+| `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
 | `versions` | VersionDTO[] | バージョン一覧（ID順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |

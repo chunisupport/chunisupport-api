@@ -3,10 +3,20 @@ package api_internal
 import (
 	"net/http"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
+
+// itemsToDTOs は []masterdata.Item を []*dto.MasterItemDTO に変換します。
+func itemsToDTOs(items []masterdata.Item) []*dto.MasterItemDTO {
+	dtos := make([]*dto.MasterItemDTO, len(items))
+	for i, item := range items {
+		dtos[i] = &dto.MasterItemDTO{ID: item.ID, Name: item.Name}
+	}
+	return dtos
+}
 
 // MasterDataHandler はマスタデータ関連のハンドラです。
 type MasterDataHandler struct {
@@ -22,20 +32,9 @@ func NewMasterDataHandler(masterDataUsecase usecase.MasterDataUsecase) *MasterDa
 func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	out := h.masterDataUsecase.GetMasterData(c.Request().Context())
 
-	genres := make([]*dto.MasterItemDTO, len(out.Genres))
-	for i, g := range out.Genres {
-		genres[i] = &dto.MasterItemDTO{ID: g.ID, Name: g.Name}
-	}
-
-	difficulties := make([]*dto.MasterItemDTO, len(out.Difficulties))
-	for i, d := range out.Difficulties {
-		difficulties[i] = &dto.MasterItemDTO{ID: d.ID, Name: d.Name}
-	}
-
-	accountTypes := make([]*dto.MasterItemDTO, len(out.AccountTypes))
-	for i, a := range out.AccountTypes {
-		accountTypes[i] = &dto.MasterItemDTO{ID: a.ID, Name: a.Name}
-	}
+	genres := itemsToDTOs(out.Genres)
+	difficulties := itemsToDTOs(out.Difficulties)
+	accountTypes := itemsToDTOs(out.AccountTypes)
 
 	versions := make([]*dto.VersionDTO, len(out.Versions))
 	for i, v := range out.Versions {
@@ -57,10 +56,7 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		}
 	}
 
-	achievementTypes := make([]*dto.MasterItemDTO, len(out.AchievementTypes))
-	for i, a := range out.AchievementTypes {
-		achievementTypes[i] = &dto.MasterItemDTO{ID: a.ID, Name: a.Name}
-	}
+	achievementTypes := itemsToDTOs(out.AchievementTypes)
 
 	return c.JSON(http.StatusOK, &dto.MasterDataResponse{
 		Genres:           genres,
