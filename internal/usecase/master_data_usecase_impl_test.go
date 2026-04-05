@@ -95,12 +95,12 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 			wantAccountTypeIDs: []int{1, 2, 3},
 		},
 		{
-			name: "バージョンはID昇順に並ぶ",
+			name: "バージョンはリリース日昇順に並ぶ",
 			masters: &masterdata.MasterDataMasters{
 				Versions: map[int]masterdata.Version{
-					3: {ID: 3, Name: "NEW!!!"},
-					1: {ID: 1, Name: "CHUNITHM"},
-					2: {ID: 2, Name: "PLUS"},
+					3: {ID: 3, Name: "NEW!!!", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
+					1: {ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
+					2: {ID: 2, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
 				},
 				Genres:           map[string]master.Genre{},
 				Difficulties:     map[string]master.ChartDifficulty{},

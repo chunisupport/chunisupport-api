@@ -25,6 +25,7 @@ func NewMasterDataUsecase(masterProvider repository.MasterDataMasterProvider, ra
 
 // GetMasterData はソート済みのマスタデータ一覧を返します。
 // 難易度はゲームの正規表示順（SortOrder昇順）でソートされます。
+// バージョンはリリース日昇順でソートされます。
 // その他のマスタはID昇順でソートされます。
 func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	masters := u.masterProvider.MasterDataMasters()
@@ -43,7 +44,7 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 		Genres:           sortedByID(masters.Genres, func(g master.Genre) masterdata.Item { return masterdata.Item{ID: g.ID, Name: g.Name} }),
 		Difficulties:     sortedDifficultiesBySortOrder(masters.Difficulties),
 		AccountTypes:     sortedByID(masters.AccountTypes, func(a master.AccountType) masterdata.Item { return masterdata.Item{ID: a.ID, Name: a.Name} }),
-		Versions:         sortedVersionsByID(masters.Versions),
+		Versions:         sortedVersionsByReleasedAt(masters.Versions),
 		RatingBands:      u.ratingBandProvider.RatingBands(),
 		AchievementTypes: sortedByID(masters.AchievementTypes, func(i masterdata.Item) masterdata.Item { return i }),
 	}
@@ -85,14 +86,14 @@ func sortedByID[V any](m map[string]V, toItem func(V) masterdata.Item) []masterd
 	return items
 }
 
-// sortedVersionsByID はバージョンをID昇順でソートしたスライスを返します。
-func sortedVersionsByID(versions map[int]masterdata.Version) []masterdata.Version {
+// sortedVersionsByReleasedAt はバージョンをリリース日昇順でソートしたスライスを返します。
+func sortedVersionsByReleasedAt(versions map[int]masterdata.Version) []masterdata.Version {
 	items := make([]masterdata.Version, 0, len(versions))
 	for _, v := range versions {
 		items = append(items, v)
 	}
 	slices.SortFunc(items, func(a, b masterdata.Version) int {
-		return cmp.Compare(int(a.ID), int(b.ID))
+		return a.ReleasedAt.Compare(b.ReleasedAt)
 	})
 	return items
 }
