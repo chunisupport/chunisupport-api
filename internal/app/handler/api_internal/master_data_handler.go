@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/labstack/echo/v4"
@@ -43,17 +44,21 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	}
 	sortMasterItemsByID(genres)
 
-	// Difficulties をID順にソートして配列化
-	difficulties := make([]*dto.MasterItemDTO, 0, len(h.masterCache.Difficulties))
+	// Difficulties を SortOrder 順にソートして配列化
+	diffList := make([]master.ChartDifficulty, 0, len(h.masterCache.Difficulties))
 	for _, item := range h.masterCache.Difficulties {
+		diffList = append(diffList, item)
+	}
+	slices.SortFunc(diffList, func(a, b master.ChartDifficulty) int {
+		return cmp.Compare(a.SortOrder, b.SortOrder)
+	})
+	difficulties := make([]*dto.MasterItemDTO, 0, len(diffList))
+	for _, item := range diffList {
 		difficulties = append(difficulties, &dto.MasterItemDTO{
 			ID:   item.ID,
 			Name: item.Name,
 		})
 	}
-	slices.SortFunc(difficulties, func(a, b *dto.MasterItemDTO) int {
-		return cmp.Compare(a.ID, b.ID)
-	})
 
 	// AccountTypes をID順にソートして配列化
 	accountTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AccountTypes))
