@@ -2,10 +2,10 @@ package service
 
 import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
 
-// MASTER/ULTIMA の難易度ID
+// MaxOPのunknown判定対象になる難易度名
 const (
-	difficultyIDMaster = 4
-	difficultyIDUltima = 5
+	difficultyNameMaster = "MASTER"
+	difficultyNameUltima = "ULTIMA"
 )
 
 // SongAggregation は楽曲の譜面集約結果を保持します。
@@ -18,9 +18,9 @@ type SongAggregation struct {
 //
 // 判定ルール:
 //   - MaxChartConst: 全譜面のうち最大の定数値
-//   - IsMaxOPUnknown: MASTER(4)またはULTIMA(5)の譜面に is_const_unknown=true が
+//   - IsMaxOPUnknown: MASTERまたはULTIMAの譜面に is_const_unknown=true が
 //     1件でも含まれれば true。EXPERT以下のunknownは判定対象外。
-func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
+func AggregateSongCharts(charts []*entity.Chart, difficultyNamesByID map[int]string) SongAggregation {
 	var maxConst float64
 	isMaxOPUnknown := false
 
@@ -31,7 +31,8 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 		}
 
 		// MASTER/ULTIMA の is_const_unknown をチェック
-		if (c.DifficultyID == difficultyIDMaster || c.DifficultyID == difficultyIDUltima) && c.IsConstUnknown {
+		difficultyName, exists := difficultyNamesByID[c.DifficultyID]
+		if exists && c.IsConstUnknown && (difficultyName == difficultyNameMaster || difficultyName == difficultyNameUltima) {
 			isMaxOPUnknown = true
 		}
 	}
@@ -44,8 +45,8 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 
 // ApplyAggregation は楽曲エンティティの譜面リストから集約結果を計算し、
 // MaxChartConst と IsMaxOPUnknown をエンティティに適用します。
-func ApplyAggregation(song *entity.Song) {
-	agg := AggregateSongCharts(song.Charts)
+func ApplyAggregation(song *entity.Song, difficultyNamesByID map[int]string) {
+	agg := AggregateSongCharts(song.Charts, difficultyNamesByID)
 	song.MaxChartConst = agg.MaxChartConst
 	song.IsMaxOPUnknown = agg.IsMaxOPUnknown
 }

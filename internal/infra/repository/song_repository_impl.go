@@ -46,6 +46,7 @@ type chartRow struct {
 	ID             int     `db:"id"`
 	SongID         int     `db:"song_id"`
 	DifficultyID   int     `db:"difficulty_id"`
+	DifficultyName string  `db:"difficulty_name"`
 	Const          float64 `db:"const"`
 	IsConstUnknown bool    `db:"is_const_unknown"`
 	Notes          *int    `db:"notes"`
@@ -85,10 +86,20 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, args, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
-		FROM charts
+		SELECT c.id, c.song_id, c.difficulty_id, d.name AS difficulty_name, c.const, c.is_const_unknown, c.notes
+		FROM charts c
+		INNER JOIN difficulties d ON c.difficulty_id = d.id
 		WHERE song_id IN (?)
-		ORDER BY song_id, difficulty_id
+		ORDER BY c.song_id,
+			CASE d.name
+				WHEN 'BASIC' THEN 1
+				WHEN 'ADVANCED' THEN 2
+				WHEN 'EXPERT' THEN 3
+				WHEN 'MASTER' THEN 4
+				WHEN 'ULTIMA' THEN 5
+				ELSE 999
+			END,
+			c.difficulty_id
 	`, songIDs)
 	if err != nil {
 		return nil, err
@@ -119,8 +130,9 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	}
 
 	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	difficultyNamesByID := buildDifficultyNamesByID(chartRows)
 	for _, song := range results {
-		service.ApplyAggregation(song)
+		service.ApplyAggregation(song, difficultyNamesByID)
 	}
 
 	return results, nil
@@ -200,10 +212,20 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, chartArgs, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
-		FROM charts
+		SELECT c.id, c.song_id, c.difficulty_id, d.name AS difficulty_name, c.const, c.is_const_unknown, c.notes
+		FROM charts c
+		INNER JOIN difficulties d ON c.difficulty_id = d.id
 		WHERE song_id IN (?)
-		ORDER BY song_id, difficulty_id
+		ORDER BY c.song_id,
+			CASE d.name
+				WHEN 'BASIC' THEN 1
+				WHEN 'ADVANCED' THEN 2
+				WHEN 'EXPERT' THEN 3
+				WHEN 'MASTER' THEN 4
+				WHEN 'ULTIMA' THEN 5
+				ELSE 999
+			END,
+			c.difficulty_id
 	`, songIDs)
 	if err != nil {
 		return nil, err
@@ -234,8 +256,9 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 	}
 
 	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	difficultyNamesByID := buildDifficultyNamesByID(chartRows)
 	for _, song := range songs {
-		service.ApplyAggregation(song)
+		service.ApplyAggregation(song, difficultyNamesByID)
 	}
 
 	return songs, nil
@@ -262,10 +285,19 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	// 2. 譜面を取得
 	chartsQuery := `
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
-		FROM charts
-		WHERE song_id = ?
-		ORDER BY difficulty_id
+		SELECT c.id, c.song_id, c.difficulty_id, d.name AS difficulty_name, c.const, c.is_const_unknown, c.notes
+		FROM charts c
+		INNER JOIN difficulties d ON c.difficulty_id = d.id
+		WHERE c.song_id = ?
+		ORDER BY CASE d.name
+			WHEN 'BASIC' THEN 1
+			WHEN 'ADVANCED' THEN 2
+			WHEN 'EXPERT' THEN 3
+			WHEN 'MASTER' THEN 4
+			WHEN 'ULTIMA' THEN 5
+			ELSE 999
+		END,
+		c.difficulty_id
 	`
 	var chartRows []chartRow
 	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, songRow.ID); err != nil {
@@ -280,9 +312,17 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	song.Charts = charts
 
 	// 3. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
-	service.ApplyAggregation(song)
+	service.ApplyAggregation(song, buildDifficultyNamesByID(chartRows))
 
 	return song, nil
+}
+
+func buildDifficultyNamesByID(chartRows []chartRow) map[int]string {
+	difficultyNamesByID := make(map[int]string, len(chartRows))
+	for _, chart := range chartRows {
+		difficultyNamesByID[chart.DifficultyID] = chart.DifficultyName
+	}
+	return difficultyNamesByID
 }
 
 // Save は楽曲エンティティの現在の状態を永続化します。

@@ -6,10 +6,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const (
-	MinDifficultyID = 1
-	MaxDifficultyID = 5
-)
+var standardDifficultyNames = map[string]struct{}{
+	"BASIC":    {},
+	"ADVANCED": {},
+	"EXPERT":   {},
+	"MASTER":   {},
+	"ULTIMA":   {},
+}
 
 // ParseDifficultyPath はパスパラメータを内部難易度名に変換します。
 // 無効なパラメータの場合は空文字とfalseを返します。
@@ -27,16 +30,20 @@ func BuildChartsMap[T any](
 ) map[string]T {
 	// Initialize map with nil for all difficulty levels
 	chartsMap := make(map[string]T)
-	for diffID, diffName := range difficultyNames {
-		if diffID >= MinDifficultyID && diffID <= MaxDifficultyID {
-			var zero T
-			chartsMap[diffName] = zero
+	for _, diffName := range difficultyNames {
+		if _, ok := standardDifficultyNames[diffName]; !ok {
+			continue
 		}
+		var zero T
+		chartsMap[diffName] = zero
 	}
 
 	// Populate map with actual chart data
 	for _, chart := range charts {
 		if diffName, ok := difficultyNames[chart.DifficultyID]; ok {
+			if _, isStandard := standardDifficultyNames[diffName]; !isStandard {
+				continue
+			}
 			chartsMap[diffName] = converter(chart)
 		}
 	}
