@@ -357,14 +357,19 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	}
 
 	var difficultyNamesByID map[int]string
+	var difficultySortOrderByID map[int]int
 	if s.masterProvider != nil {
 		masters := s.masterProvider.SongMasters()
 		if masters != nil {
 			difficultyNamesByID = masters.DifficultyNamesByID
+			difficultySortOrderByID = make(map[int]int, len(masters.Difficulties))
+			for _, d := range masters.Difficulties {
+				difficultySortOrderByID[d.ID] = d.SortOrder
+			}
 		}
 	}
 
-	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID), nil
+	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID, difficultySortOrderByID), nil
 }
 
 func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.WorldsendRecordDTO, error) {
