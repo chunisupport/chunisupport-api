@@ -175,7 +175,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	achievementTypes := make(map[string]domainmasterdata.Item, len(achievementTypeRows))
 	achievementTypesByID := make(map[int]string, len(achievementTypeRows))
 	for _, row := range achievementTypeRows {
-		achievementTypes[row.Code] = domainmasterdata.Item{ID: row.ID, Name: row.Code}
+		achievementTypes[strings.ToLower(row.Code)] = domainmasterdata.Item{ID: row.ID, Name: row.Code}
 		achievementTypesByID[row.ID] = row.Code
 	}
 
