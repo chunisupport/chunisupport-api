@@ -362,10 +362,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 		masters := s.masterProvider.SongMasters()
 		if masters != nil {
 			difficultyNamesByID = masters.DifficultyNamesByID
-			difficultySortOrderByID = make(map[int]int, len(masters.Difficulties))
-			for _, d := range masters.Difficulties {
-				difficultySortOrderByID[d.ID] = d.SortOrder
-			}
+			difficultySortOrderByID = masters.DifficultySortOrderByID()
 		}
 	}
 
