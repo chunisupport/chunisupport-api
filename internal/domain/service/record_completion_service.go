@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log/slog"
 	"math"
 	"sort"
 
@@ -55,7 +56,7 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 				ChartDifficulty: &master.ChartDifficulty{
 					ID:        chart.DifficultyID,
 					Name:      difficultyNameByID(chart.DifficultyID, difficultyNamesByID),
-					SortOrder: difficultySortOrderByID[chart.DifficultyID],
+					SortOrder: difficultySortOrder(chart.DifficultyID, difficultySortOrderByID),
 				},
 			})
 		}
@@ -117,6 +118,16 @@ func difficultyNameByID(difficultyID int, difficultyNamesByID map[int]string) st
 		return ""
 	}
 	return difficultyNamesByID[difficultyID]
+}
+
+// difficultySortOrder はID→SortOrderのマップから難易度ソート順を返します。
+// マスタデータに該当IDが存在しない場合は math.MaxInt を返し、データ不整合を検知するため警告ログを出力します。
+func difficultySortOrder(difficultyID int, difficultySortOrderByID map[int]int) int {
+	if order, ok := difficultySortOrderByID[difficultyID]; ok {
+		return order
+	}
+	slog.Warn("マスタデータに難易度ソート順が見つかりません", "difficulty_id", difficultyID)
+	return math.MaxInt
 }
 
 func playerRecordSongID(record *entity.PlayerRecord) int {
