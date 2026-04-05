@@ -3,6 +3,7 @@ package masterdata
 import (
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 		{
 			name: "正常系: 存在するIDの場合は名前を返す",
 			cache: &Cache{
-				AccountTypes: map[string]Item{
+				AccountTypes: map[string]master.AccountType{
 					"PLAYER": {ID: 1, Name: "PLAYER"},
 					"EDITOR": {ID: 2, Name: "EDITOR"},
 					"ADMIN":  {ID: 3, Name: "ADMIN"},
@@ -28,7 +29,7 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 		{
 			name: "正常系: ADMIN IDの場合",
 			cache: &Cache{
-				AccountTypes: map[string]Item{
+				AccountTypes: map[string]master.AccountType{
 					"PLAYER": {ID: 1, Name: "PLAYER"},
 					"EDITOR": {ID: 2, Name: "EDITOR"},
 					"ADMIN":  {ID: 3, Name: "ADMIN"},
@@ -40,7 +41,7 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 		{
 			name: "異常系: 存在しないIDの場合はUNKNOWNを返す",
 			cache: &Cache{
-				AccountTypes: map[string]Item{
+				AccountTypes: map[string]master.AccountType{
 					"PLAYER": {ID: 1, Name: "PLAYER"},
 				},
 			},
@@ -56,7 +57,7 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 		{
 			name: "異常系: AccountTypesが空の場合はUNKNOWNを返す",
 			cache: &Cache{
-				AccountTypes: map[string]Item{},
+				AccountTypes: map[string]master.AccountType{},
 			},
 			id:       1,
 			expected: "UNKNOWN",
@@ -81,7 +82,7 @@ func TestCache_GetClassEmblemNameByID(t *testing.T) {
 		{
 			name: "正常系: 存在するIDの場合は名前を返す",
 			cache: &Cache{
-				ClassEmblems: map[string]Item{
+				ClassEmblems: map[string]master.ClassEmblem{
 					"Bronze": {ID: 1, Name: "Bronze"},
 					"Silver": {ID: 2, Name: "Silver"},
 				},
@@ -92,7 +93,7 @@ func TestCache_GetClassEmblemNameByID(t *testing.T) {
 		{
 			name: "異常系: 存在しないIDの場合は空文字を返す",
 			cache: &Cache{
-				ClassEmblems: map[string]Item{
+				ClassEmblems: map[string]master.ClassEmblem{
 					"Bronze": {ID: 1, Name: "Bronze"},
 				},
 			},
@@ -125,7 +126,7 @@ func TestCache_GetClassEmblemBaseNameByID(t *testing.T) {
 		{
 			name: "正常系: 存在するIDの場合は名前を返す",
 			cache: &Cache{
-				ClassEmblemBases: map[string]Item{
+				ClassEmblemBases: map[string]master.ClassEmblemBase{
 					"I":   {ID: 1, Name: "I"},
 					"II":  {ID: 2, Name: "II"},
 					"III": {ID: 3, Name: "III"},
@@ -137,7 +138,7 @@ func TestCache_GetClassEmblemBaseNameByID(t *testing.T) {
 		{
 			name: "異常系: 存在しないIDの場合は空文字を返す",
 			cache: &Cache{
-				ClassEmblemBases: map[string]Item{
+				ClassEmblemBases: map[string]master.ClassEmblemBase{
 					"I": {ID: 1, Name: "I"},
 				},
 			},

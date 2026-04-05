@@ -51,7 +51,9 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 			Name: item.Name,
 		})
 	}
-	sortMasterItemsByID(difficulties)
+	slices.SortFunc(difficulties, func(a, b *dto.MasterItemDTO) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
 
 	// AccountTypes をID順にソートして配列化
 	accountTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AccountTypes))

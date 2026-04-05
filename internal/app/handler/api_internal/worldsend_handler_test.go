@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
@@ -157,7 +158,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 				},
 			}
 
-			handler := NewWorldsendHandler(mockUsecase, &masterdata.Cache{Genres: map[string]masterdata.Item{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}})
+			handler := NewWorldsendHandler(mockUsecase, &masterdata.Cache{Genres: map[string]master.Genre{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}})
 			c := newPutWorldsendContext(tc.body)
 			rec := c.Response().Writer.(*httptest.ResponseRecorder)
 
