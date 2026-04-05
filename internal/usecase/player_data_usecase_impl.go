@@ -353,13 +353,8 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 	var classID *int
 	var baseID *int
 
-	medalKey := strings.TrimSpace(payload.MedalClass)
+	medalKey := normalizeClassEmblemKey(payload.MedalClass)
 	if medalKey != "" {
-		medalKey = strings.TrimLeft(medalKey, "0")
-		if medalKey == "" {
-			medalKey = "0"
-		}
-		medalKey = strings.ToLower(medalKey)
 		if item, ok := masters.ClassEmblems[medalKey]; ok {
 			v := item.ID
 			classID = &v
@@ -367,13 +362,8 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 		// 見つからなくてもエラーにしない（classIDはnilのまま）
 	}
 
-	baseKey := strings.TrimSpace(payload.BaseClass)
+	baseKey := normalizeClassEmblemKey(payload.BaseClass)
 	if baseKey != "" {
-		baseKey = strings.TrimLeft(baseKey, "0")
-		if baseKey == "" {
-			baseKey = "0"
-		}
-		baseKey = strings.ToLower(baseKey)
 		if item, ok := masters.ClassEmblemBases[baseKey]; ok {
 			v := item.ID
 			baseID = &v
@@ -382,6 +372,29 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 	}
 
 	return classID, baseID, nil
+}
+
+func normalizeClassEmblemKey(raw string) string {
+	key := strings.TrimSpace(raw)
+	if key == "" {
+		return ""
+	}
+
+	key = strings.ToLower(key)
+	if key == "inf" {
+		return key
+	}
+
+	key = strings.TrimLeft(key, "0")
+	if key == "" {
+		return "0"
+	}
+
+	if key == "6" {
+		return "inf"
+	}
+
+	return key
 }
 
 // ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。

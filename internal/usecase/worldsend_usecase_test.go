@@ -70,25 +70,25 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 		{
 			name:                   "EDITOR権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
-			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
+			requesterAccountTypeID: new(info.AccountTypeEditor),
 			expectedIncludeDeleted: true,
 		},
 		{
 			name:                   "ADMIN権限あり_includeDeleted=true_削除済みを含む",
 			includeDeleted:         true,
-			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
+			requesterAccountTypeID: new(info.AccountTypeAdmin),
 			expectedIncludeDeleted: true,
 		},
 		{
 			name:                   "PLAYER権限のみ_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
-			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
+			requesterAccountTypeID: new(info.AccountTypePlayer),
 			expectedIncludeDeleted: false,
 		},
 		{
 			name:                   "未知ロール_includeDeleted=true_削除済みを除外",
 			includeDeleted:         true,
-			requesterAccountTypeID: intPtr(4),
+			requesterAccountTypeID: new(4),
 			expectedIncludeDeleted: false,
 		},
 		{
@@ -154,28 +154,28 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 		{
 			name:                   "削除済み楽曲はEDITOR権限で取得できる",
 			displayID:              "WE002",
-			requesterAccountTypeID: intPtr(info.AccountTypeEditor),
+			requesterAccountTypeID: new(info.AccountTypeEditor),
 			repoReturn:             deletedSong,
 			wantResult:             deletedSong,
 		},
 		{
 			name:                   "削除済み楽曲はPLAYER権限ではErrSongNotFoundになる",
 			displayID:              "WE002",
-			requesterAccountTypeID: intPtr(info.AccountTypePlayer),
+			requesterAccountTypeID: new(info.AccountTypePlayer),
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
 			name:                   "削除済み楽曲は未知ロールではErrSongNotFoundになる",
 			displayID:              "WE002",
-			requesterAccountTypeID: intPtr(4),
+			requesterAccountTypeID: new(4),
 			repoReturn:             deletedSong,
 			wantErr:                repository.ErrSongNotFound,
 		},
 		{
 			name:                   "存在しない楽曲はErrSongNotFoundを返す",
 			displayID:              "WE999",
-			requesterAccountTypeID: intPtr(info.AccountTypeAdmin),
+			requesterAccountTypeID: new(info.AccountTypeAdmin),
 			repoErr:                repository.ErrSongNotFound,
 			wantErr:                repository.ErrSongNotFound,
 		},
@@ -273,12 +273,12 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 			DisplayID: "1234567890abcdef",
 			Title:     "A",
 			Artist:    "AR",
-			Genre:     strPtr("POPS & ANIME"),
+			Genre:     new("POPS & ANIME"),
 			Charts: map[string]*UpdateWorldsendChartInput{
 				"WORLDSEND": {
-					Attribute: strPtr("狂"),
-					LevelStar: intPtr(5),
-					Notes:     intPtr(2000),
+					Attribute: new("狂"),
+					LevelStar: new(5),
+					Notes:     new(2000),
 				},
 			},
 		},
@@ -393,7 +393,7 @@ func TestUpdateWorldsendSongs_SecondRequestInvalidContainsIndex(t *testing.T) {
 			Title:     "B",
 			Artist:    "BR",
 			Charts: map[string]*UpdateWorldsendChartInput{
-				"MASTER": {LevelStar: intPtr(5)},
+				"MASTER": {LevelStar: new(5)},
 			},
 		},
 	}
@@ -418,7 +418,7 @@ func TestUpdateWorldsendSongs_InvalidGenreReturnsError(t *testing.T) {
 		DisplayID: "1234567890abcdef",
 		Title:     "A",
 		Artist:    "AR",
-		Genre:     strPtr("UNKNOWN"),
+		Genre:     new("UNKNOWN"),
 	}}
 
 	// When
@@ -442,7 +442,7 @@ func TestUpdateWorldsendSongs_InvalidLevelStarReturnsError(t *testing.T) {
 		Title:     "A",
 		Artist:    "AR",
 		Charts: map[string]*UpdateWorldsendChartInput{
-			"WORLDSEND": {LevelStar: intPtr(0)},
+			"WORLDSEND": {LevelStar: new(0)},
 		},
 	}}
 
@@ -467,7 +467,7 @@ func TestUpdateWorldsendSongs_InvalidNotesReturnsError(t *testing.T) {
 		Title:     "A",
 		Artist:    "AR",
 		Charts: map[string]*UpdateWorldsendChartInput{
-			"WORLDSEND": {Notes: intPtr(-1)},
+			"WORLDSEND": {Notes: new(-1)},
 		},
 	}}
 
@@ -492,7 +492,7 @@ func TestUpdateWorldsendSongs_InvalidChartKeyReturnsError(t *testing.T) {
 		Title:     "A",
 		Artist:    "AR",
 		Charts: map[string]*UpdateWorldsendChartInput{
-			"MASTER": {LevelStar: intPtr(5)},
+			"MASTER": {LevelStar: new(5)},
 		},
 	}}
 
@@ -599,13 +599,4 @@ func TestUpdateWorldsendSongs_DuplicateDisplayIDIsMappedToValidationError(t *tes
 	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
 	assert.ErrorIs(t, err, repository.ErrDuplicateDisplayID)
 	mockRepo.AssertExpectations(t)
-}
-
-// intPtr はint値へのポインタを返すヘルパー関数です。
-func intPtr(i int) *int {
-	return &i
-}
-
-func strPtr(s string) *string {
-	return &s
 }

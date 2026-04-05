@@ -50,7 +50,7 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 			name:           "UID を設定すると連携済みになる",
 			uid:            "firebase-uid-1",
 			expectedLinked: true,
-			expectedUID:    stringPtr("firebase-uid-1"),
+			expectedUID:    new("firebase-uid-1"),
 		},
 		{
 			name:           "空白だけのUIDは未連携として扱う",
@@ -75,8 +75,4 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 			assert.NotEqual(t, baseTime, user.UpdatedAt)
 		})
 	}
-}
-
-func stringPtr(value string) *string {
-	return &value
 }

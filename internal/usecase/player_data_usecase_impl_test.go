@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
+	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +58,7 @@ func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
 				AppVersion: tt.appVersion,
 				Name:       "テストプレイヤー",
 				Level:      1,
-				Rating:     ptrFloat64(0.0),
+				Rating:     new(0.0),
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
 					Value:      0.0,
@@ -106,7 +108,7 @@ func TestValidatePlayerDataPayload_MultipleVersions(t *testing.T) {
 		AppVersion: supportedVersion,
 		Name:       "テストプレイヤー",
 		Level:      1,
-		Rating:     ptrFloat64(0.0),
+		Rating:     new(0.0),
 		LastPlayed: "2024/01/01 00:00",
 		Overpower: PlayerDataOverpowerPayload{
 			Value:      0.0,
@@ -141,9 +143,64 @@ func TestValidatePlayerDataPayload_NilPayload(t *testing.T) {
 	require.ErrorAs(t, err, &validationErr, "validatePlayerDataPayload(nil) should return PlayerDataValidationError")
 }
 
-// ptrFloat64 はfloat64のポインタを返すヘルパー関数です
-func ptrFloat64(v float64) *float64 {
-	return &v
+func TestResolveClassEmblemIDs(t *testing.T) {
+	tests := []struct {
+		name        string
+		payload     PlayerDataClassPayload
+		wantClassID *int
+		wantBaseID  *int
+	}{
+		{
+			name: "0埋め2桁の06をinfとして解決できる",
+			payload: PlayerDataClassPayload{
+				MedalClass: "06",
+				BaseClass:  "06",
+			},
+			wantClassID: new(6),
+			wantBaseID:  new(6),
+		},
+		{
+			name: "infの直接指定も従来通り解決できる",
+			payload: PlayerDataClassPayload{
+				MedalClass: "INF",
+				BaseClass:  "inf",
+			},
+			wantClassID: new(6),
+			wantBaseID:  new(6),
+		},
+		{
+			name: "未定義値はnil扱いになる",
+			payload: PlayerDataClassPayload{
+				MedalClass: "99",
+				BaseClass:  "none",
+			},
+			wantClassID: nil,
+			wantBaseID:  nil,
+		},
+	}
+
+	masters := &playerDataMaster{
+		PlayerDataMasters: &domainmasterdata.PlayerDataMasters{
+			ClassEmblems: map[string]mastervo.ClassEmblem{
+				"1":   {ID: 1, Name: "1"},
+				"inf": {ID: 6, Name: "inf"},
+			},
+			ClassEmblemBases: map[string]mastervo.ClassEmblemBase{
+				"1":   {ID: 1, Name: "1"},
+				"inf": {ID: 6, Name: "inf"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotClassID, gotBaseID, err := resolveClassEmblemIDs(tt.payload, masters)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantClassID, gotClassID)
+			assert.Equal(t, tt.wantBaseID, gotBaseID)
+		})
+	}
 }
 
 func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と割合を計算する(t *testing.T) {

@@ -7,16 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func intPtr(v int) *int {
-	return &v
-}
-
 func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 	pool := DatabasePoolConfig{
-		MaxOpenConns:       intPtr(25),
-		MaxIdleConns:       intPtr(25),
-		ConnMaxLifetimeSec: intPtr(300),
-		ConnMaxIdleTimeSec: intPtr(60),
+		MaxOpenConns:       new(25),
+		MaxIdleConns:       new(25),
+		ConnMaxLifetimeSec: new(300),
+		ConnMaxIdleTimeSec: new(60),
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
@@ -26,10 +22,10 @@ func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 
 func TestNormalizeAndValidateDatabasePoolConfig_ZeroValues(t *testing.T) {
 	pool := DatabasePoolConfig{
-		MaxOpenConns:       intPtr(0),
-		MaxIdleConns:       intPtr(0),
-		ConnMaxLifetimeSec: intPtr(0),
-		ConnMaxIdleTimeSec: intPtr(0),
+		MaxOpenConns:       new(0),
+		MaxIdleConns:       new(0),
+		ConnMaxLifetimeSec: new(0),
+		ConnMaxIdleTimeSec: new(0),
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
@@ -52,10 +48,10 @@ func TestNormalizeAndValidateDatabasePoolConfig_ZeroValues(t *testing.T) {
 
 func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
 	pool := DatabasePoolConfig{
-		MaxOpenConns:       intPtr(-1),
-		MaxIdleConns:       intPtr(1),
-		ConnMaxLifetimeSec: intPtr(1),
-		ConnMaxIdleTimeSec: intPtr(1),
+		MaxOpenConns:       new(-1),
+		MaxIdleConns:       new(1),
+		ConnMaxLifetimeSec: new(1),
+		ConnMaxIdleTimeSec: new(1),
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err == nil {
@@ -64,7 +60,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
 }
 
 func TestNormalizeAndValidateDatabasePoolConfig_IdleGreaterThanOpen(t *testing.T) {
-	pool := DatabasePoolConfig{MaxOpenConns: intPtr(10), MaxIdleConns: intPtr(11), ConnMaxLifetimeSec: intPtr(300), ConnMaxIdleTimeSec: intPtr(60)}
+	pool := DatabasePoolConfig{MaxOpenConns: new(10), MaxIdleConns: new(11), ConnMaxLifetimeSec: new(300), ConnMaxIdleTimeSec: new(60)}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -80,10 +76,10 @@ func TestNormalizeAndValidateDatabasePoolConfig_MissingValues(t *testing.T) {
 		name string
 		pool DatabasePoolConfig
 	}{
-		{name: "max_open_conns", pool: DatabasePoolConfig{MaxIdleConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
-		{name: "max_idle_conns", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
-		{name: "conn_max_lifetime_sec", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), MaxIdleConns: intPtr(1), ConnMaxIdleTimeSec: intPtr(1)}},
-		{name: "conn_max_idle_time_sec", pool: DatabasePoolConfig{MaxOpenConns: intPtr(1), MaxIdleConns: intPtr(1), ConnMaxLifetimeSec: intPtr(1)}},
+		{name: "max_open_conns", pool: DatabasePoolConfig{MaxIdleConns: new(1), ConnMaxLifetimeSec: new(1), ConnMaxIdleTimeSec: new(1)}},
+		{name: "max_idle_conns", pool: DatabasePoolConfig{MaxOpenConns: new(1), ConnMaxLifetimeSec: new(1), ConnMaxIdleTimeSec: new(1)}},
+		{name: "conn_max_lifetime_sec", pool: DatabasePoolConfig{MaxOpenConns: new(1), MaxIdleConns: new(1), ConnMaxIdleTimeSec: new(1)}},
+		{name: "conn_max_idle_time_sec", pool: DatabasePoolConfig{MaxOpenConns: new(1), MaxIdleConns: new(1), ConnMaxLifetimeSec: new(1)}},
 	}
 
 	for _, tc := range tests {
@@ -124,10 +120,10 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleErrors(t *testing.T) {
 func TestNormalizeAndValidateDatabasePoolConfig_MultipleInvalidValues(t *testing.T) {
 	// 複数のフィールドが無効な値の場合、すべてのエラーが報告されることを検証
 	pool := DatabasePoolConfig{
-		MaxOpenConns:       intPtr(-1),
-		MaxIdleConns:       intPtr(-2),
-		ConnMaxLifetimeSec: intPtr(-3),
-		ConnMaxIdleTimeSec: intPtr(-4),
+		MaxOpenConns:       new(-1),
+		MaxIdleConns:       new(-2),
+		ConnMaxLifetimeSec: new(-3),
+		ConnMaxIdleTimeSec: new(-4),
 	}
 
 	err := normalizeAndValidateDatabasePoolConfig(&pool)
