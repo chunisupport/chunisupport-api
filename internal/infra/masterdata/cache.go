@@ -362,3 +362,27 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 		ComboLampNamesByID:     maps.Clone(c.ComboLampNamesByID),
 	}
 }
+
+// MasterDataMasters はマスタデータAPIで必要なマスタ集合を返します。
+func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
+	if c == nil {
+		return nil
+	}
+
+	versionsByID := make(map[int]domainmasterdata.Version, len(c.VersionsByID))
+	for k, v := range c.VersionsByID {
+		versionsByID[k] = domainmasterdata.Version{
+			ID:         v.ID,
+			Name:       v.Name,
+			ReleasedAt: v.ReleasedAt,
+		}
+	}
+
+	return &domainmasterdata.MasterDataMasters{
+		Genres:           maps.Clone(c.Genres),
+		Difficulties:     maps.Clone(c.Difficulties),
+		AccountTypes:     maps.Clone(c.AccountTypes),
+		Versions:         versionsByID,
+		AchievementTypes: maps.Clone(c.AchievementTypes),
+	}
+}

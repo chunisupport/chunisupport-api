@@ -60,3 +60,12 @@ type GoalMasters struct {
 	ClearLampNamesByID     map[int]string
 	ComboLampNamesByID     map[int]string
 }
+
+// MasterDataMasters はマスタデータAPIで必要になるマスタ集合です。
+type MasterDataMasters struct {
+	Genres           map[string]master.Genre
+	Difficulties     map[string]master.ChartDifficulty
+	AccountTypes     map[string]master.AccountType
+	Versions         map[int]Version
+	AchievementTypes map[string]Item
+}

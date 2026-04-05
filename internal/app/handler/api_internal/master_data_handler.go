@@ -1,114 +1,73 @@
 package api_internal
 
 import (
-	"cmp"
 	"net/http"
-	"slices"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
-	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
 // MasterDataHandler はマスタデータ関連のハンドラです。
 type MasterDataHandler struct {
-	masterCache       *masterdata.Cache
-	staticMasterCache *masterdata.StaticCache
+	masterDataUsecase usecase.MasterDataUsecase
 }
 
 // NewMasterDataHandler は新しい MasterDataHandler を生成します。
-func NewMasterDataHandler(masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *MasterDataHandler {
-	return &MasterDataHandler{
-		masterCache:       masterCache,
-		staticMasterCache: staticMasterCache,
-	}
-}
-
-// sortMasterItemsByID はMasterItemDTOスライスをID順にソートします。
-func sortMasterItemsByID(items []*dto.MasterItemDTO) {
-	slices.SortFunc(items, func(a, b *dto.MasterItemDTO) int {
-		return cmp.Compare(a.ID, b.ID)
-	})
+func NewMasterDataHandler(masterDataUsecase usecase.MasterDataUsecase) *MasterDataHandler {
+	return &MasterDataHandler{masterDataUsecase: masterDataUsecase}
 }
 
 // GetMasterData はフロントエンド向けにマスタデータを返却します。
 func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
-	// Genres をID順にソートして配列化
-	genres := make([]*dto.MasterItemDTO, 0, len(h.masterCache.Genres))
-	for _, item := range h.masterCache.Genres {
-		genres = append(genres, &dto.MasterItemDTO{
-			ID:   item.ID,
-			Name: item.Name,
-		})
-	}
-	sortMasterItemsByID(genres)
+	out := h.masterDataUsecase.GetMasterData(c.Request().Context())
 
-	// Difficulties を SortOrder 順にソートして配列化
-	diffList := make([]master.ChartDifficulty, 0, len(h.masterCache.Difficulties))
-	for _, item := range h.masterCache.Difficulties {
-		diffList = append(diffList, item)
-	}
-	slices.SortFunc(diffList, func(a, b master.ChartDifficulty) int {
-		return cmp.Compare(a.SortOrder, b.SortOrder)
-	})
-	difficulties := make([]*dto.MasterItemDTO, 0, len(diffList))
-	for _, item := range diffList {
-		difficulties = append(difficulties, &dto.MasterItemDTO{
-			ID:   item.ID,
-			Name: item.Name,
-		})
+	genres := make([]*dto.MasterItemDTO, len(out.Genres))
+	for i, g := range out.Genres {
+		genres[i] = &dto.MasterItemDTO{ID: g.ID, Name: g.Name}
 	}
 
-	// AccountTypes をID順にソートして配列化
-	accountTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AccountTypes))
-	for _, item := range h.masterCache.AccountTypes {
-		accountTypes = append(accountTypes, &dto.MasterItemDTO{
-			ID:   item.ID,
-			Name: item.Name,
-		})
+	difficulties := make([]*dto.MasterItemDTO, len(out.Difficulties))
+	for i, d := range out.Difficulties {
+		difficulties[i] = &dto.MasterItemDTO{ID: d.ID, Name: d.Name}
 	}
-	sortMasterItemsByID(accountTypes)
 
-	// Versions をID順にソートして配列化
-	versions := make([]*dto.VersionDTO, 0, len(h.masterCache.Versions))
-	for _, item := range h.masterCache.Versions {
-		versions = append(versions, &dto.VersionDTO{
-			ID:         int(item.ID),
-			Name:       item.Name,
-			ReleasedAt: item.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+	accountTypes := make([]*dto.MasterItemDTO, len(out.AccountTypes))
+	for i, a := range out.AccountTypes {
+		accountTypes[i] = &dto.MasterItemDTO{ID: a.ID, Name: a.Name}
 	}
-	slices.SortFunc(versions, func(a, b *dto.VersionDTO) int {
-		return cmp.Compare(a.ID, b.ID)
-	})
 
-	// RatingBands をソート順に配列化
-	ratingBands := make([]*dto.RatingBandDTO, 0, len(h.staticMasterCache.RatingBands))
-	for _, band := range h.staticMasterCache.RatingBands {
-		ratingBands = append(ratingBands, &dto.RatingBandDTO{
+	versions := make([]*dto.VersionDTO, len(out.Versions))
+	for i, v := range out.Versions {
+		versions[i] = &dto.VersionDTO{
+			ID:         int(v.ID),
+			Name:       v.Name,
+			ReleasedAt: v.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	ratingBands := make([]*dto.RatingBandDTO, len(out.RatingBands))
+	for i, band := range out.RatingBands {
+		ratingBands[i] = &dto.RatingBandDTO{
 			ID:           band.ID,
 			Label:        band.Label,
 			MinInclusive: band.MinInclusive,
 			MaxExclusive: band.MaxExclusive,
 			SortOrder:    band.SortOrder,
-		})
+		}
 	}
 
-	achievementTypes := make([]*dto.MasterItemDTO, 0, len(h.masterCache.AchievementTypes))
-	for _, item := range h.masterCache.AchievementTypes {
-		achievementTypes = append(achievementTypes, &dto.MasterItemDTO{ID: item.ID, Name: item.Name})
+	achievementTypes := make([]*dto.MasterItemDTO, len(out.AchievementTypes))
+	for i, a := range out.AchievementTypes {
+		achievementTypes[i] = &dto.MasterItemDTO{ID: a.ID, Name: a.Name}
 	}
-	sortMasterItemsByID(achievementTypes)
 
-	response := &dto.MasterDataResponse{
+	return c.JSON(http.StatusOK, &dto.MasterDataResponse{
 		Genres:           genres,
 		Difficulties:     difficulties,
 		AccountTypes:     accountTypes,
 		Versions:         versions,
 		RatingBands:      ratingBands,
 		AchievementTypes: achievementTypes,
-	}
-
-	return c.JSON(http.StatusOK, response)
+	})
 }
