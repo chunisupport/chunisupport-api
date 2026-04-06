@@ -94,6 +94,10 @@ func (s *tokenStubUserRepository) FindByFirebaseUID(_ context.Context, _ reposit
 	return nil, errors.New("not implemented")
 }
 
+func (s *tokenStubUserRepository) DeleteByID(_ context.Context, _ repository.Executor, _ int) error {
+	return errors.New("not implemented")
+}
+
 func TestAPITokenService_Generate(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}

@@ -95,6 +95,11 @@ func (m *MockUserRepository) FindByFirebaseUID(ctx context.Context, exec reposit
 	return nil, args.Error(1)
 }
 
+func (m *MockUserRepository) DeleteByID(ctx context.Context, exec repository.Executor, id int) error {
+	args := m.Called(ctx, exec, id)
+	return args.Error(0)
+}
+
 // MockSessionRepository はSessionRepositoryのモックです。
 type MockSessionRepository struct {
 	mock.Mock

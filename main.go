@@ -95,14 +95,14 @@ func main() {
 
 	slog.Info("Static master data preloaded")
 
-	firebaseTokenVerifier, err := app.SetupFirebaseTokenVerifier(ctx, cfg)
+	firebaseTokenVerifier, firebaseUserDeleter, err := app.SetupFirebaseAuthServices(ctx, cfg)
 	if err != nil {
-		slog.Error("Failed to initialize firebase token verifier", "error", err)
+		slog.Error("Failed to initialize firebase services", "error", err)
 		return
 	}
 
 	// サーバーの作成と起動
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier)
+	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

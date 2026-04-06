@@ -3,7 +3,7 @@ package api_internal
 import "time"
 
 // AdminUserListResponse はADMIN用のユーザー一覧APIのレスポンスです。
-// プライベートなユーザーや削除済みユーザーも含まれます。
+// プライベートなユーザーも含まれます。
 type AdminUserListResponse struct {
 	UserName       string    `json:"username"`
 	AccountType    string    `json:"account_type"`
@@ -14,5 +14,4 @@ type AdminUserListResponse struct {
 	OverPowerValue *float64  `json:"overpower_value"`
 	IsSuspicious   bool      `json:"is_suspicious"`
 	IsPrivate      bool      `json:"is_private"`
-	IsDeleted      bool      `json:"is_deleted"`
 }

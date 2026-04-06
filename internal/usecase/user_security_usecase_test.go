@@ -186,61 +186,34 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("アカウント削除に成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		mockAPITokenRepo := &stubAPITokenRepository{}
-		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, mockAPITokenRepo, mockRecoveryRepo, "test-pepper",
+			tm, mockUserRepo, nil, new(MockSessionRepository), &stubAPITokenRepository{}, new(MockRecoveryCodeRepository), "test-pepper",
 		)
 
 		user := &entity.User{ID: 1, Username: un}
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
-		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		mockSessionRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
-		mockRecoveryRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1)
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
-		mockSessionRepo.AssertExpectations(t)
-		mockRecoveryRepo.AssertExpectations(t)
-		assert.Equal(t, 1, mockAPITokenRepo.deletedUserID)
 	})
 
-	t.Run("保存時にDBエラーが発生した場合はエラーを返す", func(t *testing.T) {
+	t.Run("物理削除時にDBエラーが発生した場合はエラーを返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		mockRecoveryRepo := new(MockRecoveryCodeRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, &stubAPITokenRepository{}, mockRecoveryRepo, "test-pepper",
+			tm, mockUserRepo, nil, new(MockSessionRepository), &stubAPITokenRepository{}, new(MockRecoveryCodeRepository), "test-pepper",
 		)
 
 		user := &entity.User{ID: 2, Username: un}
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
-		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("db error")).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 2).Return(errors.New("db error")).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2)
 		assert.Error(t, err)
 		assert.Equal(t, "db error", err.Error())
-		mockUserRepo.AssertExpectations(t)
-	})
-
-	t.Run("既に削除済みのユーザーはErrUserAlreadyDeletedを返す", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		mockRecoveryRepo := new(MockRecoveryCodeRepository)
-		tm := &mockTransactionManager{}
-		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, &stubAPITokenRepository{}, mockRecoveryRepo, "test-pepper",
-		)
-
-		deletedUser := &entity.User{ID: 3, Username: un, IsDeleted: true}
-		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(deletedUser, nil).Once()
-
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3)
-		assert.ErrorIs(t, err, ErrUserAlreadyDeleted)
 		mockUserRepo.AssertExpectations(t)
 	})
 }

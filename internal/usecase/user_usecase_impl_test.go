@@ -27,6 +27,7 @@ type stubUserRepository struct {
 	err             error
 	saveErr         error
 	savedUser       *entity.User
+	deletedUserID   int
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -72,6 +73,14 @@ func (s *stubUserRepository) LinkFirebaseUID(ctx context.Context, exec repositor
 
 func (s *stubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (s *stubUserRepository) DeleteByID(ctx context.Context, exec repository.Executor, id int) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.deletedUserID = id
+	return nil
 }
 
 type stubPlayerRecordRepository struct {
@@ -748,9 +757,8 @@ func intPointer(v int) *int {
 func TestUserService_DeleteUser_Success(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
 	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: false,
+		ID:       1,
+		Username: un,
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
@@ -758,10 +766,7 @@ func TestUserService_DeleteUser_Success(t *testing.T) {
 
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
 	require.NoError(t, err)
-
-	// Saveに渡されたエンティティの状態を検証
-	require.NotNil(t, repo.savedUser, "expected user to be saved")
-	assert.True(t, repo.savedUser.IsDeleted, "expected user to be marked as deleted")
+	assert.Equal(t, 1, repo.deletedUserID)
 }
 
 func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
@@ -771,21 +776,6 @@ func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
 
 	err := service.DeleteUser(context.Background(), adminRequester, "missing")
 	require.ErrorIs(t, err, ErrUserNotFound)
-}
-
-func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
-	un, _ := username.NewUserName("deleteduser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: true,
-	}
-	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.DeleteUser(context.Background(), adminRequester, "deleteduser")
-	require.ErrorIs(t, err, ErrUserAlreadyDeleted)
 }
 
 func TestUserService_DeleteUser_AdminRequired(t *testing.T) {
@@ -808,71 +798,5 @@ func TestUserService_DeleteUser_NilRequester(t *testing.T) {
 	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
-	require.ErrorIs(t, err, ErrAdminRequired)
-}
-
-func TestUserService_RestoreUser_Success(t *testing.T) {
-	un, _ := username.NewUserName("deleteduser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: true,
-	}
-	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), adminRequester, "deleteduser")
-	require.NoError(t, err)
-
-	// Saveに渡されたエンティティの状態を検証
-	require.NotNil(t, repo.savedUser, "expected user to be saved")
-	assert.False(t, repo.savedUser.IsDeleted, "expected user to be restored (not deleted)")
-}
-
-func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
-	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{err: repository.ErrUserNotFound}
-	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), adminRequester, "missing")
-	require.ErrorIs(t, err, ErrUserNotFound)
-}
-
-func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
-	un, _ := username.NewUserName("activeuser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: false,
-	}
-	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), adminRequester, "activeuser")
-	require.ErrorIs(t, err, ErrUserNotDeleted)
-}
-
-func TestUserService_RestoreUser_AdminRequired(t *testing.T) {
-	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), normalUser, "deleteduser")
-	require.ErrorIs(t, err, ErrAdminRequired)
-}
-
-func TestUserService_RestoreUser_UnknownRoleRejected(t *testing.T) {
-	unknownRoleUser := &entity.User{ID: 1, AccountTypeID: 4}
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), unknownRoleUser, "deleteduser")
-	require.ErrorIs(t, err, ErrAdminRequired)
-}
-
-func TestUserService_RestoreUser_NilRequester(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
-
-	err := service.RestoreUser(context.Background(), nil, "deleteduser")
 	require.ErrorIs(t, err, ErrAdminRequired)
 }
