@@ -90,7 +90,6 @@ func TestRecoveryUsecase_RecoverWithRecoveryCode(t *testing.T) {
 
 	newTestCode := func() *entity.RecoveryCode { return &entity.RecoveryCode{UserID: 1, CodeHash: hash} }
 	newActiveUser := func() *entity.User { return &entity.User{ID: 1, Username: un, PasswordHash: ph} }
-	newDeletedUser := func() *entity.User { return &entity.User{ID: 1, Username: un, PasswordHash: ph, IsDeleted: true} }
 	newSamePasswordUser := func() *entity.User { return &entity.User{ID: 1, Username: un, PasswordHash: samePasswordPH} }
 
 	tests := []struct {
@@ -123,15 +122,6 @@ func TestRecoveryUsecase_RecoverWithRecoveryCode(t *testing.T) {
 			setupMock: func(userRepo *MockUserRepository, recoveryRepo *MockRecoveryCodeRepository) {
 				recoveryRepo.On("FindByHashForUpdate", mock.Anything, mock.Anything, hash).Return(newTestCode(), nil).Once()
 				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, repository.ErrUserNotFound).Once()
-			},
-			wantErr: ErrInvalidRecoveryCredentials,
-		},
-		{
-			name:        "RecoverWithRecoveryCode_異常系_非アクティブユーザー",
-			newPassword: "new-password",
-			setupMock: func(userRepo *MockUserRepository, recoveryRepo *MockRecoveryCodeRepository) {
-				recoveryRepo.On("FindByHashForUpdate", mock.Anything, mock.Anything, hash).Return(newTestCode(), nil).Once()
-				userRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(newDeletedUser(), nil).Once()
 			},
 			wantErr: ErrInvalidRecoveryCredentials,
 		},

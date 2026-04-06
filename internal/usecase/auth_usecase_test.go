@@ -151,21 +151,6 @@ func TestAuthUsecase_Login(t *testing.T) {
 		mockUserRepo.AssertNotCalled(t, "FindByUsername", mock.Anything, mock.Anything, mock.Anything)
 		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
 	})
-
-	t.Run("Login_異常系_論理削除されたユーザーはログインできない", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		authUsecase := newTestAuthUsecase(mockUserRepo, mockSessionRepo, "test-pepper")
-
-		deletedUser := &entity.User{ID: 2, Username: un, PasswordHash: ph, IsDeleted: true}
-		mockUserRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(deletedUser, nil).Once()
-
-		token, err := authUsecase.Login(context.Background(), "testuser", "password")
-		assert.ErrorIs(t, err, ErrInvalidCredentials)
-		assert.Empty(t, token)
-		mockUserRepo.AssertExpectations(t)
-		mockSessionRepo.AssertNotCalled(t, "Create", mock.Anything)
-	})
 }
 
 func TestAuthUsecase_Logout(t *testing.T) {
@@ -243,19 +228,4 @@ func TestAuthUsecase_Authenticate(t *testing.T) {
 		mockSessionRepo.AssertExpectations(t)
 	})
 
-	t.Run("Authenticate_異常系_論理削除されたユーザー", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockSessionRepo := new(MockSessionRepository)
-		authUsecase := newTestAuthUsecase(mockUserRepo, mockSessionRepo, "test-pepper")
-		deletedUser := &entity.User{ID: mockUser.ID, Username: un, IsDeleted: true}
-
-		mockSessionRepo.On("FindByID", mock.Anything, mock.Anything, sessionID).Return(mockSession, nil).Once()
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, mockUser.ID).Return(deletedUser, nil).Once()
-		mockSessionRepo.On("Delete", mock.Anything, mock.Anything, sessionID).Return(nil).Once()
-
-		_, err := authUsecase.Authenticate(context.Background(), mockUser.ID, sessionID)
-		assert.ErrorIs(t, err, ErrUserDeleted)
-		mockSessionRepo.AssertExpectations(t)
-		mockUserRepo.AssertExpectations(t)
-	})
 }

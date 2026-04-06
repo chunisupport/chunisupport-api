@@ -78,9 +78,5 @@ func (u *firebaseAuthUsecase) Authenticate(ctx context.Context, idToken string) 
 		return nil, errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
 	}
 
-	if !user.IsActive() {
-		return nil, ErrInvalidIDToken
-	}
-
 	return user, nil
 }

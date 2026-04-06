@@ -86,30 +86,14 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
-			name:    "削除済み他ユーザーに紐付いているUIDは再利用できない",
+			name:    "他ユーザーに紐付いているUIDは再利用できない",
 			userID:  12,
-			idToken: "deleted-linked-token",
+			idToken: "linked-token",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.On("VerifyIDToken", mock.Anything, "deleted-linked-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 99, IsDeleted: true}, nil).Once()
+				verifier.On("VerifyIDToken", mock.Anything, "linked-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 99}, nil).Once()
 			},
 			wantErr: ErrFirebaseUIDAlreadyLinked,
-			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.AssertExpectations(t)
-				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-			},
-		},
-		{
-			name:    "削除済みの自分に既存UIDがあっても連携成功にしない",
-			userID:  10,
-			idToken: "deleted-same-user-token",
-			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.On("VerifyIDToken", mock.Anything, "deleted-same-user-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 10, IsDeleted: true}, nil).Once()
-			},
-			wantErr: ErrUserDeleted,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
@@ -128,22 +112,6 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertNotCalled(t, "FindByFirebaseUID", mock.Anything, mock.Anything, mock.Anything)
-			},
-		},
-		{
-			name:    "削除済みユーザーには連携できない",
-			userID:  1,
-			idToken: "deleted-user-token",
-			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.On("VerifyIDToken", mock.Anything, "deleted-user-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, IsDeleted: true}, nil).Once()
-			},
-			wantErr: ErrUserDeleted,
-			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.AssertExpectations(t)
-				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{

@@ -117,20 +117,7 @@ func TestFirebaseAuthUsecase_Authenticate(t *testing.T) {
 			},
 		},
 		{
-			name:    "削除済みユーザーの場合はErrInvalidIDTokenを返す",
-			idToken: "deleted-user-token",
-			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				user := &entity.User{ID: 12, IsDeleted: true}
-				verifier.On("VerifyIDToken", mock.Anything, "deleted-user-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(user, nil).Once()
-			},
-			wantErr: ErrInvalidIDToken,
-			assertionFunc: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.AssertExpectations(t)
-				userRepo.AssertExpectations(t)
-			},
-		},
-		{
+
 			name:    "ユーザー取得がnilならErrInternalErrorを返す",
 			idToken: "nil-user-token",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {

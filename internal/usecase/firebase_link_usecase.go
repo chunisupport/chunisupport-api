@@ -56,9 +56,6 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 				return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
 			}
 			if linkedUser.ID == userID {
-				if !linkedUser.IsActive() {
-					return ErrUserDeleted
-				}
 				return nil
 			}
 			return ErrFirebaseUIDAlreadyLinked
@@ -76,9 +73,6 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 		}
 		if user == nil {
 			return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
-		}
-		if !user.IsActive() {
-			return ErrUserDeleted
 		}
 
 		currentFirebaseUID := user.FirebaseUID

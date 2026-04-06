@@ -19,7 +19,6 @@ type User struct {
 	PlayerID      *int
 	AccountTypeID int
 	IsSuspicious  bool
-	IsDeleted     bool
 	IsPrivate     bool
 }
 
@@ -49,11 +48,6 @@ func NewFirebaseUser(userName username.UserName, uid string, accountTypeID int) 
 		UpdatedAt:     now,
 		AccountTypeID: accountTypeID,
 	}
-}
-
-// IsActive はユーザーが有効（削除されていない）かを判定します。
-func (u *User) IsActive() bool {
-	return !u.IsDeleted
 }
 
 // IsPublic はユーザーが公開設定かを判定します。
@@ -91,18 +85,6 @@ func (u *User) LinkFirebaseUID(uid string) {
 	} else {
 		u.FirebaseUID = &normalizedUID
 	}
-	u.UpdatedAt = time.Now()
-}
-
-// Delete はユーザーを論理削除します。
-func (u *User) Delete() {
-	u.IsDeleted = true
-	u.UpdatedAt = time.Now()
-}
-
-// Restore はユーザーを復活させます。
-func (u *User) Restore() {
-	u.IsDeleted = false
 	u.UpdatedAt = time.Now()
 }
 

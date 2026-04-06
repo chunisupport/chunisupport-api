@@ -170,11 +170,6 @@ func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
 			userRepo:  &tokenStubUserRepository{user: nil},
 			input:     "valid",
 		},
-		"user deleted": {
-			tokenRepo: &stubAPITokenRepository{lookupToken: &entity.APIToken{ID: 1, UserID: user.ID, HashedToken: hashed}},
-			userRepo:  &tokenStubUserRepository{user: &entity.User{ID: user.ID, IsDeleted: true}},
-			input:     "valid",
-		},
 	}
 
 	for name, tc := range cases {

@@ -33,7 +33,6 @@ func TestNewUser(t *testing.T) {
 	assert.Nil(t, user.FirebaseUID)
 	assert.Nil(t, user.PlayerID)
 	assert.False(t, user.IsSuspicious)
-	assert.False(t, user.IsDeleted)
 	assert.False(t, user.IsPrivate)
 }
 

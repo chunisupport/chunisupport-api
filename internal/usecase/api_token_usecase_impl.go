@@ -77,10 +77,6 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 		return nil, nil, err
 	}
 
-	if !user.IsActive() {
-		return nil, nil, ErrInvalidAPIToken
-	}
-
 	return user, token, nil
 }
 

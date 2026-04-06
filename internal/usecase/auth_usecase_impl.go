@@ -79,9 +79,6 @@ func (s *authUsecaseImpl) Login(ctx context.Context, usernameStr, password strin
 		slog.Error("failed to find user by username", "username", usernameStr, "error", err)
 		return "", err
 	}
-	if !user.IsActive() {
-		return "", ErrInvalidCredentials
-	}
 	if !utils.CheckPasswordHashWithPepper(password, s.pepper, user.PasswordHash.String()) {
 		return "", ErrInvalidCredentials
 	}
@@ -134,12 +131,6 @@ func (s *authUsecaseImpl) Authenticate(ctx context.Context, userID int, sessionI
 			return nil, err
 		}
 		return nil, ErrUserNotFound
-	}
-	if !user.IsActive() {
-		if err := s.sessionRepo.Delete(ctx, s.db, sessionID); err != nil {
-			slog.Error("Failed to delete session for deleted user", "session_id", sessionID, "error", err)
-		}
-		return nil, ErrUserDeleted
 	}
 	return user, nil
 }

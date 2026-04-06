@@ -97,9 +97,6 @@ func (s *recoveryUsecaseImpl) RecoverWithRecoveryCode(ctx context.Context, recov
 			}
 			return err
 		}
-		if !user.IsActive() {
-			return ErrInvalidRecoveryCredentials
-		}
 		if utils.CheckPasswordHashWithPepper(newPassword, s.pepper, user.PasswordHash.String()) {
 			return ErrInvalidPassword
 		}

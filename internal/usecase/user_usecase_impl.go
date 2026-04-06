@@ -497,7 +497,7 @@ func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, req
 		return nil, nil, err
 	}
 
-	if user == nil || !user.IsActive() {
+	if user == nil {
 		return nil, nil, ErrUserNotFound
 	}
 
