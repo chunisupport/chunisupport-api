@@ -43,6 +43,9 @@ func NewUserCredentialUsecase(
 	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
+	if db == nil {
+		panic("executor is nil")
+	}
 	if tm == nil {
 		panic("transaction manager is nil")
 	}

@@ -205,7 +205,7 @@ func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerReco
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
 	return NewUserCredentialUsecase(
-		nil,
+		&MockExecutor{},
 		&mockTransactionManager{},
 		userRepo,
 		playerRecordRepo,
@@ -229,7 +229,7 @@ func newTestUserCredentialUsecaseWithDeleteDependencies(
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
-	return NewUserCredentialUsecase(nil, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, newMockMasterCache())
+	return NewUserCredentialUsecase(&MockExecutor{}, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, newMockMasterCache())
 }
 
 func newTestRecoveryUsecase(tm TransactionManager, userRepo repository.UserRepository, recoveryRepo repository.RecoveryCodeRepository, pepper string) RecoveryUsecase {
