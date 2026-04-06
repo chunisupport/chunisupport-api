@@ -220,9 +220,8 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 // DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
-	// 認可チェック: ADMIN権限が必要
-	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
-		return ErrAdminRequired
+	if err := s.ensureDeleteUserPermission(requester); err != nil {
+		return err
 	}
 
 	// 1. ユーザーを取得
@@ -240,11 +239,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		firebaseUID = *user.FirebaseUID
 	}
 
-	if err := s.userRepo.DeleteByID(ctx, s.db, user.ID); err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
-		}
-		slog.Error("failed to delete user from database", "user_id", user.ID, "username", username, "error", err)
+	if err := s.performPhysicalUserDeletion(ctx, user.ID, username); err != nil {
 		return err
 	}
 
@@ -255,6 +250,24 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 	}
 
 	slog.Info("user deleted successfully", "username", username, "user_id", user.ID)
+	return nil
+}
+
+func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
+	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
+		return ErrAdminRequired
+	}
+	return nil
+}
+
+func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID int, username string) error {
+	if err := s.userRepo.DeleteByID(ctx, s.db, userID); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
+		return err
+	}
 	return nil
 }
 
