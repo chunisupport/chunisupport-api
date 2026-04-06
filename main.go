@@ -95,14 +95,9 @@ func main() {
 
 	slog.Info("Static master data preloaded")
 
-	firebaseTokenVerifier, err := app.SetupFirebaseTokenVerifier(ctx, cfg)
+	firebaseTokenVerifier, firebaseUserDeleter, err := app.SetupFirebaseAuthServices(ctx, cfg)
 	if err != nil {
-		slog.Error("Failed to initialize firebase token verifier", "error", err)
-		return
-	}
-	firebaseUserDeleter, err := app.SetupFirebaseUserDeleter(ctx, cfg)
-	if err != nil {
-		slog.Error("Failed to initialize firebase user deleter", "error", err)
+		slog.Error("Failed to initialize firebase services", "error", err)
 		return
 	}
 
