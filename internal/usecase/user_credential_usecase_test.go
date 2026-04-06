@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
+func TestUserCredentialUsecase_ChangePassword(t *testing.T) {
 	pepper := "test-pepper"
 	errDB := errors.New("db error")
 
@@ -124,7 +124,7 @@ func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
 	}
 }
 
-func TestUserSecurityUsecase_GetUser(t *testing.T) {
+func TestUserCredentialUsecase_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
 
@@ -181,7 +181,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 	})
 }
 
-func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
+func TestUserCredentialUsecase_DeleteOwnAccount(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
 
 	t.Run("アカウント削除に成功する", func(t *testing.T) {
