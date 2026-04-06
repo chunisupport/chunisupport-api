@@ -188,23 +188,24 @@ func TestUserCredentialUsecase_DeleteOwnAccount(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryCodeRepo := new(MockRecoveryCodeRepository)
-		apiTokenRepo := &stubAPITokenRepository{}
+		mockAPITokenRepo := new(MockAPITokenRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, apiTokenRepo, mockRecoveryCodeRepo, "test-pepper",
+			tm, mockUserRepo, nil, mockSessionRepo, mockAPITokenRepo, mockRecoveryCodeRepo, "test-pepper",
 		)
 
 		user := &entity.User{ID: 1, Username: un}
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
 		mockSessionRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
+		mockAPITokenRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 		mockRecoveryCodeRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1)
 		assert.NoError(t, err)
-		assert.Equal(t, 1, apiTokenRepo.deletedUserID)
 		mockUserRepo.AssertExpectations(t)
 		mockSessionRepo.AssertExpectations(t)
+		mockAPITokenRepo.AssertExpectations(t)
 		mockRecoveryCodeRepo.AssertExpectations(t)
 	})
 
@@ -212,24 +213,25 @@ func TestUserCredentialUsecase_DeleteOwnAccount(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryCodeRepo := new(MockRecoveryCodeRepository)
-		apiTokenRepo := &stubAPITokenRepository{}
+		mockAPITokenRepo := new(MockAPITokenRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, apiTokenRepo, mockRecoveryCodeRepo, "test-pepper",
+			tm, mockUserRepo, nil, mockSessionRepo, mockAPITokenRepo, mockRecoveryCodeRepo, "test-pepper",
 		)
 
 		user := &entity.User{ID: 2, Username: un}
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
 		mockSessionRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 2).Return(nil).Once()
+		mockAPITokenRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 2).Return(nil).Once()
 		mockRecoveryCodeRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 2).Return(nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 2).Return(errors.New("db error")).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2)
 		assert.Error(t, err)
 		assert.Equal(t, "db error", err.Error())
-		assert.Equal(t, 2, apiTokenRepo.deletedUserID)
 		mockUserRepo.AssertExpectations(t)
 		mockSessionRepo.AssertExpectations(t)
+		mockAPITokenRepo.AssertExpectations(t)
 		mockRecoveryCodeRepo.AssertExpectations(t)
 	})
 
@@ -237,10 +239,10 @@ func TestUserCredentialUsecase_DeleteOwnAccount(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockSessionRepo := new(MockSessionRepository)
 		mockRecoveryCodeRepo := new(MockRecoveryCodeRepository)
-		apiTokenRepo := &stubAPITokenRepository{}
+		mockAPITokenRepo := new(MockAPITokenRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, mockSessionRepo, apiTokenRepo, mockRecoveryCodeRepo, "test-pepper",
+			tm, mockUserRepo, nil, mockSessionRepo, mockAPITokenRepo, mockRecoveryCodeRepo, "test-pepper",
 		)
 
 		user := &entity.User{ID: 3, Username: un}
@@ -250,9 +252,9 @@ func TestUserCredentialUsecase_DeleteOwnAccount(t *testing.T) {
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3)
 		assert.Error(t, err)
 		assert.Equal(t, "session delete error", err.Error())
-		assert.Equal(t, 0, apiTokenRepo.deletedUserID)
 		mockUserRepo.AssertExpectations(t)
 		mockSessionRepo.AssertExpectations(t)
+		mockAPITokenRepo.AssertNotCalled(t, "DeleteByUserID", mock.Anything, mock.Anything, mock.Anything)
 		mockRecoveryCodeRepo.AssertNotCalled(t, "DeleteByUserID", mock.Anything, mock.Anything, mock.Anything)
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -263,7 +265,7 @@ func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *t
 	userRepo := new(MockUserRepository)
 	playerRecordRepo := &stubPlayerRecordRepository{}
 	sessionRepo := new(MockSessionRepository)
-	apiTokenRepo := &stubAPITokenRepository{}
+	apiTokenRepo := new(MockAPITokenRepository)
 	recoveryCodeRepo := new(MockRecoveryCodeRepository)
 	masterCache := newMockMasterCache()
 	exec := &MockExecutor{}

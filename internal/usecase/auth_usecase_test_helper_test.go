@@ -179,6 +179,29 @@ func (m *MockRecoveryCodeRepository) FindByHashForUpdate(ctx context.Context, ex
 	return args.Get(0).(*entity.RecoveryCode), args.Error(1)
 }
 
+// MockAPITokenRepository はAPITokenRepositoryのモックです。
+type MockAPITokenRepository struct {
+	mock.Mock
+}
+
+func (m *MockAPITokenRepository) CreateOrReplace(ctx context.Context, exec repository.Executor, token *entity.APIToken) error {
+	args := m.Called(ctx, exec, token)
+	return args.Error(0)
+}
+
+func (m *MockAPITokenRepository) FindByHashedToken(ctx context.Context, exec repository.Executor, hashedToken string) (*entity.APIToken, error) {
+	args := m.Called(ctx, exec, hashedToken)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.APIToken), args.Error(1)
+}
+
+func (m *MockAPITokenRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	args := m.Called(ctx, exec, userID)
+	return args.Error(0)
+}
+
 type mockTransactionManager struct {
 	exec repository.Executor
 }
@@ -215,7 +238,7 @@ func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerReco
 		userRepo,
 		playerRecordRepo,
 		new(MockSessionRepository),
-		&stubAPITokenRepository{},
+		new(MockAPITokenRepository),
 		new(MockRecoveryCodeRepository),
 		pepper,
 		newMockMasterCache(),
