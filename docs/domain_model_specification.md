@@ -34,7 +34,7 @@
 ### User（ユーザー集約ルート）
 
 #### 概要
-システム利用者を表す集約ルート。認証情報、プレイヤー紐付け、プライバシー設定を管理します。
+システム利用者を表す集約ルート。認証情報、Firebase 連携、プレイヤー紐付け、プライバシー設定を管理します。
 
 #### フィールド
 
@@ -42,21 +42,18 @@
 |------------|-----|-----|------|
 | ID | int | ✓ | ユーザーID（主キー） |
 | Username | username.UserName | ✓ | ユーザー名（値オブジェクト） |
-| PasswordHash | passwordhash.PasswordHash | ✓ | パスワードハッシュ（値オブジェクト） |
+| FirebaseUID | *string | - | 連携済み Firebase UID |
+| PasswordHash | passwordhash.PasswordHash | ✓ | パスワードハッシュ（Firebase 専用ユーザーでは空ハッシュを許容） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
 | PlayerID | *int | - | 紐付けられたプレイヤーID |
 | AccountTypeID | int | ✓ | アカウント種別ID |
-| IsDeleted | bool | ✓ | 論理削除フラグ |
+| IsSuspicious | bool | ✓ | 不審アカウントフラグ |
 | IsPrivate | bool | ✓ | 非公開設定フラグ |
 
 #### 振る舞い（メソッド）
 
 ##### クエリメソッド
-
-- **IsActive() bool**
-  - ユーザーが有効（削除されていない）かを判定
-  - 返り値: `!IsDeleted`
 
 - **IsPublic() bool**
   - ユーザーが公開設定かを判定
@@ -65,6 +62,10 @@
 - **HasLinkedPlayer() bool**
   - ユーザーにプレイヤーが紐づいているかを判定
   - 返り値: `PlayerID != nil`
+
+- **HasLinkedFirebase() bool**
+  - ユーザーに Firebase UID が紐づいているかを判定
+  - 返り値: `FirebaseUID != nil && *FirebaseUID != ""`
 
 ##### コマンドメソッド
 
@@ -76,19 +77,23 @@
   - ユーザーのパスワードハッシュを変更
   - 副作用: `UpdatedAt` を現在時刻に更新
 
-- **Delete()**
-  - ユーザーを論理削除
-  - 副作用: `IsDeleted = true`, `UpdatedAt` を現在時刻に更新
+- **LinkFirebaseUID(uid string)**
+  - ユーザーに Firebase UID を紐付ける（空文字や空白のみの場合は解除扱い）
+  - 副作用: `FirebaseUID` を更新し、`UpdatedAt` を現在時刻に更新
 
 - **LinkPlayer(playerID int)**
   - ユーザーにプレイヤーを紐付け
   - 副作用: `PlayerID` を設定、`UpdatedAt` を現在時刻に更新
 
+- **UnlinkPlayer()**
+  - ユーザーからプレイヤーとの紐付けを解除
+  - 副作用: `PlayerID = nil`, `UpdatedAt` を現在時刻に更新
+
 #### 不変条件
 
 - `Username` は5文字以上50文字以内の小文字英数字
-- `PasswordHash` は空文字列不可のハッシュ文字列
-- 削除済みユーザー（`IsDeleted = true`）は無効とみなされる
+- `FirebaseUID` を保持する場合は空文字や空白のみを許容しない
+- `PasswordHash` は通常ユーザーではハッシュ文字列を保持し、Firebase 専用ユーザーでは空ハッシュを取りうる
 
 ---
 
