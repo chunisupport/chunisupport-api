@@ -186,23 +186,39 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("アカウント削除に成功する", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
+		mockSessionRepo := new(MockSessionRepository)
+		mockAPITokenRepo := &stubAPITokenRepository{}
+		mockRecoveryRepo := new(MockRecoveryCodeRepository)
+		tm := &mockTransactionManager{}
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			tm, mockUserRepo, nil, mockSessionRepo, mockAPITokenRepo, mockRecoveryRepo, "test-pepper",
+		)
 
 		user := &entity.User{ID: 1, Username: un}
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockSessionRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
+		mockRecoveryRepo.On("DeleteByUserID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1)
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
+		mockSessionRepo.AssertExpectations(t)
+		mockRecoveryRepo.AssertExpectations(t)
+		assert.Equal(t, 1, mockAPITokenRepo.deletedUserID)
 	})
 
 	t.Run("保存時にDBエラーが発生した場合はエラーを返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
+		mockSessionRepo := new(MockSessionRepository)
+		mockRecoveryRepo := new(MockRecoveryCodeRepository)
+		tm := &mockTransactionManager{}
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			tm, mockUserRepo, nil, mockSessionRepo, &stubAPITokenRepository{}, mockRecoveryRepo, "test-pepper",
+		)
 
 		user := &entity.User{ID: 2, Username: un}
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
 		mockUserRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("db error")).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2)
@@ -213,13 +229,98 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("既に削除済みのユーザーはErrUserAlreadyDeletedを返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
+		mockSessionRepo := new(MockSessionRepository)
+		mockRecoveryRepo := new(MockRecoveryCodeRepository)
+		tm := &mockTransactionManager{}
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			tm, mockUserRepo, nil, mockSessionRepo, &stubAPITokenRepository{}, mockRecoveryRepo, "test-pepper",
+		)
 
 		deletedUser := &entity.User{ID: 3, Username: un, IsDeleted: true}
-		mockUserRepo.On("FindByID", mock.Anything, mock.Anything, 3).Return(deletedUser, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(deletedUser, nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3)
 		assert.ErrorIs(t, err, ErrUserAlreadyDeleted)
 		mockUserRepo.AssertExpectations(t)
 	})
+}
+
+func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *testing.T) {
+	pepper := "test-pepper"
+	userRepo := new(MockUserRepository)
+	playerRecordRepo := &stubPlayerRecordRepository{}
+	sessionRepo := new(MockSessionRepository)
+	apiTokenRepo := &stubAPITokenRepository{}
+	recoveryCodeRepo := new(MockRecoveryCodeRepository)
+	masterCache := newMockMasterCache()
+	exec := &MockExecutor{}
+
+	tests := []struct {
+		name    string
+		build   func()
+		message string
+	}{
+		{
+			name: "executorがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "executor is nil",
+		},
+		{
+			name: "transaction managerがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "transaction manager is nil",
+		},
+		{
+			name: "user repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "user repository is nil",
+		},
+		{
+			name: "player record repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "player record repository is nil",
+		},
+		{
+			name: "session repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, nil, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "session repository is nil",
+		},
+		{
+			name: "api token repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, nil, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "api token repository is nil",
+		},
+		{
+			name: "recovery code repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, nil, pepper, masterCache)
+			},
+			message: "recovery code repository is nil",
+		},
+		{
+			name: "master cacheがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, nil)
+			},
+			message: "master cache is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, tt.message, tt.build)
+		})
+	}
 }

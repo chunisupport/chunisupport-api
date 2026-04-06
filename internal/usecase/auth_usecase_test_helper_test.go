@@ -123,6 +123,11 @@ func (m *MockSessionRepository) CountByUserID(ctx context.Context, exec reposito
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockSessionRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	args := m.Called(ctx, exec, userID)
+	return args.Error(0)
+}
+
 func (m *MockSessionRepository) DeleteByUserIDExcept(ctx context.Context, exec repository.Executor, userID int, excludeSessionID string) error {
 	args := m.Called(ctx, exec, userID, excludeSessionID)
 	return args.Error(0)
@@ -196,7 +201,35 @@ func newTestAuthUsecase(userRepo repository.UserRepository, sessionRepo reposito
 }
 
 func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string) UserCredentialUsecase {
-	return NewUserCredentialUsecase(nil, userRepo, playerRecordRepo, pepper, newMockMasterCache())
+	if playerRecordRepo == nil {
+		playerRecordRepo = &stubPlayerRecordRepository{}
+	}
+	return NewUserCredentialUsecase(
+		&MockExecutor{},
+		&mockTransactionManager{},
+		userRepo,
+		playerRecordRepo,
+		new(MockSessionRepository),
+		&stubAPITokenRepository{},
+		new(MockRecoveryCodeRepository),
+		pepper,
+		newMockMasterCache(),
+	)
+}
+
+func newTestUserCredentialUsecaseWithDeleteDependencies(
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRecordRepo repository.PlayerRecordRepository,
+	sessionRepo repository.SessionRepository,
+	apiTokenRepo repository.APITokenRepository,
+	recoveryCodeRepo repository.RecoveryCodeRepository,
+	pepper string,
+) UserCredentialUsecase {
+	if playerRecordRepo == nil {
+		playerRecordRepo = &stubPlayerRecordRepository{}
+	}
+	return NewUserCredentialUsecase(&MockExecutor{}, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, newMockMasterCache())
 }
 
 func newTestRecoveryUsecase(tm TransactionManager, userRepo repository.UserRepository, recoveryRepo repository.RecoveryCodeRepository, pepper string) RecoveryUsecase {

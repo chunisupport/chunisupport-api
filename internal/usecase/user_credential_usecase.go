@@ -22,14 +22,63 @@ type UserCredentialUsecase interface {
 
 type userCredentialUsecaseImpl struct {
 	db               repository.Executor
+	tm               TransactionManager
 	userRepo         repository.UserRepository
 	playerRecordRepo repository.PlayerRecordRepository
+	sessionRepo      repository.SessionRepository
+	apiTokenRepo     repository.APITokenRepository
+	recoveryCodeRepo repository.RecoveryCodeRepository
 	pepper           string
 	masterCache      AccountTypeProvider
 }
 
-func NewUserCredentialUsecase(db repository.Executor, userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string, masterCache AccountTypeProvider) UserCredentialUsecase {
-	return &userCredentialUsecaseImpl{db: db, userRepo: userRepo, playerRecordRepo: playerRecordRepo, pepper: pepper, masterCache: masterCache}
+func NewUserCredentialUsecase(
+	db repository.Executor,
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRecordRepo repository.PlayerRecordRepository,
+	sessionRepo repository.SessionRepository,
+	apiTokenRepo repository.APITokenRepository,
+	recoveryCodeRepo repository.RecoveryCodeRepository,
+	pepper string,
+	masterCache AccountTypeProvider,
+) UserCredentialUsecase {
+	if db == nil {
+		panic("executor is nil")
+	}
+	if tm == nil {
+		panic("transaction manager is nil")
+	}
+	if userRepo == nil {
+		panic("user repository is nil")
+	}
+	if playerRecordRepo == nil {
+		panic("player record repository is nil")
+	}
+	if sessionRepo == nil {
+		panic("session repository is nil")
+	}
+	if apiTokenRepo == nil {
+		panic("api token repository is nil")
+	}
+	if recoveryCodeRepo == nil {
+		panic("recovery code repository is nil")
+	}
+	if masterCache == nil {
+		panic("master cache is nil")
+	}
+
+	return &userCredentialUsecaseImpl{
+		db:               db,
+		tm:               tm,
+		userRepo:         userRepo,
+		playerRecordRepo: playerRecordRepo,
+		sessionRepo:      sessionRepo,
+		apiTokenRepo:     apiTokenRepo,
+		recoveryCodeRepo: recoveryCodeRepo,
+		pepper:           pepper,
+		masterCache:      masterCache,
+	}
 }
 
 func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error) {
@@ -93,16 +142,29 @@ func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID i
 }
 
 func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int) error {
-	user, err := s.userRepo.FindByID(ctx, s.db, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
 		}
-		return err
-	}
-	if !user.IsActive() {
-		return ErrUserAlreadyDeleted
-	}
-	user.Delete()
-	return s.userRepo.Save(ctx, s.db, user)
+		if !user.IsActive() {
+			return ErrUserAlreadyDeleted
+		}
+
+		user.Delete()
+		if err := s.userRepo.Save(ctx, tx, user); err != nil {
+			return err
+		}
+		if err := s.sessionRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
+		if err := s.apiTokenRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
+
+		return s.recoveryCodeRepo.DeleteByUserID(ctx, tx, userID)
+	})
 }
