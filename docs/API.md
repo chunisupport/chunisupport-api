@@ -462,7 +462,7 @@
 - **レスポンス**: 204 No Content。
 - **挙動**:
   - 同一ユーザーに同じ Firebase UID を再連携した場合は、冪等に成功します。
-  - 同一ユーザーに別の Firebase UID を連携した場合は、新しい Firebase UID に更新されます。
+  - 同一ユーザーに別の Firebase UID を連携しようとした場合は、`409 Conflict` (`firebase_uid_already_linked`) を返します（初回連携のみ許可）。
   - 他ユーザーに既に連携されている Firebase UID は連携できません。
 
 - **主なエラー**:
