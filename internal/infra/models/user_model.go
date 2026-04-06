@@ -78,9 +78,10 @@ func FromUserEntity(e *entity.User) *UserModel {
 // StructScanでLEFT JOIN結果を取得するために使用します。
 type UserWithPlayerRow struct {
 	// ユーザー情報
-	UserID       int    `db:"user_id"`
-	Username     string `db:"username"`
-	UserPlayerID *int   `db:"user_player_id"`
+	UserID       int     `db:"user_id"`
+	Username     string  `db:"username"`
+	FirebaseUID  *string `db:"firebase_uid"`
+	UserPlayerID *int    `db:"user_player_id"`
 
 	// プレイヤー情報（LEFT JOINなのでnull許容）
 	PlayerID             *int     `db:"player_id"`

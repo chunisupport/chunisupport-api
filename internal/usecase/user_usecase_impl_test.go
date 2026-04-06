@@ -119,6 +119,18 @@ type stubPlayerRepository struct {
 	err              error
 }
 
+type stubFirebaseUserEmailLookup struct {
+	emailsByUID map[string]string
+	err         error
+}
+
+func (s *stubFirebaseUserEmailLookup) LookupEmailsByUIDs(ctx context.Context, uids []string) (map[string]string, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.emailsByUID, nil
+}
+
 func (s *stubPlayerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
 	if s.err != nil {
 		return nil, s.err
@@ -677,6 +689,8 @@ func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLates
 func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
+	uid1 := "firebase-uid-1"
+	email1 := "user1@example.com"
 	rating1 := 15.0
 	op1 := 10.0
 	createdAt1 := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -691,6 +705,7 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 			User: entity.User{
 				ID:            1,
 				Username:      un1,
+				FirebaseUID:   &uid1,
 				AccountTypeID: info.AccountTypeAdmin,
 				CreatedAt:     createdAt1,
 				UpdatedAt:     updatedAt1,
@@ -722,6 +737,11 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 		usersWithPlayer: usersWithPlayer,
 	}
 	service := NewUserService(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, &stubSongMasterProvider{})
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.firebaseEmailLookup = &stubFirebaseUserEmailLookup{
+		emailsByUID: map[string]string{uid1: email1},
+	}
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
 	require.NoError(t, err)
@@ -740,6 +760,10 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	assert.Equal(t, 15.0, *list[0].Rating)
 	require.NotNil(t, list[0].OverPowerValue)
 	assert.Equal(t, 10.0, *list[0].OverPowerValue)
+	require.NotNil(t, list[0].FirebaseUID)
+	assert.Equal(t, uid1, *list[0].FirebaseUID)
+	require.NotNil(t, list[0].Email)
+	assert.Equal(t, email1, *list[0].Email)
 
 	// Verify User 2 (No player)
 	assert.Equal(t, "user2", list[1].UserName)
@@ -748,6 +772,8 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
 	assert.False(t, list[1].IsSuspicious)
 	assert.Nil(t, list[1].PlayerName)
+	assert.Nil(t, list[1].FirebaseUID)
+	assert.Nil(t, list[1].Email)
 }
 
 func intPointer(v int) *int {

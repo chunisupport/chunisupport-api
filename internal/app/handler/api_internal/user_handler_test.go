@@ -249,6 +249,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := createdAt.Add(2 * time.Hour)
 
+	uid := "firebase-uid-1"
+	email := "user1@example.com"
 	expected := []dto_internal.AdminUserListResponse{
 		{
 			UserName:       "user1",
@@ -260,6 +262,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: new(float64(9500)),
 			IsSuspicious:   true,
 			IsPrivate:      false,
+			FirebaseUID:    &uid,
+			Email:          &email,
 		},
 		{
 			UserName:       "user2",
@@ -271,6 +275,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: nil,
 			IsSuspicious:   false,
 			IsPrivate:      true,
+			FirebaseUID:    nil,
+			Email:          nil,
 		},
 	}
 
@@ -297,6 +303,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, 9500.0, body[0]["overpower_value"])
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
+	assert.Equal(t, uid, body[0]["firebase_uid"])
+	assert.Equal(t, email, body[0]["email"])
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])
 	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
@@ -306,6 +314,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Nil(t, body[1]["overpower_value"])
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
+	assert.Nil(t, body[1]["firebase_uid"])
+	assert.Nil(t, body[1]["email"])
 	mockService.AssertExpectations(t)
 }
 

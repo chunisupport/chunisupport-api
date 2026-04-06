@@ -14,4 +14,6 @@ type AdminUserListResponse struct {
 	OverPowerValue *float64  `json:"overpower_value"`
 	IsSuspicious   bool      `json:"is_suspicious"`
 	IsPrivate      bool      `json:"is_private"`
+	FirebaseUID    *string   `json:"firebase_uid"`
+	Email          *string   `json:"email"`
 }

@@ -187,6 +187,7 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 		SELECT
 			u.id AS user_id,
 			u.username,
+			u.firebase_uid,
 			u.account_type_id AS user_account_type_id,
 			u.player_id AS user_player_id,
 			u.created_at AS user_created_at,
@@ -246,6 +247,7 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 			User: entity.User{
 				ID:            row.UserID,
 				Username:      uname,
+				FirebaseUID:   row.FirebaseUID,
 				AccountTypeID: row.UserAccountTypeID,
 				CreatedAt:     row.UserCreatedAt,
 				UpdatedAt:     row.UserUpdatedAt,
