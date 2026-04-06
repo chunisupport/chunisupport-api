@@ -70,6 +70,13 @@ func (r *sessionRepository) CountByUserID(ctx context.Context, exec repository.E
 	return count, nil
 }
 
+// DeleteByUserID は指定されたユーザーのセッションを全て削除します。
+func (r *sessionRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	query := `DELETE FROM sessions WHERE user_id = ?`
+	_, err := exec.ExecContext(ctx, query, userID)
+	return err
+}
+
 // DeleteByUserIDExcept は指定されたセッションID以外のユーザーのセッションを全て削除します。
 func (r *sessionRepository) DeleteByUserIDExcept(ctx context.Context, exec repository.Executor, userID int, excludeSessionID string) error {
 	model, err := models.FromSessionEntity(&entity.Session{ID: excludeSessionID})
