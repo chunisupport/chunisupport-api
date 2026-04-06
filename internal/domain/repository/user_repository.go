@@ -25,6 +25,8 @@ type UserRepository interface {
 	FindByFirebaseUID(ctx context.Context, exec Executor, uid string) (*entity.User, error)
 	// LinkFirebaseUID は現在値が一致する場合のみ Firebase UID を更新します。
 	LinkFirebaseUID(ctx context.Context, exec Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error
+	// DeleteByID はユーザーを物理削除します。
+	DeleteByID(ctx context.Context, exec Executor, id int) error
 	// Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 	Save(ctx context.Context, exec Executor, user *entity.User) error
 }

@@ -22,8 +22,8 @@ func TestUserRepositorySaveProtectsFirebaseUIDFromPartialEntity(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_deleted, is_private, is_suspicious)
-		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -58,8 +58,8 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	existingUID := "linked-uid"
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_deleted, is_private, is_suspicious)
-		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -99,8 +99,8 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_deleted, is_private, is_suspicious)
-		VALUES (1, 'user01', NULL, 'hash-1', 1, 0, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', NULL, 'hash-1', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -224,8 +224,8 @@ func TestUserRepositoryLinkFirebaseUID(t *testing.T) {
 
 			if tt.wantErr != domainrepo.ErrUserNotFound {
 				_, err := db.Exec(`
-					INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_deleted, is_private, is_suspicious)
-					VALUES (?, 'user01', ?, 'hash-1', 1, 0, 0, 0)
+					INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
+					VALUES (?, 'user01', ?, 'hash-1', 1, 0, 0)
 				`, 1, tt.initialUID)
 				require.NoError(t, err)
 			}
@@ -278,7 +278,6 @@ func setupUserRepositoryTestDB(t *testing.T) *sqlx.DB {
 			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			account_type_id INTEGER NOT NULL DEFAULT 1,
 			player_id INTEGER,
-			is_deleted INTEGER NOT NULL DEFAULT 0,
 			is_private INTEGER NOT NULL DEFAULT 0,
 			is_suspicious INTEGER NOT NULL DEFAULT 0
 		);

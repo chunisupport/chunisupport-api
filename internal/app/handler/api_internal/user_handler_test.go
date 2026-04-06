@@ -61,11 +61,6 @@ func (m *mockUserService) DeleteUser(ctx context.Context, requester *entity.User
 	return args.Error(0)
 }
 
-func (m *mockUserService) RestoreUser(ctx context.Context, requester *entity.User, username string) error {
-	args := m.Called(ctx, requester, username)
-	return args.Error(0)
-}
-
 func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockUserService)
@@ -265,7 +260,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: new(float64(9500)),
 			IsSuspicious:   true,
 			IsPrivate:      false,
-			IsDeleted:      false,
 		},
 		{
 			UserName:       "user2",
@@ -277,7 +271,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: nil,
 			IsSuspicious:   false,
 			IsPrivate:      true,
-			IsDeleted:      false,
 		},
 	}
 
@@ -304,7 +297,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, 9500.0, body[0]["overpower_value"])
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
-	assert.Equal(t, false, body[0]["is_deleted"])
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])
 	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
@@ -314,7 +306,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Nil(t, body[1]["overpower_value"])
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
-	assert.Equal(t, false, body[1]["is_deleted"])
 	mockService.AssertExpectations(t)
 }
 
@@ -357,22 +348,6 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
-	t.Run("異常系: 既に削除済み", func(t *testing.T) {
-		mockService.On("DeleteUser", mock.Anything, adminUser, "deleteduser").Return(usecase.ErrUserAlreadyDeleted).Once()
-
-		req := httptest.NewRequest(http.MethodDelete, "/users/deleteduser", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("deleteduser")
-		c.Set("userEntity", adminUser)
-
-		err := h.DeleteUser(c)
-
-		assert.Error(t, err)
-		mockService.AssertExpectations(t)
-	})
-
 	t.Run("異常系: ADMIN権限がない", func(t *testing.T) {
 		normalUser := &entity.User{ID: 1, AccountTypeID: 1}
 		mockService.On("DeleteUser", mock.Anything, normalUser, "testuser").Return(usecase.ErrAdminRequired).Once()
@@ -385,79 +360,6 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		c.Set("userEntity", normalUser)
 
 		err := h.DeleteUser(c)
-
-		assert.ErrorIs(t, err, apierror.ErrForbidden)
-		mockService.AssertExpectations(t)
-	})
-}
-
-func TestUserHandler_RestoreUser(t *testing.T) {
-	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
-	adminUser := &entity.User{ID: 99, AccountTypeID: 3}
-
-	t.Run("正常系: ユーザー復活", func(t *testing.T) {
-		mockService.On("RestoreUser", mock.Anything, adminUser, "deleteduser").Return(nil).Once()
-
-		req := httptest.NewRequest(http.MethodPost, "/users/deleteduser/restore", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("deleteduser")
-		c.Set("userEntity", adminUser)
-
-		err := h.RestoreUser(c)
-
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusNoContent, rec.Code)
-		mockService.AssertExpectations(t)
-	})
-
-	t.Run("異常系: ユーザーが存在しない", func(t *testing.T) {
-		mockService.On("RestoreUser", mock.Anything, adminUser, "nonexistent").Return(usecase.ErrUserNotFound).Once()
-
-		req := httptest.NewRequest(http.MethodPost, "/users/nonexistent/restore", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("nonexistent")
-		c.Set("userEntity", adminUser)
-
-		err := h.RestoreUser(c)
-
-		assert.Error(t, err)
-		mockService.AssertExpectations(t)
-	})
-
-	t.Run("異常系: 削除されていない", func(t *testing.T) {
-		mockService.On("RestoreUser", mock.Anything, adminUser, "activeuser").Return(usecase.ErrUserNotDeleted).Once()
-
-		req := httptest.NewRequest(http.MethodPost, "/users/activeuser/restore", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("activeuser")
-		c.Set("userEntity", adminUser)
-
-		err := h.RestoreUser(c)
-
-		assert.Error(t, err)
-		mockService.AssertExpectations(t)
-	})
-
-	t.Run("異常系: ADMIN権限がない", func(t *testing.T) {
-		normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-		mockService.On("RestoreUser", mock.Anything, normalUser, "deleteduser").Return(usecase.ErrAdminRequired).Once()
-
-		req := httptest.NewRequest(http.MethodPost, "/users/deleteduser/restore", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("deleteduser")
-		c.Set("userEntity", normalUser)
-
-		err := h.RestoreUser(c)
 
 		assert.ErrorIs(t, err, apierror.ErrForbidden)
 		mockService.AssertExpectations(t)

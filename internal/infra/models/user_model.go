@@ -21,7 +21,6 @@ type UserModel struct {
 	PlayerID      *int      `db:"player_id"`
 	AccountTypeID int       `db:"account_type_id"`
 	IsSuspicious  bool      `db:"is_suspicious"`
-	IsDeleted     bool      `db:"is_deleted"`
 	IsPrivate     bool      `db:"is_private"`
 }
 
@@ -55,7 +54,6 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		PlayerID:      m.PlayerID,
 		AccountTypeID: m.AccountTypeID,
 		IsSuspicious:  m.IsSuspicious,
-		IsDeleted:     m.IsDeleted,
 		IsPrivate:     m.IsPrivate,
 	}, nil
 }
@@ -72,7 +70,6 @@ func FromUserEntity(e *entity.User) *UserModel {
 		PlayerID:      e.PlayerID,
 		AccountTypeID: e.AccountTypeID,
 		IsSuspicious:  e.IsSuspicious,
-		IsDeleted:     e.IsDeleted,
 		IsPrivate:     e.IsPrivate,
 	}
 }

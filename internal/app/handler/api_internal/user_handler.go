@@ -92,7 +92,7 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 	}
 }
 
-// DeleteUser はユーザーを論理削除するハンドラです（ADMIN権限必須）。
+// DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。
 func (h *UserHandler) DeleteUser(c echo.Context) error {
 	username := c.Param("username")
 	requester, ok := c.Get("userEntity").(*entity.User)
@@ -108,39 +108,8 @@ func (h *UserHandler) DeleteUser(c echo.Context) error {
 			return apierror.ErrForbidden
 		case errors.Is(err, usecase.ErrUserNotFound):
 			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrUserAlreadyDeleted):
-			// セキュリティ: 削除済みであることを隠蔽
-			return apierror.ErrOperationFailed
 		default:
 			slog.Error("failed to delete user", "username", username, "error", err)
-			return apierror.ErrInternalError.WithInternal(err)
-		}
-	}
-
-	return c.NoContent(http.StatusNoContent)
-}
-
-// RestoreUser はユーザーを復活させるハンドラです（ADMIN権限必須）。
-func (h *UserHandler) RestoreUser(c echo.Context) error {
-	username := c.Param("username")
-	requester, ok := c.Get("userEntity").(*entity.User)
-	if !ok {
-		// 認証ミドルウェアが正しく機能していれば、この分岐に入ることはありません。
-		// 安全のため、不正なリクエストとして処理します。
-		return apierror.ErrUnauthorized
-	}
-
-	if err := h.userUsecase.RestoreUser(c.Request().Context(), requester, username); err != nil {
-		switch {
-		case errors.Is(err, usecase.ErrAdminRequired):
-			return apierror.ErrForbidden
-		case errors.Is(err, usecase.ErrUserNotFound):
-			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrUserNotDeleted):
-			// セキュリティ: 未削除であることを隠蔽
-			return apierror.ErrOperationFailed
-		default:
-			slog.Error("failed to restore user", "username", username, "error", err)
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}

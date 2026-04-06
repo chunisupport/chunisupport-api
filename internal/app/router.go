@@ -95,7 +95,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -153,10 +153,10 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	tm := transaction.NewTransactionManager(db)
 	sessionIssuer := usecase.NewSessionIssuer(db, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour)
 	authUsecase := usecase.NewAuthUsecase(db, userRepo, sessionRepo, sessionIssuer, cfg.PwPepper, masterCache)
-	userCredentialUsecase := usecase.NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, cfg.PwPepper, masterCache)
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, firebaseUserDeleter, cfg.PwPepper, masterCache)
 	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserService(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache)
+	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
@@ -297,7 +297,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	{
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
-		usersGroup.POST("/:username/restore", handlers.User.RestoreUser, requireAdmin)
 	}
 
 	// api.chunisupport.net/internal/songs

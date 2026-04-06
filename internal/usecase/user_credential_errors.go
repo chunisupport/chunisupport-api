@@ -11,5 +11,4 @@ var (
 	ErrOperationFailed    = errors.New("operation failed")
 	ErrInternalError      = errors.New("internal error")
 	ErrUserAlreadyDeleted = errors.New("user already deleted")
-	ErrUserNotDeleted     = errors.New("user not deleted")
 )

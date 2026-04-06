@@ -32,9 +32,6 @@ type UserUsecase interface {
 	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。
 	GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]api_internal.AdminUserListResponse, error)
 
-	// DeleteUser はユーザーを論理削除します。
+	// DeleteUser はユーザーを物理削除します。
 	DeleteUser(ctx context.Context, requester *entity.User, username string) error
-
-	// RestoreUser はユーザーを復元します。
-	RestoreUser(ctx context.Context, requester *entity.User, username string) error
 }

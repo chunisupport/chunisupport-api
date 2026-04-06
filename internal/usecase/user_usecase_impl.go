@@ -25,6 +25,7 @@ type userUsecase struct {
 	worldsendChartRepo  repository.WorldsendChartRepository
 	recordCompletionSvc *service.RecordCompletionService
 	masterProvider      userMasterProvider
+	firebaseDeleter     FirebaseUserDeleter
 }
 
 type userMasterProvider interface {
@@ -50,7 +51,21 @@ func NewUserService(db repository.Executor, userRepo repository.UserRepository, 
 		worldsendChartRepo:  worldsendChartRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		masterProvider:      masterProvider,
+		firebaseDeleter:     noopFirebaseUserDeleter{},
 	}
+}
+
+// NewUserServiceWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
+func NewUserServiceWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
+	usecase := NewUserService(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+	impl, ok := usecase.(*userUsecase)
+	if !ok {
+		return usecase
+	}
+	if firebaseDeleter != nil {
+		impl.firebaseDeleter = firebaseDeleter
+	}
+	return impl
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
@@ -189,7 +204,6 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 			UpdatedAt:    u.User.UpdatedAt,
 			IsSuspicious: u.User.IsSuspicious,
 			IsPrivate:    u.User.IsPrivate,
-			IsDeleted:    u.User.IsDeleted,
 		}
 		if u.Player != nil {
 			playerName := u.Player.Name.String()
@@ -203,7 +217,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 	return responses, nil
 }
 
-// DeleteUser はユーザーを論理削除します。
+// DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	// 認可チェック: ADMIN権限が必要
@@ -221,53 +235,26 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		return err
 	}
 
-	// 2. 既に削除済みかチェック
-	if user.IsDeleted {
-		return ErrUserAlreadyDeleted
+	firebaseUID := ""
+	if user.FirebaseUID != nil {
+		firebaseUID = *user.FirebaseUID
 	}
 
-	// 3. 論理削除を実行
-	user.Delete()
-	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
-		slog.Error("failed to delete user", "user_id", user.ID, "error", err)
-		return err
-	}
-
-	slog.Info("user deleted successfully", "username", username, "user_id", user.ID)
-	return nil
-}
-
-// RestoreUser はユーザーを復活させます。
-// 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
-func (s *userUsecase) RestoreUser(ctx context.Context, requester *entity.User, username string) error {
-	// 認可チェック: ADMIN権限が必要
-	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
-		return ErrAdminRequired
-	}
-
-	// 1. ユーザーを取得
-	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
-	if err != nil {
+	if err := s.userRepo.DeleteByID(ctx, s.db, user.ID); err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
-		slog.Error("failed to find user by username", "username", username, "error", err)
+		slog.Error("failed to delete user from database", "user_id", user.ID, "username", username, "error", err)
 		return err
 	}
 
-	// 2. 削除されていない場合はエラー
-	if !user.IsDeleted {
-		return ErrUserNotDeleted
+	if firebaseUID != "" {
+		if err := s.firebaseDeleter.DeleteUser(ctx, firebaseUID); err != nil {
+			slog.Error("failed to delete firebase user after account deletion", "user_id", user.ID, "username", username, "firebase_uid", firebaseUID, "error", err)
+		}
 	}
 
-	// 3. 復活を実行
-	user.Restore()
-	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
-		slog.Error("failed to restore user", "user_id", user.ID, "error", err)
-		return err
-	}
-
-	slog.Info("user restored successfully", "username", username, "user_id", user.ID)
+	slog.Info("user deleted successfully", "username", username, "user_id", user.ID)
 	return nil
 }
 

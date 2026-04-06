@@ -100,9 +100,14 @@ func main() {
 		slog.Error("Failed to initialize firebase token verifier", "error", err)
 		return
 	}
+	firebaseUserDeleter, err := app.SetupFirebaseUserDeleter(ctx, cfg)
+	if err != nil {
+		slog.Error("Failed to initialize firebase user deleter", "error", err)
+		return
+	}
 
 	// サーバーの作成と起動
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier)
+	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

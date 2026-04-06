@@ -21,3 +21,16 @@ func SetupFirebaseTokenVerifier(ctx context.Context, cfg config.Config) (usecase
 
 	return verifier, nil
 }
+
+// SetupFirebaseUserDeleter は FirebaseUserDeleter を初期化します。
+func SetupFirebaseUserDeleter(ctx context.Context, cfg config.Config) (usecase.FirebaseUserDeleter, error) {
+	deleter, err := firebaseauth.NewFirebaseUserDeleterFromCredentialsFile(ctx, cfg.Firebase.CredentialsFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize firebase user deleter: %w", err)
+	}
+	if deleter == nil {
+		return nil, fmt.Errorf("failed to initialize firebase user deleter: deleter is nil")
+	}
+
+	return deleter, nil
+}

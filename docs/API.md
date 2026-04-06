@@ -108,7 +108,7 @@
 | `/internal/me/privacy` | PUT | Cookie | 非公開設定更新 |
 | `/internal/me/password` | PUT | Cookie | パスワード変更 |
 | `/internal/me/recovery-codes` | POST | Cookie | リカバリーコード発行 |
-| `/internal/me` | DELETE | Cookie | アカウント論理削除 |
+| `/internal/me` | DELETE | Cookie | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/me/firebase/link` | POST | Cookie | Firebase UID を現在のユーザーへ連携 |
@@ -118,11 +118,11 @@
 | `/internal/me/goals` | POST | Cookie | 目標を作成 |
 | `/internal/me/goals/:id` | PUT | Cookie | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除 |
-| `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・削除済み・プレイヤー未紐付けを含む） |
+| `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
-| `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの論理削除 |
-| `/internal/users/:username/restore` | POST | Cookie (ADMIN+) | ユーザーの復活 |
+| `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの物理削除 |
+
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得 |
@@ -429,13 +429,12 @@
 - **認証**: Cookie 必須
 - **レスポンス**: 200 OK。ボディは空です。
 
-ユーザーを論理削除し、全セッションを即時失効します。あわせて、当該ユーザーのAPIトークンとリカバリーコードも削除します。
+ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
-  - 400 Bad Request (`operation_failed`): 操作失敗（例: 既に削除済み）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー（セッション無効化失敗など）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 
 ### DELETE `/internal/me/player-data`
 - **認証**: Cookie 必須
@@ -465,12 +464,12 @@
   - 同一ユーザーに同じ Firebase UID を再連携した場合は、冪等に成功します。
   - 同一ユーザーに別の Firebase UID を連携した場合は、新しい Firebase UID に更新されます。
   - 他ユーザーに既に連携されている Firebase UID は連携できません。
-  - 論理削除済みユーザーに紐付いた Firebase UID も再利用できません。
+
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
   - 401 Unauthorized (`unauthorized`): 削除済みユーザー
-  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーまたは削除済みユーザーに連携済み
+  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーに連携済み
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### GET `/internal/me/sessions`
@@ -620,7 +619,6 @@ curl -X POST \
 **注意事項**:
 - レーティング計算は毎回全レコードを対象に行うため、10万ユーザー規模でも問題なくスケール可能です
 - `official_player_rating` は入力データの `rating` フィールドから設定され、`calculated_player_rating` とは独立して保存されます
-
 
 - **コンテンツタイプ**: `application/json`
 
@@ -1047,7 +1045,7 @@ curl -X POST \
 
 ### GET `/internal/users/`
 - **認証**: Cookie 必須（ADMIN権限必須）
-- **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、削除済みアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
+- **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
     - `page` (任意): ページ番号 (デフォルト: 1)
     - `name` (任意): ユーザー名またはプレイヤー名の前方一致検索
@@ -1066,8 +1064,7 @@ curl -X POST \
     "rating": 17.25,
     "overpower_value": 9500.00,
     "is_suspicious": false,
-    "is_private": false,
-    "is_deleted": false
+    "is_private": false
   },
   {
     "username": "user2",
@@ -1078,20 +1075,7 @@ curl -X POST \
     "rating": null,
     "overpower_value": null,
     "is_suspicious": true,
-    "is_private": true,
-    "is_deleted": false
-  },
-  {
-    "username": "deleted_user",
-    "account_type": "EDITOR",
-    "created_at": "2025-10-01T00:00:00+09:00",
-    "updated_at": "2025-10-15T18:45:00+09:00",
-    "player_name": "deleted_player",
-    "rating": 15.00,
-    "overpower_value": 7500.00,
-    "is_suspicious": false,
-    "is_private": false,
-    "is_deleted": true
+    "is_private": true
   }
 ]
 ```
@@ -1109,7 +1093,6 @@ curl -X POST \
 | `overpower_value` | number \| null | オーバーパワー値（未連携の場合は null） |
 | `is_suspicious` | boolean | 不審アカウントフラグ |
 | `is_private` | boolean | プライベートアカウントかどうか |
-| `is_deleted` | boolean | 削除済みアカウントかどうか |
 
 ---
 
@@ -1266,21 +1249,7 @@ curl -X POST \
 - **パスパラメータ**: `username` - 削除対象ユーザーのユーザー名
 - **レスポンス**: 204 No Content
 
-**説明**: 指定されたユーザー名のユーザーを論理削除（`is_deleted = TRUE`）します。物理削除は行わず、関連データ（プレイヤー、セッション）は保持されます。削除済みユーザーはログインできなくなります。
-
-- **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): Cookie欠如または無効
-  - 403 Forbidden (`forbidden`): ADMIN権限が不足
-  - 404 Not Found (`user_not_found`): ユーザーが存在しない
-  - 400 Bad Request (`operation_failed`): 操作失敗（詳細隠蔽）
-
-### POST `/internal/users/:username/restore`
-- **認証**: Cookie 必須
-- **権限**: ADMIN (account_type_id = 3) 以上
-- **パスパラメータ**: `username` - 復活対象ユーザーのユーザー名
-- **レスポンス**: 204 No Content
-
-**説明**: 論理削除されたユーザーを復活（`is_deleted = FALSE`）させます。復活後はログインが可能になります。
+**説明**: 指定されたユーザー名のユーザーを物理削除します。関連データ（プレイヤー・レコード・セッション・APIトークン・リカバリーコード）も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): Cookie欠如または無効
@@ -2604,4 +2573,4 @@ interface SkippedRecord {
 
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
-- ユーザーを論理削除するとログインは失敗し、既存セッションも無効化されます。
+- ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。

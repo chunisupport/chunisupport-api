@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -28,6 +29,7 @@ type userCredentialUsecaseImpl struct {
 	sessionRepo      repository.SessionRepository
 	apiTokenRepo     repository.APITokenRepository
 	recoveryCodeRepo repository.RecoveryCodeRepository
+	firebaseDeleter  FirebaseUserDeleter
 	pepper           string
 	masterCache      AccountTypeProvider
 }
@@ -76,9 +78,34 @@ func NewUserCredentialUsecase(
 		sessionRepo:      sessionRepo,
 		apiTokenRepo:     apiTokenRepo,
 		recoveryCodeRepo: recoveryCodeRepo,
+		firebaseDeleter:  noopFirebaseUserDeleter{},
 		pepper:           pepper,
 		masterCache:      masterCache,
 	}
+}
+
+// NewUserCredentialUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserCredentialUsecase を生成します。
+func NewUserCredentialUsecaseWithFirebaseDeleter(
+	db repository.Executor,
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRecordRepo repository.PlayerRecordRepository,
+	sessionRepo repository.SessionRepository,
+	apiTokenRepo repository.APITokenRepository,
+	recoveryCodeRepo repository.RecoveryCodeRepository,
+	firebaseDeleter FirebaseUserDeleter,
+	pepper string,
+	masterCache AccountTypeProvider,
+) UserCredentialUsecase {
+	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+	impl, ok := usecase.(*userCredentialUsecaseImpl)
+	if !ok {
+		return usecase
+	}
+	if firebaseDeleter != nil {
+		impl.firebaseDeleter = firebaseDeleter
+	}
+	return impl
 }
 
 func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error) {
@@ -142,7 +169,11 @@ func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID i
 }
 
 func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int) error {
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	var deletedUserID int
+	var deletedUsername string
+	var deletedFirebaseUID string
+
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
 		if err != nil {
 			if errors.Is(err, repository.ErrUserNotFound) {
@@ -150,21 +181,22 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			}
 			return err
 		}
-		if !user.IsActive() {
-			return ErrUserAlreadyDeleted
+		deletedUserID = user.ID
+		deletedUsername = user.Username.String()
+		if user.FirebaseUID != nil {
+			deletedFirebaseUID = *user.FirebaseUID
 		}
 
-		user.Delete()
-		if err := s.userRepo.Save(ctx, tx, user); err != nil {
-			return err
-		}
-		if err := s.sessionRepo.DeleteByUserID(ctx, tx, userID); err != nil {
-			return err
-		}
-		if err := s.apiTokenRepo.DeleteByUserID(ctx, tx, userID); err != nil {
-			return err
-		}
+		return s.userRepo.DeleteByID(ctx, tx, userID)
+	}); err != nil {
+		return err
+	}
 
-		return s.recoveryCodeRepo.DeleteByUserID(ctx, tx, userID)
-	})
+	if deletedFirebaseUID != "" {
+		if err := s.firebaseDeleter.DeleteUser(ctx, deletedFirebaseUID); err != nil {
+			slog.Error("failed to delete firebase user after account deletion", "user_id", deletedUserID, "username", deletedUsername, "firebase_uid", deletedFirebaseUID, "error", err)
+		}
+	}
+
+	return nil
 }
