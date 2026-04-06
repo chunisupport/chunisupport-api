@@ -429,7 +429,7 @@
 - **認証**: Cookie 必須
 - **レスポンス**: 200 OK。ボディは空です。
 
-ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
+ユーザーを物理削除します。退会トランザクション内で、対象ユーザーの **全セッション即時失効**（`sessions` の全削除）、**APIトークン削除**（`api_tokens`）、**リカバリーコード削除**（`user_recovery_codes`）を先に実行した後に `users` を削除します。`players` / `player_records` / `player_worldsend_records` / `player_honors` は外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
