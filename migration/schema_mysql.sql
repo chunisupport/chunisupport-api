@@ -333,7 +333,6 @@ CREATE TABLE `users` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `account_type_id` tinyint unsigned NOT NULL DEFAULT '1',
   `player_id` mediumint unsigned DEFAULT NULL,
-  `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `is_private` tinyint(1) NOT NULL DEFAULT '0',
   `is_suspicious` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
@@ -341,7 +340,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `uq_users_player_id` (`player_id`),
   UNIQUE KEY `uk_users_firebase_uid` (`firebase_uid`),
   KEY `account_type_id` (`account_type_id`),
-  KEY `idx_users_deleted_private` (`is_deleted`,`is_private`,`player_id`),
+  KEY `idx_users_private` (`is_private`,`player_id`),
   CONSTRAINT `fk_users_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`account_type_id`) REFERENCES `account_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
