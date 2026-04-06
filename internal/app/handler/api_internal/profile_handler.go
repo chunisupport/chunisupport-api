@@ -95,7 +95,7 @@ func (h *ProfileHandler) ChangePassword(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-// DeleteAccount は認証済みユーザーの論理削除を行うリクエストを処理します。
+// DeleteAccount は認証済みユーザーの物理削除を行うリクエストを処理します。
 func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
