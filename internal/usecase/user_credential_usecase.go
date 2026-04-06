@@ -43,6 +43,28 @@ func NewUserCredentialUsecase(
 	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
+	if tm == nil {
+		panic("transaction manager is nil")
+	}
+	if userRepo == nil {
+		panic("user repository is nil")
+	}
+	if playerRecordRepo == nil {
+		panic("player record repository is nil")
+	}
+	if sessionRepo == nil {
+		panic("session repository is nil")
+	}
+	if apiTokenRepo == nil {
+		panic("api token repository is nil")
+	}
+	if recoveryCodeRepo == nil {
+		panic("recovery code repository is nil")
+	}
+	if masterCache == nil {
+		panic("master cache is nil")
+	}
+
 	return &userCredentialUsecaseImpl{
 		db:               db,
 		tm:               tm,
@@ -117,19 +139,6 @@ func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID i
 }
 
 func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int) error {
-	if s.tm == nil {
-		return errors.Join(ErrInternalError, errors.New("transaction manager is nil"))
-	}
-	if s.sessionRepo == nil {
-		return errors.Join(ErrInternalError, errors.New("session repository is nil"))
-	}
-	if s.apiTokenRepo == nil {
-		return errors.Join(ErrInternalError, errors.New("api token repository is nil"))
-	}
-	if s.recoveryCodeRepo == nil {
-		return errors.Join(ErrInternalError, errors.New("recovery code repository is nil"))
-	}
-
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
 		if err != nil {

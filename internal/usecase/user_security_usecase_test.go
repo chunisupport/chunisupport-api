@@ -244,3 +244,75 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 	})
 }
+
+func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *testing.T) {
+	pepper := "test-pepper"
+	userRepo := new(MockUserRepository)
+	playerRecordRepo := &stubPlayerRecordRepository{}
+	sessionRepo := new(MockSessionRepository)
+	apiTokenRepo := &stubAPITokenRepository{}
+	recoveryCodeRepo := new(MockRecoveryCodeRepository)
+	masterCache := newMockMasterCache()
+
+	tests := []struct {
+		name    string
+		build   func()
+		message string
+	}{
+		{
+			name: "transaction managerがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, nil, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "transaction manager is nil",
+		},
+		{
+			name: "user repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, nil, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "user repository is nil",
+		},
+		{
+			name: "player record repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, nil, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "player record repository is nil",
+		},
+		{
+			name: "session repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, nil, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "session repository is nil",
+		},
+		{
+			name: "api token repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, nil, recoveryCodeRepo, pepper, masterCache)
+			},
+			message: "api token repository is nil",
+		},
+		{
+			name: "recovery code repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, nil, pepper, masterCache)
+			},
+			message: "recovery code repository is nil",
+		},
+		{
+			name: "master cacheがnil",
+			build: func() {
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, nil)
+			},
+			message: "master cache is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, tt.message, tt.build)
+		})
+	}
+}
