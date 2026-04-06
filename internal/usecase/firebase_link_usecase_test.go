@@ -53,7 +53,7 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
-			name:    "自分に別のUIDが既に紐付いていれば新しいUIDへ更新できる",
+			name:    "自分に別のUIDが既に紐付いていれば409相当のエラーを返す",
 			userID:  10,
 			idToken: "replace-user-token",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
@@ -62,11 +62,12 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 				verifier.On("VerifyIDToken", mock.Anything, "replace-user-token").Return("new-firebase-uid", nil).Once()
 				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "new-firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
 				userRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 10).Return(user, nil).Once()
-				userRepo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 10, &existingUID, "new-firebase-uid", mock.AnythingOfType("time.Time")).Return(nil).Once()
 			},
+			wantErr: ErrFirebaseUIDAlreadyLinked,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
+				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{

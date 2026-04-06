@@ -75,6 +75,9 @@ func (u *firebaseLinkUsecase) LinkFirebaseUID(ctx context.Context, userID int, i
 			return errors.Join(ErrInternalError, errors.New("user repository returned nil user"))
 		}
 
+		if user.HasLinkedFirebase() {
+			return ErrFirebaseUIDAlreadyLinked
+		}
 		currentFirebaseUID := user.FirebaseUID
 		user.LinkFirebaseUID(uid)
 		if err := u.userRepo.LinkFirebaseUID(ctx, tx, user.ID, currentFirebaseUID, uid, user.UpdatedAt); err != nil {
