@@ -187,6 +187,16 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			deletedFirebaseUID = *user.FirebaseUID
 		}
 
+		if err := s.sessionRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
+		if err := s.apiTokenRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
+		if err := s.recoveryCodeRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
+
 		return s.userRepo.DeleteByID(ctx, tx, userID)
 	}); err != nil {
 		return err
