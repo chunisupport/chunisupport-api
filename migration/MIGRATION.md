@@ -134,6 +134,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `const`: 譜面定数（DECIMAL(3,1)）。レーティング計算の基礎となります。
     - `is_const_unknown`: 譜面定数が未確定かどうかのフラグ（デフォルト1=未確定）。
     - `notes`: ノーツ数（NULL可）。
+    - `notes_designer`: 譜面製作者名（100文字まで、NULL可）。
     - ユニーク制約: `(song_id, difficulty_id)`の組み合わせ。
 
 #### `worldsend_charts`
@@ -144,6 +145,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `level_star`: WORLD'S END レベル（1～5、NULL可）。
     - `attribute`: WORLD'S END 属性（光、蔵、改、狂など、CHAR(1)）。
     - `notes`: ノーツ数（NULL可）。
+    - `notes_designer`: 譜面製作者名（100文字まで、NULL可）。
 
 ### マスタテーブル
 
@@ -179,3 +181,5 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000005**: `achievement_types` と `goals` テーブルを追加。
 - **000006**: `users` テーブルに `firebase_uid` カラムとユニークインデックスを追加。
 - **000007**: 順序を持つマスタテーブル（`difficulties`, `class_emblems`, `class_emblem_bases`, `clear_lamp_types`, `combo_lamp_types`, `full_chain_types`）に `sort_order` カラムを追加し、既存データへ明示的に表示順を投入。
+- **000008**: `users` テーブルから `is_deleted` カラムを削除し、関連インデックスを整理。
+- **000009**: `charts` テーブルと `worldsend_charts` テーブルに譜面製作者を保持する `notes_designer` カラムを追加。
