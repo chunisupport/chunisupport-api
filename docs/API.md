@@ -1249,7 +1249,7 @@ curl -X POST \
 - **パスパラメータ**: `username` - 削除対象ユーザーのユーザー名
 - **レスポンス**: 204 No Content
 
-**説明**: 指定されたユーザー名のユーザーを物理削除します。関連データ（プレイヤー・レコード・セッション・APIトークン・リカバリーコード）も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
+**説明**: 指定されたユーザー名のユーザーを物理削除します。`users` の削除に伴い、関連データ（`players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes`）は外部キー制約（ON DELETE CASCADE）により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): Cookie欠如または無効
