@@ -21,9 +21,10 @@ const worldsendChartKey = "WORLDSEND"
 
 // UpdateWorldsendChartInput は WORLD'S END 譜面更新入力を表します。
 type UpdateWorldsendChartInput struct {
-	Attribute *string
-	LevelStar *int
-	Notes     *int
+	Attribute     *string
+	LevelStar     *int
+	Notes         *int
+	NotesDesigner *string
 }
 
 // UpdateWorldsendSongInput は WORLD'S END 楽曲更新入力を表します。
@@ -236,9 +237,10 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 		}
 
 		updatedChart = &entity.WorldsendChart{
-			LevelStar: levelStarVO,
-			Attribute: chartReq.Attribute,
-			Notes:     notesVO,
+			LevelStar:     levelStarVO,
+			Attribute:     chartReq.Attribute,
+			Notes:         notesVO,
+			NotesDesigner: chartReq.NotesDesigner,
 		}
 	}
 

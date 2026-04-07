@@ -12,6 +12,7 @@ type V1ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
+	NotesDesigner  *string                     `json:"notes_designer"`
 }
 
 // V1OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
@@ -96,6 +97,7 @@ func ToV1ChartDTO(chart *entity.Chart) *V1ChartDTO {
 		Const:          chart.Const,
 		IsConstUnknown: chart.IsConstUnknown,
 		Notes:          notesPtr,
+		NotesDesigner:  chart.NotesDesigner,
 	}
 }
 

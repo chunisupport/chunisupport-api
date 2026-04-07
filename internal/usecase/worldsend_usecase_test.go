@@ -276,9 +276,10 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 			Genre:     new("POPS & ANIME"),
 			Charts: map[string]*UpdateWorldsendChartInput{
 				"WORLDSEND": {
-					Attribute: new("狂"),
-					LevelStar: new(5),
-					Notes:     new(2000),
+					Attribute:     new("狂"),
+					LevelStar:     new(5),
+					Notes:         new(2000),
+					NotesDesigner: new("譜面作者A"),
 				},
 			},
 		},
@@ -310,6 +311,9 @@ func TestUpdateWorldsendSongs_SavesEntities(t *testing.T) {
 				return false
 			}
 			if updates[0].Chart.Attribute == nil || *updates[0].Chart.Attribute != "狂" {
+				return false
+			}
+			if updates[0].Chart.NotesDesigner == nil || *updates[0].Chart.NotesDesigner != "譜面作者A" {
 				return false
 			}
 			return updates[1].Chart == nil

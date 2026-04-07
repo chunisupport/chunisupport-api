@@ -66,6 +66,7 @@ type ChartModel struct {
 	Const          float64 `db:"const"`
 	IsConstUnknown bool    `db:"is_const_unknown"`
 	Notes          *int    `db:"notes"`
+	NotesDesigner  *string `db:"notes_designer"`
 }
 
 func (m *ChartModel) ToEntity() (*entity.Chart, error) {
@@ -90,6 +91,7 @@ func (m *ChartModel) ToEntity() (*entity.Chart, error) {
 		Const:          chartConst,
 		IsConstUnknown: m.IsConstUnknown,
 		Notes:          n,
+		NotesDesigner:  m.NotesDesigner,
 	}, nil
 }
 
@@ -122,5 +124,6 @@ func FromChartEntity(e *entity.Chart) *ChartModel {
 		Const:          float64Const,
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          notesVal,
+		NotesDesigner:  e.NotesDesigner,
 	}
 }

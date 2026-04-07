@@ -49,6 +49,7 @@ type chartRow struct {
 	Const          float64 `db:"const"`
 	IsConstUnknown bool    `db:"is_const_unknown"`
 	Notes          *int    `db:"notes"`
+	NotesDesigner  *string `db:"notes_designer"`
 }
 
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
@@ -85,7 +86,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, args, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
 		FROM charts
 		WHERE song_id IN (?)
 		ORDER BY song_id, difficulty_id
@@ -158,6 +159,7 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 		Const:          constVal,
 		IsConstUnknown: row.IsConstUnknown,
 		Notes:          notesVal,
+		NotesDesigner:  row.NotesDesigner,
 	}
 }
 
@@ -200,7 +202,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, chartArgs, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
 		FROM charts
 		WHERE song_id IN (?)
 		ORDER BY song_id, difficulty_id
@@ -262,7 +264,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	// 2. 譜面を取得
 	chartsQuery := `
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
 		FROM charts
 		WHERE song_id = ?
 		ORDER BY difficulty_id
@@ -482,6 +484,7 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 		Const          float64
 		IsConstUnknown bool
 		Notes          *int
+		NotesDesigner  *string
 	}
 
 	var updates []chartUpdate
@@ -499,6 +502,7 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 				Const:          float64(chart.Const),
 				IsConstUnknown: chart.IsConstUnknown,
 				Notes:          notesPtr,
+				NotesDesigner:  chart.NotesDesigner,
 			})
 		}
 	}
@@ -510,8 +514,8 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（const→is_const_unknown→notes→WHERE）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var constCases, unknownCases, notesCases []string
-	var constArgs, unknownArgs, notesArgs, whereArgs []any
+	var constCases, unknownCases, notesCases, notesDesignerCases []string
+	var constArgs, unknownArgs, notesArgs, notesDesignerArgs, whereArgs []any
 
 	for _, u := range updates {
 		constCases = append(constCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
@@ -522,6 +526,9 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 
 		notesCases = append(notesCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
 		notesArgs = append(notesArgs, u.SongID, u.DifficultyID, u.Notes)
+
+		notesDesignerCases = append(notesDesignerCases, "WHEN song_id = ? AND difficulty_id = ? THEN ?")
+		notesDesignerArgs = append(notesDesignerArgs, u.SongID, u.DifficultyID, u.NotesDesigner)
 	}
 
 	// WHERE句用: (song_id, difficulty_id) の組み合わせ
@@ -531,24 +538,27 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 		whereArgs = append(whereArgs, u.SongID, u.DifficultyID)
 	}
 
-	// SQLの引数順序に合わせて結合: const→is_const_unknown→notes→WHERE
+	// SQLの引数順序に合わせて結合: const→is_const_unknown→notes→notes_designer→WHERE
 	args := make([]any, 0)
 	args = append(args, constArgs...)
 	args = append(args, unknownArgs...)
 	args = append(args, notesArgs...)
+	args = append(args, notesDesignerArgs...)
 	args = append(args, whereArgs...)
 
 	query := fmt.Sprintf(`
 		UPDATE charts SET
 			const = CASE %s END,
 			is_const_unknown = CASE %s END,
-			notes = CASE %s END
+			notes = CASE %s END,
+			notes_designer = CASE %s END
 		WHERE (%s)
 		  AND song_id IN (SELECT id FROM songs WHERE is_worldsend = 0)
 	`,
 		strings.Join(constCases, " "),
 		strings.Join(unknownCases, " "),
 		strings.Join(notesCases, " "),
+		strings.Join(notesDesignerCases, " "),
 		strings.Join(wherePairs, " OR "),
 	)
 

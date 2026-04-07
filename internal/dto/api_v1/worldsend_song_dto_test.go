@@ -22,6 +22,7 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	}
 	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
+	notesDesigner := "譜面作者A"
 
 	song := &entity.Song{
 		DisplayID:   "v1test1234567890",
@@ -35,9 +36,10 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	}
 
 	chart := &entity.WorldsendChart{
-		LevelStar: &levelStar,
-		Attribute: &attribute,
-		Notes:     &notesObj,
+		LevelStar:     &levelStar,
+		Attribute:     &attribute,
+		Notes:         &notesObj,
+		NotesDesigner: &notesDesigner,
 	}
 
 	genreNamesByID := map[int]string{
@@ -114,6 +116,9 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	if weChart.Notes == nil || *weChart.Notes != 2000 {
 		t.Errorf("Notes = %v, want %v", weChart.Notes, 2000)
 	}
+	if weChart.NotesDesigner == nil || *weChart.NotesDesigner != "譜面作者A" {
+		t.Errorf("NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
+	}
 }
 
 // TestToV1WorldsendSongDTO_NilSong は Song が nil の場合に nil を返すことを確認します。
@@ -133,6 +138,7 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	levelStar := 4
 	attribute := "蔵"
 	notesVal := 800
+	notesDesigner := "譜面作者B"
 
 	songDTO := &V1WorldsendSongDTO{
 		DisplayID:   "v1we123456789012",
@@ -145,9 +151,10 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 		OfficialIdx: "789",
 		Charts: map[string]*V1WorldsendChartDTO{
 			"WORLDSEND": {
-				Attribute: &attribute,
-				LevelStar: &levelStar,
-				Notes:     &notesVal,
+				Attribute:     &attribute,
+				LevelStar:     &levelStar,
+				Notes:         &notesVal,
+				NotesDesigner: &notesDesigner,
 			},
 		},
 	}
@@ -190,5 +197,8 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 
 	if !containsString(jsonString, `"notes":800`) {
 		t.Errorf("JSON should contain notes, got: %s", jsonString)
+	}
+	if !containsString(jsonString, `"notes_designer":"譜面作者B"`) {
+		t.Errorf("JSON should contain notes_designer, got: %s", jsonString)
 	}
 }

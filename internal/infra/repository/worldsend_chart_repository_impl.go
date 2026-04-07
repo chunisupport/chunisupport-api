@@ -33,7 +33,8 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
 			wc.attribute AS 'worldsend_charts.attribute',
-			wc.notes AS 'worldsend_charts.notes'
+			wc.notes AS 'worldsend_charts.notes',
+			wc.notes_designer AS 'worldsend_charts.notes_designer'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.is_worldsend = 1`
@@ -57,7 +58,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 			&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes,
+			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner,
 		)
 		if err != nil {
 			return nil, err
@@ -81,7 +82,8 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
 			wc.attribute AS 'worldsend_charts.attribute',
-			wc.notes AS 'worldsend_charts.notes'
+			wc.notes AS 'worldsend_charts.notes',
+			wc.notes_designer AS 'worldsend_charts.notes_designer'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.display_id = ? AND s.is_worldsend = 1`
@@ -93,7 +95,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 		&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes,
+		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -334,10 +336,11 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 
 func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, int, error) {
 	type chartUpdate struct {
-		ChartID   int
-		LevelStar *levelstar.LevelStar
-		Attribute *string
-		Notes     any
+		ChartID       int
+		LevelStar     *levelstar.LevelStar
+		Attribute     *string
+		Notes         any
+		NotesDesigner *string
 	}
 
 	chartUpdates := make([]chartUpdate, 0, len(updates))
@@ -348,10 +351,11 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 
 		target := targets[update.Song.DisplayID]
 		chartUpdates = append(chartUpdates, chartUpdate{
-			ChartID:   target.ChartID,
-			LevelStar: update.Chart.LevelStar,
-			Attribute: update.Chart.Attribute,
-			Notes:     update.Chart.Notes,
+			ChartID:       target.ChartID,
+			LevelStar:     update.Chart.LevelStar,
+			Attribute:     update.Chart.Attribute,
+			Notes:         update.Chart.Notes,
+			NotesDesigner: update.Chart.NotesDesigner,
 		})
 	}
 
@@ -359,8 +363,8 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		return 0, 0, nil
 	}
 
-	var levelCases, attributeCases, notesCases []string
-	var levelArgs, attributeArgs, notesArgs []any
+	var levelCases, attributeCases, notesCases, notesDesignerCases []string
+	var levelArgs, attributeArgs, notesArgs, notesDesignerArgs []any
 	chartIDs := make([]int, 0, len(chartUpdates))
 
 	for _, update := range chartUpdates {
@@ -374,12 +378,16 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 
 		notesCases = append(notesCases, "WHEN id = ? THEN ?")
 		notesArgs = append(notesArgs, update.ChartID, update.Notes)
+
+		notesDesignerCases = append(notesDesignerCases, "WHEN id = ? THEN ?")
+		notesDesignerArgs = append(notesDesignerArgs, update.ChartID, update.NotesDesigner)
 	}
 
 	args := make([]any, 0)
 	args = append(args, levelArgs...)
 	args = append(args, attributeArgs...)
 	args = append(args, notesArgs...)
+	args = append(args, notesDesignerArgs...)
 
 	placeholders := make([]string, len(chartIDs))
 	for i, id := range chartIDs {
@@ -391,12 +399,14 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 		UPDATE worldsend_charts SET
 			level_star = CASE %s END,
 			attribute = CASE %s END,
-			notes = CASE %s END
+			notes = CASE %s END,
+			notes_designer = CASE %s END
 		WHERE id IN (%s)
 	`,
 		strings.Join(levelCases, " "),
 		strings.Join(attributeCases, " "),
 		strings.Join(notesCases, " "),
+		strings.Join(notesDesignerCases, " "),
 		strings.Join(placeholders, ","),
 	)
 

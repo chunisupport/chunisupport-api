@@ -100,6 +100,7 @@ func setupWorldsendUpdateDB(t *testing.T) *sqlx.DB {
 			level_star INTEGER,
 			attribute TEXT,
 			notes INTEGER,
+			notes_designer TEXT,
 			FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
 			UNIQUE(song_id)
 		)
@@ -122,8 +123,8 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 4, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 4, '狂', 1200, '旧作者')
 	`)
 	require.NoError(t, err)
 
@@ -159,11 +160,12 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	assert.Equal(t, "new artist", song.Artist)
 
 	var chart struct {
-		LevelStar *int    `db:"level_star"`
-		Attribute *string `db:"attribute"`
-		Notes     *int    `db:"notes"`
+		LevelStar     *int    `db:"level_star"`
+		Attribute     *string `db:"attribute"`
+		Notes         *int    `db:"notes"`
+		NotesDesigner *string `db:"notes_designer"`
 	}
-	err = db.Get(&chart, `SELECT level_star, attribute, notes FROM worldsend_charts WHERE id = 101`)
+	err = db.Get(&chart, `SELECT level_star, attribute, notes, notes_designer FROM worldsend_charts WHERE id = 101`)
 	require.NoError(t, err)
 	if assert.NotNil(t, chart.LevelStar) {
 		assert.Equal(t, 4, *chart.LevelStar)
@@ -173,6 +175,9 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	}
 	if assert.NotNil(t, chart.Notes) {
 		assert.Equal(t, 1200, *chart.Notes)
+	}
+	if assert.NotNil(t, chart.NotesDesigner) {
+		assert.Equal(t, "旧作者", *chart.NotesDesigner)
 	}
 }
 
@@ -200,8 +205,8 @@ func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 2, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 2, '狂', 1200, '旧作者')
 	`)
 	require.NoError(t, err)
 
@@ -221,9 +226,10 @@ func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
 			Jacket:     &jacket,
 		},
 		Chart: &entity.WorldsendChart{
-			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute: stringPtrForWorldsendSaveTest("改"),
-			Notes:     &n,
+			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute:     stringPtrForWorldsendSaveTest("改"),
+			Notes:         &n,
+			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
 		},
 	}}
 
@@ -255,9 +261,10 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 			Artist:    "artist",
 		},
 		Chart: &entity.WorldsendChart{
-			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute: stringPtrForWorldsendSaveTest("狂"),
-			Notes:     &n,
+			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute:     stringPtrForWorldsendSaveTest("狂"),
+			Notes:         &n,
+			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
 		},
 	}}
 
@@ -280,8 +287,8 @@ func TestUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 4, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 4, '狂', 1200, '旧作者')
 	`)
 	require.NoError(t, err)
 
@@ -316,8 +323,8 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 4, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 4, '狂', 1200, '旧作者')
 	`)
 	require.NoError(t, err)
 
@@ -337,9 +344,10 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 			Jacket:     &jacket,
 		},
 		Chart: &entity.WorldsendChart{
-			LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute: stringPtrForWorldsendSaveTest("改"),
-			Notes:     &n,
+			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
+			Attribute:     stringPtrForWorldsendSaveTest("改"),
+			Notes:         &n,
+			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
 		},
 	}}
 
@@ -407,10 +415,10 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenMixedChartUpdatesSkipOneAndSkippe
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
 		VALUES
-			(101, 1, 3, '狂', 1000),
-			(102, 2, 4, '止', 1100)
+			(101, 1, 3, '狂', 1000, '作者1'),
+			(102, 2, 4, '止', 1100, '作者2')
 	`)
 	require.NoError(t, err)
 
@@ -449,9 +457,10 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenMixedChartUpdatesSkipOneAndSkippe
 				Jacket:     &jacket2,
 			},
 			Chart: &entity.WorldsendChart{
-				LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-				Attribute: stringPtrForWorldsendSaveTest("改"),
-				Notes:     &n,
+				LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
+				Attribute:     stringPtrForWorldsendSaveTest("改"),
+				Notes:         &n,
+				NotesDesigner: stringPtrForWorldsendSaveTest("新作者2"),
 			},
 		},
 	}
@@ -476,8 +485,8 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenSongSoftDeletedDuringUpdate(t *te
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 4, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 4, '狂', 1200, '旧作者')
 	`)
 	require.NoError(t, err)
 
@@ -545,10 +554,10 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
 		VALUES
-			(101, 1, 3, '狂', 1000),
-			(102, 2, 4, '止', 1100)
+			(101, 1, 3, '狂', 1000, '作者1'),
+			(102, 2, 4, '止', 1100, '作者2')
 	`)
 	require.NoError(t, err)
 
@@ -587,9 +596,10 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 				Jacket:     &jacket2,
 			},
 			Chart: &entity.WorldsendChart{
-				LevelStar: levelStarPtrForWorldsendUpdateTest(t, 5),
-				Attribute: stringPtrForWorldsendSaveTest("改"),
-				Notes:     &n,
+				LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
+				Attribute:     stringPtrForWorldsendSaveTest("改"),
+				Notes:         &n,
+				NotesDesigner: stringPtrForWorldsendSaveTest("新作者2"),
 			},
 		},
 	}
@@ -617,11 +627,12 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	assert.Equal(t, "new artist 2", song2.Artist)
 
 	var chart1 struct {
-		LevelStar *int    `db:"level_star"`
-		Attribute *string `db:"attribute"`
-		Notes     *int    `db:"notes"`
+		LevelStar     *int    `db:"level_star"`
+		Attribute     *string `db:"attribute"`
+		Notes         *int    `db:"notes"`
+		NotesDesigner *string `db:"notes_designer"`
 	}
-	err = db.Get(&chart1, `SELECT level_star, attribute, notes FROM worldsend_charts WHERE id = 101`)
+	err = db.Get(&chart1, `SELECT level_star, attribute, notes, notes_designer FROM worldsend_charts WHERE id = 101`)
 	require.NoError(t, err)
 	require.NotNil(t, chart1.LevelStar)
 	assert.Equal(t, 3, *chart1.LevelStar)
@@ -629,13 +640,16 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	assert.Equal(t, "狂", *chart1.Attribute)
 	require.NotNil(t, chart1.Notes)
 	assert.Equal(t, 1000, *chart1.Notes)
+	require.NotNil(t, chart1.NotesDesigner)
+	assert.Equal(t, "作者1", *chart1.NotesDesigner)
 
 	var chart2 struct {
-		LevelStar *int    `db:"level_star"`
-		Attribute *string `db:"attribute"`
-		Notes     *int    `db:"notes"`
+		LevelStar     *int    `db:"level_star"`
+		Attribute     *string `db:"attribute"`
+		Notes         *int    `db:"notes"`
+		NotesDesigner *string `db:"notes_designer"`
 	}
-	err = db.Get(&chart2, `SELECT level_star, attribute, notes FROM worldsend_charts WHERE id = 102`)
+	err = db.Get(&chart2, `SELECT level_star, attribute, notes, notes_designer FROM worldsend_charts WHERE id = 102`)
 	require.NoError(t, err)
 	require.NotNil(t, chart2.LevelStar)
 	assert.Equal(t, 5, *chart2.LevelStar)
@@ -643,6 +657,8 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	assert.Equal(t, "改", *chart2.Attribute)
 	require.NotNil(t, chart2.Notes)
 	assert.Equal(t, 2200, *chart2.Notes)
+	require.NotNil(t, chart2.NotesDesigner)
+	assert.Equal(t, "新作者2", *chart2.NotesDesigner)
 }
 
 func levelStarPtrForWorldsendUpdateTest(t *testing.T, value int) *levelstar.LevelStar {

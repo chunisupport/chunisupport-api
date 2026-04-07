@@ -57,6 +57,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			const REAL NOT NULL,
 			is_const_unknown INTEGER NOT NULL DEFAULT 1,
 			notes INTEGER,
+			notes_designer TEXT,
 			FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
 			FOREIGN KEY (difficulty_id) REFERENCES difficulties(id),
 			UNIQUE (song_id, difficulty_id)
@@ -191,12 +192,12 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 
 	// 各楽曲に2つずつ譜面を追加
 	_, err = db.Exec(`
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES 
-			(1, 3, 12.0, 1, 800),   -- Song1 EXPERT: const=12.0, notes=800
-			(1, 4, 13.5, 1, 1000),  -- Song1 MASTER: const=13.5, notes=1000
-			(2, 3, 12.5, 1, 900),   -- Song2 EXPERT: const=12.5, notes=900
-			(2, 4, 14.0, 1, 1200)   -- Song2 MASTER: const=14.0, notes=1200
+			(1, 3, 12.0, 1, 800, '旧作者1'),
+			(1, 4, 13.5, 1, 1000, '旧作者2'),
+			(2, 3, 12.5, 1, 900, '旧作者3'),
+			(2, 4, 14.0, 1, 1200, '旧作者4')
 	`)
 	require.NoError(t, err)
 
@@ -214,13 +215,13 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 			DisplayID: "DISPLAY001",
 			Charts: []*entity.Chart{
 				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.3), IsConstUnknown: false, Notes: &notes1Expert},
-				{DifficultyID: 4, Const: chartconstant.ChartConstant(13.8), IsConstUnknown: false, Notes: &notes1Master},
+				{DifficultyID: 4, Const: chartconstant.ChartConstant(13.8), IsConstUnknown: false, Notes: &notes1Master, NotesDesigner: stringPtr("新作者2")},
 			},
 		},
 		{
 			DisplayID: "DISPLAY002",
 			Charts: []*entity.Chart{
-				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.8), IsConstUnknown: false, Notes: &notes2Expert},
+				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.8), IsConstUnknown: false, Notes: &notes2Expert, NotesDesigner: stringPtr("新作者3")},
 				{DifficultyID: 4, Const: chartconstant.ChartConstant(14.3), IsConstUnknown: false, Notes: &notes2Master},
 			},
 		},
@@ -243,9 +244,10 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 		Const          float64 `db:"const"`
 		IsConstUnknown bool    `db:"is_const_unknown"`
 		Notes          *int    `db:"notes"`
+		NotesDesigner  *string `db:"notes_designer"`
 	}
 
-	err = db.Select(&result, "SELECT song_id, difficulty_id, const, is_const_unknown, notes FROM charts ORDER BY song_id, difficulty_id")
+	err = db.Select(&result, "SELECT song_id, difficulty_id, const, is_const_unknown, notes, notes_designer FROM charts ORDER BY song_id, difficulty_id")
 	require.NoError(t, err)
 	require.Len(t, result, 4)
 
@@ -255,6 +257,7 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 12.3, result[0].Const, 0.01, "Song1 EXPERT: Const should be 12.3")
 	assert.False(t, result[0].IsConstUnknown, "Song1 EXPERT: IsConstUnknown should be false")
 	assert.Equal(t, 850, *result[0].Notes, "Song1 EXPERT: Notes should be 850")
+	assert.Nil(t, result[0].NotesDesigner, "Song1 EXPERT: NotesDesigner should be nil")
 
 	// Song1 MASTER (song_id=1, difficulty_id=4)
 	assert.Equal(t, 1, result[1].SongID, "Song1 MASTER: SongID")
@@ -262,6 +265,8 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 13.8, result[1].Const, 0.01, "Song1 MASTER: Const should be 13.8")
 	assert.False(t, result[1].IsConstUnknown, "Song1 MASTER: IsConstUnknown should be false")
 	assert.Equal(t, 1050, *result[1].Notes, "Song1 MASTER: Notes should be 1050")
+	require.NotNil(t, result[1].NotesDesigner)
+	assert.Equal(t, "新作者2", *result[1].NotesDesigner, "Song1 MASTER: NotesDesigner should be updated")
 
 	// Song2 EXPERT (song_id=2, difficulty_id=3)
 	assert.Equal(t, 2, result[2].SongID, "Song2 EXPERT: SongID")
@@ -269,6 +274,8 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 12.8, result[2].Const, 0.01, "Song2 EXPERT: Const should be 12.8")
 	assert.False(t, result[2].IsConstUnknown, "Song2 EXPERT: IsConstUnknown should be false")
 	assert.Equal(t, 950, *result[2].Notes, "Song2 EXPERT: Notes should be 950")
+	require.NotNil(t, result[2].NotesDesigner)
+	assert.Equal(t, "新作者3", *result[2].NotesDesigner, "Song2 EXPERT: NotesDesigner should be updated")
 
 	// Song2 MASTER (song_id=2, difficulty_id=4)
 	assert.Equal(t, 2, result[3].SongID, "Song2 MASTER: SongID")
@@ -276,6 +283,7 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	assert.InDelta(t, 14.3, result[3].Const, 0.01, "Song2 MASTER: Const should be 14.3")
 	assert.False(t, result[3].IsConstUnknown, "Song2 MASTER: IsConstUnknown should be false")
 	assert.Equal(t, 1250, *result[3].Notes, "Song2 MASTER: Notes should be 1250")
+	assert.Nil(t, result[3].NotesDesigner, "Song2 MASTER: NotesDesigner should be nil")
 }
 
 func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t *testing.T) {
@@ -307,6 +315,10 @@ func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicat
 	err = db.Get(&title, `SELECT title FROM songs WHERE id = 1`)
 	require.NoError(t, err)
 	assert.Equal(t, "Original Title", title)
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 func TestSongUpdateSongs_ReturnsErrorWhenTargetIsWorldsendSong(t *testing.T) {

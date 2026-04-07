@@ -44,7 +44,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	}{
 		{
 			name:             "正常な配列で204が返る",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000}}}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000,"notes_designer":"譜面作者A"}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -87,6 +87,9 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 				}
 				if chart.Notes == nil || *chart.Notes != 2000 {
 					t.Fatalf("chart.Notes = %v, want 2000", chart.Notes)
+				}
+				if chart.NotesDesigner == nil || *chart.NotesDesigner != "譜面作者A" {
+					t.Fatalf("chart.NotesDesigner = %v, want 譜面作者A", chart.NotesDesigner)
 				}
 				if masters == nil {
 					t.Fatal("masters is nil")

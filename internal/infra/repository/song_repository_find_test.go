@@ -25,11 +25,11 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES
-			(1, 3, 12.3, 0, 850),
-			(1, 4, 13.8, 0, 1050),
-			(2, 4, 14.3, 0, 1250)
+			(1, 3, 12.3, 0, 850, '譜面作者A'),
+			(1, 4, 13.8, 0, 1050, '譜面作者B'),
+			(2, 4, 14.3, 0, 1250, '譜面作者C')
 	`)
 	require.NoError(t, err)
 
@@ -57,11 +57,15 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, chart3.SongID)
 	assert.InDelta(t, 12.3, float64(chart3.Const), 0.001)
+	require.NotNil(t, chart3.NotesDesigner)
+	assert.Equal(t, "譜面作者A", *chart3.NotesDesigner)
 
 	chart4, ok := song1ChartsByDifficulty[4]
 	require.True(t, ok)
 	assert.Equal(t, 1, chart4.SongID)
 	assert.InDelta(t, 13.8, float64(chart4.Const), 0.001)
+	require.NotNil(t, chart4.NotesDesigner)
+	assert.Equal(t, "譜面作者B", *chart4.NotesDesigner)
 
 	// ドメインサービスによる譜面集約が適用されていることを検証
 	assert.InDelta(t, 13.8, song1.MaxChartConst, 0.001)
@@ -73,6 +77,8 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	assert.Equal(t, 4, song2.Charts[0].DifficultyID)
 	assert.Equal(t, 2, song2.Charts[0].SongID)
 	assert.InDelta(t, 14.3, float64(song2.Charts[0].Const), 0.001)
+	require.NotNil(t, song2.Charts[0].NotesDesigner)
+	assert.Equal(t, "譜面作者C", *song2.Charts[0].NotesDesigner)
 
 	// Song2の集約結果も検証
 	assert.InDelta(t, 14.3, song2.MaxChartConst, 0.001)
@@ -120,10 +126,10 @@ func TestFindByDisplayIDs_SetsIsMaxOPUnknownWhenMasterOrUltimaIsConstUnknown(t *
 
 	// MASTER(4)がknown、ULTIMA(5)がunknown
 	_, err = db.Exec(`
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES
-			(1, 4, 14.6, 0, 1050),
-			(1, 5, 14.5, 1, 1100)
+			(1, 4, 14.6, 0, 1050, NULL),
+			(1, 5, 14.5, 1, 1100, NULL)
 	`)
 	require.NoError(t, err)
 
@@ -152,10 +158,10 @@ func TestFindByDisplayIDs_ExcludesWorldsendSongs(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES
-			(1, 4, 13.8, 0, 1050),
-			(2, 4, 14.5, 0, 1200)
+			(1, 4, 13.8, 0, 1050, NULL),
+			(2, 4, 14.5, 0, 1200, NULL)
 	`)
 	require.NoError(t, err)
 
@@ -201,10 +207,10 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES
-			(1, 3, 12.3, 0, 850),
-			(1, 4, 13.8, 0, 1050)
+			(1, 3, 12.3, 0, 850, '譜面作者A'),
+			(1, 4, 13.8, 0, 1050, '譜面作者B')
 	`)
 	require.NoError(t, err)
 
@@ -218,4 +224,5 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	require.Len(t, song.Charts, 2)
 	assert.InDelta(t, 13.8, song.MaxChartConst, 0.001)
 	assert.False(t, song.IsMaxOPUnknown)
+	require.NotNil(t, song.Charts[0].NotesDesigner)
 }

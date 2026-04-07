@@ -19,8 +19,8 @@ func TestFindByDisplayID_ScansLevelStarValueObject(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, 4, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, 4, '狂', 1200, '譜面作者A')
 	`)
 	require.NoError(t, err)
 
@@ -32,6 +32,8 @@ func TestFindByDisplayID_ScansLevelStarValueObject(t *testing.T) {
 	require.NotNil(t, got.Chart)
 	require.NotNil(t, got.Chart.LevelStar)
 	assert.Equal(t, 4, got.Chart.LevelStar.Int())
+	require.NotNil(t, got.Chart.NotesDesigner)
+	assert.Equal(t, "譜面作者A", *got.Chart.NotesDesigner)
 }
 
 func TestFindByDisplayID_ScansNilLevelStarAsNil(t *testing.T) {
@@ -45,8 +47,8 @@ func TestFindByDisplayID_ScansNilLevelStarAsNil(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
-		VALUES (101, 1, NULL, '狂', 1200)
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes, notes_designer)
+		VALUES (101, 1, NULL, '狂', 1200, NULL)
 	`)
 	require.NoError(t, err)
 

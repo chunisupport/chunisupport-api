@@ -184,6 +184,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 				Const:          cc,
 				IsConstUnknown: chartReq.IsConstUnknown,
 				Notes:          notesVO,
+				NotesDesigner:  chartReq.NotesDesigner,
 			}
 			charts = append(charts, chart)
 		}

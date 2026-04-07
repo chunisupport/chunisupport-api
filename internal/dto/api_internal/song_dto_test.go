@@ -120,6 +120,7 @@ func TestToChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: false,
 		Notes:          &notesObj,
+		NotesDesigner:  stringPtr("譜面作者A"),
 	}
 
 	// 変換実行
@@ -142,6 +143,11 @@ func TestToChartDTO(t *testing.T) {
 		t.Error("Notes is nil")
 	} else if *dto.Notes != 1234 {
 		t.Errorf("Notes = %v, want %v", *dto.Notes, 1234)
+	}
+	if dto.NotesDesigner == nil {
+		t.Error("NotesDesigner is nil")
+	} else if *dto.NotesDesigner != "譜面作者A" {
+		t.Errorf("NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者A")
 	}
 }
 
@@ -286,4 +292,8 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 	if !(basicIdx < advancedIdx && advancedIdx < expertIdx && expertIdx < masterIdx && masterIdx < ultimaIdx) {
 		t.Errorf("Charts keys are not in correct order (BASIC→ADVANCED→EXPERT→MASTER→ULTIMA), got: %s", jsonString)
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

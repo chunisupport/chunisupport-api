@@ -7,9 +7,10 @@ import (
 
 // WorldsendChartDTO は WORLD'S END 譜面情報を外部に公開するためのDTOです。
 type WorldsendChartDTO struct {
-	Attribute *string `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
-	LevelStar *int    `json:"level_star"` // WORLD'S END レベル（1～5）
-	Notes     *int    `json:"notes"`      // ノーツ数
+	Attribute     *string `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
+	LevelStar     *int    `json:"level_star"` // WORLD'S END レベル（1～5）
+	Notes         *int    `json:"notes"`      // ノーツ数
+	NotesDesigner *string `json:"notes_designer"`
 }
 
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
@@ -44,9 +45,10 @@ type EditorWorldsendSongsResponse struct {
 
 // UpdateWorldsendChartRequest は WORLD'S END 譜面更新リクエストを表します。
 type UpdateWorldsendChartRequest struct {
-	Attribute *string `json:"attribute"`
-	LevelStar *int    `json:"level_star" validate:"omitempty,min=1,max=5"`
-	Notes     *int    `json:"notes" validate:"omitempty,gte=0"`
+	Attribute     *string `json:"attribute"`
+	LevelStar     *int    `json:"level_star" validate:"omitempty,min=1,max=5"`
+	Notes         *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner *string `json:"notes_designer" validate:"omitempty,max=100"`
 }
 
 // UpdateWorldsendSongRequest は WORLD'S END 楽曲更新リクエストを表します。
@@ -68,9 +70,10 @@ func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 	}
 
 	return &WorldsendChartDTO{
-		Attribute: chart.Attribute,
-		LevelStar: dto.ToLevelStarIntPtr(chart.LevelStar),
-		Notes:     dto.ToNotesIntPtr(chart.Notes),
+		Attribute:     chart.Attribute,
+		LevelStar:     dto.ToLevelStarIntPtr(chart.LevelStar),
+		Notes:         dto.ToNotesIntPtr(chart.Notes),
+		NotesDesigner: chart.NotesDesigner,
 	}
 }
 

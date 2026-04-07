@@ -1251,7 +1251,7 @@ curl -X POST \
 
 ### DELETE `/internal/users/:username`
 - **認証**: Cookie 必須
-- **権限**: ADMIN (account_type_id = 3) 以上
+- **権限**: ADMIN 権限が必要
 - **パスパラメータ**: `username` - 削除対象ユーザーのユーザー名
 - **レスポンス**: 204 No Content
 
@@ -1294,12 +1294,14 @@ curl -X POST \
         "BASIC": {
           "const": 3.0,
           "is_const_unknown": false,
-          "notes": 500
+          "notes": 500,
+          "notes_designer": "譜面作者A"
         },
         "MASTER": {
           "const": 13.5,
           "is_const_unknown": false,
-          "notes": 1800
+          "notes": 1800,
+          "notes_designer": "譜面作者B"
         }
       }
     }
@@ -1336,6 +1338,7 @@ curl -X POST \
 | `const` | float | 譜面定数（小数点以下1桁表記） |
 | `is_const_unknown` | bool | 譜面定数が未確定かどうか |
 | `notes` | int \| null | ノーツ数（未設定の場合null/省略） |
+| `notes_designer` | string \| null | 譜面製作者名（未設定の場合null/省略） |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -1476,7 +1479,7 @@ curl -X POST \
 
 ### PUT `/internal/songs`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列
 
@@ -1494,7 +1497,8 @@ curl -X POST \
       "EXPERT": {
         "const": 14.5,
         "is_const_unknown": false,
-        "notes": 1234
+        "notes": 1234,
+        "notes_designer": "譜面作者A"
       }
     }
   }
@@ -1521,13 +1525,14 @@ curl -X POST \
 | `const` | float | ✓ | 譜面定数（0以上。小数1桁表記を推奨） |
 | `is_const_unknown` | bool | ✓ | 譜面定数が未確定かどうか |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
+| `notes_designer` | string \| null | | 譜面製作者名（100文字以下、nullの場合DBをNULLに更新） |
 
 **注意事項**:
 - リクエスト配列内で `id`（display_id）が重複している場合はエラーになります。
 - WORLD'S END楽曲（`is_worldsend = 1`）の `id` を指定した場合、このエンドポイントでは更新できずエラーになります。
 - マスタに存在しないジャンル名を指定するとエラーになります。
 - `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
-- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます。
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます。
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -1540,7 +1545,7 @@ curl -X POST \
 
 ### DELETE `/internal/songs/:displayid`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
@@ -1552,7 +1557,7 @@ curl -X POST \
 
 ### POST `/internal/songs/:displayid/restore`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの削除済み楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
@@ -1615,6 +1620,7 @@ curl -X POST \
 | `attribute` | string \| null | WORLD'S END 属性（光、蔵、改、狂、etc.） |
 | `level_star` | int \| null | WORLD'S END レベル（1～5） |
 | `notes` | int \| null | ノーツ数 |
+| `notes_designer` | string \| null | 譜面製作者名 |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -1641,7 +1647,8 @@ curl -X POST \
     "WORLDSEND": {
       "attribute": "狂",
       "level_star": 5,
-      "notes": 2000
+      "notes": 2000,
+      "notes_designer": "譜面作者A"
     }
   }
 }
@@ -1653,7 +1660,7 @@ curl -X POST \
 
 ### PUT `/internal/songs/worldsend`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: WORLD'S END 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列
 
@@ -1671,7 +1678,8 @@ curl -X POST \
       "WORLDSEND": {
         "attribute": "狂",
         "level_star": 5,
-        "notes": 2000
+        "notes": 2000,
+        "notes_designer": "譜面作者A"
       }
     }
   }
@@ -1698,6 +1706,7 @@ curl -X POST \
 | `attribute` | string \| null | | WORLD'S END 属性（光、蔵、改、狂、etc.） |
 | `level_star` | int \| null | | WORLD'S END レベル（1〜5、nullの場合DBをNULLに更新） |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
+| `notes_designer` | string \| null | | 譜面製作者名（100文字以下、nullの場合DBをNULLに更新） |
 
 **注意事項**:
 - `charts` を省略または `null` にした場合、譜面情報は更新されません（楽曲情報のみ更新されます）
@@ -1705,7 +1714,7 @@ curl -X POST \
 - `charts` で `WORLDSEND` 以外のキーを指定するとエラーになります
 - リクエスト配列内で `id`（display_id）が重複している場合はエラーになります
 - マスタに存在しないジャンル名を指定するとエラーになります
-- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+- ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -1719,7 +1728,7 @@ curl -X POST \
 
 ### DELETE `/internal/songs/worldsend/:displayid`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
@@ -1732,7 +1741,7 @@ curl -X POST \
 
 ### POST `/internal/songs/worldsend/:displayid/restore`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の削除済み WORLD'S END 楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
@@ -1749,7 +1758,7 @@ curl -X POST \
 
 ### GET `/internal/editor/songs`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 編集者向けに、WORLD'S END以外の全楽曲を削除済みも含めて取得します。
 - **レスポンス**: 200 OK
 
@@ -1776,7 +1785,7 @@ curl -X POST \
 
 ### GET `/internal/editor/songs/:displayid`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの通常楽曲を取得します。削除済みも取得対象です。
 - **レスポンス**: 200 OK (`EditorSongDTO`)
@@ -1789,7 +1798,7 @@ curl -X POST \
 
 ### GET `/internal/editor/songs/worldsend`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 編集者向けに、全 WORLD'S END 楽曲を削除済みも含めて取得します。
 - **レスポンス**: 200 OK
 
@@ -1816,7 +1825,7 @@ curl -X POST \
 
 ### GET `/internal/editor/songs/worldsend/:displayid`
 - **認証**: Cookie 必須
-- **権限**: EDITOR (2) または ADMIN (3) 以上が必要
+- **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの WORLD'S END 楽曲を取得します。削除済みも取得対象です。
 - **レスポンス**: 200 OK (`EditorWorldsendSongDTO`)
@@ -2000,12 +2009,14 @@ curl -X POST \
         "MASTER": {
           "const": 14.5,
           "is_const_unknown": false,
-          "notes": 1500
+          "notes": 1500,
+          "notes_designer": "譜面作者A"
         },
         "BASIC": {
           "const": 8.5,
           "is_const_unknown": false,
-          "notes": 450
+          "notes": 450,
+          "notes_designer": "譜面作者B"
         }
       }
     }
@@ -2030,6 +2041,7 @@ curl -X POST \
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |
 | `songs[].charts[key].notes` | number\|null | ノーツ数 |
+| `songs[].charts[key].notes_designer` | string\|null | 譜面製作者名 |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
@@ -2086,6 +2098,7 @@ curl -X POST \
 | `attribute` | string \| null | WORLD'S END 属性（光、蔵、改、狂、etc.） |
 | `level_star` | int \| null | WORLD'S END レベル（1～5） |
 | `notes` | int \| null | ノーツ数 |
+| `notes_designer` | string \| null | 譜面製作者名 |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定

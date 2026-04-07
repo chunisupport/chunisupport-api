@@ -163,9 +163,10 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 				}
 
 				input.Charts[key] = &usecase.UpdateWorldsendChartInput{
-					Attribute: chartReq.Attribute,
-					LevelStar: chartReq.LevelStar,
-					Notes:     chartReq.Notes,
+					Attribute:     chartReq.Attribute,
+					LevelStar:     chartReq.LevelStar,
+					Notes:         chartReq.Notes,
+					NotesDesigner: chartReq.NotesDesigner,
 				}
 			}
 		}

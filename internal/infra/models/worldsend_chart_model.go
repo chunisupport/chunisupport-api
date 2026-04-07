@@ -8,29 +8,32 @@ import (
 
 // WorldsendChartModel はデータベース用の WORLD'S END 譜面モデルです。
 type WorldsendChartModel struct {
-	ID        int                  `db:"id"`
-	SongID    int                  `db:"song_id"`
-	LevelStar *levelstar.LevelStar `db:"level_star"`
-	Attribute *string              `db:"attribute"`
-	Notes     *notes.Notes         `db:"notes"`
+	ID            int                  `db:"id"`
+	SongID        int                  `db:"song_id"`
+	LevelStar     *levelstar.LevelStar `db:"level_star"`
+	Attribute     *string              `db:"attribute"`
+	Notes         *notes.Notes         `db:"notes"`
+	NotesDesigner *string              `db:"notes_designer"`
 }
 
 func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {
 	return &entity.WorldsendChart{
-		ID:        m.ID,
-		SongID:    m.SongID,
-		LevelStar: m.LevelStar,
-		Attribute: m.Attribute,
-		Notes:     m.Notes,
+		ID:            m.ID,
+		SongID:        m.SongID,
+		LevelStar:     m.LevelStar,
+		Attribute:     m.Attribute,
+		Notes:         m.Notes,
+		NotesDesigner: m.NotesDesigner,
 	}
 }
 
 func FromWorldsendChartEntity(e *entity.WorldsendChart) *WorldsendChartModel {
 	return &WorldsendChartModel{
-		ID:        e.ID,
-		SongID:    e.SongID,
-		LevelStar: e.LevelStar,
-		Attribute: e.Attribute,
-		Notes:     e.Notes,
+		ID:            e.ID,
+		SongID:        e.SongID,
+		LevelStar:     e.LevelStar,
+		Attribute:     e.Attribute,
+		Notes:         e.Notes,
+		NotesDesigner: e.NotesDesigner,
 	}
 }

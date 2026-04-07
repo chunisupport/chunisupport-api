@@ -84,12 +84,14 @@ func TestConvertToSongDTO(t *testing.T) {
 			Const:          7.5,
 			IsConstUnknown: false,
 			Notes:          &notes1,
+			NotesDesigner:  stringPtr("譜面作者A"),
 		},
 		{
 			DifficultyID:   3, // expert
 			Const:          12.0,
 			IsConstUnknown: false,
 			Notes:          &notes2,
+			NotesDesigner:  stringPtr("譜面作者B"),
 		},
 	}
 
@@ -128,6 +130,9 @@ func TestConvertToSongDTO(t *testing.T) {
 		if basicChart.Const != 7.5 {
 			t.Errorf("BASIC chart Const = %v, want %v", basicChart.Const, 7.5)
 		}
+		if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
+			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
+		}
 	}
 
 	// EXPERT 譜面が存在することを確認
@@ -136,6 +141,9 @@ func TestConvertToSongDTO(t *testing.T) {
 	} else {
 		if expertChart.Const != 12.0 {
 			t.Errorf("expert chart Const = %v, want %v", expertChart.Const, 12.0)
+		}
+		if expertChart.NotesDesigner == nil || *expertChart.NotesDesigner != "譜面作者B" {
+			t.Errorf("EXPERT chart NotesDesigner = %v, want %v", expertChart.NotesDesigner, "譜面作者B")
 		}
 	}
 
@@ -185,7 +193,7 @@ func TestUpdateSongs(t *testing.T) {
 	}{
 		{
 			name:             "正常な配列で204が返る",
-			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":{"const":10.5}}}]`,
+			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":{"const":10.5,"notes_designer":"譜面作者A"}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
@@ -204,6 +212,9 @@ func TestUpdateSongs(t *testing.T) {
 				}
 				if _, ok := requests[0].Charts["BASIC"]; !ok {
 					t.Fatal("Charts['BASIC'] should exist")
+				}
+				if requests[0].Charts["BASIC"].NotesDesigner == nil || *requests[0].Charts["BASIC"].NotesDesigner != "譜面作者A" {
+					t.Fatalf("Charts['BASIC'].NotesDesigner = %v, want %v", requests[0].Charts["BASIC"].NotesDesigner, "譜面作者A")
 				}
 			},
 		},
@@ -312,6 +323,7 @@ func TestGetSongs(t *testing.T) {
 					Const:          7.5,
 					IsConstUnknown: false,
 					Notes:          &notes1,
+					NotesDesigner:  stringPtr("譜面作者A"),
 				},
 			},
 		},
@@ -382,6 +394,8 @@ func TestGetSongs(t *testing.T) {
 		// BASICは存在するはず
 		if basicChart := song.Charts["BASIC"]; basicChart == nil {
 			t.Error("BASIC chart should not be nil")
+		} else if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
+			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
 		}
 
 		// ADVANCED, EXPERT, MASTER, ULTIMAはnullのはず（テストデータにないため）
@@ -389,4 +403,8 @@ func TestGetSongs(t *testing.T) {
 			t.Error("ADVANCED chart should be nil")
 		}
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

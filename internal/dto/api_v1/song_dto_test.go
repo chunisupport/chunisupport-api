@@ -119,6 +119,7 @@ func TestToV1ChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: true,
 		Notes:          &notesObj,
+		NotesDesigner:  stringPtr("譜面作者B"),
 	}
 
 	// 変換実行
@@ -141,6 +142,11 @@ func TestToV1ChartDTO(t *testing.T) {
 		t.Error("Notes is nil")
 	} else if *dto.Notes != 999 {
 		t.Errorf("Notes = %v, want %v", *dto.Notes, 999)
+	}
+	if dto.NotesDesigner == nil {
+		t.Error("NotesDesigner is nil")
+	} else if *dto.NotesDesigner != "譜面作者B" {
+		t.Errorf("NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者B")
 	}
 }
 
@@ -250,4 +256,8 @@ func indexOfString(str, substr string) int {
 		}
 	}
 	return -1
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

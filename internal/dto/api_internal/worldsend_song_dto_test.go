@@ -23,6 +23,7 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	}
 	attribute := "狂"
 	notesObj, _ := notes.NewNotes(1500)
+	notesDesigner := "譜面作者A"
 
 	song := &entity.Song{
 		DisplayID:   "0123456789abcdef",
@@ -36,9 +37,10 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	}
 
 	chart := &entity.WorldsendChart{
-		LevelStar: &levelStar,
-		Attribute: &attribute,
-		Notes:     &notesObj,
+		LevelStar:     &levelStar,
+		Attribute:     &attribute,
+		Notes:         &notesObj,
+		NotesDesigner: &notesDesigner,
 	}
 
 	genreNamesByID := map[int]string{
@@ -117,6 +119,9 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	if weChart.Notes == nil || *weChart.Notes != 1500 {
 		t.Errorf("Notes = %v, want %v", weChart.Notes, 1500)
 	}
+	if weChart.NotesDesigner == nil || *weChart.NotesDesigner != "譜面作者A" {
+		t.Errorf("NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
+	}
 }
 
 // TestToWorldsendSongDTO_ReleaseDateCanBeNil はリリース日がnilの場合のテストです。
@@ -150,11 +155,13 @@ func TestToWorldsendChartDTO(t *testing.T) {
 	}
 	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
+	notesDesigner := "譜面作者B"
 
 	chart := &entity.WorldsendChart{
-		LevelStar: &levelStar,
-		Attribute: &attribute,
-		Notes:     &notesObj,
+		LevelStar:     &levelStar,
+		Attribute:     &attribute,
+		Notes:         &notesObj,
+		NotesDesigner: &notesDesigner,
 	}
 
 	dto := ToWorldsendChartDTO(chart)
@@ -173,6 +180,9 @@ func TestToWorldsendChartDTO(t *testing.T) {
 
 	if dto.Notes == nil || *dto.Notes != 2000 {
 		t.Errorf("Notes = %v, want %v", dto.Notes, 2000)
+	}
+	if dto.NotesDesigner == nil || *dto.NotesDesigner != "譜面作者B" {
+		t.Errorf("NotesDesigner = %v, want %v", dto.NotesDesigner, "譜面作者B")
 	}
 }
 
@@ -194,6 +204,7 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 	levelStar := 5
 	attribute := "狂"
 	notesVal := 1500
+	notesDesigner := "譜面作者C"
 
 	songDTO := &WorldsendSongDTO{
 		DisplayID:   "0123456789abcdef",
@@ -206,9 +217,10 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 		OfficialIdx: "123",
 		Charts: map[string]*WorldsendChartDTO{
 			"WORLDSEND": {
-				Attribute: &attribute,
-				LevelStar: &levelStar,
-				Notes:     &notesVal,
+				Attribute:     &attribute,
+				LevelStar:     &levelStar,
+				Notes:         &notesVal,
+				NotesDesigner: &notesDesigner,
 			},
 		},
 	}
@@ -252,5 +264,8 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 
 	if !strings.Contains(jsonString, `"notes":1500`) {
 		t.Errorf("JSON should contain notes, got: %s", jsonString)
+	}
+	if !strings.Contains(jsonString, `"notes_designer":"譜面作者C"`) {
+		t.Errorf("JSON should contain notes_designer, got: %s", jsonString)
 	}
 }

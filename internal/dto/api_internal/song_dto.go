@@ -12,6 +12,7 @@ type ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
+	NotesDesigner  *string                     `json:"notes_designer"`
 }
 
 // OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
@@ -96,6 +97,7 @@ type UpdateChartRequest struct {
 	Const          float64 `json:"const" validate:"gte=0"`
 	IsConstUnknown bool    `json:"is_const_unknown"`
 	Notes          *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner  *string `json:"notes_designer" validate:"omitempty,max=100"`
 }
 
 // UpdateSongRequest は楽曲更新リクエストを表します。
@@ -126,6 +128,7 @@ func ToChartDTO(chart *entity.Chart) *ChartDTO {
 		Const:          chart.Const,
 		IsConstUnknown: chart.IsConstUnknown,
 		Notes:          notesPtr,
+		NotesDesigner:  chart.NotesDesigner,
 	}
 }
 

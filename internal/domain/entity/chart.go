@@ -13,4 +13,5 @@ type Chart struct {
 	Const          chartconstant.ChartConstant
 	IsConstUnknown bool
 	Notes          *notes.Notes
+	NotesDesigner  *string
 }
