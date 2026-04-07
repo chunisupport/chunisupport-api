@@ -10,6 +10,7 @@ import (
 // MasterDataUsecase はマスタデータAPIのユースケースです。
 type MasterDataUsecase interface {
 	GetMasterData(ctx context.Context) *MasterDataOutput
+	GetVersions(ctx context.Context) []masterdata.Version
 }
 
 // MasterDataOutput はマスタデータAPIの出力です。

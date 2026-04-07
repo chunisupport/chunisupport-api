@@ -74,6 +74,16 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	}
 }
 
+// GetVersions はリリース日昇順のバージョン一覧を返します。
+func (u *masterDataUsecase) GetVersions(_ context.Context) []masterdata.Version {
+	masters := u.masterProvider.MasterDataMasters()
+	if masters == nil {
+		return []masterdata.Version{}
+	}
+
+	return sortedVersionsByReleasedAt(masters.Versions)
+}
+
 // sortedDifficultiesBySortOrder は難易度をゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。
 // SortOrder はゲーム内の表示順序（BASIC < ADVANCED < EXPERT < MASTER < ULTIMA）を表します。
 func sortedDifficultiesBySortOrder(difficulties map[string]master.ChartDifficulty) []masterdata.Item {

@@ -220,3 +220,50 @@ func TestMasterDataUsecase_GetMasterData_VersionContent(t *testing.T) {
 	assert.Equal(t, "CHUNITHM", out.Versions[0].Name)
 	assert.Equal(t, releasedAt, out.Versions[0].ReleasedAt)
 }
+
+func TestMasterDataUsecase_GetVersions(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		masters *masterdata.MasterDataMasters
+		// Then
+		wantVersionIDs []int
+	}{
+		{
+			name: "リリース日昇順で返る",
+			masters: &masterdata.MasterDataMasters{
+				Versions: map[int]masterdata.Version{
+					2: {ID: 2, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
+					1: {ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
+					3: {ID: 3, Name: "NEW", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
+				},
+			},
+			wantVersionIDs: []int{1, 2, 3},
+		},
+		{
+			name:           "mastersがnilなら空スライスを返す",
+			masters:        nil,
+			wantVersionIDs: []int{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := usecase.NewMasterDataUsecase(
+				&masterDataMasterProviderMock{masters: tt.masters},
+				&chartStatsMasterProviderMock{},
+			)
+
+			// When
+			got := uc.GetVersions(context.Background())
+
+			// Then
+			actualIDs := make([]int, len(got))
+			for i, version := range got {
+				actualIDs[i] = int(version.ID)
+			}
+			assert.Equal(t, tt.wantVersionIDs, actualIDs)
+		})
+	}
+}

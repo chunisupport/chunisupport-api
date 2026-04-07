@@ -36,15 +36,6 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 	difficulties := itemsToDTOs(out.Difficulties)
 	accountTypes := itemsToDTOs(out.AccountTypes)
 
-	versions := make([]*dto.VersionDTO, len(out.Versions))
-	for i, v := range out.Versions {
-		versions[i] = &dto.VersionDTO{
-			ID:         int(v.ID),
-			Name:       v.Name,
-			ReleasedAt: v.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
-	}
-
 	ratingBands := make([]*dto.RatingBandDTO, len(out.RatingBands))
 	for i, band := range out.RatingBands {
 		ratingBands[i] = &dto.RatingBandDTO{
@@ -62,7 +53,7 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		Genres:           genres,
 		Difficulties:     difficulties,
 		AccountTypes:     accountTypes,
-		Versions:         versions,
+		Versions:         dto.ToVersionDTOs(out.Versions),
 		RatingBands:      ratingBands,
 		AchievementTypes: achievementTypes,
 		ClassEmblems:     itemsToDTOs(out.ClassEmblems),
@@ -72,5 +63,12 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 		FullChains:       itemsToDTOs(out.FullChains),
 		Slots:            itemsToDTOs(out.Slots),
 		HonorTypes:       itemsToDTOs(out.HonorTypes),
+	})
+}
+
+// GetVersions はバージョン一覧を返却します。
+func (h *MasterDataHandler) GetVersions(c echo.Context) error {
+	return c.JSON(http.StatusOK, &dto.VersionSummariesResponse{
+		Versions: dto.ToVersionSummaryDTOs(h.masterDataUsecase.GetVersions(c.Request().Context())),
 	})
 }

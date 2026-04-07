@@ -89,6 +89,7 @@ type Handlers struct {
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
 	V1User      *api_v1.V1UserHandler
+	V1Version   *api_v1.V1VersionHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 }
@@ -191,6 +192,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
+		V1Version:   api_v1.NewV1VersionHandler(masterDataUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
 	}
@@ -347,6 +349,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
 	}
 
+	{
+		masterGroup.GET("/versions", handlers.MasterData.GetVersions)
+	}
+
 	// 外部APIルートの登録
 	// api.chunisupport.net/v1
 	apiV1 := e.Group("/v1")
@@ -364,6 +370,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
+		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 
 	// chunirec互換APIルートの登録

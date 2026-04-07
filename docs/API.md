@@ -139,12 +139,14 @@
 | `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む） |
 | `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む） |
 | `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得 |
+| `/internal/master/versions` | GET | Cookie | バージョン一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
 | `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
 | `/v1/songs/worldsend/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
+| `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
 | `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
@@ -1980,11 +1982,45 @@ curl -X POST \
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
+### GET `/internal/master/versions`
+
+- **認証**: Cookie 必須
+- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
+- **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
 ---
 
 ## 公開API `/v1`
 
 公開APIはAPIトークン認証を使用します。トークンは `Authorization: Bearer <token>` ヘッダーで送信してください。
+
+### GET `/v1/master/versions`
+- **認証**: APIトークン必須
+- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "versions": [
+    { "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
+    { "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
+    { "name": "CHUNITHM AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `versions` | VersionSummaryDTO[] | バージョン一覧（リリース日昇順） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/v1/songs`
 - **認証**: APIトークン必須
