@@ -104,26 +104,15 @@ func readAllWithMaxBytes(r io.Reader, maxBytes int) ([]byte, bool, error) {
 		return nil, false, errors.New("maxBytes must be non-negative")
 	}
 
-	limited := &io.LimitedReader{R: r, N: int64(maxBytes)}
-	body, err := io.ReadAll(limited)
+	body, err := io.ReadAll(io.LimitReader(r, int64(maxBytes)+1))
 	if err != nil {
 		return nil, false, err
 	}
-
-	if limited.N > 0 {
-		return body, false, nil
+	if len(body) > maxBytes {
+		return nil, true, nil
 	}
 
-	var probe [1]byte
-	n, err := r.Read(probe[:])
-	if err == nil || (err != nil && !errors.Is(err, io.EOF)) {
-		if err != nil {
-			return nil, false, err
-		}
-		return nil, n > 0, nil
-	}
-
-	return body, n > 0, nil
+	return body, false, nil
 }
 
 // CommitTemporaryData は一時データを認証済みユーザーに紐づけて確定保存します。
