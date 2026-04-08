@@ -124,6 +124,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `jacket`: ジャケット画像ファイル名（20文字まで）。
     - `is_worldsend`: WORLD'S END楽曲フラグ（0=通常, 1=WORLD'S END）。
     - `is_deleted`: 論理削除フラグ（0=有効, 1=削除済み）。
+    - `updated_at`: 更新日時。
 
 #### `charts`
 - **役割**: 通常楽曲の譜面情報を格納します。一つの楽曲に対して複数の難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）の譜面が存在します。
@@ -135,6 +136,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `is_const_unknown`: 譜面定数が未確定かどうかのフラグ（デフォルト1=未確定）。
     - `notes`: ノーツ数（NULL可）。
     - `notes_designer`: 譜面製作者名（100文字まで、NULL可）。
+    - `updated_at`: 更新日時。
     - ユニーク制約: `(song_id, difficulty_id)`の組み合わせ。
 
 #### `worldsend_charts`
@@ -146,6 +148,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `attribute`: WORLD'S END 属性（光、蔵、改、狂など、CHAR(1)）。
     - `notes`: ノーツ数（NULL可）。
     - `notes_designer`: 譜面製作者名（100文字まで、NULL可）。
+    - `updated_at`: 更新日時。
 
 ### マスタテーブル
 
@@ -183,3 +186,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000007**: 順序を持つマスタテーブル（`difficulties`, `class_emblems`, `class_emblem_bases`, `clear_lamp_types`, `combo_lamp_types`, `full_chain_types`）に `sort_order` カラムを追加し、既存データへ明示的に表示順を投入。
 - **000008**: `users` テーブルから `is_deleted` カラムを削除し、関連インデックスを整理。
 - **000009**: `charts` テーブルと `worldsend_charts` テーブルに譜面製作者を保持する `notes_designer` カラムを追加。
+- **000010**: `songs`、`charts`、`worldsend_charts` テーブルに `updated_at` カラムを追加し、重複・非効率なインデックスを整理（`idx_worldsend_charts_song_id` / `idx_charts_song_id` / `idx_sessions_user_id` を削除、`player_worldsend_records(player_id, updated_at DESC)` と `goals(user_id, created_at, id)` を追加）。
