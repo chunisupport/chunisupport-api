@@ -67,9 +67,6 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 }
 
 func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTemporaryPlayerDataInput) (*api_internal.PlayerDataResult, error) {
-	if input.User == nil {
-		return nil, ErrUnauthorizedOperation
-	}
 	if input.UploadToken == "" {
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
