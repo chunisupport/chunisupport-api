@@ -108,7 +108,7 @@ func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c echo.Context) error {
 	}
 
 	var req commitTemporaryPlayerDataRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
