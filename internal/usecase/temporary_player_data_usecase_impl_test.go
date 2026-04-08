@@ -17,6 +17,7 @@ type stubTemporaryPlayerDataRepository struct {
 	createErr     error
 	findErr       error
 	consumeErr    error
+	deleteErr     error
 	found         *entity.TemporaryPlayerData
 	consumedToken string
 	deletedToken  string
@@ -57,6 +58,13 @@ func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, 
 
 func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
 	s.deletedToken = token
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	if s.found == nil {
+		return domainrepo.ErrTemporaryPlayerDataNotFound
+	}
+	s.found = nil
 	return nil
 }
 
@@ -110,7 +118,8 @@ func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "token-1", repo.consumedToken)
+	assert.Empty(t, repo.consumedToken)
+	assert.Equal(t, "token-1", repo.deletedToken)
 	assert.Nil(t, repo.found)
 }
 
@@ -125,16 +134,30 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, "token-1", repo.consumedToken)
-	assert.Nil(t, repo.found)
+	assert.Empty(t, repo.deletedToken)
+	assert.NotNil(t, repo.found)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
-	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
+	repo := &stubTemporaryPlayerDataRepository{findErr: domainrepo.ErrTemporaryPlayerDataNotFound}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrTemporaryPlayerDataNotFound)
+}
+
+func TestTemporaryPlayerDataUsecase_Commit_削除失敗でも成功を返す(t *testing.T) {
+	repo := &stubTemporaryPlayerDataRepository{
+		found:     &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`)},
+		deleteErr: errors.New("delete failed"),
+	}
+	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+
+	result, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "token-1"})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "token-1", repo.deletedToken)
 }

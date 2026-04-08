@@ -74,12 +74,12 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
 
-	entry, err := u.repo.ConsumeByToken(ctx, input.UploadToken)
+	entry, err := u.repo.FindByToken(ctx, input.UploadToken)
 	if err != nil {
 		if errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
 			return nil, ErrTemporaryPlayerDataNotFound
 		}
-		return nil, fmt.Errorf("temporary player data consume failed: %w", err)
+		return nil, fmt.Errorf("temporary player data find failed: %w", err)
 	}
 
 	var payload PlayerDataPayload
@@ -96,6 +96,11 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 	result, err := u.playerDataUsecase.Register(ctx, input.User, &payload, bodyHash)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := u.repo.Delete(ctx, input.UploadToken); err != nil && !errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
+		// 登録は成功しているため、一時データ削除失敗は処理結果に影響させない。
+		// ログ監視で検知して手動対応できるようにし、クライアントには成功を返す。
 	}
 	return result, nil
 }
