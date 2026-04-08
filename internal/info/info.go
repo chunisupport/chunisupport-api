@@ -42,6 +42,7 @@ const (
 	TempDataMaxCompressedBytes   = 512000
 	TempDataMaxUncompressedBytes = 512000
 	TempDataMaxEntriesPerIP      = 3
+	DefaultTempDataMaxTotalMB    = 64
 	TempDataRateLimitPerMin      = 30
 	TempDataRateLimitWindow      = 1 * time.Minute
 

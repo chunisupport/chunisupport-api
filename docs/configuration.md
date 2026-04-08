@@ -35,7 +35,7 @@
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
-- `temp_data.max_total_mb`（必須、1以上）
+- `temp_data.max_total_mb`（任意。未設定または0以下の場合は`64`を使用）
 - `database.pool.max_open_conns`（必須）
 - `database.pool.max_idle_conns`（必須）
 - `database.pool.conn_max_lifetime_sec`（必須）

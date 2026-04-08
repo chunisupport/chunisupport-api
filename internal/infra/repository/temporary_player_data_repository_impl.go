@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"container/heap"
 	"context"
 	"sync"
 	"time"
@@ -10,22 +11,68 @@ import (
 )
 
 type temporaryPlayerDataRepository struct {
-	mu              sync.Mutex
-	entriesByToken  map[string]*entity.TemporaryPlayerData
-	tokensByIP      map[string]map[string]struct{}
-	totalBytes      int
-	maxEntriesPerIP int
-	maxTotalBytes   int
+	mu                 sync.Mutex
+	entriesByToken     map[string]*entity.TemporaryPlayerData
+	tokensByIP         map[string]map[string]struct{}
+	expiryItemsByToken map[string]*temporaryPlayerDataExpiryItem
+	expiryHeap         temporaryPlayerDataExpiryHeap
+	totalBytes         int
+	maxEntriesPerIP    int
+	maxTotalBytes      int
+}
+
+type temporaryPlayerDataExpiryItem struct {
+	token     string
+	expiresAt time.Time
+	index     int
+}
+
+type temporaryPlayerDataExpiryHeap []*temporaryPlayerDataExpiryItem
+
+func (h temporaryPlayerDataExpiryHeap) Len() int { return len(h) }
+
+func (h temporaryPlayerDataExpiryHeap) Less(i, j int) bool {
+	return h[i].expiresAt.Before(h[j].expiresAt)
+}
+
+func (h temporaryPlayerDataExpiryHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].index = i
+	h[j].index = j
+}
+
+func (h *temporaryPlayerDataExpiryHeap) Push(x any) {
+	item, ok := x.(*temporaryPlayerDataExpiryItem)
+	if !ok {
+		return
+	}
+	item.index = len(*h)
+	*h = append(*h, item)
+}
+
+func (h *temporaryPlayerDataExpiryHeap) Pop() any {
+	old := *h
+	n := len(old)
+	if n == 0 {
+		return nil
+	}
+	item := old[n-1]
+	item.index = -1
+	*h = old[:n-1]
+	return item
 }
 
 // NewTemporaryPlayerDataRepository はインメモリ一時データリポジトリを生成します。
 func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domainrepo.TemporaryPlayerDataRepository {
-	return &temporaryPlayerDataRepository{
-		entriesByToken:  make(map[string]*entity.TemporaryPlayerData),
-		tokensByIP:      make(map[string]map[string]struct{}),
-		maxEntriesPerIP: maxEntriesPerIP,
-		maxTotalBytes:   maxTotalBytes,
+	r := &temporaryPlayerDataRepository{
+		entriesByToken:     make(map[string]*entity.TemporaryPlayerData),
+		tokensByIP:         make(map[string]map[string]struct{}),
+		expiryItemsByToken: make(map[string]*temporaryPlayerDataExpiryItem),
+		maxEntriesPerIP:    maxEntriesPerIP,
+		maxTotalBytes:      maxTotalBytes,
 	}
+	heap.Init(&r.expiryHeap)
+	return r
 }
 
 func (r *temporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
@@ -53,6 +100,11 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, data *entity.T
 		r.tokensByIP[copyData.IPAddress] = ipTokens
 	}
 	ipTokens[copyData.Token] = struct{}{}
+
+	expiryItem := &temporaryPlayerDataExpiryItem{token: copyData.Token, expiresAt: copyData.ExpiresAt}
+	r.expiryItemsByToken[copyData.Token] = expiryItem
+	heap.Push(&r.expiryHeap, expiryItem)
+
 	r.totalBytes += payloadSize
 
 	return nil
@@ -75,6 +127,25 @@ func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, token str
 	return &copied, nil
 }
 
+func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, token string) (*entity.TemporaryPlayerData, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	r.cleanupExpiredLocked(now)
+
+	entry, ok := r.entriesByToken[token]
+	if !ok {
+		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
+	}
+
+	copied := *entry
+	copied.Payload = append([]byte(nil), entry.Payload...)
+	r.deleteEntryLocked(token, entry)
+
+	return &copied, nil
+}
+
 func (r *temporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -92,10 +163,20 @@ func (r *temporaryPlayerDataRepository) Delete(_ context.Context, token string) 
 }
 
 func (r *temporaryPlayerDataRepository) cleanupExpiredLocked(now time.Time) {
-	for token, entry := range r.entriesByToken {
-		if entry.IsExpired(now) {
-			r.deleteEntryLocked(token, entry)
+	for r.expiryHeap.Len() > 0 {
+		head := r.expiryHeap[0]
+		if head.expiresAt.After(now) {
+			return
 		}
+
+		heap.Pop(&r.expiryHeap)
+		delete(r.expiryItemsByToken, head.token)
+
+		entry, ok := r.entriesByToken[head.token]
+		if !ok {
+			continue
+		}
+		r.deleteEntryLocked(head.token, entry)
 	}
 }
 
@@ -107,6 +188,11 @@ func (r *temporaryPlayerDataRepository) deleteEntryLocked(token string, entry *e
 			delete(r.tokensByIP, entry.IPAddress)
 		}
 	}
+	if expiryItem, ok := r.expiryItemsByToken[token]; ok {
+		heap.Remove(&r.expiryHeap, expiryItem.index)
+		delete(r.expiryItemsByToken, token)
+	}
+
 	r.totalBytes -= len(entry.Payload)
 	if r.totalBytes < 0 {
 		r.totalBytes = 0

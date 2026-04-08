@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -30,7 +31,7 @@ func NewTemporaryPlayerDataUsecase(repo domainrepo.TemporaryPlayerDataRepository
 }
 
 func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTemporaryPlayerDataInput) (*CreateTemporaryPlayerDataOutput, error) {
-	if input.Payload == nil {
+	if len(input.Payload) == 0 {
 		return nil, &PlayerDataValidationError{Field: "payload", Message: "is required"}
 	}
 	if input.IPAddress == "" {
@@ -39,15 +40,10 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 
 	token := uuid.NewString()
 	now := time.Now().UTC()
-	payloadBytes, err := marshalPlayerDataPayload(input.Payload)
-	if err != nil {
-		return nil, fmt.Errorf("temporary player data payload encode failed: %w", err)
-	}
-
 	entry := &entity.TemporaryPlayerData{
 		Token:     token,
 		IPAddress: input.IPAddress,
-		Payload:   payloadBytes,
+		Payload:   append([]byte(nil), input.Payload...),
 		BodyHash:  input.BodyHash,
 		CreatedAt: now,
 		ExpiresAt: now.Add(u.ttl),
@@ -78,7 +74,7 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
 
-	entry, err := u.repo.FindByToken(ctx, input.UploadToken)
+	entry, err := u.repo.ConsumeByToken(ctx, input.UploadToken)
 	if err != nil {
 		if errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
 			return nil, ErrTemporaryPlayerDataNotFound
@@ -99,11 +95,11 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 
 	result, err := u.playerDataUsecase.Register(ctx, input.User, &payload, bodyHash)
 	if err != nil {
+		restoreErr := u.repo.Create(ctx, entry)
+		if restoreErr != nil {
+			slog.Warn("temporary player data restore failed after register error", "token", input.UploadToken, "error", restoreErr)
+		}
 		return nil, err
-	}
-
-	if err := u.repo.Delete(ctx, input.UploadToken); err != nil {
-		return nil, fmt.Errorf("temporary player data delete failed: %w", err)
 	}
 
 	return result, nil

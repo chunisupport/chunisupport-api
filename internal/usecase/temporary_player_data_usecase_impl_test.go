@@ -14,11 +14,12 @@ import (
 )
 
 type stubTemporaryPlayerDataRepository struct {
-	createErr    error
-	findErr      error
-	deleteErr    error
-	found        *entity.TemporaryPlayerData
-	deletedToken string
+	createErr     error
+	findErr       error
+	consumeErr    error
+	found         *entity.TemporaryPlayerData
+	deletedToken  string
+	consumedToken string
 }
 
 func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
@@ -41,10 +42,24 @@ func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ str
 	return &copyData, nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
-	if s.deleteErr != nil {
-		return s.deleteErr
+func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(_ context.Context, token string) (*entity.TemporaryPlayerData, error) {
+	if s.consumeErr != nil {
+		return nil, s.consumeErr
 	}
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	if s.found == nil {
+		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
+	}
+	copyData := *s.found
+	copyData.Payload = append([]byte(nil), s.found.Payload...)
+	s.found = nil
+	s.consumedToken = token
+	return &copyData, nil
+}
+
+func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
 	s.deletedToken = token
 	return nil
 }
@@ -68,7 +83,7 @@ func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {
 
 	result, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
-		Payload:   &PlayerDataPayload{Name: "TEST"},
+		Payload:   []byte(`{"name":"TEST"}`),
 		BodyHash:  "hash",
 	})
 
@@ -82,7 +97,7 @@ func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{createErr: domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
-	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{IPAddress: "127.0.0.1", Payload: &PlayerDataPayload{}})
+	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{IPAddress: "127.0.0.1", Payload: []byte("{}")})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrTempDataPerIPLimitExceeded)
@@ -99,7 +114,8 @@ func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "token-1", repo.deletedToken)
+	assert.Equal(t, "token-1", repo.consumedToken)
+	assert.Empty(t, repo.deletedToken)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
@@ -113,11 +129,12 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Empty(t, repo.deletedToken)
+	require.NotNil(t, repo.found)
+	assert.Equal(t, "token-1", repo.found.Token)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
-	repo := &stubTemporaryPlayerDataRepository{findErr: domainrepo.ErrTemporaryPlayerDataNotFound}
+	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})

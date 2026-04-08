@@ -66,7 +66,7 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1:12345"
 
 	mockUC.On("Create", mock.Anything, mock.MatchedBy(func(input usecase.CreateTemporaryPlayerDataInput) bool {
-		return input.IPAddress == "127.0.0.1" && input.Payload != nil
+		return input.IPAddress == "127.0.0.1" && len(input.Payload) > 0
 	})).Return(&usecase.CreateTemporaryPlayerDataOutput{UploadToken: "token", ExpiresAt: time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)}, nil).Once()
 
 	err := h.CreateTemporaryData(c)

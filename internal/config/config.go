@@ -124,7 +124,7 @@ func LoadConfig() (Config, error) {
 	}
 
 	if config.TempData.MaxTotalMB <= 0 {
-		errors = append(errors, "temp_data.max_total_mb must be greater than 0")
+		config.TempData.MaxTotalMB = info.DefaultTempDataMaxTotalMB
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {

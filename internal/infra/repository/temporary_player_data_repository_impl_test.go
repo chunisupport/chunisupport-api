@@ -57,3 +57,22 @@ func TestTemporaryPlayerDataRepository_期限切れは参照不可(t *testing.T)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrTemporaryPlayerDataNotFound)
 }
+
+func TestTemporaryPlayerDataRepository_ConsumeByTokenは一度だけ取得できる(t *testing.T) {
+	repo := NewTemporaryPlayerDataRepository(3, 1024)
+	err := repo.Create(context.Background(), &entity.TemporaryPlayerData{
+		Token:     "t1",
+		IPAddress: "127.0.0.1",
+		Payload:   []byte(`{"name":"TEST"}`),
+		ExpiresAt: time.Now().UTC().Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	consumed, err := repo.ConsumeByToken(context.Background(), "t1")
+	require.NoError(t, err)
+	assert.Equal(t, "t1", consumed.Token)
+
+	_, err = repo.ConsumeByToken(context.Background(), "t1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domainrepo.ErrTemporaryPlayerDataNotFound)
+}

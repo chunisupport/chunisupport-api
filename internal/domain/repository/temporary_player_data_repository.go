@@ -10,5 +10,6 @@ import (
 type TemporaryPlayerDataRepository interface {
 	Create(ctx context.Context, data *entity.TemporaryPlayerData) error
 	FindByToken(ctx context.Context, token string) (*entity.TemporaryPlayerData, error)
+	ConsumeByToken(ctx context.Context, token string) (*entity.TemporaryPlayerData, error)
 	Delete(ctx context.Context, token string) error
 }

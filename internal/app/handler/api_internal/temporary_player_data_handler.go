@@ -82,7 +82,7 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 	hash := sha256.Sum256(jsonBody)
 	result, err := h.temporaryPlayerDataUsecase.Create(c.Request().Context(), usecase.CreateTemporaryPlayerDataInput{
 		IPAddress: c.RealIP(),
-		Payload:   &payload,
+		Payload:   jsonBody,
 		BodyHash:  hex.EncodeToString(hash[:]),
 	})
 	if err != nil {

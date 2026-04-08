@@ -11,7 +11,7 @@ import (
 // CreateTemporaryPlayerDataInput は一時登録入力です。
 type CreateTemporaryPlayerDataInput struct {
 	IPAddress string
-	Payload   *PlayerDataPayload
+	Payload   []byte
 	BodyHash  string
 }
 
