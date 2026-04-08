@@ -14,12 +14,10 @@ import (
 )
 
 type stubTemporaryPlayerDataRepository struct {
-	createErr     error
-	findErr       error
-	consumeErr    error
-	found         *entity.TemporaryPlayerData
-	deletedToken  string
-	consumedToken string
+	createErr    error
+	findErr      error
+	found        *entity.TemporaryPlayerData
+	deletedToken string
 }
 
 func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
@@ -42,21 +40,8 @@ func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ str
 	return &copyData, nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(_ context.Context, token string) (*entity.TemporaryPlayerData, error) {
-	if s.consumeErr != nil {
-		return nil, s.consumeErr
-	}
-	if s.findErr != nil {
-		return nil, s.findErr
-	}
-	if s.found == nil {
-		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
-	}
-	copyData := *s.found
-	copyData.Payload = append([]byte(nil), s.found.Payload...)
-	s.found = nil
-	s.consumedToken = token
-	return &copyData, nil
+func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, token string) (*entity.TemporaryPlayerData, error) {
+	return s.FindByToken(ctx, token)
 }
 
 func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
@@ -114,8 +99,7 @@ func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "token-1", repo.consumedToken)
-	assert.Empty(t, repo.deletedToken)
+	assert.Equal(t, "token-1", repo.deletedToken)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
@@ -134,7 +118,7 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
-	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
+	repo := &stubTemporaryPlayerDataRepository{findErr: domainrepo.ErrTemporaryPlayerDataNotFound}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})

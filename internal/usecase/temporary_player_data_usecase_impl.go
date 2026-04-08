@@ -74,7 +74,7 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
 
-	entry, err := u.repo.ConsumeByToken(ctx, input.UploadToken)
+	entry, err := u.repo.FindByToken(ctx, input.UploadToken)
 	if err != nil {
 		if errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
 			return nil, ErrTemporaryPlayerDataNotFound
@@ -95,11 +95,11 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 
 	result, err := u.playerDataUsecase.Register(ctx, input.User, &payload, bodyHash)
 	if err != nil {
-		restoreErr := u.repo.Create(ctx, entry)
-		if restoreErr != nil {
-			slog.Warn("temporary player data restore failed after register error", "token", input.UploadToken, "error", restoreErr)
-		}
 		return nil, err
+	}
+
+	if err := u.repo.Delete(ctx, input.UploadToken); err != nil && !errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
+		slog.Warn("temporary player data delete failed after register", "token", input.UploadToken, "error", err)
 	}
 
 	return result, nil
