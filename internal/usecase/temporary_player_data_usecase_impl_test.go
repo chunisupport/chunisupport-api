@@ -107,6 +107,21 @@ func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTempDataPerIPLimitExceeded)
 }
 
+func TestTemporaryPlayerDataUsecase_Create_不正なJSONはバリデーションエラー(t *testing.T) {
+	repo := &stubTemporaryPlayerDataRepository{}
+	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+
+	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
+		IPAddress: "127.0.0.1",
+		Payload:   []byte(`{"name":"TEST"`),
+	})
+
+	require.Error(t, err)
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "payload", validationErr.Field)
+}
+
 func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`), BodyHash: "hash"}}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)

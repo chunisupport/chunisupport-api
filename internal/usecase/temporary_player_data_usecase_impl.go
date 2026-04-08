@@ -38,18 +38,21 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 	}
 	var payload PlayerDataPayload
 	if err := unmarshalPlayerDataPayload(input.Payload, &payload); err != nil {
-		return nil, fmt.Errorf("temporary player data payload decode failed: %w", err)
+		return nil, &PlayerDataValidationError{Field: "payload", Message: "must be valid json"}
 	}
 
 	token := uuid.NewString()
 	now := time.Now().UTC()
-	entry := &entity.TemporaryPlayerData{
-		Token:     token,
-		IPAddress: input.IPAddress,
-		Payload:   append([]byte(nil), input.Payload...),
-		BodyHash:  input.BodyHash,
-		CreatedAt: now,
-		ExpiresAt: now.Add(u.ttl),
+	entry, err := entity.NewTemporaryPlayerData(
+		token,
+		input.IPAddress,
+		input.Payload,
+		input.BodyHash,
+		now,
+		now.Add(u.ttl),
+	)
+	if err != nil {
+		return nil, &PlayerDataValidationError{Field: "payload", Message: err.Error()}
 	}
 
 	if err := u.repo.Create(ctx, entry); err != nil {
