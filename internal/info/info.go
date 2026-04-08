@@ -38,6 +38,14 @@ const (
 	RegisterDataRateLimitRequests   = 1
 	RegisterDataRateLimitWindow     = 30 * time.Second
 
+	TempDataTTL                  = 5 * time.Minute
+	TempDataMaxCompressedBytes   = 512000
+	TempDataMaxUncompressedBytes = 512000
+	TempDataMaxEntriesPerIP      = 3
+	DefaultTempDataMaxTotalMB    = 64
+	TempDataRateLimitPerMin      = 30
+	TempDataRateLimitWindow      = 1 * time.Minute
+
 	// セッション設定
 	MaxSessionsPerUser = 10 // ユーザーあたりの最大セッション数
 

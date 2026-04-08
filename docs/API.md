@@ -111,6 +111,8 @@
 | `/internal/me` | DELETE | Cookie | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
+| `/internal/player-data/commit` | POST | Cookie | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/firebase/link` | POST | Cookie | Firebase UID を現在のユーザーへ連携 |
 | `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得 |
 | `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト |
@@ -122,7 +124,6 @@
 | `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの物理削除 |
-
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得 |
@@ -2631,3 +2632,78 @@ interface SkippedRecord {
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
 - ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。
+
+
+### POST `/internal/player-data/temp`
+
+プレイヤーデータ（gzip圧縮JSON）を一時保存します。保存データは5分で失効します。
+
+このエンドポイントの一時保存先はDBではなく、APIプロセス内のインメモリ領域です。したがって、APIプロセスの再起動後や複数インスタンス構成では、発行済み `uploadToken` が引き継がれない場合があります。
+また、有効期限切れデータの判定とメモリ回収は、この一時保存機能へのアクセス時にまとめて行う遅延クリーンアップ方式です。TTL経過直後に即座にメモリから削除されるわけではありませんが、次回アクセス時には期限切れとして扱われます。
+
+- **認証**: 不要
+- **レート制限**: 30 req/IP/min
+- **ヘッダー**:
+  - `Content-Encoding: gzip`
+  - `Content-Type: application/json`
+- **制限**:
+  - gzip後サイズ: 500KB以下
+  - 解凍後JSONサイズ: 500KB以下
+  - 同時保持件数: 1IPあたり最大3件
+- **検証内容**:
+  - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびサイズ制限のみを検証します。
+  - 展開後の本文は生のバイト列のまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
+  - そのため、JSON構文が壊れている本文や、`PlayerDataPayload` として解釈できない本文でも一時保存される場合があります。
+  - 厳密な検証および実際の登録処理は `/internal/player-data/commit` 実行時に初めて行われます。
+  - ログイン状態やCookieの有無は判定に使いません。認証済みブラウザから呼び出した場合でも、未認証と同じ扱いで受け付けます。
+
+#### レスポンス（201 Created）
+
+```json
+{
+  "uploadToken": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "expiresAt": "2026-04-08T12:34:56Z"
+}
+```
+
+#### 主なエラー
+
+- `400 Bad Request`: gzip不正 / `Content-Encoding` 不正 / `Content-Type` 不正
+- `413 Payload Too Large`: サイズ上限超過
+- `409 Conflict`: 1IPあたり保持件数上限超過
+- `429 Too Many Requests`: レート超過
+- `503 Service Unavailable`: 一時データ総量上限超過
+
+### POST `/internal/player-data/commit`
+
+一時保存済みデータを、認証済みユーザーに紐づけて確定保存します。
+
+このエンドポイントでは、保存済み本文を `PlayerDataPayload` として解釈し、通常の `/internal/me/register-data` と同じ登録処理を実行します。ただし、一時データは登録処理の開始前に `uploadToken` 単位で消費されます。したがって、登録処理中にエラーになった場合でも同じ `uploadToken` では再試行できず、再アップロードが必要です。
+
+- **認証**: 必須（Cookie）
+- **リクエスト**:
+
+```json
+{
+  "uploadToken": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+#### レスポンス（200 OK）
+
+`/internal/me/register-data` と同じ `PlayerDataResult` を返します。
+
+#### 主なエラー
+
+- `401 Unauthorized`: 未認証
+- `400 Bad Request`: 保存済み本文がJSONとして解釈できない、または対応していない `app_ver`
+- `404 Not Found`: token期限切れ / 未存在
+- `422 Unprocessable Entity`: `uploadToken` の形式不正、またはスコア整合性など `PlayerDataPayload` のバリデーション不正
+- `500 Internal Server Error`: DB保存失敗、またはプレイヤー名・日時形式など一部の入力不正を含む想定外エラー（tokenは消費済みのため再アップロードが必要）
+
+#### バリデーションの補足
+
+- `uploadToken` は UUID v4 を要求します。
+- 一時保存時点では厳密な妥当性検証を行わないため、`commit` 時に初めて不正データとして弾かれることがあります。
+- 一時保存時点では JSON デコードすら行わないため、構文破損や型不一致も `commit` 時まで遅延します。
+- すべての入力不正が `422` になるわけではありません。実装上、`app_ver` は `400`、一部のプレイヤー名・日時形式の不正は `500` として扱われます。

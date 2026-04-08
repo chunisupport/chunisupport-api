@@ -35,6 +35,11 @@ type Firebase struct {
 	CredentialsFile string
 }
 
+// TempData は一時プレイヤーデータ保存設定です。
+type TempData struct {
+	MaxTotalMB int `json:"max_total_mb"`
+}
+
 type Config struct {
 	AppPort  int      `json:"app_port"`
 	LogLevel string   `json:"log_level"`
@@ -49,6 +54,7 @@ type Config struct {
 	JWTSecret string
 	Auth      Auth     `json:"auth"`
 	CORS      CORS     `json:"cors"`
+	TempData  TempData `json:"temp_data"`
 	Firebase  Firebase // 環境変数から読み込み
 	Database  Database // 環境変数から読み込み
 }
@@ -115,6 +121,10 @@ func LoadConfig() (Config, error) {
 
 	if strings.TrimSpace(config.StaticDBPath) == "" {
 		errors = append(errors, "static_db_path is required")
+	}
+
+	if config.TempData.MaxTotalMB <= 0 {
+		config.TempData.MaxTotalMB = info.DefaultTempDataMaxTotalMB
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
