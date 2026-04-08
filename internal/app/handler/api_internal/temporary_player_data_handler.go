@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -50,16 +51,15 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
-	limitedCompressedReader := io.LimitReader(c.Request().Body, int64(info.TempDataMaxCompressedBytes)+1)
-	compressedBody, err := io.ReadAll(limitedCompressedReader)
+	compressedBody, exceeded, err := readAllWithMaxBytes(c.Request().Body, info.TempDataMaxCompressedBytes)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
+	if exceeded {
+		return apierror.ErrPayloadTooLarge
+	}
 	if len(compressedBody) == 0 {
 		return apierror.ErrBadRequest
-	}
-	if len(compressedBody) > info.TempDataMaxCompressedBytes {
-		return apierror.ErrPayloadTooLarge
 	}
 
 	gzipReader, err := gzip.NewReader(bytes.NewReader(compressedBody))
@@ -68,12 +68,11 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 	}
 	defer gzipReader.Close()
 
-	limitedJSONReader := io.LimitReader(gzipReader, int64(info.TempDataMaxUncompressedBytes)+1)
-	jsonBody, err := io.ReadAll(limitedJSONReader)
+	jsonBody, exceeded, err := readAllWithMaxBytes(gzipReader, info.TempDataMaxUncompressedBytes)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if len(jsonBody) > info.TempDataMaxUncompressedBytes {
+	if exceeded {
 		return apierror.ErrPayloadTooLarge
 	}
 
@@ -98,6 +97,33 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 		UploadToken: result.UploadToken,
 		ExpiresAt:   result.ExpiresAt.Format(time.RFC3339),
 	})
+}
+
+func readAllWithMaxBytes(r io.Reader, maxBytes int) ([]byte, bool, error) {
+	if maxBytes < 0 {
+		return nil, false, errors.New("maxBytes must be non-negative")
+	}
+
+	limited := &io.LimitedReader{R: r, N: int64(maxBytes)}
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if limited.N > 0 {
+		return body, false, nil
+	}
+
+	var probe [1]byte
+	n, err := r.Read(probe[:])
+	if err == nil || (err != nil && !errors.Is(err, io.EOF)) {
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, n > 0, nil
+	}
+
+	return body, n > 0, nil
 }
 
 // CommitTemporaryData は一時データを認証済みユーザーに紐づけて確定保存します。

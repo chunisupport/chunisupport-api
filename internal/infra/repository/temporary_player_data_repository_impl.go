@@ -193,9 +193,6 @@ func (r *temporaryPlayerDataRepository) deleteEntryLocked(token string, entry *e
 	}
 
 	r.totalBytes -= len(entry.Payload)
-	if r.totalBytes < 0 {
-		r.totalBytes = 0
-	}
 }
 
 var _ domainrepo.TemporaryPlayerDataRepository = (*temporaryPlayerDataRepository)(nil)
