@@ -75,7 +75,7 @@ func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domain
 	return r
 }
 
-func (r *temporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
+func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.Executor, data *entity.TemporaryPlayerData) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -109,7 +109,7 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, data *entity.T
 	return nil
 }
 
-func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, token string) (*entity.TemporaryPlayerData, error) {
+func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -126,7 +126,7 @@ func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, token str
 	return &copied, nil
 }
 
-func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, token string) (*entity.TemporaryPlayerData, error) {
+func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -145,7 +145,7 @@ func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, token 
 	return &copied, nil
 }
 
-func (r *temporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
+func (r *temporaryPlayerDataRepository) Delete(_ context.Context, _ domainrepo.Executor, token string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

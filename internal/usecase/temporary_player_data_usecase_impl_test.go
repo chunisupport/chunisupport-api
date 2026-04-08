@@ -22,7 +22,7 @@ type stubTemporaryPlayerDataRepository struct {
 	consumedToken string
 }
 
-func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
+func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.Executor, data *entity.TemporaryPlayerData) error {
 	if s.createErr != nil {
 		return s.createErr
 	}
@@ -30,7 +30,7 @@ func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, data *enti
 	return nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ string) (*entity.TemporaryPlayerData, error) {
+func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ domainrepo.Executor, _ string) (*entity.TemporaryPlayerData, error) {
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
@@ -42,12 +42,12 @@ func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ str
 	return &copyData, nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, token string) (*entity.TemporaryPlayerData, error) {
+func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
 	if s.consumeErr != nil {
 		return nil, s.consumeErr
 	}
 	s.consumedToken = token
-	entry, err := s.FindByToken(ctx, token)
+	entry, err := s.FindByToken(ctx, nil, token)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, 
 	return entry, nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
+func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, _ domainrepo.Executor, _ string) error {
 	if s.deleteErr != nil {
 		return s.deleteErr
 	}
@@ -81,7 +81,7 @@ func (s *stubPlayerDataUsecase) Delete(_ context.Context, _ *entity.User) error 
 
 func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{}
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	result, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
@@ -97,7 +97,7 @@ func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {
 
 func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{createErr: domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded}
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{IPAddress: "127.0.0.1", Payload: []byte("{}")})
 
@@ -107,7 +107,7 @@ func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 
 func TestTemporaryPlayerDataUsecase_Create_不正なJSONはバリデーションエラー(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{}
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
@@ -122,7 +122,7 @@ func TestTemporaryPlayerDataUsecase_Create_不正なJSONはバリデーション
 
 func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`), BodyHash: "hash"}}
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	result, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{
 		User:        &entity.User{ID: 10},
@@ -138,7 +138,7 @@ func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testin
 func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は再試行不可になる(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`)}}
 	expectedErr := errors.New("db error")
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{registerFn: func(_ context.Context, _ *entity.User, _ *PlayerDataPayload, _ string) (*api_internal.PlayerDataResult, error) {
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{registerFn: func(_ context.Context, _ *entity.User, _ *PlayerDataPayload, _ string) (*api_internal.PlayerDataResult, error) {
 		return nil, expectedErr
 	}}, 5*time.Minute)
 
@@ -152,7 +152,7 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は再試行不可にな�
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
-	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})
 

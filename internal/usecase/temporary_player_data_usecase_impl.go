@@ -15,14 +15,16 @@ import (
 )
 
 type temporaryPlayerDataUsecase struct {
+	exec              domainrepo.Executor
 	repo              domainrepo.TemporaryPlayerDataRepository
 	playerDataUsecase PlayerDataUsecase
 	ttl               time.Duration
 }
 
 // NewTemporaryPlayerDataUsecase は TemporaryPlayerDataUsecase の実装を返します。
-func NewTemporaryPlayerDataUsecase(repo domainrepo.TemporaryPlayerDataRepository, playerDataUsecase PlayerDataUsecase, ttl time.Duration) TemporaryPlayerDataUsecase {
+func NewTemporaryPlayerDataUsecase(exec domainrepo.Executor, repo domainrepo.TemporaryPlayerDataRepository, playerDataUsecase PlayerDataUsecase, ttl time.Duration) TemporaryPlayerDataUsecase {
 	return &temporaryPlayerDataUsecase{
+		exec:              exec,
 		repo:              repo,
 		playerDataUsecase: playerDataUsecase,
 		ttl:               ttl,
@@ -55,7 +57,7 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 		return nil, &PlayerDataValidationError{Field: "payload", Message: err.Error()}
 	}
 
-	if err := u.repo.Create(ctx, entry); err != nil {
+	if err := u.repo.Create(ctx, u.exec, entry); err != nil {
 		switch {
 		case errors.Is(err, domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded):
 			return nil, ErrTempDataPerIPLimitExceeded
@@ -77,7 +79,7 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
 
-	entry, err := u.repo.ConsumeByToken(ctx, input.UploadToken)
+	entry, err := u.repo.ConsumeByToken(ctx, u.exec, input.UploadToken)
 	if err != nil {
 		if errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
 			return nil, ErrTemporaryPlayerDataNotFound
