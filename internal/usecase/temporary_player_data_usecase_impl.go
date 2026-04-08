@@ -2,8 +2,6 @@ package usecase
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -92,13 +90,7 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, fmt.Errorf("temporary player data payload decode failed: %w", err)
 	}
 
-	bodyHash := entry.BodyHash
-	if bodyHash == "" {
-		hash := sha256.Sum256(entry.Payload)
-		bodyHash = hex.EncodeToString(hash[:])
-	}
-
-	result, err := u.playerDataUsecase.Register(ctx, input.User, &payload, bodyHash)
+	result, err := u.playerDataUsecase.Register(ctx, input.User, &payload, entry.BodyHash)
 	if err != nil {
 		return nil, err
 	}
