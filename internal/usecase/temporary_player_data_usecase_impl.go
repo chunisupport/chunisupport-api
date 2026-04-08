@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -37,7 +38,7 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 		return nil, &PlayerDataValidationError{Field: "ip_address", Message: "is required"}
 	}
 	var payload PlayerDataPayload
-	if err := unmarshalPlayerDataPayload(input.Payload, &payload); err != nil {
+	if err := json.Unmarshal(input.Payload, &payload); err != nil {
 		return nil, &PlayerDataValidationError{Field: "payload", Message: "must be valid json"}
 	}
 
@@ -86,7 +87,7 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 	}
 
 	var payload PlayerDataPayload
-	if err := unmarshalPlayerDataPayload(entry.Payload, &payload); err != nil {
+	if err := json.Unmarshal(entry.Payload, &payload); err != nil {
 		return nil, fmt.Errorf("temporary player data payload decode failed: %w", err)
 	}
 
