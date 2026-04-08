@@ -40,10 +40,6 @@ type commitTemporaryPlayerDataRequest struct {
 
 // CreateTemporaryData は未ログインユーザーの一時アップロードを受け付けます。
 func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
-	if userObj := c.Get("userEntity"); userObj != nil {
-		return apierror.ErrBadRequest
-	}
-
 	if !strings.EqualFold(c.Request().Header.Get(echo.HeaderContentEncoding), "gzip") {
 		return apierror.ErrBadRequest
 	}
@@ -138,6 +134,8 @@ func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c echo.Context) error {
 		switch {
 		case err == usecase.ErrTemporaryPlayerDataNotFound:
 			return apierror.ErrNotFound.WithInternal(err)
+		case errors.Is(err, usecase.ErrTempDataPayloadInvalidJSON):
+			return apierror.ErrBadRequest.WithInternal(err)
 		default:
 			return apierror.FromUsecaseError(err)
 		}

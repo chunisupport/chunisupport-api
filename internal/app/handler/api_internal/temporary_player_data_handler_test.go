@@ -77,6 +77,32 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
 	mockUC.AssertExpectations(t)
 }
 
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_認証状態を見ない(t *testing.T) {
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	body := gzipJSON(t, map[string]any{"name": "TEST"})
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.AddCookie(&http.Cookie{Name: "token", Value: "invalid-token"})
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	mockUC.On("Create", mock.Anything, mock.MatchedBy(func(input usecase.CreateTemporaryPlayerDataInput) bool {
+		return input.IPAddress == "127.0.0.1" && len(input.Payload) > 0
+	})).Return(&usecase.CreateTemporaryPlayerDataOutput{UploadToken: "token", ExpiresAt: time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)}, nil).Once()
+
+	err := h.CreateTemporaryData(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	mockUC.AssertExpectations(t)
+}
+
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testing.T) {
 	e := echo.New()
 	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
@@ -129,5 +155,30 @@ func TestTemporaryPlayerDataHandler_CommitTemporaryData(t *testing.T) {
 	err := h.CommitTemporaryData(c)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_保存済み本文が壊れている(t *testing.T) {
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	reqBody := `{"uploadToken":"11111111-1111-4111-8111-111111111111"}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", bytes.NewBufferString(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{
+		User:        &entity.User{ID: 1},
+		UploadToken: "11111111-1111-4111-8111-111111111111",
+	}).Return(nil, usecase.ErrTempDataPayloadInvalidJSON).Once()
+
+	err := h.CommitTemporaryData(c)
+	require.Error(t, err)
+	apiErr := err.(*apierror.APIError)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 	mockUC.AssertExpectations(t)
 }

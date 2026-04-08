@@ -291,7 +291,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
-	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, optionalJWTAuth, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))

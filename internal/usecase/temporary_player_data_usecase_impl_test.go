@@ -105,22 +105,22 @@ func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 	assert.ErrorIs(t, err, ErrTempDataPerIPLimitExceeded)
 }
 
-func TestTemporaryPlayerDataUsecase_Create_不正なJSONはバリデーションエラー(t *testing.T) {
+func TestTemporaryPlayerDataUsecase_Create_壊れたJSONでも一時保存できる(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{}
 	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
-	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
+	result, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
 		Payload:   []byte(`{"name":"TEST"`),
 	})
 
-	require.Error(t, err)
-	var validationErr *PlayerDataValidationError
-	require.ErrorAs(t, err, &validationErr)
-	assert.Equal(t, "payload", validationErr.Field)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, repo.found)
+	assert.Equal(t, []byte(`{"name":"TEST"`), repo.found.Payload)
 }
 
-func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testing.T) {
+func TestTemporaryPlayerDataUsecase_Commit_登録後に消費される(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`), BodyHash: "hash"}}
 	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
@@ -158,4 +158,14 @@ func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrTemporaryPlayerDataNotFound)
+}
+
+func TestTemporaryPlayerDataUsecase_Commit_壊れたJSONはBadRequest相当エラーになる(t *testing.T) {
+	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"`)}}
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+
+	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "token-1"})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrTempDataPayloadInvalidJSON)
 }
