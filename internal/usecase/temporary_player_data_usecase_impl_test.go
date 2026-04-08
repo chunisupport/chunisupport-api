@@ -14,10 +14,12 @@ import (
 )
 
 type stubTemporaryPlayerDataRepository struct {
-	createErr    error
-	findErr      error
-	found        *entity.TemporaryPlayerData
-	deletedToken string
+	createErr     error
+	findErr       error
+	consumeErr    error
+	found         *entity.TemporaryPlayerData
+	consumedToken string
+	deletedToken  string
 }
 
 func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, data *entity.TemporaryPlayerData) error {
@@ -41,7 +43,16 @@ func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ str
 }
 
 func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, token string) (*entity.TemporaryPlayerData, error) {
-	return s.FindByToken(ctx, token)
+	if s.consumeErr != nil {
+		return nil, s.consumeErr
+	}
+	s.consumedToken = token
+	entry, err := s.FindByToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	s.found = nil
+	return entry, nil
 }
 
 func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, token string) error {
@@ -99,7 +110,8 @@ func TestTemporaryPlayerDataUsecase_Commit_成功時に削除される(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "token-1", repo.deletedToken)
+	assert.Equal(t, "token-1", repo.consumedToken)
+	assert.Nil(t, repo.found)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
@@ -113,12 +125,12 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は保持(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
-	require.NotNil(t, repo.found)
-	assert.Equal(t, "token-1", repo.found.Token)
+	assert.Equal(t, "token-1", repo.consumedToken)
+	assert.Nil(t, repo.found)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
-	repo := &stubTemporaryPlayerDataRepository{findErr: domainrepo.ErrTemporaryPlayerDataNotFound}
+	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
 	uc := NewTemporaryPlayerDataUsecase(repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})

@@ -5,13 +5,13 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -46,6 +46,9 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 	if !strings.EqualFold(c.Request().Header.Get(echo.HeaderContentEncoding), "gzip") {
 		return apierror.ErrBadRequest
 	}
+	if err := apphandler.ValidateJSONContentType(c.Request().Header); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
 
 	limitedCompressedReader := io.LimitReader(c.Request().Body, int64(info.TempDataMaxCompressedBytes)+1)
 	compressedBody, err := io.ReadAll(limitedCompressedReader)
@@ -72,11 +75,6 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 	}
 	if len(jsonBody) > info.TempDataMaxUncompressedBytes {
 		return apierror.ErrPayloadTooLarge
-	}
-
-	var payload usecase.PlayerDataPayload
-	if err := json.Unmarshal(jsonBody, &payload); err != nil {
-		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
 	hash := sha256.Sum256(jsonBody)

@@ -61,6 +61,7 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
 	body := gzipJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	req.RemoteAddr = "127.0.0.1:12345"
@@ -83,6 +84,7 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testi
 	tooLarge := bytes.Repeat([]byte("a"), 512001)
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(tooLarge))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
@@ -90,6 +92,23 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testi
 	require.Error(t, err)
 	apiErr := err.(*apierror.APIError)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, apiErr.HTTPStatus)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_ContentType不正(t *testing.T) {
+	e := echo.New()
+	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
+
+	body := gzipJSON(t, usecase.PlayerDataPayload{Name: "TEST"})
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, "text/plain")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.CreateTemporaryData(c)
+	require.Error(t, err)
+	apiErr := err.(*apierror.APIError)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 }
 
 func TestTemporaryPlayerDataHandler_CommitTemporaryData(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -36,6 +35,10 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 	}
 	if input.IPAddress == "" {
 		return nil, &PlayerDataValidationError{Field: "ip_address", Message: "is required"}
+	}
+	var payload PlayerDataPayload
+	if err := unmarshalPlayerDataPayload(input.Payload, &payload); err != nil {
+		return nil, fmt.Errorf("temporary player data payload decode failed: %w", err)
 	}
 
 	token := uuid.NewString()
@@ -71,12 +74,12 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}
 
-	entry, err := u.repo.FindByToken(ctx, input.UploadToken)
+	entry, err := u.repo.ConsumeByToken(ctx, input.UploadToken)
 	if err != nil {
 		if errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
 			return nil, ErrTemporaryPlayerDataNotFound
 		}
-		return nil, fmt.Errorf("temporary player data find failed: %w", err)
+		return nil, fmt.Errorf("temporary player data consume failed: %w", err)
 	}
 
 	var payload PlayerDataPayload
@@ -94,11 +97,6 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 	if err != nil {
 		return nil, err
 	}
-
-	if err := u.repo.Delete(ctx, input.UploadToken); err != nil && !errors.Is(err, domainrepo.ErrTemporaryPlayerDataNotFound) {
-		slog.Warn("temporary player data delete failed after register", "token", input.UploadToken, "error", err)
-	}
-
 	return result, nil
 }
 
