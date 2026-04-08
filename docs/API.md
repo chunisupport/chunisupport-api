@@ -2638,6 +2638,8 @@ interface SkippedRecord {
 
 未ログイン状態でプレイヤーデータ（gzip圧縮JSON）を一時保存します。保存データは5分で失効します。
 
+このエンドポイントの一時保存先はDBではなく、APIプロセス内のインメモリ領域です。したがって、APIプロセスの再起動後や複数インスタンス構成では、発行済み `uploadToken` が引き継がれない場合があります。
+
 - **認証**: 不要（ログイン済みユーザーは利用不可）
 - **レート制限**: 30 req/IP/min
 - **ヘッダー**:
@@ -2647,6 +2649,10 @@ interface SkippedRecord {
   - gzip後サイズ: 500KB以下
   - 解凍後JSONサイズ: 500KB以下
   - 同時保持件数: 1IPあたり最大3件
+- **検証内容**:
+  - この時点では gzip と JSON の形式、およびサイズ制限のみを検証します。
+  - `PlayerDataPayload` としての厳密な妥当性検証（アプリバージョン、スコア整合性、日時フォーマットなど）は行いません。
+  - そのため、「JSONとしては読めるがプレイヤーデータとしては不正」な内容でも一時保存される場合があります。厳密な検証は `/internal/player-data/commit` 実行時に行われます。
 
 #### レスポンス（201 Created）
 
@@ -2659,7 +2665,7 @@ interface SkippedRecord {
 
 #### 主なエラー
 
-- `400 Bad Request`: gzip不正 / JSON不正 / ログイン済みでの利用
+- `400 Bad Request`: gzip不正 / JSON不正 / `Content-Encoding` 不正 / `Content-Type` 不正 / ログイン済みでの利用
 - `413 Payload Too Large`: サイズ上限超過
 - `409 Conflict`: 1IPあたり保持件数上限超過
 - `429 Too Many Requests`: レート超過
@@ -2667,7 +2673,9 @@ interface SkippedRecord {
 
 ### POST `/internal/player-data/commit`
 
-一時保存済みデータを、認証済みユーザーに紐づけて確定保存します。確定保存成功時は一時データを物理削除します。
+一時保存済みデータを、認証済みユーザーに紐づけて確定保存します。
+
+このエンドポイントでは、保存済みJSONを `PlayerDataPayload` として解釈し、通常の `/internal/me/register-data` と同じ登録処理を実行します。ただし、一時データは登録処理の開始前に `uploadToken` 単位で消費されます。したがって、登録処理中にエラーになった場合でも同じ `uploadToken` では再試行できず、再アップロードが必要です。
 
 - **認証**: 必須（Cookie）
 - **リクエスト**:
@@ -2685,6 +2693,13 @@ interface SkippedRecord {
 #### 主なエラー
 
 - `401 Unauthorized`: 未認証
+- `400 Bad Request`: JSON不正、または対応していない `app_ver`
 - `404 Not Found`: token期限切れ / 未存在
-- `422 Unprocessable Entity`: 入力バリデーション不正
-- `500 Internal Server Error`: DB保存失敗（tokenは消費済みのため再アップロードが必要）
+- `422 Unprocessable Entity`: `uploadToken` の形式不正、またはスコア整合性など `PlayerDataPayload` のバリデーション不正
+- `500 Internal Server Error`: DB保存失敗、またはプレイヤー名・日時形式など一部の入力不正を含む想定外エラー（tokenは消費済みのため再アップロードが必要）
+
+#### バリデーションの補足
+
+- `uploadToken` は UUID v4 を要求します。
+- 一時保存時点では厳密な妥当性検証を行わないため、`commit` 時に初めて不正データとして弾かれることがあります。
+- すべての入力不正が `422` になるわけではありません。実装上、`app_ver` は `400`、一部のプレイヤー名・日時形式の不正は `500` として扱われます。
