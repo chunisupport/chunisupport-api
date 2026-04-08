@@ -295,7 +295,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))
-	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, jwtAuth)
+	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, jwtAuth, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.RegisterDataRateLimitRequests,
+		Window:   info.RegisterDataRateLimitWindow,
+	}))
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
