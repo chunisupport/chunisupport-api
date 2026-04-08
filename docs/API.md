@@ -2688,4 +2688,4 @@ interface SkippedRecord {
 - `401 Unauthorized`: 未認証
 - `404 Not Found`: token期限切れ / 未存在
 - `422 Unprocessable Entity`: 入力バリデーション不正
-- `500 Internal Server Error`: DB保存失敗（tokenは保持され再試行可）
+- `500 Internal Server Error`: DB保存失敗（tokenは消費済みのため再アップロードが必要）
