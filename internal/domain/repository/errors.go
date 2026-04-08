@@ -38,4 +38,13 @@ var (
 	// ErrDuplicateUsername はユーザー名が既に使用されている場合に返されるエラーです。
 	// 事前チェックをすり抜けた競合状態でのINSERT失敗時に使用します。
 	ErrDuplicateUsername = errors.New("username already taken")
+
+	// ErrTemporaryPlayerDataNotFound は一時プレイヤーデータが見つからない場合に返されるエラーです。
+	ErrTemporaryPlayerDataNotFound = errors.New("temporary player data not found")
+
+	// ErrTemporaryPlayerDataPerIPLimitExceeded はIP単位の一時データ上限を超えた場合に返されるエラーです。
+	ErrTemporaryPlayerDataPerIPLimitExceeded = errors.New("temporary player data per ip limit exceeded")
+
+	// ErrTemporaryPlayerDataTotalSizeLimitExceeded は一時データ総量の上限を超えた場合に返されるエラーです。
+	ErrTemporaryPlayerDataTotalSizeLimitExceeded = errors.New("temporary player data total size limit exceeded")
 )

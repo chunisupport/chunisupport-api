@@ -111,6 +111,8 @@
 | `/internal/me` | DELETE | Cookie | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
+| `/internal/player-data/commit` | POST | Cookie | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/firebase/link` | POST | Cookie | Firebase UID を現在のユーザーへ連携 |
 | `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得 |
 | `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト |
@@ -2631,3 +2633,59 @@ interface SkippedRecord {
 - `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
 - CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
 - ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。
+
+
+### POST `/internal/player-data/temp`
+
+未ログイン状態でプレイヤーデータ（gzip圧縮JSON）を一時保存します。保存データは5分で失効します。
+
+- **認証**: 不要（ログイン済みユーザーは利用不可）
+- **レート制限**: 30 req/IP/min
+- **ヘッダー**:
+  - `Content-Encoding: gzip`
+  - `Content-Type: application/json`
+- **制限**:
+  - gzip後サイズ: 500KB以下
+  - 解凍後JSONサイズ: 500KB以下
+  - 同時保持件数: 1IPあたり最大3件
+
+#### レスポンス（201 Created）
+
+```json
+{
+  "uploadToken": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "expiresAt": "2026-04-08T12:34:56Z"
+}
+```
+
+#### 主なエラー
+
+- `400 Bad Request`: gzip不正 / JSON不正 / ログイン済みでの利用
+- `413 Payload Too Large`: サイズ上限超過
+- `409 Conflict`: 1IPあたり保持件数上限超過
+- `429 Too Many Requests`: レート超過
+- `503 Service Unavailable`: 一時データ総量上限超過
+
+### POST `/internal/player-data/commit`
+
+一時保存済みデータを、認証済みユーザーに紐づけて確定保存します。確定保存成功時は一時データを物理削除します。
+
+- **認証**: 必須（Cookie）
+- **リクエスト**:
+
+```json
+{
+  "uploadToken": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+#### レスポンス（200 OK）
+
+`/internal/me/register-data` と同じ `PlayerDataResult` を返します。
+
+#### 主なエラー
+
+- `401 Unauthorized`: 未認証
+- `404 Not Found`: token期限切れ / 未存在
+- `422 Unprocessable Entity`: 入力バリデーション不正
+- `500 Internal Server Error`: DB保存失敗（tokenは保持され再試行可）

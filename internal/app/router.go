@@ -72,19 +72,20 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Auth       *api_internal.AuthHandler
-	Firebase   *api_internal.FirebaseHandler
-	Recovery   *api_internal.RecoveryHandler
-	Profile    *api_internal.ProfileHandler
-	User       *api_internal.UserHandler
-	AdminUser  *api_internal.AdminUserHandler
-	Song       *api_internal.SongHandler
-	Worldsend  *api_internal.WorldsendHandler
-	APIToken   *api_internal.APITokenHandler
-	Me         *api_internal.MeHandler
-	MasterData *api_internal.MasterDataHandler
-	Session    *api_internal.SessionHandler
-	Goal       *api_internal.GoalHandler
+	Auth                *api_internal.AuthHandler
+	Firebase            *api_internal.FirebaseHandler
+	Recovery            *api_internal.RecoveryHandler
+	Profile             *api_internal.ProfileHandler
+	User                *api_internal.UserHandler
+	AdminUser           *api_internal.AdminUserHandler
+	Song                *api_internal.SongHandler
+	Worldsend           *api_internal.WorldsendHandler
+	APIToken            *api_internal.APITokenHandler
+	Me                  *api_internal.MeHandler
+	MasterData          *api_internal.MasterDataHandler
+	Session             *api_internal.SessionHandler
+	Goal                *api_internal.GoalHandler
+	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
 	// 外部API v1 用ハンドラ
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
@@ -159,6 +160,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
+	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
+	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
@@ -175,19 +178,20 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	firebaseRegisterUsecase := usecase.NewFirebaseRegisterUsecase(tm, userRepo, firebaseTokenVerifier, sessionIssuer)
 	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, firebaseRegisterUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
-		Firebase:   firebaseHandler,
-		Recovery:   api_internal.NewRecoveryHandler(recoveryUsecase),
-		Profile:    api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
-		User:       api_internal.NewUserHandler(userUsecase),
-		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
-		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
-		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
-		Me:         api_internal.NewMeHandler(playerDataUsecase),
-		MasterData: api_internal.NewMasterDataHandler(masterDataUsecase),
-		Session:    api_internal.NewSessionHandler(sessionUsecase),
-		Goal:       api_internal.NewGoalHandler(goalUsecase),
+		Auth:                api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
+		Firebase:            firebaseHandler,
+		Recovery:            api_internal.NewRecoveryHandler(recoveryUsecase),
+		Profile:             api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
+		User:                api_internal.NewUserHandler(userUsecase),
+		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
+		Song:                api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Worldsend:           api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
+		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:                  api_internal.NewMeHandler(playerDataUsecase),
+		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
+		Session:             api_internal.NewSessionHandler(sessionUsecase),
+		Goal:                api_internal.NewGoalHandler(goalUsecase),
+		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -285,6 +289,13 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
 	}
+
+	temporaryPlayerDataGroup := internal.Group("/player-data")
+	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, optionalJWTAuth, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.TempDataRateLimitPerMin,
+		Window:   info.TempDataRateLimitWindow,
+	}))
+	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, jwtAuth)
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
