@@ -28,6 +28,25 @@ func TestTemporaryPlayerDataRepository_CreateAndFind(t *testing.T) {
 	assert.Equal(t, "token", got.Token)
 }
 
+func TestTemporaryPlayerDataRepository_Create後に元Payloadを変更しても保持データは変わらない(t *testing.T) {
+	repo := NewTemporaryPlayerDataRepository(3, 1024)
+	entry := &entity.TemporaryPlayerData{
+		Token:     "token",
+		IPAddress: "127.0.0.1",
+		Payload:   []byte(`{"name":"TEST"}`),
+		ExpiresAt: time.Now().UTC().Add(time.Minute),
+	}
+
+	err := repo.Create(context.Background(), nil, entry)
+	require.NoError(t, err)
+
+	entry.Payload[0] = 'X'
+
+	got, err := repo.FindByToken(context.Background(), nil, "token")
+	require.NoError(t, err)
+	assert.Equal(t, []byte(`{"name":"TEST"}`), got.Payload)
+}
+
 func TestTemporaryPlayerDataRepository_IP上限(t *testing.T) {
 	repo := NewTemporaryPlayerDataRepository(1, 1024)
 	err := repo.Create(context.Background(), nil, &entity.TemporaryPlayerData{Token: "t1", IPAddress: "127.0.0.1", Payload: []byte("{}"), ExpiresAt: time.Now().UTC().Add(time.Minute)})

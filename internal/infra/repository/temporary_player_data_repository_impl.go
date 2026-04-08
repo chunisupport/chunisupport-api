@@ -93,6 +93,7 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.E
 	}
 
 	copyData := *data
+	copyData.Payload = append([]byte(nil), data.Payload...)
 	r.entriesByToken[copyData.Token] = &copyData
 	if ipTokens == nil {
 		ipTokens = make(map[string]struct{})
