@@ -92,7 +92,8 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.E
 		return domainrepo.ErrTemporaryPlayerDataTotalSizeLimitExceeded
 	}
 
-	r.entriesByToken[data.Token] = data
+	copyData := *data
+	copyData.Payload = append([]byte(nil), data.Payload...)
 	r.entriesByToken[copyData.Token] = &copyData
 	if ipTokens == nil {
 		ipTokens = make(map[string]struct{})
