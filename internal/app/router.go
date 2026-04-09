@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -116,27 +117,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	e.Use(echoMiddleware.BodyLimit(info.RequestBodyLimit))
 
 	// CORS設定を適用
-	e.Use(echoMiddleware.CORSWithConfig(echoMiddleware.CORSConfig{
-		AllowOrigins:     cfg.CORS.AllowOrigins,
-		AllowCredentials: cfg.CORS.AllowCredentials,
-		AllowMethods: []string{
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
-			http.MethodOptions,
-		},
-		AllowHeaders: []string{
-			echo.HeaderOrigin,
-			echo.HeaderContentType,
-			echo.HeaderAccept,
-			echo.HeaderAuthorization,
-		},
-		ExposeHeaders: []string{
-			echo.HeaderContentLength,
-		},
-		MaxAge: cfg.CORS.MaxAge,
-	}))
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
 
 	// DI - Services
 	userRepo := infra.NewUserRepository(db)
@@ -202,22 +183,27 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 
 	// ルートの設定
+	rootCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	e.OPTIONS("/", func(c echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	}, rootCORS)
+	// TODO: 外部向けhealthエンドポイントを作る
 	e.GET("/", func(c echo.Context) error {
 		// 将来的に変更の可能性あり
 		return c.JSON(http.StatusOK, map[string]string{
 			"app_name": "chunisupport-api",
 		})
-	})
+	}, rootCORS)
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
+	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret, cfg)
 
 	return e
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.Authenticator, apiTokenUsecase usecase.APITokenUsecase, secret string) {
+func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.Authenticator, apiTokenUsecase usecase.APITokenUsecase, secret string, cfg config.Config) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
@@ -291,7 +277,11 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
-	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+	tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	temporaryPlayerDataGroup.OPTIONS("/temp", func(c echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	}, tempDataCORS)
+	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, tempDataCORS, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))
@@ -403,6 +393,52 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
 		chunirecGroup.GET("/music/show", handlers.Chunirec.GetMusicShow)
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
+	}
+}
+
+func newDefaultCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
+	return newCORSConfig(cfg.CORS.AllowOrigins, cfg, func(c echo.Context) bool {
+		return isExternalCORSPath(c.Request().URL.Path)
+	})
+}
+
+func newExternalCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
+	allowOrigins := slices.Clone(cfg.CORS.AllowOrigins)
+	if !slices.Contains(allowOrigins, info.ExternalCORSAllowOrigin) {
+		allowOrigins = append(allowOrigins, info.ExternalCORSAllowOrigin)
+	}
+
+	return newCORSConfig(allowOrigins, cfg, nil)
+}
+
+func isExternalCORSPath(path string) bool {
+	// TODO: 前者は外部向けhealthエンドポイントに変えるつもり
+	return path == "/" || path == "/internal/player-data/temp"
+}
+
+func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddleware.Skipper) echoMiddleware.CORSConfig {
+	return echoMiddleware.CORSConfig{
+		Skipper:          skipper,
+		AllowOrigins:     allowOrigins,
+		AllowCredentials: cfg.CORS.AllowCredentials,
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowHeaders: []string{
+			echo.HeaderOrigin,
+			echo.HeaderContentType,
+			echo.HeaderContentEncoding,
+			echo.HeaderAccept,
+			echo.HeaderAuthorization,
+		},
+		ExposeHeaders: []string{
+			echo.HeaderContentLength,
+		},
+		MaxAge: cfg.CORS.MaxAge,
 	}
 }
 

@@ -45,6 +45,9 @@
 `0` を明示した場合は `sql.DB` と同様に「無制限/無効」として扱います。
 また、`max_open_conns` が 1 以上で `max_idle_conns` がそれを上回る場合は、`max_idle_conns` は `max_open_conns` へ丸められます。
 
+`cors.allow_origins` は全体の基本設定です。
+ただし `/` の `GET` と `OPTIONS`、および `/internal/player-data/temp` の `POST` と `OPTIONS` に限っては、固定で `https://new.chunithm-net.com` も追加許可されます。
+
 ## Firebase 認証
 
 Firebase を使ったログイン・連携エンドポイントは常に有効です。

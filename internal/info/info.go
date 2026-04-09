@@ -49,6 +49,7 @@ const (
 	DefaultTempDataMaxTotalMB    = 64
 	TempDataRateLimitPerMin      = 30
 	TempDataRateLimitWindow      = 1 * time.Minute
+	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
 	// セッション設定
 	MaxSessionsPerUser = 10 // ユーザーあたりの最大セッション数

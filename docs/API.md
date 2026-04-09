@@ -19,7 +19,8 @@
 
 ## CORS
 
-すべてのエンドポイントでCORSが有効です。設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
+すべてのエンドポイントでCORSが有効です。基本設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
+ただし `GET /`、`OPTIONS /`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 ## 認証
 
@@ -160,6 +161,9 @@
 
 ### GET `/`
 - **認証**: 不要
+- **CORS**:
+  - `https://new.chunithm-net.com` からの `GET` / `OPTIONS` を許可します。
+  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
 - **レスポンス**: 常に 200 OK で固定のアプリケーション名を返します（将来的に変更の可能性あり）。
 
 ```json
@@ -2667,6 +2671,9 @@ interface SkippedRecord {
 
 - **認証**: 不要
 - **レート制限**: 30 req/IP/min
+- **CORS**:
+  - `https://new.chunithm-net.com` からの `POST` / `OPTIONS` を許可します。
+  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
 - **ヘッダー**:
   - `Content-Encoding: gzip`
   - `Content-Type: application/json`

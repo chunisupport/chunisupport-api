@@ -1,0 +1,96 @@
+package app
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestExternalCORS_対象エンドポイントのみ追加オリジンを許可する(t *testing.T) {
+	cfg := config.Config{
+		CORS: config.CORS{
+			AllowOrigins:     []string{"https://chunisupport.example.com"},
+			AllowCredentials: true,
+			MaxAge:           600,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		path          string
+		requestMethod string
+		setupRoute    func(e *echo.Echo)
+		wantAllow     string
+		wantAllowCred string
+	}{
+		{
+			name:          "ルートでは追加オリジンを許可する",
+			path:          "/",
+			requestMethod: http.MethodGet,
+			setupRoute: func(e *echo.Echo) {
+				rootCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+				e.OPTIONS("/", func(c echo.Context) error {
+					return c.NoContent(http.StatusNoContent)
+				}, rootCORS)
+			},
+			wantAllow:     "https://new.chunithm-net.com",
+			wantAllowCred: "true",
+		},
+		{
+			name:          "一時保存エンドポイントでは追加オリジンを許可する",
+			path:          "/internal/player-data/temp",
+			requestMethod: http.MethodPost,
+			setupRoute: func(e *echo.Echo) {
+				tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+				e.OPTIONS("/internal/player-data/temp", func(c echo.Context) error {
+					return c.NoContent(http.StatusNoContent)
+				}, tempDataCORS)
+			},
+			wantAllow:     "https://new.chunithm-net.com",
+			wantAllowCred: "true",
+		},
+		{
+			name:          "他のエンドポイントでは追加オリジンを許可しない",
+			path:          "/internal/users/sample",
+			requestMethod: http.MethodPost,
+			setupRoute: func(e *echo.Echo) {
+				e.OPTIONS("/internal/users/:username", func(c echo.Context) error {
+					return c.NoContent(http.StatusNoContent)
+				})
+			},
+			wantAllow:     "",
+			wantAllowCred: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+			tt.setupRoute(e)
+
+			req := httptest.NewRequest(http.MethodOptions, tt.path, nil)
+			req.Header.Set(echo.HeaderOrigin, "https://new.chunithm-net.com")
+			req.Header.Set(echo.HeaderAccessControlRequestMethod, tt.requestMethod)
+			req.Header.Set(echo.HeaderAccessControlRequestHeaders, strings.Join([]string{
+				echo.HeaderContentType,
+				echo.HeaderContentEncoding,
+			}, ", "))
+			rec := httptest.NewRecorder()
+
+			e.ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.wantAllow, rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+			assert.Equal(t, tt.wantAllowCred, rec.Header().Get(echo.HeaderAccessControlAllowCredentials))
+			if tt.wantAllow != "" {
+				assert.Contains(t, rec.Header().Get(echo.HeaderAccessControlAllowHeaders), echo.HeaderContentEncoding)
+			}
+		})
+	}
+}
