@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -334,7 +333,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.E
 	for idx := range idxSet {
 		idxList = append(idxList, idx)
 	}
-	sort.Strings(idxList)
+	slices.Sort(idxList)
 
 	loaded, err := us.playerDataRepo.LoadMasterData(ctx, tx, idxList)
 	if err != nil {

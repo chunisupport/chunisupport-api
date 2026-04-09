@@ -1,10 +1,11 @@
 package usecase
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -106,8 +107,8 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 	charts := make(map[string][]*entity.ChartStatsByRatingBand, len(entries))
 	for _, entry := range entries {
 		stats := statsByChartID[entry.id]
-		sort.Slice(stats, func(i, j int) bool {
-			return bandOrder[stats[i].RatingBandID] < bandOrder[stats[j].RatingBandID]
+		slices.SortFunc(stats, func(a, b *entity.ChartStatsByRatingBand) int {
+			return cmp.Compare(bandOrder[a.RatingBandID], bandOrder[b.RatingBandID])
 		})
 		charts[entry.key] = stats
 	}
@@ -189,8 +190,8 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		bandOrder[band.ID] = band.SortOrder
 	}
 
-	sort.Slice(statsRows, func(i, j int) bool {
-		return bandOrder[statsRows[i].RatingBandID] < bandOrder[statsRows[j].RatingBandID]
+	slices.SortFunc(statsRows, func(a, b *entity.ChartStatsByRatingBand) int {
+		return cmp.Compare(bandOrder[a.RatingBandID], bandOrder[b.RatingBandID])
 	})
 
 	return &entity.SingleChartStats{SongID: song.DisplayID, Difficulty: entry.key, Stats: statsRows}, nil
@@ -223,8 +224,8 @@ func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context
 		bandOrder[band.ID] = band.SortOrder
 	}
 
-	sort.Slice(statsRows, func(i, j int) bool {
-		return bandOrder[statsRows[i].RatingBandID] < bandOrder[statsRows[j].RatingBandID]
+	slices.SortFunc(statsRows, func(a, b *entity.ChartStatsByRatingBand) int {
+		return cmp.Compare(bandOrder[a.RatingBandID], bandOrder[b.RatingBandID])
 	})
 
 	return &entity.SingleChartStats{SongID: worldsend.Song.DisplayID, Difficulty: info.StatsDifficultyWorldsend, Stats: statsRows}, nil
