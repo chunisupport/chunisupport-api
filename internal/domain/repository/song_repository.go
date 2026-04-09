@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
@@ -24,6 +25,10 @@ type SongRepository interface {
 	// 存在しないDisplayIDがある場合でもエラーにはせず、存在する楽曲のみを返します。
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayIDs(ctx context.Context, exec Executor, displayIDs []string) ([]*entity.Song, error)
+
+	// FindLatestUpdatedAt は songs, charts, worldsend_charts の updated_at の最大値を返します。
+	// 対象データが存在しない場合は nil を返します。
+	FindLatestUpdatedAt(ctx context.Context, exec Executor) (*time.Time, error)
 
 	// Save は楽曲エンティティの現在の状態を永続化します。
 	// 対象が存在しない場合は ErrSongNotFound を返します。

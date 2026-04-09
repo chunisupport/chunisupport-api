@@ -125,6 +125,7 @@
 | `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの物理削除 |
+| `/internal/songs/updated-at` | GET | Cookie (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得 |
@@ -1201,6 +1202,25 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
+
+### GET `/internal/songs/updated-at`
+- **認証**: Cookie (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
+
+#### レスポンス例
+
+```json
+{
+  "updated_at": "2026-04-09T12:34:56Z"
+}
+```
+
+#### SongUpdatedAtDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null` |
 
 #### UserRecordResponseDTO スキーマ
 

@@ -129,6 +129,54 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 	return results, nil
 }
 
+// FindLatestUpdatedAt は songs, charts, worldsend_charts の updated_at の最大値を返します。
+func (r *songRepository) FindLatestUpdatedAt(ctx context.Context, exec repository.Executor) (*time.Time, error) {
+	var updatedAtRaw sql.NullString
+	if err := exec.GetContext(ctx, &updatedAtRaw, `
+		SELECT MAX(updated_at)
+		FROM (
+			SELECT MAX(updated_at) AS updated_at FROM songs
+			UNION ALL
+			SELECT MAX(updated_at) AS updated_at FROM charts
+			UNION ALL
+			SELECT MAX(updated_at) AS updated_at FROM worldsend_charts
+		) latest_updated_at
+	`); err != nil {
+		return nil, err
+	}
+
+	if !updatedAtRaw.Valid || updatedAtRaw.String == "" {
+		return nil, nil
+	}
+
+	parsedUpdatedAt, err := parseLatestUpdatedAt(updatedAtRaw.String)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsedUpdatedAt, nil
+}
+
+func parseLatestUpdatedAt(value string) (time.Time, error) {
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05 -0700 MST",
+		time.DateTime,
+		time.DateOnly,
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("failed to parse latest updated_at: %s", value)
+}
+
 func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song := entity.NewSong()
 	song.ID = row.ID

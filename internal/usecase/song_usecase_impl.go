@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -68,6 +69,11 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 	}
 
 	return song, nil
+}
+
+// GetSongsUpdatedAt は楽曲関連データの updated_at の最大値を取得します。
+func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, error) {
+	return s.songRepo.FindLatestUpdatedAt(ctx, s.defaultExecutor)
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

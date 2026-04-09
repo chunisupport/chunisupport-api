@@ -200,6 +200,10 @@ func (s *stubSongRepository) FindByDisplayIDs(ctx context.Context, exec reposito
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubSongRepository) FindLatestUpdatedAt(ctx context.Context, exec repository.Executor) (*time.Time, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *stubSongRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	return errors.New("not implemented")
 }

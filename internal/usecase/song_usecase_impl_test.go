@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -39,6 +40,14 @@ func (m *MockSongRepository) FindByDisplayIDs(ctx context.Context, exec reposito
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*entity.Song), args.Error(1)
+}
+
+func (m *MockSongRepository) FindLatestUpdatedAt(ctx context.Context, exec repository.Executor) (*time.Time, error) {
+	args := m.Called(ctx, exec)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*time.Time), args.Error(1)
 }
 
 func (m *MockSongRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
@@ -317,5 +326,28 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.False(t, song.IsDeleted)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetSongsUpdatedAt_ReturnsRepositoryValue(t *testing.T) {
+	// Given
+	mockRepo := new(MockSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockTM := new(MockTransactionManager)
+	mockExec := new(MockExecutor)
+	uc := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
+	ctx := context.Background()
+	expected := time.Date(2026, 4, 9, 12, 34, 56, 0, time.UTC)
+
+	mockRepo.On("FindLatestUpdatedAt", ctx, mockExec).Return(&expected, nil).Once()
+
+	// When
+	result, err := uc.GetSongsUpdatedAt(ctx)
+
+	// Then
+	assert.NoError(t, err)
+	if assert.NotNil(t, result) {
+		assert.True(t, expected.Equal(*result))
+	}
 	mockRepo.AssertExpectations(t)
 }

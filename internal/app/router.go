@@ -309,6 +309,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	publicSongsGroup := internal.Group("/songs")
 	publicSongsGroup.Use(optionalJWTAuth, anonymousRateLimit)
 	{
+		publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)

@@ -54,6 +54,18 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
+// GetSongsUpdatedAt は楽曲関連データの updated_at のみを返します。
+func (h *SongHandler) GetSongsUpdatedAt(c echo.Context) error {
+	updatedAt, err := h.songUsecase.GetSongsUpdatedAt(c.Request().Context())
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.SongUpdatedAtDTO{
+		UpdatedAt: updatedAt,
+	})
+}
+
 // GetSong は指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
