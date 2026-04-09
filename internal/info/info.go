@@ -1,6 +1,10 @@
 package info
 
-import "time"
+import (
+	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
+)
 
 const (
 	Name                 = "chunisupport-api"
@@ -18,7 +22,7 @@ const (
 	ChartConstMax        = 15.9
 
 	// Goal関連の理論値計算定数
-	TheoreticalScore            = 1010000
+	TheoreticalScore            = constants.TheoreticalScore
 	TheoreticalOverpowerBaseAdd = 2.0
 	TheoreticalOverpowerScale   = 5.0
 	TheoreticalOverpowerBonus   = 5.0

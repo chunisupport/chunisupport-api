@@ -459,18 +459,7 @@ func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int
 		return nil, err
 	}
 
-	pairs := make([]*service.WorldsendSongChartPair, 0, len(worldsendSongs))
-	for _, worldsendSong := range worldsendSongs {
-		if worldsendSong == nil {
-			continue
-		}
-		pairs = append(pairs, &service.WorldsendSongChartPair{
-			Song:  worldsendSong.Song,
-			Chart: worldsendSong.Chart,
-		})
-	}
-
-	return s.recordCompletionSvc.CompleteWorldsendRecords(records, pairs), nil
+	return s.recordCompletionSvc.CompleteWorldsendRecords(records, worldsendSongs), nil
 }
 
 func latestPlayerRecordUpdatedAt(records []*entity.PlayerRecord) time.Time {

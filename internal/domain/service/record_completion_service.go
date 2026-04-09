@@ -10,12 +10,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
-// WorldsendSongChartPair は WORLD'S END 楽曲と譜面の組を表します。
-type WorldsendSongChartPair struct {
-	Song  *entity.Song
-	Chart *entity.WorldsendChart
-}
-
 // RecordCompletionService は未プレイレコード補完を行うドメインサービスです。
 type RecordCompletionService struct{}
 
@@ -78,7 +72,7 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 }
 
 // CompleteWorldsendRecords は WORLD'S END レコードを未プレイ補完し、ソート済み配列を返します。
-func (s *RecordCompletionService) CompleteWorldsendRecords(records []*entity.PlayerWorldsendRecord, songCharts []*WorldsendSongChartPair) []*entity.PlayerWorldsendRecord {
+func (s *RecordCompletionService) CompleteWorldsendRecords(records []*entity.PlayerWorldsendRecord, songCharts []*entity.WorldsendSongWithChart) []*entity.PlayerWorldsendRecord {
 	completed := make([]*entity.PlayerWorldsendRecord, 0, len(records))
 	playedByChartID := make(map[int]struct{}, len(records))
 

@@ -26,7 +26,7 @@ func TestUserService_GetUserUpdatedAt_Success(t *testing.T) {
 		Level:     10,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
 	if err != nil {
@@ -52,7 +52,7 @@ func TestUserService_GetUserUpdatedAt_PrivateUserBlocked(t *testing.T) {
 		Level:     1,
 		UpdatedAt: time.Now(),
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserUpdatedAt(context.Background(), "privateuser", nil)
 	if !errors.Is(err, ErrUserPrivate) {

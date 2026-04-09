@@ -3,28 +3,28 @@ package testutil
 import (
 	"context"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 // MockWorldsendUsecase は WORLD'S END 楽曲ユースケースのテスト用モックです。
 type MockWorldsendUsecase struct {
-	GetAllWorldsendSongsFunc        func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error)
-	GetWorldsendSongByDisplayIDFunc func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error)
+	GetAllWorldsendSongsFunc        func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error)
+	GetWorldsendSongByDisplayIDFunc func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error)
 	DeleteWorldsendSongFunc         func(ctx context.Context, displayID string) error
 	RestoreWorldsendSongFunc        func(ctx context.Context, displayID string) error
 	UpdateWorldsendSongsFunc        func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
 }
 
-func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*repository.WorldsendSongWithChart, error) {
+func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error) {
 	if m.GetAllWorldsendSongsFunc != nil {
 		return m.GetAllWorldsendSongsFunc(ctx, includeDeleted, requesterAccountTypeID)
 	}
 	return nil, nil
 }
 
-func (m *MockWorldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*repository.WorldsendSongWithChart, error) {
+func (m *MockWorldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error) {
 	if m.GetWorldsendSongByDisplayIDFunc != nil {
 		return m.GetWorldsendSongByDisplayIDFunc(ctx, displayID, requesterAccountTypeID)
 	}

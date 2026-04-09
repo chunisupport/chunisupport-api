@@ -20,20 +20,20 @@ type MockWorldsendChartRepository struct {
 	mock.Mock
 }
 
-func (m *MockWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (m *MockWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
 	args := m.Called(ctx, exec, includeDeleted)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*repository.WorldsendSongWithChart), args.Error(1)
+	return args.Get(0).([]*entity.WorldsendSongWithChart), args.Error(1)
 }
 
-func (m *MockWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
+func (m *MockWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
 	args := m.Called(ctx, exec, displayID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*repository.WorldsendSongWithChart), args.Error(1)
+	return args.Get(0).(*entity.WorldsendSongWithChart), args.Error(1)
 }
 
 func (m *MockWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
@@ -108,7 +108,7 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 			uc := newWorldsendUsecaseForTest(mockRepo, mockTM, mockExec)
 			ctx := context.Background()
 
-			expectedSongs := []*repository.WorldsendSongWithChart{{
+			expectedSongs := []*entity.WorldsendSongWithChart{{
 				Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
 				Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
 			}}
@@ -126,11 +126,11 @@ func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testi
 }
 
 func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
-	activeSong := &repository.WorldsendSongWithChart{
+	activeSong := &entity.WorldsendSongWithChart{
 		Song:  &entity.Song{ID: 1, DisplayID: "WE001", IsWorldsend: true, IsDeleted: false},
 		Chart: &entity.WorldsendChart{ID: 1, SongID: 1},
 	}
-	deletedSong := &repository.WorldsendSongWithChart{
+	deletedSong := &entity.WorldsendSongWithChart{
 		Song:  &entity.Song{ID: 2, DisplayID: "WE002", IsWorldsend: true, IsDeleted: true},
 		Chart: &entity.WorldsendChart{ID: 2, SongID: 2},
 	}
@@ -139,9 +139,9 @@ func TestGetWorldsendSongByDisplayID_DeletedSongPermission(t *testing.T) {
 		name                   string
 		displayID              string
 		requesterAccountTypeID *int
-		repoReturn             *repository.WorldsendSongWithChart
+		repoReturn             *entity.WorldsendSongWithChart
 		repoErr                error
-		wantResult             *repository.WorldsendSongWithChart
+		wantResult             *entity.WorldsendSongWithChart
 		wantErr                error
 	}{
 		{
@@ -215,7 +215,7 @@ func TestDeleteWorldsendSong_SavesDeletedState(t *testing.T) {
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
 
-	songWithChart := &repository.WorldsendSongWithChart{
+	songWithChart := &entity.WorldsendSongWithChart{
 		Song:  &entity.Song{ID: 21, DisplayID: "WE021", IsWorldsend: true, IsDeleted: false, Charts: []*entity.Chart{}},
 		Chart: &entity.WorldsendChart{ID: 210, SongID: 21},
 	}
@@ -241,7 +241,7 @@ func TestRestoreWorldsendSong_SavesRestoredState(t *testing.T) {
 	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
 	ctx := context.Background()
 
-	songWithChart := &repository.WorldsendSongWithChart{
+	songWithChart := &entity.WorldsendSongWithChart{
 		Song:  &entity.Song{ID: 22, DisplayID: "WE022", IsWorldsend: true, IsDeleted: true, Charts: []*entity.Chart{}},
 		Chart: &entity.WorldsendChart{ID: 220, SongID: 22},
 	}

@@ -31,7 +31,7 @@ func (s *stubPlayerRepositoryForPlayerData) FindByUserID(ctx context.Context, ex
 	return s.foundPlayer, nil
 }
 
-func (s *stubPlayerRepositoryForPlayerData) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*repository.PlayerHonor, error) {
+func (s *stubPlayerRepositoryForPlayerData) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	return nil, nil
 }
 

@@ -152,7 +152,7 @@ func (s *stubPlayerRepository) FindByUserID(ctx context.Context, exec repository
 	return nil, errors.New("not implemented")
 }
 
-func (s *stubPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*repository.PlayerHonor, error) {
+func (s *stubPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -230,18 +230,18 @@ func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
 }
 
 type stubWorldsendChartRepository struct {
-	records []*repository.WorldsendSongWithChart
+	records []*entity.WorldsendSongWithChart
 	err     error
 }
 
-func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.records, nil
 }
 
-func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
+func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -283,7 +283,7 @@ func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 		Level:     1,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1}, false)
 	require.NoError(t, err)
@@ -377,7 +377,7 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 	rating := 15.0
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, OfficialRating: &rating, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
 	require.NoError(t, err)
@@ -404,7 +404,7 @@ func TestUserService_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t 
 	now := time.Now()
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 10, UpdatedAt: now}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
 	require.NoError(t, err)
@@ -428,7 +428,7 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 	service := NewUserService(
 		nil,
 		&stubUserRepository{user: user},
-		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
 			ChartID:         1001,
 			Score:           scorePlayed,
@@ -439,7 +439,7 @@ func TestUserService_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 		}}},
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
@@ -538,7 +538,7 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 	playerUpdatedAt := now.Add(-time.Hour)
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}}, &stubPlayerRecordRepository{ratingRecords: records}, nil, nil, nil, nil)
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{ratingRecords: records}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -565,7 +565,7 @@ func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 	service := NewUserService(
 		nil,
 		&stubUserRepository{user: user},
-		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
 			ChartID:         1001,
 			Score:           scorePlayed,
@@ -576,7 +576,7 @@ func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 		}}},
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*repository.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
@@ -606,7 +606,7 @@ func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerU
 	service := NewUserService(
 		nil,
 		&stubUserRepository{user: user},
-		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
 		&stubWorldsendRecordRepository{},
 		nil,
@@ -640,7 +640,7 @@ func TestUserService_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLate
 	service := NewUserService(
 		nil,
 		&stubUserRepository{user: user},
-		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
 		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
 		nil,
@@ -673,7 +673,7 @@ func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLates
 	service := NewUserService(
 		nil,
 		&stubUserRepository{user: user},
-		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*repository.PlayerHonor{}}},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
 		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
 		nil,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -178,7 +178,7 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 }
 
 // convertToWorldsendSongDTOs は WorldsendSongWithChart のスライスを WorldsendSongDTO のスライスに変換します。
-func (h *WorldsendHandler) convertToWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.WorldsendSongDTO {
+func (h *WorldsendHandler) convertToWorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.WorldsendSongDTO {
 	songDTOs := make([]*api_internal.WorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
 		songDTOs = append(songDTOs, h.convertToWorldsendSongDTO(swc))
@@ -187,7 +187,7 @@ func (h *WorldsendHandler) convertToWorldsendSongDTOs(songsWithCharts []*reposit
 }
 
 // convertToWorldsendSongDTO は WorldsendSongWithChart を WorldsendSongDTO に変換します。
-func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.WorldsendSongDTO {
+func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_internal.WorldsendSongDTO {
 	if swc.Song != nil && swc.Song.GenreID != nil {
 		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
 			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
@@ -197,7 +197,7 @@ func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *repository.WorldsendSo
 }
 
 // convertToEditorWorldsendSongDTOs は WorldsendSongWithChart のスライスを EditorWorldsendSongDTO のスライスに変換します。
-func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
 	songDTOs := make([]*api_internal.EditorWorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
 		songDTOs = append(songDTOs, h.convertToEditorWorldsendSongDTO(swc))
@@ -207,7 +207,7 @@ func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*r
 
 // convertToEditorWorldsendSongDTO は WorldsendSongWithChart を EditorWorldsendSongDTO に変換します。
 // EditorWorldsendChartDTO を使用して譜面の updated_at を含めます。
-func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
 	if swc == nil {
 		return nil
 	}

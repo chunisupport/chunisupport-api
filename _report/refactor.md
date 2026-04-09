@@ -205,10 +205,7 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **DOM-006** | **Medium** | `Goal` エンティティが貧血症モデル＋`[]byte`フィールド | `AchievementParams []byte` と `Attributes []byte` はJSONバイト列の生保持であり、インフラ層の都合がドメイン層に漏洩している。適切な構造体やマップに変換すべき。 |
-| **DOM-011** | **Medium** | 理論値スコア定数の二重定義 | `internal/domain/service/info.go` の `theoreticalScore uint32 = 1010000` と `internal/info/info.go` の `TheoreticalScore = 1010000` が重複。1箇所に集約すべき。 |
-| **DOM-012** | **Low** | `WorldsendSongWithChart` と `WorldsendSongChartPair` の重複 | `repository` 層と `service` 層にフィールド同一の重複構造体。entity層に統一構造体を定義すべき。 |
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり（例: `notes.go` の `Scan` 内で日本語メッセージ）。方針を統一すべき。 |
-| **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
 
 ---
 

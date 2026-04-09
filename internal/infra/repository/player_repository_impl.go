@@ -91,7 +91,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 			}
 			result = &repository.PlayerWithHonors{
 				Player: player,
-				Honors: []*repository.PlayerHonor{},
+				Honors: []*entity.PlayerHonor{},
 			}
 		}
 
@@ -99,7 +99,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 			continue
 		}
 
-		result.Honors = append(result.Honors, &repository.PlayerHonor{
+		result.Honors = append(result.Honors, &entity.PlayerHonor{
 			Slot:     *row.HonorSlot,
 			Name:     *row.HonorName,
 			TypeName: *row.HonorTypeName,
@@ -119,7 +119,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 }
 
 // FindHonorsByPlayerID はプレイヤーIDで称号情報を取得します。スロット順（1,2,3）でソートされます。
-func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*repository.PlayerHonor, error) {
+func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	query := `
 		SELECT ph.slot, h.name, ht.name AS type_name, h.image_url
 		FROM player_honors ph
@@ -134,7 +134,7 @@ func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec reposi
 	}
 	defer rows.Close()
 
-	var honors []*repository.PlayerHonor
+	var honors []*entity.PlayerHonor
 	for rows.Next() {
 		var h struct {
 			Slot     int     `db:"slot"`
@@ -145,7 +145,7 @@ func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec reposi
 		if err := rows.StructScan(&h); err != nil {
 			return nil, err
 		}
-		honors = append(honors, &repository.PlayerHonor{
+		honors = append(honors, &entity.PlayerHonor{
 			Slot:     h.Slot,
 			Name:     h.Name,
 			TypeName: h.TypeName,

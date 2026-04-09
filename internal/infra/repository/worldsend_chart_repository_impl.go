@@ -25,7 +25,7 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 }
 
 // FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
-func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
+func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted, s.updated_at,
@@ -50,7 +50,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 	}
 	defer rows.Close()
 
-	results := []*repository.WorldsendSongWithChart{}
+	results := []*entity.WorldsendSongWithChart{}
 	for rows.Next() {
 		var songModel models.SongModel
 		var chartModel models.WorldsendChartModel
@@ -65,7 +65,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			return nil, err
 		}
 
-		results = append(results, &repository.WorldsendSongWithChart{
+		results = append(results, &entity.WorldsendSongWithChart{
 			Song:  songModel.ToEntity(),
 			Chart: chartModel.ToEntity(),
 		})
@@ -75,7 +75,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 }
 
 // FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
+func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted, s.updated_at,
@@ -106,7 +106,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 		return nil, err
 	}
 
-	return &repository.WorldsendSongWithChart{
+	return &entity.WorldsendSongWithChart{
 		Song:  songModel.ToEntity(),
 		Chart: chartModel.ToEntity(),
 	}, nil

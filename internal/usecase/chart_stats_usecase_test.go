@@ -80,7 +80,7 @@ func TestGetSongStatsByDisplayID_WorldsendUsesDedicatedStatsRepository(t *testin
 
 	song := &entity.Song{DisplayID: "WE001", IsWorldsend: true}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(song, nil)
-	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&repository.WorldsendSongWithChart{
+	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&entity.WorldsendSongWithChart{
 		Song:  song,
 		Chart: &entity.WorldsendChart{ID: 301},
 	}, nil)
@@ -184,7 +184,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendBranch(t *testing.T) {
 	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
 
 	worldsendSong := &entity.Song{DisplayID: "WE001", IsWorldsend: true}
-	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&repository.WorldsendSongWithChart{Song: worldsendSong, Chart: &entity.WorldsendChart{ID: 301}}, nil)
+	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&entity.WorldsendSongWithChart{Song: worldsendSong, Chart: &entity.WorldsendChart{ID: 301}}, nil)
 	mockStatsRepo.On("FindWorldsendChartStatsByChartIDs", ctx, mockExec, []int{301}).Return([]*entity.ChartStatsByRatingBand{{ChartID: 301, RatingBandID: 1}, {ChartID: 301, RatingBandID: 2}}, nil)
 
 	result, err := u.GetChartStatsByDisplayIDAndDifficulty(ctx, "WE001", info.StatsDifficultyWorldsend, nil)
@@ -312,7 +312,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendDeletedSongPermission(t 
 			stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 1}}}
 
 			deletedWorldsendSong := &entity.Song{DisplayID: "WE002", IsWorldsend: true, IsDeleted: true}
-			mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE002").Return(&repository.WorldsendSongWithChart{
+			mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE002").Return(&entity.WorldsendSongWithChart{
 				Song:  deletedWorldsendSong,
 				Chart: &entity.WorldsendChart{ID: 401},
 			}, nil).Once()

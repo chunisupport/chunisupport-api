@@ -6,13 +6,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
-// WorldsendSongWithChart は WORLD'S END 楽曲とその譜面情報を保持する構造体です。
-// WORLD'S END は1曲1譜面が保証されています。
-type WorldsendSongWithChart struct {
-	Song  *entity.Song
-	Chart *entity.WorldsendChart
-}
-
 // WorldsendUpdate は WORLD'S END 楽曲と譜面の更新情報を表します。
 // Chart が nil の場合は楽曲情報のみ更新します。
 type WorldsendUpdate struct {
@@ -24,11 +17,11 @@ type WorldsendUpdate struct {
 type WorldsendChartRepository interface {
 	// FindAll は全 WORLD'S END 楽曲を譜面情報付きで取得します。
 	// includeDeleted が false の場合、削除済み楽曲は除外されます。
-	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*WorldsendSongWithChart, error)
+	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error)
 
 	// FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
 	// 削除済み楽曲も取得します。
-	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*WorldsendSongWithChart, error)
+	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.WorldsendSongWithChart, error)
 
 	// SaveSong は WORLD'S END 楽曲エンティティの現在の状態を永続化します。
 	// 対象が存在しない場合は ErrSongNotFound を返します。

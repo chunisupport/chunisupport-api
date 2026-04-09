@@ -75,7 +75,7 @@ func TestRecordCompletionService_CompleteWorldsendRecords(t *testing.T) {
 	records := []*entity.PlayerWorldsendRecord{
 		{WorldsendChartID: 101, Song: song1, WorldsendChart: chart1},
 	}
-	songCharts := []*WorldsendSongChartPair{
+	songCharts := []*entity.WorldsendSongWithChart{
 		{Song: song1, Chart: chart1},
 		{Song: song2, Chart: chart2},
 		{Song: song3, Chart: chart3},

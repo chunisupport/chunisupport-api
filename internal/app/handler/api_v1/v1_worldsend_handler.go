@@ -6,7 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -56,7 +56,7 @@ func (h *V1WorldsendHandler) GetWorldsendSong(c echo.Context) error {
 }
 
 // convertToV1WorldsendSongDTOs は WorldsendSongWithChart のスライスを V1WorldsendSongDTO のスライスに変換します。
-func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(songsWithCharts []*repository.WorldsendSongWithChart) []*api_v1.V1WorldsendSongDTO {
+func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_v1.V1WorldsendSongDTO {
 	songDTOs := make([]*api_v1.V1WorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
 		songDTOs = append(songDTOs, h.convertToV1WorldsendSongDTO(swc))
@@ -65,7 +65,7 @@ func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(songsWithCharts []*rep
 }
 
 // convertToV1WorldsendSongDTO は WorldsendSongWithChart を V1WorldsendSongDTO に変換します。
-func (h *V1WorldsendHandler) convertToV1WorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_v1.V1WorldsendSongDTO {
+func (h *V1WorldsendHandler) convertToV1WorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_v1.V1WorldsendSongDTO {
 	if swc.Song != nil && swc.Song.GenreID != nil {
 		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
 			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
