@@ -49,7 +49,7 @@
 | **REF-G08** | クエリ負荷・バルク処理最適化 | PERF-003, PERF-004, INFRA-010, INFRA-012 | 全件取得・無分割バルクなど、DB負荷起因の課題群。取得戦略とチャンク戦略を同時に最適化する。 |
 | **REF-G09** | 監視性・運用信頼性の標準化 | OPS-001, OPS-002, INFRA-005, UC-014, HDL-009, LIB-004 | リクエスト追跡、タイムアウト、キャンセルログ、ログ運用の課題をまとめて扱い、運用観測性を標準化する。 |
 | **REF-G11** | コード重複削減と共通化 | UC-006, UC-008, HDL-005, INFRA-007, DOM-012 | 各層に散在する重複ロジックを、ユースケース/ハンドラ/リポジトリ単位の共通ヘルパーへ抽出して保守性を改善する。 |
-| **REF-G12** | コーディング規約・命名・近代化の統一 | DOM-016, UC-009, UC-011, UC-012, DOM-013, DOM-011, QUAL-001 | `slices` への統一、命名規約、メッセージ言語統一、重複定数整理、TODO解消などを同時に進めてコード規律を揃える。 |
+| **REF-G12** | コーディング規約・命名・近代化の統一 | UC-009, UC-011, UC-012, DOM-013, DOM-011, QUAL-001 | `slices` への統一、命名規約、メッセージ言語統一、重複定数整理、TODO解消などを同時に進めてコード規律を揃える。 |
 | **REF-G14** | セキュリティ運用の継続的検証 | SEC-03, HDL-001, INFRA-002, LIB-005 | 単発修正ではなく、抑制コメント妥当性・IP抽出・SQL安全性・転送効率を含む運用時の継続検証項目として同時管理する。 |
 
 
@@ -208,9 +208,7 @@
 | **DOM-011** | **Medium** | 理論値スコア定数の二重定義 | `internal/domain/service/info.go` の `theoreticalScore uint32 = 1010000` と `internal/info/info.go` の `TheoreticalScore = 1010000` が重複。1箇所に集約すべき。 |
 | **DOM-012** | **Low** | `WorldsendSongWithChart` と `WorldsendSongChartPair` の重複 | `repository` 層と `service` 層にフィールド同一の重複構造体。entity層に統一構造体を定義すべき。 |
 | **DOM-013** | **Low** | エラーメッセージの日英混在 | 値オブジェクトは英語、エンティティバリデーションは日本語。同一パッケージ内でも混在あり（例: `notes.go` の `Scan` 内で日本語メッセージ）。方針を統一すべき。 |
-| **DOM-016** | **Low** | `record_completion_service.go` が `sort.Slice` 使用 | `rating_service.go` は `slices.SortFunc` 使用。Go 1.26で推奨される `slices` パッケージに統一すべき。 |
 | **DOM-017** | **Low** | `PlayerHonor` がrepository層に定義 | ドメイン概念だが `repository` パッケージ内に定義。`entity` パッケージに移動すべき。 |
-| **DOM-021** | **Low** | Deprecated関数が残存 | `rating_service.go` の `CalcBestAverageRating`, `CalcNewAverageRating`, `CalcPlayerRating`。本体コードからは未使用だがテストで参照中。移行完了後に削除すべき。 |
 
 ---
 

@@ -259,21 +259,3 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 		NewAverage:   newAvg,
 	}
 }
-
-// CalcBestAverageRating はベスト枠の平均レーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcBestAverageRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).BestAverage
-}
-
-// CalcNewAverageRating は新曲枠の平均レーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcNewAverageRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).NewAverage
-}
-
-// CalcPlayerRating はプレイヤーレーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcPlayerRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).PlayerRating
-}

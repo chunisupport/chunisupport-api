@@ -180,6 +180,59 @@ func TestCalcRatingStats(t *testing.T) {
 			wantBestAvg: 16.2,
 			wantNewAvg:  16.2,
 		},
+		{
+			name: "1曲のみ",
+			records: []RatingRecord{
+				{Score: 1009000, ChartConst: 15.0, IsNew: false},
+			},
+			wantPlayer:  0.34,
+			wantBestAvg: 17.15,
+			wantNewAvg:  0.0,
+		},
+		{
+			name: "ベスト枠30曲未満かつ新曲10曲",
+			records: []RatingRecord{
+				{Score: 1009000, ChartConst: 15.0, IsNew: true},
+				{Score: 1009000, ChartConst: 14.9, IsNew: true},
+				{Score: 1009000, ChartConst: 14.8, IsNew: true},
+				{Score: 1009000, ChartConst: 14.7, IsNew: true},
+				{Score: 1009000, ChartConst: 14.6, IsNew: true},
+				{Score: 1009000, ChartConst: 14.5, IsNew: true},
+				{Score: 1009000, ChartConst: 14.4, IsNew: true},
+				{Score: 1009000, ChartConst: 14.3, IsNew: true},
+				{Score: 1009000, ChartConst: 14.2, IsNew: true},
+				{Score: 1009000, ChartConst: 14.1, IsNew: true},
+				{Score: 1009000, ChartConst: 10.0, IsNew: false},
+				{Score: 1009000, ChartConst: 10.0, IsNew: false},
+			},
+			wantPlayer:  7.16,
+			wantBestAvg: 15.94,
+			wantNewAvg:  16.7,
+		},
+		{
+			name: "ベスト枠30曲と新曲枠20曲が混在",
+			records: func() []RatingRecord {
+				records := make([]RatingRecord, 50)
+				for i := 0; i < 30; i++ {
+					records[i] = RatingRecord{
+						Score:      1009000,
+						ChartConst: 15.0 - float64(i)*0.1,
+						IsNew:      false,
+					}
+				}
+				for i := 0; i < 20; i++ {
+					records[30+i] = RatingRecord{
+						Score:      1009000,
+						ChartConst: 14.0 - float64(i)*0.1,
+						IsNew:      true,
+					}
+				}
+				return records
+			}(),
+			wantPlayer:  15.7,
+			wantBestAvg: 16.03,
+			wantNewAvg:  15.2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -312,217 +365,6 @@ func TestRoundN(t *testing.T) {
 			got := roundN(tt.num, tt.n)
 			if !floatEquals(got, tt.want) {
 				t.Errorf("roundN(%.4f, %d) = %.6f, want %.6f", tt.num, tt.n, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCalcBestAverageRating(t *testing.T) {
-	tests := []struct {
-		name    string
-		records []RatingRecord
-		want    float64
-	}{
-		{
-			name:    "レコードなし",
-			records: []RatingRecord{},
-			want:    0.0,
-		},
-		{
-			name: "1曲のみ",
-			records: []RatingRecord{
-				{Score: 1009000, ChartConst: 15.0, IsNew: false},
-			},
-			want: 17.15,
-		},
-		{
-			name: "30曲未満（10曲）",
-			records: []RatingRecord{
-				{Score: 1009000, ChartConst: 15.0, IsNew: false}, // 17.15
-				{Score: 1009000, ChartConst: 14.9, IsNew: false}, // 17.05
-				{Score: 1009000, ChartConst: 14.8, IsNew: false}, // 16.95
-				{Score: 1009000, ChartConst: 14.7, IsNew: false}, // 16.85
-				{Score: 1009000, ChartConst: 14.6, IsNew: false}, // 16.75
-				{Score: 1009000, ChartConst: 14.5, IsNew: false}, // 16.65
-				{Score: 1009000, ChartConst: 14.4, IsNew: false}, // 16.55
-				{Score: 1009000, ChartConst: 14.3, IsNew: false}, // 16.45
-				{Score: 1009000, ChartConst: 14.2, IsNew: false}, // 16.35
-				{Score: 1009000, ChartConst: 14.1, IsNew: false}, // 16.25
-			},
-			want: 16.7, // (17.15 + 17.05 + ... + 16.25) / 10 = 167.0 / 10 = 16.7
-		},
-		{
-			name: "30曲以上（40曲）- 上位30曲のみ使用",
-			records: func() []RatingRecord {
-				records := make([]RatingRecord, 40)
-				for i := 0; i < 40; i++ {
-					// 定数15.0から順に減らす
-					records[i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 15.0 - float64(i)*0.1,
-						IsNew:      false,
-					}
-				}
-				return records
-			}(),
-			want: 15.7, // 上位30曲の平均: (17.15 + 17.05 + ... + 14.25) / 30 = 471.0 / 30 = 15.7
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := CalcBestAverageRating(tt.records)
-			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcBestAverageRating() = %.6f, want %.6f", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCalcNewAverageRating(t *testing.T) {
-	tests := []struct {
-		name    string
-		records []RatingRecord
-		want    float64
-	}{
-		{
-			name:    "新曲なし",
-			records: []RatingRecord{},
-			want:    0.0,
-		},
-		{
-			name: "新曲のみ1曲",
-			records: []RatingRecord{
-				{Score: 1009000, ChartConst: 15.0, IsNew: true},
-			},
-			want: 17.15,
-		},
-		{
-			name: "新曲20曲未満（10曲）",
-			records: []RatingRecord{
-				{Score: 1009000, ChartConst: 15.0, IsNew: true},  // 17.15
-				{Score: 1009000, ChartConst: 14.9, IsNew: true},  // 17.05
-				{Score: 1009000, ChartConst: 14.8, IsNew: true},  // 16.95
-				{Score: 1009000, ChartConst: 14.7, IsNew: true},  // 16.85
-				{Score: 1009000, ChartConst: 14.6, IsNew: true},  // 16.75
-				{Score: 1009000, ChartConst: 14.5, IsNew: true},  // 16.65
-				{Score: 1009000, ChartConst: 14.4, IsNew: true},  // 16.55
-				{Score: 1009000, ChartConst: 14.3, IsNew: true},  // 16.45
-				{Score: 1009000, ChartConst: 14.2, IsNew: true},  // 16.35
-				{Score: 1009000, ChartConst: 14.1, IsNew: true},  // 16.25
-				{Score: 1009000, ChartConst: 10.0, IsNew: false}, // 旧曲（除外）
-				{Score: 1009000, ChartConst: 10.0, IsNew: false}, // 旧曲（除外）
-			},
-			want: 16.7, // 新曲10曲の平均: 167.0 / 10 = 16.7
-		},
-		{
-			name: "新曲20曲以上（30曲）- 上位20曲のみ使用",
-			records: func() []RatingRecord {
-				records := make([]RatingRecord, 30)
-				for i := 0; i < 30; i++ {
-					records[i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 15.0 - float64(i)*0.1,
-						IsNew:      true,
-					}
-				}
-				return records
-			}(),
-			want: 16.2, // 上位20曲の平均: (17.15 + 17.05 + ... + 15.25) / 20 = 324.0 / 20 = 16.2
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := CalcNewAverageRating(tt.records)
-			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcNewAverageRating() = %.6f, want %.6f", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCalcPlayerRating(t *testing.T) {
-	tests := []struct {
-		name    string
-		records []RatingRecord
-		want    float64
-	}{
-		{
-			name:    "レコードなし",
-			records: []RatingRecord{},
-			want:    0.0,
-		},
-		{
-			name: "ベスト枠のみ30曲",
-			records: func() []RatingRecord {
-				records := make([]RatingRecord, 30)
-				for i := 0; i < 30; i++ {
-					records[i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 15.0 - float64(i)*0.1,
-						IsNew:      false,
-					}
-				}
-				return records
-			}(),
-			// ベスト枠30曲の合計: 17.15 + 17.05 + ... + 14.25 = 471.0
-			// 新曲枠0曲の合計: 0
-			// プレイヤーレーティング: (471.0 + 0) / 50 = 9.42
-			want: 9.42,
-		},
-		{
-			name: "新曲枠のみ20曲",
-			records: func() []RatingRecord {
-				records := make([]RatingRecord, 20)
-				for i := 0; i < 20; i++ {
-					records[i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 15.0 - float64(i)*0.1,
-						IsNew:      true,
-					}
-				}
-				return records
-			}(),
-			// ベスト枠30曲(新曲から上位20を選び、残り10は0): 17.15*20 = 343.0
-			// 新曲枠20曲の合計: 17.15 + 17.05 + ... + 15.25 = 324.0
-			// プレイヤーレーティング: (343.0 + 324.0) / 50 = 13.34 (実際は12.96?)
-			want: 12.96, // 要再計算
-		},
-		{
-			name: "ベスト枠30曲 + 新曲枠20曲（混在）",
-			records: func() []RatingRecord {
-				records := make([]RatingRecord, 50)
-				// ベスト枠: 15.0～12.1（30曲）
-				for i := 0; i < 30; i++ {
-					records[i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 15.0 - float64(i)*0.1,
-						IsNew:      false,
-					}
-				}
-				// 新曲枠: 14.0～12.1（20曲）
-				for i := 0; i < 20; i++ {
-					records[30+i] = RatingRecord{
-						Score:      1009000,
-						ChartConst: 14.0 - float64(i)*0.1,
-						IsNew:      true,
-					}
-				}
-				return records
-			}(),
-			// ベスト枠30曲: 17.15 + 17.05 + ... + 14.25 = 471.0
-			// 新曲枠20曲: 16.15 + 16.05 + ... + 14.25 = 303.0
-			// プレイヤーレーティング: (471.0 + 303.0) / 50 = 15.48 (実際は15.7?)
-			want: 15.7, // 要再計算
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := CalcPlayerRating(tt.records)
-			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcPlayerRating() = %.6f, want %.6f", got, tt.want)
 			}
 		})
 	}

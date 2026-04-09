@@ -1,8 +1,9 @@
 package service
 
 import (
+	"cmp"
 	"math"
-	"sort"
+	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 
@@ -61,13 +62,16 @@ func (s *RecordCompletionService) CompletePlayerRecords(records []*entity.Player
 		}
 	}
 
-	sort.Slice(completed, func(i, j int) bool {
-		leftSongID := playerRecordSongID(completed[i])
-		rightSongID := playerRecordSongID(completed[j])
+	slices.SortFunc(completed, func(a, b *entity.PlayerRecord) int {
+		leftSongID := playerRecordSongID(a)
+		rightSongID := playerRecordSongID(b)
 		if leftSongID != rightSongID {
-			return leftSongID < rightSongID
+			return cmp.Compare(leftSongID, rightSongID)
 		}
-		return playerRecordDifficultySortOrder(completed[i], difficultySortOrderByID) < playerRecordDifficultySortOrder(completed[j], difficultySortOrderByID)
+		return cmp.Compare(
+			playerRecordDifficultySortOrder(a, difficultySortOrderByID),
+			playerRecordDifficultySortOrder(b, difficultySortOrderByID),
+		)
 	})
 
 	return completed
@@ -100,13 +104,13 @@ func (s *RecordCompletionService) CompleteWorldsendRecords(records []*entity.Pla
 		})
 	}
 
-	sort.Slice(completed, func(i, j int) bool {
-		leftSongID := worldsendRecordSongID(completed[i])
-		rightSongID := worldsendRecordSongID(completed[j])
+	slices.SortFunc(completed, func(a, b *entity.PlayerWorldsendRecord) int {
+		leftSongID := worldsendRecordSongID(a)
+		rightSongID := worldsendRecordSongID(b)
 		if leftSongID != rightSongID {
-			return leftSongID < rightSongID
+			return cmp.Compare(leftSongID, rightSongID)
 		}
-		return worldsendRecordChartID(completed[i]) < worldsendRecordChartID(completed[j])
+		return cmp.Compare(worldsendRecordChartID(a), worldsendRecordChartID(b))
 	})
 
 	return completed
