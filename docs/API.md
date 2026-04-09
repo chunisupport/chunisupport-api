@@ -135,10 +135,10 @@
 | `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活 |
-| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted` を含む） |
-| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted` を含む） |
-| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted` を含む） |
-| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted` を含む） |
+| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得 |
 | `/internal/master/versions` | GET | Cookie | バージョン一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
@@ -1773,11 +1773,23 @@ curl -X POST \
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `is_deleted` | bool | 論理削除済みかどうか |
+| `updated_at` | string \| null | 楽曲の更新日時 (ISO8601) |
+| `charts` | object | 難易度ごとの譜面情報。キーは `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` |
+
+`charts` の各値は `EditorChartDTO \| null` です。譜面が存在しない難易度は `null` になります。
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `const` | number | 譜面定数 |
+| `is_const_unknown` | bool | 譜面定数が不明かどうか |
+| `notes` | int \| null | ノーツ数 |
+| `notes_designer` | string \| null | ノーツデザイナー名 |
+| `updated_at` | string \| null | 譜面の更新日時 (ISO8601) |
 
 `SongDTO` の各フィールドの詳細は GET `/internal/songs` の `SongDTO` を参照してください。
 
@@ -1813,11 +1825,23 @@ curl -X POST \
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `charts`）がトップレベルにそのまま展開され、追加で `is_deleted` を持ちます。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `is_deleted` | bool | 論理削除済みかどうか |
+| `updated_at` | string \| null | 楽曲の更新日時 (ISO8601) |
+| `charts` | object | WORLD'S END 譜面情報。`WORLDSEND` キーのみを持ちます |
+
+`charts.WORLDSEND` は `EditorWorldsendChartDTO` です。
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `attribute` | string \| null | WORLD'S END 属性 |
+| `level_star` | int \| null | WORLD'S END レベル |
+| `notes` | int \| null | ノーツ数 |
+| `notes_designer` | string \| null | ノーツデザイナー名 |
+| `updated_at` | string \| null | 譜面の更新日時 (ISO8601) |
 
 `WorldsendSongDTO` の各フィールドの詳細は GET `/internal/songs/worldsend` の `WorldsendSongDTO` を参照してください。
 

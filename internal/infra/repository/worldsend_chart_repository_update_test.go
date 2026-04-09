@@ -101,6 +101,7 @@ func setupWorldsendUpdateDB(t *testing.T) *sqlx.DB {
 			attribute TEXT,
 			notes INTEGER,
 			notes_designer TEXT,
+			updated_at TEXT,
 			FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
 			UNIQUE(song_id)
 		)

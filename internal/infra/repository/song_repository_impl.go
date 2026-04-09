@@ -39,17 +39,19 @@ type songRow struct {
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
 	IsDeleted   bool       `db:"is_deleted"`
+	UpdatedAt   *time.Time `db:"updated_at"`
 }
 
 // chartRow はDBから取得する譜面データの行を表します。
 type chartRow struct {
-	ID             int     `db:"id"`
-	SongID         int     `db:"song_id"`
-	DifficultyID   int     `db:"difficulty_id"`
-	Const          float64 `db:"const"`
-	IsConstUnknown bool    `db:"is_const_unknown"`
-	Notes          *int    `db:"notes"`
-	NotesDesigner  *string `db:"notes_designer"`
+	ID             int        `db:"id"`
+	SongID         int        `db:"song_id"`
+	DifficultyID   int        `db:"difficulty_id"`
+	Const          float64    `db:"const"`
+	IsConstUnknown bool       `db:"is_const_unknown"`
+	Notes          *int       `db:"notes"`
+	NotesDesigner  *string    `db:"notes_designer"`
+	UpdatedAt      *time.Time `db:"updated_at"`
 }
 
 // FindAllExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
@@ -58,7 +60,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -86,7 +88,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, args, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
 		FROM charts
 		WHERE song_id IN (?)
 		ORDER BY song_id, difficulty_id
@@ -140,6 +142,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.Jacket = row.Jacket
 	song.IsWorldsend = row.IsWorldsend
 	song.IsDeleted = row.IsDeleted
+	song.UpdatedAt = row.UpdatedAt
 	return song
 }
 
@@ -160,6 +163,7 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 		IsConstUnknown: row.IsConstUnknown,
 		Notes:          notesVal,
 		NotesDesigner:  row.NotesDesigner,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
 
@@ -173,7 +177,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -202,7 +206,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 3. 該当する楽曲の譜面を一括取得（N+1問題回避）
 	chartsQuery, chartArgs, err := sqlx.In(`
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
 		FROM charts
 		WHERE song_id IN (?)
 		ORDER BY song_id, difficulty_id
@@ -248,7 +252,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE display_id = ? AND is_worldsend = 0
 	`
@@ -264,7 +268,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	// 2. 譜面を取得
 	chartsQuery := `
-		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
 		FROM charts
 		WHERE song_id = ?
 		ORDER BY difficulty_id

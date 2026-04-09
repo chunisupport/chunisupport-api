@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
@@ -14,4 +16,5 @@ type Chart struct {
 	IsConstUnknown bool
 	Notes          *notes.Notes
 	NotesDesigner  *string
+	UpdatedAt      *time.Time
 }

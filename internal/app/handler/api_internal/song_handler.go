@@ -203,14 +203,23 @@ func (h *SongHandler) convertToEditorSongDTOs(songs []*entity.Song) []*api_inter
 }
 
 // convertToEditorSongDTO は Song を EditorSongDTO に変換します。
+// EditorOrderedChartsMap を使用して譜面の updated_at を含めます。
 func (h *SongHandler) convertToEditorSongDTO(song *entity.Song) *api_internal.EditorSongDTO {
 	if song == nil {
 		return nil
 	}
 	base := h.convertToSongDTO(song)
 
+	editorCharts := api_internal.EditorOrderedChartsMap(
+		handler.BuildChartsMap(song.Charts, h.masterCache.DifficultyNamesByID, func(chart *entity.Chart) *api_internal.EditorChartDTO {
+			return api_internal.ToEditorChartDTO(chart)
+		}),
+	)
+
 	return &api_internal.EditorSongDTO{
 		SongDTO:   base,
 		IsDeleted: song.IsDeleted,
+		UpdatedAt: song.UpdatedAt,
+		Charts:    editorCharts,
 	}
 }

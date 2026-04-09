@@ -1,6 +1,8 @@
 package api_internal
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
@@ -11,6 +13,15 @@ type WorldsendChartDTO struct {
 	LevelStar     *int    `json:"level_star"` // WORLD'S END レベル（1～5）
 	Notes         *int    `json:"notes"`      // ノーツ数
 	NotesDesigner *string `json:"notes_designer"`
+}
+
+// EditorWorldsendChartDTO は編集者向けの WORLD'S END 譜面情報DTOです。updated_at を含みます。
+type EditorWorldsendChartDTO struct {
+	Attribute     *string    `json:"attribute"`
+	LevelStar     *int       `json:"level_star"`
+	Notes         *int       `json:"notes"`
+	NotesDesigner *string    `json:"notes_designer"`
+	UpdatedAt     *time.Time `json:"updated_at"`
 }
 
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
@@ -33,9 +44,12 @@ type WorldsendSongsResponse struct {
 }
 
 // EditorWorldsendSongDTO は編集者向けの WORLD'S END 楽曲情報DTOです。
+// Charts は EditorWorldsendChartDTO にオーバーライドして譜面の updated_at を含めます。
 type EditorWorldsendSongDTO struct {
 	*WorldsendSongDTO
-	IsDeleted bool `json:"is_deleted"`
+	IsDeleted bool                                `json:"is_deleted"`
+	UpdatedAt *time.Time                          `json:"updated_at"`
+	Charts    map[string]*EditorWorldsendChartDTO `json:"charts"`
 }
 
 // EditorWorldsendSongsResponse は編集者向け WORLD'S END 楽曲一覧のレスポンスを表します。
@@ -74,6 +88,22 @@ func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 		LevelStar:     dto.ToLevelStarIntPtr(chart.LevelStar),
 		Notes:         dto.ToNotesIntPtr(chart.Notes),
 		NotesDesigner: chart.NotesDesigner,
+	}
+}
+
+// ToEditorWorldsendChartDTO は WorldsendChart エンティティから EditorWorldsendChartDTO へ変換します。
+// updated_at を含みます。
+func ToEditorWorldsendChartDTO(chart *entity.WorldsendChart) *EditorWorldsendChartDTO {
+	if chart == nil {
+		return nil
+	}
+
+	return &EditorWorldsendChartDTO{
+		Attribute:     chart.Attribute,
+		LevelStar:     dto.ToLevelStarIntPtr(chart.LevelStar),
+		Notes:         dto.ToNotesIntPtr(chart.Notes),
+		NotesDesigner: chart.NotesDesigner,
+		UpdatedAt:     chart.UpdatedAt,
 	}
 }
 

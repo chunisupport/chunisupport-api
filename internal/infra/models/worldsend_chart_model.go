@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
@@ -14,6 +16,7 @@ type WorldsendChartModel struct {
 	Attribute     *string              `db:"attribute"`
 	Notes         *notes.Notes         `db:"notes"`
 	NotesDesigner *string              `db:"notes_designer"`
+	UpdatedAt     *time.Time           `db:"updated_at"`
 }
 
 func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {
@@ -24,6 +27,7 @@ func (m *WorldsendChartModel) ToEntity() *entity.WorldsendChart {
 		Attribute:     m.Attribute,
 		Notes:         m.Notes,
 		NotesDesigner: m.NotesDesigner,
+		UpdatedAt:     m.UpdatedAt,
 	}
 }
 
@@ -35,5 +39,6 @@ func FromWorldsendChartEntity(e *entity.WorldsendChart) *WorldsendChartModel {
 		Attribute:     e.Attribute,
 		Notes:         e.Notes,
 		NotesDesigner: e.NotesDesigner,
+		UpdatedAt:     e.UpdatedAt,
 	}
 }

@@ -22,6 +22,7 @@ type SongModel struct {
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
 	IsDeleted   bool       `db:"is_deleted"`
+	UpdatedAt   *time.Time `db:"updated_at"`
 }
 
 // ToEntity はSongModelをentity.Songに変換します。
@@ -38,6 +39,7 @@ func (m *SongModel) ToEntity() *entity.Song {
 	song.Jacket = m.Jacket
 	song.IsWorldsend = m.IsWorldsend
 	song.IsDeleted = m.IsDeleted
+	song.UpdatedAt = m.UpdatedAt
 	return song
 }
 
@@ -55,18 +57,20 @@ func FromSongEntity(e *entity.Song) *SongModel {
 		Jacket:      e.Jacket,
 		IsWorldsend: e.IsWorldsend,
 		IsDeleted:   e.IsDeleted,
+		UpdatedAt:   e.UpdatedAt,
 	}
 }
 
 // ChartModel はデータベース用のChartモデルです。
 type ChartModel struct {
-	ID             int     `db:"id"`
-	SongID         int     `db:"song_id"`
-	DifficultyID   int     `db:"difficulty_id"`
-	Const          float64 `db:"const"`
-	IsConstUnknown bool    `db:"is_const_unknown"`
-	Notes          *int    `db:"notes"`
-	NotesDesigner  *string `db:"notes_designer"`
+	ID             int        `db:"id"`
+	SongID         int        `db:"song_id"`
+	DifficultyID   int        `db:"difficulty_id"`
+	Const          float64    `db:"const"`
+	IsConstUnknown bool       `db:"is_const_unknown"`
+	Notes          *int       `db:"notes"`
+	NotesDesigner  *string    `db:"notes_designer"`
+	UpdatedAt      *time.Time `db:"updated_at"`
 }
 
 func (m *ChartModel) ToEntity() (*entity.Chart, error) {
@@ -92,6 +96,7 @@ func (m *ChartModel) ToEntity() (*entity.Chart, error) {
 		IsConstUnknown: m.IsConstUnknown,
 		Notes:          n,
 		NotesDesigner:  m.NotesDesigner,
+		UpdatedAt:      m.UpdatedAt,
 	}, nil
 }
 
@@ -125,5 +130,6 @@ func FromChartEntity(e *entity.Chart) *ChartModel {
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          notesVal,
 		NotesDesigner:  e.NotesDesigner,
+		UpdatedAt:      e.UpdatedAt,
 	}
 }

@@ -28,13 +28,14 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*repository.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
+			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted, s.updated_at,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
 			wc.attribute AS 'worldsend_charts.attribute',
 			wc.notes AS 'worldsend_charts.notes',
-			wc.notes_designer AS 'worldsend_charts.notes_designer'
+			wc.notes_designer AS 'worldsend_charts.notes_designer',
+			wc.updated_at AS 'worldsend_charts.updated_at'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.is_worldsend = 1`
@@ -57,8 +58,8 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 		err := rows.Scan(
 			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 			&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
-			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner,
+			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted, &songModel.UpdatedAt,
+			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -77,13 +78,14 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*repository.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted,
+			s.id, s.display_id, s.title, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_deleted, s.updated_at,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
 			wc.attribute AS 'worldsend_charts.attribute',
 			wc.notes AS 'worldsend_charts.notes',
-			wc.notes_designer AS 'worldsend_charts.notes_designer'
+			wc.notes_designer AS 'worldsend_charts.notes_designer',
+			wc.updated_at AS 'worldsend_charts.updated_at'
 		FROM songs s
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.display_id = ? AND s.is_worldsend = 1`
@@ -94,8 +96,8 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 	err := exec.QueryRowxContext(ctx, query, displayID).Scan(
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.Artist,
 		&songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
-		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted,
-		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner,
+		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsDeleted, &songModel.UpdatedAt,
+		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

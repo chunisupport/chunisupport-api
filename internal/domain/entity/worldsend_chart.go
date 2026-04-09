@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"time"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
@@ -14,4 +16,5 @@ type WorldsendChart struct {
 	Attribute     *string              // WORLD'S END 属性（光、蔵、改、狂、etc.）
 	Notes         *notes.Notes
 	NotesDesigner *string
+	UpdatedAt     *time.Time
 }

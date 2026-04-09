@@ -22,6 +22,7 @@ type Song struct {
 	IsMaxOPUnknown bool
 	IsWorldsend    bool
 	IsDeleted      bool
+	UpdatedAt      *time.Time
 }
 
 // NewSong は Charts を必ず非nilで初期化した Song を生成します。

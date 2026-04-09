@@ -206,14 +206,21 @@ func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*r
 }
 
 // convertToEditorWorldsendSongDTO は WorldsendSongWithChart を EditorWorldsendSongDTO に変換します。
+// EditorWorldsendChartDTO を使用して譜面の updated_at を含めます。
 func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
 	if swc == nil {
 		return nil
 	}
 	base := h.convertToWorldsendSongDTO(swc)
 
+	charts := map[string]*api_internal.EditorWorldsendChartDTO{
+		"WORLDSEND": api_internal.ToEditorWorldsendChartDTO(swc.Chart),
+	}
+
 	return &api_internal.EditorWorldsendSongDTO{
 		WorldsendSongDTO: base,
 		IsDeleted:        swc.Song.IsDeleted,
+		UpdatedAt:        swc.Song.UpdatedAt,
+		Charts:           charts,
 	}
 }
