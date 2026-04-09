@@ -8,7 +8,7 @@ import (
 
 const (
 	Name                 = "chunisupport-api"
-	Version              = "0.0.2"
+	Version              = "0.1.0"
 	ConfigDir            = ".config/"
 	ResourceDir          = ".resources/"
 	MigrationDir         = "migration/mysql/"
