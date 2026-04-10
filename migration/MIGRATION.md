@@ -187,3 +187,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000008**: `users` テーブルから `is_deleted` カラムを削除し、関連インデックスを整理。
 - **000009**: `charts` テーブルと `worldsend_charts` テーブルに譜面製作者を保持する `notes_designer` カラムを追加。
 - **000010**: `songs`、`charts`、`worldsend_charts` テーブルに `updated_at` カラムを追加し、重複・非効率なインデックスを整理（`idx_worldsend_charts_song_id` / `idx_charts_song_id` / `idx_sessions_user_id` を削除、`player_worldsend_records(player_id, updated_at DESC)` と `goals(user_id, created_at, id)` を追加）。
+- **000011**: `players.overpower_value` の型を `DECIMAL(8,2)` → `DECIMAL(9,3)` へ、`players.overpower_percentage` の型を `DECIMAL(5,2)` → `DECIMAL(7,4)` へ変更。精度向上のため。
