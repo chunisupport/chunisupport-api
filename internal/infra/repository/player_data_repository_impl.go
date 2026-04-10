@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
@@ -122,6 +124,49 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	}
 
 	return nil
+}
+
+// GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
+func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	executor := r.resolveExecutor(exec)
+
+	where := make([]string, 0, 2)
+	if filter.ExcludeWorldsend {
+		where = append(where, "s.is_worldsend = 0")
+	}
+	if filter.ExcludeDeleted {
+		where = append(where, "s.is_deleted = 0")
+	}
+
+	query := `
+		SELECT
+			s.id AS song_id,
+			MAX(c.const) AS max_const
+		FROM songs s
+		INNER JOIN charts c ON c.song_id = s.id
+	`
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " GROUP BY s.id"
+
+	var rows []struct {
+		SongID   int     `db:"song_id"`
+		MaxConst float64 `db:"max_const"`
+	}
+	if err := executor.SelectContext(ctx, &rows, query); err != nil {
+		return nil, err
+	}
+
+	total := 0.0
+	for _, row := range rows {
+		total += service.CalcSongMaxOP(row.MaxConst)
+	}
+
+	return &repository.OverpowerTargetStats{
+		SongCount:         len(rows),
+		MaxOverpowerTotal: total,
+	}, nil
 }
 
 func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Executor, items []T, query string, queryName string) ([]M, error) {

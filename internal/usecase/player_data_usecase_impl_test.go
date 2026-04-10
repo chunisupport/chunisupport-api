@@ -208,6 +208,7 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 		name        string
 		fullRecords []repository.PlayerRecordForUpsert
 		chartsByID  map[int]entity.PlayerDataChart
+		maxOPTotal  float64
 		wantValue   float64
 		wantPercent float64
 	}{
@@ -225,11 +226,12 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 			chartsByID: map[int]entity.PlayerDataChart{
 				1: {ID: 1, SongID: 1, Const: 15.0},
 			},
+			maxOPTotal:  service.CalcSongMaxOP(15.0),
 			wantValue:   90,
 			wantPercent: 100,
 		},
 		{
-			name: "2譜面の合計OVER_POWERを計算する",
+			name: "未プレイ曲も含む全収録楽曲の最大OP合計を分母にして割合を計算する",
 			fullRecords: []repository.PlayerRecordForUpsert{
 				{
 					ChartID: 1,
@@ -250,12 +252,13 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 				1: {ID: 1, SongID: 1, Const: 15.0},
 				2: {ID: 2, SongID: 2, Const: 14.5},
 			},
+			maxOPTotal: service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.5) + service.CalcSongMaxOP(13.0),
 			wantValue: func() float64 {
 				return service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.5, 3)
 			}(),
 			wantPercent: func() float64 {
 				total := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.5, 3)
-				theoretical := info.CalcTheoreticalOverpowerTotal(29.5, 2)
+				theoretical := service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.5) + service.CalcSongMaxOP(13.0)
 				return roundFloat(total/theoretical*100, 4)
 			}(),
 		},
@@ -289,12 +292,13 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 				2: {ID: 2, SongID: 1, Const: 15.0},
 				3: {ID: 3, SongID: 2, Const: 14.5},
 			},
+			maxOPTotal: service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.5),
 			wantValue: func() float64 {
 				return service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.5, 3)
 			}(),
 			wantPercent: func() float64 {
 				total := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.5, 3)
-				theoretical := info.CalcTheoreticalOverpowerTotal(29.5, 2)
+				theoretical := service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.5)
 				return roundFloat(total/theoretical*100, 4)
 			}(),
 		},
@@ -302,6 +306,7 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 			name:        "通常譜面がない場合は0を返す",
 			fullRecords: []repository.PlayerRecordForUpsert{},
 			chartsByID:  map[int]entity.PlayerDataChart{},
+			maxOPTotal:  service.CalcSongMaxOP(15.0),
 			wantValue:   0,
 			wantPercent: 0,
 		},
@@ -317,6 +322,7 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 				},
 			},
 			chartsByID:  map[int]entity.PlayerDataChart{},
+			maxOPTotal:  service.CalcSongMaxOP(15.0),
 			wantValue:   0,
 			wantPercent: 0,
 		},
@@ -342,14 +348,50 @@ func TestCalculateOverpowerSummary_登録対象の通常譜面から合計値と
 				1: {ID: 1, SongID: 1, Const: 15.0},
 				2: {ID: 2, SongID: 2, Const: 14.5},
 			},
+			maxOPTotal:  service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.5),
 			wantValue:   0,
 			wantPercent: 0,
+		},
+		{
+			name: "分母が0の場合は割合を0にする",
+			fullRecords: []repository.PlayerRecordForUpsert{
+				{
+					ChartID: 1,
+					State: repository.PlayerRecordState{
+						Score:       1010000,
+						ComboLampID: 3,
+					},
+				},
+			},
+			chartsByID: map[int]entity.PlayerDataChart{
+				1: {ID: 1, SongID: 1, Const: 15.0},
+			},
+			wantValue:   90,
+			wantPercent: 0,
+		},
+		{
+			name: "計算誤差などで分子が分母を超えても割合は100を上限にする",
+			fullRecords: []repository.PlayerRecordForUpsert{
+				{
+					ChartID: 1,
+					State: repository.PlayerRecordState{
+						Score:       1010000,
+						ComboLampID: 3,
+					},
+				},
+			},
+			chartsByID: map[int]entity.PlayerDataChart{
+				1: {ID: 1, SongID: 1, Const: 15.0},
+			},
+			maxOPTotal:  1.0,
+			wantValue:   90,
+			wantPercent: 100,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateOverpowerSummary(tt.fullRecords, tt.chartsByID)
+			got := calculateOverpowerSummary(tt.fullRecords, tt.chartsByID, tt.maxOPTotal)
 
 			require.NotNil(t, got.Value)
 			require.NotNil(t, got.Percent)

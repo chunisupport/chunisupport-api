@@ -733,13 +733,20 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID), nil
+	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, tx, repository.OverpowerTargetFilter{
+		ExcludeWorldsend: true,
+		ExcludeDeleted:   true,
+	})
+	if err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, err
+	}
+
+	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal), nil
 }
 
-func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart) calculatedOverpowerSummary {
+func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart, maxOverpowerTotal float64) calculatedOverpowerSummary {
 	type songBestRecord struct {
-		overpower  float64
-		chartConst float64
+		overpower float64
 	}
 
 	bestBySongID := make(map[int]songBestRecord, len(fullRecords))
@@ -759,34 +766,20 @@ func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, c
 		best, exists := bestBySongID[chart.SongID]
 		if !exists || overpower > best.overpower {
 			bestBySongID[chart.SongID] = songBestRecord{
-				overpower:  overpower,
-				chartConst: float64(chart.Const),
+				overpower: overpower,
 			}
 		}
 	}
 
 	totalOverpower := 0.0
-	totalChartConst := 0.0
 	for _, best := range bestBySongID {
 		totalOverpower += best.overpower
-		totalChartConst += best.chartConst
 	}
 
-	chartCount := len(bestBySongID)
-	if chartCount == 0 {
-		value := 0.0
-		percent := 0.0
-		return calculatedOverpowerSummary{
-			Value:   &value,
-			Percent: &percent,
-		}
-	}
-
-	theoreticalTotal := info.CalcTheoreticalOverpowerTotal(totalChartConst, chartCount)
 	value := max(roundFloat(totalOverpower, 3), 0.0)
 	percent := 0.0
-	if theoreticalTotal > 0 {
-		percent = min(max(roundFloat(totalOverpower/theoreticalTotal*100, 4), 0.0), 100.0)
+	if maxOverpowerTotal > 0 {
+		percent = min(max(roundFloat(totalOverpower/maxOverpowerTotal*100, 4), 0.0), 100.0)
 	}
 
 	return calculatedOverpowerSummary{

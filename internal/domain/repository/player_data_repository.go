@@ -20,6 +20,18 @@ type PlayerDataSaveInput struct {
 	WorldsendRecords []WorldsendRecordForUpsert
 }
 
+// OverpowerTargetFilter はOVER POWER集計対象楽曲の絞り込み条件です。
+type OverpowerTargetFilter struct {
+	ExcludeWorldsend bool
+	ExcludeDeleted   bool
+}
+
+// OverpowerTargetStats はOVER POWER割合計算で使う全体集計値です。
+type OverpowerTargetStats struct {
+	SongCount         int
+	MaxOverpowerTotal float64
+}
+
 // PlayerDataRepository はプレイヤーデータ登録に関する永続化を扱うリポジトリです。
 type PlayerDataRepository interface {
 	// LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
@@ -27,4 +39,7 @@ type PlayerDataRepository interface {
 
 	// SavePlayerData はプレイヤーデータを一括で保存します。
 	SavePlayerData(ctx context.Context, exec Executor, input PlayerDataSaveInput) error
+
+	// GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
+	GetOverpowerTargetStats(ctx context.Context, exec Executor, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
 }
