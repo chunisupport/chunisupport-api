@@ -58,6 +58,8 @@ chunisupport-api*
 _chunisupport-api*
 *.sqlite
 *.db
+*.db-shm
+*.db-wal
 
 # 個人用メモ
 MEMO.md
