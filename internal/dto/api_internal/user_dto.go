@@ -48,6 +48,12 @@ type UserProfileRecordViewDTO struct {
 	UpdatedAt *time.Time                 `json:"updated_at"` // プレイヤーデータの最終更新日時
 }
 
+// UserProfileDTO はユーザー名とプレイヤー情報のみを含む軽量なプロファイルDTOです。
+type UserProfileDTO struct {
+	Username string         `json:"username"`
+	Player   *dto.PlayerDTO `json:"player"`
+}
+
 // UserDTO はユーザー情報を外部に公開するためのDTOです。
 // パスワードハッシュなどの機密情報は含まれません。
 type UserDTO struct {

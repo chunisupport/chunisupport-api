@@ -9,6 +9,11 @@ import (
 
 // UserUsecase はユーザー関連のユースケースを定義します。
 type UserUsecase interface {
+	// GetUserProfile はユーザー名をキーにプロファイル（username + player）のみを軽量に取得します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
+	GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error)
+
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
 	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。

@@ -74,6 +74,20 @@ func NewUserServiceWithFirebaseDeleter(db repository.Executor, userRepo reposito
 	return impl
 }
 
+// GetUserProfile はユーザー名をキーにプロファイル（username + player）を軽量に取得します。
+// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
+// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
+func (s *userUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error) {
+	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+	return &api_internal.UserProfileDTO{
+		Username: user.Username.String(),
+		Player:   player,
+	}, nil
+}
+
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 // 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
 // プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。

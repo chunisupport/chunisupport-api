@@ -23,6 +23,22 @@ func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
 	return &UserHandler{userUsecase: userUsecase}
 }
 
+// GetUserProfile はユーザー名とプレイヤーデータのみを返す軽量なハンドラです。
+func (h *UserHandler) GetUserProfile(c echo.Context) error {
+	username := c.Param("username")
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserProfile(c.Request().Context(), username, requester)
+	if err != nil {
+		return h.handleUserProfileError(err, username, "user profile")
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
 func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	username := c.Param("username")

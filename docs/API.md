@@ -123,6 +123,7 @@
 | `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除 |
 | `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
+| `/internal/users/:username/profile` | GET | Cookie (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Cookie (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
@@ -1202,6 +1203,47 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
+
+### GET `/internal/users/:username/profile`
+- **認証**: Cookie (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。
+
+#### レスポンス例
+
+```json
+{
+  "username": "sample_user",
+  "player": {
+    "name": "プレイヤー名",
+    "level": 50,
+    "rating": 16.5,
+    "class_emblem_id": 3,
+    "class_emblem_base_id": 1,
+    "last_played_at": "2024-12-01T15:30:00Z",
+    "overpower_value": 1234.56,
+    "overpower_percent": 98.76,
+    "honors": [
+      {
+        "slot": 1,
+        "name": "称号名",
+        "type_name": "gold",
+        "image_url": "https://example.com/honor.png"
+      }
+    ],
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-12-20T10:00:00Z"
+  }
+}
+```
+
+#### UserProfileDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | ユーザー名 |
+| `player` | object | プレイヤー情報。スキーマは `PlayerDTO` と同一 |
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Cookie (任意)
