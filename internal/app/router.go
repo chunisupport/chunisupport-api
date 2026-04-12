@@ -408,7 +408,6 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 	}
 }
 
-// parseSameSite は文字列をhttp.SameSite型に変換します
 // echoLogWriter はEchoログ出力用のWriterで、ファイルハンドルのライフサイクル管理が可能
 type echoLogWriter struct {
 	writer io.Writer
