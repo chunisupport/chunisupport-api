@@ -71,20 +71,6 @@ func (u *firebaseRegisterUsecase) RegisterWithFirebase(ctx context.Context, idTo
 
 	var newUser *entity.User
 	if err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		// Firebase UID が既存ユーザーに紐付いていないか確認
-		if _, err := u.userRepo.FindByFirebaseUID(ctx, tx, uid); err == nil {
-			return ErrFirebaseUIDAlreadyLinked
-		} else if !errors.Is(err, repository.ErrUserNotFound) {
-			return err
-		}
-
-		// ユーザー名が使用済みでないか確認
-		if _, err := u.userRepo.FindByUsername(ctx, tx, un.String()); err == nil {
-			return ErrUsernameTaken
-		} else if !errors.Is(err, repository.ErrUserNotFound) {
-			return err
-		}
-
 		newUser = entity.NewFirebaseUser(un, uid, info.AccountTypePlayer)
 		if err := u.userRepo.Save(ctx, tx, newUser); err != nil {
 			if errors.Is(err, repository.ErrDuplicateUsername) {

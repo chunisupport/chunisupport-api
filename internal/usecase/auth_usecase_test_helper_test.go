@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -13,9 +14,9 @@ import (
 func newMockMasterCache() AccountTypeProvider {
 	return &stubAccountTypeProvider{
 		nameByID: map[int]string{
-			1: "PLAYER",
-			2: "EDITOR",
-			3: "ADMIN",
+			info.AccountTypePlayer: "PLAYER",
+			info.AccountTypeEditor: "EDITOR",
+			info.AccountTypeAdmin:  "ADMIN",
 		},
 	}
 }

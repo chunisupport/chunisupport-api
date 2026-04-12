@@ -28,8 +28,6 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "newuser").Return(nil, repository.ErrUserNotFound).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
 					user.ID = 99
 					return user.Username.String() == "newuser" && user.FirebaseUID != nil && *user.FirebaseUID == "firebase-uid"
@@ -59,7 +57,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.On("VerifyIDToken", mock.Anything, "linked-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 10}, nil).Once()
+				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 			},
 			wantErr: ErrFirebaseUIDAlreadyLinked,
 		},
@@ -69,8 +67,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "newuser").Return(&entity.User{ID: 1}, nil).Once()
+				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrDuplicateUsername).Once()
 			},
 			wantErr: ErrUsernameTaken,
 		},
@@ -120,6 +117,8 @@ func TestSignupUsecase_Signup(t *testing.T) {
 
 			verifier.AssertExpectations(t)
 			userRepo.AssertExpectations(t)
+			userRepo.AssertNotCalled(t, "FindByFirebaseUID", mock.Anything, mock.Anything, mock.Anything)
+			userRepo.AssertNotCalled(t, "FindByUsername", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }

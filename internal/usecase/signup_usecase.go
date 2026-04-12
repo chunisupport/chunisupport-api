@@ -82,18 +82,6 @@ func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr 
 
 	var newUser *entity.User
 	if err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		if _, err := u.userRepo.FindByFirebaseUID(ctx, tx, uid); err == nil {
-			return ErrFirebaseUIDAlreadyLinked
-		} else if !errors.Is(err, repository.ErrUserNotFound) {
-			return err
-		}
-
-		if _, err := u.userRepo.FindByUsername(ctx, tx, un.String()); err == nil {
-			return ErrUsernameTaken
-		} else if !errors.Is(err, repository.ErrUserNotFound) {
-			return err
-		}
-
 		newUser = entity.NewFirebaseUser(un, uid, info.AccountTypePlayer)
 		if err := u.userRepo.Save(ctx, tx, newUser); err != nil {
 			if errors.Is(err, repository.ErrDuplicateUsername) {

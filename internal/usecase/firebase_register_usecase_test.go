@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,8 +27,6 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "newuser").Return(nil, repository.ErrUserNotFound).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(nil).Once()
 				sessionIssuer.On("IssueSession", mock.Anything, mock.AnythingOfType("*entity.User")).Return("jwt-token", nil).Once()
 			},
@@ -49,6 +46,7 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			wantErr: ErrInvalidIDToken,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.AssertNotCalled(t, "VerifyIDToken", mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -61,7 +59,7 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			wantErr: ErrInvalidIDToken,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByFirebaseUID", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -70,13 +68,13 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.On("VerifyIDToken", mock.Anything, "linked-token").Return("existing-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "existing-uid").Return(&entity.User{ID: 99}, nil).Once()
+				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 			},
 			wantErr: ErrFirebaseUIDAlreadyLinked,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				sessionIssuer.AssertNotCalled(t, "IssueSession", mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -85,14 +83,13 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			username: "takenuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "takenuser").Return(&entity.User{ID: 10}, nil).Once()
+				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrDuplicateUsername).Once()
 			},
 			wantErr: ErrUsernameTaken,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.AssertExpectations(t)
 				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+				sessionIssuer.AssertNotCalled(t, "IssueSession", mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -105,7 +102,7 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			wantErr: ErrUsernameTooShort,
 			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByFirebaseUID", mock.Anything, mock.Anything, mock.Anything)
+				userRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 			},
 		},
 		{
@@ -114,8 +111,6 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			username: "newuser",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository, sessionIssuer *authMockSessionIssuer) {
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
-				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "newuser").Return(nil, repository.ErrUserNotFound).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 			},
 			wantErr: ErrFirebaseUIDAlreadyLinked,
@@ -152,6 +147,9 @@ func TestFirebaseRegisterUsecase_RegisterWithFirebase(t *testing.T) {
 			if tt.assertAfter != nil {
 				tt.assertAfter(t, verifier, userRepo, sessionIssuer)
 			}
+
+			userRepo.AssertNotCalled(t, "FindByFirebaseUID", mock.Anything, mock.Anything, mock.Anything)
+			userRepo.AssertNotCalled(t, "FindByUsername", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
