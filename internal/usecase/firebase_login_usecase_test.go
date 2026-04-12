@@ -22,6 +22,14 @@ func (m *mockFirebaseAuthUsecase) Authenticate(ctx context.Context, idToken stri
 	return args.Get(0).(*entity.User), args.Error(1)
 }
 
+func (m *mockFirebaseAuthUsecase) AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error) {
+	args := m.Called(ctx, idToken)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
 type mockSessionIssuer struct {
 	mock.Mock
 }

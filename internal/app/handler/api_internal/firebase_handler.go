@@ -14,7 +14,7 @@ type firebaseRequest struct {
 
 type firebaseRegisterRequest struct {
 	IDToken  string `json:"id_token" validate:"required"`
-	Username string `json:"username" validate:"required,username"`
+	Username string `json:"username" validate:"username"`
 }
 
 // FirebaseHandler は Firebase ログイン・連携・登録リクエストを処理します。

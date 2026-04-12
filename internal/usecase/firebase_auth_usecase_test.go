@@ -177,6 +177,75 @@ func TestFirebaseAuthUsecase_Authenticate(t *testing.T) {
 	}
 }
 
+func TestFirebaseAuthUsecase_AuthenticateOptional(t *testing.T) {
+	tests := []struct {
+		name        string
+		idToken     string
+		setup       func(verifier *mockTokenVerifier, userRepo *MockUserRepository)
+		wantUser    *entity.User
+		wantNilUser bool
+		wantErr     error
+	}{
+		{
+			name:    "有効なIDトークンでユーザーが存在すればユーザーを返す",
+			idToken: "valid-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				user := &entity.User{ID: 10}
+				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(user, nil).Once()
+			},
+			wantUser: &entity.User{ID: 10},
+		},
+		{
+			name:    "有効なIDトークンでも未登録ユーザーなら匿名扱いにする",
+			idToken: "missing-user-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "missing-user-token").Return("firebase-uid", nil).Once()
+				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
+			},
+			wantNilUser: true,
+		},
+		{
+			name:    "不正なIDトークンならErrInvalidIDTokenを返す",
+			idToken: "invalid-token",
+			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
+				verifier.On("VerifyIDToken", mock.Anything, "invalid-token").Return("", errors.Join(ErrInvalidIDToken, errors.New("verify failed"))).Once()
+			},
+			wantErr: ErrInvalidIDToken,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			verifier := new(mockTokenVerifier)
+			userRepo := new(MockUserRepository)
+			service := NewFirebaseAuthUsecase(nil, userRepo, verifier)
+			tt.setup(verifier, userRepo)
+
+			// When
+			gotUser, err := service.AuthenticateOptional(context.Background(), tt.idToken)
+
+			// Then
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, gotUser)
+			} else if tt.wantNilUser {
+				require.NoError(t, err)
+				assert.Nil(t, gotUser)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, gotUser)
+				assert.Equal(t, tt.wantUser.ID, gotUser.ID)
+			}
+
+			verifier.AssertExpectations(t)
+			userRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestFirebaseAuthUsecase_Authenticate_TokenVerifierがnilの場合はErrInternalErrorを返す(t *testing.T) {
 	// Given
 	userRepo := new(MockUserRepository)

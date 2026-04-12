@@ -20,6 +20,8 @@ type TokenVerifier interface {
 type FirebaseAuthUsecase interface {
 	// Authenticate はFirebase IDトークンを検証し、紐づく有効ユーザーを返します。
 	Authenticate(ctx context.Context, idToken string) (*entity.User, error)
+	// AuthenticateOptional はFirebase IDトークンを検証し、未登録ユーザーなら匿名扱いにします。
+	AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error)
 }
 
 type firebaseAuthUsecase struct {
@@ -39,6 +41,15 @@ func NewFirebaseAuthUsecase(db repository.Executor, userRepo repository.UserRepo
 
 // Authenticate はFirebase IDトークンを検証し、紐づくユーザーを返します。
 func (u *firebaseAuthUsecase) Authenticate(ctx context.Context, idToken string) (*entity.User, error) {
+	return u.authenticate(ctx, idToken, false)
+}
+
+// AuthenticateOptional はFirebase IDトークンを検証し、未登録ユーザーなら匿名扱いにします。
+func (u *firebaseAuthUsecase) AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error) {
+	return u.authenticate(ctx, idToken, true)
+}
+
+func (u *firebaseAuthUsecase) authenticate(ctx context.Context, idToken string, allowMissingUser bool) (*entity.User, error) {
 	idToken = strings.TrimSpace(idToken)
 	if idToken == "" {
 		return nil, ErrInvalidIDToken
@@ -68,6 +79,10 @@ func (u *firebaseAuthUsecase) Authenticate(ctx context.Context, idToken string) 
 	user, err := u.userRepo.FindByFirebaseUID(ctx, u.db, uid)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
+			if allowMissingUser {
+				return nil, nil
+			}
+
 			return nil, ErrInvalidIDToken
 		}
 

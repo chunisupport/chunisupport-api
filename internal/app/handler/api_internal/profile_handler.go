@@ -5,26 +5,19 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/auth"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
 
 // ProfileHandler は認証済みユーザーのプロフィール関連リクエストを処理します。
 type ProfileHandler struct {
-	authUsecase           usecase.AuthUsecase
 	userCredentialUsecase usecase.UserCredentialUsecase
-	cookieSecure          bool
-	cookieSameSite        http.SameSite
 }
 
 // NewProfileHandler は新しいProfileHandlerを生成します。
-func NewProfileHandler(authUsecase usecase.AuthUsecase, userCredentialUsecase usecase.UserCredentialUsecase, cookieSecure bool, cookieSameSite http.SameSite) *ProfileHandler {
+func NewProfileHandler(userCredentialUsecase usecase.UserCredentialUsecase) *ProfileHandler {
 	return &ProfileHandler{
-		authUsecase:           authUsecase,
 		userCredentialUsecase: userCredentialUsecase,
-		cookieSecure:          cookieSecure,
-		cookieSameSite:        cookieSameSite,
 	}
 }
 
@@ -102,19 +95,11 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 		return err
 	}
 
+	// TODO: Firebase の recent sign-in を使った再認証を追加する。
 	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID); err != nil {
 		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
 	}
-
-	if claims, ok := c.Get("user").(*auth.Claims); ok && claims != nil {
-		if err := h.authUsecase.Logout(c.Request().Context(), claims.SessionID); err != nil {
-			slog.Error("Failed to invalidate session after deletion", "session_id", claims.SessionID, "error", err)
-			return apierror.ErrInternalError.WithInternal(err)
-		}
-	}
-
-	c.SetCookie(newAuthCookie(h.cookieSecure, h.cookieSameSite, "", -1))
 
 	return c.NoContent(http.StatusOK)
 }

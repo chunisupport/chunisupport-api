@@ -75,6 +75,7 @@ func (cv *CustomValidator) Validate(i any) error {
 type Handlers struct {
 	Auth                *api_internal.AuthHandler
 	Firebase            *api_internal.FirebaseHandler
+	Signup              *api_internal.SignupHandler
 	Recovery            *api_internal.RecoveryHandler
 	Profile             *api_internal.ProfileHandler
 	User                *api_internal.UserHandler
@@ -157,12 +158,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(tm, userRepo, firebaseTokenVerifier)
 	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
 	firebaseRegisterUsecase := usecase.NewFirebaseRegisterUsecase(tm, userRepo, firebaseTokenVerifier, sessionIssuer)
+	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
 	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, firebaseRegisterUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
 		Auth:                api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
 		Firebase:            firebaseHandler,
+		Signup:              api_internal.NewSignupHandler(signupUsecase),
 		Recovery:            api_internal.NewRecoveryHandler(recoveryUsecase),
-		Profile:             api_internal.NewProfileHandler(authUsecase, userCredentialUsecase, cfg.Auth.CookieSecure, sameSite),
+		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
 		User:                api_internal.NewUserHandler(userUsecase),
 		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
 		Song:                api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -197,19 +200,19 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret, cfg)
+	registerRoutes(e, handlers, firebaseAuthUsecase, apiTokenUsecase, cfg)
 
 	return e
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.Authenticator, apiTokenUsecase usecase.APITokenUsecase, secret string, cfg config.Config) {
+func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator middleware.FirebaseAuthenticator, apiTokenUsecase usecase.APITokenUsecase, cfg config.Config) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
-	// JWT認証ミドルウェア
-	jwtAuth := middleware.JWTMiddleware(secret, authenticator)
-	optionalJWTAuth := middleware.OptionalJWTMiddleware(secret, authenticator)
+	// Firebase認証ミドルウェア
+	firebaseAuth := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticator)
+	optionalFirebaseAuth := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticator)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
@@ -224,52 +227,27 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
 	{
-		// ログイン: 1分間に10回まで
-		authGroup.POST("/login", handlers.Auth.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.LoginRateLimitRequests,
-			Window:   info.LoginRateLimitWindow,
-		}))
-		authGroup.POST("/firebase/login", handlers.Firebase.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.LoginRateLimitRequests,
-			Window:   info.LoginRateLimitWindow,
-		}))
-		// Firebase経由の新規登録: 1分間に5回まで
-		authGroup.POST("/firebase/register", handlers.Firebase.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		// Firebase経由の初回登録: 1分間に5回まで
+		authGroup.POST("/signup", handlers.Signup.Signup, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.POST("/logout", handlers.Auth.Logout, jwtAuth)
-		// 登録: 1分間に5回まで
-		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.RegisterRateLimitRequests,
-			Window:   info.RegisterRateLimitWindow,
-		}))
-		authGroup.POST("/recovery-codes", handlers.Recovery.RecoverPassword, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.RecoveryCodeRateLimitRequests,
-			Window:   info.RecoveryCodeRateLimitWindow,
-		}))
-		authGroup.POST("/api-tokens", handlers.APIToken.Generate, jwtAuth)
-		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, jwtAuth)
+		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuth)
+		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuth)
 	}
 
 	// api.chunisupport.net/internal/me
 	meGroup := internal.Group("/me")
-	meGroup.Use(jwtAuth)
+	meGroup.Use(firebaseAuth)
 	{
 		meGroup.GET("", handlers.Profile.Me)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
-		meGroup.PUT("/password", handlers.Profile.ChangePassword)
-		meGroup.POST("/recovery-codes", handlers.Recovery.IssueRecoveryCodes)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
-		meGroup.POST("/firebase/link", handlers.Firebase.Link)
-		// セッション管理
-		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
-		meGroup.DELETE("/sessions", handlers.Session.LogoutOtherSessions)
 		meGroup.GET("/goals", handlers.Goal.List)
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
@@ -285,14 +263,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))
-	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, jwtAuth, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, firebaseAuth, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.RegisterDataRateLimitRequests,
 		Window:   info.RegisterDataRateLimitWindow,
 	}))
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(optionalJWTAuth, anonymousRateLimit)
+	publicUsersGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
 	{
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
@@ -300,7 +278,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	}
 
 	usersGroup := internal.Group("/users")
-	usersGroup.Use(jwtAuth)
+	usersGroup.Use(firebaseAuth)
 	{
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
@@ -308,7 +286,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 
 	// api.chunisupport.net/internal/songs
 	publicSongsGroup := internal.Group("/songs")
-	publicSongsGroup.Use(optionalJWTAuth, anonymousRateLimit)
+	publicSongsGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
 	{
 		publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
@@ -324,7 +302,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	}
 
 	songsGroup := internal.Group("/songs")
-	songsGroup.Use(jwtAuth)
+	songsGroup.Use(firebaseAuth)
 	{
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
 		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireEditor)
@@ -340,7 +318,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 	}
 
 	editorSongsGroup := internal.Group("/editor/songs")
-	editorSongsGroup.Use(jwtAuth, requireEditor)
+	editorSongsGroup.Use(firebaseAuth, requireEditor)
 	{
 		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
 		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
@@ -350,7 +328,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authenticator middleware.A
 
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
-	masterGroup.Use(jwtAuth)
+	masterGroup.Use(firebaseAuth)
 	{
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
 	}

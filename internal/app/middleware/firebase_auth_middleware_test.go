@@ -30,6 +30,15 @@ func (m *mockFirebaseAuthenticator) Authenticate(ctx context.Context, idToken st
 	return nil, args.Error(1)
 }
 
+func (m *mockFirebaseAuthenticator) AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error) {
+	args := m.Called(ctx, idToken)
+	if user, ok := args.Get(0).(*entity.User); ok {
+		return user, args.Error(1)
+	}
+
+	return nil, args.Error(1)
+}
+
 func TestFirebaseIDTokenMiddleware(t *testing.T) {
 	e := echo.New()
 
@@ -233,6 +242,108 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+		mockAuthenticator.AssertExpectations(t)
+	})
+}
+
+func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
+	e := echo.New()
+
+	t.Run("Authorizationヘッダがない場合は匿名で次のハンドラーを実行する", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		handlerCalled := false
+		handler := middlewareFunc(func(c echo.Context) error {
+			handlerCalled = true
+			assert.Nil(t, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertNotCalled(t, "Authenticate", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Bearerトークンが有効な場合はuserEntityを設定して次のハンドラーを実行する", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer firebase-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		user := &entity.User{ID: 1}
+		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "firebase-token").Return(user, nil).Once()
+
+		handlerCalled := false
+		handler := middlewareFunc(func(c echo.Context) error {
+			handlerCalled = true
+			storedUser, ok := c.Get("userEntity").(*entity.User)
+			require.True(t, ok)
+			assert.Same(t, user, storedUser)
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertExpectations(t)
+	})
+
+	t.Run("有効なトークンだが未登録ユーザーなら匿名で次のハンドラーを実行する", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer unregistered-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "unregistered-token").Return(nil, nil).Once()
+
+		handlerCalled := false
+		handler := middlewareFunc(func(c echo.Context) error {
+			handlerCalled = true
+			assert.Nil(t, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertExpectations(t)
+	})
+
+	t.Run("不正なトークンの場合は401を返す", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "invalid-token").Return(nil, usecase.ErrInvalidIDToken).Once()
+
+		handler := middlewareFunc(func(c echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		apiErr, ok := err.(*apierror.APIError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeInvalidToken, apiErr.Code)
 		mockAuthenticator.AssertExpectations(t)
 	})
 }

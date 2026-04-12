@@ -12,6 +12,7 @@ import (
 // FirebaseAuthenticator はFirebase IDトークンからユーザーを解決する最小インターフェースです。
 type FirebaseAuthenticator interface {
 	Authenticate(ctx context.Context, idToken string) (*entity.User, error)
+	AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error)
 }
 
 // FirebaseIDTokenMiddleware はBearerのFirebase IDトークン認証を行います。
@@ -35,6 +36,31 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 			}
 
 			c.Set("userEntity", user)
+			return next(c)
+		}
+	}
+}
+
+// OptionalFirebaseIDTokenMiddleware はBearerのFirebase IDトークンがある場合のみ認証を行います。
+func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			idToken := extractBearerToken(c)
+			if idToken == "" {
+				return next(c)
+			}
+			if authenticator == nil {
+				return apierror.ErrInternalError.WithInternal(errors.New("firebase authenticator is nil"))
+			}
+
+			user, err := authenticator.AuthenticateOptional(c.Request().Context(), idToken)
+			if err != nil {
+				return apierror.FromUsecaseError(err)
+			}
+			if user != nil {
+				c.Set("userEntity", user)
+			}
+
 			return next(c)
 		}
 	}
