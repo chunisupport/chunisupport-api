@@ -23,8 +23,8 @@
 - `PUT /internal/me/goals/:id`
 - `DELETE /internal/me/goals/:id`
 
-全エンドポイントで Cookie 認証が必須です。
-ルーティング上は `/internal/me` グループ配下にあり、`jwtAuth` ミドルウェアが適用されています。
+全エンドポイントで Firebase ID トークンによる Bearer 認証が必須です。
+ルーティング上は `/internal/me` グループ配下にあり、`firebaseAuth` ミドルウェアが適用されています。
 
 ## 2. データモデル
 

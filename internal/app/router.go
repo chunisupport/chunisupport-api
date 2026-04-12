@@ -17,7 +17,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	vo_recoverycode "github.com/chunisupport/chunisupport-api/internal/domain/vo/recoverycode"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -38,18 +37,10 @@ type CustomValidator struct {
 // NewCustomValidator は新しいCustomValidatorを生成します。
 func NewCustomValidator() *CustomValidator {
 	v := validator.New()
-	if err := v.RegisterValidation("recoverycode", validateRecoveryCode); err != nil {
-		panic(err)
-	}
 	if err := v.RegisterValidation("username", validateUsername); err != nil {
 		panic(err)
 	}
 	return &CustomValidator{Validator: v}
-}
-
-func validateRecoveryCode(fl validator.FieldLevel) bool {
-	_, err := vo_recoverycode.New(fl.Field().String())
-	return err == nil
 }
 
 func validateUsername(fl validator.FieldLevel) bool {
@@ -73,10 +64,7 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Auth                *api_internal.AuthHandler
-	Firebase            *api_internal.FirebaseHandler
 	Signup              *api_internal.SignupHandler
-	Recovery            *api_internal.RecoveryHandler
 	Profile             *api_internal.ProfileHandler
 	User                *api_internal.UserHandler
 	AdminUser           *api_internal.AdminUserHandler
@@ -85,7 +73,6 @@ type Handlers struct {
 	APIToken            *api_internal.APITokenHandler
 	Me                  *api_internal.MeHandler
 	MasterData          *api_internal.MasterDataHandler
-	Session             *api_internal.SessionHandler
 	Goal                *api_internal.GoalHandler
 	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
 	// 外部API v1 用ハンドラ
@@ -128,17 +115,12 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
-	sessionRepo := infra.NewSessionRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
-	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	sessionIssuer := usecase.NewSessionIssuer(db, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour)
-	authUsecase := usecase.NewAuthUsecase(db, userRepo, sessionRepo, sessionIssuer, cfg.PwPepper, masterCache)
-	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, firebaseUserDeleter, cfg.PwPepper, masterCache)
-	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
@@ -148,23 +130,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
-	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
-	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
-	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(tm, userRepo, firebaseTokenVerifier)
-	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
-	firebaseRegisterUsecase := usecase.NewFirebaseRegisterUsecase(tm, userRepo, firebaseTokenVerifier, sessionIssuer)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
-	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, firebaseRegisterUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
-		Auth:                api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
-		Firebase:            firebaseHandler,
 		Signup:              api_internal.NewSignupHandler(signupUsecase),
-		Recovery:            api_internal.NewRecoveryHandler(recoveryUsecase),
 		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
 		User:                api_internal.NewUserHandler(userUsecase),
 		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
@@ -173,7 +146,6 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:                  api_internal.NewMeHandler(playerDataUsecase),
 		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
-		Session:             api_internal.NewSessionHandler(sessionUsecase),
 		Goal:                api_internal.NewGoalHandler(goalUsecase),
 		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		// 外部API v1 用ハンドラ
@@ -433,20 +405,6 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 		}
 
 		return c.NoContent(http.StatusOK)
-	}
-}
-
-// parseSameSite は文字列をhttp.SameSite型に変換します
-func parseSameSite(value string) http.SameSite {
-	switch value {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		fallthrough
-	default:
-		return http.SameSiteLaxMode
 	}
 }
 

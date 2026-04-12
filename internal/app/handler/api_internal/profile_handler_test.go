@@ -86,7 +86,6 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Empty(t, rec.Result().Cookies())
 		userCredentialMock.AssertExpectations(t)
 	})
 
@@ -101,53 +100,5 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 
 		// Then
 		assert.ErrorIs(t, err, apierror.ErrUnauthorized)
-	})
-}
-
-func TestProfileHandler_ChangePassword(t *testing.T) {
-	e := newTestEcho()
-	h, userCredentialMock := newProfileHandlerWithMocks()
-
-	t.Run("正常系: パスワード変更", func(t *testing.T) {
-		// Given
-		user := &entity.User{ID: 5}
-		userCredentialMock.On("ChangePassword", mock.Anything, 5, "oldpass123", "newpass123").Return(nil).Once()
-
-		body := `{"current_password":"oldpass123","new_password":"newpass123"}`
-		req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.Set("userEntity", user)
-
-		// When
-		err := h.ChangePassword(c)
-
-		// Then
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
-		userCredentialMock.AssertExpectations(t)
-	})
-
-	t.Run("異常系: 新しいパスワードが短い場合はバリデーションエラー", func(t *testing.T) {
-		// Given
-		user := &entity.User{ID: 5}
-
-		body := `{"current_password":"oldpass123","new_password":"short"}`
-		req := httptest.NewRequest(http.MethodPut, "/internal/me/password", bytes.NewBufferString(body))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.Set("userEntity", user)
-
-		// When
-		err := h.ChangePassword(c)
-
-		// Then
-		assert.Error(t, err)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok)
-		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
-		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
@@ -13,7 +12,6 @@ type User struct {
 	ID            int
 	Username      username.UserName
 	FirebaseUID   *string
-	PasswordHash  passwordhash.PasswordHash
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	PlayerID      *int
@@ -23,26 +21,24 @@ type User struct {
 }
 
 // NewUser は必須項目が設定された新規ユーザーを生成します。
-func NewUser(userName username.UserName, hash passwordhash.PasswordHash, accountTypeID int) *User {
+func NewUser(userName username.UserName, accountTypeID int) *User {
 	now := time.Now()
 
 	return &User{
 		Username:      userName,
-		PasswordHash:  hash,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 		AccountTypeID: accountTypeID,
 	}
 }
 
-// NewFirebaseUser はFirebase UID紐付け済みのパスワードなし新規ユーザーを生成します。
+// NewFirebaseUser はFirebase UID紐付け済みの新規ユーザーを生成します。
 func NewFirebaseUser(userName username.UserName, uid string, accountTypeID int) *User {
 	now := time.Now()
 	normalizedUID := strings.TrimSpace(uid)
 
 	return &User{
 		Username:      userName,
-		PasswordHash:  passwordhash.NewEmptyPasswordHash(),
 		FirebaseUID:   &normalizedUID,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -68,12 +64,6 @@ func (u *User) HasLinkedFirebase() bool {
 // ChangePrivacy はユーザーの公開/非公開設定を変更します。
 func (u *User) ChangePrivacy(isPrivate bool) {
 	u.IsPrivate = isPrivate
-	u.UpdatedAt = time.Now()
-}
-
-// ChangePassword はユーザーのパスワードハッシュを変更します。
-func (u *User) ChangePassword(hash passwordhash.PasswordHash) {
-	u.PasswordHash = hash
 	u.UpdatedAt = time.Now()
 }
 

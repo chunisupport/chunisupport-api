@@ -13,7 +13,6 @@
 ```
 internal/
 ├── app/         # アプリケーション層: ルーティング、ミドルウェア、DIコンテナ
-├── auth/        # 認証・認可に関するドメインロジック
 ├── config/      # 設定情報の読み込み
 ├── domain/      # ドメインモデルとリポジトリインターフェース
 │   ├── entity/  # エンティティ（純粋なドメインモデル、db/jsonタグなし）
@@ -41,7 +40,7 @@ internal/
 ### `internal/domain` - ドメイン層
 
 - **役割**: アプリケーションの中核となるビジネスルールとデータ構造を定義します。このプロジェクトで最も重要な層です。
-- **`entity`**: アプリケーションで扱うエンティティ（例: `User`, `Player`）を定義します。**ドメインの純粋性を保つため、`db`タグや`json`タグは一切含まれません**。エンティティは振る舞いメソッド（例: `User.IsActive()`, `PlayerRecord.IsRanked()`）を持ち、ビジネスロジックをカプセル化します。
+- **`entity`**: アプリケーションで扱うエンティティ（例: `User`, `Player`）を定義します。**ドメインの純粋性を保つため、`db`タグや`json`タグは一切含まれません**。エンティティは振る舞いメソッド（例: `User.HasLinkedFirebase()`, `PlayerRecord.IsRanked()`）を持ち、ビジネスロジックをカプセル化します。
 - **`vo`**: 値オブジェクト（Value Object）を定義します。エンティティの属性を型安全に表現し、不変性とバリデーションを保証します（例: `username.UserName`, `score.Score`）。
 - **`repository`**: データベースなどへの永続化処理を抽象化するためのインターフェースを定義します。具体的な実装は`infra/repository`層が担当します。全メソッドは `context.Context` を第一引数に取ります。
 - **`service`**: CHUNITHM特有のレーティング計算ロジックを提供するドメインサービスです（例: `CalcSingleRating`, `CalcSingleOverpower`）。
@@ -75,9 +74,11 @@ internal/
 
 - **役割**: `.config/<environment>.settings.json` からアプリケーション設定を読み込み、構造体にマッピングする責務を持ちます。
 
-### `internal/auth`
+### 認証関連コンポーネント
 
-- **役割**: JWT（JSON Web Token）の生成や検証といった、認証・認可に特化したロジックを提供します。
+- **`internal/app/middleware`**: Firebase IDトークンおよびAPIトークンのHTTP認証ミドルウェアを提供します。
+- **`internal/usecase`**: Firebase IDトークン検証後のユーザー解決や初回登録など、認証フローのユースケースを提供します。
+- **`internal/infra/firebaseauth`**: Firebase Admin SDK を用いたIDトークン検証とFirebaseユーザー削除の実装を提供します。
 
 ### `internal/info`
 
@@ -103,17 +104,17 @@ internal/
 エンティティは単なるデータ構造ではなく、ビジネスロジックをカプセル化する振る舞いを持ちます：
 
 **クエリメソッド（状態の問い合わせ）**
-- `User.IsActive()`: ユーザーが有効（削除されていない）かを判定
 - `User.IsPublic()`: ユーザーが公開設定かを判定
 - `User.HasLinkedPlayer()`: プレイヤーが紐づいているかを判定
+- `User.HasLinkedFirebase()`: Firebase UID が紐づいているかを判定
 - `PlayerRecord.IsRanked()`: レコードがランキング対象かを判定
 - `PlayerRecord.SlotKey()`: スロット種別キーを取得
 
 **コマンドメソッド（状態の変更）**
 - `User.ChangePrivacy(isPrivate)`: プライバシー設定を変更
-- `User.ChangePassword(hash)`: パスワードを変更
-- `User.Delete()`: 論理削除を実行
+- `User.LinkFirebaseUID(uid)`: Firebase UID を紐付け・解除
 - `User.LinkPlayer(playerID)`: プレイヤーを紐付け
+- `User.UnlinkPlayer()`: プレイヤーとの紐付けを解除
 
 これらのメソッドは、状態変更時に自動的に`UpdatedAt`を更新するなど、ドメインのルールを強制します。
 
@@ -122,7 +123,7 @@ internal/
 リポジトリパターンは、集約単位での操作を基本とします：
 
 - **Save(ctx, entity)**: 集約ルートを保存します。内部でINSERT/UPDATE判定を行い、適切なSQL文を実行します。
-- **部分更新の廃止**: `UpdatePrivacy`や`UpdatePassword`といった特定カラムのみを更新するメソッドは廃止され、エンティティのコマンドメソッド + `Save`パターンに統一されました。
+- **部分更新の廃止**: `UpdatePrivacy`や`LinkFirebaseUID`相当の特定カラムのみを更新するメソッドは廃止され、エンティティのコマンドメソッド + `Save`パターンに統一されました。
 
 ```go
 // 推奨されるパターン

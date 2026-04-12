@@ -8,7 +8,7 @@ import (
 )
 
 // RequireRole は指定されたロール要件を満たすことを要求するミドルウェアを返します。
-// JWTMiddleware の後に使用することを想定しています。
+// userEntity を Context に設定する認証ミドルウェアの後に使用することを想定しています。
 func RequireRole(requiredRoleID int) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

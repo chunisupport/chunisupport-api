@@ -87,7 +87,6 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_認証状態を見ない
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	req.AddCookie(&http.Cookie{Name: "token", Value: "invalid-token"})
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 1})

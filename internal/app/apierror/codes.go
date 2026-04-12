@@ -13,8 +13,6 @@ const (
 	CodeInvalidToken             = "invalid_token"       // #nosec G101
 	CodeTokenExpired             = "token_expired"       // #nosec G101
 	CodeMissingToken             = "missing_token"       // #nosec G101
-	CodeInvalidSession           = "invalid_session"     // セッション無効/期限切れを統一
-	CodeInvalidRecovery          = "invalid_recovery_credentials"
 	CodeForbidden                = "forbidden"
 	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
 
@@ -51,9 +49,6 @@ const (
 	CodeUsernameTooShort      = "username_too_short"
 	CodeUsernameTooLong       = "username_too_long"
 	CodeUsernameInvalidChar   = "username_invalid_char"
-	CodePasswordTooShort      = "password_too_short"
-	CodePasswordTooLong       = "password_too_long"
-	CodeInvalidPassword       = "invalid_password"        // パスワードが無効（詳細を隠蔽）
 	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
 
 	// 目標関連エラー

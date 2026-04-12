@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -15,16 +14,13 @@ func TestNewUser(t *testing.T) {
 	// Given
 	userName, err := username.NewUserName("testuser")
 	require.NoError(t, err)
-	hash, err := passwordhash.NewPasswordHash("hashed-password")
-	require.NoError(t, err)
 
 	// When
-	user := NewUser(userName, hash, info.AccountTypePlayer)
+	user := NewUser(userName, info.AccountTypePlayer)
 
 	// Then
 	require.NotNil(t, user)
 	assert.Equal(t, userName, user.Username)
-	assert.Equal(t, hash, user.PasswordHash)
 	assert.Equal(t, info.AccountTypePlayer, user.AccountTypeID)
 	assert.False(t, user.CreatedAt.IsZero())
 	assert.False(t, user.UpdatedAt.IsZero())
@@ -49,7 +45,7 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 			name:           "UID を設定すると連携済みになる",
 			uid:            "firebase-uid-1",
 			expectedLinked: true,
-			expectedUID:    new("firebase-uid-1"),
+			expectedUID:    ptr("firebase-uid-1"),
 		},
 		{
 			name:           "空白だけのUIDは未連携として扱う",
@@ -74,4 +70,8 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 			assert.NotEqual(t, baseTime, user.UpdatedAt)
 		})
 	}
+}
+
+func ptr(value string) *string {
+	return &value
 }

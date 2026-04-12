@@ -24,7 +24,7 @@
 | `charts` | 譜面情報。楽曲ごとに複数行がありデータ量が大きいため除外。 |
 | `worldsend_charts` | WORLD'S END譜面情報。件数は多く、曲データと同様に除外。 |
 | `users` / `players` / `player_honors` | ユーザーやプレイヤープロフィールの動的データで更新が入るためキャッシュしない。 |
-| `sessions` / `api_tokens` | 認証系の揮発データで有効期限・更新が頻繁に変わるため除外。 |
+| `api_tokens` | 認証系の動的データで更新が入るため除外。 |
 | `player_records` / `player_worldsend_records` | スコア記録。更新頻度が高く件数も多いためプリロードしない。 |
 
 ## 補足

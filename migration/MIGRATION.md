@@ -22,38 +22,20 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **役割**: このシステムのユーザーアカウント情報を格納します。
 - **主なカラム**:
     - `id`: ユーザーのユニークID。
-    - `username`: ログインに使用するユーザー名（ユニーク制約）。
-    - `password_hash`: Argon2idでハッシュ化されたパスワード。
+    - `username`: アプリ内で一意なユーザー名（ユニーク制約）。
+    - `firebase_uid`: Firebase Authentication の UID（ユニーク制約、NULL可）。
     - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN）。
     - `player_id`: `players`テーブルへの外部キー（ユニーク制約、NULL可）。
-    - `is_deleted`: 論理削除フラグ（0=有効, 1=削除済み）。
     - `is_private`: プライバシー設定（0=公開, 1=非公開）。
     - `is_suspicious`: 不審アカウントフラグ（0=正常, 1=不審）。
     - `created_at`, `updated_at`: 作成日時、更新日時。
-
-#### `sessions`
-- **役割**: ユーザーのログインセッションを管理します。JWTと組み合わせた認証方式のバックエンドとして機能します。
-- **主なカラム**:
-    - `id`: セッションのユニークID（UUID文字列）。
-    - `user_id`: `users`テーブルへの外部キー（`ON DELETE CASCADE`設定）。
-    - `expires_at`: セッションの有効期限。
 
 #### `api_tokens`
 - **役割**: API認証用のトークンを管理します。
 - **主なカラム**:
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
-    - `token_hash`: トークンのハッシュ値。
-    - `name`: トークンの識別名。
-    - `expires_at`: トークンの有効期限。
-    - `created_at`, `last_used_at`: 作成日時、最終使用日時。
-
-#### `user_recovery_codes`
-- **役割**: アカウント回復用のワンタイムコードを格納します（マイグレーション000003で追加）。
-- **主なカラム**:
-    - `id`: レコードID。
-    - `user_id`: `users`テーブルへの外部キー（`ON DELETE CASCADE`設定）。
-    - `code_hash`: リカバリコードのハッシュ値（ユニーク制約）。
+    - `hashed_token`: トークンのハッシュ値。
     - `created_at`: 作成日時。
 
 ### プレイヤー・ゲームデータ関連
@@ -99,14 +81,6 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `player_id`, `slot`: プレイヤーIDとスロット番号（1=上段, 2=中段, 3=下段）の複合主キー。
     - `honor_id`: `honors`テーブルへの外部キー。
-    - `created_at`: 作成日時。
-
-#### `user_recovery_codes`
-- **役割**: アカウント回復用のワンタイムコードを格納します。
-- **主なカラム**:
-    - `id`: レコードID。
-    - `user_id`: `users`テーブルへの外部キー（`ON DELETE CASCADE`設定）。
-    - `code_hash`: リカバリコードのハッシュ値（BINARY(32)、ユニーク制約）。
     - `created_at`: 作成日時。
 
 ### 楽曲・譜面関連
@@ -188,3 +162,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000009**: `charts` テーブルと `worldsend_charts` テーブルに譜面製作者を保持する `notes_designer` カラムを追加。
 - **000010**: `songs`、`charts`、`worldsend_charts` テーブルに `updated_at` カラムを追加し、重複・非効率なインデックスを整理（`idx_worldsend_charts_song_id` / `idx_charts_song_id` / `idx_sessions_user_id` を削除、`player_worldsend_records(player_id, updated_at DESC)` と `goals(user_id, created_at, id)` を追加）。
 - **000011**: `players.overpower_value` の型を `DECIMAL(8,2)` → `DECIMAL(9,3)` へ、`players.overpower_percentage` の型を `DECIMAL(5,2)` → `DECIMAL(7,4)` へ変更。精度向上のため。
+- **000012**: Firebase 認証への一本化に伴い、`cleanup_expired_sessions` イベント、`sessions` テーブル、`user_recovery_codes` テーブル、および `users.password_hash` カラムを削除。破棄された旧認証データは down でも復元されず、ロールバックではスキーマのみ復元される。

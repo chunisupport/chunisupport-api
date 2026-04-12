@@ -36,8 +36,6 @@ func (v ValidationErrors) Details() []ValidationErrorDetail {
 			detail.Message = fmt.Sprintf("%s文字以下で入力してください。", fe.Param())
 		case "username":
 			detail.Message = "5〜50文字の小文字英数字で入力してください。"
-		case "recoverycode":
-			detail.Message = "リカバリーコードの形式が不正です。"
 		default:
 			detail.Message = "入力値の形式が不正です。"
 		}

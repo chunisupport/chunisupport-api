@@ -4,7 +4,7 @@
 
 ## 主な機能
 
-- **ユーザー認証**: JWTとサーバーサイドセッションを組み合わせたハイブリッド認証方式による、安全なユーザー登録・ログイン・ログアウト機能を提供します。
+- **内部API認証**: `/internal` エンドポイントでは Firebase ID トークンによる Bearer 認証を提供します。
 - **APIトークン認証**: 外部クライアント向けに、1ユーザー1トークンの永続APIキーで保護された `/v1` エンドポイントを提供します。
 - **プレイヤー情報**: ユーザーに紐づくプレイヤー情報を管理します。
 - **楽曲データ**: CHUNITHMの公式楽曲データを元にしたデータベースを提供します。データの構築は別リポジトリのバッチ処理で行われます。
@@ -12,7 +12,6 @@
 ## ドキュメント
 
 - [API仕様書（内部/公開）](docs/API.md)
-- [リカバリーコード仕様](docs/recovery_code_spec.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 
 ## 技術スタック
@@ -44,8 +43,7 @@
    ```bash
    # .env
    APP_ENV=develop
-   JWT_SECRET=your_secret_32_chars_min
-   PW_PEPPER=your_pepper_32_chars_min
+   FIREBASE_CREDENTIALS_FILE=path/to/service-account.json
    DB_NAME=chunisupport
    DB_HOST=localhost
    DB_PORT=3306
@@ -59,12 +57,6 @@
       "log_paths": {
          "app": ".log/app",
          "echo": ".log/echo"
-      },
-      "auth": {
-         "jwt_expiration_hour": 24,
-         "session_expiration_hour": 24,
-         "cookie_secure": false,
-         "cookie_same_site": "lax"
       },
       "shutdown_timeout_seconds": 20,
       "cors": {
@@ -88,17 +80,7 @@
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    migrate -database "sqlite3://./static.db" -path migration/sqlite up
    ```
-   
-   **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
-   ```bash
-   mysql -u <DB_USER> -p -e "SET GLOBAL event_scheduler = ON;"
-   ```
-   または、MySQL設定ファイル（`my.cnf`/`my.ini`）に以下を追加して永続化してください：
-   ```ini
-   [mysqld]
-   event_scheduler = ON
-   ```
-   
+
 5. 起動する。
    ```bash
    APP_ENV=develop go run main.go

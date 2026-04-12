@@ -64,8 +64,6 @@ var (
 	ErrInvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized)
 	ErrTokenExpired             = New(CodeTokenExpired, http.StatusUnauthorized)
 	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
-	ErrInvalidSession           = New(CodeInvalidSession, http.StatusUnauthorized) // セッション無効/期限切れ統一
-	ErrInvalidRecovery          = New(CodeInvalidRecovery, http.StatusUnauthorized)
 	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
 	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)
 
@@ -100,9 +98,6 @@ var (
 	ErrUsernameTooShort      = New(CodeUsernameTooShort, http.StatusBadRequest)
 	ErrUsernameTooLong       = New(CodeUsernameTooLong, http.StatusBadRequest)
 	ErrUsernameInvalidChar   = New(CodeUsernameInvalidChar, http.StatusBadRequest)
-	ErrPasswordTooShort      = New(CodePasswordTooShort, http.StatusBadRequest)
-	ErrPasswordTooLong       = New(CodePasswordTooLong, http.StatusBadRequest)
-	ErrInvalidPassword       = New(CodeInvalidPassword, http.StatusBadRequest)       // パスワード無効（詳細隠蔽）
 	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
 
 	ErrGoalNotFound                 = New(CodeGoalNotFound, http.StatusNotFound)

@@ -22,20 +22,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidCredentials.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidIDToken):
 		return ErrInvalidToken.WithInternal(err)
-	case errors.Is(err, usecase.ErrIncorrectPassword):
-		return ErrInvalidCredentials.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidPassword):
-		return ErrInvalidPassword.WithInternal(err) // パスワード関連を統合
-	case errors.Is(err, usecase.ErrUserIDMismatch):
-		return ErrForbidden.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidSession):
-		return ErrInvalidSession.WithInternal(err) // セッション系を統合
 	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
 		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return ErrUserNotFound.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidRecoveryCredentials):
-		return ErrInvalidRecovery.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserPrivate):
 		return ErrUserNotFound.WithInternal(err) // 403 → 404 でユーザー存在を隠蔽
 	case errors.Is(err, usecase.ErrPlayerNotLinked):
@@ -70,11 +60,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrUsernameTooLong.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameInvalidChar):
 		return ErrUsernameInvalidChar.WithInternal(err)
-	// パスワードバリデーションエラー
-	case errors.Is(err, usecase.ErrPasswordTooShort):
-		return ErrPasswordTooShort.WithInternal(err)
-	case errors.Is(err, usecase.ErrPasswordTooLong):
-		return ErrPasswordTooLong.WithInternal(err)
 	// アプリバージョンバリデーションエラー
 	case errors.Is(err, usecase.ErrAppVersionUnsupported):
 		return ErrAppVersionUnsupported.WithInternal(err)

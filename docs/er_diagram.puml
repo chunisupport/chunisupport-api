@@ -14,21 +14,13 @@ entity "users" as users {
   + id: INT [PK]
   --
   username: VARCHAR(50) NOT NULL UNIQUE
-  password_hash: VARCHAR(255) NOT NULL
+  firebase_uid: VARCHAR(128) NULL [UNIQUE]
   account_type_id: TINYINT NOT NULL
   player_id: MEDIUMINT UNSIGNED [UNIQUE]
-  is_deleted: BOOLEAN NOT NULL
   is_private: BOOLEAN NOT NULL
+  is_suspicious: BOOLEAN NOT NULL
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
-}
-
-entity "sessions" as sessions {
-  + id: VARCHAR(255) [PK]
-  --
-  user_id: INT NOT NULL
-  expires_at: TIMESTAMP NOT NULL
-  created_at: TIMESTAMP
 }
 
 entity "api_tokens" as api_tokens {
@@ -52,8 +44,8 @@ entity "players" as players {
   class_emblem_id: TINYINT
   class_emblem_base_id: TINYINT
   last_played_at: DATETIME
-  overpower_value: DECIMAL(8, 2)
-  overpower_percentage: DECIMAL(5, 2)
+  overpower_value: DECIMAL(9, 3)
+  overpower_percentage: DECIMAL(7, 4)
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
 }
@@ -107,11 +99,12 @@ entity "songs" as songs {
   artist: VARCHAR(300) NOT NULL
   genre_id: TINYINT NOT NULL
   bpm: INT
-  release_date: DATE
+  released_at: DATE
   official_idx: VARCHAR(10) UNIQUE
-  img: VARCHAR(20)
+  jacket: VARCHAR(20)
   is_worldsend: BOOLEAN NOT NULL
   is_deleted: TINYINT(1) NOT NULL
+  updated_at: TIMESTAMP
 }
 
 entity "charts" as charts {
@@ -122,6 +115,8 @@ entity "charts" as charts {
   const: DECIMAL(3, 1) NOT NULL
   is_const_unknown: BOOLEAN NOT NULL
   notes: INT
+  notes_designer: VARCHAR(100)
+  updated_at: TIMESTAMP
 }
 
 entity "worldsend_charts" as worldsend_charts {
@@ -131,6 +126,8 @@ entity "worldsend_charts" as worldsend_charts {
   level_star: TINYINT
   attribute: CHAR(1)
   notes: INT
+  notes_designer: VARCHAR(100)
+  updated_at: TIMESTAMP
 }
 
 ' master tables
@@ -207,20 +204,10 @@ entity "versions" as versions {
   released_at: DATE NOT NULL
 }
 
-entity "user_recovery_codes" as user_recovery_codes {
-  + id: INT UNSIGNED [PK]
-  --
-  user_id: INT NOT NULL
-  code_hash: BINARY(32) NOT NULL [UNIQUE]
-  created_at: TIMESTAMP
-}
-
 
 ' relationships
-users ||--o{ sessions
 users ||--|o players
 users ||--|o api_tokens
-users ||--o{ user_recovery_codes
 users }o--|| account_types
 
 players ||--o{ player_records

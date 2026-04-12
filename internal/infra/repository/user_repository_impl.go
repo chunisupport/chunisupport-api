@@ -29,7 +29,7 @@ func NewUserRepository(db *sqlx.DB) repository.UserRepository {
 // FindByID はIDでユーザーを検索します。
 func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ?`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ?`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -43,7 +43,7 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 // FindByIDForUpdate はIDでユーザーを検索し、更新用に行ロックします。
 func (r *userRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ? FOR UPDATE`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ? FOR UPDATE`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -57,7 +57,7 @@ func (r *userRepository) FindByIDForUpdate(ctx context.Context, exec repository.
 // FindByUsername はユーザー名でユーザーを検索します。
 func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE username = ?`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE username = ?`
 	err := exec.GetContext(ctx, &userModel, query, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -71,7 +71,7 @@ func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Exe
 // FindByFirebaseUID はFirebase UIDでユーザーを検索します。
 func (r *userRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE firebase_uid = ?`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE firebase_uid = ?`
 	err := exec.GetContext(ctx, &userModel, query, uid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -287,8 +287,8 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 
 	if user.ID == 0 {
 		// 新規作成
-		query := `INSERT INTO users (username, firebase_uid, password_hash, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.PasswordHash, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate)
+		query := `INSERT INTO users (username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate)
 		if err != nil {
 			err = wrapFirebaseUIDDuplicateError(err)
 			err = wrapUsernameDuplicateError(err)
@@ -304,8 +304,8 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 
 	// 更新。部分取得エンティティで取りこぼし得る不変項目は更新前提としてのみ扱います。
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
-	query := fmt.Sprintf("UPDATE users SET password_hash = ?, player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND %s", whereClause)
-	args := []any{userModel.PasswordHash, userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, userModel.AccountTypeID}
+	query := "UPDATE users SET player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
+	args := []any{userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, userModel.AccountTypeID}
 	args = append(args, whereArgs...)
 
 	result, err := exec.ExecContext(ctx, query, args...)

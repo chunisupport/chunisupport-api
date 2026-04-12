@@ -60,34 +60,6 @@ func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"is_private": req.IsPrivate})
 }
 
-type changePasswordRequest struct {
-	CurrentPassword string `json:"current_password" validate:"required,min=8,max=128"`
-	NewPassword     string `json:"new_password" validate:"required,min=8,max=128"`
-}
-
-// ChangePassword は認証済みユーザーのパスワードを変更するリクエストを処理します。
-func (h *ProfileHandler) ChangePassword(c echo.Context) error {
-	user, err := getUserEntityFromContext(c)
-	if err != nil {
-		return err
-	}
-
-	req := new(changePasswordRequest)
-	if err := c.Bind(req); err != nil {
-		return apierror.ErrBadRequest.WithInternal(err)
-	}
-	if err := c.Validate(req); err != nil {
-		return err
-	}
-
-	if err := h.userCredentialUsecase.ChangePassword(c.Request().Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
-		slog.Error("Failed to change password", "user_id", user.ID, "error", err)
-		return apierror.FromUsecaseError(err)
-	}
-
-	return c.NoContent(http.StatusOK)
-}
-
 // DeleteAccount は認証済みユーザーの物理削除を行うリクエストを処理します。
 func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 	user, err := getUserEntityFromContext(c)

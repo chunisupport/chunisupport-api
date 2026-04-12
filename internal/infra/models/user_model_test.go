@@ -15,48 +15,41 @@ func TestUserModel_ToEntity(t *testing.T) {
 	tests := []struct {
 		name            string
 		model           UserModel
-		wantPassword    string
 		wantFirebaseUID *string
-		wantErr         string
 	}{
 		{
-			name: "Firebase UID があるユーザーは空の password_hash を許容する",
+			name: "Firebase UID があるユーザーを復元できる",
 			model: UserModel{
 				ID:            1,
 				Username:      "firebaseuser",
 				FirebaseUID:   &firebaseUID,
-				PasswordHash:  "",
 				CreatedAt:     now,
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantPassword:    "",
 			wantFirebaseUID: &firebaseUID,
 		},
 		{
-			name: "Firebase UID がないユーザーの空の password_hash はエラーになる",
+			name: "Firebase UID がないユーザーも復元できる",
 			model: UserModel{
 				ID:            2,
 				Username:      "normaluser",
-				PasswordHash:  "",
 				CreatedAt:     now,
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantErr: "password hash cannot be empty",
 		},
 		{
-			name: "Firebase UID が空文字だけのユーザーの空の password_hash はエラーになる",
+			name: "Firebase UID が空白なら未連携として復元する",
 			model: UserModel{
 				ID:            3,
 				Username:      "invaliduser",
 				FirebaseUID:   ptr(" "),
-				PasswordHash:  "",
 				CreatedAt:     now,
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantErr: "password hash cannot be empty",
+			wantFirebaseUID: nil,
 		},
 	}
 
@@ -69,16 +62,8 @@ func TestUserModel_ToEntity(t *testing.T) {
 			got, err := model.ToEntity()
 
 			// Then
-			if tt.wantErr != "" {
-				require.Error(t, err)
-				assert.EqualError(t, err, tt.wantErr)
-				assert.Nil(t, got)
-				return
-			}
-
 			require.NoError(t, err)
 			require.NotNil(t, got)
-			assert.Equal(t, tt.wantPassword, got.PasswordHash.String())
 			assert.Equal(t, tt.wantFirebaseUID, got.FirebaseUID)
 		})
 	}

@@ -7,12 +7,6 @@
   },
   "static_db_path": "./static.db",
   "shutdown_timeout_seconds": 20,
-  "auth": {
-    "jwt_expiration_hour": 24,
-    "session_expiration_hour": 24,
-    "cookie_secure": false,
-    "cookie_same_site": "lax"
-  },
   "cors": {
     "allow_origins": [
       "http://localhost:3000"

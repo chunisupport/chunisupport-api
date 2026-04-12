@@ -1,5 +1,8 @@
 # Firebase認証移行計画書
 
+> **注記**
+> この文書は 2026-04-05 時点の移行途中メモです。Cookie セッション、`password_hash`、`user_recovery_codes` などの記述は当時の検討材料を含んでおり、現行実装の正本ではありません。現行仕様は `docs/API.md`、`ARCHITECTURE.md`、`migration/MIGRATION.md` を参照してください。
+
 作成日: 2026-04-05
 
 ## 目的

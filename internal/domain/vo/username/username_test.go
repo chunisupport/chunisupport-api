@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewUserName(t *testing.T) {
@@ -132,6 +133,44 @@ func TestValidateUserName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.wantErr(t, validateUserName(tt.value), fmt.Sprintf("validateUserName(%v)", tt.value))
+		})
+	}
+}
+
+func TestValidateUserNameReturnsTypedErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantErr error
+	}{
+		{
+			name:    "空文字はErrEmpty",
+			value:   "",
+			wantErr: ErrEmpty,
+		},
+		{
+			name:    "4文字はErrTooShort",
+			value:   "test",
+			wantErr: ErrTooShort,
+		},
+		{
+			name:    "51文字はErrTooLong",
+			value:   "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxy",
+			wantErr: ErrTooLong,
+		},
+		{
+			name:    "英大文字を含むとErrInvalidChar",
+			value:   "Testuser",
+			wantErr: ErrInvalidChar,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateUserName(tt.value)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }

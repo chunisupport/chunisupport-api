@@ -7,17 +7,13 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
-	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/chunisupport/chunisupport-api/internal/utils"
 )
 
 // UserCredentialUsecase は認証済みユーザー自身の資格情報・プロフィール設定管理を扱います。
 type UserCredentialUsecase interface {
 	GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
-	ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) error
 	DeleteOwnAccount(ctx context.Context, userID int) error
 }
 
@@ -26,11 +22,7 @@ type userCredentialUsecaseImpl struct {
 	tm               TransactionManager
 	userRepo         repository.UserRepository
 	playerRecordRepo repository.PlayerRecordRepository
-	sessionRepo      repository.SessionRepository
-	apiTokenRepo     repository.APITokenRepository
-	recoveryCodeRepo repository.RecoveryCodeRepository
 	firebaseDeleter  FirebaseUserDeleter
-	pepper           string
 	masterCache      AccountTypeProvider
 }
 
@@ -39,10 +31,6 @@ func NewUserCredentialUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
-	sessionRepo repository.SessionRepository,
-	apiTokenRepo repository.APITokenRepository,
-	recoveryCodeRepo repository.RecoveryCodeRepository,
-	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
 	if db == nil {
@@ -57,15 +45,6 @@ func NewUserCredentialUsecase(
 	if playerRecordRepo == nil {
 		panic("player record repository is nil")
 	}
-	if sessionRepo == nil {
-		panic("session repository is nil")
-	}
-	if apiTokenRepo == nil {
-		panic("api token repository is nil")
-	}
-	if recoveryCodeRepo == nil {
-		panic("recovery code repository is nil")
-	}
 	if masterCache == nil {
 		panic("master cache is nil")
 	}
@@ -75,11 +54,7 @@ func NewUserCredentialUsecase(
 		tm:               tm,
 		userRepo:         userRepo,
 		playerRecordRepo: playerRecordRepo,
-		sessionRepo:      sessionRepo,
-		apiTokenRepo:     apiTokenRepo,
-		recoveryCodeRepo: recoveryCodeRepo,
 		firebaseDeleter:  noopFirebaseUserDeleter{},
-		pepper:           pepper,
 		masterCache:      masterCache,
 	}
 }
@@ -90,14 +65,10 @@ func NewUserCredentialUsecaseWithFirebaseDeleter(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
-	sessionRepo repository.SessionRepository,
-	apiTokenRepo repository.APITokenRepository,
-	recoveryCodeRepo repository.RecoveryCodeRepository,
 	firebaseDeleter FirebaseUserDeleter,
-	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
-	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, masterCache)
 	impl, ok := usecase.(*userCredentialUsecaseImpl)
 	if !ok {
 		return usecase
@@ -133,38 +104,6 @@ func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID in
 		return err
 	}
 	user.ChangePrivacy(isPrivate)
-	return s.userRepo.Save(ctx, s.db, user)
-}
-
-func (s *userCredentialUsecaseImpl) ChangePassword(ctx context.Context, userID int, currentPassword, newPassword string) error {
-	if len(newPassword) < info.PasswordMinLength {
-		return ErrPasswordTooShort
-	}
-	if len(newPassword) > info.PasswordMaxLength {
-		return ErrPasswordTooLong
-	}
-	user, err := s.userRepo.FindByID(ctx, s.db, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
-		}
-		return err
-	}
-	if !utils.CheckPasswordHashWithPepper(currentPassword, s.pepper, user.PasswordHash.String()) {
-		return ErrIncorrectPassword
-	}
-	if utils.CheckPasswordHashWithPepper(newPassword, s.pepper, user.PasswordHash.String()) {
-		return ErrInvalidPassword
-	}
-	hashed, err := utils.HashPasswordWithPepper(newPassword, s.pepper)
-	if err != nil {
-		return err
-	}
-	newHash, err := passwordhash.NewPasswordHash(hashed)
-	if err != nil {
-		return err
-	}
-	user.ChangePassword(newHash)
 	return s.userRepo.Save(ctx, s.db, user)
 }
 

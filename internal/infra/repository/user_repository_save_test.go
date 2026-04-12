@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
@@ -22,12 +21,12 @@ func TestUserRepositorySaveProtectsFirebaseUIDFromPartialEntity(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
-		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', 'linked-uid', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.IsPrivate = true
 	user.UpdatedAt = time.Date(2026, 4, 5, 12, 0, 0, 0, time.UTC)
 
@@ -58,12 +57,12 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	existingUID := "linked-uid"
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
-		VALUES (1, 'user01', 'linked-uid', 'hash-1', 1, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', 'linked-uid', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-2")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.FirebaseUID = &existingUID
 	user.IsPrivate = true
 	user.IsSuspicious = true
@@ -79,15 +78,13 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 
 	var saved struct {
 		FirebaseUID  *string `db:"firebase_uid"`
-		PasswordHash string  `db:"password_hash"`
 		IsPrivate    bool    `db:"is_private"`
 		IsSuspicious bool    `db:"is_suspicious"`
 	}
-	err = db.Get(&saved, `SELECT firebase_uid, password_hash, is_private, is_suspicious FROM users WHERE id = ?`, 1)
+	err = db.Get(&saved, `SELECT firebase_uid, is_private, is_suspicious FROM users WHERE id = ?`, 1)
 	require.NoError(t, err)
 	require.NotNil(t, saved.FirebaseUID)
 	assert.Equal(t, existingUID, *saved.FirebaseUID)
-	assert.Equal(t, "hash-2", saved.PasswordHash)
 	assert.True(t, saved.IsPrivate)
 	assert.True(t, saved.IsSuspicious)
 }
@@ -99,12 +96,12 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
-		VALUES (1, 'user01', NULL, 'hash-1', 1, 0, 0)
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-2")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.AccountTypeID = 0
 	user.IsPrivate = true
 	user.UpdatedAt = time.Date(2026, 4, 5, 12, 45, 0, 0, time.UTC)
@@ -118,12 +115,10 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
 
 	var saved struct {
-		PasswordHash string `db:"password_hash"`
-		IsPrivate    bool   `db:"is_private"`
+		IsPrivate bool `db:"is_private"`
 	}
-	err = db.Get(&saved, `SELECT password_hash, is_private FROM users WHERE id = ?`, 1)
+	err = db.Get(&saved, `SELECT is_private FROM users WHERE id = ?`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, "hash-1", saved.PasswordHash)
 	assert.False(t, saved.IsPrivate)
 }
 
@@ -133,7 +128,7 @@ func TestUserRepositorySaveReturnsErrUserNotFoundWhenTargetMissing(t *testing.T)
 	defer db.Close()
 	ctx := context.Background()
 
-	user := newUserForRepositorySaveTest(t, 999, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 999, "user01")
 	user.UpdatedAt = time.Date(2026, 4, 5, 14, 0, 0, 0, time.UTC)
 
 	repo := &userRepository{db: db}
@@ -151,7 +146,7 @@ func TestUserRepositorySaveCreatesUserWithAggregateTimestamps(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	user := newUserForRepositorySaveTest(t, 0, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 0, "user01")
 	user.CreatedAt = time.Date(2026, 4, 5, 15, 0, 0, 0, time.UTC)
 	user.UpdatedAt = time.Date(2026, 4, 5, 15, 1, 0, 0, time.UTC)
 	playerID := 123
@@ -168,7 +163,7 @@ func TestUserRepositorySaveCreatesUserWithAggregateTimestamps(t *testing.T) {
 	assert.NotZero(t, user.ID)
 
 	var savedCount int
-	err = db.Get(&savedCount, `SELECT COUNT(1) FROM users WHERE id = ? AND username = ? AND password_hash = ? AND created_at = ? AND updated_at = ? AND player_id = ? AND account_type_id = ? AND is_suspicious = 1`, user.ID, user.Username.String(), user.PasswordHash.String(), user.CreatedAt, user.UpdatedAt, playerID, user.AccountTypeID)
+	err = db.Get(&savedCount, `SELECT COUNT(1) FROM users WHERE id = ? AND username = ? AND created_at = ? AND updated_at = ? AND player_id = ? AND account_type_id = ? AND is_suspicious = 1`, user.ID, user.Username.String(), user.CreatedAt, user.UpdatedAt, playerID, user.AccountTypeID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, savedCount)
 }
@@ -224,8 +219,8 @@ func TestUserRepositoryLinkFirebaseUID(t *testing.T) {
 
 			if tt.wantErr != domainrepo.ErrUserNotFound {
 				_, err := db.Exec(`
-					INSERT INTO users (id, username, firebase_uid, password_hash, account_type_id, is_private, is_suspicious)
-					VALUES (?, 'user01', ?, 'hash-1', 1, 0, 0)
+					INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+					VALUES (?, 'user01', ?, 1, 0, 0)
 				`, 1, tt.initialUID)
 				require.NoError(t, err)
 			}
@@ -273,7 +268,6 @@ func setupUserRepositoryTestDB(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			username TEXT NOT NULL UNIQUE,
 			firebase_uid TEXT UNIQUE,
-			password_hash TEXT NOT NULL,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			account_type_id INTEGER NOT NULL DEFAULT 1,
@@ -287,15 +281,13 @@ func setupUserRepositoryTestDB(t *testing.T) *sqlx.DB {
 	return db
 }
 
-func newUserForRepositorySaveTest(t *testing.T, id int, name string, hash string) *entity.User {
+func newUserForRepositorySaveTest(t *testing.T, id int, name string) *entity.User {
 	t.Helper()
 
 	userName, err := username.NewUserName(name)
 	require.NoError(t, err)
-	passwordHash, err := passwordhash.NewPasswordHash(hash)
-	require.NoError(t, err)
 
-	user := entity.NewUser(userName, passwordHash, info.AccountTypePlayer)
+	user := entity.NewUser(userName, info.AccountTypePlayer)
 	user.ID = id
 
 	return user
