@@ -102,23 +102,4 @@ func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr 
 	return dto_internal.ToUserDTO(newUser, accountTypeName, newUser.IsPrivate, nil), nil
 }
 
-func convertUsernameError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	switch err.Error() {
-	case "username cannot be empty":
-		return ErrUsernameEmpty
-	case "username must be at least 5 characters":
-		return ErrUsernameTooShort
-	case "username must be 50 characters or less":
-		return ErrUsernameTooLong
-	case "username can only contain lowercase letters and numbers":
-		return ErrUsernameInvalidChar
-	default:
-		return err
-	}
-}
-
 var _ SignupUsecase = (*signupUsecase)(nil)
