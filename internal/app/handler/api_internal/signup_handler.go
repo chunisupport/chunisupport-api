@@ -2,9 +2,9 @@ package api_internal
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/httpheader"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -33,7 +33,7 @@ func (h *SignupHandler) Signup(c echo.Context) error {
 		return err
 	}
 
-	idToken := extractSignupBearerToken(c)
+	idToken := httpheader.ExtractBearerToken(c.Request().Header)
 	if idToken == "" {
 		return apierror.ErrMissingToken
 	}
@@ -44,23 +44,4 @@ func (h *SignupHandler) Signup(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, user)
-}
-
-func extractSignupBearerToken(c echo.Context) string {
-	authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
-	if authHeader == "" {
-		return ""
-	}
-
-	scheme, token, found := strings.Cut(authHeader, " ")
-	if !found || !strings.EqualFold(strings.TrimSpace(scheme), "Bearer") {
-		return ""
-	}
-
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return ""
-	}
-
-	return token
 }
