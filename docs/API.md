@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年04月05日
+**最終更新日**: 2026年04月12日
 
 ## ベースURLと環境
 
@@ -26,9 +26,11 @@
 
 ### 内部API (`/internal`)
 
-- ログイン成功時に `token` という名前の HTTPOnly Cookie を発行します。
-- 認証必須エンドポイントでは Cookie を検証し、ユーザー情報をリクエストコンテキストに格納します。
-- Cookie 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
+- 認証必須エンドポイントでは `Authorization: Bearer <Firebase ID Token>` を送信します。
+- 認証必須エンドポイントでは Firebase ID トークンを検証し、ユーザー情報をリクエストコンテキストに格納します。
+- Bearer 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
+- `token` Cookie や独自セッションは使用しません。
+- `POST /internal/auth/login`、`POST /internal/auth/logout`、`GET /internal/me/sessions` などのCookie/セッション前提APIは廃止されています。
 
 ### 公開API (`/v1`, `/compat/chunirec/2.0`)
 
@@ -97,53 +99,43 @@
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
-| `/internal/auth/register` | POST | 不要 | ユーザー登録 |
-| `/internal/auth/login` | POST | 不要 | ログインしてCookieを発行 |
-| `/internal/auth/firebase/login` | POST | 不要 | Firebase IDトークンでログインしてCookieを発行 |
-| `/internal/auth/firebase/register` | POST | 不要 | Firebase IDトークンで新規ユーザー登録してCookieを発行 |
-| `/internal/auth/logout` | POST | Cookie | セッション失効 |
-| `/internal/auth/recovery-codes` | POST | 不要 | リカバリーコードでパスワード再設定 |
-| `/internal/auth/api-tokens` | POST | Cookie | APIトークン発行 |
-| `/internal/auth/api-tokens` | DELETE | Cookie | APIトークン削除 |
-| `/internal/me` | GET | Cookie | 自身のユーザー情報 |
-| `/internal/me/privacy` | PUT | Cookie | 非公開設定更新 |
-| `/internal/me/password` | PUT | Cookie | パスワード変更 |
-| `/internal/me/recovery-codes` | POST | Cookie | リカバリーコード発行 |
-| `/internal/me` | DELETE | Cookie | アカウント物理削除 |
-| `/internal/me/register-data` | POST | Cookie | CHUNITHMプレイヤーデータ登録 |
-| `/internal/me/player-data` | DELETE | Cookie | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
+| `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
+| `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
+| `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
+| `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
+| `/internal/me` | DELETE | Firebase Bearer | アカウント物理削除 |
+| `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
+| `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
-| `/internal/player-data/commit` | POST | Cookie | 一時受付したプレイヤーデータを確定保存 |
-| `/internal/me/firebase/link` | POST | Cookie | Firebase UID を現在のユーザーへ連携 |
-| `/internal/me/sessions` | GET | Cookie | 有効なセッション数を取得 |
-| `/internal/me/sessions` | DELETE | Cookie | 現在のセッション以外をすべてログアウト |
-| `/internal/me/goals` | GET | Cookie | 目標一覧を取得 |
-| `/internal/me/goals` | POST | Cookie | 目標を作成 |
-| `/internal/me/goals/:id` | PUT | Cookie | 目標を更新 |
-| `/internal/me/goals/:id` | DELETE | Cookie | 目標を削除 |
-| `/internal/users/` | GET | Cookie (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
-| `/internal/users/:username/updated-at` | GET | Cookie (任意) | レコード更新日時のみ取得 |
-| `/internal/users/:username/profile` | GET | Cookie (任意) | ユーザー名とプレイヤー情報のみ取得 |
-| `/internal/users/:username` | GET | Cookie (任意) | プロファイルとレコードを一括取得 |
-| `/internal/users/:username` | DELETE | Cookie (ADMIN+) | ユーザーの物理削除 |
-| `/internal/songs/updated-at` | GET | Cookie (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
-| `/internal/songs` | GET | Cookie (任意) | WORLD'S END以外の楽曲一覧取得 |
-| `/internal/songs/:displayid` | GET | Cookie (任意) | 楽曲詳細取得 |
-| `/internal/songs/:displayid/stats/:difficulty` | GET | Cookie (任意) | 難易度別楽曲統計取得 |
-| `/internal/songs` | PUT | Cookie (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/:displayid` | DELETE | Cookie (EDITOR+) | 楽曲の論理削除 |
-| `/internal/songs/:displayid/restore` | POST | Cookie (EDITOR+) | 楽曲の復活 |
-| `/internal/songs/worldsend` | GET | Cookie (任意) | WORLD'S END楽曲一覧取得 |
-| `/internal/songs/worldsend/:displayid` | GET | Cookie (任意) | WORLD'S END楽曲詳細取得 |
-| `/internal/songs/worldsend` | PUT | Cookie (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/worldsend/:displayid` | DELETE | Cookie (EDITOR+) | WORLD'S END楽曲の論理削除 |
-| `/internal/songs/worldsend/:displayid/restore` | POST | Cookie (EDITOR+) | WORLD'S END楽曲の復活 |
-| `/internal/editor/songs` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/:displayid` | GET | Cookie (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/worldsend` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/worldsend/:displayid` | GET | Cookie (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/master` | GET | Cookie | フロントエンド向けマスターデータ取得 |
-| `/internal/master/versions` | GET | Cookie | バージョン一覧取得 |
+| `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
+| `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
+| `/internal/me/goals` | POST | Firebase Bearer | 目標を作成 |
+| `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
+| `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
+| `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
+| `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | レコード更新日時のみ取得 |
+| `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
+| `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
+| `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
+| `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
+| `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
+| `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
+| `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
+| `/internal/songs/:displayid` | DELETE | Firebase Bearer (EDITOR+) | 楽曲の論理削除 |
+| `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
+| `/internal/songs/worldsend` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
+| `/internal/songs/worldsend/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/songs/worldsend` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
+| `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の論理削除 |
+| `/internal/songs/worldsend/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
+| `/internal/editor/songs` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/worldsend` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/worldsend/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/master` | GET | Firebase Bearer | フロントエンド向けマスターデータ取得 |
+| `/internal/master/versions` | GET | Firebase Bearer | バージョン一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
@@ -184,30 +176,29 @@
 
 ## 認証エンドポイント
 
-### POST `/internal/auth/register`
-- **認証**: 不要
+### POST `/internal/auth/signup`
+- **認証**: Firebase Bearer 必須
+- **リクエストヘッダー**: `Authorization: Bearer <Firebase ID Token>`
 - **リクエストボディ**:
 
 ```json
 {
-  "username": "sample_user",
-  "password": "strongpassword"
+  "username": "sampleuser"
 }
 ```
 
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
 | `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
-| `password` | string | ✓ | 8〜128文字 |
 
-- **レスポンス**: 201 Created。`UserDTO` を返します。登録成功時は自動的にログイン状態となり、`token` Cookie が設定されます。
-- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
-- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、新しいセッションを作成すると最も古いセッションから自動的に削除されます。
+- **レスポンス**: 201 Created。`UserDTO` を返します。
 
 ```json
 {
-  "username": "sample_user",
-  "player": null
+  "username": "sampleuser",
+  "account_type": "PLAYER",
+  "is_private": false,
+  "last_score_update": null
 }
 ```
 
@@ -217,118 +208,14 @@
   - 400 Bad Request (`username_too_short`): ユーザー名が5文字未満
   - 400 Bad Request (`username_too_long`): ユーザー名が50文字超過
   - 400 Bad Request (`username_invalid_char`): ユーザー名に使用できない文字が含まれている（小文字英数字のみ可）
-  - 400 Bad Request (`password_too_short`): パスワードが8文字未満
-  - 400 Bad Request (`password_too_long`): パスワードが128文字超過
   - 400 Bad Request (`registration_failed`): ユーザー登録失敗（詳細隠蔽）
-  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
-
-### POST `/internal/auth/login`
-- **認証**: 不要
-- **リクエストボディ**:
-
-```json
-{
-  "username": "sample_user",
-  "password": "strongpassword"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
-| `password` | string | ✓ | 8〜128文字 |
-
-- **レスポンス**: 200 OK。ボディは空で、`token` Cookie が設定されます。
-- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
-- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、新しいセッションを作成すると最も古いセッションから自動的に削除されます。
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
-  - 401 Unauthorized (`invalid_credentials`): ユーザー名またはパスワードが不正
-
-### POST `/internal/auth/firebase/login`
-- **認証**: 不要
-- **リクエストボディ**:
-
-```json
-{
-  "id_token": "<Firebase ID Token>"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `id_token` | string | ✓ | 必須 |
-
-- **レスポンス**: 204 No Content。ボディは空で、`token` Cookie が設定されます。
-- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
-- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、新しいセッションを作成すると最も古いセッションから自動的に削除されます。
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
-  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正、失効済み、またはユーザーに未連携
-  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
-
-### POST `/internal/auth/firebase/register`
-- **認証**: 不要
-- **リクエストボディ**:
-
-```json
-{
-  "id_token": "<Firebase ID Token>",
-  "username": "<username>"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `id_token` | string | ✓ | 必須 |
-| `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
-
-- **レスポンス**: 201 Created。ボディは空で、`token` Cookie が設定されます。
-- **レスポンスヘッダー**: `Set-Cookie: token=<JWT>; Path=/; HttpOnly; ...`
-- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されており、超過時は最古のセッションから自動的に削除されます。
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
-  - 400 Bad Request (`registration_failed`): username 重複などによりユーザー登録失敗（詳細隠蔽）
   - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
-  - 422 Unprocessable Entity (`validation_failed`): usernameバリデーション失敗
-  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
-
-### POST `/internal/auth/logout`
-- **認証**: Cookie 必須
-- **レスポンス**: 200 OK。ボディは空です。
-- Cookieは即時失効 (`Max-Age=-1`)。
-- **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-
-### POST `/internal/auth/recovery-codes`
-- **認証**: 不要
-- **レートリミット**: 1分あたり5回/IP
-- **リクエストボディ**:
-
-```json
-{
-  "recovery_code": "A1B2-C3D4-E5F6",
-  "new_password": "new-password"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `recovery_code` | string | ✓ | `XXXX-XXXX-XXXX` 形式の英数字 |
-| `new_password` | string | ✓ | 8〜128文字 |
-
-- **レスポンス**: 200 OK。ボディは空です。
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): `recovery_code` の形式不正
-  - 400 Bad Request (`password_too_short`): パスワードが8文字未満
-  - 400 Bad Request (`password_too_long`): パスワードが128文字超過
-  - 400 Bad Request (`invalid_password`): パスワードが無効（詳細隠蔽）
-  - 401 Unauthorized (`invalid_recovery_credentials`): コード不正/使用済み/ユーザー不在（詳細隠蔽）
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/api-tokens`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **レスポンス**: 200 OK
 
 ```json
@@ -338,7 +225,7 @@
 トークンはレスポンスでのみ平文が取得できます。
 
 ### DELETE `/internal/auth/api-tokens`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **レスポンス**: 204 No Content
 - 自分のAPIトークンを削除します。トークンが存在しない場合でも204を返します。
 - **主なエラー**:
@@ -349,7 +236,7 @@
 ## `/internal/me` グループ
 
 ### GET `/internal/me`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **レスポンス**: `UserDTO`
 
 ```json
@@ -373,7 +260,7 @@
 - 最終スコア更新日時の取得に失敗した場合、このエンドポイントは成功レスポンスを返さずエラーを返します。
 
 ### PUT `/internal/me/privacy`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **リクエストボディ**:
 
 ```json
@@ -392,53 +279,11 @@
   - 400 Bad Request (`bad_request`): リクエスト形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
 
-### PUT `/internal/me/password`
-- **認証**: Cookie 必須
-- **リクエストボディ**:
-
-```json
-{
-  "current_password": "oldpassword123",
-  "new_password": "newpassword123"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `current_password` | string | ✓ | 8〜128文字 |
-| `new_password` | string | ✓ | 8〜128文字 |
-
-- **レスポンス**: 200 OK。ボディは空です。
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
-  - 400 Bad Request (`password_too_short`): 新しいパスワードが8文字未満
-  - 400 Bad Request (`password_too_long`): 新しいパスワードが128文字超過
-  - 400 Bad Request (`invalid_password`): パスワードが無効（詳細隠蔽）
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-  - 401 Unauthorized (`invalid_credentials`): 現在のパスワードが不正
-
-### POST `/internal/me/recovery-codes`
-- **認証**: Cookie 必須
-- **リクエストボディ**: なし
-- **レスポンス**: 200 OK。リカバリーコード一覧を返却します。
-
-```json
-{
-  "recovery_codes": [
-    "A1B2-C3D4-E5F6",
-    "G7H8-I9J0-K1L2"
-  ]
-}
-```
-
-- **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-
 ### DELETE `/internal/me`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **レスポンス**: 200 OK。ボディは空です。
 
-ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
+ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。現時点では Firebase の recent sign-in を使った再認証は未実装です。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -446,7 +291,7 @@
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 
 ### DELETE `/internal/me/player-data`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **レスポンス**: 204 No Content（ボディなし）
 
 ユーザーアカウントは残したまま、`users.player_id` を `NULL` にし、紐づく `players` および `player_records`/`player_worldsend_records`/`player_honors` を物理削除します。削除はトランザクション内で実行され、連携済みでない状態でも冪等に成功します。
@@ -454,70 +299,8 @@
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
 
-### POST `/internal/me/firebase/link`
-- **認証**: Cookie 必須
-- **リクエストボディ**:
-
-```json
-{
-  "id_token": "<Firebase ID Token>"
-}
-```
-
-| フィールド | 型 | 必須 | バリデーション |
-| ---------- | -- | ---- | -------------- |
-| `id_token` | string | ✓ | 必須 |
-
-- **レスポンス**: 204 No Content。
-- **挙動**:
-  - 同一ユーザーに同じ Firebase UID を再連携した場合は、冪等に成功します。
-  - 同一ユーザーに別の Firebase UID を連携しようとした場合は、`409 Conflict` (`firebase_uid_already_linked`) を返します（初回連携のみ許可）。
-  - 他ユーザーに既に連携されている Firebase UID は連携できません。
-
-- **主なエラー**:
-  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
-  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
-  - 401 Unauthorized (`unauthorized`): 削除済みユーザー
-  - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が他ユーザーに連携済み
-  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
-
-### GET `/internal/me/sessions`
-- **認証**: Cookie 必須
-- **説明**: 現在有効なセッション数を取得します。
-- **セッション数制限**: ユーザーあたりのセッション数は10件に制限されています。新規ログインで上限を超えた場合、最も古いセッションから自動的に削除されます。
-- **レスポンス**: 200 OK
-
-#### レスポンス例
-
-```json
-{
-  "count": 3
-}
-```
-
-#### レスポンススキーマ
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `count` | number | 有効なセッション数（期限切れを除く） |
-
-- **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-  - 500 Internal Server Error (`internal_error`): DB処理失敗
-
-### DELETE `/internal/me/sessions`
-- **認証**: Cookie 必須
-- **説明**: 現在のセッション以外をすべてログアウトします（他の端末からログアウト）。
-- **レスポンス**: 204 No Content（ボディなし）
-
-現在使用中のセッションは削除されないため、このリクエストを実行した端末はログイン状態のままとなります。他の端末では次回リクエスト時に401エラーが返され、再ログインが必要になります。
-
-- **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-  - 500 Internal Server Error (`internal_error`): DB処理失敗
-
 ### POST `/internal/me/register-data`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **コンテンツタイプ**: 
   - デフォルト（クエリパラメータなし）: `application/octet-stream` または `text/plain`（base64+gzip形式）
   - `?format=json`: `application/json`（デバッグ用、通常は使用しない）
@@ -767,7 +550,7 @@ curl -X POST \
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
-  - 401 Unauthorized (`missing_token` / `invalid_token`): Cookie欠如
+  - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
   - 409 Conflict (`conflict`): 別ユーザーのプレイヤーデータと競合
   - 413 Request Entity Too Large (`payload_too_large`): ボディサイズ5MB超過
   - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー（スコア範囲外など）
@@ -1053,7 +836,7 @@ curl -X POST \
 ## `/internal/users` グループ
 
 ### GET `/internal/users/`
-- **認証**: Cookie 必須（ADMIN権限必須）
+- **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
     - `page` (任意): ページ番号 (デフォルト: 1)
@@ -1112,7 +895,7 @@ curl -X POST \
 ---
 
 ### GET `/internal/users/:username`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
@@ -1185,7 +968,7 @@ curl -X POST \
 ---
 
 ### GET `/internal/users/:username/updated-at`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: プレイヤーデータの `updated_at` のみを返します。非公開設定のユーザーは本人以外 404 を返します。
@@ -1205,7 +988,7 @@ curl -X POST \
 | `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
 
 ### GET `/internal/users/:username/profile`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。
@@ -1246,7 +1029,7 @@ curl -X POST \
 | `player` | object | プレイヤー情報。スキーマは `PlayerDTO` と同一 |
 
 ### GET `/internal/songs/updated-at`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間10回/IP
 - **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
 
@@ -1319,7 +1102,7 @@ curl -X POST \
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開/プレイヤー未紐付含む）
 
 ### DELETE `/internal/users/:username`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
 - **パスパラメータ**: `username` - 削除対象ユーザーのユーザー名
 - **レスポンス**: 204 No Content
@@ -1327,7 +1110,7 @@ curl -X POST \
 **説明**: 指定されたユーザー名のユーザーを物理削除します。関連データ（プレイヤー・レコード・セッション・APIトークン・リカバリーコード）も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): Cookie欠如または無効
+  - 401 Unauthorized (`unauthorized`): Bearerトークン欠如または無効
   - 403 Forbidden (`forbidden`): ADMIN権限が不足
   - 404 Not Found (`user_not_found`): ユーザーが存在しない
   - 400 Bad Request (`operation_failed`): 操作失敗（詳細隠蔽）
@@ -1337,7 +1120,7 @@ curl -X POST \
 ## `/internal/songs` グループ
 
 ### GET `/internal/songs`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **概要**: WORLD'S END以外の全楽曲を譜面情報付きで取得します。デフォルトでは削除済み楽曲は除外されます。
 - **クエリパラメータ**:
@@ -1414,7 +1197,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/songs/:displayid`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
@@ -1454,7 +1237,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
 ### GET `/internal/songs/:displayid/stats/:difficulty`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: 
   - `displayid` - 楽曲の表示用ID
@@ -1547,7 +1330,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### PUT `/internal/songs`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列
@@ -1613,7 +1396,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### DELETE `/internal/songs/:displayid`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
@@ -1625,7 +1408,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
 ### POST `/internal/songs/:displayid/restore`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの削除済み楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
@@ -1637,7 +1420,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
 ### GET `/internal/songs/worldsend`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **クエリパラメータ**: 
   - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
@@ -1696,7 +1479,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/songs/worldsend/:displayid`
-- **認証**: Cookie (任意)
+- **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
@@ -1728,7 +1511,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### PUT `/internal/songs/worldsend`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: WORLD'S END 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列
@@ -1796,7 +1579,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### DELETE `/internal/songs/worldsend/:displayid`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
@@ -1809,7 +1592,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/songs/worldsend/:displayid/restore`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の削除済み WORLD'S END 楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
@@ -1826,7 +1609,7 @@ curl -X POST \
 ## `/internal/editor/songs` グループ
 
 ### GET `/internal/editor/songs`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 編集者向けに、WORLD'S END以外の全楽曲を削除済みも含めて取得します。
 - **レスポンス**: 200 OK
@@ -1865,7 +1648,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/editor/songs/:displayid`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの通常楽曲を取得します。削除済みも取得対象です。
@@ -1878,7 +1661,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/editor/songs/worldsend`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 編集者向けに、全 WORLD'S END 楽曲を削除済みも含めて取得します。
 - **レスポンス**: 200 OK
@@ -1917,7 +1700,7 @@ curl -X POST \
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/editor/songs/worldsend/:displayid`
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの WORLD'S END 楽曲を取得します。削除済みも取得対象です。
@@ -1935,7 +1718,7 @@ curl -X POST \
 
 ### GET `/internal/master`
 
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
@@ -2075,7 +1858,7 @@ curl -X POST \
 
 ### GET `/internal/master/versions`
 
-- **認証**: Cookie 必須
+- **認証**: Firebase Bearer 必須
 - **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
@@ -2773,7 +2556,7 @@ interface SkippedRecord {
 
 このエンドポイントでは、保存済み本文を `PlayerDataPayload` として解釈し、通常の `/internal/me/register-data` と同じ登録処理を実行します。ただし、一時データは登録処理の開始前に `uploadToken` 単位で消費されます。したがって、登録処理中にエラーになった場合でも同じ `uploadToken` では再試行できず、再アップロードが必要です。
 
-- **認証**: 必須（Cookie）
+- **認証**: 必須（Firebase Bearer）
 - **リクエスト**:
 
 ```json

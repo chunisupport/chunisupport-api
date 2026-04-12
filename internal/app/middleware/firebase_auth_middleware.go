@@ -39,3 +39,29 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 		}
 	}
 }
+
+// OptionalFirebaseIDTokenMiddleware はBearerのFirebase IDトークンがある場合のみ認証を行います。
+func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			idToken := extractBearerToken(c)
+			if idToken == "" {
+				return next(c)
+			}
+			if authenticator == nil {
+				return apierror.ErrInternalError.WithInternal(errors.New("firebase authenticator is nil"))
+			}
+
+			user, err := authenticator.Authenticate(c.Request().Context(), idToken)
+			if err != nil {
+				return apierror.FromUsecaseError(err)
+			}
+			if user == nil {
+				return apierror.ErrInternalError.WithInternal(errors.New("firebase authenticator returned nil user"))
+			}
+
+			c.Set("userEntity", user)
+			return next(c)
+		}
+	}
+}

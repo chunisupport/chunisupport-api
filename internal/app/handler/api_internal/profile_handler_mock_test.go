@@ -2,7 +2,6 @@ package api_internal_test
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -37,11 +36,10 @@ func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID
 	return args.Error(0)
 }
 
-func newProfileHandlerWithMocks(secureCookie bool, sameSite http.SameSite) (*api_internal.ProfileHandler, *mockAuthUsecase, *mockUserCredentialUsecase) {
-	authMock := new(mockAuthUsecase)
+func newProfileHandlerWithMocks() (*api_internal.ProfileHandler, *mockUserCredentialUsecase) {
 	userCredentialMock := new(mockUserCredentialUsecase)
 
-	h := api_internal.NewProfileHandler(authMock, userCredentialMock, secureCookie, sameSite)
+	h := api_internal.NewProfileHandler(userCredentialMock)
 
-	return h, authMock, userCredentialMock
+	return h, userCredentialMock
 }

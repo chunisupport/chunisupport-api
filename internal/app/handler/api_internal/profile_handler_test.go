@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/auth"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/labstack/echo/v4"
@@ -17,7 +16,7 @@ import (
 
 func TestProfileHandler_Me(t *testing.T) {
 	e := newTestEcho()
-	h, _, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
+	h, userCredentialMock := newProfileHandlerWithMocks()
 
 	t.Run("正常系: 自分のユーザー情報を取得できる", func(t *testing.T) {
 		// Given
@@ -43,7 +42,7 @@ func TestProfileHandler_Me(t *testing.T) {
 
 func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 	e := newTestEcho()
-	h, _, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
+	h, userCredentialMock := newProfileHandlerWithMocks()
 
 	t.Run("公開設定更新時にユースケースを呼び出して成功レスポンスを返す", func(t *testing.T) {
 		// Given
@@ -69,20 +68,17 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 
 func TestProfileHandler_DeleteAccount(t *testing.T) {
 	e := newTestEcho()
-	h, authMock, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
+	h, userCredentialMock := newProfileHandlerWithMocks()
 
-	t.Run("アカウント削除時にセッション無効化とCookie削除を行う", func(t *testing.T) {
+	t.Run("アカウント削除時にユーザー削除のみを行う", func(t *testing.T) {
 		// Given
 		user := &entity.User{ID: 20}
-		claims := &auth.Claims{SessionID: "session-1"}
 		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20).Return(nil).Once()
-		authMock.On("Logout", mock.Anything, "session-1").Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", user)
-		c.Set("user", claims)
 
 		// When
 		err := h.DeleteAccount(c)
@@ -90,13 +86,8 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		cookies := rec.Result().Cookies()
-		if assert.NotEmpty(t, cookies) {
-			assert.Equal(t, "token", cookies[0].Name)
-			assert.Equal(t, -1, cookies[0].MaxAge)
-		}
+		assert.Empty(t, rec.Result().Cookies())
 		userCredentialMock.AssertExpectations(t)
-		authMock.AssertExpectations(t)
 	})
 
 	t.Run("ユーザー未設定時は認証エラー", func(t *testing.T) {
@@ -115,7 +106,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 
 func TestProfileHandler_ChangePassword(t *testing.T) {
 	e := newTestEcho()
-	h, _, userCredentialMock := newProfileHandlerWithMocks(false, http.SameSiteLaxMode)
+	h, userCredentialMock := newProfileHandlerWithMocks()
 
 	t.Run("正常系: パスワード変更", func(t *testing.T) {
 		// Given

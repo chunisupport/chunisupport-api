@@ -237,4 +237,81 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 	})
 }
 
+func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
+	e := echo.New()
+
+	t.Run("Authorizationヘッダがない場合は匿名で次のハンドラーを実行する", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		handlerCalled := false
+		handler := middlewareFunc(func(c echo.Context) error {
+			handlerCalled = true
+			assert.Nil(t, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertNotCalled(t, "Authenticate", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Bearerトークンが有効な場合はuserEntityを設定して次のハンドラーを実行する", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer firebase-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		user := &entity.User{ID: 1}
+		mockAuthenticator.On("Authenticate", mock.Anything, "firebase-token").Return(user, nil).Once()
+
+		handlerCalled := false
+		handler := middlewareFunc(func(c echo.Context) error {
+			handlerCalled = true
+			storedUser, ok := c.Get("userEntity").(*entity.User)
+			require.True(t, ok)
+			assert.Same(t, user, storedUser)
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertExpectations(t)
+	})
+
+	t.Run("不正なトークンの場合は401を返す", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		mockAuthenticator.On("Authenticate", mock.Anything, "invalid-token").Return(nil, usecase.ErrInvalidIDToken).Once()
+
+		handler := middlewareFunc(func(c echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		apiErr, ok := err.(*apierror.APIError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeInvalidToken, apiErr.Code)
+		mockAuthenticator.AssertExpectations(t)
+	})
+}
+
 var _ middleware.FirebaseAuthenticator = (*mockFirebaseAuthenticator)(nil)
