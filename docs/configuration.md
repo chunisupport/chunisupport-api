@@ -7,7 +7,6 @@
 `.env` ファイル自体は必須ではありませんが、以下の環境変数は `.env` または実行環境の環境変数として必ず設定してください。
 
 - `APP_ENV` (例: `develop`)
-- `PW_PEPPER` (32文字以上)
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `DB_NAME`
 - `DB_HOST`

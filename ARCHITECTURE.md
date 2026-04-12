@@ -111,7 +111,6 @@ internal/
 
 **コマンドメソッド（状態の変更）**
 - `User.ChangePrivacy(isPrivate)`: プライバシー設定を変更
-- `User.ChangePassword(hash)`: パスワードを変更
 - `User.Delete()`: 論理削除を実行
 - `User.LinkPlayer(playerID)`: プレイヤーを紐付け
 

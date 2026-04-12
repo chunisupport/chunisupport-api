@@ -14,9 +14,6 @@ var (
 	// ErrPlayerNotFound はプレイヤーが見つからなかった場合に返されるエラーです。
 	ErrPlayerNotFound = errors.New("player not found")
 
-	// ErrRecoveryCodeNotFound はリカバリーコードが見つからなかった場合に返されるエラーです。
-	ErrRecoveryCodeNotFound = errors.New("recovery code not found")
-
 	// ErrAPITokenNotFound はAPIトークンが見つからなかった場合に返されるエラーです。
 	ErrAPITokenNotFound = errors.New("api token not found")
 

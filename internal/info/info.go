@@ -51,22 +51,10 @@ const (
 	TempDataRateLimitWindow      = 1 * time.Minute
 	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
-	// リカバリーコード設定
-	RecoveryCodeCount             = 10
-	RecoveryCodeSegmentLength     = 4
-	RecoveryCodeSegmentCount      = 3
-	RecoveryCodeRateLimitRequests = 5
-	RecoveryCodeRateLimitWindow   = 1 * time.Minute
-	RecoveryCodeCharset           = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
 	// アカウントタイプ定数
 	AccountTypePlayer = 1 // 一般ユーザー
 	AccountTypeEditor = 2 // 編集者
 	AccountTypeAdmin  = 3 // 管理者
-
-	// パスワード設定
-	PasswordMinLength = 8
-	PasswordMaxLength = 128
 
 	// リクエストボディサイズ上限
 	RequestBodyLimit = "5M"

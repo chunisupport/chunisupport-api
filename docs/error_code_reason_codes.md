@@ -19,7 +19,6 @@
 | `invalid_token` | トークン不正 |
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン欠落 |
-| `invalid_recovery_credentials` | リカバリ認証情報不正 |
 | `forbidden` | 権限不足 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
 | `registration_failed` | ユーザー登録失敗 |
@@ -46,9 +45,6 @@
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名の文字種不正 |
-| `password_too_short` | パスワードが短すぎる |
-| `password_too_long` | パスワードが長すぎる |
-| `invalid_password` | パスワード不正 |
 | `app_version_unsupported` | アプリバージョン非対応 |
 | `goal_not_found` | goal未検出 |
 | `goal_limit_exceeded` | goal上限超過 |

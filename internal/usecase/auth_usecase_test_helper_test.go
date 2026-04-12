@@ -101,42 +101,6 @@ func (m *MockUserRepository) DeleteByID(ctx context.Context, exec repository.Exe
 	return args.Error(0)
 }
 
-// MockRecoveryCodeRepository はRecoveryCodeRepositoryのモックです。
-type MockRecoveryCodeRepository struct {
-	mock.Mock
-}
-
-func (m *MockRecoveryCodeRepository) CreateBatch(ctx context.Context, exec repository.Executor, codes []*entity.RecoveryCode) error {
-	args := m.Called(ctx, exec, codes)
-	return args.Error(0)
-}
-
-func (m *MockRecoveryCodeRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
-	args := m.Called(ctx, exec, userID)
-	return args.Error(0)
-}
-
-func (m *MockRecoveryCodeRepository) DeleteByID(ctx context.Context, exec repository.Executor, id uint32) error {
-	args := m.Called(ctx, exec, id)
-	return args.Error(0)
-}
-
-func (m *MockRecoveryCodeRepository) FindByHash(ctx context.Context, exec repository.Executor, codeHash []byte) (*entity.RecoveryCode, error) {
-	args := m.Called(ctx, exec, codeHash)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entity.RecoveryCode), args.Error(1)
-}
-
-func (m *MockRecoveryCodeRepository) FindByHashForUpdate(ctx context.Context, exec repository.Executor, codeHash []byte) (*entity.RecoveryCode, error) {
-	args := m.Called(ctx, exec, codeHash)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*entity.RecoveryCode), args.Error(1)
-}
-
 type mockTransactionManager struct {
 	exec repository.Executor
 }
@@ -145,7 +109,7 @@ func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx re
 	return f(m.exec)
 }
 
-func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository, pepper string) UserCredentialUsecase {
+func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerRecordRepo repository.PlayerRecordRepository) UserCredentialUsecase {
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
@@ -154,7 +118,6 @@ func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerReco
 		&mockTransactionManager{},
 		userRepo,
 		playerRecordRepo,
-		pepper,
 		newMockMasterCache(),
 	)
 }
@@ -163,14 +126,9 @@ func newTestUserCredentialUsecaseWithDeleteDependencies(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
-	pepper string,
 ) UserCredentialUsecase {
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
-	return NewUserCredentialUsecase(&MockExecutor{}, tm, userRepo, playerRecordRepo, pepper, newMockMasterCache())
-}
-
-func newTestRecoveryUsecase(tm TransactionManager, userRepo repository.UserRepository, recoveryRepo repository.RecoveryCodeRepository, pepper string) RecoveryUsecase {
-	return NewRecoveryUsecase(nil, tm, userRepo, recoveryRepo, pepper)
+	return NewUserCredentialUsecase(&MockExecutor{}, tm, userRepo, playerRecordRepo, newMockMasterCache())
 }

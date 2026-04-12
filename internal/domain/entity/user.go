@@ -71,12 +71,6 @@ func (u *User) ChangePrivacy(isPrivate bool) {
 	u.UpdatedAt = time.Now()
 }
 
-// ChangePassword はユーザーのパスワードハッシュを変更します。
-func (u *User) ChangePassword(hash passwordhash.PasswordHash) {
-	u.PasswordHash = hash
-	u.UpdatedAt = time.Now()
-}
-
 // LinkFirebaseUID はユーザーに Firebase UID を紐付けます。
 func (u *User) LinkFirebaseUID(uid string) {
 	normalizedUID := strings.TrimSpace(uid)

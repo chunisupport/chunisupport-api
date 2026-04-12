@@ -14,21 +14,12 @@ entity "users" as users {
   + id: INT [PK]
   --
   username: VARCHAR(50) NOT NULL UNIQUE
-  password_hash: VARCHAR(255) NOT NULL
   account_type_id: TINYINT NOT NULL
   player_id: MEDIUMINT UNSIGNED [UNIQUE]
   is_deleted: BOOLEAN NOT NULL
   is_private: BOOLEAN NOT NULL
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
-}
-
-entity "sessions" as sessions {
-  + id: VARCHAR(255) [PK]
-  --
-  user_id: INT NOT NULL
-  expires_at: TIMESTAMP NOT NULL
-  created_at: TIMESTAMP
 }
 
 entity "api_tokens" as api_tokens {
@@ -207,20 +198,10 @@ entity "versions" as versions {
   released_at: DATE NOT NULL
 }
 
-entity "user_recovery_codes" as user_recovery_codes {
-  + id: INT UNSIGNED [PK]
-  --
-  user_id: INT NOT NULL
-  code_hash: BINARY(32) NOT NULL [UNIQUE]
-  created_at: TIMESTAMP
-}
-
 
 ' relationships
-users ||--o{ sessions
 users ||--|o players
 users ||--|o api_tokens
-users ||--o{ user_recovery_codes
 users }o--|| account_types
 
 players ||--o{ player_records

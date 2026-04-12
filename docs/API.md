@@ -30,7 +30,6 @@
 - 認証必須エンドポイントでは Firebase ID トークンを検証し、ユーザー情報をリクエストコンテキストに格納します。
 - Bearer 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
 - `token` Cookie や独自セッションは使用しません。
-- `POST /internal/auth/login`、`POST /internal/auth/logout`、`GET /internal/me/sessions` などのCookie/セッション前提APIは廃止されています。
 
 ### 公開API (`/v1`, `/compat/chunirec/2.0`)
 
@@ -74,22 +73,16 @@
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン未指定 |
 | `forbidden` | 権限不足 |
-| `invalid_credentials` | ユーザー名またはパスワード不正 |
+| `invalid_credentials` | 認証情報不正 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
-| `invalid_recovery_credentials` | リカバリーコード不正/使用済み |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名に使用できない文字が含まれる |
-| `password_too_short` | パスワードが短すぎる |
-| `password_too_long` | パスワードが長すぎる |
-| `invalid_password` | パスワードが無効 |
 | `not_found` | エンドポイントが見つからない |
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
 | `internal_error` | 予期しないサーバーエラー |
-
-`invalid_recovery_credentials` とパスワード系エラーコードは旧認証フロー向けの互換説明です。`migration/mysql/000012_remove_legacy_auth_artifacts.up.sql` 適用後は、パスワードハッシュとリカバリーコードを前提にした運用は行えません。
 
 ## マスターデータ概要
 
@@ -1109,7 +1102,7 @@ curl -X POST \
 - **パスパラメータ**: `username` - 削除対象ユーザーのユーザー名
 - **レスポンス**: 204 No Content
 
-**説明**: 指定されたユーザー名のユーザーを物理削除します。関連データ（プレイヤー・レコード・セッション・APIトークン・リカバリーコード）も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
+**説明**: 指定されたユーザー名のユーザーを物理削除します。関連データ（プレイヤー・レコード・APIトークン）も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): Bearerトークン欠如または無効
@@ -2504,7 +2497,6 @@ interface SkippedRecord {
 
 - エラーコードと内部理由コードの最新一覧は `docs/error_code_reason_codes.md` を参照してください。
 
-- `.env` の `PW_PEPPER` は、旧パスワード/リカバリー処理がアプリケーション側に残っている移行期間中のみ32文字以上の強度を推奨します。
 - CORSの許可オリジンは環境ごとに設定ファイルで管理します。
 - ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。
 

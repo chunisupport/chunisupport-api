@@ -7,126 +7,14 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
-	"github.com/chunisupport/chunisupport-api/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestUserSecurityUsecase_ChangePassword(t *testing.T) {
-	pepper := "test-pepper"
-	errDB := errors.New("db error")
-
-	tests := []struct {
-		name            string
-		userID          int
-		currentPassword string
-		newPassword     string
-		setupMock       func(*MockUserRepository)
-		wantErr         error
-	}{
-		{
-			name:            "パスワード変更に成功する",
-			userID:          1,
-			currentPassword: "old-password",
-			newPassword:     "new-password",
-			setupMock: func(m *MockUserRepository) {
-				hashedPassword, _ := utils.HashPasswordWithPepper("old-password", pepper)
-				ph, _ := passwordhash.NewPasswordHash(hashedPassword)
-				un, _ := username.NewUserName("testuser")
-				mockUser := &entity.User{ID: 1, Username: un, PasswordHash: ph}
-				m.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
-				m.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-			},
-		},
-		{
-			name:            "ユーザーが見つからない場合はErrUserNotFoundを返す",
-			userID:          2,
-			currentPassword: "old-password",
-			newPassword:     "new-password",
-			setupMock: func(m *MockUserRepository) {
-				m.On("FindByID", mock.Anything, mock.Anything, 2).Return(nil, repository.ErrUserNotFound).Once()
-			},
-			wantErr: ErrUserNotFound,
-		},
-		{
-			name:            "ユーザー取得でDBエラーが発生した場合はそのまま返す",
-			userID:          1,
-			currentPassword: "old-password",
-			newPassword:     "new-password",
-			setupMock: func(m *MockUserRepository) {
-				m.On("FindByID", mock.Anything, mock.Anything, 1).Return(nil, errDB).Once()
-			},
-			wantErr: errDB,
-		},
-		{
-			name:            "現在のパスワードが誤っている場合はErrIncorrectPasswordを返す",
-			userID:          1,
-			currentPassword: "wrong-password",
-			newPassword:     "new-password",
-			setupMock: func(m *MockUserRepository) {
-				hashedPassword, _ := utils.HashPasswordWithPepper("old-password", pepper)
-				ph, _ := passwordhash.NewPasswordHash(hashedPassword)
-				un, _ := username.NewUserName("testuser")
-				mockUser := &entity.User{ID: 1, Username: un, PasswordHash: ph}
-				m.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
-			},
-			wantErr: ErrIncorrectPassword,
-		},
-		{
-			name:            "保存時にDBエラーが発生した場合はそのまま返す",
-			userID:          1,
-			currentPassword: "old-password",
-			newPassword:     "new-password",
-			setupMock: func(m *MockUserRepository) {
-				hashedPassword, _ := utils.HashPasswordWithPepper("old-password", pepper)
-				ph, _ := passwordhash.NewPasswordHash(hashedPassword)
-				un, _ := username.NewUserName("testuser")
-				mockUser := &entity.User{ID: 1, Username: un, PasswordHash: ph}
-				m.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
-				m.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errDB).Once()
-			},
-			wantErr: errDB,
-		},
-		{
-			name:            "新しいパスワードが現在のものと同じ場合はErrInvalidPasswordを返す",
-			userID:          1,
-			currentPassword: "old-password",
-			newPassword:     "old-password",
-			setupMock: func(m *MockUserRepository) {
-				hashedPassword, _ := utils.HashPasswordWithPepper("old-password", pepper)
-				ph, _ := passwordhash.NewPasswordHash(hashedPassword)
-				un, _ := username.NewUserName("testuser")
-				mockUser := &entity.User{ID: 1, Username: un, PasswordHash: ph}
-				m.On("FindByID", mock.Anything, mock.Anything, 1).Return(mockUser, nil).Once()
-			},
-			wantErr: ErrInvalidPassword,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			mockUserRepo := new(MockUserRepository)
-			userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, pepper)
-
-			tc.setupMock(mockUserRepo)
-			err := userCredentialUsecase.ChangePassword(context.Background(), tc.userID, tc.currentPassword, tc.newPassword)
-
-			if tc.wantErr != nil {
-				assert.ErrorIs(t, err, tc.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
-			mockUserRepo.AssertExpectations(t)
-		})
-	}
-}
-
 func TestUserSecurityUsecase_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
-	userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil, "test-pepper")
+	userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, nil)
 
 	t.Run("ユーザー取得に成功する", func(t *testing.T) {
 		un, _ := username.NewUserName("testuser")
@@ -147,7 +35,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 		lastScoreUpdate := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 		mockUserRepo := new(MockUserRepository)
 		playerRecordRepo := &stubPlayerRecordRepository{lastScoreUpdate: &lastScoreUpdate}
-		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo, "test-pepper")
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo)
 
 		un, _ := username.NewUserName("playeruser")
 		mockUser := &entity.User{ID: 2, Username: un, IsPrivate: true, AccountTypeID: 1, PlayerID: &playerID}
@@ -168,7 +56,7 @@ func TestUserSecurityUsecase_GetUser(t *testing.T) {
 		playerID := 11
 		mockUserRepo := new(MockUserRepository)
 		playerRecordRepo := &stubPlayerRecordRepository{err: errors.New("db error")}
-		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo, "test-pepper")
+		userCredentialUsecase := newTestUserCredentialUsecase(mockUserRepo, playerRecordRepo)
 
 		un, _ := username.NewUserName("playeruser2")
 		mockUser := &entity.User{ID: 3, Username: un, PlayerID: &playerID}
@@ -188,7 +76,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, "test-pepper",
+			tm, mockUserRepo, nil,
 		)
 
 		user := &entity.User{ID: 1, Username: un}
@@ -204,7 +92,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, "test-pepper",
+			tm, mockUserRepo, nil,
 		)
 
 		user := &entity.User{ID: 2, Username: un}
@@ -219,7 +107,6 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 }
 
 func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *testing.T) {
-	pepper := "test-pepper"
 	userRepo := new(MockUserRepository)
 	playerRecordRepo := &stubPlayerRecordRepository{}
 	masterCache := newMockMasterCache()
@@ -233,35 +120,35 @@ func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *t
 		{
 			name: "executorがnil",
 			build: func() {
-				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, pepper, masterCache)
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, masterCache)
 			},
 			message: "executor is nil",
 		},
 		{
 			name: "transaction managerがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, pepper, masterCache)
+				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, masterCache)
 			},
 			message: "transaction manager is nil",
 		},
 		{
 			name: "user repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, pepper, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, masterCache)
 			},
 			message: "user repository is nil",
 		},
 		{
 			name: "player record repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, pepper, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, masterCache)
 			},
 			message: "player record repository is nil",
 		},
 		{
 			name: "master cacheがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, pepper, nil)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, nil)
 			},
 			message: "master cache is nil",
 		},

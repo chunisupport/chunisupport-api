@@ -17,7 +17,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	vo_recoverycode "github.com/chunisupport/chunisupport-api/internal/domain/vo/recoverycode"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -38,18 +37,10 @@ type CustomValidator struct {
 // NewCustomValidator は新しいCustomValidatorを生成します。
 func NewCustomValidator() *CustomValidator {
 	v := validator.New()
-	if err := v.RegisterValidation("recoverycode", validateRecoveryCode); err != nil {
-		panic(err)
-	}
 	if err := v.RegisterValidation("username", validateUsername); err != nil {
 		panic(err)
 	}
 	return &CustomValidator{Validator: v}
-}
-
-func validateRecoveryCode(fl validator.FieldLevel) bool {
-	_, err := vo_recoverycode.New(fl.Field().String())
-	return err == nil
 }
 
 func validateUsername(fl validator.FieldLevel) bool {
@@ -74,7 +65,6 @@ func (cv *CustomValidator) Validate(i any) error {
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
 	Signup              *api_internal.SignupHandler
-	Recovery            *api_internal.RecoveryHandler
 	Profile             *api_internal.ProfileHandler
 	User                *api_internal.UserHandler
 	AdminUser           *api_internal.AdminUserHandler
@@ -126,13 +116,11 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
-	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, firebaseUserDeleter, cfg.PwPepper, masterCache)
-	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
@@ -150,7 +138,6 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
 	handlers := &Handlers{
 		Signup:              api_internal.NewSignupHandler(signupUsecase),
-		Recovery:            api_internal.NewRecoveryHandler(recoveryUsecase),
 		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
 		User:                api_internal.NewUserHandler(userUsecase),
 		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),

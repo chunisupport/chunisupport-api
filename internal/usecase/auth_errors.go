@@ -4,7 +4,7 @@ import "errors"
 
 var (
 	ErrUsernameTaken            = errors.New("this username is already taken")
-	ErrInvalidCredentials       = errors.New("invalid username or password")
+	ErrInvalidCredentials       = errors.New("invalid credentials")
 	ErrInvalidIDToken           = errors.New("invalid firebase id token")
 	ErrFirebaseUIDAlreadyLinked = errors.New("firebase uid already linked to another user")
 
@@ -12,7 +12,4 @@ var (
 	ErrUsernameTooShort    = errors.New("username must be at least 5 characters")
 	ErrUsernameTooLong     = errors.New("username must be 50 characters or less")
 	ErrUsernameInvalidChar = errors.New("username can only contain lowercase letters and numbers")
-
-	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
-	ErrPasswordTooLong  = errors.New("password must be 128 characters or less")
 )

@@ -41,7 +41,6 @@ type Config struct {
 	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
-	PwPepper               string   // 環境変数から読み込み
 	CORS                   CORS     `json:"cors"`
 	TempData               TempData `json:"temp_data"`
 	Firebase               Firebase // 環境変数から読み込み
@@ -129,12 +128,6 @@ func LoadConfig() (Config, error) {
 		} else {
 			errors = append(errors, errMsg)
 		}
-	}
-
-	// 環境変数から秘密情報を取得
-	config.PwPepper = os.Getenv("PW_PEPPER")
-	if config.PwPepper == "" {
-		errors = append(errors, "PW_PEPPER environment variable is required")
 	}
 
 	config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))

@@ -12,7 +12,6 @@
 ## ドキュメント
 
 - [API仕様書（内部/公開）](docs/API.md)
-- [リカバリーコード仕様](docs/recovery_code_spec.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 
 ## 技術スタック
@@ -44,7 +43,6 @@
    ```bash
    # .env
    APP_ENV=develop
-   PW_PEPPER=your_pepper_32_chars_min
    FIREBASE_CREDENTIALS_FILE=path/to/service-account.json
    DB_NAME=chunisupport
    DB_HOST=localhost
@@ -81,16 +79,6 @@
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    migrate -database "sqlite3://./static.db" -path migration/sqlite up
-   ```
-
-   **重要**: マイグレーション実行後、MySQLのイベントスケジューラを有効化してください（セッション自動クリーンアップに必要）。
-   ```bash
-   mysql -u <DB_USER> -p -e "SET GLOBAL event_scheduler = ON;"
-   ```
-   または、MySQL設定ファイル（`my.cnf`/`my.ini`）に以下を追加して永続化してください：
-   ```ini
-   [mysqld]
-   event_scheduler = ON
    ```
 
 5. 起動する。

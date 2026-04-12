@@ -106,24 +106,6 @@ func TestFindByID_ReturnsErrPlayerNotFoundWhenWrappedNoRows(t *testing.T) {
 	require.Nil(t, player)
 }
 
-func TestRecoveryCodeFindByHash_ReturnsErrRecoveryCodeNotFoundWhenWrappedNoRows(t *testing.T) {
-	repo := &recoveryCodeRepository{}
-	exec := &noRowsWrappedExecutor{}
-
-	code, err := repo.FindByHash(context.Background(), exec, []byte("hash"))
-	require.ErrorIs(t, err, domainrepo.ErrRecoveryCodeNotFound)
-	require.Nil(t, code)
-}
-
-func TestRecoveryCodeFindByHashForUpdate_ReturnsErrRecoveryCodeNotFoundWhenWrappedNoRows(t *testing.T) {
-	repo := &recoveryCodeRepository{}
-	exec := &noRowsWrappedExecutor{}
-
-	code, err := repo.FindByHashForUpdate(context.Background(), exec, []byte("hash"))
-	require.ErrorIs(t, err, domainrepo.ErrRecoveryCodeNotFound)
-	require.Nil(t, code)
-}
-
 func TestAPITokenFindByHashedToken_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
 	repo := &apiTokenRepository{}
 	exec := &noRowsWrappedExecutor{}
