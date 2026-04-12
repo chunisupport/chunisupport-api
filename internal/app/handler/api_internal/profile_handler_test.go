@@ -86,7 +86,6 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Empty(t, rec.Result().Cookies())
 		userCredentialMock.AssertExpectations(t)
 	})
 

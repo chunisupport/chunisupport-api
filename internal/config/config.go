@@ -12,13 +12,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Auth struct {
-	JWTExpirationHour     int    `json:"jwt_expiration_hour"`
-	SessionExpirationHour int    `json:"session_expiration_hour"`
-	CookieSecure          bool   `json:"cookie_secure"`
-	CookieSameSite        string `json:"cookie_same_site"`
-}
-
 // CORS はCORS設定を表します
 type CORS struct {
 	AllowOrigins     []string `json:"allow_origins"`
@@ -47,16 +40,12 @@ type Config struct {
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int    `json:"shutdown_timeout_seconds"`
-	PwPepper               string // 環境変数から読み込み
-	// JWTSecret は環境変数から読み込む機密値であり、命名は役割明示のため維持する。
-	// #nosec G117
-	JWTSecret string
-	Auth      Auth     `json:"auth"`
-	CORS      CORS     `json:"cors"`
-	TempData  TempData `json:"temp_data"`
-	Firebase  Firebase // 環境変数から読み込み
-	Database  Database // 環境変数から読み込み
+	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
+	PwPepper               string   // 環境変数から読み込み
+	CORS                   CORS     `json:"cors"`
+	TempData               TempData `json:"temp_data"`
+	Firebase               Firebase // 環境変数から読み込み
+	Database               Database // 環境変数から読み込み
 }
 
 type DbConfig struct {
@@ -143,11 +132,6 @@ func LoadConfig() (Config, error) {
 	}
 
 	// 環境変数から秘密情報を取得
-	config.JWTSecret = os.Getenv("JWT_SECRET")
-	if config.JWTSecret == "" {
-		errors = append(errors, "JWT_SECRET environment variable is required")
-	}
-
 	config.PwPepper = os.Getenv("PW_PEPPER")
 	if config.PwPepper == "" {
 		errors = append(errors, "PW_PEPPER environment variable is required")

@@ -89,6 +89,8 @@
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
 | `internal_error` | 予期しないサーバーエラー |
 
+`invalid_recovery_credentials` とパスワード系エラーコードは旧認証フロー向けの互換説明です。`migration/mysql/000012_remove_legacy_auth_artifacts.up.sql` 適用後は、パスワードハッシュとリカバリーコードを前提にした運用は行えません。
+
 ## マスターデータ概要
 
 主なマスタ定義は `migration/mysql/000001_init_schema.up.sql` に記載されています。
@@ -283,7 +285,7 @@
 - **認証**: Firebase Bearer 必須
 - **レスポンス**: 200 OK。ボディは空です。
 
-ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `sessions` / `api_tokens` / `user_recovery_codes` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。現時点では Firebase の recent sign-in を使った再認証は未実装です。
+ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `api_tokens` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。現時点では Firebase の recent sign-in を使った再認証は未実装です。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -2502,8 +2504,8 @@ interface SkippedRecord {
 
 - エラーコードと内部理由コードの最新一覧は `docs/error_code_reason_codes.md` を参照してください。
 
-- `.env` の `JWT_SECRET` と `PW_PEPPER` は32文字以上の強度を推奨します。
-- CORSの許可オリジンやCookie属性は環境ごとに設定ファイルで管理します。
+- `.env` の `PW_PEPPER` は、旧パスワード/リカバリー処理がアプリケーション側に残っている移行期間中のみ32文字以上の強度を推奨します。
+- CORSの許可オリジンは環境ごとに設定ファイルで管理します。
 - ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。
 
 
@@ -2531,7 +2533,7 @@ interface SkippedRecord {
   - 展開後の本文は生のバイト列のまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
   - そのため、JSON構文が壊れている本文や、`PlayerDataPayload` として解釈できない本文でも一時保存される場合があります。
   - 厳密な検証および実際の登録処理は `/internal/player-data/commit` 実行時に初めて行われます。
-  - ログイン状態やCookieの有無は判定に使いません。認証済みブラウザから呼び出した場合でも、未認証と同じ扱いで受け付けます。
+  - 認証状態は判定に使いません。認証済みブラウザから呼び出した場合でも、未認証と同じ扱いで受け付けます。
 
 #### レスポンス（201 Created）
 

@@ -19,7 +19,6 @@
 | `invalid_token` | トークン不正 |
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン欠落 |
-| `invalid_session` | セッション無効 |
 | `invalid_recovery_credentials` | リカバリ認証情報不正 |
 | `forbidden` | 権限不足 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |

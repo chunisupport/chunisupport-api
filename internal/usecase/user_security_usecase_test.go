@@ -188,7 +188,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, new(MockSessionRepository), &stubAPITokenRepository{}, new(MockRecoveryCodeRepository), "test-pepper",
+			tm, mockUserRepo, nil, "test-pepper",
 		)
 
 		user := &entity.User{ID: 1, Username: un}
@@ -204,7 +204,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		tm := &mockTransactionManager{}
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			tm, mockUserRepo, nil, new(MockSessionRepository), &stubAPITokenRepository{}, new(MockRecoveryCodeRepository), "test-pepper",
+			tm, mockUserRepo, nil, "test-pepper",
 		)
 
 		user := &entity.User{ID: 2, Username: un}
@@ -222,9 +222,6 @@ func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *t
 	pepper := "test-pepper"
 	userRepo := new(MockUserRepository)
 	playerRecordRepo := &stubPlayerRecordRepository{}
-	sessionRepo := new(MockSessionRepository)
-	apiTokenRepo := &stubAPITokenRepository{}
-	recoveryCodeRepo := new(MockRecoveryCodeRepository)
 	masterCache := newMockMasterCache()
 	exec := &MockExecutor{}
 
@@ -236,56 +233,35 @@ func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *t
 		{
 			name: "executorがnil",
 			build: func() {
-				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, pepper, masterCache)
 			},
 			message: "executor is nil",
 		},
 		{
 			name: "transaction managerがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, pepper, masterCache)
 			},
 			message: "transaction manager is nil",
 		},
 		{
 			name: "user repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, pepper, masterCache)
 			},
 			message: "user repository is nil",
 		},
 		{
 			name: "player record repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, pepper, masterCache)
 			},
 			message: "player record repository is nil",
 		},
 		{
-			name: "session repositoryがnil",
-			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, nil, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
-			},
-			message: "session repository is nil",
-		},
-		{
-			name: "api token repositoryがnil",
-			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, nil, recoveryCodeRepo, pepper, masterCache)
-			},
-			message: "api token repository is nil",
-		},
-		{
-			name: "recovery code repositoryがnil",
-			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, nil, pepper, masterCache)
-			},
-			message: "recovery code repository is nil",
-		},
-		{
 			name: "master cacheがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, nil)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, pepper, nil)
 			},
 			message: "master cache is nil",
 		},

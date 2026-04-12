@@ -26,9 +26,6 @@ type userCredentialUsecaseImpl struct {
 	tm               TransactionManager
 	userRepo         repository.UserRepository
 	playerRecordRepo repository.PlayerRecordRepository
-	sessionRepo      repository.SessionRepository
-	apiTokenRepo     repository.APITokenRepository
-	recoveryCodeRepo repository.RecoveryCodeRepository
 	firebaseDeleter  FirebaseUserDeleter
 	pepper           string
 	masterCache      AccountTypeProvider
@@ -39,9 +36,6 @@ func NewUserCredentialUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
-	sessionRepo repository.SessionRepository,
-	apiTokenRepo repository.APITokenRepository,
-	recoveryCodeRepo repository.RecoveryCodeRepository,
 	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
@@ -57,15 +51,6 @@ func NewUserCredentialUsecase(
 	if playerRecordRepo == nil {
 		panic("player record repository is nil")
 	}
-	if sessionRepo == nil {
-		panic("session repository is nil")
-	}
-	if apiTokenRepo == nil {
-		panic("api token repository is nil")
-	}
-	if recoveryCodeRepo == nil {
-		panic("recovery code repository is nil")
-	}
 	if masterCache == nil {
 		panic("master cache is nil")
 	}
@@ -75,9 +60,6 @@ func NewUserCredentialUsecase(
 		tm:               tm,
 		userRepo:         userRepo,
 		playerRecordRepo: playerRecordRepo,
-		sessionRepo:      sessionRepo,
-		apiTokenRepo:     apiTokenRepo,
-		recoveryCodeRepo: recoveryCodeRepo,
 		firebaseDeleter:  noopFirebaseUserDeleter{},
 		pepper:           pepper,
 		masterCache:      masterCache,
@@ -90,14 +72,11 @@ func NewUserCredentialUsecaseWithFirebaseDeleter(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
-	sessionRepo repository.SessionRepository,
-	apiTokenRepo repository.APITokenRepository,
-	recoveryCodeRepo repository.RecoveryCodeRepository,
 	firebaseDeleter FirebaseUserDeleter,
 	pepper string,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
-	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, pepper, masterCache)
+	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, pepper, masterCache)
 	impl, ok := usecase.(*userCredentialUsecaseImpl)
 	if !ok {
 		return usecase

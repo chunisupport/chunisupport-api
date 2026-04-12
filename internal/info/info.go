@@ -51,9 +51,6 @@ const (
 	TempDataRateLimitWindow      = 1 * time.Minute
 	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
-	// セッション設定
-	MaxSessionsPerUser = 10 // ユーザーあたりの最大セッション数
-
 	// リカバリーコード設定
 	RecoveryCodeCount             = 10
 	RecoveryCodeSegmentLength     = 4

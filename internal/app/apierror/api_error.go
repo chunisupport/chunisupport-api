@@ -64,7 +64,6 @@ var (
 	ErrInvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized)
 	ErrTokenExpired             = New(CodeTokenExpired, http.StatusUnauthorized)
 	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
-	ErrInvalidSession           = New(CodeInvalidSession, http.StatusUnauthorized) // セッション無効/期限切れ統一
 	ErrInvalidRecovery          = New(CodeInvalidRecovery, http.StatusUnauthorized)
 	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
 	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)

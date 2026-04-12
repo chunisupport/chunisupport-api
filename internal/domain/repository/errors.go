@@ -11,9 +11,6 @@ var (
 	// ErrUserConflict はユーザー更新時の前提条件が一致しなかった場合に返されるエラーです。
 	ErrUserConflict = errors.New("user conflict")
 
-	// ErrSessionNotFound はセッションが見つからなかった場合に返されるエラーです。
-	ErrSessionNotFound = errors.New("session not found")
-
 	// ErrPlayerNotFound はプレイヤーが見つからなかった場合に返されるエラーです。
 	ErrPlayerNotFound = errors.New("player not found")
 

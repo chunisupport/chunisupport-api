@@ -208,16 +208,6 @@ CREATE TABLE `schema_migrations` (
   `dirty` tinyint(1) NOT NULL,
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `sessions` (
-  `id` binary(16) NOT NULL,
-  `user_id` int unsigned NOT NULL,
-  `expires_at` timestamp NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_sessions_expires_at` (`expires_at`),
-  KEY `idx_sessions_user_expires` (`user_id`,`expires_at`),
-  CONSTRAINT `sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `slots` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -246,21 +236,10 @@ CREATE TABLE `songs` (
   CONSTRAINT `songs_ibfk_1` FOREIGN KEY (`genre_id`) REFERENCES `genres` (`id`),
   CONSTRAINT `songs_chk_1` CHECK (((`bpm` is null) or (`bpm` > 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `user_recovery_codes` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` int unsigned NOT NULL,
-  `code_hash` binary(32) NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_user_recovery_codes_code_hash` (`code_hash`),
-  KEY `idx_user_recovery_codes_user_id` (`user_id`),
-  CONSTRAINT `user_recovery_codes_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `users` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `firebase_uid` varchar(128) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
-  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `account_type_id` tinyint unsigned NOT NULL DEFAULT '1',

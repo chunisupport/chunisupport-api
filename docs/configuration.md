@@ -7,7 +7,6 @@
 `.env` ファイル自体は必須ではありませんが、以下の環境変数は `.env` または実行環境の環境変数として必ず設定してください。
 
 - `APP_ENV` (例: `develop`)
-- `JWT_SECRET` (32文字以上)
 - `PW_PEPPER` (32文字以上)
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `DB_NAME`
@@ -28,10 +27,6 @@
 - `log_paths.echo`
 - `static_db_path` (統計データ用SQLiteデータベースのパス)
 - `shutdown_timeout_seconds` (1以上)
-- `auth.jwt_expiration_hour`
-- `auth.session_expiration_hour`
-- `auth.cookie_secure`
-- `auth.cookie_same_site`
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`

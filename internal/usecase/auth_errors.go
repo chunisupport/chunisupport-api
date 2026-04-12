@@ -7,8 +7,6 @@ var (
 	ErrInvalidCredentials       = errors.New("invalid username or password")
 	ErrInvalidIDToken           = errors.New("invalid firebase id token")
 	ErrFirebaseUIDAlreadyLinked = errors.New("firebase uid already linked to another user")
-	ErrUserIDMismatch           = errors.New("user ID mismatch")
-	ErrInvalidSession           = errors.New("session invalid or expired")
 
 	ErrUsernameEmpty       = errors.New("username cannot be empty")
 	ErrUsernameTooShort    = errors.New("username must be at least 5 characters")

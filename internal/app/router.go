@@ -73,8 +73,6 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Auth                *api_internal.AuthHandler
-	Firebase            *api_internal.FirebaseHandler
 	Signup              *api_internal.SignupHandler
 	Recovery            *api_internal.RecoveryHandler
 	Profile             *api_internal.ProfileHandler
@@ -85,7 +83,6 @@ type Handlers struct {
 	APIToken            *api_internal.APITokenHandler
 	Me                  *api_internal.MeHandler
 	MasterData          *api_internal.MasterDataHandler
-	Session             *api_internal.SessionHandler
 	Goal                *api_internal.GoalHandler
 	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
 	// 外部API v1 用ハンドラ
@@ -128,16 +125,13 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
-	sessionRepo := infra.NewSessionRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	sessionIssuer := usecase.NewSessionIssuer(db, sessionRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour)
-	authUsecase := usecase.NewAuthUsecase(db, userRepo, sessionRepo, sessionIssuer, cfg.PwPepper, masterCache)
-	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, sessionRepo, apiTokenRepo, recoveryCodeRepo, firebaseUserDeleter, cfg.PwPepper, masterCache)
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, firebaseUserDeleter, cfg.PwPepper, masterCache)
 	recoveryUsecase := usecase.NewRecoveryUsecase(db, tm, userRepo, recoveryCodeRepo, cfg.PwPepper)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
@@ -148,21 +142,13 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
-	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
-	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
 	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
-	firebaseLinkUsecase := usecase.NewFirebaseLinkUsecase(tm, userRepo, firebaseTokenVerifier)
-	firebaseLoginUsecase := usecase.NewFirebaseLoginUsecase(firebaseAuthUsecase, sessionIssuer)
-	firebaseRegisterUsecase := usecase.NewFirebaseRegisterUsecase(tm, userRepo, firebaseTokenVerifier, sessionIssuer)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
-	firebaseHandler := api_internal.NewFirebaseHandler(firebaseLinkUsecase, firebaseLoginUsecase, firebaseRegisterUsecase, cfg.Auth.CookieSecure, sameSite)
 	handlers := &Handlers{
-		Auth:                api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite),
-		Firebase:            firebaseHandler,
 		Signup:              api_internal.NewSignupHandler(signupUsecase),
 		Recovery:            api_internal.NewRecoveryHandler(recoveryUsecase),
 		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
@@ -173,7 +159,6 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:                  api_internal.NewMeHandler(playerDataUsecase),
 		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
-		Session:             api_internal.NewSessionHandler(sessionUsecase),
 		Goal:                api_internal.NewGoalHandler(goalUsecase),
 		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		// 外部API v1 用ハンドラ
@@ -437,19 +422,6 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 }
 
 // parseSameSite は文字列をhttp.SameSite型に変換します
-func parseSameSite(value string) http.SameSite {
-	switch value {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		fallthrough
-	default:
-		return http.SameSiteLaxMode
-	}
-}
-
 // echoLogWriter はEchoログ出力用のWriterで、ファイルハンドルのライフサイクル管理が可能
 type echoLogWriter struct {
 	writer io.Writer

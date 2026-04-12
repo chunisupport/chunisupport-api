@@ -26,10 +26,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidCredentials.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidPassword):
 		return ErrInvalidPassword.WithInternal(err) // パスワード関連を統合
-	case errors.Is(err, usecase.ErrUserIDMismatch):
-		return ErrForbidden.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidSession):
-		return ErrInvalidSession.WithInternal(err) // セッション系を統合
 	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
 		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):
