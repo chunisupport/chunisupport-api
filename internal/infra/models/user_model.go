@@ -1,10 +1,10 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
@@ -27,11 +27,18 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		return nil, err
 	}
 
+	var firebaseUID *string
+	if m.FirebaseUID != nil {
+		normalizedUID := strings.TrimSpace(*m.FirebaseUID)
+		if normalizedUID != "" {
+			firebaseUID = &normalizedUID
+		}
+	}
+
 	return &entity.User{
 		ID:            m.ID,
 		Username:      uname,
-		FirebaseUID:   m.FirebaseUID,
-		PasswordHash:  passwordhash.NewEmptyPasswordHash(),
+		FirebaseUID:   firebaseUID,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		PlayerID:      m.PlayerID,

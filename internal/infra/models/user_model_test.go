@@ -15,11 +15,10 @@ func TestUserModel_ToEntity(t *testing.T) {
 	tests := []struct {
 		name            string
 		model           UserModel
-		wantPassword    string
 		wantFirebaseUID *string
 	}{
 		{
-			name: "Firebase UID があるユーザーはパスワードなしで復元する",
+			name: "Firebase UID があるユーザーを復元できる",
 			model: UserModel{
 				ID:            1,
 				Username:      "firebaseuser",
@@ -28,11 +27,10 @@ func TestUserModel_ToEntity(t *testing.T) {
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantPassword:    "",
 			wantFirebaseUID: &firebaseUID,
 		},
 		{
-			name: "Firebase UID がないユーザーもパスワードなしで復元する",
+			name: "Firebase UID がないユーザーも復元できる",
 			model: UserModel{
 				ID:            2,
 				Username:      "normaluser",
@@ -40,10 +38,9 @@ func TestUserModel_ToEntity(t *testing.T) {
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantPassword: "",
 		},
 		{
-			name: "Firebase UID が空白でもパスワードなしで復元する",
+			name: "Firebase UID が空白なら未連携として復元する",
 			model: UserModel{
 				ID:            3,
 				Username:      "invaliduser",
@@ -52,8 +49,7 @@ func TestUserModel_ToEntity(t *testing.T) {
 				UpdatedAt:     now,
 				AccountTypeID: 1,
 			},
-			wantPassword:    "",
-			wantFirebaseUID: ptr(" "),
+			wantFirebaseUID: nil,
 		},
 	}
 
@@ -68,7 +64,6 @@ func TestUserModel_ToEntity(t *testing.T) {
 			// Then
 			require.NoError(t, err)
 			require.NotNil(t, got)
-			assert.Equal(t, tt.wantPassword, got.PasswordHash.String())
 			assert.Equal(t, tt.wantFirebaseUID, got.FirebaseUID)
 		})
 	}

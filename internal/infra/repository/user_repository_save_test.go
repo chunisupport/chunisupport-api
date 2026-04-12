@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
@@ -27,7 +26,7 @@ func TestUserRepositorySaveProtectsFirebaseUIDFromPartialEntity(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.IsPrivate = true
 	user.UpdatedAt = time.Date(2026, 4, 5, 12, 0, 0, 0, time.UTC)
 
@@ -63,7 +62,7 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-2")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.FirebaseUID = &existingUID
 	user.IsPrivate = true
 	user.IsSuspicious = true
@@ -102,7 +101,7 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	`)
 	require.NoError(t, err)
 
-	user := newUserForRepositorySaveTest(t, 1, "user01", "hash-2")
+	user := newUserForRepositorySaveTest(t, 1, "user01")
 	user.AccountTypeID = 0
 	user.IsPrivate = true
 	user.UpdatedAt = time.Date(2026, 4, 5, 12, 45, 0, 0, time.UTC)
@@ -129,7 +128,7 @@ func TestUserRepositorySaveReturnsErrUserNotFoundWhenTargetMissing(t *testing.T)
 	defer db.Close()
 	ctx := context.Background()
 
-	user := newUserForRepositorySaveTest(t, 999, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 999, "user01")
 	user.UpdatedAt = time.Date(2026, 4, 5, 14, 0, 0, 0, time.UTC)
 
 	repo := &userRepository{db: db}
@@ -147,7 +146,7 @@ func TestUserRepositorySaveCreatesUserWithAggregateTimestamps(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	user := newUserForRepositorySaveTest(t, 0, "user01", "hash-1")
+	user := newUserForRepositorySaveTest(t, 0, "user01")
 	user.CreatedAt = time.Date(2026, 4, 5, 15, 0, 0, 0, time.UTC)
 	user.UpdatedAt = time.Date(2026, 4, 5, 15, 1, 0, 0, time.UTC)
 	playerID := 123
@@ -282,15 +281,13 @@ func setupUserRepositoryTestDB(t *testing.T) *sqlx.DB {
 	return db
 }
 
-func newUserForRepositorySaveTest(t *testing.T, id int, name string, hash string) *entity.User {
+func newUserForRepositorySaveTest(t *testing.T, id int, name string) *entity.User {
 	t.Helper()
 
 	userName, err := username.NewUserName(name)
 	require.NoError(t, err)
-	passwordHash, err := passwordhash.NewPasswordHash(hash)
-	require.NoError(t, err)
 
-	user := entity.NewUser(userName, passwordHash, info.AccountTypePlayer)
+	user := entity.NewUser(userName, info.AccountTypePlayer)
 	user.ID = id
 
 	return user
