@@ -10,7 +10,7 @@ import (
 )
 
 type signupRequest struct {
-	Username string `json:"username" validate:"required,username"`
+	Username string `json:"username" validate:"username"`
 }
 
 // SignupHandler は Firebase Bearer トークンを用いた初回登録を処理します。
