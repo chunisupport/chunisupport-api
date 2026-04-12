@@ -244,7 +244,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	publicUsersGroup := internal.Group("/users")
 	publicUsersGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
 	{
-		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}

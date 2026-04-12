@@ -109,7 +109,6 @@
 | `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
-| `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | レコード更新日時のみ取得 |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
@@ -963,26 +962,6 @@ curl -X POST \
 | `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
 
 ---
-
-### GET `/internal/users/:username/updated-at`
-- **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
-- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: プレイヤーデータの `updated_at` のみを返します。非公開設定のユーザーは本人以外 404 を返します。
-
-#### レスポンス例
-
-```json
-{
-  "updated_at": "2025-11-28T22:23:32+09:00"
-}
-```
-
-#### UserUpdatedAtDTO スキーマ
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
 
 ### GET `/internal/users/:username/profile`
 - **認証**: Firebase Bearer (任意)
