@@ -6,12 +6,10 @@ require (
 	firebase.google.com/go/v4 v4.19.0
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.13.4
-	github.com/matthewhartstonge/argon2 v1.4.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.231.0
 )
