@@ -25,9 +25,7 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **SEC-01** | **High** | Cookieベース認証に対するCSRF対策不足 | `token` Cookie を用いた `/internal` の状態変更系APIに対して、CSRFトークン検証や `Origin` / `Referer` 検証がありません。`SameSite` は設定されていますが防御として不十分です。 |
-| **SEC-05** | **Medium** | ログイン失敗時のタイミング攻撃軽減なし | `auth_usecase_impl.go` の `Login` では、ユーザー不存在時にダミーハッシュ比較を行っていません。レスポンス時間差からユーザー列挙の足がかりになる可能性があります。 |
-| **SEC-011** | **High** | パスワード複雑性要件の欠如 | `Register` / `ChangePassword` / `RecoverWithRecoveryCode` は長さチェックのみで、文字種や強度評価がありません。 |
+| **SEC-012** | **High** | 退会APIに recent sign-in を使った再認証がない | `internal/app/handler/api_internal/profile_handler.go` の `DeleteAccount` には TODO が残っており、現状は有効な Bearer トークンさえあれば `DELETE /internal/me` を実行できます。Firebase を認証基盤にしている以上、アカウント削除のような破壊的操作は recent sign-in に基づく再認証を要求すべきです。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。他は概ね理由付きですが、全体の棚卸しが未完了です。 |
 
 ### パフォーマンス (PERF)
@@ -48,7 +46,7 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **QUAL-001** | **Low** | TODOコメントが3件残存 | `internal/usecase/auth_usecase_impl.go` に1件、`internal/app/router.go` に2件残っています。未着手ならIssue化、不要なら削除すべきです。 |
+| **QUAL-001** | **Low** | TODOコメントが3件残存 | `internal/app/router.go` に2件、`internal/app/handler/api_internal/profile_handler.go` に1件残っています。未着手ならIssue化、不要なら削除すべきです。 |
 | **QUAL-002** | **Medium** | セキュリティヘッダー未設定 | Echo の `Secure` ミドルウェア相当の設定がなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` などの標準ヘッダーが不足しています。 |
 | **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows`, `*sqlx.Row` を直接公開しており、ドメイン層がインフラ実装詳細に依存しています。 |
 
@@ -77,9 +75,7 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-004** | **Medium** | `Register` が非トランザクション | `auth_usecase_impl.go` でユーザー保存後にセッション発行しており、途中失敗時に整合性が崩れます。 |
-| **UC-005** | **Medium** | `convertUsernameError` が文字列比較 | `auth_usecase_impl.go` はVOエラーを `err.Error()` 文字列で分岐しています。`errors.Is` に移行すべきです。 |
-| **UC-006** | **Low** | パスワード長チェックが3箇所重複 | `auth_usecase_impl.go`、`recovery_usecase.go`、`user_credential_usecase.go` に同一ロジックがあります。 |
+| **UC-005** | **Medium** | `convertUsernameError` が文字列比較 | 旧 `auth_usecase_impl.go` は削除済みですが、`signup_usecase.go` から呼ばれる `convertUsernameError` 自体は引き続き文字列比較ベースです。VOエラーを `errors.Is` または専用エラー型へ寄せるべきです。 |
 | **UC-008** | **Medium** | `applyScores` が巨大で重複も多い | 通常譜面とWORLD'S END譜面の分岐が長大で、解決ロジックも類似しています。分割余地が大きい状態です。 |
 | **UC-011** | **Medium** | `Service` / `Usecase` 命名が混在 | `NewAPITokenService`, `NewUserService`, `NewSongService`, `NewPlayerDataService` と `NewAuthUsecase`, `NewGoalUsecase` などが混在しています。 |
 | **UC-013** | **Medium** | `goalUsecase.Update` が非トランザクション | `Create` は `tm.Transactional` を使う一方、`Update` は `u.db` へ直接アクセスしています。 |
@@ -99,11 +95,12 @@
 
 ## 補足
 
-- 以前の指摘のうち、`sort` パッケージの利用統一のように、現状コードと一致しなくなったものは削除しました。
+- Firebase 認証への移行で、Cookie セッション前提の CSRF、`password_hash`、`user_recovery_codes`、旧 `auth_usecase_impl.go` に依存した指摘は現状と一致しなくなったため削除しました。
+- その代わり、Firebase 化後に残る論点として、**退会時の再認証不足** と **`signup_usecase.go` 経由で残っているユーザー名エラー変換の粗さ** を追加しています。
 - 逆に、`TODO` 件数や `#nosec` 箇所、`song_repository_impl.go` のVO変換エラー無視のように、**根拠は同じテーマでも現行コード上の実態に合わせて記述を更新**しています。
 
 ## まとめ
 
-- 優先度が高いのは、**CSRF対策不足**, **パスワード強度不足**, **認証登録処理の非トランザクション**, **Goal更新の非トランザクション**, **Domain層の `sqlx` 依存** です。
+- 優先度が高いのは、**退会時の再認証不足**, **Goal更新の非トランザクション**, **Domain層の `sqlx` 依存** です。
 - 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視** を詰めると、APIの安定性と保守性が上がります。
 - `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。
