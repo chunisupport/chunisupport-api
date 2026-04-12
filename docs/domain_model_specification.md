@@ -722,7 +722,7 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 ### 集約境界
 
-- **User**: 集約ルート。プライバシー設定、パスワード変更、プレイヤー紐付けはUserが管理
+- **User**: 集約ルート。プライバシー設定、Firebase UID連携、プレイヤー紐付けはUserが管理
 - **Player**: 別の集約。UserとはIDで参照（直接の親子関係を持たない）
 - **PlayerRecord**: Playerの子エンティティではなく、独立したエンティティとして扱う（Chart/Songとの多対多の関係を持つため）
 
@@ -730,4 +730,4 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 - 集約ルートごとにリポジトリを定義
 - `Save(ctx, entity)` メソッドで集約全体を永続化（INSERT/UPDATE判定は内部で実施）
-- 部分更新メソッド（`UpdatePassword`, `UpdatePrivacy`など）は廃止し、集約指向の永続化を推進
+- 部分更新メソッド（`UpdatePrivacy`, `LinkFirebaseUID`相当など）は廃止し、集約指向の永続化を推進

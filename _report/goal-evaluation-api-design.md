@@ -32,14 +32,14 @@
 
 - **Method**: `GET`
 - **Path**: `/internal/me/goals/evaluations`
-- **Auth**: Cookie/JWT 必須
+- **Auth**: Firebase Bearer 必須
 - **説明**: 自分の全Goal（最大100件）を評価し、判定結果を返却する
 
 ## 3.2 単体判定
 
 - **Method**: `GET`
 - **Path**: `/internal/me/goals/:id/evaluation`
-- **Auth**: Cookie/JWT 必須
+- **Auth**: Firebase Bearer 必須
 - **説明**: 指定Goal 1件を評価し、判定結果を返却する
 
 ---

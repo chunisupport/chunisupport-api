@@ -22,7 +22,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **役割**: このシステムのユーザーアカウント情報を格納します。
 - **主なカラム**:
     - `id`: ユーザーのユニークID。
-    - `username`: ログインに使用するユーザー名（ユニーク制約）。
+    - `username`: アプリ内で一意なユーザー名（ユニーク制約）。
     - `firebase_uid`: Firebase Authentication の UID（ユニーク制約、NULL可）。
     - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN）。
     - `player_id`: `players`テーブルへの外部キー（ユニーク制約、NULL可）。
@@ -35,10 +35,8 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
-    - `token_hash`: トークンのハッシュ値。
-    - `name`: トークンの識別名。
-    - `expires_at`: トークンの有効期限。
-    - `created_at`, `last_used_at`: 作成日時、最終使用日時。
+    - `hashed_token`: トークンのハッシュ値。
+    - `created_at`: 作成日時。
 
 ### プレイヤー・ゲームデータ関連
 

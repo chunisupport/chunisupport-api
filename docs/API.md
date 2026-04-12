@@ -353,8 +353,10 @@ const base64Data = btoa(binary);
 // 5. POST
 fetch('/internal/me/register-data', {
     method: 'POST',
+    headers: {
+        Authorization: `Bearer ${firebaseIdToken}`
+    },
     body: base64Data,
-    credentials: 'include'
 });
 ```
 
