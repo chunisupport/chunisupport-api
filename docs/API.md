@@ -2145,7 +2145,8 @@ curl -X POST \
     "best_candidate": [],
     "new": [],
     "new_candidate": [],
-    "all": []
+    "all": [],
+    "worldsend": []
   },
   "updated_at": "2024-12-20T10:00:00Z"
 }
