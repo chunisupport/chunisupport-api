@@ -5,9 +5,12 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
+
+const reauthTokenHeader = "X-Reauth-Token" // #nosec G101 -- HTTPヘッダー名であり、認証情報（シークレット）ではないため
 
 // ProfileHandler は認証済みユーザーのプロフィール関連リクエストを処理します。
 type ProfileHandler struct {
@@ -67,11 +70,15 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 		return err
 	}
 
-	// TODO: Firebase の recent sign-in を使った再認証を追加する。
-	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID); err != nil {
+	reauthToken, err := reauthtoken.New(c.Request().Header.Get(reauthTokenHeader))
+	if err != nil {
+		return apierror.ErrRecentSignInRequired
+	}
+
+	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID, reauthToken); err != nil {
 		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.NoContent(http.StatusNoContent)
 }

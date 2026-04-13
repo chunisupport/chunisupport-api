@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/stretchr/testify/mock"
 )
@@ -26,8 +27,8 @@ func (m *mockUserCredentialUsecase) UpdatePrivacy(ctx context.Context, userID in
 	return args.Error(0)
 }
 
-func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
+func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error {
+	args := m.Called(ctx, userID, reauthToken)
 	return args.Error(0)
 }
 

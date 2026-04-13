@@ -20,6 +20,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
 	case errors.Is(err, usecase.ErrInvalidCredentials):
 		return ErrInvalidCredentials.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecentSignInAuthTimeMissing):
+		return ErrRecentSignInRequired.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecentSignInRequired):
+		return ErrRecentSignInRequired.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidIDToken):
 		return ErrInvalidToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):

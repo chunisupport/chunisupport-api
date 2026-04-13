@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	firebaseauthsdk "firebase.google.com/go/v4/auth"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -57,6 +58,12 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 			name:    "UID を返せる場合はそのまま返す",
 			client:  &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid"}},
 			idToken: "valid-token",
+			wantUID: "firebase-uid",
+		},
+		{
+			name:    "UID に前後空白が含まれる場合は正規化して返す",
+			client:  &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  "}},
+			idToken: "valid-token-with-space",
 			wantUID: "firebase-uid",
 		},
 		{
@@ -126,6 +133,91 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 			assert.Equal(t, tt.wantUID, uid)
 			if client, ok := tt.client.(*stubAuthClient); ok {
 				assert.Equal(t, tt.idToken, client.receivedToken)
+			}
+		})
+	}
+}
+
+func TestTokenVerifier_VerifyRecentSignIn(t *testing.T) {
+	originalIsFirebaseInvalidIDToken := isFirebaseInvalidIDToken
+	originalIsFirebaseIDTokenRevoked := isFirebaseIDTokenRevoked
+	originalIsFirebaseUserDisabled := isFirebaseUserDisabled
+	t.Cleanup(func() {
+		isFirebaseInvalidIDToken = originalIsFirebaseInvalidIDToken
+		isFirebaseIDTokenRevoked = originalIsFirebaseIDTokenRevoked
+		isFirebaseUserDisabled = originalIsFirebaseUserDisabled
+	})
+
+	invalidErr := errors.New("invalid token from firebase sdk")
+	isFirebaseInvalidIDToken = func(err error) bool {
+		return errors.Is(err, invalidErr)
+	}
+	isFirebaseIDTokenRevoked = func(err error) bool {
+		return false
+	}
+	isFirebaseUserDisabled = func(err error) bool {
+		return false
+	}
+
+	tests := []struct {
+		name         string
+		client       authClient
+		idToken      string
+		wantUID      string
+		wantAuthTime int64
+		wantErr      error
+		wantErrIn    string
+	}{
+		{
+			name:         "AuthTime を返せる場合は recent sign-in 情報を返す",
+			client:       &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid", AuthTime: 1704067200}},
+			idToken:      "valid-token",
+			wantUID:      "firebase-uid",
+			wantAuthTime: 1704067200,
+		},
+		{
+			name:         "recent sign-in UID に前後空白が含まれる場合は正規化して返す",
+			client:       &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  ", AuthTime: 1704067200}},
+			idToken:      "valid-token-with-space",
+			wantUID:      "firebase-uid",
+			wantAuthTime: 1704067200,
+		},
+		{
+			name:      "AuthTime が空なら専用の recent sign-in エラーを返す",
+			client:    &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid"}},
+			idToken:   "missing-auth-time-token",
+			wantErr:   usecase.ErrRecentSignInAuthTimeMissing,
+			wantErrIn: "firebase token auth_time is empty",
+		},
+		{
+			name:      "SDK が不正トークンエラーを返す場合は ErrInvalidIDToken を返す",
+			client:    &stubAuthClient{err: invalidErr},
+			idToken:   "invalid-token",
+			wantErr:   usecase.ErrInvalidIDToken,
+			wantErrIn: "invalid token from firebase sdk",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verifier := &tokenVerifier{client: tt.client}
+
+			info, err := verifier.VerifyRecentSignIn(context.Background(), tt.idToken)
+
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				if tt.wantErrIn != "" {
+					assert.ErrorContains(t, err, tt.wantErrIn)
+				}
+				assert.Nil(t, info)
+				return
+			}
+
+			require.NoError(t, err)
+			if assert.NotNil(t, info) {
+				assert.Equal(t, tt.wantUID, info.UID)
+				assert.Equal(t, time.Unix(tt.wantAuthTime, 0).UTC(), info.AuthTime)
 			}
 		})
 	}

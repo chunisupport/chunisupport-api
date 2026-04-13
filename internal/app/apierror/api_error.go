@@ -66,6 +66,7 @@ var (
 	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
 	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
 	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)
+	ErrRecentSignInRequired     = New(CodeRecentSignInRequired, http.StatusUnauthorized)
 
 	// ユーザー関連エラー
 	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest) // 409→400に変更

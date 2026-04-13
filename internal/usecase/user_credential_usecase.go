@@ -4,26 +4,42 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // UserCredentialUsecase は認証済みユーザー自身の資格情報・プロフィール設定管理を扱います。
 type UserCredentialUsecase interface {
 	GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
-	DeleteOwnAccount(ctx context.Context, userID int) error
+	DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error
+}
+
+type clock interface {
+	Now() time.Time
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time {
+	return time.Now()
 }
 
 type userCredentialUsecaseImpl struct {
-	db               repository.Executor
-	tm               TransactionManager
-	userRepo         repository.UserRepository
-	playerRecordRepo repository.PlayerRecordRepository
-	firebaseDeleter  FirebaseUserDeleter
-	masterCache      AccountTypeProvider
+	db                   repository.Executor
+	tm                   TransactionManager
+	userRepo             repository.UserRepository
+	playerRecordRepo     repository.PlayerRecordRepository
+	recentSignInVerifier RecentSignInVerifier
+	firebaseDeleter      FirebaseUserDeleter
+	masterCache          AccountTypeProvider
+	clock                clock
 }
 
 func NewUserCredentialUsecase(
@@ -50,12 +66,14 @@ func NewUserCredentialUsecase(
 	}
 
 	return &userCredentialUsecaseImpl{
-		db:               db,
-		tm:               tm,
-		userRepo:         userRepo,
-		playerRecordRepo: playerRecordRepo,
-		firebaseDeleter:  noopFirebaseUserDeleter{},
-		masterCache:      masterCache,
+		db:                   db,
+		tm:                   tm,
+		userRepo:             userRepo,
+		playerRecordRepo:     playerRecordRepo,
+		recentSignInVerifier: nil,
+		firebaseDeleter:      noopFirebaseUserDeleter{},
+		masterCache:          masterCache,
+		clock:                systemClock{},
 	}
 }
 
@@ -68,10 +86,26 @@ func NewUserCredentialUsecaseWithFirebaseDeleter(
 	firebaseDeleter FirebaseUserDeleter,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
+	return NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, nil, firebaseDeleter, masterCache)
+}
+
+// NewUserCredentialUsecaseWithFirebaseServices は recent sign-in 検証と Firebase 削除連携付きの UserCredentialUsecase を生成します。
+func NewUserCredentialUsecaseWithFirebaseServices(
+	db repository.Executor,
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRecordRepo repository.PlayerRecordRepository,
+	recentSignInVerifier RecentSignInVerifier,
+	firebaseDeleter FirebaseUserDeleter,
+	masterCache AccountTypeProvider,
+) UserCredentialUsecase {
 	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, masterCache)
 	impl, ok := usecase.(*userCredentialUsecaseImpl)
 	if !ok {
 		return usecase
+	}
+	if recentSignInVerifier != nil {
+		impl.recentSignInVerifier = recentSignInVerifier
 	}
 	if firebaseDeleter != nil {
 		impl.firebaseDeleter = firebaseDeleter
@@ -107,7 +141,12 @@ func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID in
 	return s.userRepo.Save(ctx, s.db, user)
 }
 
-func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int) error {
+func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error {
+	reauthInfo, err := s.verifyRecentSignIn(ctx, reauthToken)
+	if err != nil {
+		return err
+	}
+
 	var deletedUserID int
 	var deletedUsername string
 	var deletedFirebaseUID string
@@ -120,11 +159,15 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			}
 			return err
 		}
+
+		firebaseUID, err := s.validateDeleteOwnAccountPreconditions(user, reauthInfo)
+		if err != nil {
+			return err
+		}
+
 		deletedUserID = user.ID
 		deletedUsername = user.Username.String()
-		if user.FirebaseUID != nil {
-			deletedFirebaseUID = *user.FirebaseUID
-		}
+		deletedFirebaseUID = firebaseUID
 
 		return s.userRepo.DeleteByID(ctx, tx, userID)
 	}); err != nil {
@@ -138,4 +181,80 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 	}
 
 	return nil
+}
+
+func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *entity.User, reauthInfo *RecentSignInInfo) (string, error) {
+	firebaseUID := normalizeFirebaseUID(user.FirebaseUID)
+	if firebaseUID == "" {
+		slog.Warn(
+			"suspicious account deletion authentication failure",
+			"reason",
+			"delete_account_firebase_uid_not_linked",
+			"user_id",
+			user.ID,
+			"reauth_uid",
+			reauthInfo.UID,
+		)
+		return "", ErrInvalidCredentials
+	}
+	if firebaseUID != reauthInfo.UID {
+		slog.Warn(
+			"suspicious account deletion authentication failure",
+			"reason",
+			"delete_account_reauth_uid_mismatch",
+			"user_id",
+			user.ID,
+			"reauth_uid",
+			reauthInfo.UID,
+			"linked_firebase_uid",
+			firebaseUID,
+		)
+		return "", ErrInvalidCredentials
+	}
+
+	return firebaseUID, nil
+}
+
+func normalizeFirebaseUID(firebaseUID *string) string {
+	if firebaseUID == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*firebaseUID)
+}
+
+func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reauthToken reauthtoken.ReauthToken) (*RecentSignInInfo, error) {
+	if s.recentSignInVerifier == nil {
+		return nil, errors.Join(ErrInternalError, errors.New("recent sign-in verifier is nil"))
+	}
+	if s.clock == nil {
+		return nil, errors.Join(ErrInternalError, errors.New("clock is nil"))
+	}
+
+	reauthInfo, err := s.recentSignInVerifier.VerifyRecentSignIn(ctx, reauthToken.String())
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRecentSignInAuthTimeMissing):
+			return nil, errors.Join(ErrRecentSignInRequired, err)
+		case errors.Is(err, ErrInvalidIDToken):
+			return nil, errors.Join(ErrRecentSignInRequired, err)
+		case errors.Is(err, ErrInternalError):
+			return nil, err
+		default:
+			return nil, errors.Join(ErrInternalError, err)
+		}
+	}
+	if reauthInfo == nil {
+		return nil, errors.Join(ErrInternalError, errors.New("recent sign-in verifier returned nil info"))
+	}
+
+	currentTime := s.clock.Now()
+	if reauthInfo.AuthTime.After(currentTime.Add(info.RecentSignInFutureAllowance)) {
+		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is in the future"))
+	}
+	if currentTime.Sub(reauthInfo.AuthTime) > info.RecentSignInMaxAge {
+		return nil, errors.Join(ErrRecentSignInRequired, ErrRecentSignInExpired)
+	}
+
+	return reauthInfo, nil
 }

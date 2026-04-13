@@ -38,6 +38,10 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
+type mockRecentSignInVerifier struct {
+	mock.Mock
+}
+
 func (m *MockUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	args := m.Called(ctx, exec, id)
 	if args.Get(0) == nil {
@@ -101,8 +105,24 @@ func (m *MockUserRepository) DeleteByID(ctx context.Context, exec repository.Exe
 	return args.Error(0)
 }
 
+func (m *mockRecentSignInVerifier) VerifyRecentSignIn(ctx context.Context, idToken string) (*RecentSignInInfo, error) {
+	args := m.Called(ctx, idToken)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*RecentSignInInfo), args.Error(1)
+}
+
 type mockTransactionManager struct {
 	exec repository.Executor
+}
+
+type fixedClock struct {
+	now time.Time
+}
+
+func (c fixedClock) Now() time.Time {
+	return c.now
 }
 
 func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx repository.Executor) error) error {
@@ -126,9 +146,16 @@ func newTestUserCredentialUsecaseWithDeleteDependencies(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
+	recentSignInVerifier RecentSignInVerifier,
+	currentTime time.Time,
 ) UserCredentialUsecase {
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
-	return NewUserCredentialUsecase(&MockExecutor{}, tm, userRepo, playerRecordRepo, newMockMasterCache())
+	userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, tm, userRepo, playerRecordRepo, recentSignInVerifier, nil, newMockMasterCache())
+	impl, ok := userCredentialUsecase.(*userCredentialUsecaseImpl)
+	if ok && !currentTime.IsZero() {
+		impl.clock = fixedClock{now: currentTime}
+	}
+	return userCredentialUsecase
 }

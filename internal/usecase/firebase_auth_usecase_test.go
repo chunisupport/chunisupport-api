@@ -95,7 +95,7 @@ func TestFirebaseAuthUsecase_Authenticate(t *testing.T) {
 			name:    "空のUIDが返された場合はErrInternalErrorを返す",
 			idToken: "empty-uid-token",
 			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.On("VerifyIDToken", mock.Anything, "empty-uid-token").Return("  ", nil).Once()
+				verifier.On("VerifyIDToken", mock.Anything, "empty-uid-token").Return("", nil).Once()
 			},
 			wantErr: ErrInternalError,
 			assertionFunc: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
