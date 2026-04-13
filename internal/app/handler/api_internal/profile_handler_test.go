@@ -68,14 +68,15 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 
 func TestProfileHandler_DeleteAccount(t *testing.T) {
 	e := newTestEcho()
-	h, userCredentialMock := newProfileHandlerWithMocks()
 
 	t.Run("アカウント削除時にユーザー削除のみを行う", func(t *testing.T) {
+		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 20}
-		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20).Return(nil).Once()
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20, "reauth-token").Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
+		req.Header.Set("X-Reauth-Token", "reauth-token")
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", user)
@@ -89,7 +90,25 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		userCredentialMock.AssertExpectations(t)
 	})
 
+	t.Run("再認証トークンがなければ recent sign-in required を返す", func(t *testing.T) {
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		// Given
+		user := &entity.User{ID: 21}
+		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", user)
+
+		// When
+		err := h.DeleteAccount(c)
+
+		// Then
+		assert.ErrorIs(t, err, apierror.ErrRecentSignInRequired)
+		userCredentialMock.AssertNotCalled(t, "DeleteOwnAccount", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 	t.Run("ユーザー未設定時は認証エラー", func(t *testing.T) {
+		h, _ := newProfileHandlerWithMocks()
 		// Given
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		rec := httptest.NewRecorder()

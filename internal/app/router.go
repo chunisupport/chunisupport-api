@@ -120,7 +120,11 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseDeleter(db, tm, userRepo, playerRecordRepo, firebaseUserDeleter, masterCache)
+	recentSignInVerifier, _ := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
+	if firebaseTokenVerifier != nil && recentSignInVerifier == nil {
+		slog.Error("firebase token verifier does not implement recent sign-in verifier")
+	}
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
 	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
@@ -385,6 +389,7 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 			echo.HeaderContentEncoding,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
+			"X-Reauth-Token",
 		},
 		ExposeHeaders: []string{
 			echo.HeaderContentLength,

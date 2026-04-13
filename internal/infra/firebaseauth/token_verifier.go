@@ -3,6 +3,7 @@ package firebaseauth
 import (
 	"context"
 	"errors"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	firebaseauthsdk "firebase.google.com/go/v4/auth"
@@ -42,24 +43,50 @@ func NewTokenVerifierFromApp(ctx context.Context, app *firebase.App) (usecase.To
 
 // VerifyIDToken は Firebase ID トークンを検証し、失効・無効化も含めて UID を返します。
 func (v *tokenVerifier) VerifyIDToken(ctx context.Context, idToken string) (string, error) {
-	if v.client == nil {
-		return "", errors.Join(usecase.ErrInternalError, errors.New("firebase auth client is nil"))
-	}
-
-	token, err := v.client.VerifyIDTokenAndCheckRevoked(ctx, idToken)
+	token, err := v.verifyToken(ctx, idToken)
 	if err != nil {
-		if isFirebaseInvalidIDToken(err) || isFirebaseIDTokenRevoked(err) || isFirebaseUserDisabled(err) {
-			return "", errors.Join(usecase.ErrInvalidIDToken, err)
-		}
-
-		return "", errors.Join(usecase.ErrInternalError, err)
-	}
-
-	if token == nil || token.UID == "" {
-		return "", errors.Join(usecase.ErrInternalError, errors.New("firebase token uid is empty"))
+		return "", err
 	}
 
 	return token.UID, nil
 }
 
+// VerifyRecentSignIn は Firebase ID トークンを検証し、UID と auth_time を返します。
+func (v *tokenVerifier) VerifyRecentSignIn(ctx context.Context, idToken string) (*usecase.RecentSignInInfo, error) {
+	token, err := v.verifyToken(ctx, idToken)
+	if err != nil {
+		return nil, err
+	}
+	if token.AuthTime == 0 {
+		return nil, errors.Join(usecase.ErrInvalidIDToken, errors.New("firebase token auth_time is empty"))
+	}
+
+	return &usecase.RecentSignInInfo{
+		UID:      token.UID,
+		AuthTime: time.Unix(token.AuthTime, 0).UTC(),
+	}, nil
+}
+
+func (v *tokenVerifier) verifyToken(ctx context.Context, idToken string) (*firebaseauthsdk.Token, error) {
+	if v.client == nil {
+		return nil, errors.Join(usecase.ErrInternalError, errors.New("firebase auth client is nil"))
+	}
+
+	token, err := v.client.VerifyIDTokenAndCheckRevoked(ctx, idToken)
+	if err != nil {
+		if isFirebaseInvalidIDToken(err) || isFirebaseIDTokenRevoked(err) || isFirebaseUserDisabled(err) {
+			return nil, errors.Join(usecase.ErrInvalidIDToken, err)
+		}
+
+		return nil, errors.Join(usecase.ErrInternalError, err)
+	}
+
+	if token == nil || token.UID == "" {
+		return nil, errors.Join(usecase.ErrInternalError, errors.New("firebase token uid is empty"))
+	}
+
+	return token, nil
+}
+
 var _ usecase.TokenVerifier = (*tokenVerifier)(nil)
+var _ usecase.RecentSignInVerifier = (*tokenVerifier)(nil)

@@ -41,6 +41,7 @@ const (
 	InternalPublicRateLimitWindow   = 1 * time.Minute
 	RegisterDataRateLimitRequests   = 1
 	RegisterDataRateLimitWindow     = 30 * time.Second
+	RecentSignInMaxAge              = 5 * time.Minute
 
 	TempDataTTL                  = 5 * time.Minute
 	TempDataMaxCompressedBytes   = 512000

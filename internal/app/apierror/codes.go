@@ -15,6 +15,7 @@ const (
 	CodeMissingToken             = "missing_token"       // #nosec G101
 	CodeForbidden                = "forbidden"
 	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
+	CodeRecentSignInRequired     = "recent_sign_in_required"
 
 	// ユーザー関連エラー
 	CodeRegistrationFailed = "registration_failed" // ユーザー登録失敗（詳細を隠蔽）

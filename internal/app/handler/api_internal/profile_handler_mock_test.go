@@ -26,8 +26,8 @@ func (m *mockUserCredentialUsecase) UpdatePrivacy(ctx context.Context, userID in
 	return args.Error(0)
 }
 
-func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
+func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID int, reauthToken string) error {
+	args := m.Called(ctx, userID, reauthToken)
 	return args.Error(0)
 }
 

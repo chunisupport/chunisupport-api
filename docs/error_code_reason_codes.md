@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-04-03
+最終更新: 2026-04-13
 
 ## 更新ルール
 
@@ -21,6 +21,7 @@
 | `missing_token` | トークン欠落 |
 | `forbidden` | 権限不足 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `recent_sign_in_required` | recent sign-in を満たす再認証が必要 |
 | `registration_failed` | ユーザー登録失敗 |
 | `user_not_found` | ユーザー未検出 |
 | `operation_failed` | 操作失敗 |

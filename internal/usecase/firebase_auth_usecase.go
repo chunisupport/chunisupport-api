@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -14,6 +15,18 @@ import (
 type TokenVerifier interface {
 	// VerifyIDToken はIDトークンを検証し、紐づくUIDを返します。
 	VerifyIDToken(ctx context.Context, idToken string) (string, error)
+}
+
+// RecentSignInInfo は recent sign-in 検証済みトークンの情報です。
+type RecentSignInInfo struct {
+	UID      string
+	AuthTime time.Time
+}
+
+// RecentSignInVerifier は recent sign-in を要求する操作向けのIDトークン検証を抽象化します。
+type RecentSignInVerifier interface {
+	// VerifyRecentSignIn はIDトークンを検証し、UIDと auth_time を返します。
+	VerifyRecentSignIn(ctx context.Context, idToken string) (*RecentSignInInfo, error)
 }
 
 // FirebaseAuthUsecase はFirebase IDトークンによる認証を扱います。

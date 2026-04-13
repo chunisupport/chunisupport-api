@@ -99,7 +99,7 @@
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
-| `/internal/me` | DELETE | Firebase Bearer | アカウント物理削除 |
+| `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
@@ -275,12 +275,16 @@
 
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
+- **必須ヘッダ**: `X-Reauth-Token: <再認証直後の Firebase ID トークン>`
 - **レスポンス**: 200 OK。ボディは空です。
 
-ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `api_tokens` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。現時点では Firebase の recent sign-in を使った再認証は未実装です。
+ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `api_tokens` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
+
+このエンドポイントでは通常の Bearer 認証に加えて、退会直前に取得した recent sign-in 済み Firebase ID トークンを `X-Reauth-Token` ヘッダで送る必要があります。バックエンドは `X-Reauth-Token` の `auth_time` が 5 分以内であること、およびトークンの UID が削除対象ユーザーに連携された Firebase UID と一致することを検証します。
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 通常認証が必要
+  - 401 Unauthorized (`recent_sign_in_required`): 再認証トークン未指定・不正・期限切れ・UID不一致
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 
