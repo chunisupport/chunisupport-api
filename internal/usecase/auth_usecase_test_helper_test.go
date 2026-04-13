@@ -117,6 +117,14 @@ type mockTransactionManager struct {
 	exec repository.Executor
 }
 
+type fixedClock struct {
+	now time.Time
+}
+
+func (c fixedClock) Now() time.Time {
+	return c.now
+}
+
 func (m *mockTransactionManager) Transactional(ctx context.Context, f func(tx repository.Executor) error) error {
 	return f(m.exec)
 }
@@ -139,9 +147,15 @@ func newTestUserCredentialUsecaseWithDeleteDependencies(
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
 	recentSignInVerifier RecentSignInVerifier,
+	currentTime time.Time,
 ) UserCredentialUsecase {
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
-	return NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, tm, userRepo, playerRecordRepo, recentSignInVerifier, nil, newMockMasterCache())
+	userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, tm, userRepo, playerRecordRepo, recentSignInVerifier, nil, newMockMasterCache())
+	impl, ok := userCredentialUsecase.(*userCredentialUsecaseImpl)
+	if ok && !currentTime.IsZero() {
+		impl.clock = fixedClock{now: currentTime}
+	}
+	return userCredentialUsecase
 }

@@ -19,6 +19,16 @@ type UserCredentialUsecase interface {
 	DeleteOwnAccount(ctx context.Context, userID int, reauthToken string) error
 }
 
+type clock interface {
+	Now() time.Time
+}
+
+type systemClock struct{}
+
+func (systemClock) Now() time.Time {
+	return time.Now()
+}
+
 type userCredentialUsecaseImpl struct {
 	db                   repository.Executor
 	tm                   TransactionManager
@@ -27,6 +37,7 @@ type userCredentialUsecaseImpl struct {
 	recentSignInVerifier RecentSignInVerifier
 	firebaseDeleter      FirebaseUserDeleter
 	masterCache          AccountTypeProvider
+	clock                clock
 }
 
 func NewUserCredentialUsecase(
@@ -60,6 +71,7 @@ func NewUserCredentialUsecase(
 		recentSignInVerifier: nil,
 		firebaseDeleter:      noopFirebaseUserDeleter{},
 		masterCache:          masterCache,
+		clock:                systemClock{},
 	}
 }
 
@@ -180,6 +192,9 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 	if s.recentSignInVerifier == nil {
 		return nil, errors.Join(ErrInternalError, errors.New("recent sign-in verifier is nil"))
 	}
+	if s.clock == nil {
+		return nil, errors.Join(ErrInternalError, errors.New("clock is nil"))
+	}
 
 	reauthInfo, err := s.recentSignInVerifier.VerifyRecentSignIn(ctx, reauthToken)
 	if err != nil {
@@ -203,10 +218,11 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 	if reauthInfo.AuthTime.IsZero() {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is empty"))
 	}
-	if reauthInfo.AuthTime.After(time.Now().Add(1 * time.Minute)) {
+	currentTime := s.clock.Now()
+	if reauthInfo.AuthTime.After(currentTime.Add(info.RecentSignInFutureAllowance)) {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is in the future"))
 	}
-	if time.Since(reauthInfo.AuthTime) > info.RecentSignInMaxAge {
+	if currentTime.Sub(reauthInfo.AuthTime) > info.RecentSignInMaxAge {
 		return nil, errors.Join(ErrRecentSignInRequired, ErrRecentSignInExpired)
 	}
 
