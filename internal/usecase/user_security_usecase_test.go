@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -91,7 +92,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 1).Return(nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
@@ -111,7 +112,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 2).Return(errors.New("db error")).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2, "reauth-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2, reauthtoken.MustNew("reauth-token"))
 		assert.Error(t, err)
 		assert.Equal(t, "db error", err.Error())
 		mockUserRepo.AssertExpectations(t)
@@ -120,12 +121,9 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 	t.Run("再認証トークンが空なら recent sign-in required を返す", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
-		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
-			&mockTransactionManager{}, mockUserRepo, nil, nil, currentTime,
-		)
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "   ")
-		assert.ErrorIs(t, err, ErrRecentSignInRequired)
+		_, err := reauthtoken.New("   ")
+		assert.ErrorIs(t, err, reauthtoken.ErrEmpty)
 		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -138,7 +136,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "invalid-token").Return(nil, errors.Join(ErrInvalidIDToken, errors.New("invalid token"))).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "invalid-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("invalid-token"))
 		assert.ErrorIs(t, err, ErrRecentSignInRequired)
 		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
 		recentSignInVerifier.AssertExpectations(t)
@@ -153,7 +151,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "expired-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: currentTime.Add(-info.RecentSignInMaxAge - time.Second)}, nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "expired-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("expired-token"))
 		assert.ErrorIs(t, err, ErrRecentSignInRequired)
 		assert.ErrorIs(t, err, ErrRecentSignInExpired)
 		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
@@ -173,7 +171,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(user, nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 3).Return(nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, "slightly-future-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, reauthtoken.MustNew("slightly-future-token"))
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
@@ -188,7 +186,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: currentTime.Add(info.RecentSignInFutureAllowance + time.Second)}, nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "future-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("future-token"))
 		assert.ErrorIs(t, err, ErrRecentSignInRequired)
 		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
 		recentSignInVerifier.AssertExpectations(t)
@@ -205,7 +203,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid-a", AuthTime: recentAuthTime}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un, FirebaseUID: ptrString("firebase-uid-b")}, nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
 		assert.Contains(t, logBuffer.String(), "delete_account_reauth_uid_mismatch")
 		assert.Contains(t, logBuffer.String(), "firebase-uid-a")
@@ -226,7 +224,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un}, nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
 		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
 		assert.Contains(t, logBuffer.String(), "firebase-uid")
@@ -246,7 +244,7 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un, FirebaseUID: ptrString("   ")}, nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
 		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
 		assert.Contains(t, logBuffer.String(), "firebase-uid")

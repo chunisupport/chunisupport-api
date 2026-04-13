@@ -3,9 +3,9 @@ package api_internal
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -70,8 +70,8 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 		return err
 	}
 
-	reauthToken := strings.TrimSpace(c.Request().Header.Get(reauthTokenHeader))
-	if reauthToken == "" {
+	reauthToken, err := reauthtoken.New(c.Request().Header.Get(reauthTokenHeader))
+	if err != nil {
 		return apierror.ErrRecentSignInRequired
 	}
 

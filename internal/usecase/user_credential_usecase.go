@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
@@ -17,7 +18,7 @@ import (
 type UserCredentialUsecase interface {
 	GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
-	DeleteOwnAccount(ctx context.Context, userID int, reauthToken string) error
+	DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error
 }
 
 type clock interface {
@@ -140,7 +141,7 @@ func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID in
 	return s.userRepo.Save(ctx, s.db, user)
 }
 
-func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int, reauthToken string) error {
+func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error {
 	reauthInfo, err := s.verifyRecentSignIn(ctx, reauthToken)
 	if err != nil {
 		return err
@@ -222,11 +223,7 @@ func normalizeFirebaseUID(firebaseUID *string) string {
 	return strings.TrimSpace(*firebaseUID)
 }
 
-func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reauthToken string) (*RecentSignInInfo, error) {
-	reauthToken = strings.TrimSpace(reauthToken)
-	if reauthToken == "" {
-		return nil, ErrRecentSignInRequired
-	}
+func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reauthToken reauthtoken.ReauthToken) (*RecentSignInInfo, error) {
 	if s.recentSignInVerifier == nil {
 		return nil, errors.Join(ErrInternalError, errors.New("recent sign-in verifier is nil"))
 	}
@@ -234,7 +231,7 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 		return nil, errors.Join(ErrInternalError, errors.New("clock is nil"))
 	}
 
-	reauthInfo, err := s.recentSignInVerifier.VerifyRecentSignIn(ctx, reauthToken)
+	reauthInfo, err := s.recentSignInVerifier.VerifyRecentSignIn(ctx, reauthToken.String())
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidIDToken):

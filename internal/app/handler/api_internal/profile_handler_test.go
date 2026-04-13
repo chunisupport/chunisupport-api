@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
@@ -74,7 +75,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 20}
-		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20, "reauth-token").Return(nil).Once()
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20, reauthtoken.MustNew("reauth-token")).Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		req.Header.Set("X-Reauth-Token", "reauth-token")
@@ -130,7 +131,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 			"DeleteOwnAccount",
 			mock.Anything,
 			22,
-			"reauth-token",
+			reauthtoken.MustNew("reauth-token"),
 		).Return(usecase.ErrInvalidCredentials).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
@@ -148,6 +149,27 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 			assert.Equal(t, apierror.CodeInvalidCredentials, apiErr.Code)
 			assert.Equal(t, apierror.ErrInvalidCredentials.HTTPStatus, apiErr.HTTPStatus)
 		}
+		userCredentialMock.AssertExpectations(t)
+	})
+
+	t.Run("再認証トークンはハンドラー境界で正規化してユースケースへ渡す", func(t *testing.T) {
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		// Given
+		user := &entity.User{ID: 23}
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 23, reauthtoken.MustNew("reauth-token")).Return(nil).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
+		req.Header.Set("X-Reauth-Token", "  reauth-token  ")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", user)
+
+		// When
+		err := h.DeleteAccount(c)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
 		userCredentialMock.AssertExpectations(t)
 	})
 }
