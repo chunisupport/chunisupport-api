@@ -250,12 +250,6 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 	}
 
 	reauthInfo.UID = strings.TrimSpace(reauthInfo.UID)
-	if reauthInfo.UID == "" {
-		return nil, errors.Join(ErrInternalError, errors.New("reauth token uid is empty"))
-	}
-	if reauthInfo.AuthTime.IsZero() {
-		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is empty"))
-	}
 	currentTime := s.clock.Now()
 	if reauthInfo.AuthTime.After(currentTime.Add(info.RecentSignInFutureAllowance)) {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is in the future"))
