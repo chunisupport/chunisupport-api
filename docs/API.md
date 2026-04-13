@@ -276,7 +276,7 @@
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
 - **必須ヘッダ**: `X-Reauth-Token: <再認証直後の Firebase ID トークン>`
-- **レスポンス**: 200 OK。ボディは空です。
+- **レスポンス**: 204 No Content。ボディは空です。
 
 ユーザーを物理削除します。ユーザーに紐づく `players` / `player_records` / `player_worldsend_records` / `player_honors` / `api_tokens` も外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 

@@ -71,7 +71,7 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 func TestProfileHandler_DeleteAccount(t *testing.T) {
 	e := newTestEcho()
 
-	t.Run("アカウント削除時にユーザー削除のみを行う", func(t *testing.T) {
+	t.Run("アカウント削除時に204 No Contentを返す", func(t *testing.T) {
 		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 20}
@@ -88,7 +88,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 
 		// Then
 		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusNoContent, rec.Code)
 		userCredentialMock.AssertExpectations(t)
 	})
 
@@ -152,7 +152,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		userCredentialMock.AssertExpectations(t)
 	})
 
-	t.Run("再認証トークンはハンドラー境界で正規化してユースケースへ渡す", func(t *testing.T) {
+	t.Run("再認証トークンを正規化して204 No Contentを返す", func(t *testing.T) {
 		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 23}
@@ -169,7 +169,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 
 		// Then
 		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusNoContent, rec.Code)
 		userCredentialMock.AssertExpectations(t)
 	})
 }

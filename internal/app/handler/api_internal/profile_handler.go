@@ -80,5 +80,5 @@ func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.NoContent(http.StatusNoContent)
 }
