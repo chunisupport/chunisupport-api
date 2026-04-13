@@ -2,6 +2,7 @@ package api_internal_test
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -119,5 +121,34 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 
 		// Then
 		assert.ErrorIs(t, err, apierror.ErrUnauthorized)
+	})
+
+	t.Run("UID不一致系はクライアントへ汎用認証エラーを返す", func(t *testing.T) {
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		// Given
+		user := &entity.User{ID: 22}
+		userCredentialMock.On(
+			"DeleteOwnAccount",
+			mock.Anything,
+			22,
+			"reauth-token",
+		).Return(errors.Join(usecase.ErrInvalidCredentials, usecase.ErrReauthUIDMismatch)).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
+		req.Header.Set("X-Reauth-Token", "reauth-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", user)
+
+		// When
+		err := h.DeleteAccount(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeInvalidCredentials, apiErr.Code)
+			assert.Equal(t, apierror.ErrInvalidCredentials.HTTPStatus, apiErr.HTTPStatus)
+		}
+		userCredentialMock.AssertExpectations(t)
 	})
 }

@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年04月12日
+**最終更新日**: 2026年04月13日
 
 ## ベースURLと環境
 
@@ -284,7 +284,8 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 通常認証が必要
-  - 401 Unauthorized (`recent_sign_in_required`): 再認証トークン未指定・不正・期限切れ・UID不一致
+  - 401 Unauthorized (`recent_sign_in_required`): 再認証トークン未指定・不正・期限切れ
+  - 401 Unauthorized (`invalid_credentials`): 削除対象アカウントと再認証情報の整合性が取れない認証失敗。詳細理由はレスポンスに含めず、サーバーログで監視します
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 

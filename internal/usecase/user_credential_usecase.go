@@ -160,10 +160,30 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 
 		firebaseUID := strings.TrimSpace(derefString(user.FirebaseUID))
 		if firebaseUID == "" {
-			return errors.Join(ErrRecentSignInRequired, ErrFirebaseUIDNotLinked)
+			slog.Warn(
+				"suspicious account deletion authentication failure",
+				"reason",
+				"delete_account_firebase_uid_not_linked",
+				"user_id",
+				user.ID,
+				"reauth_uid",
+				reauthInfo.UID,
+			)
+			return errors.Join(ErrInvalidCredentials, ErrFirebaseUIDNotLinked)
 		}
 		if firebaseUID != reauthInfo.UID {
-			return errors.Join(ErrRecentSignInRequired, ErrReauthUIDMismatch)
+			slog.Warn(
+				"suspicious account deletion authentication failure",
+				"reason",
+				"delete_account_reauth_uid_mismatch",
+				"user_id",
+				user.ID,
+				"reauth_uid",
+				reauthInfo.UID,
+				"linked_firebase_uid",
+				firebaseUID,
+			)
+			return errors.Join(ErrInvalidCredentials, ErrReauthUIDMismatch)
 		}
 
 		deletedUserID = user.ID

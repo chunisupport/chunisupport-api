@@ -65,6 +65,13 @@
 | `total_score_over_dynamic_max` | `total_score.total` が理論上限超過 |
 | `overpower_value_over_dynamic_max` | `overpower_value.total` が理論上限超過 |
 
+### 退会処理の認証監視ログ（`slog`）
+
+| reason | 発生条件 |
+| --- | --- |
+| `delete_account_firebase_uid_not_linked` | 退会対象ユーザーに Firebase UID が連携されていない |
+| `delete_account_reauth_uid_mismatch` | 再認証トークンの UID と退会対象ユーザーの Firebase UID が一致しない |
+
 ### PlayerData `skipped_records[].reason`
 
 | reason | 発生条件 |

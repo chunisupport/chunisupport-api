@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,13 +200,17 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
 			&mockTransactionManager{}, mockUserRepo, nil, recentSignInVerifier, currentTime,
 		)
+		logBuffer := captureDefaultSlog(t)
 
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid-a", AuthTime: recentAuthTime}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un, FirebaseUID: ptrString("firebase-uid-b")}, nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
-		assert.ErrorIs(t, err, ErrRecentSignInRequired)
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
 		assert.ErrorIs(t, err, ErrReauthUIDMismatch)
+		assert.Contains(t, logBuffer.String(), "delete_account_reauth_uid_mismatch")
+		assert.Contains(t, logBuffer.String(), "firebase-uid-a")
+		assert.Contains(t, logBuffer.String(), "firebase-uid-b")
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
@@ -216,17 +222,34 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
 			&mockTransactionManager{}, mockUserRepo, nil, recentSignInVerifier, currentTime,
 		)
+		logBuffer := captureDefaultSlog(t)
 
 		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un}, nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
-		assert.ErrorIs(t, err, ErrRecentSignInRequired)
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
 		assert.ErrorIs(t, err, ErrFirebaseUIDNotLinked)
+		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
+		assert.Contains(t, logBuffer.String(), "firebase-uid")
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
 	})
+}
+
+func captureDefaultSlog(t *testing.T) *strings.Builder {
+	t.Helper()
+
+	var buffer strings.Builder
+	original := slog.Default()
+	logger := slog.New(slog.NewTextHandler(&buffer, nil))
+	slog.SetDefault(logger)
+	t.Cleanup(func() {
+		slog.SetDefault(original)
+	})
+
+	return &buffer
 }
 
 func ptrString(value string) *string {
