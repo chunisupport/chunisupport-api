@@ -120,10 +120,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	recentSignInVerifier, ok := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
-	if firebaseTokenVerifier != nil && !ok {
-		slog.Error("firebase token verifier does not implement recent sign-in verifier")
-	}
+	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserServiceWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
@@ -179,6 +176,19 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	registerRoutes(e, handlers, firebaseAuthUsecase, apiTokenUsecase, cfg)
 
 	return e
+}
+
+func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) usecase.RecentSignInVerifier {
+	if firebaseTokenVerifier == nil {
+		return nil
+	}
+
+	recentSignInVerifier, ok := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
+	if !ok {
+		panic(fmt.Sprintf("firebase token verifier must implement recent sign-in verifier: %T", firebaseTokenVerifier))
+	}
+
+	return recentSignInVerifier
 }
 
 // registerRoutes はすべてのルートを登録します
