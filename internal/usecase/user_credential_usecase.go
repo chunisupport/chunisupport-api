@@ -203,7 +203,7 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 	if reauthInfo.AuthTime.IsZero() {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is empty"))
 	}
-	if reauthInfo.AuthTime.After(time.Now()) {
+	if reauthInfo.AuthTime.After(time.Now().Add(1 * time.Minute)) {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is in the future"))
 	}
 	if time.Since(reauthInfo.AuthTime) > info.RecentSignInMaxAge {
