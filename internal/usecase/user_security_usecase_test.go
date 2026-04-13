@@ -156,14 +156,33 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.AssertExpectations(t)
 	})
 
-	t.Run("recent sign-in の auth_time が未来なら削除しない", func(t *testing.T) {
+	t.Run("recent sign-in の auth_time が1分以内の未来なら許容する", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		tm := &mockTransactionManager{}
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			tm, mockUserRepo, nil, recentSignInVerifier,
+		)
+
+		user := &entity.User{ID: 3, Username: un, FirebaseUID: ptrString("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "slightly-future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: time.Now().Add(30 * time.Second)}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 3).Return(nil).Once()
+
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, "slightly-future-token")
+		assert.NoError(t, err)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("recent sign-in の auth_time が1分を超えて未来なら削除しない", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		recentSignInVerifier := new(mockRecentSignInVerifier)
 		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
 			&mockTransactionManager{}, mockUserRepo, nil, recentSignInVerifier,
 		)
 
-		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: time.Now().Add(10 * time.Second)}, nil).Once()
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: time.Now().Add(2 * time.Minute)}, nil).Once()
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "future-token")
 		assert.ErrorIs(t, err, ErrRecentSignInRequired)
