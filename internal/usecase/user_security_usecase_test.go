@@ -236,6 +236,27 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
 	})
+
+	t.Run("ユーザーのFirebase UIDが空文字列なら削除しない", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			&mockTransactionManager{}, mockUserRepo, nil, recentSignInVerifier, currentTime,
+		)
+		logBuffer := captureDefaultSlog(t)
+
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(&entity.User{ID: 1, Username: un, FirebaseUID: ptrString("   ")}, nil).Once()
+
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+		assert.ErrorIs(t, err, ErrFirebaseUIDNotLinked)
+		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
+		assert.Contains(t, logBuffer.String(), "firebase-uid")
+		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
 }
 
 func captureDefaultSlog(t *testing.T) *strings.Builder {
