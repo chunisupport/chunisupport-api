@@ -9,7 +9,7 @@ import (
 
 // UserProfileWithRecordsDTO はユーザープロファイルとレコードを統合したDTOです。
 type UserProfileWithRecordsDTO struct {
-	UserID    int                        `json:"user_id"`
+	UserID    int                        `json:"-"`
 	Username  string                     `json:"username"`
 	Player    *dto.PlayerDTO             `json:"player"`
 	Records   *dto.UserRecordResponseDTO `json:"records"`

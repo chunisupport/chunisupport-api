@@ -983,7 +983,7 @@ curl -X POST \
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`all`/`worldsend` のみを返します。
     - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
-- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。
+- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 
 #### レスポンス例
 
@@ -1043,9 +1043,20 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
-| `player` | PlayerDTO | プレイヤー情報 |
-| `records` | UserRecordResponseDTO | スロット別レコード |
-| `updated_at` | string | プレイヤーデータの最終更新日時 (ISO8601) |
+| `player` | PlayerDTO \| null | プレイヤー情報。未連携の場合は `null` |
+| `records` | UserRecordResponseDTO \| null | スロット別レコード。未連携の場合は `null` |
+| `updated_at` | string \| null | プレイヤーデータの最終更新日時 (ISO8601)。未連携の場合は `null` |
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "username": "sample_user",
+  "player": null,
+  "records": null,
+  "updated_at": null
+}
+```
 
 ---
 
@@ -1053,7 +1064,7 @@ curl -X POST \
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。
+- **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` が `null` になります。
 
 #### レスポンス例
 
@@ -1088,7 +1099,16 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
-| `player` | object | プレイヤー情報。スキーマは `PlayerDTO` と同一 |
+| `player` | object \| null | プレイヤー情報。スキーマは `PlayerDTO` と同一。未連携の場合は `null` |
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "username": "sample_user",
+  "player": null
+}
+```
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
@@ -2172,7 +2192,7 @@ curl -X POST \
 
 ### GET `/v1/users/:username`
 - **認証**: APIトークン必須
-- **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）以外 404 を返します。
+- **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
@@ -2235,6 +2255,17 @@ curl -X POST \
     "worldsend": []
   },
   "updated_at": "2024-12-20T10:00:00Z"
+}
+```
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "username": "sample_user",
+  "player": null,
+  "records": null,
+  "updated_at": null
 }
 ```
 
@@ -2439,9 +2470,9 @@ interface AdminUserListResponse {
 // プロファイル＋レコード統合レスポンス
 interface UserProfileWithRecordsDTO {
   username: string;
-  player: PlayerDTO;
-  records: UserRecordResponseDTO;
-  updated_at: string;
+  player: PlayerDTO | null;
+  records: UserRecordResponseDTO | null;
+  updated_at: string | null;
 }
 
 interface PlayerDTO {

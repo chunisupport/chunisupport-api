@@ -11,22 +11,18 @@ import (
 type UserUsecase interface {
 	// GetUserProfile はユーザー名をキーにプロファイル（username + player）のみを軽量に取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
-	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error)
 
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
-	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error)
 
 	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
-	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error)
 
 	// GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
-	// プレイヤーが紐づいていない場合は ErrPlayerNotLinked を返します。
 	GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileRecordViewDTO, error)
 
 	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。

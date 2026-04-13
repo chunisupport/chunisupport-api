@@ -264,12 +264,17 @@ func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
-func TestUserService_GetUserProfileWithRecords_PlayerNotLinked(t *testing.T) {
+func TestUserService_GetUserProfileWithRecords_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
 	user := &entity.User{ID: 1}
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
-	require.ErrorIs(t, err, ErrPlayerNotLinked)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 1, result.UserID)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
 }
 
 func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
@@ -293,7 +298,7 @@ func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUserService_GetUserProfileWithRecords_PlayerRepositoryNoRows(t *testing.T) {
+func TestUserService_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilPlayerAndRecords(t *testing.T) {
 	un, _ := username.NewUserName("tester")
 	user := &entity.User{
 		ID:       1,
@@ -302,8 +307,12 @@ func TestUserService_GetUserProfileWithRecords_PlayerRepositoryNoRows(t *testing
 	}
 	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
-	require.ErrorIs(t, err, ErrPlayerNotLinked)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
 }
 
 func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
@@ -554,6 +563,18 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 	assert.Empty(t, result.Records.New)
 }
 
+func TestUserService_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
+	user := &entity.User{ID: 1}
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileRatingView(context.Background(), "no-player", nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
+}
+
 func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 	now := time.Now()
 	scorePlayed, _ := score.NewScore(1000000)
@@ -599,6 +620,18 @@ func TestUserService_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 
 	require.Len(t, result.Records.Worldsend, 1)
 	assert.False(t, result.Records.Worldsend[0].IsPlayed, "expected worldsend completion record is unplayed")
+}
+
+func TestUserService_GetUserProfileRecordView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
+	user := &entity.User{ID: 1}
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "no-player", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
 }
 
 func TestUserService_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerUpdatedAt(t *testing.T) {

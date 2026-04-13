@@ -63,6 +63,31 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
+	t.Run("正常系: プレイヤー未連携なら player は null を返す", func(t *testing.T) {
+		result := &dto_internal.UserProfileDTO{
+			Username: "testuser",
+			Player:   nil,
+		}
+		mockService.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserProfile(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "testuser", body["username"])
+		assert.Nil(t, body["player"])
+		mockService.AssertExpectations(t)
+	})
+
 	t.Run("異常系: 既存プロフィールAPIと同じエラー変換を使う", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -77,11 +102,6 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 			{
 				name:          "ユーザーが非公開",
 				usecaseError:  usecase.ErrUserPrivate,
-				expectedError: apierror.ErrUserNotFound,
-			},
-			{
-				name:          "プレイヤー未連携",
-				usecaseError:  usecase.ErrPlayerNotLinked,
 				expectedError: apierror.ErrUserNotFound,
 			},
 		}

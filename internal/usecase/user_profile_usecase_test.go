@@ -64,3 +64,19 @@ func TestUserService_GetUserProfile_UserNotFound(t *testing.T) {
 	_, err := service.GetUserProfile(context.Background(), "nobody", nil)
 	assert.ErrorIs(t, err, ErrUserNotFound)
 }
+
+func TestUserService_GetUserProfile_PlayerNotLinkedReturnsNilPlayer(t *testing.T) {
+	un, err := username.NewUserName("tester")
+	require.NoError(t, err)
+	user := &entity.User{
+		ID:       1,
+		Username: un,
+	}
+	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfile(context.Background(), "tester", nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "tester", result.Username)
+	assert.Nil(t, result.Player)
+}

@@ -110,9 +110,6 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 		case errors.Is(err, usecase.ErrUserPrivate):
 			// セキュリティ: 非公開と未発見を区別しない
 			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrPlayerNotLinked):
-			// セキュリティ: プレイヤー未紐付も404で隠蔽
-			return apierror.ErrUserNotFound
 		default:
 			slog.Error("failed to get user profile", "username", username, "error", err)
 			return apierror.ErrInternalError.WithInternal(err)

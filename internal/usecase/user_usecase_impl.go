@@ -76,9 +76,12 @@ func NewUserServiceWithFirebaseDeleter(db repository.Executor, userRepo reposito
 
 // GetUserProfile はユーザー名をキーにプロファイル（username + player）を軽量に取得します。
 // 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
 func (s *userUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error) {
-	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+	player, err := s.getOptionalPlayer(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +93,23 @@ func (s *userUsecase) GetUserProfile(ctx context.Context, username string, reque
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 // 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-// プレイヤーが紐付いていない場合は ErrPlayerNotLinked を返します。
 func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {
-	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
+	}
+	player, err := s.getOptionalPlayer(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if player == nil {
+		return &api_internal.UserProfileWithRecordsDTO{
+			UserID:    user.ID,
+			Username:  user.Username.String(),
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}, nil
 	}
 
 	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
@@ -132,9 +147,21 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 
 // GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
 func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error) {
-	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
+	}
+	player, err := s.getOptionalPlayer(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if player == nil {
+		return &api_internal.UserProfileRatingViewDTO{
+			Username:  user.Username.String(),
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}, nil
 	}
 
 	records, err := s.playerRecordRepo.FindByPlayerIDForRating(ctx, s.db, *user.PlayerID)
@@ -325,9 +352,21 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID in
 
 // GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
 func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileRecordViewDTO, error) {
-	user, player, err := s.getUserAndPlayer(ctx, username, requester)
+	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
+	}
+	player, err := s.getOptionalPlayer(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if player == nil {
+		return &api_internal.UserProfileRecordViewDTO{
+			Username:  user.Username.String(),
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}, nil
 	}
 
 	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
@@ -528,40 +567,52 @@ func initializeRatingSlotMap() map[string][]*dto.PlayerRecordDTO {
 	return result
 }
 
-func (s *userUsecase) getUserAndPlayer(ctx context.Context, username string, requester *entity.User) (*entity.User, *dto.PlayerDTO, error) {
+func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, requester *entity.User) (*entity.User, error) {
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, nil, ErrUserNotFound
+			return nil, ErrUserNotFound
 		}
 		slog.Error("failed to find user by username", "username", username, "error", err)
-		return nil, nil, err
+		return nil, err
 	}
 
 	if user == nil {
-		return nil, nil, ErrUserNotFound
+		return nil, ErrUserNotFound
 	}
 
 	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
-		return nil, nil, ErrUserPrivate
+		return nil, ErrUserPrivate
 	}
 
 	if !user.HasLinkedPlayer() {
-		return nil, nil, ErrPlayerNotLinked
+		return user, nil
+	}
+
+	return user, nil
+}
+
+func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) (*dto.PlayerDTO, error) {
+	if user == nil || !user.HasLinkedPlayer() {
+		return nil, nil
 	}
 
 	playerWithHonors, err := s.playerRepo.FindByIDWithHonors(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrPlayerNotFound) {
-			return nil, nil, ErrPlayerNotLinked
+			return nil, nil
 		}
 		if errors.Is(err, context.Canceled) {
 			slog.Warn("failed to find player due to context canceled", "player_id", *user.PlayerID, "error", err)
 		} else {
 			slog.Error("failed to find player", "player_id", *user.PlayerID, "error", err)
 		}
-		return nil, nil, err
+		return nil, err
 	}
 
-	return user, buildPlayerDTO(playerWithHonors), nil
+	if playerWithHonors == nil || playerWithHonors.Player == nil {
+		return nil, nil
+	}
+
+	return buildPlayerDTO(playerWithHonors), nil
 }

@@ -126,6 +126,35 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
+	t.Run("viewなしでプレイヤー未連携なら player と records は null を返す", func(t *testing.T) {
+		noPlayerResult := &dto_internal.UserProfileWithRecordsDTO{
+			Username:  "testuser",
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}
+		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(noPlayerResult, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserProfileWithRecords(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "testuser", body["username"])
+		assert.Nil(t, body["player"])
+		assert.Nil(t, body["records"])
+		_, hasUserID := body["user_id"]
+		assert.False(t, hasUserID)
+		mockService.AssertExpectations(t)
+	})
+
 	t.Run("view=ratingはレーティング枠のみ返す", func(t *testing.T) {
 		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
 
@@ -164,11 +193,6 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 			{
 				name:          "ユーザーが非公開",
 				usecaseError:  usecase.ErrUserPrivate,
-				expectedError: apierror.ErrUserNotFound,
-			},
-			{
-				name:          "プレイヤー未紐付け",
-				usecaseError:  usecase.ErrPlayerNotLinked,
 				expectedError: apierror.ErrUserNotFound,
 			},
 		}
