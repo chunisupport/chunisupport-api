@@ -183,20 +183,7 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 }
 
 func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *entity.User, reauthInfo *RecentSignInInfo) (string, error) {
-	if user.FirebaseUID == nil {
-		slog.Warn(
-			"suspicious account deletion authentication failure",
-			"reason",
-			"delete_account_firebase_uid_not_linked",
-			"user_id",
-			user.ID,
-			"reauth_uid",
-			reauthInfo.UID,
-		)
-		return "", errors.Join(ErrInvalidCredentials, ErrFirebaseUIDNotLinked)
-	}
-
-	firebaseUID := strings.TrimSpace(*user.FirebaseUID)
+	firebaseUID := normalizeFirebaseUID(user.FirebaseUID)
 	if firebaseUID == "" {
 		slog.Warn(
 			"suspicious account deletion authentication failure",
@@ -207,7 +194,7 @@ func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *
 			"reauth_uid",
 			reauthInfo.UID,
 		)
-		return "", errors.Join(ErrInvalidCredentials, ErrFirebaseUIDNotLinked)
+		return "", ErrInvalidCredentials
 	}
 	if firebaseUID != reauthInfo.UID {
 		slog.Warn(
@@ -221,10 +208,18 @@ func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *
 			"linked_firebase_uid",
 			firebaseUID,
 		)
-		return "", errors.Join(ErrInvalidCredentials, ErrReauthUIDMismatch)
+		return "", ErrInvalidCredentials
 	}
 
 	return firebaseUID, nil
+}
+
+func normalizeFirebaseUID(firebaseUID *string) string {
+	if firebaseUID == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*firebaseUID)
 }
 
 func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reauthToken string) (*RecentSignInInfo, error) {

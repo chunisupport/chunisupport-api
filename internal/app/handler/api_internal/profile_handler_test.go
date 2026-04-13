@@ -2,7 +2,6 @@ package api_internal_test
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -132,7 +131,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 			mock.Anything,
 			22,
 			"reauth-token",
-		).Return(errors.Join(usecase.ErrInvalidCredentials, usecase.ErrReauthUIDMismatch)).Once()
+		).Return(usecase.ErrInvalidCredentials).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		req.Header.Set("X-Reauth-Token", "reauth-token")

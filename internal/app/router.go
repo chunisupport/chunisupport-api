@@ -120,8 +120,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	recentSignInVerifier, _ := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
-	if firebaseTokenVerifier != nil && recentSignInVerifier == nil {
+	recentSignInVerifier, ok := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
+	if firebaseTokenVerifier != nil && !ok {
 		slog.Error("firebase token verifier does not implement recent sign-in verifier")
 	}
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)

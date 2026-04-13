@@ -207,7 +207,6 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
-		assert.ErrorIs(t, err, ErrReauthUIDMismatch)
 		assert.Contains(t, logBuffer.String(), "delete_account_reauth_uid_mismatch")
 		assert.Contains(t, logBuffer.String(), "firebase-uid-a")
 		assert.Contains(t, logBuffer.String(), "firebase-uid-b")
@@ -229,7 +228,6 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
-		assert.ErrorIs(t, err, ErrFirebaseUIDNotLinked)
 		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
 		assert.Contains(t, logBuffer.String(), "firebase-uid")
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
@@ -250,7 +248,6 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, "reauth-token")
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
-		assert.ErrorIs(t, err, ErrFirebaseUIDNotLinked)
 		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
 		assert.Contains(t, logBuffer.String(), "firebase-uid")
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
