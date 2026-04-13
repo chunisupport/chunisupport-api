@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const reauthTokenHeader = "X-Reauth-Token"
+const reauthTokenHeader = "X-Reauth-Token" // #nosec G101 -- HTTPヘッダー名であり、認証情報（シークレット）ではないため
 
 // ProfileHandler は認証済みユーザーのプロフィール関連リクエストを処理します。
 type ProfileHandler struct {
