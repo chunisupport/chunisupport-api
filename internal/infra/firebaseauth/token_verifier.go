@@ -3,6 +3,7 @@ package firebaseauth
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -48,7 +49,7 @@ func (v *tokenVerifier) VerifyIDToken(ctx context.Context, idToken string) (stri
 		return "", err
 	}
 
-	return token.UID, nil
+	return normalizeUID(token.UID), nil
 }
 
 // VerifyRecentSignIn は Firebase ID トークンを検証し、UID と auth_time を返します。
@@ -58,11 +59,11 @@ func (v *tokenVerifier) VerifyRecentSignIn(ctx context.Context, idToken string) 
 		return nil, err
 	}
 	if token.AuthTime == 0 {
-		return nil, errors.Join(usecase.ErrInvalidIDToken, errors.New("firebase token auth_time is empty"))
+		return nil, errors.Join(usecase.ErrRecentSignInAuthTimeMissing, errors.New("firebase token auth_time is empty"))
 	}
 
 	return &usecase.RecentSignInInfo{
-		UID:      token.UID,
+		UID:      normalizeUID(token.UID),
 		AuthTime: time.Unix(token.AuthTime, 0).UTC(),
 	}, nil
 }
@@ -81,11 +82,15 @@ func (v *tokenVerifier) verifyToken(ctx context.Context, idToken string) (*fireb
 		return nil, errors.Join(usecase.ErrInternalError, err)
 	}
 
-	if token == nil || token.UID == "" {
+	if token == nil || normalizeUID(token.UID) == "" {
 		return nil, errors.Join(usecase.ErrInternalError, errors.New("firebase token uid is empty"))
 	}
 
 	return token, nil
+}
+
+func normalizeUID(uid string) string {
+	return strings.TrimSpace(uid)
 }
 
 var _ usecase.TokenVerifier = (*tokenVerifier)(nil)

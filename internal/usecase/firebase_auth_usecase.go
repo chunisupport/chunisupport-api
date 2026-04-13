@@ -84,7 +84,6 @@ func (u *firebaseAuthUsecase) authenticate(ctx context.Context, idToken string, 
 			return nil, errors.Join(ErrInternalError, err)
 		}
 	}
-	uid = strings.TrimSpace(uid)
 	if uid == "" {
 		return nil, errors.Join(ErrInternalError, errors.New("firebase uid is empty"))
 	}

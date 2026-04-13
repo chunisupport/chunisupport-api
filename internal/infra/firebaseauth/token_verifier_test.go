@@ -61,6 +61,12 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 			wantUID: "firebase-uid",
 		},
 		{
+			name:    "UID に前後空白が含まれる場合は正規化して返す",
+			client:  &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  "}},
+			idToken: "valid-token-with-space",
+			wantUID: "firebase-uid",
+		},
+		{
 			name:    "SDK が不正トークンエラーを返す場合は ErrInvalidIDToken を返す",
 			client:  &stubAuthClient{err: invalidErr},
 			idToken: "invalid-token",
@@ -170,10 +176,17 @@ func TestTokenVerifier_VerifyRecentSignIn(t *testing.T) {
 			wantAuthTime: 1704067200,
 		},
 		{
-			name:      "AuthTime が空なら ErrInvalidIDToken を返す",
+			name:         "recent sign-in UID に前後空白が含まれる場合は正規化して返す",
+			client:       &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  ", AuthTime: 1704067200}},
+			idToken:      "valid-token-with-space",
+			wantUID:      "firebase-uid",
+			wantAuthTime: 1704067200,
+		},
+		{
+			name:      "AuthTime が空なら専用の recent sign-in エラーを返す",
 			client:    &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid"}},
 			idToken:   "missing-auth-time-token",
-			wantErr:   usecase.ErrInvalidIDToken,
+			wantErr:   usecase.ErrRecentSignInAuthTimeMissing,
 			wantErrIn: "firebase token auth_time is empty",
 		},
 		{

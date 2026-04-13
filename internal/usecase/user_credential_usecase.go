@@ -234,6 +234,8 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 	reauthInfo, err := s.recentSignInVerifier.VerifyRecentSignIn(ctx, reauthToken.String())
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrRecentSignInAuthTimeMissing):
+			return nil, errors.Join(ErrRecentSignInRequired, err)
 		case errors.Is(err, ErrInvalidIDToken):
 			return nil, errors.Join(ErrRecentSignInRequired, err)
 		case errors.Is(err, ErrInternalError):
@@ -246,7 +248,6 @@ func (s *userCredentialUsecaseImpl) verifyRecentSignIn(ctx context.Context, reau
 		return nil, errors.Join(ErrInternalError, errors.New("recent sign-in verifier returned nil info"))
 	}
 
-	reauthInfo.UID = strings.TrimSpace(reauthInfo.UID)
 	currentTime := s.clock.Now()
 	if reauthInfo.AuthTime.After(currentTime.Add(info.RecentSignInFutureAllowance)) {
 		return nil, errors.Join(ErrRecentSignInRequired, errors.New("reauth token auth_time is in the future"))

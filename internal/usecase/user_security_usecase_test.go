@@ -142,6 +142,22 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.AssertExpectations(t)
 	})
 
+	t.Run("再認証トークンのauth_timeが欠落しているなら recent sign-in required を返す", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			&mockTransactionManager{}, mockUserRepo, nil, recentSignInVerifier, currentTime,
+		)
+
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "missing-auth-time-token").Return(nil, errors.Join(ErrRecentSignInAuthTimeMissing, errors.New("firebase token auth_time is empty"))).Once()
+
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("missing-auth-time-token"))
+		assert.ErrorIs(t, err, ErrRecentSignInRequired)
+		assert.ErrorIs(t, err, ErrRecentSignInAuthTimeMissing)
+		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
 	t.Run("recent sign-in が期限切れなら削除しない", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		recentSignInVerifier := new(mockRecentSignInVerifier)
