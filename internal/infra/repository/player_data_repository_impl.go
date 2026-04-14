@@ -217,23 +217,23 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
-var fullRecordChangedCondition = strings.Join([]string{
-	"score <> VALUES(score)",
-	"clear_lamp_id <> VALUES(clear_lamp_id)",
-	"combo_lamp_id <> VALUES(combo_lamp_id)",
-	"full_chain_id <> VALUES(full_chain_id)",
-	"slot_id <> VALUES(slot_id)",
-	"NOT (slot_order <=> VALUES(slot_order))",
-}, " OR ")
+const (
+	fullRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id) OR " +
+		"slot_id <> VALUES(slot_id) OR " +
+		"NOT (slot_order <=> VALUES(slot_order))"
 
-var worldsendRecordChangedCondition = strings.Join([]string{
-	"score <> VALUES(score)",
-	"clear_lamp_id <> VALUES(clear_lamp_id)",
-	"combo_lamp_id <> VALUES(combo_lamp_id)",
-	"full_chain_id <> VALUES(full_chain_id)",
-}, " OR ")
+	worldsendRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id)"
 
-var fullRecordUpsertQuery = fmt.Sprintf(`
+	changedConditionPlaceholder = "{{CHANGED_CONDITION}}"
+)
+
+var fullRecordUpsertQuery = replaceQueryPlaceholder(`
 		INSERT INTO player_records (
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
 			full_chain_id, slot_id, slot_order, updated_at
@@ -243,7 +243,7 @@ var fullRecordUpsertQuery = fmt.Sprintf(`
 		)
 		ON DUPLICATE KEY UPDATE
 			updated_at = IF(
-				%s,
+				{{CHANGED_CONDITION}},
 				VALUES(updated_at),
 				updated_at
 			),
@@ -253,9 +253,9 @@ var fullRecordUpsertQuery = fmt.Sprintf(`
 			full_chain_id = VALUES(full_chain_id),
 			slot_id = VALUES(slot_id),
 			slot_order = VALUES(slot_order)
-	`, fullRecordChangedCondition)
+	`, changedConditionPlaceholder, fullRecordChangedCondition)
 
-var worldsendRecordUpsertQuery = fmt.Sprintf(`
+var worldsendRecordUpsertQuery = replaceQueryPlaceholder(`
 		INSERT INTO player_worldsend_records (
 			player_id, worldsend_chart_id, score, clear_lamp_id,
 			combo_lamp_id, full_chain_id, updated_at
@@ -265,7 +265,7 @@ var worldsendRecordUpsertQuery = fmt.Sprintf(`
 		)
 		ON DUPLICATE KEY UPDATE
 			updated_at = IF(
-				%s,
+				{{CHANGED_CONDITION}},
 				VALUES(updated_at),
 				updated_at
 			),
@@ -273,7 +273,11 @@ var worldsendRecordUpsertQuery = fmt.Sprintf(`
 			clear_lamp_id = VALUES(clear_lamp_id),
 			combo_lamp_id = VALUES(combo_lamp_id),
 			full_chain_id = VALUES(full_chain_id)
-	`, worldsendRecordChangedCondition)
+	`, changedConditionPlaceholder, worldsendRecordChangedCondition)
+
+func replaceQueryPlaceholder(query string, placeholder string, replacement string) string {
+	return strings.ReplaceAll(query, placeholder, replacement)
+}
 
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
