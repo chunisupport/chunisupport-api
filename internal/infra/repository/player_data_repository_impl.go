@@ -217,28 +217,23 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
-func fullRecordChangedCondition() string {
-	return strings.Join([]string{
-		"score <> VALUES(score)",
-		"clear_lamp_id <> VALUES(clear_lamp_id)",
-		"combo_lamp_id <> VALUES(combo_lamp_id)",
-		"full_chain_id <> VALUES(full_chain_id)",
-		"slot_id <> VALUES(slot_id)",
-		"NOT (slot_order <=> VALUES(slot_order))",
-	}, " OR ")
-}
+var fullRecordChangedCondition = strings.Join([]string{
+	"score <> VALUES(score)",
+	"clear_lamp_id <> VALUES(clear_lamp_id)",
+	"combo_lamp_id <> VALUES(combo_lamp_id)",
+	"full_chain_id <> VALUES(full_chain_id)",
+	"slot_id <> VALUES(slot_id)",
+	"NOT (slot_order <=> VALUES(slot_order))",
+}, " OR ")
 
-func worldsendRecordChangedCondition() string {
-	return strings.Join([]string{
-		"score <> VALUES(score)",
-		"clear_lamp_id <> VALUES(clear_lamp_id)",
-		"combo_lamp_id <> VALUES(combo_lamp_id)",
-		"full_chain_id <> VALUES(full_chain_id)",
-	}, " OR ")
-}
+var worldsendRecordChangedCondition = strings.Join([]string{
+	"score <> VALUES(score)",
+	"clear_lamp_id <> VALUES(clear_lamp_id)",
+	"combo_lamp_id <> VALUES(combo_lamp_id)",
+	"full_chain_id <> VALUES(full_chain_id)",
+}, " OR ")
 
-func fullRecordUpsertQuery() string {
-	return fmt.Sprintf(`
+var fullRecordUpsertQuery = fmt.Sprintf(`
 		INSERT INTO player_records (
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
 			full_chain_id, slot_id, slot_order, updated_at
@@ -258,11 +253,9 @@ func fullRecordUpsertQuery() string {
 			full_chain_id = VALUES(full_chain_id),
 			slot_id = VALUES(slot_id),
 			slot_order = VALUES(slot_order)
-	`, fullRecordChangedCondition())
-}
+	`, fullRecordChangedCondition)
 
-func worldsendRecordUpsertQuery() string {
-	return fmt.Sprintf(`
+var worldsendRecordUpsertQuery = fmt.Sprintf(`
 		INSERT INTO player_worldsend_records (
 			player_id, worldsend_chart_id, score, clear_lamp_id,
 			combo_lamp_id, full_chain_id, updated_at
@@ -280,8 +273,7 @@ func worldsendRecordUpsertQuery() string {
 			clear_lamp_id = VALUES(clear_lamp_id),
 			combo_lamp_id = VALUES(combo_lamp_id),
 			full_chain_id = VALUES(full_chain_id)
-	`, worldsendRecordChangedCondition())
-}
+	`, worldsendRecordChangedCondition)
 
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
@@ -299,9 +291,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	query := fullRecordUpsertQuery()
-
-	return bulkUpsert(ctx, exec, rows, query, "player records")
+	return bulkUpsert(ctx, exec, rows, fullRecordUpsertQuery, "player records")
 }
 
 func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec repository.Executor, records []repository.WorldsendRecordForUpsert) error {
@@ -318,9 +308,7 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	query := worldsendRecordUpsertQuery()
-
-	return bulkUpsert(ctx, exec, rows, query, "worldsend records")
+	return bulkUpsert(ctx, exec, rows, worldsendRecordUpsertQuery, "worldsend records")
 }
 
 func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, query string, recordType string) error {
