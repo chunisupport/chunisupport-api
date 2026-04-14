@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -215,4 +216,32 @@ func TestWorldsendRecordChangedCondition_比較対象カラムを過不足なく
 
 	// Then
 	assert.Equal(t, expected, got)
+}
+
+func TestFullRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
+	// Given
+	query := fullRecordUpsertQuery()
+
+	// When
+	updatedAtIndex := strings.Index(query, "updated_at = IF(")
+	scoreIndex := strings.Index(query, "score = VALUES(score)")
+
+	// Then
+	require.NotEqual(t, -1, updatedAtIndex)
+	require.NotEqual(t, -1, scoreIndex)
+	assert.Less(t, updatedAtIndex, scoreIndex)
+}
+
+func TestWorldsendRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
+	// Given
+	query := worldsendRecordUpsertQuery()
+
+	// When
+	updatedAtIndex := strings.Index(query, "updated_at = IF(")
+	scoreIndex := strings.Index(query, "score = VALUES(score)")
+
+	// Then
+	require.NotEqual(t, -1, updatedAtIndex)
+	require.NotEqual(t, -1, scoreIndex)
+	assert.Less(t, updatedAtIndex, scoreIndex)
 }

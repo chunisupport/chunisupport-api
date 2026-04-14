@@ -237,6 +237,52 @@ func worldsendRecordChangedCondition() string {
 	}, " OR ")
 }
 
+func fullRecordUpsertQuery() string {
+	return fmt.Sprintf(`
+		INSERT INTO player_records (
+			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
+			full_chain_id, slot_id, slot_order, updated_at
+		) VALUES (
+			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
+			:full_chain_id, :slot_id, :slot_order, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				%s,
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id),
+			slot_id = VALUES(slot_id),
+			slot_order = VALUES(slot_order)
+	`, fullRecordChangedCondition())
+}
+
+func worldsendRecordUpsertQuery() string {
+	return fmt.Sprintf(`
+		INSERT INTO player_worldsend_records (
+			player_id, worldsend_chart_id, score, clear_lamp_id,
+			combo_lamp_id, full_chain_id, updated_at
+		) VALUES (
+			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
+			:combo_lamp_id, :full_chain_id, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				%s,
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id)
+	`, worldsendRecordChangedCondition())
+}
+
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
 	for _, record := range records {
@@ -253,27 +299,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	query := fmt.Sprintf(`
-		INSERT INTO player_records (
-			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
-			full_chain_id, slot_id, slot_order, updated_at
-		) VALUES (
-			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
-			:full_chain_id, :slot_id, :slot_order, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			slot_id = VALUES(slot_id),
-			slot_order = VALUES(slot_order),
-			updated_at = IF(
-				%s,
-				VALUES(updated_at),
-				updated_at
-			)
-	`, fullRecordChangedCondition())
+	query := fullRecordUpsertQuery()
 
 	return bulkUpsert(ctx, exec, rows, query, "player records")
 }
@@ -292,25 +318,7 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	query := fmt.Sprintf(`
-		INSERT INTO player_worldsend_records (
-			player_id, worldsend_chart_id, score, clear_lamp_id,
-			combo_lamp_id, full_chain_id, updated_at
-		) VALUES (
-			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
-			:combo_lamp_id, :full_chain_id, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			updated_at = IF(
-				%s,
-				VALUES(updated_at),
-				updated_at
-			)
-	`, worldsendRecordChangedCondition())
+	query := worldsendRecordUpsertQuery()
 
 	return bulkUpsert(ctx, exec, rows, query, "worldsend records")
 }
