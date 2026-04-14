@@ -217,6 +217,68 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
+const (
+	fullRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id) OR " +
+		"slot_id <> VALUES(slot_id) OR " +
+		"NOT (slot_order <=> VALUES(slot_order))"
+
+	worldsendRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id)"
+
+	changedConditionPlaceholder = "{{CHANGED_CONDITION}}"
+)
+
+var fullRecordUpsertQuery = replaceQueryPlaceholder(`
+		INSERT INTO player_records (
+			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
+			full_chain_id, slot_id, slot_order, updated_at
+		) VALUES (
+			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
+			:full_chain_id, :slot_id, :slot_order, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				{{CHANGED_CONDITION}},
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id),
+			slot_id = VALUES(slot_id),
+			slot_order = VALUES(slot_order)
+	`, changedConditionPlaceholder, fullRecordChangedCondition)
+
+var worldsendRecordUpsertQuery = replaceQueryPlaceholder(`
+		INSERT INTO player_worldsend_records (
+			player_id, worldsend_chart_id, score, clear_lamp_id,
+			combo_lamp_id, full_chain_id, updated_at
+		) VALUES (
+			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
+			:combo_lamp_id, :full_chain_id, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				{{CHANGED_CONDITION}},
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id)
+	`, changedConditionPlaceholder, worldsendRecordChangedCondition)
+
+func replaceQueryPlaceholder(query string, placeholder string, replacement string) string {
+	return strings.ReplaceAll(query, placeholder, replacement)
+}
+
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
 	for _, record := range records {
@@ -233,25 +295,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	query := `
-		INSERT INTO player_records (
-			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
-			full_chain_id, slot_id, slot_order, updated_at
-		) VALUES (
-			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
-			:full_chain_id, :slot_id, :slot_order, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			slot_id = VALUES(slot_id),
-			slot_order = VALUES(slot_order),
-			updated_at = VALUES(updated_at)
-	`
-
-	return bulkUpsert(ctx, exec, rows, query, "player records")
+	return bulkUpsert(ctx, exec, rows, fullRecordUpsertQuery, "player records")
 }
 
 func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec repository.Executor, records []repository.WorldsendRecordForUpsert) error {
@@ -268,23 +312,7 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	query := `
-		INSERT INTO player_worldsend_records (
-			player_id, worldsend_chart_id, score, clear_lamp_id,
-			combo_lamp_id, full_chain_id, updated_at
-		) VALUES (
-			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
-			:combo_lamp_id, :full_chain_id, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			updated_at = VALUES(updated_at)
-	`
-
-	return bulkUpsert(ctx, exec, rows, query, "worldsend records")
+	return bulkUpsert(ctx, exec, rows, worldsendRecordUpsertQuery, "worldsend records")
 }
 
 func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, query string, recordType string) error {

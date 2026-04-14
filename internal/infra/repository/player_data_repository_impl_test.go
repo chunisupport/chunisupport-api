@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -191,6 +192,93 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 			require.NotNil(t, stats)
 			assert.Equal(t, tt.wantCount, stats.SongCount)
 			assert.InDelta(t, tt.wantTotal, stats.MaxOverpowerTotal, 0.0001)
+		})
+	}
+}
+
+func TestFullRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
+	// Given
+	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id) OR slot_id <> VALUES(slot_id) OR NOT (slot_order <=> VALUES(slot_order))"
+
+	// When
+	got := fullRecordChangedCondition
+
+	// Then
+	assert.Equal(t, expected, got)
+}
+
+func TestWorldsendRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
+	// Given
+	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
+
+	// When
+	got := worldsendRecordChangedCondition
+
+	// Then
+	assert.Equal(t, expected, got)
+}
+
+func TestFullRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
+	// Given
+	query := fullRecordUpsertQuery
+
+	// When
+	updatedAtIndex := strings.Index(query, "updated_at = IF(")
+	scoreIndex := strings.Index(query, "score = VALUES(score)")
+
+	// Then
+	require.NotEqual(t, -1, updatedAtIndex)
+	require.NotEqual(t, -1, scoreIndex)
+	assert.Less(t, updatedAtIndex, scoreIndex)
+}
+
+func TestWorldsendRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
+	// Given
+	query := worldsendRecordUpsertQuery
+
+	// When
+	updatedAtIndex := strings.Index(query, "updated_at = IF(")
+	scoreIndex := strings.Index(query, "score = VALUES(score)")
+
+	// Then
+	require.NotEqual(t, -1, updatedAtIndex)
+	require.NotEqual(t, -1, scoreIndex)
+	assert.Less(t, updatedAtIndex, scoreIndex)
+}
+
+func TestReplaceQueryPlaceholder_パーセント記号を含む置換文字列もそのまま埋め込める(t *testing.T) {
+	tests := []struct {
+		name          string
+		query         string
+		placeholder   string
+		replacement   string
+		expectedQuery string
+	}{
+		{
+			name:          "LIKE句のパーセント記号を保持する",
+			query:         "SELECT * FROM users WHERE {{CONDITION}}",
+			placeholder:   "{{CONDITION}}",
+			replacement:   "name LIKE 'abc%'",
+			expectedQuery: "SELECT * FROM users WHERE name LIKE 'abc%'",
+		},
+		{
+			name:          "同じプレースホルダをすべて置換する",
+			query:         "{{CONDITION}} OR {{CONDITION}}",
+			placeholder:   "{{CONDITION}}",
+			replacement:   "score >= 1000000",
+			expectedQuery: "score >= 1000000 OR score >= 1000000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+
+			// When
+			got := replaceQueryPlaceholder(tt.query, tt.placeholder, tt.replacement)
+
+			// Then
+			assert.Equal(t, tt.expectedQuery, got)
 		})
 	}
 }
