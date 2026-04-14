@@ -120,6 +120,12 @@ func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index in
 		}
 	}
 
+	// 1010000点かつAJでないのは矛盾している
+	if entry.Score == 1010000 && (entry.ComboLv == nil || *entry.ComboLv != 3) {
+		return fmt.Errorf("%s[%d]: inconsistent data - score=1,010,000 without AJ (cmb_lv=3), idx=%s",
+			recordType, index, entry.Idx)
+	}
+
 	return nil
 }
 
