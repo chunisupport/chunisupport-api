@@ -194,3 +194,25 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 		})
 	}
 }
+
+func TestFullRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
+	// Given
+	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id) OR slot_id <> VALUES(slot_id) OR NOT (slot_order <=> VALUES(slot_order))"
+
+	// When
+	got := fullRecordChangedCondition()
+
+	// Then
+	assert.Equal(t, expected, got)
+}
+
+func TestWorldsendRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
+	// Given
+	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
+
+	// When
+	got := worldsendRecordChangedCondition()
+
+	// Then
+	assert.Equal(t, expected, got)
+}

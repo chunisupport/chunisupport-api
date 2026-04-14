@@ -217,6 +217,26 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
+func fullRecordChangedCondition() string {
+	return strings.Join([]string{
+		"score <> VALUES(score)",
+		"clear_lamp_id <> VALUES(clear_lamp_id)",
+		"combo_lamp_id <> VALUES(combo_lamp_id)",
+		"full_chain_id <> VALUES(full_chain_id)",
+		"slot_id <> VALUES(slot_id)",
+		"NOT (slot_order <=> VALUES(slot_order))",
+	}, " OR ")
+}
+
+func worldsendRecordChangedCondition() string {
+	return strings.Join([]string{
+		"score <> VALUES(score)",
+		"clear_lamp_id <> VALUES(clear_lamp_id)",
+		"combo_lamp_id <> VALUES(combo_lamp_id)",
+		"full_chain_id <> VALUES(full_chain_id)",
+	}, " OR ")
+}
+
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
 	for _, record := range records {
@@ -233,7 +253,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO player_records (
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
 			full_chain_id, slot_id, slot_order, updated_at
@@ -248,8 +268,12 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 			full_chain_id = VALUES(full_chain_id),
 			slot_id = VALUES(slot_id),
 			slot_order = VALUES(slot_order),
-			updated_at = VALUES(updated_at)
-	`
+			updated_at = IF(
+				%s,
+				VALUES(updated_at),
+				updated_at
+			)
+	`, fullRecordChangedCondition())
 
 	return bulkUpsert(ctx, exec, rows, query, "player records")
 }
@@ -268,7 +292,7 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO player_worldsend_records (
 			player_id, worldsend_chart_id, score, clear_lamp_id,
 			combo_lamp_id, full_chain_id, updated_at
@@ -281,8 +305,12 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 			clear_lamp_id = VALUES(clear_lamp_id),
 			combo_lamp_id = VALUES(combo_lamp_id),
 			full_chain_id = VALUES(full_chain_id),
-			updated_at = VALUES(updated_at)
-	`
+			updated_at = IF(
+				%s,
+				VALUES(updated_at),
+				updated_at
+			)
+	`, worldsendRecordChangedCondition())
 
 	return bulkUpsert(ctx, exec, rows, query, "worldsend records")
 }
