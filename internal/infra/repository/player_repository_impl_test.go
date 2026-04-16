@@ -115,6 +115,15 @@ func TestAPITokenFindByHashedToken_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t
 	require.Nil(t, token)
 }
 
+func TestAPITokenFindByUserID_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
+	repo := &apiTokenRepository{}
+	exec := &noRowsWrappedExecutor{}
+
+	token, err := repo.FindByUserID(context.Background(), exec, 10)
+	require.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
+	require.Nil(t, token)
+}
+
 func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testing.T) {
 	repo := &goalRepository{}
 	exec := &noRowsWrappedExecutor{}

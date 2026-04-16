@@ -13,6 +13,8 @@ import (
 type stubAPITokenRepository struct {
 	savedToken    *entity.APIToken
 	createErr     error
+	userLookup    *entity.APIToken
+	userLookupErr error
 	lookupToken   *entity.APIToken
 	lookupErr     error
 	deletedUserID int
@@ -26,6 +28,17 @@ func (s *stubAPITokenRepository) CreateOrReplace(ctx context.Context, exec repos
 	copied := *token
 	s.savedToken = &copied
 	return nil
+}
+
+func (s *stubAPITokenRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.APIToken, error) {
+	if s.userLookupErr != nil {
+		return nil, s.userLookupErr
+	}
+	if s.userLookup == nil || s.userLookup.UserID != userID {
+		return nil, repository.ErrAPITokenNotFound
+	}
+	tokenCopy := *s.userLookup
+	return &tokenCopy, nil
 }
 
 func (s *stubAPITokenRepository) FindByHashedToken(ctx context.Context, exec repository.Executor, hashedToken string) (*entity.APIToken, error) {
@@ -122,6 +135,63 @@ func TestAPITokenService_Generate(t *testing.T) {
 	}
 	if tokenRepo.savedToken.UserID != 1 {
 		t.Fatalf("expected user id 1, got %d", tokenRepo.savedToken.UserID)
+	}
+}
+
+func TestAPITokenService_GetStatus(t *testing.T) {
+	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+	tokenRepo := &stubAPITokenRepository{
+		userLookup: &entity.APIToken{
+			ID:        10,
+			UserID:    123,
+			CreatedAt: createdAt,
+		},
+	}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if token == nil {
+		t.Fatalf("expected token status")
+	}
+	if token.ID != 10 {
+		t.Fatalf("expected token id 10, got %d", token.ID)
+	}
+	if !token.CreatedAt.Equal(createdAt) {
+		t.Fatalf("expected created_at %v, got %v", createdAt, token.CreatedAt)
+	}
+}
+
+func TestAPITokenService_GetStatus_NotFound(t *testing.T) {
+	tokenRepo := &stubAPITokenRepository{}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token != nil {
+		t.Fatalf("expected nil token, got %#v", token)
+	}
+}
+
+func TestAPITokenService_GetStatus_Error(t *testing.T) {
+	expectedErr := errors.New("find failed")
+	tokenRepo := &stubAPITokenRepository{userLookupErr: expectedErr}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != expectedErr {
+		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+	if token != nil {
+		t.Fatalf("expected nil token, got %#v", token)
 	}
 }
 

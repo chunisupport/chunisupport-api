@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -26,6 +27,14 @@ func (m *mockAPITokenService) Generate(ctx context.Context, userID int) (string,
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockAPITokenService) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.APIToken), args.Error(1)
+}
+
 func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
 	args := m.Called(ctx, rawToken)
 	if args.Get(0) == nil || args.Get(1) == nil {
@@ -43,6 +52,76 @@ func newAPITokenTestEcho() *echo.Echo {
 	e := echo.New()
 	e.Validator = app.NewCustomValidator()
 	return e
+}
+
+func TestAPITokenHandler_GetStatus(t *testing.T) {
+	e := newAPITokenTestEcho()
+	mockService := new(mockAPITokenService)
+	h := api_internal.NewAPITokenHandler(mockService)
+
+	t.Run("認証済みユーザーのトークン状態を返す", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 10}
+		c.Set("userEntity", user)
+		createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+
+		mockService.On("GetStatus", mock.Anything, user.ID).Return(&entity.APIToken{
+			ID:        1,
+			UserID:    user.ID,
+			CreatedAt: createdAt,
+		}, nil).Once()
+
+		err := h.GetStatus(c)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"has_token":true,"created_at":"2026-04-16T12:34:56Z"}`, rec.Body.String())
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("トークン未発行ならhas_token=falseを返す", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 10}
+		c.Set("userEntity", user)
+
+		mockService.On("GetStatus", mock.Anything, user.ID).Return(nil, nil).Once()
+
+		err := h.GetStatus(c)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"has_token":false,"created_at":null}`, rec.Body.String())
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("ユーザー情報が存在しない場合は401", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := h.GetStatus(c)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok, "error should be *apierror.APIError")
+		assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
+	})
+
+	t.Run("状態取得に失敗した場合は500", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 10}
+		c.Set("userEntity", user)
+
+		mockService.On("GetStatus", mock.Anything, user.ID).Return(nil, errors.New("failed")).Once()
+
+		err := h.GetStatus(c)
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok, "error should be *apierror.APIError")
+		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+		mockService.AssertExpectations(t)
+	})
 }
 
 func TestAPITokenHandler_Generate(t *testing.T) {

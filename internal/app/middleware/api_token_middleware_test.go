@@ -25,6 +25,14 @@ func (m *mockAPITokenService) Generate(ctx context.Context, userID int) (string,
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockAPITokenService) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.APIToken), args.Error(1)
+}
+
 func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
 	args := m.Called(ctx, rawToken)
 	if args.Get(0) == nil || args.Get(1) == nil {

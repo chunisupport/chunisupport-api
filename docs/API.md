@@ -95,6 +95,7 @@
 | `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
+| `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
@@ -217,6 +218,23 @@
 ```
 
 トークンはレスポンスでのみ平文が取得できます。
+
+### GET `/internal/auth/api-tokens`
+- **認証**: Firebase Bearer 必須
+- **レスポンス**: 200 OK
+
+```json
+{
+  "has_token": true,
+  "created_at": "2026-04-16T12:34:56Z"
+}
+```
+
+- APIトークンが未発行の場合は `has_token=false`、`created_at=null` を返します。
+- `created_at` は現在有効なAPIトークンの発行日時です。再発行した場合はその時刻に更新されます。
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### DELETE `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須

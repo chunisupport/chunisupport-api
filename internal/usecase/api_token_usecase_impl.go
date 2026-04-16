@@ -54,6 +54,19 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int) (string, er
 	return plain, nil
 }
 
+// GetStatus はユーザーに紐づくAPIトークンの状態を返します。未発行の場合は nil を返します。
+func (us *apiTokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+	token, err := us.tokenRepo.FindByUserID(ctx, us.db, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAPITokenNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return token, nil
+}
+
 // Validate はAPIトークンを検証し、有効な場合はユーザーとトークン情報を返します。
 func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
 	if rawToken == "" {

@@ -40,6 +40,19 @@ ON DUPLICATE KEY UPDATE
 	return nil
 }
 
+// FindByUserID はユーザーIDからAPIトークンを取得します。
+func (r *apiTokenRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.APIToken, error) {
+	var tokenModel models.APITokenModel
+	query := `SELECT id, user_id, hashed_token, created_at FROM api_tokens WHERE user_id = ?`
+	if err := exec.GetContext(ctx, &tokenModel, query, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrAPITokenNotFound, err)
+		}
+		return nil, err
+	}
+	return tokenModel.ToEntity(), nil
+}
+
 // FindByHashedToken はハッシュ値からAPIトークンを取得します。
 func (r *apiTokenRepository) FindByHashedToken(ctx context.Context, exec repository.Executor, hashedToken string) (*entity.APIToken, error) {
 	var tokenModel models.APITokenModel

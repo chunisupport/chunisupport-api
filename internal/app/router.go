@@ -218,6 +218,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
+		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuth)
 		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuth)
 		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuth)
 	}
