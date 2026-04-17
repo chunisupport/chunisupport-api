@@ -260,6 +260,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	publicUsersGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
 	{
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
+		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}
 

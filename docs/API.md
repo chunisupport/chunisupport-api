@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年04月13日
+**最終更新日**: 2026年04月18日
 
 ## ベースURLと環境
 
@@ -111,6 +111,7 @@
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
+| `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
@@ -1125,6 +1126,74 @@ curl -X POST \
 {
   "username": "sample_user",
   "player": null
+}
+```
+
+### GET `/internal/users/:username/rating`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: レーティング枠のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は各配列が空、`meta.updated_at` が `null` になります。
+
+#### レスポンス例
+
+```json
+{
+  "best": [
+    {
+      "updated_at": "2024-12-20T10:00:00Z",
+      "difficulty": "MASTER",
+      "id": "0000000000000001",
+      "title": "楽曲名",
+      "artist": "アーティスト名",
+      "const": 14.5,
+      "is_const_unknown": false,
+      "score": 1009500,
+      "rating": 17.14,
+      "overpower": 5.67,
+      "img": "https://example.com/jacket.png",
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "FULL COMBO",
+      "full_chain": null,
+      "slot": "best"
+    }
+  ],
+  "best_candidate": [],
+  "new": [],
+  "new_candidate": [],
+  "meta": {
+    "updated_at": "2024-12-20T10:00:00Z"
+  }
+}
+```
+
+#### UserRatingDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `best` | PlayerRecordDTO[] | ベスト枠レコード |
+| `best_candidate` | PlayerRecordDTO[] | ベスト候補枠レコード |
+| `new` | PlayerRecordDTO[] | 新曲枠レコード |
+| `new_candidate` | PlayerRecordDTO[] | 新曲候補枠レコード |
+| `meta` | UserRatingMetaDTO | メタ情報 |
+
+#### UserRatingMetaDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | レーティング枠レコードの最終更新日時 (ISO8601)。対象レコードが存在しない場合は `player.updated_at`、プレイヤー未連携の場合は `null` |
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "best": [],
+  "best_candidate": [],
+  "new": [],
+  "new_candidate": [],
+  "meta": {
+    "updated_at": null
+  }
 }
 ```
 
@@ -2490,6 +2559,18 @@ interface UserProfileWithRecordsDTO {
   username: string;
   player: PlayerDTO | null;
   records: UserRecordResponseDTO | null;
+  updated_at: string | null;
+}
+
+interface UserRatingDTO {
+  best: PlayerRecordDTO[];
+  best_candidate: PlayerRecordDTO[];
+  new: PlayerRecordDTO[];
+  new_candidate: PlayerRecordDTO[];
+  meta: UserRatingMetaDTO;
+}
+
+interface UserRatingMetaDTO {
   updated_at: string | null;
 }
 

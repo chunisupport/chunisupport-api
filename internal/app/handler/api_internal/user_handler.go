@@ -9,6 +9,8 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 )
@@ -37,6 +39,22 @@ func (h *UserHandler) GetUserProfile(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, result)
+}
+
+// GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
+func (h *UserHandler) GetUserRating(c echo.Context) error {
+	username := c.Param("username")
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
+	if err != nil {
+		return h.handleUserProfileError(err, username, "user rating")
+	}
+
+	return c.JSON(http.StatusOK, toUserRatingDTO(result))
 }
 
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
@@ -87,6 +105,34 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 		}
 		return apierror.ErrInternalError.WithInternal(err)
 	}
+}
+
+func toUserRatingDTO(result *dto_internal.UserProfileRatingViewDTO) *dto_internal.UserRatingDTO {
+	if result == nil {
+		return nil
+	}
+
+	ratingDTO := &dto_internal.UserRatingDTO{
+		Best:          []*dto.PlayerRecordDTO{},
+		BestCandidate: []*dto.PlayerRecordDTO{},
+		New:           []*dto.PlayerRecordDTO{},
+		NewCandidate:  []*dto.PlayerRecordDTO{},
+		Meta: &dto_internal.UserRatingMetaDTO{
+			UpdatedAt: result.UpdatedAt,
+		},
+	}
+
+	if result.Records == nil {
+		return ratingDTO
+	}
+
+	ratingDTO.Best = result.Records.Best
+	ratingDTO.BestCandidate = result.Records.BestCandidate
+	ratingDTO.New = result.Records.New
+	ratingDTO.NewCandidate = result.Records.NewCandidate
+	ratingDTO.Meta.UpdatedAt = &result.Records.UpdatedAt
+
+	return ratingDTO
 }
 
 // DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。

@@ -216,6 +216,106 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	})
 }
 
+func TestUserHandler_GetUserRating(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewUserHandler(mockService)
+	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	player := &dto.PlayerDTO{
+		Name:      "player",
+		Level:     10,
+		Honors:    []*dto.HonorDTO{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	ratingResult := &dto_internal.UserProfileRatingViewDTO{
+		Username: "testuser",
+		Player:   player,
+		Records: &dto_internal.UserRatingRecordResponseDTO{
+			UpdatedAt:     now,
+			Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
+			BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
+			New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
+			NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
+		},
+		UpdatedAt: &now,
+	}
+
+	t.Run("正常系: レーティング枠とメタ情報を返す", func(t *testing.T) {
+		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRating(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Len(t, body["best"], 1)
+		assert.Len(t, body["best_candidate"], 1)
+		assert.Len(t, body["new"], 1)
+		assert.Len(t, body["new_candidate"], 1)
+		meta, ok := body["meta"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, now.Format(time.RFC3339), meta["updated_at"])
+		_, hasUsername := body["username"]
+		assert.False(t, hasUsername)
+		_, hasPlayer := body["player"]
+		assert.False(t, hasPlayer)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
+		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserProfileRatingViewDTO{
+			Username:  "testuser",
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRating(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Empty(t, body["best"])
+		assert.Empty(t, body["best_candidate"])
+		assert.Empty(t, body["new"])
+		assert.Empty(t, body["new_candidate"])
+		meta, ok := body["meta"].(map[string]any)
+		assert.True(t, ok)
+		assert.Nil(t, meta["updated_at"])
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
+		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), usecase.ErrUserNotFound).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRating(c)
+
+		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
+		mockService.AssertExpectations(t)
+	})
+}
+
 func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockUserService)

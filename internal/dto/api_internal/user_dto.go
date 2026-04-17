@@ -25,6 +25,20 @@ type UserRatingRecordResponseDTO struct {
 	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
 }
 
+// UserRatingMetaDTO はレーティングAPIのメタ情報です。
+type UserRatingMetaDTO struct {
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// UserRatingDTO は公開向けのレーティング枠レスポンスです。
+type UserRatingDTO struct {
+	Best          []*dto.PlayerRecordDTO `json:"best"`
+	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
+	New           []*dto.PlayerRecordDTO `json:"new"`
+	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
+	Meta          *UserRatingMetaDTO     `json:"meta"`
+}
+
 // UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
 type UserRecordViewResponseDTO struct {
 	UpdatedAt time.Time                 `json:"updated_at"`
