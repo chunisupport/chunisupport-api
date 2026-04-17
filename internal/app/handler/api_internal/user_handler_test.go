@@ -316,6 +316,99 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	})
 }
 
+func TestUserHandler_GetUserRecord(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewUserHandler(mockService)
+	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	recordResult := &dto_internal.UserProfileRecordViewDTO{
+		Username: "testuser",
+		Player: &dto.PlayerDTO{
+			Name:      "player",
+			Level:     10,
+			Honors:    []*dto.HonorDTO{},
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		Records: &dto_internal.UserRecordViewResponseDTO{
+			UpdatedAt: now,
+			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
+		},
+		UpdatedAt: &now,
+	}
+
+	t.Run("正常系: レコード枠とメタ情報を返す", func(t *testing.T) {
+		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordResult, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record?include_noplay=true", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRecord(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Len(t, body["all"], 1)
+		assert.Len(t, body["worldsend"], 1)
+		meta, ok := body["meta"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, now.Format(time.RFC3339), meta["updated_at"])
+		_, hasUsername := body["username"]
+		assert.False(t, hasUsername)
+		_, hasPlayer := body["player"]
+		assert.False(t, hasPlayer)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
+		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&dto_internal.UserProfileRecordViewDTO{
+			Username:  "testuser",
+			Player:    nil,
+			Records:   nil,
+			UpdatedAt: nil,
+		}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRecord(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Empty(t, body["all"])
+		assert.Empty(t, body["worldsend"])
+		meta, ok := body["meta"].(map[string]any)
+		assert.True(t, ok)
+		assert.Nil(t, meta["updated_at"])
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
+		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*dto_internal.UserProfileRecordViewDTO)(nil), usecase.ErrUserNotFound).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserRecord(c)
+
+		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
+		mockService.AssertExpectations(t)
+	})
+}
+
 func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	e := newTestEcho()
 	mockService := new(mockUserService)

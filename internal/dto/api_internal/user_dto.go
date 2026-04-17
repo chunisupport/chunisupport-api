@@ -39,6 +39,18 @@ type UserRatingDTO struct {
 	Meta          *UserRatingMetaDTO     `json:"meta"`
 }
 
+// UserRecordMetaDTO はレコードAPIのメタ情報です。
+type UserRecordMetaDTO struct {
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// UserRecordDTO は公開向けのレコードレスポンスです。
+type UserRecordDTO struct {
+	All       []*dto.PlayerRecordDTO    `json:"all"`
+	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+	Meta      *UserRecordMetaDTO        `json:"meta"`
+}
+
 // UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
 type UserRecordViewResponseDTO struct {
 	UpdatedAt time.Time                 `json:"updated_at"`

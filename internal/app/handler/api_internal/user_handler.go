@@ -57,6 +57,23 @@ func (h *UserHandler) GetUserRating(c echo.Context) error {
 	return c.JSON(http.StatusOK, toUserRatingDTO(result))
 }
 
+// GetUserRecord はユーザー名をキーにレコード枠のみを返すハンドラです。
+func (h *UserHandler) GetUserRecord(c echo.Context) error {
+	username := c.Param("username")
+	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester, includeNoPlay)
+	if err != nil {
+		return h.handleUserProfileError(err, username, "user record")
+	}
+
+	return c.JSON(http.StatusOK, toUserRecordDTO(result))
+}
+
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
 func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
 	username := c.Param("username")
@@ -133,6 +150,30 @@ func toUserRatingDTO(result *dto_internal.UserProfileRatingViewDTO) *dto_interna
 	ratingDTO.Meta.UpdatedAt = &result.Records.UpdatedAt
 
 	return ratingDTO
+}
+
+func toUserRecordDTO(result *dto_internal.UserProfileRecordViewDTO) *dto_internal.UserRecordDTO {
+	if result == nil {
+		return nil
+	}
+
+	recordDTO := &dto_internal.UserRecordDTO{
+		All:       []*dto.PlayerRecordDTO{},
+		Worldsend: []*dto.WorldsendRecordDTO{},
+		Meta: &dto_internal.UserRecordMetaDTO{
+			UpdatedAt: result.UpdatedAt,
+		},
+	}
+
+	if result.Records == nil {
+		return recordDTO
+	}
+
+	recordDTO.All = result.Records.All
+	recordDTO.Worldsend = result.Records.Worldsend
+	recordDTO.Meta.UpdatedAt = &result.Records.UpdatedAt
+
+	return recordDTO
 }
 
 // DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。

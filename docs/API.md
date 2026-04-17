@@ -112,6 +112,7 @@
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
+| `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
@@ -1191,6 +1192,90 @@ curl -X POST \
   "best_candidate": [],
   "new": [],
   "new_candidate": [],
+  "meta": {
+    "updated_at": null
+  }
+}
+```
+
+### GET `/internal/users/:username/record`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `all` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | ユーザー名 |
+
+- **クエリパラメータ**:
+    - `include_noplay` (任意): `true` を指定すると、`all` と `worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
+
+- **レスポンス**: `UserRecordDTO`
+
+```json
+{
+  "all": [
+    {
+      "updated_at": "2024-12-20T10:00:00Z",
+      "difficulty": "MASTER",
+      "id": "0000000000000001",
+      "title": "楽曲名",
+      "artist": "アーティスト名",
+      "const": 14.5,
+      "is_const_unknown": false,
+      "score": 1009500,
+      "rating": 17.14,
+      "overpower": 5.67,
+      "img": "https://example.com/jacket.png",
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "FULL COMBO",
+      "full_chain": null,
+      "slot": "best"
+    }
+  ],
+  "worldsend": [
+    {
+      "updated_at": "2024-12-20T10:00:00Z",
+      "id": "0000000000000002",
+      "title": "楽曲名",
+      "artist": "アーティスト名",
+      "level_star": 5,
+      "attribute": "狂",
+      "notes": 2000,
+      "score": 1000000,
+      "img": "https://example.com/jacket.png",
+      "clear_lamp": "CLEAR",
+      "combo_lamp": null,
+      "full_chain": null
+    }
+  ],
+  "meta": {
+    "updated_at": "2024-12-20T10:00:00Z"
+  }
+}
+```
+
+#### UserRecordDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `all` | PlayerRecordDTO[] | 通常譜面の全レコード |
+| `worldsend` | WorldsendRecordDTO[] | WORLD'S END の全レコード |
+| `meta` | UserRecordMetaDTO | メタ情報 |
+
+#### UserRecordMetaDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | レコードの最終更新日時 (ISO8601)。通常譜面・WORLD'S END の両方にレコードが存在しない場合は `player.updated_at`、プレイヤー未連携の場合は `null` |
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "all": [],
+  "worldsend": [],
   "meta": {
     "updated_at": null
   }
@@ -2571,6 +2656,16 @@ interface UserRatingDTO {
 }
 
 interface UserRatingMetaDTO {
+  updated_at: string | null;
+}
+
+interface UserRecordDTO {
+  all: PlayerRecordDTO[];
+  worldsend: WorldsendRecordDTO[];
+  meta: UserRecordMetaDTO;
+}
+
+interface UserRecordMetaDTO {
   updated_at: string | null;
 }
 
