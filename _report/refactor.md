@@ -25,7 +25,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **SEC-012** | **High** | 退会APIに recent sign-in を使った再認証がない | `internal/app/handler/api_internal/profile_handler.go` の `DeleteAccount` には TODO が残っており、現状は有効な Bearer トークンさえあれば `DELETE /internal/me` を実行できます。Firebase を認証基盤にしている以上、アカウント削除のような破壊的操作は recent sign-in に基づく再認証を要求すべきです。 |
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。他は概ね理由付きですが、全体の棚卸しが未完了です。 |
 
 ### パフォーマンス (PERF)
@@ -96,11 +95,10 @@
 ## 補足
 
 - Firebase 認証への移行で、Cookie セッション前提の CSRF、`password_hash`、`user_recovery_codes`、旧 `auth_usecase_impl.go` に依存した指摘は現状と一致しなくなったため削除しました。
-- その代わり、Firebase 化後に残る論点として、**退会時の再認証不足** と **`signup_usecase.go` 経由で残っているユーザー名エラー変換の粗さ** を追加しています。
 - 逆に、`TODO` 件数や `#nosec` 箇所、`song_repository_impl.go` のVO変換エラー無視のように、**根拠は同じテーマでも現行コード上の実態に合わせて記述を更新**しています。
 
 ## まとめ
 
-- 優先度が高いのは、**退会時の再認証不足**, **Goal更新の非トランザクション**, **Domain層の `sqlx` 依存** です。
+- 優先度が高いのは、**Goal更新の非トランザクション** と **Domain層の `sqlx` 依存** です。
 - 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視** を詰めると、APIの安定性と保守性が上がります。
 - `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。
