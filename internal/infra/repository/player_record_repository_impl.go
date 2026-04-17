@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"time"
 
@@ -166,19 +167,67 @@ func (r *playerRecordRepository) FindByPlayerIDForRating(ctx context.Context, ex
 // GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
 func (r *playerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
 	const query = `
-SELECT MAX(updated_at) AS last_update FROM (
-    SELECT updated_at FROM player_records WHERE player_id = ?
+SELECT MAX(last_update) AS last_update FROM (
+    SELECT (
+        SELECT updated_at
+        FROM player_records
+        WHERE player_id = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+    ) AS last_update
     UNION ALL
-    SELECT updated_at FROM player_worldsend_records WHERE player_id = ?
+    SELECT (
+        SELECT updated_at
+        FROM player_worldsend_records
+        WHERE player_id = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+    ) AS last_update
 ) AS combined
 `
 
-	var lastUpdate *time.Time
-	if err := exec.GetContext(ctx, &lastUpdate, query, playerID, playerID); err != nil {
+	var rawLastUpdate any
+	if err := exec.GetContext(ctx, &rawLastUpdate, query, playerID, playerID); err != nil {
 		return nil, err
 	}
 
-	return lastUpdate, nil
+	return parseLastScoreUpdate(rawLastUpdate)
+}
+
+func parseLastScoreUpdate(rawLastUpdate any) (*time.Time, error) {
+	switch value := rawLastUpdate.(type) {
+	case nil:
+		return nil, nil
+	case time.Time:
+		return &value, nil
+	case []byte:
+		return parseLastScoreUpdateString(string(value))
+	case string:
+		return parseLastScoreUpdateString(value)
+	default:
+		return nil, fmt.Errorf("unsupported last score update type: %T", rawLastUpdate)
+	}
+}
+
+func parseLastScoreUpdateString(value string) (*time.Time, error) {
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05 -0700 MST",
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05-07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+	}
+
+	for _, layout := range layouts {
+		parsed, err := time.Parse(layout, value)
+		if err == nil {
+			return &parsed, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unsupported last score update format: %q", value)
 }
 
 func buildPlayerRecords(rows []playerRecordRow) []*entity.PlayerRecord {
