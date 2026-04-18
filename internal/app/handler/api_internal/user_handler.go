@@ -41,6 +41,22 @@ func (h *UserHandler) GetUserProfile(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
+// GetUserUpdatedAt はユーザー関連データの updated_at のみを返す軽量なハンドラです。
+func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
+	username := c.Param("username")
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserUpdatedAt(c.Request().Context(), username, requester)
+	if err != nil {
+		return h.handleUserProfileError(err, username, "user updated at")
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 // GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
 func (h *UserHandler) GetUserRating(c echo.Context) error {
 	username := c.Param("username")

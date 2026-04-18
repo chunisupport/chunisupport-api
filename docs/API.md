@@ -111,6 +111,7 @@
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
+| `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
@@ -1129,6 +1130,34 @@ curl -X POST \
   "player": null
 }
 ```
+
+### GET `/internal/users/:username/updated-at`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間10回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
+
+#### レスポンス例
+
+```json
+{
+  "updated_at": "2026-04-18T12:34:56Z"
+}
+```
+
+#### プレイヤー未連携時のレスポンス例
+
+```json
+{
+  "updated_at": null
+}
+```
+
+#### UserUpdatedAtDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | `players.updated_at` と `player_records` / `player_worldsend_records` の `updated_at` の最大値 (ISO8601)。プレイヤー未連携の場合は `null` |
 
 ### GET `/internal/users/:username/rating`
 - **認証**: Firebase Bearer (任意)

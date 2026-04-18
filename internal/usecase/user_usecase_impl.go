@@ -91,6 +91,42 @@ func (s *userUsecase) GetUserProfile(ctx context.Context, username string, reque
 	}, nil
 }
 
+// GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方を返します。
+func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error) {
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+	player, err := s.getOptionalPlayer(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if player == nil || user.PlayerID == nil {
+		return &api_internal.UserUpdatedAtDTO{
+			UpdatedAt: nil,
+		}, nil
+	}
+
+	lastScoreUpdate, err := s.playerRecordRepo.GetLastScoreUpdate(ctx, s.db, *user.PlayerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to get last score update due to context canceled", "player_id", *user.PlayerID, "error", err)
+		} else {
+			slog.Error("failed to get last score update", "player_id", *user.PlayerID, "error", err)
+		}
+		return nil, err
+	}
+
+	latestUpdatedAt := player.UpdatedAt
+	if lastScoreUpdate != nil && lastScoreUpdate.After(latestUpdatedAt) {
+		latestUpdatedAt = *lastScoreUpdate
+	}
+
+	return &api_internal.UserUpdatedAtDTO{
+		UpdatedAt: &latestUpdatedAt,
+	}, nil
+}
+
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 // 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
 func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {

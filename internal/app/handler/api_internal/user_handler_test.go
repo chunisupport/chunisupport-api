@@ -32,6 +32,14 @@ func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, usernam
 	return args.Get(0).(*dto_internal.UserProfileWithRecordsDTO), args.Error(1)
 }
 
+func (m *mockUserService) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserUpdatedAtDTO, error) {
+	args := m.Called(ctx, username, requester)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto_internal.UserUpdatedAtDTO), args.Error(1)
+}
+
 func (m *mockUserService) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
@@ -59,6 +67,72 @@ func (m *mockUserService) GetAllUsersForAdmin(ctx context.Context, page int, lim
 func (m *mockUserService) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	args := m.Called(ctx, requester, username)
 	return args.Error(0)
+}
+
+func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
+	e := newTestEcho()
+	mockService := new(mockUserService)
+	h := api_internal.NewUserHandler(mockService)
+	now := time.Date(2026, 4, 18, 12, 34, 56, 0, time.UTC)
+
+	t.Run("正常系: updated_at を返す", func(t *testing.T) {
+		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+			UpdatedAt: &now,
+		}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserUpdatedAt(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body dto_internal.UserUpdatedAtDTO
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		if assert.NotNil(t, body.UpdatedAt) {
+			assert.True(t, now.Equal(*body.UpdatedAt))
+		}
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("プレイヤー未連携時は null を返す", func(t *testing.T) {
+		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+			UpdatedAt: nil,
+		}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserUpdatedAt(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Nil(t, body["updated_at"])
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
+		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserUpdatedAtDTO)(nil), usecase.ErrUserNotFound).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		err := h.GetUserUpdatedAt(c)
+
+		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
+		mockService.AssertExpectations(t)
+	})
 }
 
 func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {

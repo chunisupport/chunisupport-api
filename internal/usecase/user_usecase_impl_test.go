@@ -315,6 +315,79 @@ func TestUserService_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilP
 	assert.Nil(t, result.UpdatedAt)
 }
 
+func TestUserService_GetUserUpdatedAt(t *testing.T) {
+	now := time.Now()
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	playerUpdatedAt := now
+	scoreUpdatedAt := now.Add(time.Hour)
+
+	t.Run("レコード更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
+		service := NewUserService(
+			nil,
+			&stubUserRepository{user: user},
+			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
+				ID:        1,
+				Name:      playername.MustNewPlayerName("テストプレイヤー"),
+				Level:     1,
+				UpdatedAt: playerUpdatedAt,
+			}, Honors: []*entity.PlayerHonor{}}},
+			&stubPlayerRecordRepository{lastScoreUpdate: &scoreUpdatedAt},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.UpdatedAt)
+		assert.True(t, scoreUpdatedAt.Equal(*result.UpdatedAt))
+	})
+
+	t.Run("プロフィール更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
+		service := NewUserService(
+			nil,
+			&stubUserRepository{user: user},
+			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
+				ID:        1,
+				Name:      playername.MustNewPlayerName("テストプレイヤー"),
+				Level:     1,
+				UpdatedAt: playerUpdatedAt,
+			}, Honors: []*entity.PlayerHonor{}}},
+			&stubPlayerRecordRepository{lastScoreUpdate: timePointer(now.Add(-time.Hour))},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.UpdatedAt)
+		assert.True(t, playerUpdatedAt.Equal(*result.UpdatedAt))
+	})
+
+	t.Run("プレイヤー未連携時は nil を返す", func(t *testing.T) {
+		service := NewUserService(
+			nil,
+			&stubUserRepository{user: &entity.User{ID: 1}},
+			&stubPlayerRepository{},
+			&stubPlayerRecordRepository{},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Nil(t, result.UpdatedAt)
+	})
+}
+
 func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
@@ -814,6 +887,10 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 }
 
 func intPointer(v int) *int {
+	return &v
+}
+
+func timePointer(v time.Time) *time.Time {
 	return &v
 }
 
