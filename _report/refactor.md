@@ -86,7 +86,6 @@
 | **HDL-002** | **Medium** | `displayid` パスパラメータ未検証 | `song_handler.go` などで `displayid` をそのままUsecaseへ渡しています。更新APIのリクエストボディでは長さ検証しており、方針が不統一です。 |
 | **HDL-003** | **Medium** | `username` パスパラメータ未検証 | `user_handler.go` / `api_v1/user_handler.go` などで `username` を境界で検証していません。 |
 | **HDL-004** | **Medium** | Usecaseエラー変換の不統一 | `DeleteSong`, `RestoreSong`, `AuthHandler.Logout`, `APITokenHandler.Generate/Delete`, `ProfileHandler.UpdatePrivacy` などで `apierror.FromUsecaseError` を使わず、一律 `internal_error` に寄せています。 |
-| **HDL-009** | **Low** | `me_handler.go` だけ `c.Logger()` を使用 | 全体が `slog` ベースなのに `me_handler.go` だけ `c.Logger().Warnf` を使っています。加えて `user.ID` を `%s` で出力しており、フォーマットも不適切です。 |
 | **HDL-010** | **Low** | `knownFields` が手書きハードコード | `me_handler.go` 内の未知フィールド検出は `PlayerDataPayload` と手動同期になっており、メンテナンス漏れの温床です。 |
 
 ---

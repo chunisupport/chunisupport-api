@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -110,7 +111,7 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 
 	// 未知のフィールドがあれば警告ログを出力
 	if len(unknownFields) > 0 {
-		c.Logger().Warnf("unknown fields in player data payload: %v (user: %s)", unknownFields, user.ID)
+		slog.Warn("unknown fields in player data payload", "unknown_fields", unknownFields, "user_id", user.ID)
 	}
 
 	// 正式な構造体にデコード（未知フィールドは無視される）
