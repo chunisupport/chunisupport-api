@@ -17,12 +17,16 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	slog.Info(info.Name + " v" + info.Version)
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		slog.Error("Failed to load config", "error", err)
-		return
+		return 1
 	}
 
 	// アプリのロガーを設定
@@ -47,12 +51,7 @@ func main() {
 	database, err := db.Connect(cfg.Database.DbConfig)
 	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
-		return
-	}
-
-	if err := database.Ping(); err != nil {
-		slog.Error("Failed to ping database", "error", err)
-		return
+		return 1
 	}
 
 	slog.Info("Connected to the database")
@@ -60,12 +59,7 @@ func main() {
 	staticDatabase, err := db.ConnectStatic(cfg.StaticDBPath)
 	if err != nil {
 		slog.Error("Failed to connect to static database", "error", err)
-		return
-	}
-
-	if err := staticDatabase.Ping(); err != nil {
-		slog.Error("Failed to ping static database", "error", err)
-		return
+		return 1
 	}
 
 	slog.Info("Connected to the static database")
@@ -82,7 +76,7 @@ func main() {
 	masterCache, err := masterdata.Preload(ctx, database)
 	if err != nil {
 		slog.Error("Failed to preload master data", "error", err)
-		return
+		return 1
 	}
 
 	slog.Info("Master data preloaded")
@@ -90,7 +84,7 @@ func main() {
 	staticMasterCache, err := masterdata.PreloadStatic(ctx, staticDatabase)
 	if err != nil {
 		slog.Error("Failed to preload static master data", "error", err)
-		return
+		return 1
 	}
 
 	slog.Info("Static master data preloaded")
@@ -98,7 +92,7 @@ func main() {
 	firebaseTokenVerifier, firebaseUserDeleter, err := app.SetupFirebaseAuthServices(ctx, cfg)
 	if err != nil {
 		slog.Error("Failed to initialize firebase services", "error", err)
-		return
+		return 1
 	}
 
 	// サーバーの作成と起動
@@ -106,23 +100,43 @@ func main() {
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	serverErrCh := make(chan error, 1)
 	go func() {
-		if err := server.Start(); err != nil {
-			stop()
-		}
+		serverErrCh <- server.Start()
 	}()
 
-	<-signalCtx.Done()
-	slog.Info("Starting graceful shutdown")
+	select {
+	case <-signalCtx.Done():
+		slog.Info("Starting graceful shutdown")
+	case err := <-serverErrCh:
+		if err != nil {
+			slog.Error("Server stopped with error", "error", err)
+			if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+				slog.Error("Server shutdown after start failure failed", "error", shutdownErr)
+			}
+			return 1
+		}
+		slog.Info("Server stopped")
+		if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+			slog.Error("Server shutdown after stop failed", "error", shutdownErr)
+			return 1
+		}
+		return 0
+	}
 
-	shutdownTimeout := time.Duration(cfg.ShutdownTimeoutSeconds) * time.Second
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
 		slog.Error("Server shutdown failed", "error", err)
-		return
+		return 1
 	}
 
 	slog.Info("Graceful shutdown completed")
+	return 0
+}
+
+func shutdownServer(server *app.Server, shutdownTimeoutSeconds int) error {
+	shutdownTimeout := time.Duration(shutdownTimeoutSeconds) * time.Second
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	return server.Shutdown(shutdownCtx)
 }
