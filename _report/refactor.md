@@ -26,6 +26,10 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。他は概ね理由付きですが、全体の棚卸しが未完了です。 |
+| **SEC-04** | **Medium** | HTTPサーバーのタイムアウト未設定 | `internal/app/server.go` で `echo.Start` を直接使っており、`ReadHeaderTimeout` / `ReadTimeout` / `WriteTimeout` / `IdleTimeout` が明示されていません。Slowloris 系のリソース枯渇対策として、`http.Server` を明示生成してタイムアウトを設定すべきです。 |
+| **SEC-05** | **Medium** | DB接続のTLS設定がない | `internal/infra/db/connection.go` のMySQL DSNに `tls` 指定がありません。DBが同一ホストまたは信頼できる閉域網に限定されない場合、通信経路上の盗聴・改ざんリスクがあります。本番設定ではTLS必須化を検討すべきです。 |
+| **SEC-06** | **Low** | CORS設定の危険値検証がない | `internal/app/router.go` のCORSは設定値をそのまま反映しています。`allow_credentials=true` と広すぎる `allow_origins` の組み合わせを設定時に拒否するなど、起動時検証を追加すべきです。 |
+| **SEC-07** | **Low** | ログ出力のサニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行除去がありますが、全ログ出力で統一された機微情報・制御文字サニタイズ方針は見当たりません。ログ注入やトークン・UID等の混入を防ぐため、ログ出力ルールを統一すべきです。 |
 
 ### パフォーマンス (PERF)
 
@@ -94,6 +98,7 @@
 
 - Firebase 認証への移行で、Cookie セッション前提の CSRF、`password_hash`、`user_recovery_codes`、旧 `auth_usecase_impl.go` に依存した指摘は現状と一致しなくなったため削除しました。
 - 逆に、`TODO` 件数や `#nosec` 箇所、`song_repository_impl.go` のVO変換エラー無視のように、**根拠は同じテーマでも現行コード上の実態に合わせて記述を更新**しています。
+- 2026-04-26時点のOWASP/CWE観点の追加確認では、`govulncheck` はローカル未導入でしたが、CIでは特に問題として検出されていない前提です。
 
 ## まとめ
 
