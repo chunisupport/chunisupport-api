@@ -116,12 +116,6 @@ func (h *WorldsendHandler) CreateWorldsendSong(c echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(fmt.Errorf("song masters are not initialized"))
 	}
 
-	// ジャンル名の検証とID変換
-	genreItem, ok := masters.Genres[req.Genre]
-	if !ok {
-		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("invalid genre: %s", req.Genre))
-	}
-
 	var chartInput *usecase.CreateWorldsendChartInput
 	if req.Chart != nil {
 		chartInput = &usecase.CreateWorldsendChartInput{
@@ -136,14 +130,14 @@ func (h *WorldsendHandler) CreateWorldsendSong(c echo.Context) error {
 		OfficialIdx: req.OfficialIdx,
 		Title:       req.Title,
 		Artist:      req.Artist,
-		GenreID:     genreItem.ID,
+		Genre:       req.Genre,
 		BPM:         req.BPM,
 		ReleasedAt:  req.ReleasedAt.TimePtr(),
 		Jacket:      req.Jacket,
 		Chart:       chartInput,
 	}
 
-	songWithChart, err := h.worldsendUsecase.CreateWorldsendSong(c.Request().Context(), input)
+	songWithChart, err := h.worldsendUsecase.CreateWorldsendSong(c.Request().Context(), input, masters)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

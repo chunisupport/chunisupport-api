@@ -217,6 +217,10 @@ func generateDisplayID() (string, error) {
 // CreateSong は新規楽曲を追加します。
 // display_id はサーバー側で生成します。
 func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput) (*entity.Song, error) {
+	if input == nil {
+		return nil, fmt.Errorf("%w: input is nil", ErrInvalidDifficulty)
+	}
+
 	masters := s.masterCache.SongMasters()
 	if masters == nil {
 		return nil, fmt.Errorf("master cache is not initialized")
@@ -229,10 +233,19 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	}
 	genreID := genreItem.ID
 
+	// 難易度の重複チェック
+	seen := make(map[string]struct{}, len(input.Charts))
 	// 譜面の変換
 	charts := make([]*entity.Chart, 0, len(input.Charts))
 	for _, chartInput := range input.Charts {
+		if chartInput == nil {
+			return nil, fmt.Errorf("%w: charts contains nil element", ErrInvalidDifficulty)
+		}
 		diffKey := strings.ToUpper(chartInput.Difficulty)
+		if _, dup := seen[diffKey]; dup {
+			return nil, fmt.Errorf("%w: duplicate difficulty=%s", ErrInvalidDifficulty, chartInput.Difficulty)
+		}
+		seen[diffKey] = struct{}{}
 		item, ok := masters.Difficulties[diffKey]
 		if !ok {
 			return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, chartInput.Difficulty)

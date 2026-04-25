@@ -52,7 +52,7 @@ type CreateWorldsendSongInput struct {
 	OfficialIdx string
 	Title       string
 	Artist      string
-	GenreID     int
+	Genre       string
 	BPM         *int
 	ReleasedAt  *time.Time
 	Jacket      *string
@@ -81,7 +81,8 @@ type WorldsendUsecase interface {
 	// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
 	// display_id はサーバー側で crypto/rand を使って生成します。
 	// official_idx が重複する場合は repository.ErrDuplicateOfficialIdx を返します。
-	CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error)
+	// masters が nil の場合は内部エラーを返します。
+	CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error)
 }
 
 // worldsendUsecase は WorldsendUsecase の実装です。
@@ -302,7 +303,18 @@ func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChart
 }
 
 // CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
-func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error) {
+func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error) {
+	if masters == nil {
+		return nil, fmt.Errorf("%w: masters is nil", ErrInternalError)
+	}
+
+	// ジャンル名の検証とID変換（UpdateWorldsendSongs と同様のパターン）
+	genreItem, ok := masters.Genres[input.Genre]
+	if !ok {
+		return nil, fmt.Errorf("%w: invalid genre=%s", ErrInvalidWorldsendInput, input.Genre)
+	}
+	genreID := genreItem.ID
+
 	displayID, err := generateDisplayID()
 	if err != nil {
 		return nil, err
@@ -313,7 +325,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.OfficialIdx = input.OfficialIdx
 	song.Title = input.Title
 	song.Artist = input.Artist
-	song.GenreID = &input.GenreID
+	song.GenreID = &genreID
 	song.BPM = input.BPM
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
