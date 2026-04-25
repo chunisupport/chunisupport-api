@@ -39,6 +39,26 @@ type UpdateWorldsendSongInput struct {
 	Charts     map[string]*UpdateWorldsendChartInput
 }
 
+// CreateWorldsendChartInput は WORLD'S END 譜面追加入力を表します。nil の場合は空行を挿入します。
+type CreateWorldsendChartInput struct {
+	Attribute     *string
+	LevelStar     *int
+	Notes         *int
+	NotesDesigner *string
+}
+
+// CreateWorldsendSongInput は WORLD'S END 楽曲追加入力を表します。
+type CreateWorldsendSongInput struct {
+	OfficialIdx string
+	Title       string
+	Artist      string
+	GenreID     int
+	BPM         *int
+	ReleasedAt  *time.Time
+	Jacket      *string
+	Chart       *CreateWorldsendChartInput
+}
+
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
@@ -57,6 +77,11 @@ type WorldsendUsecase interface {
 
 	// UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 	UpdateWorldsendSongs(ctx context.Context, requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
+
+	// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
+	// display_id はサーバー側で crypto/rand を使って生成します。
+	// official_idx が重複する場合は repository.ErrDuplicateOfficialIdx を返します。
+	CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error)
 }
 
 // worldsendUsecase は WorldsendUsecase の実装です。
@@ -274,4 +299,66 @@ func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChart
 	}
 
 	return chart, true, nil
+}
+
+// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
+func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error) {
+	displayID, err := generateDisplayID()
+	if err != nil {
+		return nil, err
+	}
+
+	song := entity.NewSong()
+	song.DisplayID = displayID
+	song.OfficialIdx = input.OfficialIdx
+	song.Title = input.Title
+	song.Artist = input.Artist
+	song.GenreID = &input.GenreID
+	song.BPM = input.BPM
+	song.ReleasedAt = input.ReleasedAt
+	song.Jacket = input.Jacket
+	song.IsWorldsend = true
+
+	// 譜面情報の構築（全フィールド任意）
+	var chart *entity.WorldsendChart
+	if input.Chart != nil {
+		var levelStarVO *levelstar.LevelStar
+		if input.Chart.LevelStar != nil {
+			ls, err := levelstar.NewLevelStar(*input.Chart.LevelStar)
+			if err != nil {
+				return nil, fmt.Errorf("%w: level_star: %v", ErrInvalidWorldsendInput, err)
+			}
+			levelStarVO = &ls
+		}
+
+		var notesVO *notes.Notes
+		if input.Chart.Notes != nil {
+			n, err := notes.NewNotes(*input.Chart.Notes)
+			if err != nil {
+				return nil, fmt.Errorf("%w: notes: %v", ErrInvalidWorldsendInput, err)
+			}
+			notesVO = &n
+		}
+
+		chart = &entity.WorldsendChart{
+			LevelStar:     levelStarVO,
+			Attribute:     input.Chart.Attribute,
+			Notes:         notesVO,
+			NotesDesigner: input.Chart.NotesDesigner,
+		}
+	}
+
+	var created *entity.WorldsendSongWithChart
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		result, err := s.worldsendChartRepo.CreateSong(ctx, tx, song, chart)
+		if err != nil {
+			return err
+		}
+		created = result
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return created, nil
 }

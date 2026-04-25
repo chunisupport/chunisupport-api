@@ -41,4 +41,7 @@ var (
 
 	// ErrTemporaryPlayerDataTotalSizeLimitExceeded は一時データ総量の上限を超えた場合に返されるエラーです。
 	ErrTemporaryPlayerDataTotalSizeLimitExceeded = errors.New("temporary player data total size limit exceeded")
+
+	// ErrDuplicateOfficialIdx は official_idx が既に使用されている場合に返されるエラーです。
+	ErrDuplicateOfficialIdx = errors.New("official_idx already exists")
 )

@@ -60,6 +60,14 @@ func (m *MockSongRepository) UpdateSongs(ctx context.Context, exec repository.Ex
 	return args.Error(0)
 }
 
+func (m *MockSongRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
+	args := m.Called(ctx, exec, song)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
 // MockSongMasterProvider は SongMasterProvider のモックです。
 type MockSongMasterProvider struct {
 	mock.Mock

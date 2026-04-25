@@ -46,6 +46,14 @@ func (m *MockWorldsendChartRepository) UpdateSongs(ctx context.Context, exec rep
 	return args.Error(0)
 }
 
+func (m *MockWorldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
+	args := m.Called(ctx, exec, song, chart)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.WorldsendSongWithChart), args.Error(1)
+}
+
 // MockTransactionManager は TransactionManager のモックです。
 type MockTransactionManager struct {
 	mock.Mock

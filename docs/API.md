@@ -120,11 +120,13 @@
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs` | POST | Firebase Bearer (EDITOR+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/:displayid` | DELETE | Firebase Bearer (EDITOR+) | 楽曲の論理削除 |
 | `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
 | `/internal/songs/worldsend` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
 | `/internal/songs/worldsend/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/songs/worldsend` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の新規追加 |
 | `/internal/songs/worldsend` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の論理削除 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
@@ -1612,6 +1614,60 @@ curl -X POST \
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
+### POST `/internal/songs`
+- **認証**: Firebase Bearer 必須
+- **権限**: EDITOR または ADMIN 権限が必要
+- **概要**: 新規楽曲（WORLD'S ENDを除く）を追加します。`display_id` はサーバーが自動生成します。
+- **リクエスト**: JSON オブジェクト
+
+```json
+{
+  "official_idx": "1234567890",
+  "title": "楽曲タイトル",
+  "artist": "アーティスト名",
+  "genre": "POPS & ANIME",
+  "bpm": 180,
+  "released_at": "2024-01-01",
+  "jacket": "ce21ae87308e7599",
+  "charts": [
+    {
+      "difficulty": "MASTER",
+      "const": 14.9,
+      "is_const_unknown": false,
+      "notes": 1234,
+      "notes_designer": "デザイナー名"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `official_idx` | string | ✅ | 公式ID（最大10文字） |
+| `title` | string | ✅ | 楽曲タイトル |
+| `artist` | string | ✅ | アーティスト名 |
+| `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
+| `bpm` | int | - | BPM（省略可） |
+| `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
+| `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
+| `charts` | array | - | 譜面情報配列（省略可） |
+| `charts[].difficulty` | string | ✅ | 難易度（`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`） |
+| `charts[].const` | float64 | ✅ | 譜面定数（0以上） |
+| `charts[].is_const_unknown` | bool | ✅ | 定数が不明な場合 `true`（`const` には暫定値を設定） |
+| `charts[].notes` | int | - | ノーツ数（省略可） |
+| `charts[].notes_designer` | string | - | ノーツデザイナー名（最大100文字、省略可） |
+
+- **レスポンス**: `201 Created` — 作成された楽曲情報（EditorSong形式）
+
+レスポンスフィールドの詳細は GET `/internal/editor/songs/:displayid` と同様です。
+
+- **エラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式が不正
+  - 400 Bad Request (`validation_failed`): バリデーションエラー
+  - 400 Bad Request (`invalid_difficulty`): 難易度またはジャンルが無効
+  - 409 Conflict (`duplicate_official_idx`): `official_idx` が既に存在する
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
 ### PUT `/internal/songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
@@ -1791,6 +1847,55 @@ curl -X POST \
 
 - **主なエラー**:
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### POST `/internal/songs/worldsend`
+- **認証**: Firebase Bearer 必須
+- **権限**: EDITOR または ADMIN 権限が必要
+- **概要**: 新規 WORLD'S END 楽曲を追加します。`display_id` はサーバーが自動生成します。
+- **リクエスト**: JSON オブジェクト
+
+```json
+{
+  "official_idx": "1234567890",
+  "title": "楽曲タイトル",
+  "artist": "アーティスト名",
+  "genre": "POPS & ANIME",
+  "bpm": 180,
+  "released_at": "2024-01-01",
+  "jacket": "ce21ae87308e7599",
+  "chart": {
+    "attribute": "red",
+    "level_star": 5,
+    "notes": 567,
+    "notes_designer": "デザイナー名"
+  }
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `official_idx` | string | ✅ | 公式ID（最大10文字） |
+| `title` | string | ✅ | 楽曲タイトル |
+| `artist` | string | ✅ | アーティスト名 |
+| `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
+| `bpm` | int | - | BPM（省略可） |
+| `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
+| `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
+| `chart` | object | - | 譜面情報（省略可、省略時は空行を挿入） |
+| `chart.attribute` | string | - | アトリビュート（省略可） |
+| `chart.level_star` | int | - | レベル星数（1〜5、省略可） |
+| `chart.notes` | int | - | ノーツ数（省略可） |
+| `chart.notes_designer` | string | - | ノーツデザイナー名（最大100文字、省略可） |
+
+- **レスポンス**: `201 Created` — 作成された WORLD'S END 楽曲情報（EditorWorldsendSong形式）
+
+レスポンスフィールドの詳細は GET `/internal/editor/songs/worldsend/:displayid` と同様です。
+
+- **エラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式が不正
+  - 400 Bad Request (`validation_failed`): バリデーションエラーまたはジャンルが無効
+  - 409 Conflict (`duplicate_official_idx`): `official_idx` が既に存在する
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### PUT `/internal/songs/worldsend`

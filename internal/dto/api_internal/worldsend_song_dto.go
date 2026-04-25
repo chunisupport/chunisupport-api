@@ -77,6 +77,27 @@ type UpdateWorldsendSongRequest struct {
 	Charts     map[string]*UpdateWorldsendChartRequest `json:"charts" validate:"dive"`
 }
 
+// CreateWorldsendChartRequest は WORLD'S END 譜面追加リクエストを表します。
+// 新規楽曲作成時に任意で指定できます。フィールドはすべて任意です。
+type CreateWorldsendChartRequest struct {
+	Attribute     *string `json:"attribute"`
+	LevelStar     *int    `json:"level_star" validate:"omitempty,min=1,max=5"`
+	Notes         *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner *string `json:"notes_designer" validate:"omitempty,max=100"`
+}
+
+// CreateWorldsendSongRequest は WORLD'S END 楽曲追加リクエストを表します。
+type CreateWorldsendSongRequest struct {
+	OfficialIdx string                       `json:"official_idx" validate:"required,max=10"`
+	Title       string                       `json:"title" validate:"required"`
+	Artist      string                       `json:"artist" validate:"required"`
+	Genre       string                       `json:"genre" validate:"required"`
+	BPM         *int                         `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt  *DateOnly                    `json:"released_at"`
+	Jacket      *string                      `json:"jacket" validate:"omitempty,max=20"`
+	Chart       *CreateWorldsendChartRequest `json:"chart" validate:"omitempty"`
+}
+
 // ToWorldsendChartDTO は WorldsendChart エンティティから WorldsendChartDTO へ変換します。
 func ToWorldsendChartDTO(chart *entity.WorldsendChart) *WorldsendChartDTO {
 	if chart == nil {

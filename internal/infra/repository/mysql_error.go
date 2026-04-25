@@ -27,6 +27,14 @@ func wrapUsernameDuplicateError(err error) error {
 	return fmt.Errorf("%w: %v", domainrepo.ErrDuplicateUsername, err)
 }
 
+func wrapOfficialIdxDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "official_idx") {
+		return err
+	}
+
+	return fmt.Errorf("%w: %v", domainrepo.ErrDuplicateOfficialIdx, err)
+}
+
 func isMySQLDuplicateEntryForKey(err error, key string) bool {
 	var mysqlErr *mysql.MySQLError
 	if !errors.As(err, &mysqlErr) {

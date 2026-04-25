@@ -167,6 +167,27 @@ type UpdateSongRequest struct {
 	Charts     map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
 }
 
+// CreateChartRequest は譜面追加リクエストを表します。
+type CreateChartRequest struct {
+	Difficulty     string  `json:"difficulty" validate:"required"`
+	Const          float64 `json:"const" validate:"gte=0"`
+	IsConstUnknown bool    `json:"is_const_unknown"`
+	Notes          *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner  *string `json:"notes_designer" validate:"omitempty,max=100"`
+}
+
+// CreateSongRequest は楽曲追加リクエストを表します。
+type CreateSongRequest struct {
+	OfficialIdx string                `json:"official_idx" validate:"required,max=10"`
+	Title       string                `json:"title" validate:"required"`
+	Artist      string                `json:"artist" validate:"required"`
+	Genre       string                `json:"genre" validate:"required"`
+	BPM         *int                  `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt  *DateOnly             `json:"released_at"`
+	Jacket      *string               `json:"jacket" validate:"omitempty,max=20"`
+	Charts      []*CreateChartRequest `json:"charts" validate:"dive"`
+}
+
 // ToChartDTO はChartエンティティからChartDTOへ変換します。
 func ToChartDTO(chart *entity.Chart) *ChartDTO {
 	if chart == nil {

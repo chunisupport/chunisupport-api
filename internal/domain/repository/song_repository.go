@@ -38,4 +38,8 @@ type SongRepository interface {
 	// トランザクション管理はUseCase層（TransactionManager経由）で行います。
 	// 存在しない楽曲・譜面がある場合はエラーを返します。
 	UpdateSongs(ctx context.Context, exec Executor, songs []*entity.Song) error
+
+	// Create は新規楽曲を songs および charts テーブルに追加します。
+	// display_id 重複時は ErrDuplicateDisplayID を、official_idx 重複時は ErrDuplicateOfficialIdx を返します。
+	Create(ctx context.Context, exec Executor, song *entity.Song) (*entity.Song, error)
 }

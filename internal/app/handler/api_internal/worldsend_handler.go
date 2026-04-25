@@ -92,6 +92,65 @@ func (h *WorldsendHandler) DeleteWorldsendSong(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
+func (h *WorldsendHandler) CreateWorldsendSong(c echo.Context) error {
+	var req api_internal.CreateWorldsendSongRequest
+	if err := c.Bind(&req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	if req.Chart != nil {
+		if err := c.Validate(req.Chart); err != nil {
+			return err
+		}
+	}
+
+	if h.masterCache == nil {
+		return apierror.ErrInternalError.WithInternal(fmt.Errorf("master cache is not initialized"))
+	}
+
+	masters := h.masterCache.SongMasters()
+	if masters == nil {
+		return apierror.ErrInternalError.WithInternal(fmt.Errorf("song masters are not initialized"))
+	}
+
+	// ジャンル名の検証とID変換
+	genreItem, ok := masters.Genres[req.Genre]
+	if !ok {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("invalid genre: %s", req.Genre))
+	}
+
+	var chartInput *usecase.CreateWorldsendChartInput
+	if req.Chart != nil {
+		chartInput = &usecase.CreateWorldsendChartInput{
+			Attribute:     req.Chart.Attribute,
+			LevelStar:     req.Chart.LevelStar,
+			Notes:         req.Chart.Notes,
+			NotesDesigner: req.Chart.NotesDesigner,
+		}
+	}
+
+	input := &usecase.CreateWorldsendSongInput{
+		OfficialIdx: req.OfficialIdx,
+		Title:       req.Title,
+		Artist:      req.Artist,
+		GenreID:     genreItem.ID,
+		BPM:         req.BPM,
+		ReleasedAt:  req.ReleasedAt.TimePtr(),
+		Jacket:      req.Jacket,
+		Chart:       chartInput,
+	}
+
+	songWithChart, err := h.worldsendUsecase.CreateWorldsendSong(c.Request().Context(), input)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusCreated, h.convertToEditorWorldsendSongDTO(songWithChart))
+}
+
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (h *WorldsendHandler) RestoreWorldsendSong(c echo.Context) error {
 	displayID := c.Param("displayid")

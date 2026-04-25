@@ -29,4 +29,9 @@ type WorldsendChartRepository interface {
 
 	// UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 	UpdateSongs(ctx context.Context, exec Executor, updates []*WorldsendUpdate) error
+
+	// CreateSong は新規 WORLD'S END 楽曲を songs および worldsend_charts テーブルに追加します。
+	// worldsend_charts は1曲1行が必須のため、chart が nil の場合でも空行を挿入します。
+	// display_id 重複時は ErrDuplicateDisplayID を、official_idx 重複時は ErrDuplicateOfficialIdx を返します。
+	CreateSong(ctx context.Context, exec Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error)
 }

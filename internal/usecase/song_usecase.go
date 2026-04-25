@@ -8,6 +8,27 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
+// CreateChartInput は譜面追加入力を表します。
+type CreateChartInput struct {
+	Difficulty     string
+	Const          float64
+	IsConstUnknown bool
+	Notes          *int
+	NotesDesigner  *string
+}
+
+// CreateSongInput は楽曲追加入力を表します。
+type CreateSongInput struct {
+	OfficialIdx string
+	Title       string
+	Artist      string
+	Genre       string
+	BPM         *int
+	ReleasedAt  *time.Time
+	Jacket      *string
+	Charts      []*CreateChartInput
+}
+
 // SongUsecase は楽曲に関するユースケースを提供します。
 type SongUsecase interface {
 	// GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
@@ -30,6 +51,11 @@ type SongUsecase interface {
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// マスタデータの検証およびリポジトリへの委譲を行います。
 	UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
+
+	// CreateSong は新規楽曲を追加します。
+	// display_id はサーバー側で crypto/rand を使って生成します。
+	// official_idx が重複する場合は repository.ErrDuplicateOfficialIdx を返します。
+	CreateSong(ctx context.Context, input *CreateSongInput) (*entity.Song, error)
 
 	// CalcSongMaxOP は楽曲の譜面から理論値の最大OPを計算します。
 	CalcSongMaxOP(song *entity.Song) float64

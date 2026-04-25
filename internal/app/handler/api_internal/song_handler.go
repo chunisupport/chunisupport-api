@@ -138,6 +138,60 @@ func (h *SongHandler) DeleteSong(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// CreateSong は新規楽曲を追加します。
+func (h *SongHandler) CreateSong(c echo.Context) error {
+	var req api_internal.CreateSongRequest
+	if err := c.Bind(&req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	for _, chart := range req.Charts {
+		if chart == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("charts: chart element is null"))
+		}
+		if err := c.Validate(chart); err != nil {
+			return err
+		}
+	}
+
+	input := &usecase.CreateSongInput{
+		OfficialIdx: req.OfficialIdx,
+		Title:       req.Title,
+		Artist:      req.Artist,
+		Genre:       req.Genre,
+		BPM:         req.BPM,
+		ReleasedAt:  req.ReleasedAt.TimePtr(),
+		Jacket:      req.Jacket,
+		Charts:      convertToCreateChartInputs(req.Charts),
+	}
+
+	song, err := h.songUsecase.CreateSong(c.Request().Context(), input)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusCreated, h.convertToEditorSongDTO(song))
+}
+
+func convertToCreateChartInputs(reqs []*api_internal.CreateChartRequest) []*usecase.CreateChartInput {
+	inputs := make([]*usecase.CreateChartInput, 0, len(reqs))
+	for _, r := range reqs {
+		if r == nil {
+			continue
+		}
+		inputs = append(inputs, &usecase.CreateChartInput{
+			Difficulty:     r.Difficulty,
+			Const:          r.Const,
+			IsConstUnknown: r.IsConstUnknown,
+			Notes:          r.Notes,
+			NotesDesigner:  r.NotesDesigner,
+		})
+	}
+	return inputs
+}
+
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (h *SongHandler) RestoreSong(c echo.Context) error {
 	displayID := c.Param("displayid")

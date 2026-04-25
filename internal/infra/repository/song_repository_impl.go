@@ -617,3 +617,65 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 	_, err := exec.ExecContext(ctx, query, args...)
 	return err
 }
+
+// Create は新規楽曲を songs および charts テーブルに追加します。
+// display_id は呼び出し元（usecase）で生成済みのものを使用します。
+// official_idx 重複時は ErrDuplicateOfficialIdx を返します。
+func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
+	// songs テーブルに挿入
+	songResult, err := exec.ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+	`,
+		song.DisplayID,
+		song.Title,
+		song.Artist,
+		song.GenreID,
+		song.BPM,
+		song.ReleasedAt,
+		song.OfficialIdx,
+		song.Jacket,
+	)
+	if err != nil {
+		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {
+			return nil, wrapped
+		}
+		return nil, err
+	}
+
+	songID, err := songResult.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	// charts テーブルに挿入（譜面が存在する場合のみ）
+	for _, chart := range song.Charts {
+		constVal, err := chart.Const.Value()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chart const value: %w", err)
+		}
+
+		var notesVal *int
+		if chart.Notes != nil {
+			n := int(*chart.Notes)
+			notesVal = &n
+		}
+
+		if _, err = exec.ExecContext(ctx, `
+			INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`,
+			songID,
+			chart.DifficultyID,
+			constVal,
+			chart.IsConstUnknown,
+			notesVal,
+			chart.NotesDesigner,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	// DB が付与した updated_at を取得するため再フェッチする
+	return r.FindByDisplayID(ctx, exec, song.DisplayID)
+}

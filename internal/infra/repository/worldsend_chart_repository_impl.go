@@ -451,3 +451,68 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 
 	return count == len(targets), nil
 }
+
+// CreateSong は新規 WORLD'S END 楽曲を songs および worldsend_charts テーブルに追加します。
+// worldsend_charts は 1 曲 1 行が必須のため、chart が nil の場合でも空行を挿入します。
+// official_idx 重複時は ErrDuplicateOfficialIdx を返します。
+func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
+	// songs テーブルに挿入
+	songResult, err := exec.ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+	`,
+		song.DisplayID,
+		song.Title,
+		song.Artist,
+		song.GenreID,
+		song.BPM,
+		song.ReleasedAt,
+		song.OfficialIdx,
+		song.Jacket,
+	)
+	if err != nil {
+		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {
+			return nil, wrapped
+		}
+		return nil, err
+	}
+
+	songID, err := songResult.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	// worldsend_charts テーブルに挿入（chart が nil の場合も空行を挿入）
+	var attribute *string
+	var levelStarVal *int
+	var notesVal *int
+	var notesDesigner *string
+	if chart != nil {
+		attribute = chart.Attribute
+		if chart.LevelStar != nil {
+			v := int(*chart.LevelStar)
+			levelStarVal = &v
+		}
+		if chart.Notes != nil {
+			n := int(*chart.Notes)
+			notesVal = &n
+		}
+		notesDesigner = chart.NotesDesigner
+	}
+
+	if _, err = exec.ExecContext(ctx, `
+		INSERT INTO worldsend_charts (song_id, level_star, attribute, notes, notes_designer)
+		VALUES (?, ?, ?, ?, ?)
+	`,
+		songID,
+		levelStarVal,
+		attribute,
+		notesVal,
+		notesDesigner,
+	); err != nil {
+		return nil, err
+	}
+
+	// DB が付与した updated_at を取得するため再フェッチする
+	return r.FindByDisplayID(ctx, exec, song.DisplayID)
+}

@@ -27,11 +27,12 @@ const (
 	CodePlayerNotFound  = "player_not_found"
 
 	// 楽曲・譜面関連エラー
-	CodeSongNotFound        = "song_not_found"
-	CodeChartNotFound       = "chart_not_found"
-	CodeInvalidGenreID      = "invalid_genre_id"
-	CodeInvalidDifficultyID = "invalid_difficulty_id"
-	CodeInvalidDifficulty   = "invalid_difficulty" // 無効な難易度パラメータ
+	CodeSongNotFound         = "song_not_found"
+	CodeChartNotFound        = "chart_not_found"
+	CodeInvalidGenreID       = "invalid_genre_id"
+	CodeInvalidDifficultyID  = "invalid_difficulty_id"
+	CodeInvalidDifficulty    = "invalid_difficulty"     // 無効な難易度パラメータ
+	CodeDuplicateOfficialIdx = "duplicate_official_idx" // official_idx 重複
 
 	// データ関連エラー
 	CodeValidationFailed   = "validation_failed"

@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -200,4 +202,92 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 	}
 
 	return result, nil
+}
+
+// generateDisplayID は crypto/rand で 8 バイトの乱数を生成し、16 文字の小文字 16 進文字列を返します。
+func generateDisplayID() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate display_id: %w", err)
+	}
+
+	return hex.EncodeToString(b), nil
+}
+
+// CreateSong は新規楽曲を追加します。
+// display_id はサーバー側で生成します。
+func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput) (*entity.Song, error) {
+	masters := s.masterCache.SongMasters()
+	if masters == nil {
+		return nil, fmt.Errorf("master cache is not initialized")
+	}
+
+	// ジャンル名の検証とID変換
+	genreItem, ok := masters.Genres[input.Genre]
+	if !ok {
+		return nil, fmt.Errorf("%w: genre=%s", ErrInvalidDifficulty, input.Genre)
+	}
+	genreID := genreItem.ID
+
+	// 譜面の変換
+	charts := make([]*entity.Chart, 0, len(input.Charts))
+	for _, chartInput := range input.Charts {
+		diffKey := strings.ToUpper(chartInput.Difficulty)
+		item, ok := masters.Difficulties[diffKey]
+		if !ok {
+			return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, chartInput.Difficulty)
+		}
+
+		cc, err := chartconstant.NewChartConstant(chartInput.Const)
+		if err != nil {
+			return nil, fmt.Errorf("invalid chart constant (difficulty: %s): %w", chartInput.Difficulty, err)
+		}
+
+		var notesVO *notes.Notes
+		if chartInput.Notes != nil {
+			n, err := notes.NewNotes(*chartInput.Notes)
+			if err != nil {
+				return nil, fmt.Errorf("invalid notes (difficulty: %s): %w", chartInput.Difficulty, err)
+			}
+			notesVO = &n
+		}
+
+		charts = append(charts, &entity.Chart{
+			DifficultyID:   item.ID,
+			Const:          cc,
+			IsConstUnknown: chartInput.IsConstUnknown,
+			Notes:          notesVO,
+			NotesDesigner:  chartInput.NotesDesigner,
+		})
+	}
+
+	displayID, err := generateDisplayID()
+	if err != nil {
+		return nil, err
+	}
+
+	song := entity.NewSong()
+	song.DisplayID = displayID
+	song.OfficialIdx = input.OfficialIdx
+	song.Title = input.Title
+	song.Artist = input.Artist
+	song.GenreID = &genreID
+	song.BPM = input.BPM
+	song.ReleasedAt = input.ReleasedAt
+	song.Jacket = input.Jacket
+	song.Charts = charts
+
+	var created *entity.Song
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		result, err := s.songRepo.Create(ctx, tx, song)
+		if err != nil {
+			return err
+		}
+		created = result
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return created, nil
 }

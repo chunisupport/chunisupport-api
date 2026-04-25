@@ -212,6 +212,10 @@ func (s *stubSongRepository) UpdateSongs(ctx context.Context, exec repository.Ex
 	return errors.New("not implemented")
 }
 
+func (s *stubSongRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
 type stubSongMasterProvider struct {
 	masters *masterdata.SongMasters
 }
@@ -255,6 +259,10 @@ func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec reposi
 
 func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
 	return errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {

@@ -15,6 +15,7 @@ type MockWorldsendUsecase struct {
 	DeleteWorldsendSongFunc         func(ctx context.Context, displayID string) error
 	RestoreWorldsendSongFunc        func(ctx context.Context, displayID string) error
 	UpdateWorldsendSongsFunc        func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
+	CreateWorldsendSongFunc         func(ctx context.Context, input *usecase.CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error)
 }
 
 func (m *MockWorldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error) {
@@ -50,4 +51,11 @@ func (m *MockWorldsendUsecase) UpdateWorldsendSongs(ctx context.Context, request
 		return m.UpdateWorldsendSongsFunc(ctx, requests, masters)
 	}
 	return nil
+}
+
+func (m *MockWorldsendUsecase) CreateWorldsendSong(ctx context.Context, input *usecase.CreateWorldsendSongInput) (*entity.WorldsendSongWithChart, error) {
+	if m.CreateWorldsendSongFunc != nil {
+		return m.CreateWorldsendSongFunc(ctx, input)
+	}
+	return nil, nil
 }
