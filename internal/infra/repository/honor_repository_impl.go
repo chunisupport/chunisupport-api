@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -42,21 +43,32 @@ func (r *honorRepository) DeletePlayerHonors(ctx context.Context, exec repositor
 }
 
 // BulkAssignHonors はプレイヤーに称号を一括で割り当てます。
+// 大量の割り当てはチャンク分割して実行されます。
 func (r *honorRepository) BulkAssignHonors(ctx context.Context, exec repository.Executor, assignments []repository.HonorAssignment) error {
 	if len(assignments) == 0 {
 		return nil
 	}
 
-	query := `INSERT INTO player_honors (player_id, honor_id, slot) VALUES `
-	values := make([]any, 0, len(assignments)*3)
-	placeholders := make([]string, 0, len(assignments))
+	batchSize := info.BulkInsertChunkSize
+	for i := 0; i < len(assignments); i += batchSize {
+		end := min(i+batchSize, len(assignments))
+		batch := assignments[i:end]
 
-	for _, a := range assignments {
-		placeholders = append(placeholders, "(?, ?, ?)")
-		values = append(values, a.PlayerID, a.HonorID, a.Slot)
+		query := `INSERT INTO player_honors (player_id, honor_id, slot) VALUES `
+		values := make([]any, 0, len(batch)*3)
+		placeholders := make([]string, 0, len(batch))
+
+		for _, a := range batch {
+			placeholders = append(placeholders, "(?, ?, ?)")
+			values = append(values, a.PlayerID, a.HonorID, a.Slot)
+		}
+
+		query += strings.Join(placeholders, ", ")
+		_, err := exec.ExecContext(ctx, query, values...)
+		if err != nil {
+			return err
+		}
 	}
 
-	query += strings.Join(placeholders, ", ")
-	_, err := exec.ExecContext(ctx, query, values...)
-	return err
+	return nil
 }
