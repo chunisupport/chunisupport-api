@@ -293,17 +293,17 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	songsGroup := internal.Group("/songs")
 	songsGroup.Use(firebaseAuth)
 	{
-		songsGroup.POST("", handlers.Song.CreateSong, requireEditor)
+		songsGroup.POST("", handlers.Song.CreateSong, requireAdmin)
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
-		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireEditor)
+		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireAdmin)
 		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
 
 		// WORLD'S END 楽曲エンドポイント
 		worldsendGroup := songsGroup.Group("/worldsend")
 		{
-			worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireEditor)
+			worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
 			worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
-			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireEditor)
+			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
 			worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 		}
 	}

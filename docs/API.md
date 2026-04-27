@@ -120,15 +120,15 @@
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
-| `/internal/songs` | POST | Firebase Bearer (EDITOR+) | 楽曲の新規追加 |
+| `/internal/songs` | POST | Firebase Bearer (ADMIN+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/:displayid` | DELETE | Firebase Bearer (EDITOR+) | 楽曲の論理削除 |
+| `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
 | `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
 | `/internal/songs/worldsend` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
 | `/internal/songs/worldsend/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
-| `/internal/songs/worldsend` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の新規追加 |
+| `/internal/songs/worldsend` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
 | `/internal/songs/worldsend` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の論理削除 |
+| `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
 | `/internal/editor/songs` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
@@ -1616,7 +1616,7 @@ curl -X POST \
 
 ### POST `/internal/songs`
 - **認証**: Firebase Bearer 必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: ADMIN 権限が必要
 - **概要**: 新規楽曲（WORLD'S ENDを除く）を追加します。`display_id` はサーバーが自動生成します。
 - **リクエスト**: JSON オブジェクト
 
@@ -1665,6 +1665,8 @@ curl -X POST \
   - 400 Bad Request (`bad_request`): リクエスト形式が不正
   - 400 Bad Request (`validation_failed`): バリデーションエラー
   - 400 Bad Request (`invalid_difficulty`): 難易度またはジャンルが無効
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
   - 409 Conflict (`duplicate_official_idx`): `official_idx` が既に存在する
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
@@ -1736,14 +1738,14 @@ curl -X POST \
 
 ### DELETE `/internal/songs/:displayid`
 - **認証**: Firebase Bearer 必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
   - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
 
 ### POST `/internal/songs/:displayid/restore`
@@ -1851,7 +1853,7 @@ curl -X POST \
 
 ### POST `/internal/songs/worldsend`
 - **認証**: Firebase Bearer 必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: ADMIN 権限が必要
 - **概要**: 新規 WORLD'S END 楽曲を追加します。`display_id` はサーバーが自動生成します。
 - **リクエスト**: JSON オブジェクト
 
@@ -1895,6 +1897,8 @@ curl -X POST \
 - **エラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式が不正
   - 400 Bad Request (`validation_failed`): バリデーションエラーまたはジャンルが無効
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
   - 409 Conflict (`duplicate_official_idx`): `official_idx` が既に存在する
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
@@ -1968,14 +1972,14 @@ curl -X POST \
 
 ### DELETE `/internal/songs/worldsend/:displayid`
 - **認証**: Firebase Bearer 必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
