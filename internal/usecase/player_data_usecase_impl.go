@@ -545,192 +545,11 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
 func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, calculatedOverpowerSummary, error) {
-	counts := api_internal.PlayerDataCounts{}
-	skipped := make([]api_internal.SkippedRecord, 0, 4)
-
-	// バルクインサート用のバッファ
-	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(scores.Full))
-
-	for _, entry := range scores.Full {
-		counts.FullRecordsUpserted++
-
-		chart, song, _, err := resolveChart(entry, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve chart",
-				Details:    fmt.Sprintf("idx=%s, diff=%s, error=%s", entry.Idx, entry.Diff, err.Error()),
-			})
-			continue
-		}
-
-		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
-			counts.FullRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
-				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
-			})
-			continue
-		}
-
-		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			clearLampStr := "nil"
-			if entry.ClearLamp != nil {
-				clearLampStr = *entry.ClearLamp
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve clear_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
-			})
-			continue
-		}
-		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			comboLvStr := "nil"
-			if entry.ComboLv != nil {
-				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve combo_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
-			})
-			continue
-		}
-		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			fullChainStr := "nil"
-			if entry.FullChain != nil {
-				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve full_chain",
-				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
-			})
-			continue
-		}
-		slotID, err := resolveSlotID(entry.Slot, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			slotStr := "nil"
-			if entry.Slot != nil {
-				slotStr = *entry.Slot
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve slot",
-				Details:    fmt.Sprintf("idx=%s (%s), slot=%s, error=%s", entry.Idx, song.Title, slotStr, err.Error()),
-			})
-			continue
-		}
-
-		// バルクインサート用のバッファに追加
-		fullRecordsToUpsert = append(fullRecordsToUpsert, repository.PlayerRecordForUpsert{
-			PlayerID: playerID,
-			ChartID:  chart.ID,
-			State: repository.PlayerRecordState{
-				Score:       entry.Score,
-				ClearLampID: clearLampID,
-				ComboLampID: comboLampID,
-				FullChainID: fullChainID,
-				SlotID:      slotID,
-				SlotOrder:   entry.Order,
-				UpdatedAt:   updatedAt,
-			},
-		})
-	}
-
-	// バルクインサート用のバッファ
-	worldsendRecordsToUpsert := make([]repository.WorldsendRecordForUpsert, 0, len(scores.Worldsend))
-
-	for _, entry := range scores.Worldsend {
-		counts.WorldsendRecordsUpserted++
-
-		chart, song, err := resolveWorldsendChart(entry, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve worldsend chart",
-				Details:    fmt.Sprintf("idx=%s, error=%s", entry.Idx, err.Error()),
-			})
-			continue
-		}
-
-		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
-			counts.WorldsendRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
-				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
-			})
-			continue
-		}
-
-		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			clearLampStr := "nil"
-			if entry.ClearLamp != nil {
-				clearLampStr = *entry.ClearLamp
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve clear_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
-			})
-			continue
-		}
-		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			comboLvStr := "nil"
-			if entry.ComboLv != nil {
-				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve combo_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
-			})
-			continue
-		}
-		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			fullChainStr := "nil"
-			if entry.FullChain != nil {
-				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve full_chain",
-				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
-			})
-			continue
-		}
-
-		// バルクインサート用のバッファに追加
-		worldsendRecordsToUpsert = append(worldsendRecordsToUpsert, repository.WorldsendRecordForUpsert{
-			PlayerID: playerID,
-			ChartID:  chart.ID,
-			State: repository.WorldsendRecordState{
-				Score:       entry.Score,
-				ClearLampID: clearLampID,
-				ComboLampID: comboLampID,
-				FullChainID: fullChainID,
-				UpdatedAt:   updatedAt,
-			},
-		})
-	}
+	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Full, masters, updatedAt)
+	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
+	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
+	counts.WorldsendRecordsSkipped = worldsendCounts.WorldsendRecordsSkipped
+	skipped = append(skipped, worldsendSkipped...)
 
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
@@ -748,6 +567,177 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	}
 
 	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal), nil
+}
+
+type resolvedLampIDs struct {
+	clearLampID int
+	comboLampID int
+	fullChainID int
+}
+
+func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []repository.PlayerRecordForUpsert) {
+	counts := api_internal.PlayerDataCounts{}
+	skipped := make([]api_internal.SkippedRecord, 0, len(entries))
+	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(entries))
+
+	for _, entry := range entries {
+		counts.FullRecordsUpserted++
+
+		chart, song, _, err := resolveChart(entry, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "full",
+				Reason:     "failed to resolve chart",
+				Details:    fmt.Sprintf("idx=%s, diff=%s, error=%s", entry.Idx, entry.Diff, err.Error()),
+			})
+			continue
+		}
+
+		if skippedRecord, ok := validateScoreRange("full", entry, song); ok {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, skippedRecord)
+			continue
+		}
+
+		lampIDs, skippedRecord := resolveCommonLampIDs("full", entry, song, masters)
+		if skippedRecord != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, *skippedRecord)
+			continue
+		}
+
+		slotID, err := resolveSlotID(entry.Slot, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, newResolveSkippedRecord("full", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
+			continue
+		}
+
+		fullRecordsToUpsert = append(fullRecordsToUpsert, repository.PlayerRecordForUpsert{
+			PlayerID: playerID,
+			ChartID:  chart.ID,
+			State: repository.PlayerRecordState{
+				Score:       entry.Score,
+				ClearLampID: lampIDs.clearLampID,
+				ComboLampID: lampIDs.comboLampID,
+				FullChainID: lampIDs.fullChainID,
+				SlotID:      slotID,
+				SlotOrder:   entry.Order,
+				UpdatedAt:   updatedAt,
+			},
+		})
+	}
+
+	return counts, skipped, fullRecordsToUpsert
+}
+
+func applyWorldsendScores(playerID int, entries []PlayerDataScoreEntry, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []repository.WorldsendRecordForUpsert) {
+	counts := api_internal.PlayerDataCounts{}
+	skipped := make([]api_internal.SkippedRecord, 0, len(entries))
+	worldsendRecordsToUpsert := make([]repository.WorldsendRecordForUpsert, 0, len(entries))
+
+	for _, entry := range entries {
+		counts.WorldsendRecordsUpserted++
+
+		chart, song, err := resolveWorldsendChart(entry, masters)
+		if err != nil {
+			counts.WorldsendRecordsSkipped++
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "worldsend",
+				Reason:     "failed to resolve worldsend chart",
+				Details:    fmt.Sprintf("idx=%s, error=%s", entry.Idx, err.Error()),
+			})
+			continue
+		}
+
+		if skippedRecord, ok := validateScoreRange("worldsend", entry, song); ok {
+			counts.WorldsendRecordsSkipped++
+			skipped = append(skipped, skippedRecord)
+			continue
+		}
+
+		lampIDs, skippedRecord := resolveCommonLampIDs("worldsend", entry, song, masters)
+		if skippedRecord != nil {
+			counts.WorldsendRecordsSkipped++
+			skipped = append(skipped, *skippedRecord)
+			continue
+		}
+
+		worldsendRecordsToUpsert = append(worldsendRecordsToUpsert, repository.WorldsendRecordForUpsert{
+			PlayerID: playerID,
+			ChartID:  chart.ID,
+			State: repository.WorldsendRecordState{
+				Score:       entry.Score,
+				ClearLampID: lampIDs.clearLampID,
+				ComboLampID: lampIDs.comboLampID,
+				FullChainID: lampIDs.fullChainID,
+				UpdatedAt:   updatedAt,
+			},
+		})
+	}
+
+	return counts, skipped, worldsendRecordsToUpsert
+}
+
+func validateScoreRange(recordType string, entry PlayerDataScoreEntry, song entity.PlayerDataSong) (api_internal.SkippedRecord, bool) {
+	if entry.Score >= minScoreValue && entry.Score <= maxScoreValue {
+		return api_internal.SkippedRecord{}, false
+	}
+
+	return api_internal.SkippedRecord{
+		RecordType: recordType,
+		Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
+		Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
+	}, true
+}
+
+func resolveCommonLampIDs(recordType string, entry PlayerDataScoreEntry, song entity.PlayerDataSong, masters *playerDataMaster) (resolvedLampIDs, *api_internal.SkippedRecord) {
+	clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "clear_lamp", "clear_lamp", entry, song, optionalStringValue(entry.ClearLamp), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "combo_lamp", "combo_lv", entry, song, optionalIntValue(entry.ComboLv), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	fullChainID, err := resolveFullChainID(entry.FullChain, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "full_chain", "full_chain", entry, song, optionalIntValue(entry.FullChain), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	return resolvedLampIDs{
+		clearLampID: clearLampID,
+		comboLampID: comboLampID,
+		fullChainID: fullChainID,
+	}, nil
+}
+
+func newResolveSkippedRecord(recordType, reasonField, detailField string, entry PlayerDataScoreEntry, song entity.PlayerDataSong, value string, err error) api_internal.SkippedRecord {
+	return api_internal.SkippedRecord{
+		RecordType: recordType,
+		Reason:     fmt.Sprintf("failed to resolve %s", reasonField),
+		Details:    fmt.Sprintf("idx=%s (%s), %s=%s, error=%s", entry.Idx, song.Title, detailField, value, err.Error()),
+	}
+}
+
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return "nil"
+	}
+	return *value
+}
+
+func optionalIntValue(value *int) string {
+	if value == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%d", *value)
 }
 
 func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart, maxOverpowerTotal float64) calculatedOverpowerSummary {

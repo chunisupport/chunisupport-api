@@ -75,7 +75,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-008** | **Medium** | `applyScores` が巨大で重複も多い | 通常譜面とWORLD'S END譜面の分岐が長大で、解決ロジックも類似しています。分割余地が大きい状態です。 |
 | **UC-011** | **Medium** | `Service` / `Usecase` 命名が混在 | `NewAPITokenService`, `NewUserService`, `NewSongService`, `NewPlayerDataService` と `NewAuthUsecase`, `NewGoalUsecase` などが混在しています。 |
 | **UC-013** | **Medium** | `goalUsecase.Update` が非トランザクション | `Create` は `tm.Transactional` を使う一方、`Update` は `u.db` へ直接アクセスしています。 |
 
