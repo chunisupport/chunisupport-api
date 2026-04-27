@@ -90,12 +90,6 @@
 
 ---
 
-## 補足
-
-- Firebase 認証への移行で、Cookie セッション前提の CSRF、`password_hash`、`user_recovery_codes`、旧 `auth_usecase_impl.go` に依存した指摘は現状と一致しなくなったため削除しました。
-- 逆に、`TODO` 件数や `#nosec` 箇所、`song_repository_impl.go` のVO変換エラー無視のように、**根拠は同じテーマでも現行コード上の実態に合わせて記述を更新**しています。
-- 2026-04-26時点のOWASP/CWE観点の追加確認では、`govulncheck` はローカル未導入でしたが、CIでは特に問題として検出されていない前提です。
-
 ## まとめ
 
 - 優先度が高いのは、**Goal更新の非トランザクション** と **Domain層の `sqlx` 依存** です。
