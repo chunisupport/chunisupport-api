@@ -69,7 +69,6 @@
 | **INFRA-005** | **Low** | `validation.go` がContext非対応 | `ValidateRequiredData` / `GetTableStats` は `context.Context` を受け取らず、`db.Get` を使っています。起動時専用でも、I/O規約の一貫性は崩れています。 |
 | **INFRA-007** | **Medium** | `FindAllWithPlayer` と `FindAllWithPlayerForAdmin` の重複 | `internal/infra/repository/user_repository_impl.go` で、クエリ構築・LIKE検索・rows処理がかなり重複しています。 |
 | **INFRA-009** | **Medium** | 譜面定数・ノーツ変換時のエラー無視 | `internal/infra/models/song_chart_model.go` の `FromChartEntity` では `ParseFloat` のエラーチェックは追加されましたが、`e.Notes.Value()` / `e.Const.Value()` のエラーは依然として `_` で破棄しています。`internal/infra/repository/song_repository_impl.go` の `toChartEntity` も `chartconstant.NewChartConstant` / `notes.NewNotes` のエラーを無視しています。 |
-| **INFRA-011** | **Medium** | `resolveExecutor` の暗黙nilフォールバック | `internal/infra/repository/player_data_repository_impl.go` で `exec == nil` 時に `r.db` へフォールバックします。トランザクション必須箇所で誤って外側DB実行に落ちる危険があります。 |
 | **INFRA-012** | **Low** | `ClassEmblem` 系の逆引きが線形探索 | `GetClassEmblemNameByID` / `GetClassEmblemBaseNameByID` / `GetAccountTypeNameByID` が map を持ちながら毎回線形探索しています。 |
 | **INFRA-016** | **Medium** | スコアVOからの変換でエラー無視 | `internal/infra/models/player_record_model.go` と `player_worldsend_record_model.go` が `Value()` のエラーを `_` で破棄し、`scoreVal.(int64)` の型アサーション前提で変換しています。`#nosec G115` コメントに範囲保証の根拠は記述されましたが、`scoreVal` が `nil` の場合（`Value()` が失敗した場合）にパニックが発生するリスクは残存しています。 |
 

@@ -229,7 +229,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
-		masters, loadErr := us.loadMasterData(ctx, tx, payload)
+		masters, loadErr := us.loadMasterData(ctx, payload)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -300,7 +300,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 }
 
 // loadMasterData はプレイヤーデータ登録に必要なマスターデータをキャッシュおよびDBから読み込みます。
-func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.Executor, payload *PlayerDataPayload) (*playerDataMaster, error) {
+func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *PlayerDataPayload) (*playerDataMaster, error) {
 	if us.masterCache == nil {
 		return nil, errors.New("master cache is not initialized")
 	}
@@ -341,7 +341,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.E
 	}
 	slices.Sort(idxList)
 
-	loaded, err := us.playerDataRepo.LoadMasterData(ctx, tx, idxList)
+	loaded, err := us.playerDataRepo.LoadMasterData(ctx, idxList)
 	if err != nil {
 		return nil, err
 	}
@@ -739,7 +739,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, tx, repository.OverpowerTargetFilter{
+	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
 		ExcludeWorldsend: true,
 		ExcludeDeleted:   true,
 	})

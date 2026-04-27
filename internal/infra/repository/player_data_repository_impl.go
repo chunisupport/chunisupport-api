@@ -24,8 +24,9 @@ func NewPlayerDataRepository(db *sqlx.DB) repository.PlayerDataRepository {
 }
 
 // LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
-func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec repository.Executor, officialIdxList []string) (*repository.PlayerDataMaster, error) {
-	executor := r.resolveExecutor(exec)
+// songs/charts/worldsend_chartsの読み取りのみのためトランザクション外で呼び出せます。
+func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
+	executor := r.db
 	result := &repository.PlayerDataMaster{
 		Songs:             make(map[string]entity.PlayerDataSong),
 		ChartsByKey:       make(map[string]entity.PlayerDataChart),
@@ -112,8 +113,12 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec reposito
 }
 
 // SavePlayerData はプレイヤーデータを一括で保存します。
+// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。
 func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec repository.Executor, input repository.PlayerDataSaveInput) error {
-	executor := r.resolveExecutor(exec)
+	if exec == nil {
+		return fmt.Errorf("SavePlayerData requires a non-nil executor: must be called within a transaction")
+	}
+	executor := exec
 
 	if err := r.saveFullRecords(ctx, executor, input.FullRecords); err != nil {
 		return fmt.Errorf("failed to save player records (count=%d): %w", len(input.FullRecords), err)
@@ -127,8 +132,9 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 }
 
 // GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
-func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
-	executor := r.resolveExecutor(exec)
+// songs/chartsの読み取りのみのためトランザクション外で呼び出せます。
+func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	executor := r.db
 
 	where := make([]string, 0, 2)
 	if filter.ExcludeWorldsend {
@@ -330,11 +336,4 @@ func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, 
 	}
 
 	return nil
-}
-
-func (r *playerDataRepository) resolveExecutor(exec repository.Executor) repository.Executor {
-	if exec != nil {
-		return exec
-	}
-	return r.db
 }
