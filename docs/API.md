@@ -216,7 +216,7 @@
 
 ### POST `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須
-- **説明**: 自分のAPIトークンを新規発行します。1ユーザーあたり最大10個まで発行できます。`name` は15文字以内です。未指定または空白のみの場合は既定名 `API Key` を使用します。
+- **説明**: 自分のAPIトークンを新規発行します。1ユーザーあたり最大10個まで発行できます。`name` は15文字以内です。リクエストボディ未指定、または`name`が未指定・空白のみの場合は既定名 `API Key` を使用します。
 - **リクエスト**:
 
 ```json
@@ -238,7 +238,7 @@
 
 トークンはレスポンスでのみ平文が取得できます。
 - **主なエラー**:
-  - 400 Bad Request (`invalid_api_token_name`): `name` が15文字を超過
+  - 422 Unprocessable Entity (`validation_failed`): `name` が15文字を超過（`details`にフィールド別の理由を返却）
   - 400 Bad Request (`api_token_limit_exceeded`): 発行済みAPIトークンが10個に到達
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
 

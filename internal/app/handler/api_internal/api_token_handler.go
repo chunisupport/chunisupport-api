@@ -24,7 +24,7 @@ type apiTokenListResponse struct {
 }
 
 type apiTokenGenerateRequest struct {
-	Name string `json:"name"`
+	Name string `json:"name" validate:"max=15"`
 }
 
 type apiTokenGenerateResponse struct {
@@ -73,10 +73,11 @@ func (h *APITokenHandler) Generate(c echo.Context) error {
 	}
 
 	var req apiTokenGenerateRequest
-	if c.Request().ContentLength != 0 {
-		if err := apphandler.BindStrictJSON(c, &req); err != nil {
-			return apierror.ErrBadRequest.WithInternal(err)
-		}
+	if err := apphandler.BindOptionalStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	rawToken, token, err := h.usecase.Generate(c.Request().Context(), user.ID, req.Name)

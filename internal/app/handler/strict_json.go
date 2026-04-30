@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,6 +15,18 @@ import (
 // BindStrictJSON は echo.Context からヘッダー/ボディを取り出して厳格なJSONデコードを行います。
 func BindStrictJSON(c echo.Context, out any) error {
 	return DecodeStrictJSON(c.Request().Body, c.Request().Header, out)
+}
+
+// BindOptionalStrictJSON は空ボディを許容し、ボディがある場合だけ厳格なJSONデコードを行います。
+func BindOptionalStrictJSON(c echo.Context, out any) error {
+	reader := bufio.NewReader(c.Request().Body)
+	if _, err := reader.Peek(1); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	return DecodeStrictJSON(reader, c.Request().Header, out)
 }
 
 // ValidateJSONContentType は Content-Type が application/json かを検証します。

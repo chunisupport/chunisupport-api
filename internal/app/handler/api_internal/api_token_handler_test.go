@@ -5,12 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -159,6 +161,46 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"token":"plain-token","item":{"id":11,"name":"API Key","created_at":"2026-04-16T12:34:56Z"}}`, rec.Body.String())
 		mockService.AssertExpectations(t)
+	})
+
+	t.Run("ContentLengthが不明なJSONボディでも名前を読み取る", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", strings.NewReader(`{"name":"外部連携"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 10}
+		c.Set("userEntity", user)
+
+		createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+		mockService.On("Generate", mock.Anything, user.ID, "外部連携").Return("plain-token", &entity.APIToken{
+			ID:        12,
+			UserID:    user.ID,
+			Name:      "外部連携",
+			CreatedAt: createdAt,
+		}, nil).Once()
+
+		err := h.Generate(c)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"token":"plain-token","item":{"id":12,"name":"外部連携","created_at":"2026-04-16T12:34:56Z"}}`, rec.Body.String())
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("名前が長すぎる場合はフィールド固有の詳細を返す", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", strings.NewReader(`{"name":"1234567890123456"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 10}
+		c.Set("userEntity", user)
+
+		err := h.Generate(c)
+		assert.Error(t, err)
+		middleware.CustomHTTPErrorHandler(err, c)
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+		assert.JSONEq(t, `{"error":{"status":422,"code":"validation_failed","message":"入力値の形式に誤りがあります。","details":[{"field":"name","message":"15文字以下で入力してください。"}]}}`, rec.Body.String())
 	})
 
 	t.Run("ユーザー情報が存在しない場合は401", func(t *testing.T) {
