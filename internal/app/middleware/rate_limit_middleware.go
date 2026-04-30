@@ -128,10 +128,12 @@ func (s *FixedWindowStore) Cleanup() {
 
 // APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
 // ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
+// APIキー単位の制限に加えて、同一ユーザーの複数キー合算にも3倍の制限が適用されます。
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
 // このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
 func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
-	store := newFixedWindowStoreWithCleanup(window)
+	tokenStore := newFixedWindowStoreWithCleanup(window)
+	userStore := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -154,24 +156,30 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 				return apierror.ErrUnauthorized
 			}
 
-			// APIトークンIDを識別子として使用
-			identifier := strconv.FormatInt(apiToken.ID, 10)
-
 			// ADMINかどうかで制限数を変更
-			limit := normalLimit
+			tokenLimit := normalLimit
 			if user.AccountTypeID == info.AccountTypeAdmin {
-				limit = adminLimit
+				tokenLimit = adminLimit
 			}
+			userLimit := tokenLimit * info.APIRateLimitUserMultiplier
 
-			// レートリミットチェック
-			allowed, remaining, resetTime := store.Allow(identifier, limit)
+			// APIキー単位のレートリミットチェック
+			tokenIdentifier := strconv.FormatInt(apiToken.ID, 10)
+			tokenAllowed, remaining, resetTime := tokenStore.Allow(tokenIdentifier, tokenLimit)
 
 			// ヘッダーを設定
-			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
+			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(tokenLimit))
 			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
 
-			if !allowed {
+			if !tokenAllowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			// ユーザー単位のレートリミットチェック
+			userIdentifier := strconv.Itoa(user.ID)
+			userAllowed, _, _ := userStore.Allow(userIdentifier, userLimit)
+			if !userAllowed {
 				return apierror.ErrTooManyRequests
 			}
 

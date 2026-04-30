@@ -28,9 +28,10 @@ const (
 	TheoreticalOverpowerBonus   = 5.0
 
 	// レートリミット設定: 外部API v1
-	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）
-	APIRateLimitAdminRequests = 150000           // ADMINユーザーのリクエスト制限（15分間）
-	APIRateLimitWindow        = 15 * time.Minute // レートリミットのウィンドウ期間
+	APIRateLimitRequests       = 150              // 一般ユーザーのリクエスト制限（15分間）
+	APIRateLimitAdminRequests  = 150000           // ADMINユーザーのリクエスト制限（15分間）
+	APIRateLimitUserMultiplier = 3                // ユーザー単位制限はAPIキー単位制限の3倍
+	APIRateLimitWindow         = 15 * time.Minute // レートリミットのウィンドウ期間
 
 	// レートリミット設定: 認証エンドポイント（IPベース）
 	LoginRateLimitRequests          = 10              // ログインエンドポイントのリクエスト制限（1分間）

@@ -336,6 +336,73 @@ func TestAPIRateLimitMiddleware_DifferentTokensHaveSeparateLimits(t *testing.T) 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestAPIRateLimitMiddleware_UserLimitedAcrossTokens(t *testing.T) {
+	tests := []struct {
+		name              string
+		user              *entity.User
+		tokenLimit        int
+		adminTokenLimit   int
+		expectedUserLimit int
+	}{
+		{
+			name: "一般ユーザーはAPIキー単位制限の3倍でユーザー単位制限を受ける",
+			user: &entity.User{
+				ID:            600,
+				AccountTypeID: info.AccountTypePlayer,
+			},
+			tokenLimit:        2,
+			adminTokenLimit:   3,
+			expectedUserLimit: 6,
+		},
+		{
+			name: "ADMINユーザーはADMIN用APIキー単位制限の3倍でユーザー単位制限を受ける",
+			user: &entity.User{
+				ID:            700,
+				AccountTypeID: info.AccountTypeAdmin,
+			},
+			tokenLimit:        2,
+			adminTokenLimit:   3,
+			expectedUserLimit: 9,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := setupEchoWithErrorHandler(t)
+			middleware := APIRateLimitMiddleware(tt.tokenLimit, tt.adminTokenLimit, 1*time.Minute)
+			handler := middleware(func(c echo.Context) error {
+				return c.String(http.StatusOK, "OK")
+			})
+
+			for i := 0; i < tt.expectedUserLimit; i++ {
+				req := httptest.NewRequest(http.MethodGet, "/", nil)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				c.Set("userEntity", tt.user)
+				c.Set("apiToken", &entity.APIToken{ID: int64(1000 + i)})
+
+				err := handler(c)
+				if err != nil {
+					e.HTTPErrorHandler(err, c)
+				}
+				assert.Equal(t, http.StatusOK, rec.Code)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set("userEntity", tt.user)
+			c.Set("apiToken", &entity.APIToken{ID: int64(2000 + tt.user.ID)})
+
+			err := handler(c)
+			if err != nil {
+				e.HTTPErrorHandler(err, c)
+			}
+			assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+		})
+	}
+}
+
 func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 	// ユーザー情報がない場合は認証エラー
 	e := setupEchoWithErrorHandler(t)
