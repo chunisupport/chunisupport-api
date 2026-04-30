@@ -24,7 +24,7 @@ type RateLimitConfig struct {
 type rateLimitEntry struct {
 	Count       int       // 現在のウィンドウ内でのリクエスト数
 	WindowStart time.Time // 現在のウィンドウの開始時刻
-	Limit       int       // このエントリの制限数（ADMINは150000、その他は150）
+	Limit       int       // このエントリの制限数
 }
 
 // FixedWindowStore はFixed Window方式のレートリミットストアです
@@ -127,12 +127,11 @@ func (s *FixedWindowStore) Cleanup() {
 }
 
 // APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
-// ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
-// APIキー単位の制限に加えて、同一ユーザーの複数キー合算にも3倍の制限が適用されます。
+// ADMINアカウントは300,000回/15分、その他のアカウントは300回/15分の制限が適用されます。
+// 同一ユーザーの複数キー合算にユーザー単位の制限が適用されます。
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
 // このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
 func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
-	tokenStore := newFixedWindowStoreWithCleanup(window)
 	userStore := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -147,38 +146,21 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 				return apierror.ErrUnauthorized
 			}
 
-			tokenObj := c.Get("apiToken")
-			if tokenObj == nil {
-				return apierror.ErrUnauthorized
-			}
-			apiToken, ok := tokenObj.(*entity.APIToken)
-			if !ok || apiToken.ID <= 0 {
-				return apierror.ErrUnauthorized
-			}
-
 			// ADMINかどうかで制限数を変更
-			tokenLimit := normalLimit
+			limit := normalLimit
 			if user.AccountTypeID == info.AccountTypeAdmin {
-				tokenLimit = adminLimit
-			}
-			userLimit := tokenLimit * info.APIRateLimitUserMultiplier
-
-			// APIキー単位のレートリミットチェック
-			tokenIdentifier := strconv.FormatInt(apiToken.ID, 10)
-			tokenAllowed, remaining, resetTime := tokenStore.Allow(tokenIdentifier, tokenLimit)
-
-			// ヘッダーを設定
-			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(tokenLimit))
-			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
-			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
-
-			if !tokenAllowed {
-				return apierror.ErrTooManyRequests
+				limit = adminLimit
 			}
 
 			// ユーザー単位のレートリミットチェック
 			userIdentifier := strconv.Itoa(user.ID)
-			userAllowed, _, _ := userStore.Allow(userIdentifier, userLimit)
+			userAllowed, remaining, resetTime := userStore.Allow(userIdentifier, limit)
+
+			// ヘッダーを設定
+			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
+			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+
 			if !userAllowed {
 				return apierror.ErrTooManyRequests
 			}

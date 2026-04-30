@@ -333,7 +333,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	// api.chunisupport.net/v1
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
-	// レートリミット: ADMINは15分150,000回、その他は15分150回
+	// レートリミット: ADMINは15分300,000回、その他は15分300回
 	apiV1.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
 		info.APIRateLimitAdminRequests,

@@ -2295,7 +2295,7 @@ curl -X POST \
 ## 公開API `/v1`
 
 公開APIはAPIトークン認証を使用します。トークンは `Authorization: Bearer <token>` ヘッダーで送信してください。
-レートリミットはAPIキー単位とユーザー単位の両方で適用されます。一般ユーザーはAPIキー単位で15分150回、ユーザー単位で15分450回です。ADMINユーザーはAPIキー単位で15分150,000回、ユーザー単位で15分450,000回です。
+レートリミットはユーザー単位で適用されます。一般ユーザーは15分300回、ADMINユーザーは15分300,000回です。
 
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
@@ -2623,7 +2623,7 @@ curl -X POST \
 ## chunirec互換API `/compat/chunirec/2.0`
 
 chunirec互換APIはchunirecとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
-レートリミットは公開API `/v1` と同じく、APIキー単位とユーザー単位の両方で適用されます。
+レートリミットは公開API `/v1` と同じく、ユーザー単位で適用されます。
 
 ### GET `/compat/chunirec/2.0/music/showall`
 - **認証**: APIトークン必須

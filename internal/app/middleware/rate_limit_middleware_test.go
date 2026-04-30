@@ -90,8 +90,8 @@ func performUserRateLimitRequest(t *testing.T, e *echo.Echo, handler echo.Handle
 	return rec
 }
 
-func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
-	// ADMINユーザーはレートリミットを受けない
+func TestAPIRateLimitMiddleware_AdminUsesAdminLimit(t *testing.T) {
+	// ADMINユーザーはADMIN用の制限値が適用される
 	e := setupEchoWithErrorHandler(t)
 
 	// normalLimit=2, adminLimit=10000
@@ -106,7 +106,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	// ADMINは通常の制限（2回）を超えてもリクエストできる
+	// ADMINは一般ユーザーの制限（2回）を超えてもADMIN用制限まではリクエストできる
 	for i := 0; i < 10; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
@@ -286,90 +286,40 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-func TestAPIRateLimitMiddleware_DifferentTokensHaveSeparateLimits(t *testing.T) {
-	e := setupEchoWithErrorHandler(t)
-
-	middleware := APIRateLimitMiddleware(1, 10000, 1*time.Minute)
-	user := &entity.User{
-		ID:            500,
-		AccountTypeID: info.AccountTypePlayer,
-	}
-
-	handler := middleware(func(c echo.Context) error {
-		return c.String(http.StatusOK, "OK")
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set("userEntity", user)
-	c.Set("apiToken", &entity.APIToken{ID: 501})
-
-	err := handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
-	assert.Equal(t, http.StatusOK, rec.Code)
-
-	req = httptest.NewRequest(http.MethodGet, "/", nil)
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
-	c.Set("userEntity", user)
-	c.Set("apiToken", &entity.APIToken{ID: 501})
-
-	err = handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
-	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
-
-	req = httptest.NewRequest(http.MethodGet, "/", nil)
-	rec = httptest.NewRecorder()
-	c = e.NewContext(req, rec)
-	c.Set("userEntity", user)
-	c.Set("apiToken", &entity.APIToken{ID: 502})
-
-	err = handler(c)
-	if err != nil {
-		e.HTTPErrorHandler(err, c)
-	}
-	assert.Equal(t, http.StatusOK, rec.Code)
-}
-
 func TestAPIRateLimitMiddleware_UserLimitedAcrossTokens(t *testing.T) {
 	tests := []struct {
 		name              string
 		user              *entity.User
-		tokenLimit        int
-		adminTokenLimit   int
+		normalLimit       int
+		adminLimit        int
 		expectedUserLimit int
 	}{
 		{
-			name: "一般ユーザーはAPIキー単位制限の3倍でユーザー単位制限を受ける",
+			name: "一般ユーザーはユーザー単位制限を複数キー合算で受ける",
 			user: &entity.User{
 				ID:            600,
 				AccountTypeID: info.AccountTypePlayer,
 			},
-			tokenLimit:        2,
-			adminTokenLimit:   3,
-			expectedUserLimit: 6,
+			normalLimit:       2,
+			adminLimit:        3,
+			expectedUserLimit: 2,
 		},
 		{
-			name: "ADMINユーザーはADMIN用APIキー単位制限の3倍でユーザー単位制限を受ける",
+			name: "ADMINユーザーはADMIN用ユーザー単位制限を複数キー合算で受ける",
 			user: &entity.User{
 				ID:            700,
 				AccountTypeID: info.AccountTypeAdmin,
 			},
-			tokenLimit:        2,
-			adminTokenLimit:   3,
-			expectedUserLimit: 9,
+			normalLimit:       2,
+			adminLimit:        3,
+			expectedUserLimit: 3,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := setupEchoWithErrorHandler(t)
-			middleware := APIRateLimitMiddleware(tt.tokenLimit, tt.adminTokenLimit, 1*time.Minute)
+			middleware := APIRateLimitMiddleware(tt.normalLimit, tt.adminLimit, 1*time.Minute)
 			handler := middleware(func(c echo.Context) error {
 				return c.String(http.StatusOK, "OK")
 			})
