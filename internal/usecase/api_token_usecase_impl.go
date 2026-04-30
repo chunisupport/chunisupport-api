@@ -28,14 +28,16 @@ var ErrAPITokenLimitExceeded = errors.New("api token limit exceeded")
 // apiTokenUsecase は APITokenUsecase の実装です。
 type apiTokenUsecase struct {
 	db        repository.Executor
+	tm        TransactionManager
 	tokenRepo repository.APITokenRepository
 	userRepo  repository.UserRepository
 }
 
 // NewAPITokenService はAPITokenUsecaseを生成します。
-func NewAPITokenService(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
+func NewAPITokenService(db repository.Executor, tm TransactionManager, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
 	return &apiTokenUsecase{
 		db:        db,
+		tm:        tm,
 		tokenRepo: tokenRepo,
 		userRepo:  userRepo,
 	}
@@ -46,14 +48,6 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int, name string
 	name, err := normalizeAPITokenName(name)
 	if err != nil {
 		return "", nil, err
-	}
-
-	count, err := us.tokenRepo.CountByUserID(ctx, us.db, userID)
-	if err != nil {
-		return "", nil, err
-	}
-	if count >= APITokenMaxCountPerUser {
-		return "", nil, ErrAPITokenLimitExceeded
 	}
 
 	buf := make([]byte, tokenByteLength)
@@ -71,7 +65,20 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int, name string
 		CreatedAt:   time.Now().UTC(),
 	}
 
-	if err := us.tokenRepo.Create(ctx, us.db, token); err != nil {
+	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if _, err := us.userRepo.FindByIDForUpdate(ctx, tx, userID); err != nil {
+			return err
+		}
+		count, err := us.tokenRepo.CountByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		if count >= APITokenMaxCountPerUser {
+			return ErrAPITokenLimitExceeded
+		}
+		return us.tokenRepo.Create(ctx, tx, token)
+	})
+	if err != nil {
 		return "", nil, err
 	}
 

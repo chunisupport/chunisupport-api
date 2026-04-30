@@ -86,8 +86,9 @@ func (s *stubAPITokenRepository) DeleteByUserID(ctx context.Context, exec reposi
 }
 
 type tokenStubUserRepository struct {
-	user    *entity.User
-	findErr error
+	user         *entity.User
+	findErr      error
+	lockedUserID int
 }
 
 func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -102,7 +103,11 @@ func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.
 }
 
 func (s *tokenStubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
-	return s.FindByID(ctx, exec, id)
+	s.lockedUserID = id
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	return &entity.User{ID: id}, nil
 }
 
 func (s *tokenStubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
@@ -133,10 +138,20 @@ func (s *tokenStubUserRepository) DeleteByID(_ context.Context, _ repository.Exe
 	return errors.New("not implemented")
 }
 
+type stubAPITokenTM struct {
+	called bool
+}
+
+func (s *stubAPITokenTM) Transactional(ctx context.Context, f func(tx repository.Executor) error) error {
+	s.called = true
+	return f(nil)
+}
+
 func TestAPITokenService_Generate(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	tm := &stubAPITokenTM{}
+	service := NewAPITokenService(nil, tm, tokenRepo, userRepo)
 
 	token, savedToken, err := service.Generate(context.Background(), 1, "メイン")
 	if err != nil {
@@ -161,12 +176,18 @@ func TestAPITokenService_Generate(t *testing.T) {
 	if savedToken.Name != "メイン" {
 		t.Fatalf("expected token name メイン, got %s", savedToken.Name)
 	}
+	if !tm.called {
+		t.Fatalf("expected transaction to be used")
+	}
+	if userRepo.lockedUserID != 1 {
+		t.Fatalf("expected user id 1 to be locked, got %d", userRepo.lockedUserID)
+	}
 }
 
 func TestAPITokenService_Generate_UsesDefaultNameWhenNameIsBlank(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	_, savedToken, err := service.Generate(context.Background(), 1, " ")
 	if err != nil {
@@ -181,7 +202,7 @@ func TestAPITokenService_Generate_UsesDefaultNameWhenNameIsBlank(t *testing.T) {
 func TestAPITokenService_Generate_RejectsTooLongName(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	_, _, err := service.Generate(context.Background(), 1, "1234567890123456")
 	if !errors.Is(err, ErrInvalidAPITokenName) {
@@ -192,11 +213,26 @@ func TestAPITokenService_Generate_RejectsTooLongName(t *testing.T) {
 func TestAPITokenService_Generate_RejectsWhenUserAlreadyHasTenTokens(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{count: 10}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	_, _, err := service.Generate(context.Background(), 1, "追加用")
 	if !errors.Is(err, ErrAPITokenLimitExceeded) {
 		t.Fatalf("expected ErrAPITokenLimitExceeded, got %v", err)
+	}
+}
+
+func TestAPITokenService_Generate_DoesNotCreateWhenUserLockFails(t *testing.T) {
+	expectedErr := errors.New("lock failed")
+	tokenRepo := &stubAPITokenRepository{}
+	userRepo := &tokenStubUserRepository{findErr: expectedErr}
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
+
+	_, _, err := service.Generate(context.Background(), 1, "メイン")
+	if err != expectedErr {
+		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+	if tokenRepo.savedToken != nil {
+		t.Fatalf("expected token not to be saved")
 	}
 }
 
@@ -211,7 +247,7 @@ func TestAPITokenService_List(t *testing.T) {
 		}},
 	}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	tokens, err := service.List(context.Background(), 123)
 	if err != nil {
@@ -236,7 +272,7 @@ func TestAPITokenService_List(t *testing.T) {
 func TestAPITokenService_List_NotFound(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	tokens, err := service.List(context.Background(), 123)
 	if err != nil {
@@ -251,7 +287,7 @@ func TestAPITokenService_List_Error(t *testing.T) {
 	expectedErr := errors.New("find failed")
 	tokenRepo := &stubAPITokenRepository{userLookupErr: expectedErr}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	tokens, err := service.List(context.Background(), 123)
 	if err != expectedErr {
@@ -269,7 +305,7 @@ func TestAPITokenService_Validate(t *testing.T) {
 		lookupToken: &entity.APIToken{ID: 10, UserID: user.ID, HashedToken: hashed},
 	}
 	userRepo := &tokenStubUserRepository{user: user}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	gotUser, apiToken, err := service.Validate(context.Background(), "plain-token")
 	if err != nil {
@@ -311,7 +347,7 @@ func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			service := NewAPITokenService(nil, tc.tokenRepo, tc.userRepo)
+			service := NewAPITokenService(nil, &stubAPITokenTM{}, tc.tokenRepo, tc.userRepo)
 			_, _, err := service.Validate(context.Background(), tc.input)
 			if !errors.Is(err, ErrInvalidAPIToken) {
 				t.Fatalf("expected ErrInvalidAPIToken, got %v", err)
@@ -323,7 +359,7 @@ func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
 func TestAPITokenService_Delete(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	err := service.Delete(context.Background(), 123, 456)
 	if err != nil {
@@ -342,7 +378,7 @@ func TestAPITokenService_Delete_Error(t *testing.T) {
 	expectedErr := errors.New("delete failed")
 	tokenRepo := &stubAPITokenRepository{deleteErr: expectedErr}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenService(nil, &stubAPITokenTM{}, tokenRepo, userRepo)
 
 	err := service.Delete(context.Background(), 123, 456)
 	if err != expectedErr {
