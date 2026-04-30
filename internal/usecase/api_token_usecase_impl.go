@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -59,12 +58,7 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int, name string
 	plain := base64.RawURLEncoding.EncodeToString(buf)
 	hashed := hashToken(plain)
 
-	token := &entity.APIToken{
-		UserID:      userID,
-		Name:        name,
-		HashedToken: hashed,
-		CreatedAt:   time.Now().UTC(),
-	}
+	token := entity.NewAPIToken(userID, name, hashed)
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
 		if _, err := us.userRepo.FindByIDForUpdate(ctx, tx, userID); err != nil {
