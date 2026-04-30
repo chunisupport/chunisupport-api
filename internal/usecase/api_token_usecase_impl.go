@@ -7,14 +7,23 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 )
 
 const tokenByteLength = 32
+const apiTokenMaxNameLength = 15
+
+// APITokenMaxCountPerUser は1ユーザーが保持できるAPIトークン数の上限です。
+const APITokenMaxCountPerUser = 10
 
 var ErrInvalidAPIToken = errors.New("invalid API token")
+var ErrInvalidAPITokenName = errors.New("invalid API token name")
+var ErrAPITokenLimitExceeded = errors.New("api token limit exceeded")
 
 // apiTokenUsecase は APITokenUsecase の実装です。
 type apiTokenUsecase struct {
@@ -32,11 +41,24 @@ func NewAPITokenService(db repository.Executor, tokenRepo repository.APITokenRep
 	}
 }
 
-// Generate はユーザーに紐づくAPIトークンを新しく発行します。既存のトークンは置き換えられます。
-func (us *apiTokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
+// Generate はユーザーに紐づくAPIトークンを新しく発行します。
+func (us *apiTokenUsecase) Generate(ctx context.Context, userID int, name string) (string, *entity.APIToken, error) {
+	name, err := normalizeAPITokenName(name)
+	if err != nil {
+		return "", nil, err
+	}
+
+	count, err := us.tokenRepo.CountByUserID(ctx, us.db, userID)
+	if err != nil {
+		return "", nil, err
+	}
+	if count >= APITokenMaxCountPerUser {
+		return "", nil, ErrAPITokenLimitExceeded
+	}
+
 	buf := make([]byte, tokenByteLength)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
+	if _, err = rand.Read(buf); err != nil {
+		return "", nil, err
 	}
 
 	plain := base64.RawURLEncoding.EncodeToString(buf)
@@ -44,27 +66,21 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int) (string, er
 
 	token := &entity.APIToken{
 		UserID:      userID,
+		Name:        name,
 		HashedToken: hashed,
+		CreatedAt:   time.Now().UTC(),
 	}
 
-	if err := us.tokenRepo.CreateOrReplace(ctx, us.db, token); err != nil {
-		return "", err
+	if err := us.tokenRepo.Create(ctx, us.db, token); err != nil {
+		return "", nil, err
 	}
 
-	return plain, nil
+	return plain, token, nil
 }
 
-// GetStatus はユーザーに紐づくAPIトークンの状態を返します。未発行の場合は nil を返します。
-func (us *apiTokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
-	token, err := us.tokenRepo.FindByUserID(ctx, us.db, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrAPITokenNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return token, nil
+// List はユーザーに紐づくAPIトークン一覧を返します。
+func (us *apiTokenUsecase) List(ctx context.Context, userID int) ([]*entity.APIToken, error) {
+	return us.tokenRepo.FindByUserID(ctx, us.db, userID)
 }
 
 // Validate はAPIトークンを検証し、有効な場合はユーザーとトークン情報を返します。
@@ -93,8 +109,13 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 	return user, token, nil
 }
 
-// Delete はユーザーに紐づくAPIトークンを削除します。
-func (us *apiTokenUsecase) Delete(ctx context.Context, userID int) error {
+// Delete はユーザーに紐づく指定APIトークンを削除します。
+func (us *apiTokenUsecase) Delete(ctx context.Context, userID int, tokenID int64) error {
+	return us.tokenRepo.DeleteByID(ctx, us.db, userID, tokenID)
+}
+
+// DeleteAll はユーザーに紐づくAPIトークンをすべて削除します。
+func (us *apiTokenUsecase) DeleteAll(ctx context.Context, userID int) error {
 	return us.tokenRepo.DeleteByUserID(ctx, us.db, userID)
 }
 
@@ -102,4 +123,15 @@ func (us *apiTokenUsecase) Delete(ctx context.Context, userID int) error {
 func hashToken(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+func normalizeAPITokenName(name string) (string, error) {
+	normalized := strings.TrimSpace(name)
+	if normalized == "" {
+		return "APIキー", nil
+	}
+	if utf8.RuneCountInString(normalized) > apiTokenMaxNameLength {
+		return "", ErrInvalidAPITokenName
+	}
+	return normalized, nil
 }

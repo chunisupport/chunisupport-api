@@ -13,10 +13,11 @@ CREATE TABLE `achievement_types` (
 CREATE TABLE `api_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
+  `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'APIキー',
   `hashed_token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_api_tokens_user_id` (`user_id`),
+  KEY `idx_api_tokens_user_id` (`user_id`),
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
   CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

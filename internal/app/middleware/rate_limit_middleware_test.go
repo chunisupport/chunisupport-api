@@ -112,6 +112,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", adminUser)
+		c.Set("apiToken", &entity.APIToken{ID: 1})
 
 		err := handler(c)
 		if err != nil {
@@ -147,6 +148,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", playerUser)
+		c.Set("apiToken", &entity.APIToken{ID: 100})
 
 		err := handler(c)
 		if err != nil {
@@ -165,6 +167,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", playerUser)
+	c.Set("apiToken", &entity.APIToken{ID: 100})
 
 	err := handler(c)
 	if err != nil {
@@ -199,6 +202,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", editorUser)
+		c.Set("apiToken", &entity.APIToken{ID: 200})
 
 		err := handler(c)
 		if err != nil {
@@ -212,6 +216,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", editorUser)
+	c.Set("apiToken", &entity.APIToken{ID: 200})
 
 	err := handler(c)
 	if err != nil {
@@ -245,6 +250,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", user1)
+		c.Set("apiToken", &entity.APIToken{ID: 300})
 
 		err := handler(c)
 		if err != nil {
@@ -258,6 +264,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", user1)
+	c.Set("apiToken", &entity.APIToken{ID: 300})
 
 	err := handler(c)
 	if err != nil {
@@ -270,6 +277,57 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
 	c.Set("userEntity", user2)
+	c.Set("apiToken", &entity.APIToken{ID: 400})
+
+	err = handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestAPIRateLimitMiddleware_DifferentTokensHaveSeparateLimits(t *testing.T) {
+	e := setupEchoWithErrorHandler(t)
+
+	middleware := APIRateLimitMiddleware(1, 10000, 1*time.Minute)
+	user := &entity.User{
+		ID:            500,
+		AccountTypeID: info.AccountTypePlayer,
+	}
+
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", user)
+	c.Set("apiToken", &entity.APIToken{ID: 501})
+
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set("userEntity", user)
+	c.Set("apiToken", &entity.APIToken{ID: 501})
+
+	err = handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set("userEntity", user)
+	c.Set("apiToken", &entity.APIToken{ID: 502})
 
 	err = handler(c)
 	if err != nil {

@@ -145,8 +145,17 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 				return apierror.ErrUnauthorized
 			}
 
-			// ユーザーIDを識別子として使用
-			identifier := strconv.Itoa(user.ID)
+			tokenObj := c.Get("apiToken")
+			if tokenObj == nil {
+				return apierror.ErrUnauthorized
+			}
+			apiToken, ok := tokenObj.(*entity.APIToken)
+			if !ok || apiToken.ID <= 0 {
+				return apierror.ErrUnauthorized
+			}
+
+			// APIトークンIDを識別子として使用
+			identifier := strconv.FormatInt(apiToken.ID, 10)
 
 			// ADMINかどうかで制限数を変更
 			limit := normalLimit

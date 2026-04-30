@@ -11,17 +11,20 @@ import (
 )
 
 type stubAPITokenRepository struct {
-	savedToken    *entity.APIToken
-	createErr     error
-	userLookup    *entity.APIToken
-	userLookupErr error
-	lookupToken   *entity.APIToken
-	lookupErr     error
-	deletedUserID int
-	deleteErr     error
+	savedToken     *entity.APIToken
+	createErr      error
+	userLookup     []*entity.APIToken
+	userLookupErr  error
+	lookupToken    *entity.APIToken
+	lookupErr      error
+	count          int
+	countErr       error
+	deletedTokenID int64
+	deletedUserID  int
+	deleteErr      error
 }
 
-func (s *stubAPITokenRepository) CreateOrReplace(ctx context.Context, exec repository.Executor, token *entity.APIToken) error {
+func (s *stubAPITokenRepository) Create(ctx context.Context, exec repository.Executor, token *entity.APIToken) error {
 	if s.createErr != nil {
 		return s.createErr
 	}
@@ -30,15 +33,18 @@ func (s *stubAPITokenRepository) CreateOrReplace(ctx context.Context, exec repos
 	return nil
 }
 
-func (s *stubAPITokenRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.APIToken, error) {
+func (s *stubAPITokenRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.APIToken, error) {
 	if s.userLookupErr != nil {
 		return nil, s.userLookupErr
 	}
-	if s.userLookup == nil || s.userLookup.UserID != userID {
-		return nil, repository.ErrAPITokenNotFound
+	tokens := make([]*entity.APIToken, 0, len(s.userLookup))
+	for _, token := range s.userLookup {
+		if token.UserID == userID {
+			tokenCopy := *token
+			tokens = append(tokens, &tokenCopy)
+		}
 	}
-	tokenCopy := *s.userLookup
-	return &tokenCopy, nil
+	return tokens, nil
 }
 
 func (s *stubAPITokenRepository) FindByHashedToken(ctx context.Context, exec repository.Executor, hashedToken string) (*entity.APIToken, error) {
@@ -53,6 +59,22 @@ func (s *stubAPITokenRepository) FindByHashedToken(ctx context.Context, exec rep
 	}
 	tokenCopy := *s.lookupToken
 	return &tokenCopy, nil
+}
+
+func (s *stubAPITokenRepository) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {
+	if s.countErr != nil {
+		return 0, s.countErr
+	}
+	return s.count, nil
+}
+
+func (s *stubAPITokenRepository) DeleteByID(ctx context.Context, exec repository.Executor, userID int, tokenID int64) error {
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	s.deletedUserID = userID
+	s.deletedTokenID = tokenID
+	return nil
 }
 
 func (s *stubAPITokenRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
@@ -116,7 +138,7 @@ func TestAPITokenService_Generate(t *testing.T) {
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	token, err := service.Generate(context.Background(), 1)
+	token, savedToken, err := service.Generate(context.Background(), 1, "メイン")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,25 +158,70 @@ func TestAPITokenService_Generate(t *testing.T) {
 	if tokenRepo.savedToken.UserID != 1 {
 		t.Fatalf("expected user id 1, got %d", tokenRepo.savedToken.UserID)
 	}
+	if savedToken.Name != "メイン" {
+		t.Fatalf("expected token name メイン, got %s", savedToken.Name)
+	}
 }
 
-func TestAPITokenService_GetStatus(t *testing.T) {
-	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
-	tokenRepo := &stubAPITokenRepository{
-		userLookup: &entity.APIToken{
-			ID:        10,
-			UserID:    123,
-			CreatedAt: createdAt,
-		},
-	}
+func TestAPITokenService_Generate_UsesDefaultNameWhenNameIsBlank(t *testing.T) {
+	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	token, err := service.GetStatus(context.Background(), 123)
+	_, savedToken, err := service.Generate(context.Background(), 1, " ")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if savedToken.Name != "APIキー" {
+		t.Fatalf("expected default token name APIキー, got %s", savedToken.Name)
+	}
+}
+
+func TestAPITokenService_Generate_RejectsTooLongName(t *testing.T) {
+	tokenRepo := &stubAPITokenRepository{}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	_, _, err := service.Generate(context.Background(), 1, "1234567890123456")
+	if !errors.Is(err, ErrInvalidAPITokenName) {
+		t.Fatalf("expected ErrInvalidAPITokenName, got %v", err)
+	}
+}
+
+func TestAPITokenService_Generate_RejectsWhenUserAlreadyHasTenTokens(t *testing.T) {
+	tokenRepo := &stubAPITokenRepository{count: 10}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	_, _, err := service.Generate(context.Background(), 1, "追加用")
+	if !errors.Is(err, ErrAPITokenLimitExceeded) {
+		t.Fatalf("expected ErrAPITokenLimitExceeded, got %v", err)
+	}
+}
+
+func TestAPITokenService_List(t *testing.T) {
+	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+	tokenRepo := &stubAPITokenRepository{
+		userLookup: []*entity.APIToken{{
+			ID:        10,
+			UserID:    123,
+			Name:      "テスト",
+			CreatedAt: createdAt,
+		}},
+	}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenService(nil, tokenRepo, userRepo)
+
+	tokens, err := service.List(context.Background(), 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(tokens) != 1 {
+		t.Fatalf("expected 1 token, got %d", len(tokens))
+	}
+	token := tokens[0]
 	if token == nil {
 		t.Fatalf("expected token status")
 	}
@@ -166,32 +233,32 @@ func TestAPITokenService_GetStatus(t *testing.T) {
 	}
 }
 
-func TestAPITokenService_GetStatus_NotFound(t *testing.T) {
+func TestAPITokenService_List_NotFound(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	token, err := service.GetStatus(context.Background(), 123)
+	tokens, err := service.List(context.Background(), 123)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if token != nil {
-		t.Fatalf("expected nil token, got %#v", token)
+	if len(tokens) != 0 {
+		t.Fatalf("expected empty tokens, got %#v", tokens)
 	}
 }
 
-func TestAPITokenService_GetStatus_Error(t *testing.T) {
+func TestAPITokenService_List_Error(t *testing.T) {
 	expectedErr := errors.New("find failed")
 	tokenRepo := &stubAPITokenRepository{userLookupErr: expectedErr}
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	token, err := service.GetStatus(context.Background(), 123)
+	tokens, err := service.List(context.Background(), 123)
 	if err != expectedErr {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
 	}
-	if token != nil {
-		t.Fatalf("expected nil token, got %#v", token)
+	if tokens != nil {
+		t.Fatalf("expected nil tokens, got %#v", tokens)
 	}
 }
 
@@ -258,13 +325,16 @@ func TestAPITokenService_Delete(t *testing.T) {
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	err := service.Delete(context.Background(), 123)
+	err := service.Delete(context.Background(), 123, 456)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if tokenRepo.deletedUserID != 123 {
 		t.Fatalf("expected deletedUserID to be 123, got %d", tokenRepo.deletedUserID)
+	}
+	if tokenRepo.deletedTokenID != 456 {
+		t.Fatalf("expected deletedTokenID to be 456, got %d", tokenRepo.deletedTokenID)
 	}
 }
 
@@ -274,7 +344,7 @@ func TestAPITokenService_Delete_Error(t *testing.T) {
 	userRepo := &tokenStubUserRepository{}
 	service := NewAPITokenService(nil, tokenRepo, userRepo)
 
-	err := service.Delete(context.Background(), 123)
+	err := service.Delete(context.Background(), 123, 456)
 	if err != expectedErr {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
 	}

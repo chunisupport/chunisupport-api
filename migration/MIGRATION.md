@@ -35,6 +35,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
+    - `name`: トークンの表示名（15文字まで）。
     - `hashed_token`: トークンのハッシュ値。
     - `created_at`: 作成日時。
 
@@ -164,3 +165,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000011**: `players.overpower_value` の型を `DECIMAL(8,2)` → `DECIMAL(9,3)` へ、`players.overpower_percentage` の型を `DECIMAL(5,2)` → `DECIMAL(7,4)` へ変更。精度向上のため。
 - **000012**: Firebase 認証への一本化に伴い、`cleanup_expired_sessions` イベント、`sessions` テーブル、`user_recovery_codes` テーブル、および `users.password_hash` カラムを削除。破棄された旧認証データは down でも復元されず、ロールバックではスキーマのみ復元される。
 - **000013**: `player_records` の最新更新取得をプレイヤー単位で高速化するため、`idx_player_records_updated_at` を削除し、`player_records(player_id, updated_at DESC)` を追加。あわせて `player_worldsend_records` の単独 `updated_at` インデックス、`idx_goals_user_created_id` に包含される `idx_goals_user_id`、および不要になった `idx_songs_title` を削除した。
+- **000014**: `api_tokens` に15文字までの `name` カラムを追加し、`user_id` のユニーク制約を通常インデックスへ変更。1ユーザー最大10個のAPIトークンはアプリケーション層で制御する。

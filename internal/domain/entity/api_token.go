@@ -8,6 +8,7 @@ import (
 type APIToken struct {
 	ID          int64
 	UserID      int
+	Name        string
 	HashedToken string
 	CreatedAt   time.Time
 }

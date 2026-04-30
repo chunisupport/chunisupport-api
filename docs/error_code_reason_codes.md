@@ -36,6 +36,8 @@
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |
 | `api_token_not_found` | APIトークン未検出 |
+| `api_token_limit_exceeded` | APIトークン数上限超過 |
+| `invalid_api_token_name` | APIトークン名不正 |
 | `payload_too_large` | ペイロード過大 |
 | `unsupported_media_type` | Content-Type不正 |
 | `method_not_allowed` | HTTPメソッド不正 |

@@ -22,17 +22,20 @@ type mockAPITokenService struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenService) Generate(ctx context.Context, userID int) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
+func (m *mockAPITokenService) Generate(ctx context.Context, userID int, name string) (string, *entity.APIToken, error) {
+	args := m.Called(ctx, userID, name)
+	if args.Get(1) == nil {
+		return args.String(0), nil, args.Error(2)
+	}
+	return args.String(0), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenService) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (m *mockAPITokenService) List(ctx context.Context, userID int) ([]*entity.APIToken, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.APIToken), args.Error(1)
+	return args.Get(0).([]*entity.APIToken), args.Error(1)
 }
 
 func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
@@ -43,7 +46,12 @@ func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenService) Delete(ctx context.Context, userID int) error {
+func (m *mockAPITokenService) Delete(ctx context.Context, userID int, tokenID int64) error {
+	args := m.Called(ctx, userID, tokenID)
+	return args.Error(0)
+}
+
+func (m *mockAPITokenService) DeleteAll(ctx context.Context, userID int) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
@@ -54,7 +62,7 @@ func newAPITokenTestEcho() *echo.Echo {
 	return e
 }
 
-func TestAPITokenHandler_GetStatus(t *testing.T) {
+func TestAPITokenHandler_List(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockService := new(mockAPITokenService)
 	h := api_internal.NewAPITokenHandler(mockService)
@@ -67,32 +75,33 @@ func TestAPITokenHandler_GetStatus(t *testing.T) {
 		c.Set("userEntity", user)
 		createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
 
-		mockService.On("GetStatus", mock.Anything, user.ID).Return(&entity.APIToken{
+		mockService.On("List", mock.Anything, user.ID).Return([]*entity.APIToken{{
 			ID:        1,
 			UserID:    user.ID,
+			Name:      "テスト",
 			CreatedAt: createdAt,
-		}, nil).Once()
+		}}, nil).Once()
 
-		err := h.GetStatus(c)
+		err := h.List(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"has_token":true,"created_at":"2026-04-16T12:34:56Z"}`, rec.Body.String())
+		assert.JSONEq(t, `{"tokens":[{"id":1,"name":"テスト","created_at":"2026-04-16T12:34:56Z"}],"limit":10}`, rec.Body.String())
 		mockService.AssertExpectations(t)
 	})
 
-	t.Run("トークン未発行ならhas_token=falseを返す", func(t *testing.T) {
+	t.Run("トークン未発行なら空配列を返す", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		user := &entity.User{ID: 10}
 		c.Set("userEntity", user)
 
-		mockService.On("GetStatus", mock.Anything, user.ID).Return(nil, nil).Once()
+		mockService.On("List", mock.Anything, user.ID).Return([]*entity.APIToken{}, nil).Once()
 
-		err := h.GetStatus(c)
+		err := h.List(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"has_token":false,"created_at":null}`, rec.Body.String())
+		assert.JSONEq(t, `{"tokens":[],"limit":10}`, rec.Body.String())
 		mockService.AssertExpectations(t)
 	})
 
@@ -101,7 +110,7 @@ func TestAPITokenHandler_GetStatus(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		err := h.GetStatus(c)
+		err := h.List(c)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
@@ -114,9 +123,9 @@ func TestAPITokenHandler_GetStatus(t *testing.T) {
 		user := &entity.User{ID: 10}
 		c.Set("userEntity", user)
 
-		mockService.On("GetStatus", mock.Anything, user.ID).Return(nil, errors.New("failed")).Once()
+		mockService.On("List", mock.Anything, user.ID).Return(nil, errors.New("failed")).Once()
 
-		err := h.GetStatus(c)
+		err := h.List(c)
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
@@ -136,11 +145,18 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 		user := &entity.User{ID: 10}
 		c.Set("userEntity", user)
 
-		mockService.On("Generate", mock.Anything, user.ID).Return("plain-token", nil).Once()
+		createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+		mockService.On("Generate", mock.Anything, user.ID, "").Return("plain-token", &entity.APIToken{
+			ID:        11,
+			UserID:    user.ID,
+			Name:      "APIキー",
+			CreatedAt: createdAt,
+		}, nil).Once()
 
 		err := h.Generate(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"token":"plain-token","item":{"id":11,"name":"APIキー","created_at":"2026-04-16T12:34:56Z"}}`, rec.Body.String())
 		mockService.AssertExpectations(t)
 	})
 
@@ -162,7 +178,7 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 		user := &entity.User{ID: 10}
 		c.Set("userEntity", user)
 
-		mockService.On("Generate", mock.Anything, user.ID).Return("", errors.New("failed")).Once()
+		mockService.On("Generate", mock.Anything, user.ID, "").Return("", nil, errors.New("failed")).Once()
 
 		err := h.Generate(c)
 		apiErr, ok := err.(*apierror.APIError)
@@ -186,7 +202,10 @@ func TestAPITokenHandler_Delete(t *testing.T) {
 		user := &entity.User{ID: 42}
 		c.Set("userEntity", user)
 
-		mockService.On("Delete", mock.Anything, user.ID).Return(nil).Once()
+		c.SetParamNames("id")
+		c.SetParamValues("99")
+
+		mockService.On("Delete", mock.Anything, user.ID, int64(99)).Return(nil).Once()
 
 		err := h.Delete(c)
 		assert.NoError(t, err)
@@ -211,8 +230,10 @@ func TestAPITokenHandler_Delete(t *testing.T) {
 		c := e.NewContext(req, rec)
 		user := &entity.User{ID: 42}
 		c.Set("userEntity", user)
+		c.SetParamNames("id")
+		c.SetParamValues("99")
 
-		mockService.On("Delete", mock.Anything, user.ID).Return(errors.New("failed")).Once()
+		mockService.On("Delete", mock.Anything, user.ID, int64(99)).Return(errors.New("failed")).Once()
 
 		err := h.Delete(c)
 		apiErr, ok := err.(*apierror.APIError)
@@ -220,4 +241,23 @@ func TestAPITokenHandler_Delete(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
 		mockService.AssertExpectations(t)
 	})
+}
+
+func TestAPITokenHandler_DeleteAll(t *testing.T) {
+	e := newAPITokenTestEcho()
+	mockService := new(mockAPITokenService)
+	h := api_internal.NewAPITokenHandler(mockService)
+
+	req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	user := &entity.User{ID: 42}
+	c.Set("userEntity", user)
+
+	mockService.On("DeleteAll", mock.Anything, user.ID).Return(nil).Once()
+
+	err := h.DeleteAll(c)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	mockService.AssertExpectations(t)
 }

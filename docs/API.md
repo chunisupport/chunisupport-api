@@ -216,35 +216,67 @@
 
 ### POST `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須
-- **レスポンス**: 200 OK
+- **説明**: 自分のAPIトークンを新規発行します。1ユーザーあたり最大10個まで発行できます。`name` は15文字以内です。未指定または空白のみの場合は既定名を使用します。
+- **リクエスト**:
 
 ```json
-{"token":"plain-text-api-token"}
+{"name":"自宅PC"}
 ```
 
-トークンはレスポンスでのみ平文が取得できます。
-
-### GET `/internal/auth/api-tokens`
-- **認証**: Firebase Bearer 必須
 - **レスポンス**: 200 OK
 
 ```json
 {
-  "has_token": true,
-  "created_at": "2026-04-16T12:34:56Z"
+  "token": "plain-text-api-token",
+  "item": {
+    "id": 1,
+    "name": "自宅PC",
+    "created_at": "2026-04-16T12:34:56Z"
+  }
 }
 ```
 
-- APIトークンが未発行の場合は `has_token=false`、`created_at=null` を返します。
-- `created_at` は現在有効なAPIトークンの発行日時です。再発行した場合はその時刻に更新されます。
+トークンはレスポンスでのみ平文が取得できます。
+- **主なエラー**:
+  - 400 Bad Request (`invalid_api_token_name`): `name` が15文字を超過
+  - 400 Bad Request (`api_token_limit_exceeded`): 発行済みAPIトークンが10個に到達
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### GET `/internal/auth/api-tokens`
+- **認証**: Firebase Bearer 必須
+- **説明**: 自分のAPIトークン一覧を取得します。平文のトークン値は返しません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "tokens": [
+    {
+      "id": 1,
+      "name": "自宅PC",
+      "created_at": "2026-04-16T12:34:56Z"
+    }
+  ],
+  "limit": 10
+}
+```
+
+- APIトークンが未発行の場合は `tokens=[]` を返します。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
+### DELETE `/internal/auth/api-tokens/:id`
+- **認証**: Firebase Bearer 必須
+- **レスポンス**: 204 No Content
+- 自分の指定APIトークンを削除します。存在しないIDを指定した場合も204を返します。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): `id` が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
 ### DELETE `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須
 - **レスポンス**: 204 No Content
-- 自分のAPIトークンを削除します。トークンが存在しない場合でも204を返します。
+- 自分のAPIトークンをすべて削除します。トークンが存在しない場合でも204を返します。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
 

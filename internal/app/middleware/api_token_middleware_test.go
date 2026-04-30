@@ -20,17 +20,20 @@ type mockAPITokenService struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenService) Generate(ctx context.Context, userID int) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
+func (m *mockAPITokenService) Generate(ctx context.Context, userID int, name string) (string, *entity.APIToken, error) {
+	args := m.Called(ctx, userID, name)
+	if args.Get(1) == nil {
+		return args.String(0), nil, args.Error(2)
+	}
+	return args.String(0), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenService) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (m *mockAPITokenService) List(ctx context.Context, userID int) ([]*entity.APIToken, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.APIToken), args.Error(1)
+	return args.Get(0).([]*entity.APIToken), args.Error(1)
 }
 
 func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
@@ -41,7 +44,12 @@ func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenService) Delete(ctx context.Context, userID int) error {
+func (m *mockAPITokenService) Delete(ctx context.Context, userID int, tokenID int64) error {
+	args := m.Called(ctx, userID, tokenID)
+	return args.Error(0)
+}
+
+func (m *mockAPITokenService) DeleteAll(ctx context.Context, userID int) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }

@@ -218,9 +218,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuth)
+		authGroup.GET("/api-tokens", handlers.APIToken.List, firebaseAuth)
 		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuth)
-		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuth)
+		authGroup.DELETE("/api-tokens", handlers.APIToken.DeleteAll, firebaseAuth)
+		authGroup.DELETE("/api-tokens/:id", handlers.APIToken.Delete, firebaseAuth)
 	}
 
 	// api.chunisupport.net/internal/me

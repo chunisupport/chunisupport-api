@@ -60,6 +60,17 @@ func (e *noRowsWrappedExecutor) GetContext(ctx context.Context, dest any, query 
 
 var _ domainrepo.Executor = (*noRowsWrappedExecutor)(nil)
 
+type selectErrorExecutor struct {
+	baseExecutor
+	err error
+}
+
+func (e *selectErrorExecutor) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
+	return e.err
+}
+
+var _ domainrepo.Executor = (*selectErrorExecutor)(nil)
+
 type rowsAffectedResult struct {
 	lastInsertID int64
 	rowsAffected int64
@@ -115,13 +126,14 @@ func TestAPITokenFindByHashedToken_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t
 	require.Nil(t, token)
 }
 
-func TestAPITokenFindByUserID_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
+func TestAPITokenFindByUserID_ReturnsErrorWhenSelectFails(t *testing.T) {
 	repo := &apiTokenRepository{}
-	exec := &noRowsWrappedExecutor{}
+	expectedErr := errors.New("select failed")
+	exec := &selectErrorExecutor{err: expectedErr}
 
-	token, err := repo.FindByUserID(context.Background(), exec, 10)
-	require.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
-	require.Nil(t, token)
+	tokens, err := repo.FindByUserID(context.Background(), exec, 10)
+	require.ErrorIs(t, err, expectedErr)
+	require.Nil(t, tokens)
 }
 
 func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testing.T) {

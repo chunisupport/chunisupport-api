@@ -84,16 +84,18 @@ var (
 	ErrDuplicateOfficialIdx = New(CodeDuplicateOfficialIdx, http.StatusConflict)
 
 	// データ関連エラー
-	ErrValidationFailed   = New(CodeValidationFailed, http.StatusUnprocessableEntity)
-	ErrResourceNotFound   = New(CodeResourceNotFound, http.StatusBadRequest)
-	ErrConflict           = New(CodeConflict, http.StatusConflict)
-	ErrAPITokenNotFound   = New(CodeAPITokenNotFound, http.StatusNotFound)
-	ErrPayloadTooLarge    = New(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
-	ErrUnsupportedMedia   = New(CodeUnsupportedMedia, http.StatusUnsupportedMediaType)
-	ErrMethodNotAllowed   = New(CodeMethodNotAllowed, http.StatusMethodNotAllowed)
-	ErrNotFound           = New(CodeNotFound, http.StatusNotFound)
-	ErrTooManyRequests    = New(CodeTooManyRequests, http.StatusTooManyRequests)
-	ErrServiceUnavailable = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
+	ErrValidationFailed      = New(CodeValidationFailed, http.StatusUnprocessableEntity)
+	ErrResourceNotFound      = New(CodeResourceNotFound, http.StatusBadRequest)
+	ErrConflict              = New(CodeConflict, http.StatusConflict)
+	ErrAPITokenNotFound      = New(CodeAPITokenNotFound, http.StatusNotFound)
+	ErrAPITokenLimitExceeded = New(CodeAPITokenLimitExceeded, http.StatusBadRequest)
+	ErrInvalidAPITokenName   = New(CodeInvalidAPITokenName, http.StatusBadRequest)
+	ErrPayloadTooLarge       = New(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
+	ErrUnsupportedMedia      = New(CodeUnsupportedMedia, http.StatusUnsupportedMediaType)
+	ErrMethodNotAllowed      = New(CodeMethodNotAllowed, http.StatusMethodNotAllowed)
+	ErrNotFound              = New(CodeNotFound, http.StatusNotFound)
+	ErrTooManyRequests       = New(CodeTooManyRequests, http.StatusTooManyRequests)
+	ErrServiceUnavailable    = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
 	ErrUsernameEmpty         = New(CodeUsernameEmpty, http.StatusBadRequest)
