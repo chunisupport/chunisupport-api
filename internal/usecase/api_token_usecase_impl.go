@@ -13,6 +13,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 )
 
 const tokenByteLength = 32
@@ -135,7 +136,7 @@ func hashToken(raw string) string {
 func normalizeAPITokenName(name string) (string, error) {
 	normalized := strings.TrimSpace(name)
 	if normalized == "" {
-		return "APIキー", nil
+		return domainservice.DefaultAPITokenName, nil
 	}
 	if utf8.RuneCountInString(normalized) > apiTokenMaxNameLength {
 		return "", ErrInvalidAPITokenName

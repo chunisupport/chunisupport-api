@@ -12,6 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
@@ -149,14 +150,14 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 		mockService.On("Generate", mock.Anything, user.ID, "").Return("plain-token", &entity.APIToken{
 			ID:        11,
 			UserID:    user.ID,
-			Name:      "APIキー",
+			Name:      domainservice.DefaultAPITokenName,
 			CreatedAt: createdAt,
 		}, nil).Once()
 
 		err := h.Generate(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"token":"plain-token","item":{"id":11,"name":"APIキー","created_at":"2026-04-16T12:34:56Z"}}`, rec.Body.String())
+		assert.JSONEq(t, `{"token":"plain-token","item":{"id":11,"name":"API Key","created_at":"2026-04-16T12:34:56Z"}}`, rec.Body.String())
 		mockService.AssertExpectations(t)
 	})
 

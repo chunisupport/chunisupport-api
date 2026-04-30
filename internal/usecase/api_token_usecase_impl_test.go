@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 )
 
 type stubAPITokenRepository struct {
@@ -194,8 +195,8 @@ func TestAPITokenService_Generate_UsesDefaultNameWhenNameIsBlank(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if savedToken.Name != "APIキー" {
-		t.Fatalf("expected default token name APIキー, got %s", savedToken.Name)
+	if savedToken.Name != domainservice.DefaultAPITokenName {
+		t.Fatalf("expected default token name %s, got %s", domainservice.DefaultAPITokenName, savedToken.Name)
 	}
 }
 
