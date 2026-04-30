@@ -38,9 +38,9 @@ const (
 	CodeValidationFailed      = "validation_failed"
 	CodeResourceNotFound      = "resource_not_found"
 	CodeConflict              = "conflict"
-	CodeAPITokenNotFound      = "api_token_not_found" // #nosec G101
-	CodeAPITokenLimitExceeded = "api_token_limit_exceeded"
-	CodeInvalidAPITokenName   = "invalid_api_token_name" // #nosec G101
+	CodeAPITokenNotFound      = "api_token_not_found"      // #nosec G101
+	CodeAPITokenLimitExceeded = "api_token_limit_exceeded" // #nosec G101
+	CodeInvalidAPITokenName   = "invalid_api_token_name"   // #nosec G101
 	CodePayloadTooLarge       = "payload_too_large"
 	CodeUnsupportedMedia      = "unsupported_media_type"
 	CodeMethodNotAllowed      = "method_not_allowed"
