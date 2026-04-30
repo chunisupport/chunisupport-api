@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -19,14 +20,19 @@ func BindStrictJSON(c echo.Context, out any) error {
 
 // BindOptionalStrictJSON は空ボディを許容し、ボディがある場合だけ厳格なJSONデコードを行います。
 func BindOptionalStrictJSON(c echo.Context, out any) error {
-	reader := bufio.NewReader(c.Request().Body)
-	if _, err := reader.Peek(1); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
+	originalBody := c.Request().Body
+	body, hasValue, err := prepareOptionalJSONReader(originalBody)
+	if err != nil {
 		return err
 	}
-	return DecodeStrictJSON(reader, c.Request().Header, out)
+	c.Request().Body = readCloser{
+		Reader: body,
+		Closer: originalBody,
+	}
+	if !hasValue {
+		return nil
+	}
+	return DecodeStrictJSON(c.Request().Body, c.Request().Header, out)
 }
 
 // ValidateJSONContentType は Content-Type が application/json かを検証します。
@@ -60,4 +66,43 @@ func DecodeStrictJSON(body io.Reader, header http.Header, out any) error {
 		return err
 	}
 	return nil
+}
+
+// DecodeOptionalStrictJSON は空ボディを許容し、ボディがある場合だけ厳格なJSONデコードを行います。
+func DecodeOptionalStrictJSON(body io.Reader, header http.Header, out any) error {
+	body, hasValue, err := prepareOptionalJSONReader(body)
+	if err != nil {
+		return err
+	}
+	if !hasValue {
+		return nil
+	}
+	return DecodeStrictJSON(body, header, out)
+}
+
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
+func prepareOptionalJSONReader(body io.Reader) (io.Reader, bool, error) {
+	reader := bufio.NewReader(body)
+	prefix := make([]byte, 0, 16)
+	for {
+		b, err := reader.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return bytes.NewReader(prefix), false, nil
+			}
+			return nil, false, err
+		}
+		prefix = append(prefix, b)
+		if !isJSONWhitespace(b) {
+			return io.MultiReader(bytes.NewReader(prefix), reader), true, nil
+		}
+	}
+}
+
+func isJSONWhitespace(b byte) bool {
+	return b == ' ' || b == '\n' || b == '\r' || b == '\t'
 }
