@@ -227,9 +227,7 @@ const (
 	fullRecordChangedCondition = "score <> VALUES(score) OR " +
 		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
 		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
-		"full_chain_id <> VALUES(full_chain_id) OR " +
-		"slot_id <> VALUES(slot_id) OR " +
-		"NOT (slot_order <=> VALUES(slot_order))"
+		"full_chain_id <> VALUES(full_chain_id)"
 
 	worldsendRecordChangedCondition = "score <> VALUES(score) OR " +
 		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
