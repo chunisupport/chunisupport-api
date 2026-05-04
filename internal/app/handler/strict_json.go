@@ -86,19 +86,21 @@ type readCloser struct {
 }
 
 func prepareOptionalJSONReader(body io.Reader) (io.Reader, bool, error) {
-	reader := bufio.NewReader(body)
-	prefix := make([]byte, 0, 16)
+	var prefix bytes.Buffer
+	reader := io.TeeReader(body, &prefix)
+	
 	for {
-		b, err := reader.ReadByte()
+		var b [1]byte
+		_, err := reader.Read(b[:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return bytes.NewReader(prefix), false, nil
+				return bytes.NewReader(prefix.Bytes()), false, nil
 			}
 			return nil, false, err
 		}
-		prefix = append(prefix, b)
-		if !isJSONWhitespace(b) {
-			return io.MultiReader(bytes.NewReader(prefix), reader), true, nil
+		
+		if !isJSONWhitespace(b[0]) {
+			return io.MultiReader(&prefix, body), true, nil
 		}
 	}
 }
