@@ -281,10 +281,10 @@ func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T)
 		Title:             "test",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"const":{"max":15.9}}`),
+		Attributes:        []byte(`{"const":{"max":16.0}}`),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(1), "max": float64(15.9)}}, out.Attributes)
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(1), "max": float64(16)}}, out.Attributes)
 }
 
 func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T) {
@@ -294,7 +294,7 @@ func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T)
 		Title:             "test",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"const":{"min":1.23,"max":15.9}}`),
+		Attributes:        []byte(`{"const":{"min":1.23,"max":16.0}}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
