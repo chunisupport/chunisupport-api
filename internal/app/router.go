@@ -17,6 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	api_token_name "github.com/chunisupport/chunisupport-api/internal/domain/vo/api_token_name"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -40,11 +41,19 @@ func NewCustomValidator() *CustomValidator {
 	if err := v.RegisterValidation("username", validateUsername); err != nil {
 		panic(err)
 	}
+	if err := v.RegisterValidation("api_token_name", validateAPITokenName); err != nil {
+		panic(err)
+	}
 	return &CustomValidator{Validator: v}
 }
 
 func validateUsername(fl validator.FieldLevel) bool {
 	_, err := vo_username.NewUserName(fl.Field().String())
+	return err == nil
+}
+
+func validateAPITokenName(fl validator.FieldLevel) bool {
+	_, err := api_token_name.Normalize(fl.Field().String())
 	return err == nil
 }
 

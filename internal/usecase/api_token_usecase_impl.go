@@ -7,16 +7,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	api_token_name "github.com/chunisupport/chunisupport-api/internal/domain/vo/api_token_name"
 )
 
 const tokenByteLength = 32
-const apiTokenMaxNameLength = 15
 
 // APITokenMaxCountPerUser は1ユーザーが保持できるAPIトークン数の上限です。
 const APITokenMaxCountPerUser = 10
@@ -128,12 +126,12 @@ func hashToken(raw string) string {
 }
 
 func normalizeAPITokenName(name string) (string, error) {
-	normalized := strings.TrimSpace(name)
+	normalized, err := api_token_name.Normalize(name)
+	if err != nil {
+		return "", ErrInvalidAPITokenName
+	}
 	if normalized == "" {
 		return domainservice.DefaultAPITokenName, nil
-	}
-	if utf8.RuneCountInString(normalized) > apiTokenMaxNameLength {
-		return "", ErrInvalidAPITokenName
 	}
 	return normalized, nil
 }

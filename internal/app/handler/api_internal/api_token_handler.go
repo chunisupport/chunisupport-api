@@ -24,7 +24,7 @@ type apiTokenListResponse struct {
 }
 
 type apiTokenGenerateRequest struct {
-	Name string `json:"name" validate:"max=15"`
+	Name string `json:"name" validate:"api_token_name"`
 }
 
 type apiTokenGenerateResponse struct {
