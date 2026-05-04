@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -88,7 +87,7 @@ type readCloser struct {
 func prepareOptionalJSONReader(body io.Reader) (io.Reader, bool, error) {
 	var prefix bytes.Buffer
 	reader := io.TeeReader(body, &prefix)
-	
+
 	for {
 		var b [1]byte
 		_, err := reader.Read(b[:])
@@ -98,7 +97,7 @@ func prepareOptionalJSONReader(body io.Reader) (io.Reader, bool, error) {
 			}
 			return nil, false, err
 		}
-		
+
 		if !isJSONWhitespace(b[0]) {
 			return io.MultiReader(&prefix, body), true, nil
 		}
