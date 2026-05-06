@@ -210,7 +210,7 @@ goalsテーブルの `achievement_params` / `attributes` に保存するJSON。
     "diff": 4,
     "const": {
       "min": 14.0,
-      "max": 15.9
+      "max": 16.0
     },
     "genre": [1, 2],
     "ver": 20
@@ -233,7 +233,7 @@ goalsテーブルの `achievement_params` / `attributes` に保存するJSON。
     "diff": "MASTER",
     "const": {
       "min": 14.0,
-      "max": 15.9
+      "max": 16.0
     },
     "genre": ["POPS_ANIME", "NICONICO"],
     "ver": "LUMINOUS"

@@ -18,8 +18,8 @@ const (
 	DefaultUserListLimit = 100
 	DefaultSongListLimit = 100
 	GoalMaxPerUser       = 100
-	ChartConstMin        = 1.0
-	ChartConstMax        = 16.0
+	ChartConstMin        = constants.ChartConstMin
+	ChartConstMax        = constants.ChartConstMax
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

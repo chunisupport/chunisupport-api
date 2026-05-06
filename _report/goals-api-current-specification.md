@@ -88,7 +88,7 @@ CREATE TABLE goals (
         "diff": 4,
         "const": {
           "min": 14.0,
-          "max": 15.9
+          "max": 16.0
         }
       },
       "invert": false,
@@ -125,7 +125,7 @@ CREATE TABLE goals (
     "diff": 4,
     "const": {
       "min": 14.0,
-      "max": 15.9
+      "max": 16.0
     }
   },
   "invert": false
@@ -206,7 +206,7 @@ CREATE TABLE goals (
     "diff": 4,
     "const": {
       "min": 14.0,
-      "max": 15.9
+      "max": 16.0
     }
   },
   "invert": false,
@@ -396,7 +396,7 @@ CREATE TABLE goals (
   "diff": 4,
   "const": {
     "min": 14.0,
-    "max": 15.9
+    "max": 16.0
   },
   "genre": [1, 2],
   "ver": 20
@@ -490,7 +490,7 @@ CREATE TABLE goals (
 {
   "const": {
     "min": 14.0,
-    "max": 15.9
+    "max": 16.0
   }
 }
 ```
@@ -500,12 +500,12 @@ CREATE TABLE goals (
 - `min` と `max` はそれぞれ任意
 - 未指定時はデフォルト値に補完されます
 - 小数第1位までのみ許可
-- 範囲は `1.0 <= min <= max <= 15.9`
+- 範囲は `1.0 <= min <= max <= 16.0`
 
 補完仕様:
 
 - `min` 省略時は `1.0`
-- `max` 省略時は `15.9`
+- `max` 省略時は `16.0`
 
 例:
 
@@ -514,7 +514,7 @@ CREATE TABLE goals (
 ```json
 {
   "const": {
-    "max": 15.9
+    "max": 16.0
   }
 }
 ```
@@ -525,7 +525,7 @@ CREATE TABLE goals (
 {
   "const": {
     "min": 1.0,
-    "max": 15.9
+    "max": 16.0
   }
 }
 ```

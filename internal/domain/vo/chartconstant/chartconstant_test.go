@@ -1,6 +1,50 @@
 package chartconstant
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNewChartConstant(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       float64
+		expected    ChartConstant
+		expectedErr string
+		wantErr     bool
+	}{
+		{
+			name:     "16.0なら生成できる",
+			input:    16.0,
+			expected: ChartConstant(16.0),
+			wantErr:  false,
+		},
+		{
+			name:        "16.0を超える値ならエラーになる",
+			input:       16.1,
+			expectedErr: "chart constant must be between 0.0 and 16.0",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got, err := NewChartConstant(tt.input)
+
+			// Then
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
 
 func TestChartConstantScan(t *testing.T) {
 	tests := []struct {
@@ -25,7 +69,7 @@ func TestChartConstantScan(t *testing.T) {
 		{
 			name:        "負の値ならエラーになる",
 			input:       float64(-1),
-			expectedErr: "chart constant must be 0 or greater",
+			expectedErr: "chart constant must be between 0.0 and 16.0",
 			wantErr:     true,
 		},
 	}
@@ -72,7 +116,7 @@ func TestChartConstantUnmarshalJSON(t *testing.T) {
 		{
 			name:        "負の値ならエラーになる",
 			input:       "-0.1",
-			expectedErr: "chart constant must be 0 or greater",
+			expectedErr: "chart constant must be between 0.0 and 16.0",
 			wantErr:     true,
 		},
 	}

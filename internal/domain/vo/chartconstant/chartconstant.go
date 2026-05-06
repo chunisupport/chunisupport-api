@@ -3,9 +3,10 @@ package chartconstant
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
 // ChartConstant は譜面定数の値オブジェクトです。
@@ -14,9 +15,10 @@ type ChartConstant float64
 
 // NewChartConstant は新しい ChartConstant を生成します。
 // 譜面定数は0以上である必要があります。
+// 通常譜面の上限を超える値は許可しません。
 func NewChartConstant(value float64) (ChartConstant, error) {
-	if value < 0 {
-		return 0, errors.New("chart constant must be 0 or greater")
+	if value < constants.ChartConstValueMin || value > constants.ChartConstMax {
+		return 0, fmt.Errorf("chart constant must be between %.1f and %.1f", constants.ChartConstValueMin, constants.ChartConstMax)
 	}
 	return ChartConstant(value), nil
 }
