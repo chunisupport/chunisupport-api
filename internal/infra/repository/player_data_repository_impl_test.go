@@ -212,7 +212,7 @@ func TestSavePlayerData_execがnilならエラーを返す(t *testing.T) {
 
 func TestFullRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
 	// Given
-	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id) OR slot_id <> VALUES(slot_id) OR NOT (slot_order <=> VALUES(slot_order))"
+	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
 
 	// When
 	got := fullRecordChangedCondition
