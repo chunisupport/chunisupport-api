@@ -16,18 +16,20 @@ import (
 func TestPlayerLockedSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 	tests := []struct {
 		name string
-		act  func(context.Context, *PlayerLockedSongRepository) error
+		act  func(context.Context) error
 	}{
 		{
 			name: "未解禁楽曲一覧取得の永続化エラーはドメイン定義エラーになる",
-			act: func(ctx context.Context, repo *PlayerLockedSongRepository) error {
+			act: func(ctx context.Context) error {
+				repo := &PlayerLockedSongRepository{}
 				_, err := repo.ListByPlayerID(ctx, closedSQLiteExecutor(t), 1)
 				return err
 			},
 		},
 		{
 			name: "未解禁楽曲作成の永続化エラーはドメイン定義エラーになる",
-			act: func(ctx context.Context, repo *PlayerLockedSongRepository) error {
+			act: func(ctx context.Context) error {
+				repo := &PlayerLockedSongRepository{}
 				return repo.Create(ctx, closedSQLiteExecutor(t), &entity.PlayerLockedSong{
 					PlayerID: 1,
 					SongID:   1,
@@ -37,21 +39,24 @@ func TestPlayerLockedSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 		},
 		{
 			name: "未解禁楽曲削除の永続化エラーはドメイン定義エラーになる",
-			act: func(ctx context.Context, repo *PlayerLockedSongRepository) error {
+			act: func(ctx context.Context) error {
+				repo := &PlayerLockedSongRepository{}
 				return repo.Delete(ctx, closedSQLiteExecutor(t), 1, 1, true)
 			},
 		},
 		{
 			name: "未解禁楽曲表示用一覧取得の永続化エラーはドメイン定義エラーになる",
-			act: func(ctx context.Context, repo *PlayerLockedSongRepository) error {
-				_, err := repo.ListWithSongDisplayIDAndTitleByPlayerID(ctx, closedSQLiteExecutor(t), 1)
+			act: func(ctx context.Context) error {
+				queryService := &PlayerLockedSongQueryService{}
+				_, err := queryService.ListWithSongDisplayIDAndTitleByPlayerID(ctx, closedSQLiteExecutor(t), 1)
 				return err
 			},
 		},
 		{
 			name: "楽曲ID解決の永続化エラーはドメイン定義エラーになる",
-			act: func(ctx context.Context, repo *PlayerLockedSongRepository) error {
-				_, err := repo.ResolveSongIDByDisplayID(ctx, closedSQLiteExecutor(t), "0000000000000001")
+			act: func(ctx context.Context) error {
+				resolver := &PlayerSongIDResolver{}
+				_, err := resolver.ResolveSongIDByDisplayID(ctx, closedSQLiteExecutor(t), "0000000000000001")
 				return err
 			},
 		},
@@ -60,10 +65,9 @@ func TestPlayerLockedSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			repo := &PlayerLockedSongRepository{}
 
 			// When
-			err := tt.act(context.Background(), repo)
+			err := tt.act(context.Background())
 
 			// Then
 			require.Error(t, err)
@@ -75,7 +79,7 @@ func TestPlayerLockedSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 
 func TestResolveSongIDByDisplayIDReturnsNilWhenNoRows(t *testing.T) {
 	// Given
-	repo := &PlayerLockedSongRepository{}
+	resolver := &PlayerSongIDResolver{}
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -85,7 +89,7 @@ func TestResolveSongIDByDisplayIDReturnsNilWhenNoRows(t *testing.T) {
 	require.NoError(t, err)
 
 	// When
-	id, err := repo.ResolveSongIDByDisplayID(context.Background(), db, "0000000000000001")
+	id, err := resolver.ResolveSongIDByDisplayID(context.Background(), db, "0000000000000001")
 
 	// Then
 	require.NoError(t, err)
