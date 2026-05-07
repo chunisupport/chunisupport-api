@@ -63,7 +63,11 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if input.IsUltima && !hasUltimaChart(song) {
 		return ErrChartNotFound
 	}
-	return u.lockedRepo.Create(ctx, u.db, &entity.PlayerLockedSong{PlayerID: player.ID, SongID: song.ID, IsUltima: input.IsUltima})
+	lockedSong, err := entity.NewPlayerLockedSong(player.ID, song.ID, input.IsUltima)
+	if err != nil {
+		return err
+	}
+	return u.lockedRepo.Create(ctx, u.db, lockedSong)
 }
 
 func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error {

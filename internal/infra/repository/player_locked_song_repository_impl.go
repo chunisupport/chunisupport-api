@@ -33,7 +33,11 @@ func (r *PlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec do
 	}
 	return res, nil
 }
+
 func (r *PlayerLockedSongRepository) Create(ctx context.Context, exec domainrepo.Executor, lockedSong *entity.PlayerLockedSong) error {
+	if err := lockedSong.Validate(); err != nil {
+		return err
+	}
 	const q = `INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES (?, ?, ?)`
 	_, err := exec.ExecContext(ctx, q, lockedSong.PlayerID, lockedSong.SongID, lockedSong.IsUltima)
 	if err != nil && !isMySQLDuplicateEntryForKey(err, "PRIMARY") {
@@ -41,6 +45,7 @@ func (r *PlayerLockedSongRepository) Create(ctx context.Context, exec domainrepo
 	}
 	return nil
 }
+
 func (r *PlayerLockedSongRepository) Delete(ctx context.Context, exec domainrepo.Executor, playerID int, songID int, isUltima bool) error {
 	const q = `DELETE FROM player_locked_songs WHERE player_id = ? AND song_id = ? AND is_ultima = ?`
 	_, err := exec.ExecContext(ctx, q, playerID, songID, isUltima)
