@@ -22,13 +22,9 @@ func NewPlayerLockedSongRepository(db *sqlx.DB) *PlayerLockedSongRepository {
 
 func (r *PlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
 	const q = `SELECT player_id, song_id, is_ultima FROM player_locked_songs WHERE player_id = ? ORDER BY song_id ASC, is_ultima ASC`
-	var rows []entity.PlayerLockedSong
-	if err := sqlx.SelectContext(ctx, exec, &rows, q, playerID); err != nil {
+	var res []*entity.PlayerLockedSong
+	if err := sqlx.SelectContext(ctx, exec, &res, q, playerID); err != nil {
 		return nil, wrapPlayerLockedSongRepositoryError("list by player id", err)
-	}
-	res := make([]*entity.PlayerLockedSong, 0, len(rows))
-	for i := range rows {
-		res = append(res, &rows[i])
 	}
 	return res, nil
 }
