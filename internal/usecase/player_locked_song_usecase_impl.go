@@ -50,7 +50,7 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if player == nil {
 		return ErrPlayerNotLinked
 	}
-	song, err := u.songRepo.FindByDisplayID(ctx, u.db, input.DisplayID)
+	song, err := u.songRepo.FindByDisplayID(ctx, u.db, input.DisplayID.String())
 	if err != nil {
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return repository.ErrSongNotFound
@@ -74,7 +74,7 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	if player == nil {
 		return ErrPlayerNotLinked
 	}
-	songID, err := u.resolver.ResolveSongIDByDisplayID(ctx, u.db, input.DisplayID)
+	songID, err := u.resolver.ResolveSongIDByDisplayID(ctx, u.db, input.DisplayID.String())
 	if err != nil {
 		return err
 	}

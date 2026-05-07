@@ -2,11 +2,13 @@ package usecase
 
 import (
 	"context"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 type PlayerLockedSongInput struct {
-	DisplayID string
+	DisplayID displayid.DisplayID
 	IsUltima  bool
 }
 

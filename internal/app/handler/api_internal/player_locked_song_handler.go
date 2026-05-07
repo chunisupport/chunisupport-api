@@ -2,10 +2,10 @@ package api_internal
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
@@ -47,7 +47,11 @@ func (h *PlayerLockedSongHandler) Lock(c echo.Context) error {
 	if err := c.Validate(&req); err != nil {
 		return err
 	}
-	if err := h.usecase.Lock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: req.DisplayID, IsUltima: req.IsUltima}); err != nil {
+	displayID, err := displayid.NewDisplayID(req.DisplayID)
+	if err != nil {
+		return apierror.ErrValidationFailed.WithInternal(err)
+	}
+	if err := h.usecase.Lock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: req.IsUltima}); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -58,22 +62,21 @@ func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	isUltima := false
-	if raw, ok := c.QueryParams()["is_ultima"]; ok {
-		if len(raw) == 0 || raw[0] == "" {
-			return apierror.ErrBadRequest
-		}
-		v, err := strconv.ParseBool(raw[0])
-		if err != nil {
-			return apierror.ErrBadRequest.WithInternal(err)
-		}
-		isUltima = v
+	var req internaldto.PlayerLockedSongUnlockRequest
+	if raw, ok := c.QueryParams()["is_ultima"]; ok && (len(raw) == 0 || raw[0] == "") {
+		return apierror.ErrBadRequest
 	}
-	displayID := c.Param("displayid")
-	if len(displayID) != 16 {
-		return apierror.ErrValidationFailed
+	if err := c.Bind(&req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if err := h.usecase.Unlock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: isUltima}); err != nil {
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	displayID, err := displayid.NewDisplayID(req.DisplayID)
+	if err != nil {
+		return apierror.ErrValidationFailed.WithInternal(err)
+	}
+	if err := h.usecase.Unlock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: req.IsUltima}); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
