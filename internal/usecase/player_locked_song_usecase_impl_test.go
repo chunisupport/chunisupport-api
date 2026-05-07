@@ -1,0 +1,158 @@
+package usecase
+
+import (
+	"context"
+	"testing"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+type stubPlayerLockedSongPlayerRepository struct {
+	player *entity.Player
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return nil, nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
+	return nil, nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.player, nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
+	return nil, nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongPlayerRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	return nil
+}
+
+type spyPlayerLockedSongRepository struct {
+	createCalled bool
+}
+
+func (s *spyPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	return nil, nil
+}
+
+func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec repository.Executor, lockedSong *entity.PlayerLockedSong) error {
+	s.createCalled = true
+	return nil
+}
+
+func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	return nil
+}
+
+func TestPlayerLockedSongLock(t *testing.T) {
+	tests := []struct {
+		name           string
+		song           *entity.Song
+		inputIsUltima  bool
+		wantErr        error
+		wantCreateCall bool
+	}{
+		{
+			name:    "WORLD'S END楽曲は見つからない楽曲として扱う",
+			song:    &entity.Song{ID: 1, DisplayID: "0123456789abcdef", IsWorldsend: true, Charts: []*entity.Chart{}},
+			wantErr: repository.ErrSongNotFound,
+		},
+		{
+			name:    "削除済み楽曲は見つからない楽曲として扱う",
+			song:    &entity.Song{ID: 1, DisplayID: "0123456789abcdef", IsDeleted: true, Charts: []*entity.Chart{}},
+			wantErr: repository.ErrSongNotFound,
+		},
+		{
+			name:          "ULTIMA譜面がない楽曲をULTIMA未解禁にできない",
+			song:          &entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDMaster}}},
+			inputIsUltima: true,
+			wantErr:       ErrChartNotFound,
+		},
+		{
+			name:           "ULTIMA譜面がある楽曲をULTIMA未解禁にできる",
+			song:           &entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDUltima}}},
+			inputIsUltima:  true,
+			wantCreateCall: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			displayID, err := displayid.NewDisplayID("0123456789abcdef")
+			require.NoError(t, err)
+			songRepo := new(MockSongRepository)
+			songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(tt.song, nil).Once()
+			lockedRepo := &spyPlayerLockedSongRepository{}
+			u := &playerLockedSongUsecase{
+				playerRepo: &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
+				songRepo:   songRepo,
+				lockedRepo: lockedRepo,
+			}
+
+			// When
+			err = u.Lock(context.Background(), 100, &PlayerLockedSongInput{DisplayID: displayID, IsUltima: tt.inputIsUltima})
+
+			// Then
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantCreateCall, lockedRepo.createCalled)
+			songRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPlayerLockedSongInputRequired(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(*playerLockedSongUsecase) error
+	}{
+		{
+			name: "ロック入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Lock(context.Background(), 100, nil)
+			},
+		},
+		{
+			name: "ロック解除入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Unlock(context.Background(), 100, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			u := &playerLockedSongUsecase{}
+
+			// When
+			err := tt.run(u)
+
+			// Then
+			require.ErrorIs(t, err, errPlayerLockedSongInputRequired)
+			assert.EqualError(t, err, "input is required")
+		})
+	}
+}

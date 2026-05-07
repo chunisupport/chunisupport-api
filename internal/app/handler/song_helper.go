@@ -2,13 +2,14 @@ package handler
 
 import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v4"
 )
 
 const (
-	MinDifficultyID = 1
-	MaxDifficultyID = 5
+	MinDifficultyID = domainservice.DifficultyIDBasic
+	MaxDifficultyID = domainservice.DifficultyIDUltima
 )
 
 // ParseDifficultyPath はパスパラメータを内部難易度名に変換します。

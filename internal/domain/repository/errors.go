@@ -44,4 +44,7 @@ var (
 
 	// ErrDuplicateOfficialIdx は official_idx が既に使用されている場合に返されるエラーです。
 	ErrDuplicateOfficialIdx = errors.New("official_idx already exists")
+
+	// ErrRepositoryOperationFailed はリポジトリ操作が永続化層の事情で失敗した場合に返されるエラーです。
+	ErrRepositoryOperationFailed = errors.New("repository operation failed")
 )

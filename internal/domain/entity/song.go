@@ -37,6 +37,16 @@ func (s *Song) IsActive() bool {
 	return !s.IsDeleted
 }
 
+// HasDifficultyChart は指定された難易度IDの譜面を持つかを判定します。
+func (s *Song) HasDifficultyChart(difficultyID int) bool {
+	for _, chart := range s.Charts {
+		if chart.DifficultyID == difficultyID {
+			return true
+		}
+	}
+	return false
+}
+
 // Delete は楽曲を論理削除します。
 func (s *Song) Delete() {
 	s.IsDeleted = true
