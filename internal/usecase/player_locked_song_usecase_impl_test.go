@@ -136,6 +136,40 @@ func TestPlayerLockedSongLock(t *testing.T) {
 	}
 }
 
+func TestPlayerLockedSongInputRequired(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(*playerLockedSongUsecase) error
+	}{
+		{
+			name: "ロック入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Lock(context.Background(), 100, nil)
+			},
+		},
+		{
+			name: "ロック解除入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Unlock(context.Background(), 100, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			u := &playerLockedSongUsecase{}
+
+			// When
+			err := tt.run(u)
+
+			// Then
+			require.ErrorIs(t, err, errPlayerLockedSongInputRequired)
+			assert.EqualError(t, err, "input is required")
+		})
+	}
+}
+
 func TestPlayerLockedSongDifficultyChart(t *testing.T) {
 	tests := []struct {
 		name       string

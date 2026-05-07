@@ -12,6 +12,8 @@ import (
 
 const difficultyNameUltima = "ULTIMA"
 
+var errPlayerLockedSongInputRequired = errors.New("input is required")
+
 type playerLockedSongUsecase struct {
 	db             repository.Executor
 	playerRepo     repository.PlayerRepository
@@ -46,6 +48,9 @@ func (u *playerLockedSongUsecase) List(ctx context.Context, userID int) ([]*Play
 }
 
 func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *PlayerLockedSongInput) error {
+	if input == nil {
+		return errPlayerLockedSongInputRequired
+	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
 		return err
@@ -80,6 +85,9 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 }
 
 func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error {
+	if input == nil {
+		return errPlayerLockedSongInputRequired
+	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
 		return err
