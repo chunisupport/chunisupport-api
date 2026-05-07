@@ -63,9 +63,6 @@ func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
 		return err
 	}
 	var req internaldto.PlayerLockedSongUnlockRequest
-	if raw, ok := c.QueryParams()["is_ultima"]; ok && (len(raw) == 0 || raw[0] == "") {
-		return apierror.ErrBadRequest
-	}
 	if err := c.Bind(&req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
@@ -76,7 +73,7 @@ func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
-	if err := h.usecase.Unlock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: req.IsUltima}); err != nil {
+	if err := h.usecase.Unlock(c.Request().Context(), user.ID, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: bool(req.IsUltima)}); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
