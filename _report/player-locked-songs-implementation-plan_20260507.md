@@ -161,7 +161,7 @@ ULTIMA譜面だけが未解禁の場合のみ `is_ultima = true` を登録する
 type PlayerLockedSongRepository interface {
     ListByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerLockedSong, error)
     Create(ctx context.Context, exec Executor, lockedSong *entity.PlayerLockedSong) error
-    DeleteByPlayerIDAndSongID(ctx context.Context, exec Executor, playerID int, songID int, isUltima bool) error
+    Delete(ctx context.Context, exec Executor, playerID int, songID int, isUltima bool) error
 }
 ```
 
@@ -169,11 +169,11 @@ OP計算ではプレイヤー単位で一括取得してメモリ上のセット
 
 `ListByPlayerID` は未解禁集合の永続化状態だけを返し、`songs.display_id` は返さない。論理削除済み楽曲の除外もこのメソッドでは行わない。OP計算側は事前に `songs.is_deleted = 0` の譜面へ絞り込んだうえで、`song_id + is_ultima` のセットだけで判定できるため、ドメインリポジトリに表示用データや楽曲表示条件を混入させない。
 
-`DeleteByPlayerIDAndSongID` は指定された未解禁状態だけを削除する。対象レコードが存在しない場合も、解除APIの冪等性を保つため成功扱いにする。
+`Delete` は `player_id`, `song_id`, `is_ultima` の複合主キー全項目を条件にして、指定された未解禁状態だけを削除する。対象レコードが存在しない場合も、解除APIの冪等性を保つため成功扱いにする。
 
-Repositoryインターフェースには、実装時点で利用予定のない `Exists` や汎用 `Delete` は追加しない。必要になった時点で用途を明確にして追加する。
+Repositoryインターフェースには、実装時点で利用予定のない `Exists` は追加しない。必要になった時点で用途を明確にして追加する。
 
-削除APIでは、論理削除済み楽曲の未解禁レコードも後から消せる必要があるため、Usecaseで通常の `SongRepository.FindByDisplayID` による楽曲存在確認とエラー判定は行わない。代わりに、削除専用の楽曲ID解決ポートを用意し、`display_id` から `song_id` を解決できた場合だけ `DeleteByPlayerIDAndSongID` を呼び出す。`display_id` に該当する楽曲が存在しない場合は、削除対象なしとして成功扱いにする。
+削除APIでは、論理削除済み楽曲の未解禁レコードも後から消せる必要があるため、Usecaseで通常の `SongRepository.FindByDisplayID` による楽曲存在確認とエラー判定は行わない。代わりに、削除専用の楽曲ID解決ポートを用意し、`display_id` から `song_id` を解決できた場合だけ `Delete` を呼び出す。`display_id` に該当する楽曲が存在しない場合は、削除対象なしとして成功扱いにする。
 
 削除専用の楽曲ID解決ポートは、`songs.display_id` を条件にし、`songs.is_deleted` / `songs.is_worldsend` では絞り込まない。これは、論理削除済み楽曲に紐づく未解禁レコードを削除可能にするためである。
 
@@ -210,7 +210,7 @@ type PlayerLockedSongQueryService interface {
 - `ListByPlayerID` は `player_locked_songs.player_id, player_locked_songs.song_id, player_locked_songs.is_ultima` を明示取得し、`player_locked_songs.song_id ASC, player_locked_songs.is_ultima ASC` で返す
 - `PlayerLockedSongQueryService.ListWithSongDisplayIDByPlayerID` は `player_locked_songs.song_id, player_locked_songs.is_ultima, songs.display_id` を明示取得する
 - `Create` は重複キーを成功扱いにする
-- `DeleteByPlayerIDAndSongID` は対象なしでも成功扱いにする
+- `Delete` は `player_id`, `song_id`, `is_ultima` の複合主キー全項目を条件にし、対象なしでも成功扱いにする
 - 削除専用の楽曲ID解決ポートは、`display_id` が存在しない場合も成功扱いにできるよう、未検出をUsecaseで削除対象なしとして扱えるエラーまたは `nil` で返す
 
 管理APIの使いやすさを優先し、登録・解除は冪等操作にする。登録時は通常の `INSERT` を行い、複合主キーの重複エラーだけを成功扱いに変換する。実装上 `ON DUPLICATE KEY UPDATE player_id = player_id` 相当を使ってもよいが、`INSERT IGNORE` は重複以外の制約違反も見えにくくするため使用しない。解除時は `DELETE` の影響行数が0件でも成功扱いにする。
@@ -286,7 +286,7 @@ Lockは指定された `is_ultima` のレコードだけを作成する。
 
 通常譜面群とULTIMA譜面は別の解禁単位として扱うため、同一曲に `is_ultima = false` と `is_ultima = true` の両方が存在することを許容する。両方が存在する場合は、通常譜面群とULTIMA譜面の両方をOP計算対象から除外する。
 
-Unlockは指定された `is_ultima` のレコードだけを削除する。削除APIでは通常の楽曲存在確認によるエラー判定を行わず、対象レコードが存在しない場合も成功扱いにする。Usecaseは削除専用の楽曲ID解決ポートで `display_id` から `song_id` を解決する。この解決では `songs.is_deleted` / `songs.is_worldsend` で絞り込まない。楽曲が見つからない場合は削除対象なしとして204相当にする。`song_id` が解決できた場合だけ、`PlayerLockedSongRepository.DeleteByPlayerIDAndSongID` を呼び出す。
+Unlockは指定された `is_ultima` のレコードだけを削除する。削除APIでは通常の楽曲存在確認によるエラー判定を行わず、対象レコードが存在しない場合も成功扱いにする。Usecaseは削除専用の楽曲ID解決ポートで `display_id` から `song_id` を解決する。この解決では `songs.is_deleted` / `songs.is_worldsend` で絞り込まない。楽曲が見つからない場合は削除対象なしとして204相当にする。`song_id` が解決できた場合だけ、`PlayerLockedSongRepository.Delete` を呼び出す。
 
 ---
 
@@ -544,7 +544,7 @@ DELETE bodyに依存しないため、クライアント・プロキシ差異の
 
 - `display_id`
 
-DB内部では `song_id` を使う。APIでは、既存の楽曲APIが `display_id` をパスパラメータとして使っているため、フロントエンドから操作する管理APIも `display_id` を受ける。登録時はUsecaseで通常楽曲であること、論理削除されていないこと、WORLD'S END楽曲ではないことを検証したうえで `song_id` に変換する。解除時は論理削除済み楽曲の未解禁レコードも消せるように、通常の楽曲取得ではなく削除専用の楽曲ID解決ポートで `song_id` を解決する。未解禁リポジトリ自体は `song_id` ベースの `DeleteByPlayerIDAndSongID` を提供し、Repository境界にAPI用の `display_id` を持ち込まない。
+DB内部では `song_id` を使う。APIでは、既存の楽曲APIが `display_id` をパスパラメータとして使っているため、フロントエンドから操作する管理APIも `display_id` を受ける。登録時はUsecaseで通常楽曲であること、論理削除されていないこと、WORLD'S END楽曲ではないことを検証したうえで `song_id` に変換する。解除時は論理削除済み楽曲の未解禁レコードも消せるように、通常の楽曲取得ではなく削除専用の楽曲ID解決ポートで `song_id` を解決する。未解禁リポジトリ自体は `song_id` と `is_ultima` を引数に取る `Delete` を提供し、Repository境界にAPI用の `display_id` を持ち込まない。
 
 DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:displayid` と揃えられるため `display_id` を採用する。
 
@@ -572,7 +572,7 @@ DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:dis
 - `display_id` に該当する楽曲が存在しない場合も204を返す
 - 論理削除済み楽曲に紐づく未解禁レコードも削除できる
 
-存在しない楽曲の削除操作をエラーにすると、楽曲が論理削除された後に未解禁レコードをユーザー操作で消せなくなる。そのため、解除APIは状態削除の冪等操作として扱い、形式が正しい `display_id` であれば削除対象なしでも成功扱いにする。実装では通常の `SongRepository` で楽曲を事前取得せず、削除専用の楽曲ID解決ポートで `song_id` を解決できた場合だけ `PlayerLockedSongRepository.DeleteByPlayerIDAndSongID` で削除する。
+存在しない楽曲の削除操作をエラーにすると、楽曲が論理削除された後に未解禁レコードをユーザー操作で消せなくなる。そのため、解除APIは状態削除の冪等操作として扱い、形式が正しい `display_id` であれば削除対象なしでも成功扱いにする。実装では通常の `SongRepository` で楽曲を事前取得せず、削除専用の楽曲ID解決ポートで `song_id` を解決できた場合だけ `PlayerLockedSongRepository.Delete` で削除する。
 
 ---
 
