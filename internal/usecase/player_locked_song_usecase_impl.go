@@ -65,7 +65,7 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 		}
 		return err
 	}
-	if song.IsDeleted || song.IsWorldsend {
+	if song == nil || song.IsDeleted || song.IsWorldsend {
 		return repository.ErrSongNotFound
 	}
 	if input.IsUltima {
