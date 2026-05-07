@@ -24,7 +24,7 @@ func (r *PlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec do
 	const q = `SELECT player_id, song_id, is_ultima FROM player_locked_songs WHERE player_id = ? ORDER BY song_id ASC, is_ultima ASC`
 	var rows []entity.PlayerLockedSong
 	if err := sqlx.SelectContext(ctx, exec, &rows, q, playerID); err != nil {
-		return nil, err
+		return nil, wrapPlayerLockedSongRepositoryError("list by player id", err)
 	}
 	res := make([]*entity.PlayerLockedSong, 0, len(rows))
 	for i := range rows {
@@ -40,7 +40,7 @@ func (r *PlayerLockedSongRepository) Create(ctx context.Context, exec domainrepo
 	const q = `INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES (?, ?, ?)`
 	_, err := exec.ExecContext(ctx, q, lockedSong.PlayerID, lockedSong.SongID, lockedSong.IsUltima)
 	if err != nil && !isMySQLDuplicateEntryForKey(err, "PRIMARY") {
-		return err
+		return wrapPlayerLockedSongRepositoryError("create", err)
 	}
 	return nil
 }
@@ -48,7 +48,7 @@ func (r *PlayerLockedSongRepository) Create(ctx context.Context, exec domainrepo
 func (r *PlayerLockedSongRepository) Delete(ctx context.Context, exec domainrepo.Executor, playerID int, songID int, isUltima bool) error {
 	const q = `DELETE FROM player_locked_songs WHERE player_id = ? AND song_id = ? AND is_ultima = ?`
 	_, err := exec.ExecContext(ctx, q, playerID, songID, isUltima)
-	return err
+	return wrapPlayerLockedSongRepositoryError("delete", err)
 }
 
 type playerLockedSongReadModelRow struct {
@@ -62,7 +62,7 @@ func (r *PlayerLockedSongRepository) ListWithSongDisplayIDAndTitleByPlayerID(ctx
 	const q = `SELECT pls.song_id, pls.is_ultima, s.display_id, s.title FROM player_locked_songs pls INNER JOIN songs s ON s.id = pls.song_id WHERE pls.player_id = ? AND s.is_deleted = FALSE AND s.is_worldsend = FALSE ORDER BY s.display_id ASC, pls.is_ultima ASC`
 	var rows []playerLockedSongReadModelRow
 	if err := sqlx.SelectContext(ctx, exec, &rows, q, playerID); err != nil {
-		return nil, err
+		return nil, wrapPlayerLockedSongRepositoryError("list read model by player id", err)
 	}
 	res := make([]*usecase.PlayerLockedSongReadModel, 0, len(rows))
 	for _, row := range rows {
@@ -78,7 +78,14 @@ func (r *PlayerLockedSongRepository) ResolveSongIDByDisplayID(ctx context.Contex
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("resolve song id by display id: %w", err)
+		return nil, wrapPlayerLockedSongRepositoryError("resolve song id by display id", err)
 	}
 	return &id, nil
+}
+
+func wrapPlayerLockedSongRepositoryError(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %s: %v", domainrepo.ErrRepositoryOperationFailed, operation, err)
 }
