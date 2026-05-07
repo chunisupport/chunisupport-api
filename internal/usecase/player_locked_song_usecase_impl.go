@@ -3,29 +3,25 @@ package usecase
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 )
-
-const difficultyNameUltima = "ULTIMA"
 
 var errPlayerLockedSongInputRequired = errors.New("input is required")
 
 type playerLockedSongUsecase struct {
-	db             repository.Executor
-	playerRepo     repository.PlayerRepository
-	songRepo       repository.SongRepository
-	lockedRepo     repository.PlayerLockedSongRepository
-	queryService   PlayerLockedSongQueryService
-	resolver       PlayerSongIDResolver
-	masterProvider repository.SongMasterProvider
+	db           repository.Executor
+	playerRepo   repository.PlayerRepository
+	songRepo     repository.SongRepository
+	lockedRepo   repository.PlayerLockedSongRepository
+	queryService PlayerLockedSongQueryService
+	resolver     PlayerSongIDResolver
 }
 
-func NewPlayerLockedSongUsecase(db repository.Executor, playerRepo repository.PlayerRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver, masterProvider repository.SongMasterProvider) PlayerLockedSongUsecase {
-	return &playerLockedSongUsecase{db: db, playerRepo: playerRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver, masterProvider: masterProvider}
+func NewPlayerLockedSongUsecase(db repository.Executor, playerRepo repository.PlayerRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
+	return &playerLockedSongUsecase{db: db, playerRepo: playerRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, userID int) ([]*PlayerLockedSongOutput, error) {
@@ -69,11 +65,7 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 		return repository.ErrSongNotFound
 	}
 	if input.IsUltima {
-		ultimaDifficulty, err := u.ultimaDifficulty()
-		if err != nil {
-			return err
-		}
-		if !song.HasDifficultyChart(ultimaDifficulty.ID) {
+		if !song.HasDifficultyChart(domainservice.DifficultyIDUltima) {
 			return ErrChartNotFound
 		}
 	}
@@ -103,22 +95,4 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 		return nil
 	}
 	return u.lockedRepo.Delete(ctx, u.db, player.ID, *songID, input.IsUltima)
-}
-
-func (u *playerLockedSongUsecase) ultimaDifficulty() (*master.ChartDifficulty, error) {
-	if u.masterProvider == nil {
-		return nil, fmt.Errorf("master cache is not initialized")
-	}
-
-	masters := u.masterProvider.SongMasters()
-	if masters == nil {
-		return nil, fmt.Errorf("master cache is not initialized")
-	}
-
-	difficulty, ok := masters.Difficulties[difficultyNameUltima]
-	if !ok {
-		return nil, fmt.Errorf("difficulty not found: %s", difficultyNameUltima)
-	}
-
-	return &difficulty, nil
 }

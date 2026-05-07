@@ -5,22 +5,13 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type stubPlayerLockedSongMasterProvider struct {
-	masters *masterdata.SongMasters
-}
-
-func (s *stubPlayerLockedSongMasterProvider) SongMasters() *masterdata.SongMasters {
-	return s.masters
-}
 
 type stubPlayerLockedSongPlayerRepository struct {
 	player *entity.Player
@@ -71,33 +62,13 @@ func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec reposit
 	return nil
 }
 
-func TestPlayerLockedSongUltimaDifficulty(t *testing.T) {
-	// Given
-	expected := master.ChartDifficulty{ID: 99, Name: difficultyNameUltima, SortOrder: 4}
-	u := &playerLockedSongUsecase{
-		masterProvider: &stubPlayerLockedSongMasterProvider{
-			masters: &masterdata.SongMasters{
-				Difficulties: map[string]master.ChartDifficulty{
-					difficultyNameUltima: expected,
-				},
-			},
-		},
-	}
-
-	// When
-	actual, err := u.ultimaDifficulty()
-
-	// Then
-	require.NoError(t, err)
-	require.NotNil(t, actual)
-	assert.Equal(t, expected, *actual)
-}
-
 func TestPlayerLockedSongLock(t *testing.T) {
 	tests := []struct {
-		name    string
-		song    *entity.Song
-		wantErr error
+		name           string
+		song           *entity.Song
+		inputIsUltima  bool
+		wantErr        error
+		wantCreateCall bool
 	}{
 		{
 			name:    "WORLD'S END楽曲は見つからない楽曲として扱う",
@@ -108,6 +79,18 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			name:    "削除済み楽曲は見つからない楽曲として扱う",
 			song:    &entity.Song{ID: 1, DisplayID: "0123456789abcdef", IsDeleted: true, Charts: []*entity.Chart{}},
 			wantErr: repository.ErrSongNotFound,
+		},
+		{
+			name:          "ULTIMA譜面がない楽曲をULTIMA未解禁にできない",
+			song:          &entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDMaster}}},
+			inputIsUltima: true,
+			wantErr:       ErrChartNotFound,
+		},
+		{
+			name:           "ULTIMA譜面がある楽曲をULTIMA未解禁にできる",
+			song:           &entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDUltima}}},
+			inputIsUltima:  true,
+			wantCreateCall: true,
 		},
 	}
 
@@ -126,11 +109,15 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			}
 
 			// When
-			err = u.Lock(context.Background(), 100, &PlayerLockedSongInput{DisplayID: displayID})
+			err = u.Lock(context.Background(), 100, &PlayerLockedSongInput{DisplayID: displayID, IsUltima: tt.inputIsUltima})
 
 			// Then
-			assert.ErrorIs(t, err, tt.wantErr)
-			assert.False(t, lockedRepo.createCalled)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantCreateCall, lockedRepo.createCalled)
 			songRepo.AssertExpectations(t)
 		})
 	}
