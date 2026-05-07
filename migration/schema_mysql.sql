@@ -128,6 +128,15 @@ CREATE TABLE `player_honors` (
   CONSTRAINT `player_honors_ibfk_2` FOREIGN KEY (`honor_id`) REFERENCES `honors` (`id`),
   CONSTRAINT `player_honors_chk_1` CHECK ((`slot` between 1 and 3))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_locked_songs` (
+  `player_id` mediumint unsigned NOT NULL,
+  `song_id` int unsigned NOT NULL,
+  `is_ultima` tinyint(1) NOT NULL,
+  PRIMARY KEY (`player_id`,`song_id`,`is_ultima`),
+  KEY `fk_player_locked_songs_song_id` (`song_id`),
+  CONSTRAINT `fk_player_locked_songs_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_locked_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_records` (
   `player_id` mediumint unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,

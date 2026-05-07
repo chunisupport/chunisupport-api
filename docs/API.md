@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年04月18日
+**最終更新日**: 2026年05月07日
 
 ## ベースURLと環境
 
@@ -103,6 +103,9 @@
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/me/locked-songs` | GET | Firebase Bearer | 自分の未解禁曲一覧を取得 |
+| `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
+| `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -320,6 +323,96 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### GET `/internal/me/locked-songs`
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分のプレイヤーに紐づく未解禁曲一覧を取得します。通常未解禁とULTIMA未解禁は `is_ultima` で区別されます。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "items": [
+    {
+      "display_id": "0000000000000001",
+      "title": "楽曲名",
+      "is_ultima": false
+    },
+    {
+      "display_id": "0000000000000002",
+      "title": "ULTIMA未解禁の楽曲名",
+      "is_ultima": true
+    }
+  ]
+}
+```
+
+**PlayerLockedSongsResponse フィールド**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `items` | PlayerLockedSongResponseItem[] | 未解禁曲の一覧。未解禁曲がない場合は空配列 |
+| `items[].display_id` | string | 楽曲の表示用ID |
+| `items[].title` | string | 楽曲名 |
+| `items[].is_ultima` | bool | trueの場合はULTIMA譜面のみ未解禁、falseの場合は通常の未解禁 |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### POST `/internal/me/locked-songs`
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分のプレイヤーに未解禁曲を登録します。同じ曲・同じ `is_ultima` の登録は冪等に成功します。
+- **リクエストボディ**:
+
+```json
+{
+  "display_id": "0000000000000001",
+  "is_ultima": false
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `display_id` | string | ✓ | 楽曲の表示用ID |
+| `is_ultima` | bool | - | trueの場合はULTIMA譜面のみ未解禁として登録。省略時はfalse |
+
+- **レスポンス**: 204 No Content（ボディなし）
+- WORLD'S END楽曲、削除済み楽曲、存在しない楽曲は登録できません。
+- `is_ultima=true` の場合、対象楽曲にULTIMA譜面が存在しないと `chart_not_found` を返します。
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正
+  - 400 Bad Request (`validation_failed`): `display_id` が未指定または形式不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない、または登録対象外
+  - 404 Not Found (`chart_not_found`): ULTIMA譜面が存在しない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### DELETE `/internal/me/locked-songs/:displayid`
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分のプレイヤーから指定した未解禁曲を解除します。対象の未解禁曲が存在しない場合でも204を返します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | 楽曲の表示用ID |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `is_ultima` | bool | - | trueの場合はULTIMA未解禁を解除。省略時はfalse |
+
+- **レスポンス**: 204 No Content（ボディなし）
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): `is_ultima` がboolとして解釈できない
+  - 400 Bad Request (`validation_failed`): `displayid` が未指定または形式不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/me/register-data`
 - **認証**: Firebase Bearer 必須
