@@ -1,6 +1,10 @@
 package entity
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSongDeletionLifecycle(t *testing.T) {
 	tests := []struct {
@@ -117,5 +121,54 @@ func TestSongStartsWithEmptyCharts(t *testing.T) {
 	}
 	if len(song.Charts) != 0 {
 		t.Fatalf("Charts length: got %d, want 0", len(song.Charts))
+	}
+}
+
+func TestSongHasDifficultyChart(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 楽曲が持つ譜面
+		charts []*Chart
+		// When: 判定する難易度ID
+		difficultyID int
+		// Then: 期待する判定結果
+		expected bool
+	}{
+		{
+			name: "ULTIMA譜面を持つ楽曲はtrueになる",
+			charts: []*Chart{
+				{DifficultyID: 4},
+				{DifficultyID: 5},
+			},
+			difficultyID: 5,
+			expected:     true,
+		},
+		{
+			name: "指定した難易度の譜面を持たない楽曲はfalseになる",
+			charts: []*Chart{
+				{DifficultyID: 4},
+			},
+			difficultyID: 5,
+			expected:     false,
+		},
+		{
+			name:         "譜面がない楽曲はfalseになる",
+			charts:       []*Chart{},
+			difficultyID: 5,
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			song := &Song{Charts: tt.charts}
+
+			// When
+			result := song.HasDifficultyChart(tt.difficultyID)
+
+			// Then
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }

@@ -73,7 +73,7 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 		if err != nil {
 			return err
 		}
-		if !hasDifficultyChart(song, *ultimaDifficulty) {
+		if !song.HasDifficultyChart(ultimaDifficulty.ID) {
 			return ErrChartNotFound
 		}
 	}
@@ -121,13 +121,4 @@ func (u *playerLockedSongUsecase) ultimaDifficulty() (*master.ChartDifficulty, e
 	}
 
 	return &difficulty, nil
-}
-
-func hasDifficultyChart(song *entity.Song, difficulty master.ChartDifficulty) bool {
-	for _, chart := range song.Charts {
-		if chart.DifficultyID == difficulty.ID {
-			return true
-		}
-	}
-	return false
 }
