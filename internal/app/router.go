@@ -75,6 +75,7 @@ type Handlers struct {
 	MasterData          *api_internal.MasterDataHandler
 	Goal                *api_internal.GoalHandler
 	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
+	PlayerLockedSong    *api_internal.PlayerLockedSongHandler
 	// 外部API v1 用ハンドラ
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
@@ -132,6 +133,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	playerLockedSongRepo := infra.NewPlayerLockedSongRepository(db)
+	playerLockedSongUsecase := usecase.NewPlayerLockedSongUsecase(db, playerRepo, songRepo, playerLockedSongRepo, playerLockedSongRepo, playerLockedSongRepo)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
@@ -149,6 +152,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
 		Goal:                api_internal.NewGoalHandler(goalUsecase),
 		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
+		PlayerLockedSong:    api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -239,6 +243,9 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
+		meGroup.GET("/locked-songs", handlers.PlayerLockedSong.List)
+		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
+		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")

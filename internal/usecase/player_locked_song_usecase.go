@@ -1,0 +1,38 @@
+package usecase
+
+import (
+	"context"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+)
+
+type PlayerLockedSongInput struct {
+	DisplayID string
+	IsUltima  bool
+}
+
+type PlayerLockedSongOutput struct {
+	DisplayID string
+	Title     string
+	IsUltima  bool
+}
+
+type PlayerLockedSongUsecase interface {
+	List(ctx context.Context, userID int) ([]*PlayerLockedSongOutput, error)
+	Lock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
+	Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
+}
+
+type PlayerLockedSongReadModel struct {
+	SongID    int
+	DisplayID string
+	Title     string
+	IsUltima  bool
+}
+
+type PlayerLockedSongQueryService interface {
+	ListWithSongDisplayIDAndTitleByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*PlayerLockedSongReadModel, error)
+}
+
+type PlayerSongIDResolver interface {
+	ResolveSongIDByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*int, error)
+}
