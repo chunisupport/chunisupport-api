@@ -28,8 +28,7 @@ func (r *PlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec do
 	}
 	res := make([]*entity.PlayerLockedSong, 0, len(rows))
 	for i := range rows {
-		row := rows[i]
-		res = append(res, &row)
+		res = append(res, &rows[i])
 	}
 	return res, nil
 }
