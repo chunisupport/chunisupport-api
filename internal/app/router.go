@@ -134,7 +134,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository(db)
-	playerLockedSongUsecase := usecase.NewPlayerLockedSongUsecase(db, playerRepo, songRepo, playerLockedSongRepo, playerLockedSongRepo, playerLockedSongRepo)
+	playerLockedSongUsecase := usecase.NewPlayerLockedSongUsecase(db, playerRepo, songRepo, playerLockedSongRepo, playerLockedSongRepo, playerLockedSongRepo, masterCache)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers

@@ -1,11 +1,8 @@
 package service
 
-import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
-
-// MASTER/ULTIMA の難易度ID
-const (
-	difficultyIDMaster = 4
-	difficultyIDUltima = 5
+import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
 // SongAggregation は楽曲の譜面集約結果を保持します。
@@ -31,7 +28,7 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 		}
 
 		// MASTER/ULTIMA の is_const_unknown をチェック
-		if (c.DifficultyID == difficultyIDMaster || c.DifficultyID == difficultyIDUltima) && c.IsConstUnknown {
+		if (c.DifficultyID == constants.DifficultyIDMaster || c.DifficultyID == constants.DifficultyIDUltima) && c.IsConstUnknown {
 			isMaxOPUnknown = true
 		}
 	}
