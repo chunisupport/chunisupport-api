@@ -11,7 +11,11 @@ import (
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 )
 
-var errPlayerLockedSongInputRequired = errors.New("input is required")
+var (
+	errPlayerLockedSongInputRequired = errors.New("input is required")
+	errPlayerLockedSongNilDB         = errors.New("database executor is nil")
+	errPlayerLockedSongNilTM         = errors.New("transaction manager is nil")
+)
 
 type playerLockedSongUsecase struct {
 	db             repository.Executor
@@ -26,8 +30,14 @@ type playerLockedSongUsecase struct {
 	resolver       PlayerSongIDResolver
 }
 
-func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
-	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
+func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) (PlayerLockedSongUsecase, error) {
+	if db == nil {
+		return nil, errPlayerLockedSongNilDB
+	}
+	if tm == nil {
+		return nil, errPlayerLockedSongNilTM
+	}
+	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}, nil
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {
@@ -67,6 +77,9 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if input == nil {
 		return errPlayerLockedSongInputRequired
 	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
+	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
 		return err
@@ -105,6 +118,9 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	if input == nil {
 		return errPlayerLockedSongInputRequired
 	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
+	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
 		return err
@@ -125,10 +141,6 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 		}
 		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
 	})
-}
-
-func (u *playerLockedSongUsecase) recalculatePlayerOverpower(ctx context.Context, player *entity.Player) error {
-	return u.recalculatePlayerOverpowerWithTx(ctx, u.db, player)
 }
 
 func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
