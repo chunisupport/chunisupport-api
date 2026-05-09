@@ -15,6 +15,7 @@ var errPlayerLockedSongInputRequired = errors.New("input is required")
 
 type playerLockedSongUsecase struct {
 	db             repository.Executor
+	tm             TransactionManager
 	userRepo       repository.UserRepository
 	playerRepo     repository.PlayerRepository
 	playerRecRepo  repository.PlayerRecordRepository
@@ -25,8 +26,8 @@ type playerLockedSongUsecase struct {
 	resolver       PlayerSongIDResolver
 }
 
-func NewPlayerLockedSongUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
-	return &playerLockedSongUsecase{db: db, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
+func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
+	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {
@@ -92,10 +93,12 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if err != nil {
 		return err
 	}
-	if err := u.lockedRepo.Create(ctx, u.db, lockedSong); err != nil {
-		return err
-	}
-	return u.recalculatePlayerOverpower(ctx, player)
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.lockedRepo.Create(ctx, tx, lockedSong); err != nil {
+			return err
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
 }
 
 func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error {
@@ -116,21 +119,27 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	if songID == nil {
 		return nil
 	}
-	if err := u.lockedRepo.Delete(ctx, u.db, player.ID, *songID, input.IsUltima); err != nil {
-		return err
-	}
-	return u.recalculatePlayerOverpower(ctx, player)
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.lockedRepo.Delete(ctx, tx, player.ID, *songID, input.IsUltima); err != nil {
+			return err
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
 }
 
 func (u *playerLockedSongUsecase) recalculatePlayerOverpower(ctx context.Context, player *entity.Player) error {
+	return u.recalculatePlayerOverpowerWithTx(ctx, u.db, player)
+}
+
+func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	if player == nil {
 		return ErrPlayerNotLinked
 	}
-	records, err := u.playerRecRepo.FindByPlayerID(ctx, u.db, player.ID)
+	records, err := u.playerRecRepo.FindByPlayerID(ctx, exec, player.ID)
 	if err != nil {
 		return err
 	}
-	lockedSongs, err := u.lockedRepo.ListByPlayerID(ctx, u.db, player.ID)
+	lockedSongs, err := u.lockedRepo.ListByPlayerID(ctx, exec, player.ID)
 	if err != nil {
 		return err
 	}
@@ -167,7 +176,7 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpower(ctx context.Context
 	}
 	player.OverpowerValue = &value
 	player.OverpowerPercent = &percent
-	return u.playerRepo.Save(ctx, u.db, player)
+	return u.playerRepo.Save(ctx, exec, player)
 }
 
 func lockedSongKey(songID int, isUltima bool) string {
