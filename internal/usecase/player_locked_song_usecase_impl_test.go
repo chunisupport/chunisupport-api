@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -16,6 +17,7 @@ import (
 type stubPlayerLockedSongPlayerRepository struct {
 	player    *entity.Player
 	gotUserID int
+	saved     *entity.Player
 }
 
 func (s *stubPlayerLockedSongPlayerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
@@ -40,6 +42,7 @@ func (s *stubPlayerLockedSongPlayerRepository) UpdateCalculatedRatings(ctx conte
 }
 
 func (s *stubPlayerLockedSongPlayerRepository) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	s.saved = player
 	return nil
 }
 
@@ -49,10 +52,11 @@ func (s *stubPlayerLockedSongPlayerRepository) DeleteByUserID(ctx context.Contex
 
 type spyPlayerLockedSongRepository struct {
 	createCalled bool
+	lockedSongs  []*entity.PlayerLockedSong
 }
 
 func (s *spyPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
-	return nil, nil
+	return s.lockedSongs, nil
 }
 
 func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec repository.Executor, lockedSong *entity.PlayerLockedSong) error {
@@ -62,6 +66,32 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 
 func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
 	return nil
+}
+
+type stubPlayerRecordRepositoryForLockedSong struct {
+	records []*entity.PlayerRecord
+}
+
+func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
+	return s.records, nil
+}
+func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDForRating(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
+	return nil, nil
+}
+func (s *stubPlayerRecordRepositoryForLockedSong) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
+	return nil, nil
+}
+
+type stubPlayerDataRepositoryForLockedSong struct{}
+
+func (s *stubPlayerDataRepositoryForLockedSong) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
+	return nil, nil
+}
+func (s *stubPlayerDataRepositoryForLockedSong) SavePlayerData(ctx context.Context, exec repository.Executor, input repository.PlayerDataSaveInput) error {
+	return nil
+}
+func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	return &repository.OverpowerTargetStats{MaxOverpowerTotal: 100}, nil
 }
 
 type stubPlayerLockedSongQueryService struct {
@@ -200,9 +230,11 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(tt.song, nil).Once()
 			lockedRepo := &spyPlayerLockedSongRepository{}
 			u := &playerLockedSongUsecase{
-				playerRepo: &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
-				songRepo:   songRepo,
-				lockedRepo: lockedRepo,
+				playerRepo:     &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
+				playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
+				playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+				songRepo:       songRepo,
+				lockedRepo:     lockedRepo,
 			}
 
 			// When
