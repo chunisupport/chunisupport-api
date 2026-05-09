@@ -5,6 +5,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -20,11 +21,13 @@ func NewPlayerLockedSongHandler(u usecase.PlayerLockedSongUsecase) *PlayerLocked
 }
 
 func (h *PlayerLockedSongHandler) List(c echo.Context) error {
-	user, err := getUser(c)
-	if err != nil {
-		return err
+	username := c.Param("username")
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
 	}
-	items, err := h.usecase.List(c.Request().Context(), user.ID)
+
+	items, err := h.usecase.List(c.Request().Context(), username, requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

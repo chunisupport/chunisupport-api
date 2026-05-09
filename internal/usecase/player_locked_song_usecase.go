@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
@@ -19,7 +20,7 @@ type PlayerLockedSongOutput struct {
 }
 
 type PlayerLockedSongUsecase interface {
-	List(ctx context.Context, userID int) ([]*PlayerLockedSongOutput, error)
+	List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error)
 	Lock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
 	Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
 }

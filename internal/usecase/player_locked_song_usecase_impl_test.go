@@ -14,7 +14,8 @@ import (
 )
 
 type stubPlayerLockedSongPlayerRepository struct {
-	player *entity.Player
+	player    *entity.Player
+	gotUserID int
 }
 
 func (s *stubPlayerLockedSongPlayerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
@@ -26,6 +27,7 @@ func (s *stubPlayerLockedSongPlayerRepository) FindByIDWithHonors(ctx context.Co
 }
 
 func (s *stubPlayerLockedSongPlayerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	s.gotUserID = userID
 	return s.player, nil
 }
 
@@ -60,6 +62,101 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 
 func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
 	return nil
+}
+
+type stubPlayerLockedSongQueryService struct {
+	gotPlayerID int
+	rows        []*PlayerLockedSongReadModel
+}
+
+func (s *stubPlayerLockedSongQueryService) ListWithSongDisplayIDAndTitleByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*PlayerLockedSongReadModel, error) {
+	s.gotPlayerID = playerID
+	return s.rows, nil
+}
+
+func TestPlayerLockedSongList(t *testing.T) {
+	tests := []struct {
+		name        string
+		targetUser  *entity.User
+		player      *entity.Player
+		requester   *entity.User
+		wantErr     error
+		wantRowsHit bool
+	}{
+		{
+			name:        "公開ユーザーの未解禁曲を取得できる",
+			targetUser:  &entity.User{ID: 100},
+			player:      &entity.Player{ID: 10},
+			wantRowsHit: true,
+		},
+		{
+			name:        "非公開ユーザー本人は未解禁曲を取得できる",
+			targetUser:  &entity.User{ID: 100, IsPrivate: true},
+			player:      &entity.Player{ID: 10},
+			requester:   &entity.User{ID: 100},
+			wantRowsHit: true,
+		},
+		{
+			name:       "プレイヤー未連携ユーザーは未連携エラー",
+			targetUser: &entity.User{ID: 100},
+			wantErr:    ErrPlayerNotLinked,
+		},
+		{
+			name:       "非公開ユーザーを他人が参照すると非公開エラー",
+			targetUser: &entity.User{ID: 100, IsPrivate: true},
+			requester:  &entity.User{ID: 200},
+			wantErr:    ErrUserPrivate,
+		},
+		{
+			name:    "存在しないユーザーは見つからないエラー",
+			wantErr: ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			userRepo := new(MockUserRepository)
+			if tt.targetUser == nil {
+				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(nil, repository.ErrUserNotFound).Once()
+			} else {
+				userRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(tt.targetUser, nil).Once()
+			}
+			queryService := &stubPlayerLockedSongQueryService{
+				rows: []*PlayerLockedSongReadModel{
+					{DisplayID: "0123456789abcdef", Title: "テスト楽曲", IsUltima: true},
+				},
+			}
+			playerRepo := &stubPlayerLockedSongPlayerRepository{player: tt.player}
+			u := &playerLockedSongUsecase{
+				userRepo:     userRepo,
+				playerRepo:   playerRepo,
+				queryService: queryService,
+			}
+
+			// When
+			got, err := u.List(context.Background(), "testuser", tt.requester)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, "0123456789abcdef", got[0].DisplayID)
+				assert.Equal(t, "テスト楽曲", got[0].Title)
+				assert.True(t, got[0].IsUltima)
+			}
+			if tt.wantRowsHit {
+				assert.Equal(t, 100, playerRepo.gotUserID)
+				assert.Equal(t, 10, queryService.gotPlayerID)
+			} else {
+				assert.Zero(t, queryService.gotPlayerID)
+			}
+			userRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestPlayerLockedSongLock(t *testing.T) {

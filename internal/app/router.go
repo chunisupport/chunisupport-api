@@ -136,7 +136,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
 	playerSongIDResolver := infra.NewPlayerSongIDResolver()
-	playerLockedSongUsecase := usecase.NewPlayerLockedSongUsecase(db, playerRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
+	playerLockedSongUsecase := usecase.NewPlayerLockedSongUsecase(db, userRepo, playerRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
@@ -245,7 +245,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
-		meGroup.GET("/locked-songs", handlers.PlayerLockedSong.List)
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
 	}
@@ -272,6 +271,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
+		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}
 

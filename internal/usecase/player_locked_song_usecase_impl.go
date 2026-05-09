@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -13,6 +14,7 @@ var errPlayerLockedSongInputRequired = errors.New("input is required")
 
 type playerLockedSongUsecase struct {
 	db           repository.Executor
+	userRepo     repository.UserRepository
 	playerRepo   repository.PlayerRepository
 	songRepo     repository.SongRepository
 	lockedRepo   repository.PlayerLockedSongRepository
@@ -20,12 +22,26 @@ type playerLockedSongUsecase struct {
 	resolver     PlayerSongIDResolver
 }
 
-func NewPlayerLockedSongUsecase(db repository.Executor, playerRepo repository.PlayerRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
-	return &playerLockedSongUsecase{db: db, playerRepo: playerRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
+func NewPlayerLockedSongUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
+	return &playerLockedSongUsecase{db: db, userRepo: userRepo, playerRepo: playerRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
 }
 
-func (u *playerLockedSongUsecase) List(ctx context.Context, userID int) ([]*PlayerLockedSongOutput, error) {
-	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
+func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {
+	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		slog.Error("failed to find user by username", "username", username, "error", err)
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+		return nil, ErrUserPrivate
+	}
+	player, err := u.playerRepo.FindByUserID(ctx, u.db, user.ID)
 	if err != nil {
 		return nil, err
 	}
