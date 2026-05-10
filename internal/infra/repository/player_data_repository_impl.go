@@ -144,23 +144,55 @@ func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filt
 		where = append(where, "s.is_deleted = 0")
 	}
 
+	maxConstExpr := "MAX(c.const)"
 	query := `
 		SELECT
 			s.id AS song_id,
-			MAX(c.const) AS max_const
+			` + maxConstExpr + ` AS max_const
 		FROM songs s
 		INNER JOIN charts c ON c.song_id = s.id
+		INNER JOIN difficulties d ON d.id = c.difficulty_id
 	`
+	args := make([]any, 0, 2)
+	if filter.PlayerID != nil {
+		maxConstExpr = `MAX(
+			CASE
+				WHEN pls_ultima.song_id IS NOT NULL AND d.name = 'ULTIMA' THEN NULL
+				ELSE c.const
+			END
+		)`
+		query = `
+		SELECT
+			s.id AS song_id,
+			` + maxConstExpr + ` AS max_const
+		FROM songs s
+		INNER JOIN charts c ON c.song_id = s.id
+		INNER JOIN difficulties d ON d.id = c.difficulty_id
+	`
+		query += `
+			LEFT JOIN player_locked_songs pls_song
+				ON pls_song.song_id = s.id
+				AND pls_song.player_id = ?
+				AND pls_song.is_ultima = 0
+			LEFT JOIN player_locked_songs pls_ultima
+				ON pls_ultima.song_id = s.id
+				AND pls_ultima.player_id = ?
+				AND pls_ultima.is_ultima = 1
+		`
+		args = append(args, *filter.PlayerID, *filter.PlayerID)
+		where = append(where, "pls_song.song_id IS NULL")
+	}
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 	query += " GROUP BY s.id"
+	query += " HAVING max_const IS NOT NULL"
 
 	var rows []struct {
 		SongID   int     `db:"song_id"`
 		MaxConst float64 `db:"max_const"`
 	}
-	if err := executor.SelectContext(ctx, &rows, query); err != nil {
+	if err := executor.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
 

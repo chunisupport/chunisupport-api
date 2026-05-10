@@ -61,7 +61,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	}, counts)
 	assert.Empty(t, skipped)
 	require.Equal(t, 1, repo.saveCalls)
-	assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true}, repo.receivedFilter)
+	assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: intPtrForApplyScoresTest(99)}, repo.receivedFilter)
 
 	require.Len(t, repo.savedInput.FullRecords, 1)
 	assert.Equal(t, repository.PlayerRecordForUpsert{
