@@ -190,7 +190,7 @@ func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filt
 		MaxConst float64 `db:"max_const"`
 	}
 	if err := executor.SelectContext(ctx, &rows, query, args...); err != nil {
-		return nil, fmt.Errorf("%w: failed to select overpower target stats: %v", repository.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: failed to select overpower target stats: %w", repository.ErrRepositoryOperationFailed, err)
 	}
 
 	total := 0.0
