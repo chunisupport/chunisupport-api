@@ -561,6 +561,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
 		ExcludeWorldsend: true,
 		ExcludeDeleted:   true,
+		PlayerID:         &playerID,
 	})
 	if err != nil {
 		return counts, skipped, calculatedOverpowerSummary{}, err

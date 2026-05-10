@@ -138,7 +138,7 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 				ExcludeDeleted:   true,
 			},
 			wantCount: 2,
-			wantTotal: service.CalcSongMaxOP(15.0) +
+			wantTotal: service.CalcSongMaxOP(15.4) +
 				service.CalcSongMaxOP(14.5),
 		},
 		{
@@ -148,10 +148,21 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 				ExcludeDeleted:   false,
 			},
 			wantCount: 4,
-			wantTotal: service.CalcSongMaxOP(15.0) +
+			wantTotal: service.CalcSongMaxOP(15.4) +
 				service.CalcSongMaxOP(14.5) +
 				service.CalcSongMaxOP(13.0) +
 				service.CalcSongMaxOP(12.0),
+		},
+		{
+			name: "プレイヤー未解禁曲がある場合は通常未解禁曲を除外しULTIMA未解禁時は下位難易度を採用する",
+			filter: domainrepo.OverpowerTargetFilter{
+				ExcludeWorldsend: true,
+				ExcludeDeleted:   true,
+				PlayerID:         intPtrForPlayerDataRepositoryTest(100),
+			},
+			wantCount: 2,
+			wantTotal: service.CalcSongMaxOP(15.0) + // Song1: ULTIMA未解禁のためMASTERを採用
+				service.CalcSongMaxOP(14.5), // Song2: 通常譜面は解禁済み
 		},
 	}
 
@@ -176,9 +187,25 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 				VALUES
 					(1, 1, 3, 13.0, 0, 1000),
 					(2, 1, 4, 15.0, 0, 1200),
+					(6, 1, 5, 15.4, 0, 1250),
 					(3, 2, 4, 14.5, 1, 1100),
 					(4, 3, 4, 13.0, 0, 900),
 					(5, 4, 4, 12.0, 0, 800)
+			`)
+			require.NoError(t, err)
+			_, err = db.Exec(`
+				CREATE TABLE IF NOT EXISTS player_locked_songs (
+					player_id INTEGER NOT NULL,
+					song_id INTEGER NOT NULL,
+					is_ultima BOOLEAN NOT NULL,
+					PRIMARY KEY (player_id, song_id, is_ultima)
+				)
+			`)
+			require.NoError(t, err)
+			_, err = db.Exec(`
+				INSERT INTO player_locked_songs (player_id, song_id, is_ultima)
+				VALUES
+					(100, 1, 1)
 			`)
 			require.NoError(t, err)
 
@@ -194,6 +221,10 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 			assert.InDelta(t, tt.wantTotal, stats.MaxOverpowerTotal, 0.0001)
 		})
 	}
+}
+
+func intPtrForPlayerDataRepositoryTest(value int) *int {
+	return &value
 }
 
 func TestSavePlayerData_execがnilならエラーを返す(t *testing.T) {

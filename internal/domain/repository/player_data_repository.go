@@ -24,6 +24,7 @@ type PlayerDataSaveInput struct {
 type OverpowerTargetFilter struct {
 	ExcludeWorldsend bool
 	ExcludeDeleted   bool
+	PlayerID         *int
 }
 
 // OverpowerTargetStats はOVER POWER割合計算で使う全体集計値です。
