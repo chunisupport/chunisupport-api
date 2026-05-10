@@ -145,15 +145,10 @@ func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filt
 	}
 
 	maxConstExpr := "MAX(c.const)"
-	query := `
-		SELECT
-			s.id AS song_id,
-			` + maxConstExpr + ` AS max_const
-		FROM songs s
-		INNER JOIN charts c ON c.song_id = s.id
-		INNER JOIN difficulties d ON d.id = c.difficulty_id
-	`
 	args := make([]any, 0, 2)
+	joins := `
+		INNER JOIN charts c ON c.song_id = s.id
+	`
 	if filter.PlayerID != nil {
 		maxConstExpr = `MAX(
 			CASE
@@ -161,15 +156,8 @@ func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filt
 				ELSE c.const
 			END
 		)`
-		query = `
-		SELECT
-			s.id AS song_id,
-			` + maxConstExpr + ` AS max_const
-		FROM songs s
-		INNER JOIN charts c ON c.song_id = s.id
-		INNER JOIN difficulties d ON d.id = c.difficulty_id
-	`
-		query += `
+		joins += `
+			INNER JOIN difficulties d ON d.id = c.difficulty_id
 			LEFT JOIN player_locked_songs pls_song
 				ON pls_song.song_id = s.id
 				AND pls_song.player_id = ?
@@ -182,11 +170,20 @@ func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filt
 		args = append(args, *filter.PlayerID, *filter.PlayerID)
 		where = append(where, "pls_song.song_id IS NULL")
 	}
+
+	query := `
+		SELECT
+			s.id AS song_id,
+			` + maxConstExpr + ` AS max_const
+		FROM songs s
+	` + joins
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 	query += " GROUP BY s.id"
-	query += " HAVING max_const IS NOT NULL"
+	if filter.PlayerID != nil {
+		query += " HAVING max_const IS NOT NULL"
+	}
 
 	var rows []struct {
 		SongID   int     `db:"song_id"`
