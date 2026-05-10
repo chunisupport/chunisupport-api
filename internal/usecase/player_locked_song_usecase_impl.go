@@ -3,27 +3,42 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
-var errPlayerLockedSongInputRequired = errors.New("input is required")
+var (
+	errPlayerLockedSongInputRequired = errors.New("input is required")
+	errPlayerLockedSongNilDB         = errors.New("database executor is nil")
+	errPlayerLockedSongNilTM         = errors.New("transaction manager is nil")
+)
 
 type playerLockedSongUsecase struct {
-	db           repository.Executor
-	userRepo     repository.UserRepository
-	playerRepo   repository.PlayerRepository
-	songRepo     repository.SongRepository
-	lockedRepo   repository.PlayerLockedSongRepository
-	queryService PlayerLockedSongQueryService
-	resolver     PlayerSongIDResolver
+	db             repository.Executor
+	tm             TransactionManager
+	userRepo       repository.UserRepository
+	playerRepo     repository.PlayerRepository
+	playerRecRepo  repository.PlayerRecordRepository
+	playerDataRepo repository.PlayerDataRepository
+	songRepo       repository.SongRepository
+	lockedRepo     repository.PlayerLockedSongRepository
+	queryService   PlayerLockedSongQueryService
+	resolver       PlayerSongIDResolver
 }
 
-func NewPlayerLockedSongUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) PlayerLockedSongUsecase {
-	return &playerLockedSongUsecase{db: db, userRepo: userRepo, playerRepo: playerRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}
+func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) (PlayerLockedSongUsecase, error) {
+	if db == nil {
+		return nil, errPlayerLockedSongNilDB
+	}
+	if tm == nil {
+		return nil, errPlayerLockedSongNilTM
+	}
+	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}, nil
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {
@@ -63,6 +78,9 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if input == nil {
 		return errPlayerLockedSongInputRequired
 	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
+	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
 		return err
@@ -89,12 +107,20 @@ func (u *playerLockedSongUsecase) Lock(ctx context.Context, userID int, input *P
 	if err != nil {
 		return err
 	}
-	return u.lockedRepo.Create(ctx, u.db, lockedSong)
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.lockedRepo.Create(ctx, tx, lockedSong); err != nil {
+			return err
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
 }
 
 func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error {
 	if input == nil {
 		return errPlayerLockedSongInputRequired
+	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
 	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
 	if err != nil {
@@ -110,5 +136,62 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	if songID == nil {
 		return nil
 	}
-	return u.lockedRepo.Delete(ctx, u.db, player.ID, *songID, input.IsUltima)
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.lockedRepo.Delete(ctx, tx, player.ID, *songID, input.IsUltima); err != nil {
+			return err
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
+}
+
+func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	if player == nil {
+		return ErrPlayerNotLinked
+	}
+	records, err := u.playerRecRepo.FindByPlayerID(ctx, exec, player.ID)
+	if err != nil {
+		return err
+	}
+	lockedSongs, err := u.lockedRepo.ListByPlayerID(ctx, exec, player.ID)
+	if err != nil {
+		return err
+	}
+	lockedSet := make(map[string]struct{}, len(lockedSongs))
+	for _, lockedSong := range lockedSongs {
+		key := lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)
+		lockedSet[key] = struct{}{}
+	}
+	bestBySong := make(map[int]float64, len(records))
+	for _, record := range records {
+		if record == nil || record.Song == nil || record.Chart == nil || record.ChartDifficulty == nil {
+			continue
+		}
+		if _, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]; exists {
+			continue
+		}
+		overpower := domainservice.CalcSingleOverpower(uint32(record.Score), float64(record.Chart.Const), record.ComboLampID)
+		if current, exists := bestBySong[record.Song.ID]; !exists || overpower > current {
+			bestBySong[record.Song.ID] = overpower
+		}
+	}
+	total := 0.0
+	for _, best := range bestBySong {
+		total += best
+	}
+	value := max(roundFloat(total, 3), 0.0)
+	stats, err := u.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true})
+	if err != nil {
+		return err
+	}
+	percent := 0.0
+	if stats.MaxOverpowerTotal > 0 {
+		percent = min(max(roundFloat(total/stats.MaxOverpowerTotal*100, 4), 0.0), 100.0)
+	}
+	player.OverpowerValue = &value
+	player.OverpowerPercent = &percent
+	return u.playerRepo.Save(ctx, exec, player)
+}
+
+func lockedSongKey(songID int, isUltima bool) string {
+	return fmt.Sprintf("%d:%t", songID, isUltima)
 }
