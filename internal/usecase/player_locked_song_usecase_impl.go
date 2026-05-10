@@ -9,6 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 var (
@@ -165,7 +166,7 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 		if record == nil || record.Song == nil || record.Chart == nil || record.ChartDifficulty == nil {
 			continue
 		}
-		if _, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == "ULTIMA")]; exists {
+		if _, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]; exists {
 			continue
 		}
 		overpower := domainservice.CalcSingleOverpower(uint32(record.Score), float64(record.Chart.Const), record.ComboLampID)

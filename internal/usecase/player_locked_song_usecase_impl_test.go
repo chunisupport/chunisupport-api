@@ -230,6 +230,7 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(tt.song, nil).Once()
 			lockedRepo := &spyPlayerLockedSongRepository{}
 			u := &playerLockedSongUsecase{
+				tm:             &passthroughTransactionManager{},
 				playerRepo:     &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
 				playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
 				playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
