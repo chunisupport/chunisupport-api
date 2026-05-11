@@ -37,6 +37,20 @@
 - `/v1` と `/compat/chunirec/2.0` はどちらも API トークン認証です。
 - トークンは `/internal/auth/api-tokens` で発行します。
 
+## レートリミット（現行実装値）
+
+ルーター実装（`internal/app/router.go`）および定数定義（`internal/info/info.go`）に基づく主要なレートリミットは以下です。
+
+- `/internal/auth/signup`: **1分あたり5回/IP**
+- `/internal/me/register-data`: **30秒あたり1回/ユーザー**
+- `/internal/player-data/temp`: **1分あたり30回/IP**
+- `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
+- `/internal/users/*` および `/internal/songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり10回/IP**
+- `/v1/*`: **15分あたり150回（一般ユーザー） / 150,000回（ADMIN）**
+- `/compat/chunirec/2.0/*`: **`/v1` と同一**
+
+実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
+
 ## 共通レスポンス仕様
 
 - コンテンツタイプは `application/json`。
