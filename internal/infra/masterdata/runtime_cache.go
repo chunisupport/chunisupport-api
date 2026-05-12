@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 )
 
@@ -16,21 +17,22 @@ type Loader interface {
 
 // RuntimeCache は再読み込み可能なマスタキャッシュです。
 type RuntimeCache struct {
-	mu      sync.RWMutex
-	dynamic *Cache
-	static  *StaticCache
-	loader  Loader
+	mu       sync.RWMutex
+	reloadMu sync.Mutex
+	dynamic  *Cache
+	static   *StaticCache
+	loader   Loader
 }
 
 // NewRuntimeCache は初期ロードを実行してRuntimeCacheを生成します。
 func NewRuntimeCache(ctx context.Context, loader Loader) (*RuntimeCache, error) {
 	if loader == nil {
-		return nil, fmt.Errorf("loader is nil")
+		return nil, fmt.Errorf("%w: loader is nil", repository.ErrRepositoryOperationFailed)
 	}
 
 	dynamic, static, err := loader.Load(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to load initial cache: %w", repository.ErrRepositoryOperationFailed, err)
 	}
 
 	return &RuntimeCache{dynamic: dynamic, static: static, loader: loader}, nil
@@ -39,12 +41,15 @@ func NewRuntimeCache(ctx context.Context, loader Loader) (*RuntimeCache, error) 
 // Reload はマスタを再読み込みし、成功時のみスワップします。
 func (c *RuntimeCache) Reload(ctx context.Context) error {
 	if c == nil {
-		return fmt.Errorf("runtime cache is nil")
+		return fmt.Errorf("%w: runtime cache is nil", repository.ErrRepositoryOperationFailed)
 	}
+
+	c.reloadMu.Lock()
+	defer c.reloadMu.Unlock()
 
 	dynamic, static, err := c.loader.Load(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: failed to reload cache: %w", repository.ErrRepositoryOperationFailed, err)
 	}
 
 	c.mu.Lock()
@@ -54,24 +59,40 @@ func (c *RuntimeCache) Reload(ctx context.Context) error {
 	return nil
 }
 
-// Snapshot は動的マスタの現在値を返します。
+// Snapshot は動的マスタの現在値のコピーを返します。
 func (c *RuntimeCache) Snapshot() *Cache {
 	if c == nil {
 		return nil
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.dynamic
+	if c.dynamic == nil {
+		return nil
+	}
+
+	// 浅いコピーを作成（マップ自体は共有されるが、構造体ポインタは新規）
+	copied := *c.dynamic
+	return &copied
 }
 
-// StaticSnapshot は静的マスタの現在値を返します。
+// StaticSnapshot は静的マスタの現在値のコピーを返します。
 func (c *RuntimeCache) StaticSnapshot() *StaticCache {
 	if c == nil {
 		return nil
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.static
+	if c.static == nil {
+		return nil
+	}
+
+	// 浅いコピーを作成（スライスとマップのコンテンツは共有されるが、構造体ポインタは新規）
+	copied := *c.static
+	// RatingBands スライスのコピーを作成
+	if c.static.RatingBands != nil {
+		copied.RatingBands = append([]*ratingband.RatingBand{}, c.static.RatingBands...)
+	}
+	return &copied
 }
 
 func (c *RuntimeCache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
