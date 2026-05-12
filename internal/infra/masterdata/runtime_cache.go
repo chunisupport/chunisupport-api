@@ -92,10 +92,9 @@ func (c *RuntimeCache) StaticSnapshot() *StaticCache {
 
 	// 浅いコピーを作成（スライスとマップのコンテンツは共有されるが、構造体ポインタは新規）
 	copied := *c.static
-	// RatingBands スライスのコピーを作成
-	if c.static.RatingBands != nil {
-		copied.RatingBands = append([]*ratingband.RatingBand{}, c.static.RatingBands...)
-	}
+	// RatingBands は常に非nilスライスを返し、呼び出し側のnil判定を不要にする。
+	copied.RatingBands = make([]*ratingband.RatingBand, 0, len(c.static.RatingBands))
+	copied.RatingBands = append(copied.RatingBands, c.static.RatingBands...)
 	return &copied
 }
 
@@ -144,5 +143,5 @@ func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
 	if static == nil {
 		return []*ratingband.RatingBand{}
 	}
-	return append([]*ratingband.RatingBand{}, static.RatingBands...)
+	return static.RatingBands
 }
