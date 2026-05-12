@@ -117,7 +117,7 @@ func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
 	static := c.StaticSnapshot()
 	if static == nil {
-		return nil
+		return []*ratingband.RatingBand{}
 	}
-	return static.RatingBands
+	return append([]*ratingband.RatingBand{}, static.RatingBands...)
 }
