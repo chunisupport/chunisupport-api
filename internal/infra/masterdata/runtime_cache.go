@@ -139,9 +139,11 @@ func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 }
 
 func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
-	static := c.StaticSnapshot()
-	if static == nil {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.static == nil {
 		return []*ratingband.RatingBand{}
 	}
-	return static.RatingBands
+	res := make([]*ratingband.RatingBand, 0, len(c.static.RatingBands))
+	return append(res, c.static.RatingBands...)
 }
