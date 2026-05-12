@@ -47,6 +47,10 @@ func (c *RuntimeCache) Reload(ctx context.Context) error {
 	c.reloadMu.Lock()
 	defer c.reloadMu.Unlock()
 
+	if c.loader == nil {
+		return fmt.Errorf("%w: loader is nil", repository.ErrRepositoryOperationFailed)
+	}
+
 	dynamic, static, err := c.loader.Load(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: failed to reload cache: %w", repository.ErrRepositoryOperationFailed, err)
