@@ -63,8 +63,8 @@ func (c *RuntimeCache) Reload(ctx context.Context) error {
 	return nil
 }
 
-// Snapshot は動的マスタの現在値のコピーを返します。
-func (c *RuntimeCache) Snapshot() *Cache {
+// snapshot は動的マスタの現在値のコピーを返します。
+func (c *RuntimeCache) snapshot() *Cache {
 	if c == nil {
 		return nil
 	}
@@ -79,8 +79,8 @@ func (c *RuntimeCache) Snapshot() *Cache {
 	return &copied
 }
 
-// StaticSnapshot は静的マスタの現在値のコピーを返します。
-func (c *RuntimeCache) StaticSnapshot() *StaticCache {
+// staticSnapshot は静的マスタの現在値のコピーを返します。
+func (c *RuntimeCache) staticSnapshot() *StaticCache {
 	if c == nil {
 		return nil
 	}
@@ -99,7 +99,7 @@ func (c *RuntimeCache) StaticSnapshot() *StaticCache {
 }
 
 func (c *RuntimeCache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
-	dynamic := c.Snapshot()
+	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
 	}
@@ -107,7 +107,7 @@ func (c *RuntimeCache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
 }
 
 func (c *RuntimeCache) SongMasters() *domainmasterdata.SongMasters {
-	dynamic := c.Snapshot()
+	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (c *RuntimeCache) SongMasters() *domainmasterdata.SongMasters {
 }
 
 func (c *RuntimeCache) GetAccountTypeNameByID(id int) string {
-	dynamic := c.Snapshot()
+	dynamic := c.snapshot()
 	if dynamic == nil {
 		return "UNKNOWN"
 	}
@@ -123,7 +123,7 @@ func (c *RuntimeCache) GetAccountTypeNameByID(id int) string {
 }
 
 func (c *RuntimeCache) GoalMasters() *domainmasterdata.GoalMasters {
-	dynamic := c.Snapshot()
+	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (c *RuntimeCache) GoalMasters() *domainmasterdata.GoalMasters {
 }
 
 func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
-	dynamic := c.Snapshot()
+	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
 	}
@@ -139,11 +139,9 @@ func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 }
 
 func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.static == nil {
+	static := c.staticSnapshot()
+	if static == nil {
 		return []*ratingband.RatingBand{}
 	}
-	res := make([]*ratingband.RatingBand, 0, len(c.static.RatingBands))
-	return append(res, c.static.RatingBands...)
+	return static.RatingBands
 }
