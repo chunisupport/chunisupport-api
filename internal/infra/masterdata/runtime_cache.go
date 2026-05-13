@@ -34,6 +34,9 @@ func NewRuntimeCache(ctx context.Context, loader Loader) (*RuntimeCache, error) 
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to load initial cache: %w", repository.ErrRepositoryOperationFailed, err)
 	}
+	if dynamic == nil || static == nil {
+		return nil, fmt.Errorf("%w: loader returned nil cache", repository.ErrRepositoryOperationFailed)
+	}
 
 	return &RuntimeCache{dynamic: dynamic, static: static, loader: loader}, nil
 }
