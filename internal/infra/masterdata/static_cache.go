@@ -82,6 +82,15 @@ func (c *StaticCache) RatingBandsSnapshot() []*ratingband.RatingBand {
 			continue
 		}
 		copied := *band
+		// Deep copy pointer fields to prevent mutation of cached values
+		if band.MinInclusive != nil {
+			minVal := *band.MinInclusive
+			copied.MinInclusive = &minVal
+		}
+		if band.MaxExclusive != nil {
+			maxVal := *band.MaxExclusive
+			copied.MaxExclusive = &maxVal
+		}
 		res[i] = &copied
 	}
 
