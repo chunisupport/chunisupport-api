@@ -70,6 +70,24 @@ func loadRatingBands(ctx context.Context, db *sqlx.DB) ([]*ratingband.RatingBand
 	return results, nil
 }
 
+// RatingBandsSnapshot はレーティング帯の防衛的コピーを返します。
+func (c *StaticCache) RatingBandsSnapshot() []*ratingband.RatingBand {
+	if c == nil || len(c.RatingBands) == 0 {
+		return []*ratingband.RatingBand{}
+	}
+
+	res := make([]*ratingband.RatingBand, len(c.RatingBands))
+	for i, band := range c.RatingBands {
+		if band == nil {
+			continue
+		}
+		copied := *band
+		res[i] = &copied
+	}
+
+	return res
+}
+
 // GetRatingBandByID はIDからRatingBandを取得します。
 // 見つからない場合はnilを返します。
 func (c *StaticCache) GetRatingBandByID(id int) *ratingband.RatingBand {
