@@ -154,3 +154,32 @@ func TestRuntimeCache_既存インターフェースを満たす(t *testing.T) {
 	assert.Equal(t, dynamic.MasterDataMasters().Genres, runtime.MasterDataMasters().Genres)
 	assert.Equal(t, static.RatingBands, runtime.RatingBands())
 }
+
+func TestRuntimeCache_RatingBandsは呼び出し側の変更が内部キャッシュへ波及しない(t *testing.T) {
+	tests := []struct {
+		name   string
+		static *StaticCache
+	}{
+		{
+			name:   "ポインタ要素をコピーして返すため外部変更が内部に影響しない",
+			static: &StaticCache{RatingBands: []*ratingband.RatingBand{{ID: 1, Label: "A"}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			loader := &masterLoaderMock{dynamic: &Cache{}, static: tt.static}
+			runtime, err := NewRuntimeCache(context.Background(), loader)
+			require.NoError(t, err)
+
+			// When
+			bands := runtime.RatingBands()
+			require.Len(t, bands, 1)
+			bands[0].Label = "CHANGED"
+
+			// Then
+			assert.Equal(t, "A", runtime.RatingBands()[0].Label)
+		})
+	}
+}

@@ -3,7 +3,6 @@ package masterdata
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -104,6 +103,7 @@ func (c *RuntimeCache) staticSnapshot() *StaticCache {
 }
 
 func (c *RuntimeCache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
+	// 初期化前や破棄後の呼び出しでは上位層で未初期化として扱えるようnilを返す。
 	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
@@ -112,6 +112,7 @@ func (c *RuntimeCache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
 }
 
 func (c *RuntimeCache) SongMasters() *domainmasterdata.SongMasters {
+	// 動的キャッシュが未ロードなら参照不能であることを明確にするためnilを返す。
 	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
@@ -120,6 +121,7 @@ func (c *RuntimeCache) SongMasters() *domainmasterdata.SongMasters {
 }
 
 func (c *RuntimeCache) GetAccountTypeNameByID(id int) string {
+	// 未初期化時でも呼び出し側が扱えるよう、フェイルセーフとしてUNKNOWNを返す。
 	dynamic := c.snapshot()
 	if dynamic == nil {
 		return "UNKNOWN"
@@ -128,6 +130,7 @@ func (c *RuntimeCache) GetAccountTypeNameByID(id int) string {
 }
 
 func (c *RuntimeCache) GoalMasters() *domainmasterdata.GoalMasters {
+	// 目標系マスタは動的キャッシュ依存のため、未初期化時はnilで不在を返す。
 	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
@@ -136,6 +139,7 @@ func (c *RuntimeCache) GoalMasters() *domainmasterdata.GoalMasters {
 }
 
 func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
+	// 参照系ユースケースでnil判定できるよう、未初期化時はnilを返す契約にする。
 	dynamic := c.snapshot()
 	if dynamic == nil {
 		return nil
@@ -144,6 +148,7 @@ func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 }
 
 func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
+	// 集約参照として扱いやすいよう、未初期化/空でもnilではなく空スライスを返す。
 	static := c.staticSnapshot()
 	if static == nil || len(static.RatingBands) == 0 {
 		return []*ratingband.RatingBand{}
