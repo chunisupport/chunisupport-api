@@ -148,6 +148,14 @@ func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
 	if static == nil || len(static.RatingBands) == 0 {
 		return []*ratingband.RatingBand{}
 	}
-	// 呼び出し側からの変更が内部キャッシュへ伝播しないようにコピーを返す。
-	return slices.Clone(static.RatingBands)
+	// 呼び出し側からの変更が内部キャッシュへ伝播しないように、各要素をコピーして返す。
+	res := make([]*ratingband.RatingBand, len(static.RatingBands))
+	for i, b := range static.RatingBands {
+		if b == nil {
+			continue
+		}
+		copy := *b
+		res[i] = &copy
+	}
+	return res
 }
