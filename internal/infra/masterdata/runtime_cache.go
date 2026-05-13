@@ -3,6 +3,7 @@ package masterdata
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -85,7 +86,7 @@ func (c *RuntimeCache) snapshot() *Cache {
 	return &copied
 }
 
-// staticSnapshot は静的マスタの現在値のコピーを返します。
+// staticSnapshot は静的マスタの現在値の浅いコピーを返します。
 func (c *RuntimeCache) staticSnapshot() *StaticCache {
 	if c == nil {
 		return nil
@@ -96,11 +97,9 @@ func (c *RuntimeCache) staticSnapshot() *StaticCache {
 		return nil
 	}
 
-	// 浅いコピーを作成（スライスとマップのコンテンツは共有されるが、構造体ポインタは新規）
+	// スナップショット取得自体の責務は参照の固定化に限定し、
+	// 可変コレクションの防衛的コピーは各公開アクセサ側で行う。
 	copied := *c.static
-	// RatingBands は常に非nilスライスを返し、呼び出し側のnil判定を不要にする。
-	copied.RatingBands = make([]*ratingband.RatingBand, 0, len(c.static.RatingBands))
-	copied.RatingBands = append(copied.RatingBands, c.static.RatingBands...)
 	return &copied
 }
 
@@ -146,8 +145,9 @@ func (c *RuntimeCache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 
 func (c *RuntimeCache) RatingBands() []*ratingband.RatingBand {
 	static := c.staticSnapshot()
-	if static == nil {
+	if static == nil || len(static.RatingBands) == 0 {
 		return []*ratingband.RatingBand{}
 	}
-	return static.RatingBands
+	// 呼び出し側からの変更が内部キャッシュへ伝播しないようにコピーを返す。
+	return slices.Clone(static.RatingBands)
 }
