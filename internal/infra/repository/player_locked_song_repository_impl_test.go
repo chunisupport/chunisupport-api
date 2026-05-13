@@ -77,6 +77,45 @@ func TestPlayerLockedSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 	}
 }
 
+func TestPlayerLockedSongRepositoryListByPlayerID(t *testing.T) {
+	// Given
+	repo := &PlayerLockedSongRepository{}
+	db, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+	_, err = db.Exec(`
+		CREATE TABLE player_locked_songs (
+			player_id INTEGER NOT NULL,
+			song_id INTEGER NOT NULL,
+			is_ultima BOOLEAN NOT NULL
+		)
+	`)
+	require.NoError(t, err)
+	_, err = db.Exec(`
+		INSERT INTO player_locked_songs (player_id, song_id, is_ultima)
+		VALUES
+			(1, 20, FALSE),
+			(1, 10, TRUE),
+			(2, 30, FALSE)
+	`)
+	require.NoError(t, err)
+
+	// When
+	got, err := repo.ListByPlayerID(context.Background(), db, 1)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, 1, got[0].PlayerID)
+	assert.Equal(t, 10, got[0].SongID)
+	assert.True(t, got[0].IsUltima)
+	assert.Equal(t, 1, got[1].PlayerID)
+	assert.Equal(t, 20, got[1].SongID)
+	assert.False(t, got[1].IsUltima)
+}
+
 func TestResolveSongIDByDisplayIDReturnsNilWhenNoRows(t *testing.T) {
 	// Given
 	resolver := &PlayerSongIDResolver{}
