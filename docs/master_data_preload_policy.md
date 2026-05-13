@@ -5,7 +5,7 @@
 ## 起動時に読み込む
 | テーブル | 理由 |
 | --- | --- |
-| `genres` | 7件のみの楽曲ジャンルマスタで固定値。 |
+| `genres` | 7件のみの楽曲ジャンルマスタで固定値。表示順は `sort_order` で管理する。 |
 | `difficulties` | 5件のみの難易度マスタで固定値。 |
 | `class_emblems` / `class_emblem_bases` | クラスエンブレム種別で件数少、定義済みマスタ。 |
 | `clear_lamp_types` / `combo_lamp_types` | クリア・コンボランプ種別で件数少、定義済みマスタ。 |

@@ -69,11 +69,12 @@ func (m *SortedMasterModel) ToChartDifficulty() *master.ChartDifficulty {
 	}
 }
 
-// ToGenre はMasterModelをmaster.Genreに変換します。
-func (m *MasterModel) ToGenre() *master.Genre {
+// ToGenre はSortedMasterModelをmaster.Genreに変換します。
+func (m *SortedMasterModel) ToGenre() *master.Genre {
 	return &master.Genre{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		SortOrder: m.SortOrder,
 	}
 }
 

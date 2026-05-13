@@ -24,7 +24,7 @@ func NewMasterDataUsecase(masterProvider repository.MasterDataMasterProvider, ra
 }
 
 // GetMasterData はソート済みのマスタデータ一覧を返します。
-// 難易度はゲームの正規表示順（SortOrder昇順）でソートされます。
+// 難易度とジャンルはゲームの正規表示順（SortOrder昇順）でソートされます。
 // バージョンはリリース日昇順でソートされます。
 // その他のマスタはID昇順でソートされます。
 func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
@@ -48,7 +48,7 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	}
 
 	return &MasterDataOutput{
-		Genres:           sortedByID(masters.Genres, func(g master.Genre) masterdata.Item { return masterdata.Item{ID: g.ID, Name: g.Name} }),
+		Genres:           sortedGenresBySortOrder(masters.Genres),
 		Difficulties:     sortedDifficultiesBySortOrder(masters.Difficulties),
 		AccountTypes:     sortedByID(masters.AccountTypes, func(a master.AccountType) masterdata.Item { return masterdata.Item{ID: a.ID, Name: a.Name} }),
 		Versions:         sortedVersionsByReleasedAt(masters.Versions),
@@ -82,6 +82,13 @@ func (u *masterDataUsecase) GetVersions(_ context.Context) []masterdata.Version 
 	}
 
 	return sortedVersionsByReleasedAt(masters.Versions)
+}
+
+// sortedGenresBySortOrder はジャンルをゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。
+func sortedGenresBySortOrder(genres map[string]master.Genre) []masterdata.Item {
+	return sortedBySortOrder(genres, func(g master.Genre) (masterdata.Item, int) {
+		return masterdata.Item{ID: g.ID, Name: g.Name}, g.SortOrder
+	})
 }
 
 // sortedDifficultiesBySortOrder は難易度をゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。

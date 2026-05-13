@@ -63,12 +63,12 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 			wantDifficultyIDs: []int{1, 2, 3, 4, 5},
 		},
 		{
-			name: "ジャンルはID昇順に並ぶ",
+			name: "ジャンルはSortOrder昇順に並ぶ",
 			masters: &masterdata.MasterDataMasters{
 				Genres: map[string]master.Genre{
-					"POPS&ANIME": {ID: 2, Name: "POPS&ANIME"},
-					"VARIETY":    {ID: 3, Name: "VARIETY"},
-					"ORIGINAL":   {ID: 1, Name: "ORIGINAL"},
+					"POPS&ANIME": {ID: 2, Name: "POPS&ANIME", SortOrder: 0},
+					"VARIETY":    {ID: 3, Name: "VARIETY", SortOrder: 2},
+					"ORIGINAL":   {ID: 1, Name: "ORIGINAL", SortOrder: 1},
 				},
 				Difficulties:     map[string]master.ChartDifficulty{},
 				AccountTypes:     map[string]master.AccountType{},
@@ -76,7 +76,7 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 				AchievementTypes: map[string]masterdata.Item{},
 			},
 			ratingBands:  nil,
-			wantGenreIDs: []int{1, 2, 3},
+			wantGenreIDs: []int{2, 1, 3},
 		},
 		{
 			name: "アカウントタイプはID昇順に並ぶ",

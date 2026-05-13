@@ -127,14 +127,14 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 ### マスタテーブル
 
 #### ゲームデータマスタ
-- `genres`: ジャンルマスタ（POPS & ANIME、niconico、東方Project、VARIETY、イロドリミドリ、ゲキマイ、ORIGINAL）。
+- `genres`: ジャンルマスタ（POPS & ANIME、niconico、東方Project、VARIETY、イロドリミドリ、ゲキマイ、ORIGINAL）。表示順は `sort_order` で管理。
 - `difficulties`: 譜面難易度マスタ（BASIC、ADVANCED、EXPERT、MASTER、ULTIMA）。
 - `clear_lamp_types`: クリアランプ種別マスタ。
 - `combo_lamp_types`: コンボランプ種別マスタ。
 - `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM）。
 - `class_emblems`: クラスエンブレムマスタ（1、2、3、4、5、inf）。
 - `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5、inf）。
-- `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
+- `genres` / `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
@@ -164,3 +164,5 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000011**: `players.overpower_value` の型を `DECIMAL(8,2)` → `DECIMAL(9,3)` へ、`players.overpower_percentage` の型を `DECIMAL(5,2)` → `DECIMAL(7,4)` へ変更。精度向上のため。
 - **000012**: Firebase 認証への一本化に伴い、`cleanup_expired_sessions` イベント、`sessions` テーブル、`user_recovery_codes` テーブル、および `users.password_hash` カラムを削除。破棄された旧認証データは down でも復元されず、ロールバックではスキーマのみ復元される。
 - **000013**: `player_records` の最新更新取得をプレイヤー単位で高速化するため、`idx_player_records_updated_at` を削除し、`player_records(player_id, updated_at DESC)` を追加。あわせて `player_worldsend_records` の単独 `updated_at` インデックス、`idx_goals_user_created_id` に包含される `idx_goals_user_id`、および不要になった `idx_songs_title` を削除した。
+- **000014**: プレイヤーごとの解禁済み楽曲を保持する `player_locked_songs` テーブルを追加。
+- **000015**: `genres` テーブルに `sort_order` カラムを追加し、ジャンルの表示順を投入。

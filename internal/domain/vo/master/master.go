@@ -1,7 +1,7 @@
 package master
 
 // BaseMasterVO は、IDとNameを持つ単純なマスタ値オブジェクトの基本構造体です。
-// sort_order を持たないマスタ（genres, honor_types, slots など）に使用します。
+// sort_order を持たないマスタ（honor_types, slots など）に使用します。
 type BaseMasterVO struct {
 	ID   int
 	Name string
@@ -37,7 +37,7 @@ type ComboLampType SortedMasterVO
 type FullChainType SortedMasterVO
 
 // Genre はジャンルマスタの値オブジェクトです。
-type Genre BaseMasterVO
+type Genre SortedMasterVO
 
 // HonorType は称号種類マスタの値オブジェクトです。
 type HonorType BaseMasterVO

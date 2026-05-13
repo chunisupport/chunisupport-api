@@ -139,14 +139,14 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		difficultyNamesByID[row.ID] = row.Name
 	}
 
-	genreRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM genres")
+	genreRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM genres")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload genres: %w", err)
 	}
 	genres := make(map[string]master.Genre, len(genreRows))
 	genreNamesByID := make(map[int]string, len(genreRows))
 	for _, row := range genreRows {
-		genres[row.Name] = master.Genre{ID: row.ID, Name: row.Name}
+		genres[row.Name] = master.Genre{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
 		genreNamesByID[row.ID] = row.Name
 	}
 

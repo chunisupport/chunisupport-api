@@ -82,6 +82,7 @@ CREATE TABLE `full_chain_types` (
 CREATE TABLE `genres` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

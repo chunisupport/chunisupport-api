@@ -135,6 +135,7 @@ entity "genres" as genres {
   + id: TINYINT [PK]
   --
   name: VARCHAR(30) NOT NULL UNIQUE
+  sort_order: TINYINT NOT NULL
 }
 
 entity "difficulties" as difficulties {
