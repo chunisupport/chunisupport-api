@@ -51,8 +51,11 @@ func (s *stubPlayerLockedSongPlayerRepository) DeleteByUserID(ctx context.Contex
 }
 
 type spyPlayerLockedSongRepository struct {
-	createCalled bool
-	lockedSongs  []*entity.PlayerLockedSong
+	createCalled     bool
+	deleteCalled     bool
+	bulkCreateCalled bool
+	bulkDeleteCalled bool
+	lockedSongs      []*entity.PlayerLockedSong
 }
 
 func (s *spyPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
@@ -64,8 +67,38 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 	return nil
 }
 
-func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+func (s *spyPlayerLockedSongRepository) BulkCreate(ctx context.Context, exec repository.Executor, lockedSongs []*entity.PlayerLockedSong) error {
+	s.bulkCreateCalled = true
 	return nil
+}
+
+func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	s.deleteCalled = true
+	return nil
+}
+
+func (s *spyPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec repository.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
+	s.bulkDeleteCalled = true
+	return nil
+}
+
+type stubPlayerSongIDResolver struct {
+	songID *int
+}
+
+func (s *stubPlayerSongIDResolver) ResolveSongIDByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*int, error) {
+	return s.songID, nil
+}
+
+func (s *stubPlayerSongIDResolver) ResolveSongIDsByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) (map[string]int, error) {
+	resolved := make(map[string]int, len(displayIDs))
+	if s.songID == nil {
+		return resolved, nil
+	}
+	for _, displayID := range displayIDs {
+		resolved[displayID] = *s.songID
+	}
+	return resolved, nil
 }
 
 type stubPlayerRecordRepositoryForLockedSong struct {
@@ -270,6 +303,12 @@ func TestPlayerLockedSongInputRequired(t *testing.T) {
 				return u.Unlock(context.Background(), 100, nil)
 			},
 		},
+		{
+			name: "バッチ入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Batch(context.Background(), 100, nil)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -286,3 +325,41 @@ func TestPlayerLockedSongInputRequired(t *testing.T) {
 		})
 	}
 }
+
+func TestPlayerLockedSongBatch(t *testing.T) {
+	// Given
+	displayID1, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	displayID2, err := displayid.NewDisplayID("fedcba9876543210")
+	require.NoError(t, err)
+
+	lockedRepo := &spyPlayerLockedSongRepository{}
+	songRepo := new(MockSongRepository)
+	songRepo.On("FindByDisplayIDs", mock.Anything, mock.Anything, []string{"0123456789abcdef"}).Return([]*entity.Song{{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{}}}, nil).Once()
+
+	u := &playerLockedSongUsecase{
+		db:             nil,
+		tm:             &passthroughTransactionManager{},
+		playerRepo:     &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
+		playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
+		playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+		songRepo:       songRepo,
+		lockedRepo:     lockedRepo,
+		resolver:       &stubPlayerSongIDResolver{songID: ptrInt(1)},
+	}
+
+	// When
+	err = u.Batch(context.Background(), 100, &PlayerLockedSongBatchInput{
+		Add:    []*PlayerLockedSongInput{{DisplayID: displayID1, IsUltima: false}},
+		Delete: []*PlayerLockedSongInput{{DisplayID: displayID2, IsUltima: true}},
+	})
+	// Then
+	require.NoError(t, err)
+	assert.True(t, lockedRepo.bulkCreateCalled)
+	assert.True(t, lockedRepo.bulkDeleteCalled)
+	assert.False(t, lockedRepo.createCalled)
+	assert.False(t, lockedRepo.deleteCalled)
+	songRepo.AssertExpectations(t)
+}
+
+func ptrInt(v int) *int { return &v }

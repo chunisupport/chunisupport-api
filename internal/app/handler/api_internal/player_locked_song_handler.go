@@ -81,3 +81,48 @@ func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+func (h *PlayerLockedSongHandler) Batch(c echo.Context) error {
+	user, err := getUser(c)
+	if err != nil {
+		return err
+	}
+	var req internaldto.PlayerLockedSongBatchRequest
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	// バッチの総件数を処理前に検証する
+	totalItems := len(req.Add) + len(req.Delete)
+	if totalItems > MaxPlayerLockedSongBatchItems {
+		return apierror.ErrValidationFailed
+	}
+	toInputs := func(items []*internaldto.PlayerLockedSongBatchRequestItem) ([]*usecase.PlayerLockedSongInput, error) {
+		inputs := make([]*usecase.PlayerLockedSongInput, 0, len(items))
+		for _, item := range items {
+			if item == nil {
+				return nil, apierror.ErrValidationFailed
+			}
+			displayID, err := displayid.NewDisplayID(item.DisplayID)
+			if err != nil {
+				return nil, apierror.ErrValidationFailed.WithInternal(err)
+			}
+			inputs = append(inputs, &usecase.PlayerLockedSongInput{DisplayID: displayID, IsUltima: item.IsUltima})
+		}
+		return inputs, nil
+	}
+	addInputs, err := toInputs(req.Add)
+	if err != nil {
+		return err
+	}
+	deleteInputs, err := toInputs(req.Delete)
+	if err != nil {
+		return err
+	}
+	if err := h.usecase.Batch(c.Request().Context(), user.ID, &usecase.PlayerLockedSongBatchInput{Add: addInputs, Delete: deleteInputs}); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}

@@ -249,6 +249,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
+		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
 	}
 

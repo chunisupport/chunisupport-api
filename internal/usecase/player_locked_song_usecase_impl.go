@@ -144,6 +144,106 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	})
 }
 
+func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *PlayerLockedSongBatchInput) error {
+	if input == nil {
+		return errPlayerLockedSongInputRequired
+	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
+	}
+	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
+	if err != nil {
+		return err
+	}
+	if player == nil {
+		return ErrPlayerNotLinked
+	}
+
+	// Validate and prepare entities for bulk add
+	addDisplayIDs := make([]string, 0, len(input.Add))
+	for _, addInput := range input.Add {
+		if addInput == nil {
+			return errPlayerLockedSongInputRequired
+		}
+		addDisplayIDs = append(addDisplayIDs, addInput.DisplayID.String())
+	}
+	songs, err := u.songRepo.FindByDisplayIDs(ctx, u.db, addDisplayIDs)
+	if err != nil {
+		return err
+	}
+	songByDisplayID := make(map[string]*entity.Song, len(songs))
+	for _, song := range songs {
+		songByDisplayID[song.DisplayID] = song
+	}
+	lockedSongsToAdd := make([]*entity.PlayerLockedSong, 0, len(input.Add))
+	for _, addInput := range input.Add {
+		song, ok := songByDisplayID[addInput.DisplayID.String()]
+		if !ok {
+			return repository.ErrSongNotFound
+		}
+		if song == nil || song.IsDeleted || song.IsWorldsend {
+			return repository.ErrSongNotFound
+		}
+		if addInput.IsUltima {
+			if !song.HasDifficultyChart(domainservice.DifficultyIDUltima) {
+				return ErrChartNotFound
+			}
+		}
+		lockedSong, err := entity.NewPlayerLockedSong(player.ID, song.ID, addInput.IsUltima)
+		if err != nil {
+			return err
+		}
+		lockedSongsToAdd = append(lockedSongsToAdd, lockedSong)
+	}
+
+	// Validate and prepare song IDs for bulk delete
+	deleteDisplayIDs := make([]string, 0, len(input.Delete))
+	for _, deleteInput := range input.Delete {
+		if deleteInput == nil {
+			return errPlayerLockedSongInputRequired
+		}
+		deleteDisplayIDs = append(deleteDisplayIDs, deleteInput.DisplayID.String())
+	}
+	resolvedSongIDs, err := u.resolver.ResolveSongIDsByDisplayIDs(ctx, u.db, deleteDisplayIDs)
+	if err != nil {
+		return err
+	}
+	songIDsToDelete := make([]int, 0, len(input.Delete))
+	isUltimaFlagsToDelete := make([]bool, 0, len(input.Delete))
+	deleteKeys := make(map[string]struct{}, len(input.Delete))
+	for _, deleteInput := range input.Delete {
+		songID, ok := resolvedSongIDs[deleteInput.DisplayID.String()]
+		if !ok {
+			continue
+		}
+		key := fmt.Sprintf("%d:%t", songID, deleteInput.IsUltima)
+		if _, exists := deleteKeys[key]; exists {
+			continue
+		}
+		deleteKeys[key] = struct{}{}
+		songIDsToDelete = append(songIDsToDelete, songID)
+		isUltimaFlagsToDelete = append(isUltimaFlagsToDelete, deleteInput.IsUltima)
+	}
+	if len(lockedSongsToAdd) == 0 && len(songIDsToDelete) == 0 {
+		return nil
+	}
+
+	// Execute all operations in a single transaction
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if len(lockedSongsToAdd) > 0 {
+			if err := u.lockedRepo.BulkCreate(ctx, tx, lockedSongsToAdd); err != nil {
+				return err
+			}
+		}
+		if len(songIDsToDelete) > 0 {
+			if err := u.lockedRepo.BulkDelete(ctx, tx, player.ID, songIDsToDelete, isUltimaFlagsToDelete); err != nil {
+				return err
+			}
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
+}
+
 func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	if player == nil {
 		return ErrPlayerNotLinked

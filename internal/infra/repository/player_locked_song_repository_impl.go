@@ -75,6 +75,56 @@ func (r *PlayerLockedSongRepository) Delete(ctx context.Context, exec domainrepo
 	return wrapPlayerLockedSongRepositoryError("delete", err)
 }
 
+func (r *PlayerLockedSongRepository) BulkCreate(ctx context.Context, exec domainrepo.Executor, lockedSongs []*entity.PlayerLockedSong) error {
+	if len(lockedSongs) == 0 {
+		return nil
+	}
+	for _, lockedSong := range lockedSongs {
+		if err := lockedSong.Validate(); err != nil {
+			return err
+		}
+	}
+	const baseQuery = `INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES `
+	const valueClause = `(?, ?, ?)`
+	query := baseQuery
+	args := make([]interface{}, 0, len(lockedSongs)*3)
+	for i, lockedSong := range lockedSongs {
+		if i > 0 {
+			query += ", "
+		}
+		query += valueClause
+		args = append(args, lockedSong.PlayerID, lockedSong.SongID, lockedSong.IsUltima)
+	}
+	query += ` ON DUPLICATE KEY UPDATE player_id = player_id`
+	_, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return wrapPlayerLockedSongRepositoryError("bulk create", err)
+	}
+	return nil
+}
+
+func (r *PlayerLockedSongRepository) BulkDelete(ctx context.Context, exec domainrepo.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
+	if len(songIDs) == 0 {
+		return nil
+	}
+	if len(songIDs) != len(isUltimaFlags) {
+		return wrapPlayerLockedSongRepositoryError("bulk delete", fmt.Errorf("songIDs and isUltimaFlags length mismatch"))
+	}
+	const baseQuery = "DELETE FROM player_locked_songs WHERE player_id = ? AND (song_id, is_ultima) IN ("
+	query := baseQuery
+	args := []interface{}{playerID}
+	for i := range songIDs {
+		if i > 0 {
+			query += ", "
+		}
+		query += "(?, ?)"
+		args = append(args, songIDs[i], isUltimaFlags[i])
+	}
+	query += ")"
+	_, err := exec.ExecContext(ctx, query, args...)
+	return wrapPlayerLockedSongRepositoryError("bulk delete", err)
+}
+
 func wrapPlayerLockedSongRepositoryError(operation string, err error) error {
 	if err == nil {
 		return nil

@@ -118,6 +118,7 @@
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
+| `/internal/me/locked-songs/batch` | POST | Firebase Bearer | 自分の未解禁曲をまとめて登録・解除 |
 | `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
@@ -432,6 +433,41 @@
   - 400 Bad Request (`validation_failed`): `displayid` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### POST `/internal/me/locked-songs/batch`
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分のプレイヤーに対して、未解禁曲の登録（`add`）と解除（`delete`）を1リクエストで実行します。
+- **リクエストボディ**:
+
+```json
+{
+  "add": [
+    { "display_id": "0000000000000001", "is_ultima": false }
+  ],
+  "delete": [
+    { "display_id": "0000000000000002", "is_ultima": true }
+  ]
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `add` | object[] | - | 追加する未解禁曲の配列 |
+| `delete` | object[] | - | 解除する未解禁曲の配列 |
+| `add[].display_id` / `delete[].display_id` | string | ✓ | 楽曲の表示用ID |
+| `add[].is_ultima` / `delete[].is_ultima` | bool | - | true の場合はULTIMA未解禁を対象 |
+
+- **レスポンス**: 204 No Content（ボディなし）
+- **実行順**: `add` を先に実行し、その後 `delete` を実行します。
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正
+  - 400 Bad Request (`validation_failed`): `display_id` が未指定または形式不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
+  - 404 Not Found (`song_not_found`): 追加対象の楽曲が見つからない、または登録対象外
+  - 404 Not Found (`chart_not_found`): 追加対象で `is_ultima=true` かつ ULTIMA譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/me/register-data`

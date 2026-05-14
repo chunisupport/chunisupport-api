@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -18,6 +19,7 @@ import (
 type mockPlayerLockedSongUsecase struct {
 	listFunc   func(ctx context.Context, username string, requester *entity.User) ([]*usecase.PlayerLockedSongOutput, error)
 	unlockFunc func(ctx context.Context, userID int, input *usecase.PlayerLockedSongInput) error
+	batchFunc  func(ctx context.Context, userID int, input *usecase.PlayerLockedSongBatchInput) error
 }
 
 func (m *mockPlayerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*usecase.PlayerLockedSongOutput, error) {
@@ -34,6 +36,13 @@ func (m *mockPlayerLockedSongUsecase) Lock(ctx context.Context, userID int, inpu
 func (m *mockPlayerLockedSongUsecase) Unlock(ctx context.Context, userID int, input *usecase.PlayerLockedSongInput) error {
 	if m.unlockFunc != nil {
 		return m.unlockFunc(ctx, userID, input)
+	}
+	return nil
+}
+
+func (m *mockPlayerLockedSongUsecase) Batch(ctx context.Context, userID int, input *usecase.PlayerLockedSongBatchInput) error {
+	if m.batchFunc != nil {
+		return m.batchFunc(ctx, userID, input)
 	}
 	return nil
 }
@@ -146,4 +155,36 @@ func TestPlayerLockedSongHandler_Unlock(t *testing.T) {
 			assert.Equal(t, tt.expectUsecaseHit, called)
 		})
 	}
+}
+
+func TestPlayerLockedSongHandler_Batch(t *testing.T) {
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	body := `{"add":[{"display_id":"1234567890abcdef","is_ultima":true}],"delete":[{"display_id":"fedcba0987654321","is_ultima":false}]}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/locked-songs/batch", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	called := false
+	handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
+		batchFunc: func(ctx context.Context, userID int, input *usecase.PlayerLockedSongBatchInput) error {
+			called = true
+			assert.Equal(t, 1, userID)
+			require.Len(t, input.Add, 1)
+			assert.Equal(t, "1234567890abcdef", input.Add[0].DisplayID.String())
+			assert.True(t, input.Add[0].IsUltima)
+			require.Len(t, input.Delete, 1)
+			assert.Equal(t, "fedcba0987654321", input.Delete[0].DisplayID.String())
+			assert.False(t, input.Delete[0].IsUltima)
+			return nil
+		},
+	})
+
+	err := handler.Batch(c)
+
+	require.NoError(t, err)
+	assert.True(t, called)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
 }

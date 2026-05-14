@@ -20,3 +20,28 @@ func (r *PlayerSongIDResolver) ResolveSongIDByDisplayID(ctx context.Context, exe
 	}
 	return &id, nil
 }
+
+func (r *PlayerSongIDResolver) ResolveSongIDsByDisplayIDs(ctx context.Context, exec domainrepo.Executor, displayIDs []string) (map[string]int, error) {
+	if len(displayIDs) == 0 {
+		return map[string]int{}, nil
+	}
+	query, args, err := sqlx.In("SELECT display_id, id FROM songs WHERE display_id IN (?)", displayIDs)
+	if err != nil {
+		return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
+	}
+
+	type songIDResult struct {
+		DisplayID string `db:"display_id"`
+		ID        int    `db:"id"`
+	}
+	results := make([]songIDResult, 0, len(displayIDs))
+	if err := sqlx.SelectContext(ctx, exec, &results, query, args...); err != nil {
+		return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
+	}
+
+	resolved := make(map[string]int, len(results))
+	for _, result := range results {
+		resolved[result.DisplayID] = result.ID
+	}
+	return resolved, nil
+}
