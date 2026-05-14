@@ -371,6 +371,94 @@ func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing
 	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
 }
 
+func TestGoalUsecase_CreateRejectsUnknownKeyInScoreCountParams(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"coutn":1}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateRejectsUnknownKeyInTotalScoreParams(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "total_score",
+		AchievementParams: []byte(`{"totla":100}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateRejectsUnknownKeyInOverpowerValueParams(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"totla":12.345}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateAcceptsOmittedCountForScoreCount(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsNullCountForScoreCount(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":null}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsOmittedTotalForTotalScore(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "total_score",
+		AchievementParams: []byte(`{}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"total":null}`),
+		Attributes:        []byte(`{}`),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
 func TestGoalUsecase_ListReturnsInternalErrorWhenAchievementTypeMissing(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, Title: "test", AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubMissingTypeMasterProvider{})

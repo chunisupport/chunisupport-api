@@ -370,6 +370,15 @@ func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt
 	return next
 }
 
+func hasOnlyKeys(m map[string]json.RawMessage, allowed ...string) bool {
+	for k := range m {
+		if !slices.Contains(allowed, k) {
+			return false
+		}
+	}
+	return true
+}
+
 func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goalAchievementParam, error) {
 	if len(raw) == 0 {
 		return nil, nil, ErrInvalidAchievementParam
@@ -382,28 +391,40 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
-		if len(m) != 2 {
+		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "score", "count") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		var score, count int
-		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > info.TheoreticalScore {
+		score, ok, err := parseOptional[int](m["score"])
+		if err != nil || !ok || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if err := json.Unmarshal(m["count"], &count); err != nil || count < 1 {
+		count, ok, err := parseOptional[int](m["count"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok && count < 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
-		result.Count = &count
+		if ok {
+			result.Count = &count
+		}
 	case achievementType == "avg_score":
 		var score int
-		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
+		if len(m) != 1 || !hasOnlyKeys(m, "score") || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
 	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
 		var lamp string
-		var count int
-		if len(m) != 2 || json.Unmarshal(m["lamp"], &lamp) != nil || json.Unmarshal(m["count"], &count) != nil || count < 1 {
+		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "lamp", "count") || json.Unmarshal(m["lamp"], &lamp) != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		count, ok, err := parseOptional[int](m["count"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok && count < 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		if achievementType == "hardlamp_count" {
@@ -413,20 +434,38 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Count = &count
+		if ok {
+			result.Count = &count
+		}
 	case achievementType == "total_score":
-		var total int64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 {
+		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		totalFloat := float64(total)
-		result.Total = &totalFloat
+		total, ok, err := parseOptional[int64](m["total"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok {
+			if total < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			totalFloat := float64(total)
+			result.Total = &totalFloat
+		}
 	case achievementType == "overpower_value":
-		var total float64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || !isScale(total, 3) {
+		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Total = &total
+		total, ok, err := parseOptional[float64](m["total"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok {
+			if total < 0 || !isScale(total, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Total = &total
+		}
 	case achievementType == "overpower_percent":
 		var total float64
 		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || total > 100 || !isScale(total, 3) {
@@ -488,6 +527,18 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 func isScale(v float64, scale int) bool {
 	f := math.Pow10(scale)
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
+}
+
+func parseOptional[T any](raw json.RawMessage) (T, bool, error) {
+	var zero T
+	if len(raw) == 0 || slices.Equal(raw, json.RawMessage("null")) {
+		return zero, false, nil
+	}
+	var value T
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return zero, false, err
+	}
+	return value, true, nil
 }
 
 func hasControlCharacter(value string) bool {
