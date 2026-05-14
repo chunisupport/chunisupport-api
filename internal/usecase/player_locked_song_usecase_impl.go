@@ -160,17 +160,26 @@ func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *
 	}
 
 	// Validate and prepare entities for bulk add
-	lockedSongsToAdd := make([]*entity.PlayerLockedSong, 0, len(input.Add))
+	addDisplayIDs := make([]string, 0, len(input.Add))
 	for _, addInput := range input.Add {
 		if addInput == nil {
 			return errPlayerLockedSongInputRequired
 		}
-		song, err := u.songRepo.FindByDisplayID(ctx, u.db, addInput.DisplayID.String())
-		if err != nil {
-			if errors.Is(err, repository.ErrSongNotFound) {
-				return repository.ErrSongNotFound
-			}
-			return err
+		addDisplayIDs = append(addDisplayIDs, addInput.DisplayID.String())
+	}
+	songs, err := u.songRepo.FindByDisplayIDs(ctx, u.db, addDisplayIDs)
+	if err != nil {
+		return err
+	}
+	songByDisplayID := make(map[string]*entity.Song, len(songs))
+	for _, song := range songs {
+		songByDisplayID[song.DisplayID] = song
+	}
+	lockedSongsToAdd := make([]*entity.PlayerLockedSong, 0, len(input.Add))
+	for _, addInput := range input.Add {
+		song, ok := songByDisplayID[addInput.DisplayID.String()]
+		if !ok {
+			return repository.ErrSongNotFound
 		}
 		if song == nil || song.IsDeleted || song.IsWorldsend {
 			return repository.ErrSongNotFound
@@ -188,18 +197,22 @@ func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *
 	}
 
 	// Validate and prepare song IDs for bulk delete
-	songIDsToDelete := make([]int, 0, len(input.Delete))
-	isUltimaFlagsToDelete := make([]bool, 0, len(input.Delete))
+	deleteDisplayIDs := make([]string, 0, len(input.Delete))
 	for _, deleteInput := range input.Delete {
 		if deleteInput == nil {
 			return errPlayerLockedSongInputRequired
 		}
-		songID, err := u.resolver.ResolveSongIDByDisplayID(ctx, u.db, deleteInput.DisplayID.String())
-		if err != nil {
-			return err
-		}
-		if songID != nil {
-			songIDsToDelete = append(songIDsToDelete, *songID)
+		deleteDisplayIDs = append(deleteDisplayIDs, deleteInput.DisplayID.String())
+	}
+	resolvedSongIDs, err := u.resolver.ResolveSongIDsByDisplayIDs(ctx, u.db, deleteDisplayIDs)
+	if err != nil {
+		return err
+	}
+	songIDsToDelete := make([]int, 0, len(input.Delete))
+	isUltimaFlagsToDelete := make([]bool, 0, len(input.Delete))
+	for _, deleteInput := range input.Delete {
+		if songID, ok := resolvedSongIDs[deleteInput.DisplayID.String()]; ok {
+			songIDsToDelete = append(songIDsToDelete, songID)
 			isUltimaFlagsToDelete = append(isUltimaFlagsToDelete, deleteInput.IsUltima)
 		}
 	}

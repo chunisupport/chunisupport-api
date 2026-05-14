@@ -44,4 +44,5 @@ type PlayerLockedSongQueryService interface {
 
 type PlayerSongIDResolver interface {
 	ResolveSongIDByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*int, error)
+	ResolveSongIDsByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) (map[string]int, error)
 }

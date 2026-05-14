@@ -14,7 +14,7 @@ import (
 
 const (
 	// MaxPlayerLockedSongBatchItems is the maximum number of items allowed in a batch operation
-	MaxPlayerLockedSongBatchItems = 1000
+	MaxPlayerLockedSongBatchItems = 100
 )
 
 type PlayerLockedSongHandler struct {

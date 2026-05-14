@@ -88,6 +88,17 @@ func (s *stubPlayerSongIDResolver) ResolveSongIDByDisplayID(ctx context.Context,
 	return s.songID, nil
 }
 
+func (s *stubPlayerSongIDResolver) ResolveSongIDsByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) (map[string]int, error) {
+	resolved := make(map[string]int, len(displayIDs))
+	if s.songID == nil {
+		return resolved, nil
+	}
+	for _, displayID := range displayIDs {
+		resolved[displayID] = *s.songID
+	}
+	return resolved, nil
+}
+
 type stubPlayerRecordRepositoryForLockedSong struct {
 	records []*entity.PlayerRecord
 }
@@ -321,7 +332,7 @@ func TestPlayerLockedSongBatch(t *testing.T) {
 
 	lockedRepo := &spyPlayerLockedSongRepository{}
 	songRepo := new(MockSongRepository)
-	songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(&entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{}}, nil).Once()
+	songRepo.On("FindByDisplayIDs", mock.Anything, mock.Anything, []string{"0123456789abcdef"}).Return([]*entity.Song{{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{}}}, nil).Once()
 
 	u := &playerLockedSongUsecase{
 		db:             nil,
