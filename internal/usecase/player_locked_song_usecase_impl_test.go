@@ -51,9 +51,11 @@ func (s *stubPlayerLockedSongPlayerRepository) DeleteByUserID(ctx context.Contex
 }
 
 type spyPlayerLockedSongRepository struct {
-	createCalled bool
-	deleteCalled bool
-	lockedSongs  []*entity.PlayerLockedSong
+	createCalled     bool
+	deleteCalled     bool
+	bulkCreateCalled bool
+	bulkDeleteCalled bool
+	lockedSongs      []*entity.PlayerLockedSong
 }
 
 func (s *spyPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
@@ -66,7 +68,7 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 }
 
 func (s *spyPlayerLockedSongRepository) BulkCreate(ctx context.Context, exec repository.Executor, lockedSongs []*entity.PlayerLockedSong) error {
-	s.createCalled = true
+	s.bulkCreateCalled = true
 	return nil
 }
 
@@ -76,7 +78,7 @@ func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec reposit
 }
 
 func (s *spyPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec repository.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
-	s.deleteCalled = true
+	s.bulkDeleteCalled = true
 	return nil
 }
 
@@ -350,8 +352,8 @@ func TestPlayerLockedSongBatch(t *testing.T) {
 		Delete: []*PlayerLockedSongInput{{DisplayID: displayID2, IsUltima: true}},
 	})
 	require.NoError(t, err)
-	assert.True(t, lockedRepo.createCalled)
-	assert.True(t, lockedRepo.deleteCalled)
+	assert.True(t, lockedRepo.bulkCreateCalled)
+	assert.True(t, lockedRepo.bulkDeleteCalled)
 	songRepo.AssertExpectations(t)
 }
 
