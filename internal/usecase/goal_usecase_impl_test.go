@@ -380,7 +380,7 @@ func TestGoalUsecase_CreateAcceptsOmittedCountForScoreCount(t *testing.T) {
 		AchievementParams: []byte(`{"score":1000000}`),
 		Attributes:        []byte(`{}`),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, out)
 }
 
@@ -393,7 +393,7 @@ func TestGoalUsecase_CreateAcceptsNullCountForScoreCount(t *testing.T) {
 		AchievementParams: []byte(`{"score":1000000,"count":null}`),
 		Attributes:        []byte(`{}`),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, out)
 }
 
@@ -406,7 +406,7 @@ func TestGoalUsecase_CreateAcceptsOmittedTotalForTotalScore(t *testing.T) {
 		AchievementParams: []byte(`{}`),
 		Attributes:        []byte(`{}`),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, out)
 }
 
@@ -419,7 +419,7 @@ func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
 		AchievementParams: []byte(`{"total":null}`),
 		Attributes:        []byte(`{}`),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, out)
 }
 
