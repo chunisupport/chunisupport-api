@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"strings"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/jmoiron/sqlx"
@@ -27,28 +25,23 @@ func (r *PlayerSongIDResolver) ResolveSongIDsByDisplayIDs(ctx context.Context, e
 	if len(displayIDs) == 0 {
 		return map[string]int{}, nil
 	}
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(displayIDs)), ",")
-	args := make([]any, 0, len(displayIDs))
-	for _, displayID := range displayIDs {
-		args = append(args, displayID)
-	}
-	query := fmt.Sprintf("SELECT display_id, id FROM songs WHERE display_id IN (%s)", placeholders)
-	rows, err := exec.QueryContext(ctx, query, args...)
+	query, args, err := sqlx.In("SELECT display_id, id FROM songs WHERE display_id IN (?)", displayIDs)
 	if err != nil {
 		return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
 	}
-	defer rows.Close()
-	resolved := make(map[string]int, len(displayIDs))
-	for rows.Next() {
-		var displayID string
-		var songID int
-		if err := rows.Scan(&displayID, &songID); err != nil {
-			return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
-		}
-		resolved[displayID] = songID
+
+	type songIDResult struct {
+		DisplayID string `db:"display_id"`
+		ID        int    `db:"id"`
 	}
-	if err := rows.Err(); err != nil {
+	results := make([]songIDResult, 0, len(displayIDs))
+	if err := sqlx.SelectContext(ctx, exec, &results, query, args...); err != nil {
 		return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
+	}
+
+	resolved := make(map[string]int, len(results))
+	for _, result := range results {
+		resolved[result.DisplayID] = result.ID
 	}
 	return resolved, nil
 }
