@@ -110,14 +110,14 @@ func (r *PlayerLockedSongRepository) BulkDelete(ctx context.Context, exec domain
 	if len(songIDs) != len(isUltimaFlags) {
 		return wrapPlayerLockedSongRepositoryError("bulk delete", fmt.Errorf("songIDs and isUltimaFlags length mismatch"))
 	}
-	const baseQuery = `DELETE FROM player_locked_songs WHERE player_id = ? AND (`
+	const baseQuery = "DELETE FROM player_locked_songs WHERE player_id = ? AND (song_id, is_ultima) IN ("
 	query := baseQuery
 	args := []interface{}{playerID}
 	for i := range songIDs {
 		if i > 0 {
-			query += " OR "
+			query += ", "
 		}
-		query += "(song_id = ? AND is_ultima = ?)"
+		query += "(?, ?)"
 		args = append(args, songIDs[i], isUltimaFlags[i])
 	}
 	query += ")"
