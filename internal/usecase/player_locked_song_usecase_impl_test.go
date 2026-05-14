@@ -65,7 +65,17 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 	return nil
 }
 
+func (s *spyPlayerLockedSongRepository) BulkCreate(ctx context.Context, exec repository.Executor, lockedSongs []*entity.PlayerLockedSong) error {
+	s.createCalled = true
+	return nil
+}
+
 func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	s.deleteCalled = true
+	return nil
+}
+
+func (s *spyPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec repository.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
 	s.deleteCalled = true
 	return nil
 }
