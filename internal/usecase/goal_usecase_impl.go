@@ -535,7 +535,7 @@ func isScale(v float64, scale int) bool {
 
 func parseOptional[T any](raw json.RawMessage) (T, bool, error) {
 	var zero T
-	if len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 || slices.Equal(raw, json.RawMessage("null")) {
 		return zero, false, nil
 	}
 	var value T
