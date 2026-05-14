@@ -371,6 +371,58 @@ func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing
 	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
 }
 
+func TestGoalUsecase_CreateAcceptsOmittedCountForScoreCount(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsNullCountForScoreCount(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":null}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsOmittedTotalForTotalScore(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "total_score",
+		AchievementParams: []byte(`{}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"total":null}`),
+		Attributes:        []byte(`{}`),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, out)
+}
+
 func TestGoalUsecase_ListReturnsInternalErrorWhenAchievementTypeMissing(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, Title: "test", AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubMissingTypeMasterProvider{})

@@ -382,18 +382,24 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
-		if len(m) != 2 {
+		if len(m) < 1 || len(m) > 2 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		var score, count int
-		if err := json.Unmarshal(m["score"], &score); err != nil || score < 0 || score > info.TheoreticalScore {
+		score, ok, err := parseOptionalInt(m["score"])
+		if err != nil || !ok || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if err := json.Unmarshal(m["count"], &count); err != nil || count < 1 {
+		count, ok, err := parseOptionalInt(m["count"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok && count < 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
-		result.Count = &count
+		if ok {
+			result.Count = &count
+		}
 	case achievementType == "avg_score":
 		var score int
 		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
@@ -402,8 +408,14 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		result.Score = &score
 	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
 		var lamp string
-		var count int
-		if len(m) != 2 || json.Unmarshal(m["lamp"], &lamp) != nil || json.Unmarshal(m["count"], &count) != nil || count < 1 {
+		if len(m) < 1 || len(m) > 2 || json.Unmarshal(m["lamp"], &lamp) != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		count, ok, err := parseOptionalInt(m["count"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok && count < 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		if achievementType == "hardlamp_count" {
@@ -413,20 +425,38 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Count = &count
+		if ok {
+			result.Count = &count
+		}
 	case achievementType == "total_score":
-		var total int64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 {
+		if len(m) > 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		totalFloat := float64(total)
-		result.Total = &totalFloat
+		total, ok, err := parseOptionalInt64(m["total"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok {
+			if total < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			totalFloat := float64(total)
+			result.Total = &totalFloat
+		}
 	case achievementType == "overpower_value":
-		var total float64
-		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || !isScale(total, 3) {
+		if len(m) > 1 {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Total = &total
+		total, ok, err := parseOptionalFloat64(m["total"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if ok {
+			if total < 0 || !isScale(total, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Total = &total
+		}
 	case achievementType == "overpower_percent":
 		var total float64
 		if len(m) != 1 || json.Unmarshal(m["total"], &total) != nil || total < 0 || total > 100 || !isScale(total, 3) {
@@ -488,6 +518,39 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 func isScale(v float64, scale int) bool {
 	f := math.Pow10(scale)
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
+}
+
+func parseOptionalInt(raw json.RawMessage) (int, bool, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, false, nil
+	}
+	var value int
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, false, err
+	}
+	return value, true, nil
+}
+
+func parseOptionalInt64(raw json.RawMessage) (int64, bool, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, false, nil
+	}
+	var value int64
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, false, err
+	}
+	return value, true, nil
+}
+
+func parseOptionalFloat64(raw json.RawMessage) (float64, bool, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, false, nil
+	}
+	var value float64
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, false, err
+	}
+	return value, true, nil
 }
 
 func hasControlCharacter(value string) bool {
