@@ -148,17 +148,76 @@ func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *
 	if input == nil {
 		return errPlayerLockedSongInputRequired
 	}
+	if u.tm == nil {
+		return errPlayerLockedSongNilTM
+	}
+	player, err := u.playerRepo.FindByUserID(ctx, u.db, userID)
+	if err != nil {
+		return err
+	}
+	if player == nil {
+		return ErrPlayerNotLinked
+	}
+
+	// Validate and prepare entities for bulk add
+	lockedSongsToAdd := make([]*entity.PlayerLockedSong, 0, len(input.Add))
 	for _, addInput := range input.Add {
-		if err := u.Lock(ctx, userID, addInput); err != nil {
+		if addInput == nil {
+			return errPlayerLockedSongInputRequired
+		}
+		song, err := u.songRepo.FindByDisplayID(ctx, u.db, addInput.DisplayID.String())
+		if err != nil {
+			if errors.Is(err, repository.ErrSongNotFound) {
+				return repository.ErrSongNotFound
+			}
 			return err
 		}
+		if song == nil || song.IsDeleted || song.IsWorldsend {
+			return repository.ErrSongNotFound
+		}
+		if addInput.IsUltima {
+			if !song.HasDifficultyChart(domainservice.DifficultyIDUltima) {
+				return ErrChartNotFound
+			}
+		}
+		lockedSong, err := entity.NewPlayerLockedSong(player.ID, song.ID, addInput.IsUltima)
+		if err != nil {
+			return err
+		}
+		lockedSongsToAdd = append(lockedSongsToAdd, lockedSong)
 	}
+
+	// Validate and prepare song IDs for bulk delete
+	songIDsToDelete := make([]int, 0, len(input.Delete))
+	isUltimaFlagsToDelete := make([]bool, 0, len(input.Delete))
 	for _, deleteInput := range input.Delete {
-		if err := u.Unlock(ctx, userID, deleteInput); err != nil {
+		if deleteInput == nil {
+			return errPlayerLockedSongInputRequired
+		}
+		songID, err := u.resolver.ResolveSongIDByDisplayID(ctx, u.db, deleteInput.DisplayID.String())
+		if err != nil {
 			return err
 		}
+		if songID != nil {
+			songIDsToDelete = append(songIDsToDelete, *songID)
+			isUltimaFlagsToDelete = append(isUltimaFlagsToDelete, deleteInput.IsUltima)
+		}
 	}
-	return nil
+
+	// Execute all operations in a single transaction
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if len(lockedSongsToAdd) > 0 {
+			if err := u.lockedRepo.BulkCreate(ctx, tx, lockedSongsToAdd); err != nil {
+				return err
+			}
+		}
+		if len(songIDsToDelete) > 0 {
+			if err := u.lockedRepo.BulkDelete(ctx, tx, player.ID, songIDsToDelete, isUltimaFlagsToDelete); err != nil {
+				return err
+			}
+		}
+		return u.recalculatePlayerOverpowerWithTx(ctx, tx, player)
+	})
 }
 
 func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
