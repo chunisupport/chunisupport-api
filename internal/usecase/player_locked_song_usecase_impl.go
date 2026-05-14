@@ -216,6 +216,9 @@ func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *
 			isUltimaFlagsToDelete = append(isUltimaFlagsToDelete, deleteInput.IsUltima)
 		}
 	}
+	if len(lockedSongsToAdd) == 0 && len(songIDsToDelete) == 0 {
+		return nil
+	}
 
 	// Execute all operations in a single transaction
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {

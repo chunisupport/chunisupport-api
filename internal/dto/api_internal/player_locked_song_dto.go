@@ -39,6 +39,6 @@ type PlayerLockedSongBatchRequestItem struct {
 }
 
 type PlayerLockedSongBatchRequest struct {
-	Add    []*PlayerLockedSongBatchRequestItem `json:"add"`
-	Delete []*PlayerLockedSongBatchRequestItem `json:"delete"`
+	Add    []*PlayerLockedSongBatchRequestItem `json:"add" validate:"dive"`
+	Delete []*PlayerLockedSongBatchRequestItem `json:"delete" validate:"dive"`
 }

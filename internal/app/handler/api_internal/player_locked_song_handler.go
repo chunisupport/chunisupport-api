@@ -91,6 +91,9 @@ func (h *PlayerLockedSongHandler) Batch(c echo.Context) error {
 	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
 	// バッチの総件数を処理前に検証する
 	totalItems := len(req.Add) + len(req.Delete)
 	if totalItems > MaxPlayerLockedSongBatchItems {

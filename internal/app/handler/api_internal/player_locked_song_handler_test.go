@@ -159,6 +159,7 @@ func TestPlayerLockedSongHandler_Unlock(t *testing.T) {
 
 func TestPlayerLockedSongHandler_Batch(t *testing.T) {
 	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
 	body := `{"add":[{"display_id":"1234567890abcdef","is_ultima":true}],"delete":[{"display_id":"fedcba0987654321","is_ultima":false}]}`
 	req := httptest.NewRequest(http.MethodPost, "/internal/me/locked-songs/batch", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
