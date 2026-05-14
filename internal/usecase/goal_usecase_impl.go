@@ -370,6 +370,19 @@ func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt
 	return next
 }
 
+func hasOnlyKeys(m map[string]json.RawMessage, allowed ...string) bool {
+	allow := make(map[string]struct{}, len(allowed))
+	for _, k := range allowed {
+		allow[k] = struct{}{}
+	}
+	for k := range m {
+		if _, ok := allow[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goalAchievementParam, error) {
 	if len(raw) == 0 {
 		return nil, nil, ErrInvalidAchievementParam
@@ -382,7 +395,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
-		if len(m) < 1 || len(m) > 2 {
+		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "score", "count") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		score, ok, err := parseOptionalInt(m["score"])
@@ -402,13 +415,13 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		}
 	case achievementType == "avg_score":
 		var score int
-		if len(m) != 1 || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
+		if len(m) != 1 || !hasOnlyKeys(m, "score") || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
 	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
 		var lamp string
-		if len(m) < 1 || len(m) > 2 || json.Unmarshal(m["lamp"], &lamp) != nil {
+		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "lamp", "count") || json.Unmarshal(m["lamp"], &lamp) != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		count, ok, err := parseOptionalInt(m["count"])
@@ -429,7 +442,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			result.Count = &count
 		}
 	case achievementType == "total_score":
-		if len(m) > 1 {
+		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		total, ok, err := parseOptionalInt64(m["total"])
@@ -444,7 +457,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			result.Total = &totalFloat
 		}
 	case achievementType == "overpower_value":
-		if len(m) > 1 {
+		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		total, ok, err := parseOptionalFloat64(m["total"])
