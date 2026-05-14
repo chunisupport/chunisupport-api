@@ -398,11 +398,11 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "score", "count") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		score, ok, err := parseOptionalInt(m["score"])
+		score, ok, err := parseOptional[int](m["score"])
 		if err != nil || !ok || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptionalInt(m["count"])
+		count, ok, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
@@ -424,7 +424,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "lamp", "count") || json.Unmarshal(m["lamp"], &lamp) != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptionalInt(m["count"])
+		count, ok, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
@@ -445,7 +445,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptionalInt64(m["total"])
+		total, ok, err := parseOptional[int64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
@@ -460,7 +460,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		if len(m) > 1 || !hasOnlyKeys(m, "total") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptionalFloat64(m["total"])
+		total, ok, err := parseOptional[float64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
@@ -533,35 +533,14 @@ func isScale(v float64, scale int) bool {
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
 }
 
-func parseOptionalInt(raw json.RawMessage) (int, bool, error) {
+func parseOptional[T any](raw json.RawMessage) (T, bool, error) {
+	var zero T
 	if len(raw) == 0 || string(raw) == "null" {
-		return 0, false, nil
+		return zero, false, nil
 	}
-	var value int
+	var value T
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return 0, false, err
-	}
-	return value, true, nil
-}
-
-func parseOptionalInt64(raw json.RawMessage) (int64, bool, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return 0, false, nil
-	}
-	var value int64
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return 0, false, err
-	}
-	return value, true, nil
-}
-
-func parseOptionalFloat64(raw json.RawMessage) (float64, bool, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return 0, false, nil
-	}
-	var value float64
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return 0, false, err
+		return zero, false, err
 	}
 	return value, true, nil
 }
