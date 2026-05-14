@@ -144,6 +144,23 @@ func (u *playerLockedSongUsecase) Unlock(ctx context.Context, userID int, input 
 	})
 }
 
+func (u *playerLockedSongUsecase) Batch(ctx context.Context, userID int, input *PlayerLockedSongBatchInput) error {
+	if input == nil {
+		return errPlayerLockedSongInputRequired
+	}
+	for _, addInput := range input.Add {
+		if err := u.Lock(ctx, userID, addInput); err != nil {
+			return err
+		}
+	}
+	for _, deleteInput := range input.Delete {
+		if err := u.Unlock(ctx, userID, deleteInput); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.Context, exec repository.Executor, player *entity.Player) error {
 	if player == nil {
 		return ErrPlayerNotLinked

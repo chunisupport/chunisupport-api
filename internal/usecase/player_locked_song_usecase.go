@@ -23,6 +23,12 @@ type PlayerLockedSongUsecase interface {
 	List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error)
 	Lock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
 	Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
+	Batch(ctx context.Context, userID int, input *PlayerLockedSongBatchInput) error
+}
+
+type PlayerLockedSongBatchInput struct {
+	Add    []*PlayerLockedSongInput
+	Delete []*PlayerLockedSongInput
 }
 
 type PlayerLockedSongReadModel struct {

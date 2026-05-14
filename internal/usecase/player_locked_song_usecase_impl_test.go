@@ -52,6 +52,7 @@ func (s *stubPlayerLockedSongPlayerRepository) DeleteByUserID(ctx context.Contex
 
 type spyPlayerLockedSongRepository struct {
 	createCalled bool
+	deleteCalled bool
 	lockedSongs  []*entity.PlayerLockedSong
 }
 
@@ -65,7 +66,16 @@ func (s *spyPlayerLockedSongRepository) Create(ctx context.Context, exec reposit
 }
 
 func (s *spyPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	s.deleteCalled = true
 	return nil
+}
+
+type stubPlayerSongIDResolver struct {
+	songID *int
+}
+
+func (s *stubPlayerSongIDResolver) ResolveSongIDByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*int, error) {
+	return s.songID, nil
 }
 
 type stubPlayerRecordRepositoryForLockedSong struct {
@@ -270,6 +280,12 @@ func TestPlayerLockedSongInputRequired(t *testing.T) {
 				return u.Unlock(context.Background(), 100, nil)
 			},
 		},
+		{
+			name: "バッチ入力がnilの場合はエラー",
+			run: func(u *playerLockedSongUsecase) error {
+				return u.Batch(context.Background(), 100, nil)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -286,3 +302,36 @@ func TestPlayerLockedSongInputRequired(t *testing.T) {
 		})
 	}
 }
+
+func TestPlayerLockedSongBatch(t *testing.T) {
+	displayID1, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	displayID2, err := displayid.NewDisplayID("fedcba9876543210")
+	require.NoError(t, err)
+
+	lockedRepo := &spyPlayerLockedSongRepository{}
+	songRepo := new(MockSongRepository)
+	songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(&entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{}}, nil).Once()
+
+	u := &playerLockedSongUsecase{
+		db:             nil,
+		tm:             &passthroughTransactionManager{},
+		playerRepo:     &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
+		playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
+		playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+		songRepo:       songRepo,
+		lockedRepo:     lockedRepo,
+		resolver:       &stubPlayerSongIDResolver{songID: ptrInt(1)},
+	}
+
+	err = u.Batch(context.Background(), 100, &PlayerLockedSongBatchInput{
+		Add:    []*PlayerLockedSongInput{{DisplayID: displayID1, IsUltima: false}},
+		Delete: []*PlayerLockedSongInput{{DisplayID: displayID2, IsUltima: true}},
+	})
+	require.NoError(t, err)
+	assert.True(t, lockedRepo.createCalled)
+	assert.True(t, lockedRepo.deleteCalled)
+	songRepo.AssertExpectations(t)
+}
+
+func ptrInt(v int) *int { return &v }

@@ -32,3 +32,13 @@ type PlayerLockedSongResponseItem struct {
 type PlayerLockedSongsResponse struct {
 	Items []*PlayerLockedSongResponseItem `json:"items"`
 }
+
+type PlayerLockedSongBatchRequestItem struct {
+	DisplayID string `json:"display_id" validate:"required"`
+	IsUltima  bool   `json:"is_ultima"`
+}
+
+type PlayerLockedSongBatchRequest struct {
+	Add    []*PlayerLockedSongBatchRequestItem `json:"add"`
+	Delete []*PlayerLockedSongBatchRequestItem `json:"delete"`
+}
