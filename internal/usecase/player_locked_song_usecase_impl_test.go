@@ -357,6 +357,8 @@ func TestPlayerLockedSongBatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, lockedRepo.bulkCreateCalled)
 	assert.True(t, lockedRepo.bulkDeleteCalled)
+	assert.False(t, lockedRepo.createCalled)
+	assert.False(t, lockedRepo.deleteCalled)
 	songRepo.AssertExpectations(t)
 }
 
