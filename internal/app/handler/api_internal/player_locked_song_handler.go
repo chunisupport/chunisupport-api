@@ -12,11 +12,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const (
-	// MaxPlayerLockedSongBatchItems is the maximum number of items allowed in a batch operation
-	MaxPlayerLockedSongBatchItems = 100
-)
-
 type PlayerLockedSongHandler struct {
 	usecase usecase.PlayerLockedSongUsecase
 }
@@ -96,7 +91,7 @@ func (h *PlayerLockedSongHandler) Batch(c echo.Context) error {
 	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	// Validate total batch size before processing
+	// バッチの総件数を処理前に検証する
 	totalItems := len(req.Add) + len(req.Delete)
 	if totalItems > MaxPlayerLockedSongBatchItems {
 		return apierror.ErrValidationFailed

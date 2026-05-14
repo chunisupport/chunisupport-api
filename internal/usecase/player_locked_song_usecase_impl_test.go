@@ -327,6 +327,7 @@ func TestPlayerLockedSongInputRequired(t *testing.T) {
 }
 
 func TestPlayerLockedSongBatch(t *testing.T) {
+	// Given
 	displayID1, err := displayid.NewDisplayID("0123456789abcdef")
 	require.NoError(t, err)
 	displayID2, err := displayid.NewDisplayID("fedcba9876543210")
@@ -347,10 +348,12 @@ func TestPlayerLockedSongBatch(t *testing.T) {
 		resolver:       &stubPlayerSongIDResolver{songID: ptrInt(1)},
 	}
 
+	// When
 	err = u.Batch(context.Background(), 100, &PlayerLockedSongBatchInput{
 		Add:    []*PlayerLockedSongInput{{DisplayID: displayID1, IsUltima: false}},
 		Delete: []*PlayerLockedSongInput{{DisplayID: displayID2, IsUltima: true}},
 	})
+	// Then
 	require.NoError(t, err)
 	assert.True(t, lockedRepo.bulkCreateCalled)
 	assert.True(t, lockedRepo.bulkDeleteCalled)
