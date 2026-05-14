@@ -371,12 +371,8 @@ func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt
 }
 
 func hasOnlyKeys(m map[string]json.RawMessage, allowed ...string) bool {
-	allow := make(map[string]struct{}, len(allowed))
-	for _, k := range allowed {
-		allow[k] = struct{}{}
-	}
 	for k := range m {
-		if _, ok := allow[k]; !ok {
+		if !slices.Contains(allowed, k) {
 			return false
 		}
 	}
