@@ -15,6 +15,7 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	genreID := 2
 	bpm := 200
 	jacket := "v1jacket.png"
+	reading := "ブイワンテストガッキョク"
 	releasedAt := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
 	levelStar, levelStarErr := levelstar.NewLevelStar(3)
 	if levelStarErr != nil {
@@ -27,6 +28,7 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	song := &entity.Song{
 		DisplayID:   "v1test1234567890",
 		Title:       "V1テスト楽曲",
+		Reading:     &reading,
 		Artist:      "V1アーティスト",
 		GenreID:     &genreID,
 		BPM:         &bpm,
@@ -59,6 +61,10 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 
 	if dto.Title != "V1テスト楽曲" {
 		t.Errorf("Title = %v, want %v", dto.Title, "V1テスト楽曲")
+	}
+
+	if dto.Reading == nil || *dto.Reading != "ブイワンテストガッキョク" {
+		t.Errorf("Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
 	}
 
 	if dto.Artist != "V1アーティスト" {
@@ -135,6 +141,7 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	jacket := "we_jacket.png"
 	bpm := 160
 	genre := "VARIETY"
+	reading := "ブイワンワールドエンドテスト"
 	levelStar := 4
 	attribute := "蔵"
 	notesVal := 800
@@ -143,6 +150,7 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	songDTO := &V1WorldsendSongDTO{
 		DisplayID:   "v1we123456789012",
 		Title:       "V1 WE テスト",
+		Reading:     &reading,
 		Artist:      "V1 WE アーティスト",
 		Genre:       &genre,
 		BPM:         &bpm,
@@ -169,6 +177,10 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	// release フィールド名であることを確認
 	if !containsString(jsonString, `"release":"2024-06-01"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
+	}
+
+	if !containsString(jsonString, `"reading":"ブイワンワールドエンドテスト"`) {
+		t.Errorf("JSON should contain reading field, got: %s", jsonString)
 	}
 
 	// genre がジャンル名であることを確認

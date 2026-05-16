@@ -43,7 +43,7 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxLi
 		executor,
 		officialIdxList,
 		`
-			SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_deleted
+			SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_deleted
 			FROM songs
 			WHERE official_idx IN (?)
 		`,

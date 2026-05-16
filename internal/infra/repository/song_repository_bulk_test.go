@@ -39,6 +39,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			display_id TEXT UNIQUE NOT NULL,
 			title TEXT NOT NULL,
+			reading TEXT,
 			artist TEXT NOT NULL,
 			genre_id INTEGER NOT NULL,
 			bpm INTEGER,

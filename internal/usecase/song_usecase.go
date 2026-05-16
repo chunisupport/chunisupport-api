@@ -21,6 +21,7 @@ type CreateChartInput struct {
 type CreateSongInput struct {
 	OfficialIdx string
 	Title       string
+	Reading     *string
 	Artist      string
 	Genre       string
 	BPM         *int

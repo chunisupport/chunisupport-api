@@ -31,6 +31,7 @@ type UpdateWorldsendChartInput struct {
 type UpdateWorldsendSongInput struct {
 	DisplayID  string
 	Title      string
+	Reading    *string
 	Artist     string
 	Genre      *string
 	BPM        *int
@@ -51,6 +52,7 @@ type CreateWorldsendChartInput struct {
 type CreateWorldsendSongInput struct {
 	OfficialIdx string
 	Title       string
+	Reading     *string
 	Artist      string
 	Genre       string
 	BPM         *int
@@ -235,6 +237,7 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 	updatedSong := entity.NewSong()
 	updatedSong.DisplayID = req.DisplayID
 	updatedSong.Title = req.Title
+	updatedSong.Reading = req.Reading
 	updatedSong.Artist = req.Artist
 	updatedSong.GenreID = genreID
 	updatedSong.BPM = req.BPM
@@ -324,6 +327,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.DisplayID = displayID
 	song.OfficialIdx = input.OfficialIdx
 	song.Title = input.Title
+	song.Reading = input.Reading
 	song.Artist = input.Artist
 	song.GenreID = &genreID
 	song.BPM = input.BPM

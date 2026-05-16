@@ -11,6 +11,7 @@ type Song struct {
 	ID             int
 	DisplayID      string
 	Title          string
+	Reading        *string
 	Artist         string
 	GenreID        *int
 	BPM            *int

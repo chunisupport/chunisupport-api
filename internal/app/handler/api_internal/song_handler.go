@@ -159,6 +159,7 @@ func (h *SongHandler) CreateSong(c echo.Context) error {
 	input := &usecase.CreateSongInput{
 		OfficialIdx: req.OfficialIdx,
 		Title:       req.Title,
+		Reading:     req.Reading,
 		Artist:      req.Artist,
 		Genre:       req.Genre,
 		BPM:         req.BPM,

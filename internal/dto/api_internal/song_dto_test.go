@@ -17,6 +17,7 @@ func TestToSongDTO(t *testing.T) {
 	genreID := 1
 	bpm := 180
 	imgURL := "https://example.com/jacket.jpg"
+	reading := "テストガッキョク"
 	releaseDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	masterConst, _ := chartconstant.NewChartConstant(13.0)
 	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
@@ -24,6 +25,7 @@ func TestToSongDTO(t *testing.T) {
 	song := &entity.Song{
 		DisplayID:      "test123456789012",
 		Title:          "テスト楽曲",
+		Reading:        &reading,
 		Artist:         "テストアーティスト",
 		GenreID:        &genreID,
 		BPM:            &bpm,
@@ -55,6 +57,10 @@ func TestToSongDTO(t *testing.T) {
 
 	if dto.Title != "テスト楽曲" {
 		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
+	}
+
+	if dto.Reading == nil || *dto.Reading != "テストガッキョク" {
+		t.Errorf("Reading = %v, want %v", dto.Reading, "テストガッキョク")
 	}
 
 	if dto.Artist != "テストアーティスト" {
@@ -160,6 +166,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	jacket := "jacket123"
 	bpm := 180
 	genre := "ORIGINAL"
+	reading := "テストガッキョク"
 
 	chartBasic, _ := chartconstant.NewChartConstant(3.0)
 	chartAdvanced, _ := chartconstant.NewChartConstant(5.0)
@@ -169,6 +176,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	songDTO := &SongDTO{
 		DisplayID: "92eaa42ee1d1a70f",
 		Title:     "テスト楽曲",
+		Reading:   &reading,
 		Artist:    "テストアーティスト",
 		Genre:     &genre,
 		BPM:       &bpm,
@@ -203,6 +211,10 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
 	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
+	}
+
+	if !strings.Contains(jsonString, `"reading":"テストガッキョク"`) {
+		t.Errorf("JSON should contain reading field, got: %s", jsonString)
 	}
 
 	// constが小数点以下1桁表記であることを確認

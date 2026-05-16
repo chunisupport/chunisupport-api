@@ -14,6 +14,7 @@ type PlayerDataSongModel struct {
 	ID          int        `db:"id"`
 	DisplayID   string     `db:"display_id"`
 	Title       string     `db:"title"`
+	Reading     *string    `db:"reading"`
 	Artist      string     `db:"artist"`
 	GenreID     *int       `db:"genre_id"`
 	BPM         *int       `db:"bpm"`
@@ -29,6 +30,7 @@ func (m *PlayerDataSongModel) ToEntity() *entity.PlayerDataSong {
 		ID:          m.ID,
 		DisplayID:   m.DisplayID,
 		Title:       m.Title,
+		Reading:     m.Reading,
 		Artist:      m.Artist,
 		GenreID:     m.GenreID,
 		BPM:         m.BPM,
@@ -44,6 +46,7 @@ func FromPlayerDataSongEntity(e *entity.PlayerDataSong) *PlayerDataSongModel {
 		ID:          e.ID,
 		DisplayID:   e.DisplayID,
 		Title:       e.Title,
+		Reading:     e.Reading,
 		Artist:      e.Artist,
 		GenreID:     e.GenreID,
 		BPM:         e.BPM,

@@ -129,6 +129,7 @@ func (h *WorldsendHandler) CreateWorldsendSong(c echo.Context) error {
 	input := &usecase.CreateWorldsendSongInput{
 		OfficialIdx: req.OfficialIdx,
 		Title:       req.Title,
+		Reading:     req.Reading,
 		Artist:      req.Artist,
 		Genre:       req.Genre,
 		BPM:         req.BPM,
@@ -197,6 +198,7 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 		input := &usecase.UpdateWorldsendSongInput{
 			DisplayID: req.DisplayID,
 			Title:     req.Title,
+			Reading:   req.Reading,
 			Artist:    req.Artist,
 			Genre:     req.Genre,
 			BPM:       req.BPM,
