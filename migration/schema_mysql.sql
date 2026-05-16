@@ -226,6 +226,7 @@ CREATE TABLE `songs` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reading` varchar(300) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `artist` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
   `genre_id` tinyint unsigned NOT NULL,
   `bpm` int DEFAULT NULL,

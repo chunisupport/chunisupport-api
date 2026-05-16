@@ -90,7 +90,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `id`: 楽曲のユニークID。
     - `display_id`: 16進数16文字の表示用ID（ユニーク制約）。
-    - `title`, `artist`: 楽曲のタイトル（300文字まで）とアーティスト名（300文字まで）。
+    - `title`, `reading`, `artist`: 楽曲のタイトル（300文字まで）、読み（300文字まで、NULL可）、アーティスト名（300文字まで）。
     - `genre_id`: `genres`マスタへの外部キー。
     - `bpm`: BPM（NULL可）。
     - `released_at`: リリース日（DATE型、NULL可）。
@@ -166,3 +166,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000013**: `player_records` の最新更新取得をプレイヤー単位で高速化するため、`idx_player_records_updated_at` を削除し、`player_records(player_id, updated_at DESC)` を追加。あわせて `player_worldsend_records` の単独 `updated_at` インデックス、`idx_goals_user_created_id` に包含される `idx_goals_user_id`、および不要になった `idx_songs_title` を削除した。
 - **000014**: プレイヤーごとの解禁済み楽曲を保持する `player_locked_songs` テーブルを追加。
 - **000015**: `genres` テーブルに `sort_order` カラムを追加し、ジャンルの表示順を投入。
+- **000016**: `songs` テーブルに楽曲の読みを保持する `reading` カラムを追加。

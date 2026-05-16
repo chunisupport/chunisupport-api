@@ -1,0 +1,2 @@
+ALTER TABLE songs
+    ADD COLUMN reading VARCHAR(300) NULL AFTER title;
