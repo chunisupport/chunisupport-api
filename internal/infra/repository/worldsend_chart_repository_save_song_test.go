@@ -30,6 +30,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				ID:          1,
 				DisplayID:   "WE001-UPDATED",
 				Title:       "Updated WE Title",
+				Reading:     stringPtrForWorldsendSaveTest("Updated WE Reading"),
 				Artist:      "Updated WE Artist",
 				GenreID:     intPtrForWorldsendSaveTest(2),
 				BPM:         intPtrForWorldsendSaveTest(230),
@@ -93,6 +94,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					ID          int            `db:"id"`
 					DisplayID   string         `db:"display_id"`
 					Title       string         `db:"title"`
+					Reading     *string        `db:"reading"`
 					Artist      string         `db:"artist"`
 					GenreID     int            `db:"genre_id"`
 					BPM         int            `db:"bpm"`
@@ -103,7 +105,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					IsDeleted   bool           `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+					SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -112,6 +114,8 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				assert.Equal(t, tt.saveSong.ID, saved.ID)
 				assert.Equal(t, tt.saveSong.DisplayID, saved.DisplayID)
 				assert.Equal(t, tt.saveSong.Title, saved.Title)
+				require.NotNil(t, saved.Reading)
+				assert.Equal(t, *tt.saveSong.Reading, *saved.Reading)
 				assert.Equal(t, tt.saveSong.Artist, saved.Artist)
 				assert.Equal(t, *tt.saveSong.GenreID, saved.GenreID)
 				assert.Equal(t, *tt.saveSong.BPM, saved.BPM)

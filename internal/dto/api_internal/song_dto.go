@@ -117,6 +117,7 @@ func (o EditorOrderedChartsMap) MarshalJSON() ([]byte, error) {
 type SongDTO struct {
 	DisplayID      string           `json:"id"`
 	Title          string           `json:"title"`
+	Reading        *string          `json:"reading"`
 	Artist         string           `json:"artist"`
 	Genre          *string          `json:"genre"`
 	BPM            *int             `json:"bpm"`
@@ -159,6 +160,7 @@ type UpdateChartRequest struct {
 type UpdateSongRequest struct {
 	DisplayID  string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
 	Title      string                         `json:"title" validate:"required"`
+	Reading    *string                        `json:"reading" validate:"omitempty,max=300"`
 	Artist     string                         `json:"artist" validate:"required"`
 	Genre      *string                        `json:"genre"`
 	BPM        *int                           `json:"bpm" validate:"omitempty,gt=0"`
@@ -180,6 +182,7 @@ type CreateChartRequest struct {
 type CreateSongRequest struct {
 	OfficialIdx string                `json:"official_idx" validate:"required,max=10"`
 	Title       string                `json:"title" validate:"required"`
+	Reading     *string               `json:"reading" validate:"omitempty,max=300"`
 	Artist      string                `json:"artist" validate:"required"`
 	Genre       string                `json:"genre" validate:"required"`
 	BPM         *int                  `json:"bpm" validate:"omitempty,gt=0"`
@@ -255,6 +258,7 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 	return &SongDTO{
 		DisplayID:      song.DisplayID,
 		Title:          song.Title,
+		Reading:        song.Reading,
 		Artist:         song.Artist,
 		Genre:          genrePtr,
 		BPM:            song.BPM,

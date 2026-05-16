@@ -1568,6 +1568,7 @@ curl -X POST \
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -1607,6 +1608,7 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID（16進数16文字） |
 | `title` | string | 楽曲名 |
+| `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM（未設定の場合null） |
@@ -1773,6 +1775,7 @@ curl -X POST \
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
   "bpm": 180,
@@ -1794,6 +1797,7 @@ curl -X POST \
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
 | `bpm` | int | - | BPM（省略可） |
@@ -1830,6 +1834,7 @@ curl -X POST \
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
     "bpm": 180,
@@ -1853,6 +1858,7 @@ curl -X POST \
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
@@ -1923,6 +1929,7 @@ curl -X POST \
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -1947,6 +1954,7 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
+| `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |
@@ -2010,6 +2018,7 @@ curl -X POST \
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
   "bpm": 180,
@@ -2028,6 +2037,7 @@ curl -X POST \
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
 | `bpm` | int | - | BPM（省略可） |
@@ -2062,6 +2072,7 @@ curl -X POST \
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
     "bpm": 180,
@@ -2085,6 +2096,7 @@ curl -X POST \
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
@@ -2163,7 +2175,7 @@ curl -X POST \
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -2215,7 +2227,7 @@ curl -X POST \
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -2448,6 +2460,7 @@ curl -X POST \
     {
       "id": "0000000000000001",
       "title": "楽曲名",
+      "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -2480,6 +2493,7 @@ curl -X POST \
 | `songs` | array | 楽曲オブジェクトの配列 |
 | `songs[].id` | string | 楽曲の識別ID（16桁） |
 | `songs[].title` | string | 楽曲名 |
+| `songs[].reading` | string\|null | 楽曲名の読み |
 | `songs[].artist` | string | アーティスト名 |
 | `songs[].genre` | string\|null | ジャンル名 |
 | `songs[].bpm` | number\|null | BPM |
@@ -2510,6 +2524,7 @@ curl -X POST \
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -2534,6 +2549,7 @@ curl -X POST \
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
+| `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |

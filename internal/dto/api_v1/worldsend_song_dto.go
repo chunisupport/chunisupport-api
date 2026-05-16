@@ -18,6 +18,7 @@ type V1WorldsendChartDTO struct {
 type V1WorldsendSongDTO struct {
 	DisplayID   string                          `json:"id"`
 	Title       string                          `json:"title"`
+	Reading     *string                         `json:"reading"`
 	Artist      string                          `json:"artist"`
 	Genre       *string                         `json:"genre"`
 	BPM         *int                            `json:"bpm"`
@@ -72,6 +73,7 @@ func ToV1WorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genre
 	return &V1WorldsendSongDTO{
 		DisplayID:   song.DisplayID,
 		Title:       song.Title,
+		Reading:     song.Reading,
 		Artist:      song.Artist,
 		Genre:       genrePtr,
 		BPM:         song.BPM,

@@ -65,6 +65,7 @@ func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
 type V1SongDTO struct {
 	DisplayID      string             `json:"id"`
 	Title          string             `json:"title"`
+	Reading        *string            `json:"reading"`
 	Artist         string             `json:"artist"`
 	Genre          *string            `json:"genre"`
 	BPM            *int               `json:"bpm"`
@@ -125,6 +126,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 	return &V1SongDTO{
 		DisplayID:      song.DisplayID,
 		Title:          song.Title,
+		Reading:        song.Reading,
 		Artist:         song.Artist,
 		Genre:          genrePtr,
 		BPM:            song.BPM,

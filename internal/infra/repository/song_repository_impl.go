@@ -31,6 +31,7 @@ type songRow struct {
 	ID          int        `db:"id"`
 	DisplayID   string     `db:"display_id"`
 	Title       string     `db:"title"`
+	Reading     *string    `db:"reading"`
 	Artist      string     `db:"artist"`
 	GenreID     *int       `db:"genre_id"`
 	BPM         *int       `db:"bpm"`
@@ -60,7 +61,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -182,6 +183,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.ID = row.ID
 	song.DisplayID = row.DisplayID
 	song.Title = row.Title
+	song.Reading = row.Reading
 	song.Artist = row.Artist
 	song.GenreID = row.GenreID
 	song.BPM = row.BPM
@@ -225,7 +227,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -300,7 +302,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
-		SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
 		FROM songs
 		WHERE display_id = ? AND is_worldsend = 0
 	`
@@ -344,7 +346,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -352,6 +354,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		query,
 		song.DisplayID,
 		song.Title,
+		song.Reading,
 		song.Artist,
 		song.GenreID,
 		song.BPM,
@@ -457,16 +460,19 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	}
 
 	// CASE式を構築
-	// 注意: SQLの引数順序はCASE式の出現順（title→artist→genre→...→IN句）であるため、
+	// 注意: SQLの引数順序はCASE式の出現順（title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
-	var titleArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
+	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
+	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
 
 	for _, song := range songs {
 		songID := displayIDToSongID[song.DisplayID]
 
 		titleCases = append(titleCases, "WHEN id = ? THEN ?")
 		titleArgs = append(titleArgs, songID, song.Title)
+
+		readingCases = append(readingCases, "WHEN id = ? THEN ?")
+		readingArgs = append(readingArgs, songID, song.Reading)
 
 		artistCases = append(artistCases, "WHEN id = ? THEN ?")
 		artistArgs = append(artistArgs, songID, song.Artist)
@@ -484,9 +490,10 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		jacketArgs = append(jacketArgs, songID, song.Jacket)
 	}
 
-	// SQLの引数順序に合わせて結合: title→artist→genre→bpm→released→jacket→IN句
+	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
+	args = append(args, readingArgs...)
 	args = append(args, artistArgs...)
 	args = append(args, genreArgs...)
 	args = append(args, bpmArgs...)
@@ -506,6 +513,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	query := fmt.Sprintf(`
 		UPDATE songs SET
 			title = CASE %s END,
+			reading = CASE %s END,
 			artist = CASE %s END,
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
@@ -515,6 +523,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		  AND is_worldsend = 0
 	`,
 		strings.Join(titleCases, " "),
+		strings.Join(readingCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
 		strings.Join(bpmCases, " "),
@@ -624,11 +633,12 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
 	`,
 		song.DisplayID,
 		song.Title,
+		song.Reading,
 		song.Artist,
 		song.GenreID,
 		song.BPM,

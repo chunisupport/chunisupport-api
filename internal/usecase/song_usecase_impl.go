@@ -157,6 +157,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 		song := entity.NewSong()
 		song.DisplayID = req.DisplayID
 		song.Title = req.Title
+		song.Reading = req.Reading
 		song.Artist = req.Artist
 		song.GenreID = genreID
 		song.BPM = req.BPM
@@ -283,6 +284,7 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.DisplayID = displayID
 	song.OfficialIdx = input.OfficialIdx
 	song.Title = input.Title
+	song.Reading = input.Reading
 	song.Artist = input.Artist
 	song.GenreID = &genreID
 	song.BPM = input.BPM
