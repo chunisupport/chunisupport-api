@@ -155,8 +155,8 @@ type playerDataUsecase struct {
 	masterCache      repository.PlayerDataMasterProvider
 }
 
-// NewPlayerDataService は PlayerDataUsecase の実装を生成します。
-func NewPlayerDataService(
+// NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
+func NewPlayerDataUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRepo repository.PlayerRepository,

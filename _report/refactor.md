@@ -76,7 +76,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-011** | **Medium** | `Service` / `Usecase` 命名が混在 | `NewAPITokenService`, `NewUserService`, `NewSongService`, `NewPlayerDataService`, `NewPlayerService` と `NewFirebaseAuthUsecase`, `NewSignupUsecase`, `NewGoalUsecase` などが混在しています。 |
 | **UC-013** | **Medium** | `goalUsecase.Update` が非トランザクション | `Create` は `tm.Transactional` を使う一方、`Update` は `u.db` へ直接アクセスしています。 |
 
 ### ハンドラー / ルーター層 (HDL)

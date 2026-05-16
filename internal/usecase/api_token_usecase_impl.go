@@ -23,8 +23,8 @@ type apiTokenUsecase struct {
 	userRepo  repository.UserRepository
 }
 
-// NewAPITokenService はAPITokenUsecaseを生成します。
-func NewAPITokenService(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
+// NewAPITokenUsecase はAPITokenUsecaseを生成します。
+func NewAPITokenUsecase(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
 	return &apiTokenUsecase{
 		db:        db,
 		tokenRepo: tokenRepo,

@@ -16,8 +16,8 @@ type playerUsecase struct {
 	playerRepo repository.PlayerRepository
 }
 
-// NewPlayerService は新しいPlayerUsecaseを生成します。
-func NewPlayerService(db repository.Executor, playerRepo repository.PlayerRepository) PlayerUsecase {
+// NewPlayerUsecase は新しいPlayerUsecaseを生成します。
+func NewPlayerUsecase(db repository.Executor, playerRepo repository.PlayerRepository) PlayerUsecase {
 	return &playerUsecase{
 		db:         db,
 		playerRepo: playerRepo,

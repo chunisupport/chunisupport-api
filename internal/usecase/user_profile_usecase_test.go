@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUserService_GetUserProfile_Success(t *testing.T) {
+func TestUserUsecase_GetUserProfile_Success(t *testing.T) {
 	now := time.Now()
 	un, err := username.NewUserName("tester")
 	require.NoError(t, err)
@@ -28,7 +28,7 @@ func TestUserService_GetUserProfile_Success(t *testing.T) {
 		Level:     10,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfile(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestUserService_GetUserProfile_Success(t *testing.T) {
 	assert.True(t, result.Player.UpdatedAt.Equal(now))
 }
 
-func TestUserService_GetUserProfile_PrivateUserBlocked(t *testing.T) {
+func TestUserUsecase_GetUserProfile_PrivateUserBlocked(t *testing.T) {
 	un, err := username.NewUserName("privateuser")
 	require.NoError(t, err)
 	user := &entity.User{
@@ -52,27 +52,27 @@ func TestUserService_GetUserProfile_PrivateUserBlocked(t *testing.T) {
 		Level:     1,
 		UpdatedAt: time.Now(),
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err = service.GetUserProfile(context.Background(), "privateuser", nil)
 	assert.ErrorIs(t, err, ErrUserPrivate)
 }
 
-func TestUserService_GetUserProfile_UserNotFound(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+func TestUserUsecase_GetUserProfile_UserNotFound(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfile(context.Background(), "nobody", nil)
 	assert.ErrorIs(t, err, ErrUserNotFound)
 }
 
-func TestUserService_GetUserProfile_PlayerNotLinkedReturnsNilPlayer(t *testing.T) {
+func TestUserUsecase_GetUserProfile_PlayerNotLinkedReturnsNilPlayer(t *testing.T) {
 	un, err := username.NewUserName("tester")
 	require.NoError(t, err)
 	user := &entity.User{
 		ID:       1,
 		Username: un,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfile(context.Background(), "tester", nil)
 	require.NoError(t, err)

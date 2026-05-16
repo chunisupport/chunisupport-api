@@ -20,12 +20,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// mockPlayerService は service.PlayerService のモックです。
-type mockPlayerService struct {
+// mockPlayerUsecase は usecase.PlayerUsecase のモックです。
+type mockPlayerUsecase struct {
 	mock.Mock
 }
 
-func (m *mockPlayerService) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
+func (m *mockPlayerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
 	args := m.Called(ctx, userID, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -39,13 +39,13 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 	e.Validator = app.NewCustomValidator()
 
 	// モックの期待値設定
-	mockService := new(mockPlayerService)
+	mockUsecase := new(mockPlayerUsecase)
 	expectedPlayer := &dto.PlayerDTO{Name: "太郎"}
-	mockService.On("CreatePlayer", mock.Anything, 1, "太郎").Return(expectedPlayer, nil)
-	mockService.On("CreatePlayer", mock.Anything, 1, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
-	mockService.On("CreatePlayer", mock.Anything, 1, "不正名").Return(nil, usecase.ErrInvalidPlayerName)
+	mockUsecase.On("CreatePlayer", mock.Anything, 1, "太郎").Return(expectedPlayer, nil)
+	mockUsecase.On("CreatePlayer", mock.Anything, 1, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
+	mockUsecase.On("CreatePlayer", mock.Anything, 1, "不正名").Return(nil, usecase.ErrInvalidPlayerName)
 
-	h := api_internal.NewPlayerHandler(mockService)
+	h := api_internal.NewPlayerHandler(mockUsecase)
 
 	t.Run("ハッピーパス: 正常なプレイヤー作成", func(t *testing.T) {
 		body := `{"name": "太郎"}`

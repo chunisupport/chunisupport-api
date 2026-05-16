@@ -19,12 +19,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// mockUserService は usecase.UserUsecase のモックです。
-type mockUserService struct {
+// mockUserUsecase は usecase.UserUsecase のモックです。
+type mockUserUsecase struct {
 	mock.Mock
 }
 
-func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+func (m *mockUserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
 	args := m.Called(ctx, username, requester, includeNoPlay)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -32,7 +32,7 @@ func (m *mockUserService) GetUserProfileWithRecords(ctx context.Context, usernam
 	return args.Get(0).(*dto_internal.UserProfileWithRecordsDTO), args.Error(1)
 }
 
-func (m *mockUserService) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserUpdatedAtDTO, error) {
+func (m *mockUserUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserUpdatedAtDTO, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -40,7 +40,7 @@ func (m *mockUserService) GetUserUpdatedAt(ctx context.Context, username string,
 	return args.Get(0).(*dto_internal.UserUpdatedAtDTO), args.Error(1)
 }
 
-func (m *mockUserService) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
+func (m *mockUserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -48,7 +48,7 @@ func (m *mockUserService) GetUserProfileRatingView(ctx context.Context, username
 	return args.Get(0).(*dto_internal.UserProfileRatingViewDTO), args.Error(1)
 }
 
-func (m *mockUserService) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileRecordViewDTO, error) {
+func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileRecordViewDTO, error) {
 	args := m.Called(ctx, username, requester, includeNoPlay)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -56,7 +56,7 @@ func (m *mockUserService) GetUserProfileRecordView(ctx context.Context, username
 	return args.Get(0).(*dto_internal.UserProfileRecordViewDTO), args.Error(1)
 }
 
-func (m *mockUserService) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
+func (m *mockUserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
 	args := m.Called(ctx, page, limit, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -64,19 +64,19 @@ func (m *mockUserService) GetAllUsersForAdmin(ctx context.Context, page int, lim
 	return args.Get(0).([]dto_internal.AdminUserListResponse), args.Error(1)
 }
 
-func (m *mockUserService) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
+func (m *mockUserUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	args := m.Called(ctx, requester, username)
 	return args.Error(0)
 }
 
 func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2026, 4, 18, 12, 34, 56, 0, time.UTC)
 
 	t.Run("正常系: updated_at を返す", func(t *testing.T) {
-		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
 			UpdatedAt: &now,
 		}, nil).Once()
 
@@ -95,11 +95,11 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		if assert.NotNil(t, body.UpdatedAt) {
 			assert.True(t, now.Equal(*body.UpdatedAt))
 		}
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("プレイヤー未連携時は null を返す", func(t *testing.T) {
-		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
 			UpdatedAt: nil,
 		}, nil).Once()
 
@@ -116,11 +116,11 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		var body map[string]any
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Nil(t, body["updated_at"])
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockService.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserUpdatedAtDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserUpdatedAtDTO)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
@@ -131,14 +131,14 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		err := h.GetUserUpdatedAt(c)
 
 		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 }
 
 func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 	player := &dto.PlayerDTO{
 		Name:      "player",
@@ -177,7 +177,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	}
 
 	t.Run("viewなしは全レコードを返す", func(t *testing.T) {
-		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(result, nil).Once()
+		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(result, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -197,7 +197,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		_, hasWorldsend := recordsBody["worldsend"]
 		assert.True(t, hasAll)
 		assert.True(t, hasWorldsend)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("viewなしでプレイヤー未連携なら player と records は null を返す", func(t *testing.T) {
@@ -207,7 +207,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 			Records:   nil,
 			UpdatedAt: nil,
 		}
-		mockService.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(noPlayerResult, nil).Once()
+		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(noPlayerResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -226,11 +226,11 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.Nil(t, body["records"])
 		_, hasUserID := body["user_id"]
 		assert.False(t, hasUserID)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("view=ratingはレーティング枠のみ返す", func(t *testing.T) {
-		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 		rec := httptest.NewRecorder()
@@ -250,7 +250,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		_, hasWorldsend := recordsBody["worldsend"]
 		assert.False(t, hasAll)
 		assert.False(t, hasWorldsend)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("view=ratingの異常系", func(t *testing.T) {
@@ -273,7 +273,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
-				mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), testCase.usecaseError).Once()
+				mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), testCase.usecaseError).Once()
 
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 				rec := httptest.NewRecorder()
@@ -284,7 +284,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 				err := h.GetUserProfileWithRecords(c)
 
 				assert.ErrorIs(t, err, testCase.expectedError)
-				mockService.AssertExpectations(t)
+				mockUsecase.AssertExpectations(t)
 			})
 		}
 	})
@@ -292,8 +292,8 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 
 func TestUserHandler_GetUserRating(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 	player := &dto.PlayerDTO{
 		Name:      "player",
@@ -316,7 +316,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	}
 
 	t.Run("正常系: レーティング枠とメタ情報を返す", func(t *testing.T) {
-		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(ratingResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
@@ -341,11 +341,11 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.False(t, hasUsername)
 		_, hasPlayer := body["player"]
 		assert.False(t, hasPlayer)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
-		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserProfileRatingViewDTO{
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserProfileRatingViewDTO{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -371,11 +371,11 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Nil(t, meta["updated_at"])
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockService.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
@@ -386,14 +386,14 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		err := h.GetUserRating(c)
 
 		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 }
 
 func TestUserHandler_GetUserRecord(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 	recordResult := &dto_internal.UserProfileRecordViewDTO{
 		Username: "testuser",
@@ -413,7 +413,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	}
 
 	t.Run("正常系: レコード枠とメタ情報を返す", func(t *testing.T) {
-		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordResult, nil).Once()
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
@@ -436,11 +436,11 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.False(t, hasUsername)
 		_, hasPlayer := body["player"]
 		assert.False(t, hasPlayer)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
-		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&dto_internal.UserProfileRecordViewDTO{
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&dto_internal.UserProfileRecordViewDTO{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -464,11 +464,11 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Nil(t, meta["updated_at"])
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*dto_internal.UserProfileRecordViewDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*dto_internal.UserProfileRecordViewDTO)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
@@ -479,14 +479,14 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		err := h.GetUserRecord(c)
 
 		assert.ErrorIs(t, err, apierror.ErrUserNotFound)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 }
 
 func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 	player := &dto.PlayerDTO{
 		Name:      "player",
@@ -506,7 +506,7 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 		UpdatedAt: &now,
 	}
 
-	mockService.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordViewResult, nil).Once()
+	mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordViewResult, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record&include_noplay=true", nil)
 	rec := httptest.NewRecorder()
@@ -530,13 +530,13 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	assert.True(t, hasWorldsend)
 	assert.False(t, hasBest)
 	assert.False(t, hasNew)
-	mockService.AssertExpectations(t)
+	mockUsecase.AssertExpectations(t)
 }
 
 func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewAdminUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewAdminUserHandler(mockUsecase)
 	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := createdAt.Add(2 * time.Hour)
 
@@ -571,7 +571,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 		},
 	}
 
-	mockService.On("GetAllUsersForAdmin", mock.Anything, 2, info.DefaultUserListLimit, "user").Return(expected, nil).Once()
+	mockUsecase.On("GetAllUsersForAdmin", mock.Anything, 2, info.DefaultUserListLimit, "user").Return(expected, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/internal/users?page=2&name=user", nil)
 	rec := httptest.NewRecorder()
@@ -607,17 +607,17 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[1]["is_private"])
 	assert.Nil(t, body[1]["firebase_uid"])
 	assert.Nil(t, body[1]["email"])
-	mockService.AssertExpectations(t)
+	mockUsecase.AssertExpectations(t)
 }
 
 func TestUserHandler_DeleteUser(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	adminUser := &entity.User{ID: 99, AccountTypeID: 3}
 
 	t.Run("正常系: ユーザー削除", func(t *testing.T) {
-		mockService.On("DeleteUser", mock.Anything, adminUser, "testuser").Return(nil).Once()
+		mockUsecase.On("DeleteUser", mock.Anything, adminUser, "testuser").Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -630,11 +630,11 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusNoContent, rec.Code)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ユーザーが存在しない", func(t *testing.T) {
-		mockService.On("DeleteUser", mock.Anything, adminUser, "nonexistent").Return(usecase.ErrUserNotFound).Once()
+		mockUsecase.On("DeleteUser", mock.Anything, adminUser, "nonexistent").Return(usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/nonexistent", nil)
 		rec := httptest.NewRecorder()
@@ -646,12 +646,12 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		err := h.DeleteUser(c)
 
 		assert.Error(t, err)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: ADMIN権限がない", func(t *testing.T) {
 		normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-		mockService.On("DeleteUser", mock.Anything, normalUser, "testuser").Return(usecase.ErrAdminRequired).Once()
+		mockUsecase.On("DeleteUser", mock.Anything, normalUser, "testuser").Return(usecase.ErrAdminRequired).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -663,6 +663,6 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		err := h.DeleteUser(c)
 
 		assert.ErrorIs(t, err, apierror.ErrForbidden)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 }

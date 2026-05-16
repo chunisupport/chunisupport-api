@@ -149,7 +149,7 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 			mockTM := new(MockTransactionManager)
 			mockExec := new(MockExecutor)
 
-			usecase := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
+			usecase := NewSongUsecase(mockRepo, mockMasterCache, mockTM, mockExec)
 
 			ctx := context.Background()
 
@@ -258,7 +258,7 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 			mockTM := new(MockTransactionManager)
 			mockExec := new(MockExecutor)
 
-			uc := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
+			uc := NewSongUsecase(mockRepo, mockMasterCache, mockTM, mockExec)
 			ctx := context.Background()
 
 			mockRepo.On("FindByDisplayID", ctx, mockExec, tt.displayID).Return(tt.repoReturn, tt.repoErr)
@@ -285,7 +285,7 @@ func TestDeleteSong_SavesDeletedState(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongService(mockRepo, mockMasterCache, tm, mockExec)
+	uc := NewSongUsecase(mockRepo, mockMasterCache, tm, mockExec)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -314,7 +314,7 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongService(mockRepo, mockMasterCache, tm, mockExec)
+	uc := NewSongUsecase(mockRepo, mockMasterCache, tm, mockExec)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -343,7 +343,7 @@ func TestGetSongsUpdatedAt_ReturnsRepositoryValue(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockTM := new(MockTransactionManager)
 	mockExec := new(MockExecutor)
-	uc := NewSongService(mockRepo, mockMasterCache, mockTM, mockExec)
+	uc := NewSongUsecase(mockRepo, mockMasterCache, mockTM, mockExec)
 	ctx := context.Background()
 	expected := time.Date(2026, 4, 9, 12, 34, 56, 0, time.UTC)
 

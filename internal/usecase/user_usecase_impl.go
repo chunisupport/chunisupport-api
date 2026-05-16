@@ -41,8 +41,8 @@ type userProfilePlayerRecords struct {
 	latestUpdatedAt time.Time
 }
 
-// NewUserService は UserUsecase の実装を生成します。
-func NewUserService(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider) UserUsecase {
+// NewUserUsecase は UserUsecase の実装を生成します。
+func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
@@ -58,9 +58,9 @@ func NewUserService(db repository.Executor, userRepo repository.UserRepository, 
 	}
 }
 
-// NewUserServiceWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
-func NewUserServiceWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
-	usecase := NewUserService(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+// NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
+func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase

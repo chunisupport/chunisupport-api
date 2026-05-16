@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func (m *mockUserService) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileDTO, error) {
+func (m *mockUserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileDTO, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -28,8 +28,8 @@ func (m *mockUserService) GetUserProfile(ctx context.Context, username string, r
 
 func TestUserHandler_GetUserProfile(t *testing.T) {
 	e := newTestEcho()
-	mockService := new(mockUserService)
-	h := api_internal.NewUserHandler(mockService)
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 
 	t.Run("正常系: username と player を返す", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 				Honors:    []*dto.HonorDTO{},
 			},
 		}
-		mockService.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+		mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 		rec := httptest.NewRecorder()
@@ -60,7 +60,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		assert.Equal(t, "testuser", body.Username)
 		assert.NotNil(t, body.Player)
 		assert.Equal(t, "テストプレイヤー", body.Player.Name)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("正常系: プレイヤー未連携なら player は null を返す", func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 			Username: "testuser",
 			Player:   nil,
 		}
-		mockService.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
+		mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 		rec := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		assert.Equal(t, "testuser", body["username"])
 		assert.Nil(t, body["player"])
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("異常系: 既存プロフィールAPIと同じエラー変換を使う", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
-				mockService.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileDTO)(nil), testCase.usecaseError).Once()
+				mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileDTO)(nil), testCase.usecaseError).Once()
 
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 				rec := httptest.NewRecorder()
@@ -119,7 +119,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 				err := h.GetUserProfile(c)
 
 				assert.ErrorIs(t, err, testCase.expectedError)
-				mockService.AssertExpectations(t)
+				mockUsecase.AssertExpectations(t)
 			})
 		}
 	})

@@ -26,8 +26,8 @@ type songUsecaseImpl struct {
 	defaultExecutor repository.Executor
 }
 
-// NewSongService は新しい SongUsecase を生成します。
-func NewSongService(
+// NewSongUsecase は新しい SongUsecase を生成します。
+func NewSongUsecase(
 	songRepo repository.SongRepository,
 	masterCache repository.SongMasterProvider,
 	tm TransactionManager,
