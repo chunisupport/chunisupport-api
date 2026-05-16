@@ -9,6 +9,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestToWorldsendSongDTO は ToWorldsendSongDTO 関数の基本的な変換をテストします。
@@ -64,9 +66,8 @@ func TestToWorldsendSongDTO(t *testing.T) {
 		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
 	}
 
-	if dto.Reading == nil || *dto.Reading != "テストガッキョク" {
-		t.Errorf("Reading = %v, want %v", dto.Reading, "テストガッキョク")
-	}
+	require.NotNil(t, dto.Reading)
+	assert.Equal(t, "テストガッキョク", *dto.Reading)
 
 	if dto.Artist != "テストアーティスト" {
 		t.Errorf("Artist = %v, want %v", dto.Artist, "テストアーティスト")
