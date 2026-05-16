@@ -33,7 +33,7 @@ func (h *APITokenHandler) GetStatus(c echo.Context) error {
 
 	token, err := h.usecase.GetStatus(c.Request().Context(), user.ID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	if token == nil {
@@ -59,7 +59,7 @@ func (h *APITokenHandler) Generate(c echo.Context) error {
 
 	token, err := h.usecase.Generate(c.Request().Context(), user.ID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
@@ -75,7 +75,7 @@ func (h *APITokenHandler) Delete(c echo.Context) error {
 	}
 
 	if err := h.usecase.Delete(c.Request().Context(), user.ID); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.NoContent(http.StatusNoContent)

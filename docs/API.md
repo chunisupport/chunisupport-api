@@ -313,6 +313,7 @@
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない
 
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
@@ -1901,7 +1902,8 @@ curl -X POST \
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/songs/:displayid/restore`
 - **認証**: Firebase Bearer 必須
@@ -1913,7 +1915,8 @@ curl -X POST \
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/songs/worldsend`
 - **認証**: Firebase Bearer (任意)

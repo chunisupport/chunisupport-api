@@ -1,8 +1,6 @@
 package api_v1
 
 import (
-	"errors"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -33,16 +31,7 @@ func (h *V1UserHandler) GetUser(c echo.Context) error {
 	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
 	if err != nil {
-		switch {
-		case errors.Is(err, usecase.ErrUserNotFound):
-			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrUserPrivate):
-			// セキュリティ: 非公開と未発見を区別しない
-			return apierror.ErrUserNotFound
-		default:
-			slog.Error("failed to get user profile", "username", username, "error", err)
-			return apierror.ErrInternalError.WithInternal(err)
-		}
+		return apierror.FromUsecaseError(err)
 	}
 
 	// 既存DTOから V1DTO へ変換

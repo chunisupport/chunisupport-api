@@ -66,6 +66,30 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		userCredentialMock.AssertExpectations(t)
 	})
+
+	t.Run("ユーザーが存在しない場合はuser_not_foundを返す", func(t *testing.T) {
+		// Given
+		user := &entity.User{ID: 11, IsPrivate: false}
+		userCredentialMock.On("UpdatePrivacy", mock.Anything, 11, true).Return(usecase.ErrUserNotFound).Once()
+
+		body := `{"is_private": true}`
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/privacy", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", user)
+
+		// When
+		err := h.UpdatePrivacy(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
+		userCredentialMock.AssertExpectations(t)
+	})
 }
 
 func TestProfileHandler_DeleteAccount(t *testing.T) {

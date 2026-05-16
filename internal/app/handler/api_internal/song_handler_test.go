@@ -10,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -17,6 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
 )
 
 type testValidator struct {
@@ -403,6 +405,70 @@ func TestGetSongs(t *testing.T) {
 			t.Error("ADVANCED chart should be nil")
 		}
 	}
+}
+
+func TestSongHandler_DeleteSong(t *testing.T) {
+	e := echo.New()
+	staticMasterCache := &masterdata.StaticCache{}
+	masterCache := &masterdata.Cache{}
+
+	t.Run("楽曲が存在しない場合はsong_not_foundを返す", func(t *testing.T) {
+		// Given
+		mockUsecase := &testutil.MockSongUsecase{
+			DeleteSongFunc: func(ctx context.Context, displayID string) error {
+				assert.Equal(t, "missing", displayID)
+				return repository.ErrSongNotFound
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/missing", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("missing")
+
+		// When
+		err := handler.DeleteSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
+	})
+}
+
+func TestSongHandler_RestoreSong(t *testing.T) {
+	e := echo.New()
+	staticMasterCache := &masterdata.StaticCache{}
+	masterCache := &masterdata.Cache{}
+
+	t.Run("楽曲が存在しない場合はsong_not_foundを返す", func(t *testing.T) {
+		// Given
+		mockUsecase := &testutil.MockSongUsecase{
+			RestoreSongFunc: func(ctx context.Context, displayID string) error {
+				assert.Equal(t, "missing", displayID)
+				return repository.ErrSongNotFound
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodPost, "/internal/songs/missing/restore", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("missing")
+
+		// When
+		err := handler.RestoreSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
+	})
 }
 
 func stringPtr(value string) *string {

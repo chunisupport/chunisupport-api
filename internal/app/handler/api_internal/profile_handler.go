@@ -57,7 +57,7 @@ func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
 
 	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
 		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"is_private": req.IsPrivate})

@@ -133,7 +133,7 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 func (h *SongHandler) DeleteSong(c echo.Context) error {
 	displayID := c.Param("displayid")
 	if err := h.songUsecase.DeleteSong(c.Request().Context(), displayID); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
@@ -197,7 +197,7 @@ func convertToCreateChartInputs(reqs []*api_internal.CreateChartRequest) []*usec
 func (h *SongHandler) RestoreSong(c echo.Context) error {
 	displayID := c.Param("displayid")
 	if err := h.songUsecase.RestoreSong(c.Request().Context(), displayID); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }

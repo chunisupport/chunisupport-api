@@ -85,7 +85,6 @@
 | **HDL-001** | **Medium** | `RealIP()` の信頼境界未設定 | `router.go` で `e.IPExtractor` を設定しておらず、リバースプロキシ配下での `RealIP()` 利用が危険です。レートリミットやログに影響します。 |
 | **HDL-002** | **Medium** | `displayid` パスパラメータ未検証 | `song_handler.go` などで `displayid` をそのままUsecaseへ渡しています。更新APIのリクエストボディでは長さ検証しており、方針が不統一です。 |
 | **HDL-003** | **Medium** | `username` パスパラメータ未検証 | `user_handler.go` / `api_v1/user_handler.go` などで `username` を境界で検証していません。 |
-| **HDL-004** | **Medium** | Usecaseエラー変換の不統一 | `DeleteSong`, `RestoreSong`, `APITokenHandler.GetStatus/Generate/Delete`, `ProfileHandler.UpdatePrivacy`, `UserHandler.DeleteUser`, `api_v1.UserHandler.GetUser` などで `apierror.FromUsecaseError` を使わず、一律または個別の `internal_error` 寄せが残っています。 |
 | **HDL-010** | **Low** | `knownFields` が手書きハードコード | `me_handler.go` 内の未知フィールド検出は `PlayerDataPayload` と手動同期になっており、メンテナンス漏れの温床です。 |
 
 ---

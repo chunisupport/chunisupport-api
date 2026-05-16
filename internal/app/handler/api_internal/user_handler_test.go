@@ -645,7 +645,11 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 
 		err := h.DeleteUser(c)
 
-		assert.Error(t, err)
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -662,7 +666,11 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 
 		err := h.DeleteUser(c)
 
-		assert.ErrorIs(t, err, apierror.ErrForbidden)
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeForbidden, apiErr.Code)
+			assert.Equal(t, http.StatusForbidden, apiErr.HTTPStatus)
+		}
 		mockUsecase.AssertExpectations(t)
 	})
 }
