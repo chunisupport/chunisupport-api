@@ -1,4 +1,4 @@
-# リファクタリング指摘書 (2026-04-18時点)
+# リファクタリング指摘書 (2026-05-16時点)
 
 本ドキュメントは、現在のコードベースを再確認したうえで、**まだ残っている改善点のみ**を整理したものです。
 解消済み、または根拠が現状と一致しなくなった項目は削除しました。
@@ -25,18 +25,18 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。他は概ね理由付きですが、全体の棚卸しが未完了です。 |
+| **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。`internal/dto/worldsend_dto.go` や `internal/infra/models/*record*_model.go` の `G115` は理由付きですが、`Value()` 失敗時の扱いも含めた棚卸しが未完了です。 |
 | **SEC-04** | **Medium** | HTTPサーバーのタイムアウト未設定 | `internal/app/server.go` で `echo.Start` を直接使っており、`ReadHeaderTimeout` / `ReadTimeout` / `WriteTimeout` / `IdleTimeout` が明示されていません。Slowloris 系のリソース枯渇対策として、`http.Server` を明示生成してタイムアウトを設定すべきです。 |
 | **SEC-05** | **Medium** | DB接続のTLS設定がない | `internal/infra/db/connection.go` のMySQL DSNに `tls` 指定がありません。DBが同一ホストまたは信頼できる閉域網に限定されない場合、通信経路上の盗聴・改ざんリスクがあります。本番設定ではTLS必須化を検討すべきです。 |
 | **SEC-06** | **Low** | CORS設定の危険値検証がない | `internal/app/router.go` のCORSは設定値をそのまま反映しています。`allow_credentials=true` と広すぎる `allow_origins` の組み合わせを設定時に拒否するなど、起動時検証を追加すべきです。 |
-| **SEC-07** | **Low** | ログ出力のサニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行除去がありますが、全ログ出力で統一された機微情報・制御文字サニタイズ方針は見当たりません。ログ注入やトークン・UID等の混入を防ぐため、ログ出力ルールを統一すべきです。 |
+| **SEC-07** | **Low** | ログ出力のサニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行除去がありますが、全ログ出力で統一された機微情報・制御文字サニタイズ方針は見当たりません。`router.go` の health check では `slog.Error("Database health check failed: " + err.Error())` のような文字列連結ログも残っています。ログ注入やトークン・UID等の混入を防ぐため、ログ出力ルールを統一すべきです。 |
 
 ### パフォーマンス (PERF)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | `GetUserProfileWithRecords` は `records.all` と `records.worldsend` をまとめて返しており、ページネーションがありません。ユーザーの蓄積データ増加に比例してレスポンスが肥大化します。 |
-| **PERF-004** | **Medium** | `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | `user_usecase_impl.go` では通常譜面・WORLD'S ENDともに全件取得してからDTO化や未プレイ補完を行っています。用途別取得への分割余地があります。 |
+| **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | `GetUserProfileWithRecords` と `GetUserProfileRecordView` は `records.all` と `records.worldsend` をまとめて返しており、ページネーションがありません。`view=rating` で軽量化できる経路はありますが、レコード一覧系はユーザーの蓄積データ増加に比例してレスポンスが肥大化します。 |
+| **PERF-004** | **Medium** | `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | `user_usecase_impl.go` では通常譜面・WORLD'S ENDともに `FindByPlayerID` で全件取得してからDTO化や未プレイ補完を行っています。用途別取得への分割余地があります。 |
 
 ### 信頼性・運用 (OPS)
 
@@ -49,7 +49,7 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **QUAL-001** | **Low** | TODOコメントが2件残存 | `internal/app/router.go` に2件（L166: 外部向けhealthエンドポイント、L384: 同関連）残っています。`profile_handler.go` の1件は解消済み。未着手ならIssue化、不要なら削除すべきです。 |
+| **QUAL-001** | **Low** | TODOコメントが2件残存 | `internal/app/router.go` に2件（L175: 外部向けhealthエンドポイント、L399: 同関連）残っています。未着手ならIssue化、不要なら削除すべきです。 |
 | **QUAL-002** | **Medium** | セキュリティヘッダー未設定 | Echo の `Secure` ミドルウェア相当の設定がなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` などの標準ヘッダーが不足しています。 |
 | **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows`, `*sqlx.Row` を直接公開しており、ドメイン層がインフラ実装詳細に依存しています。 |
 
@@ -69,13 +69,14 @@
 | **INFRA-005** | **Low** | `validation.go` がContext非対応 | `ValidateRequiredData` / `GetTableStats` は `context.Context` を受け取らず、`db.Get` を使っています。起動時専用でも、I/O規約の一貫性は崩れています。 |
 | **INFRA-007** | **Medium** | `FindAllWithPlayer` と `FindAllWithPlayerForAdmin` の重複 | `internal/infra/repository/user_repository_impl.go` で、クエリ構築・LIKE検索・rows処理がかなり重複しています。 |
 | **INFRA-009** | **Medium** | 譜面定数・ノーツ変換時のエラー無視 | `internal/infra/models/song_chart_model.go` の `FromChartEntity` では `ParseFloat` のエラーチェックは追加されましたが、`e.Notes.Value()` / `e.Const.Value()` のエラーは依然として `_` で破棄しています。`internal/infra/repository/song_repository_impl.go` の `toChartEntity` も `chartconstant.NewChartConstant` / `notes.NewNotes` のエラーを無視しています。 |
+| **INFRA-010** | **Low** | 一時プレイヤーデータリポジトリが `context.Context` を無視 | `internal/infra/repository/temporary_player_data_repository_impl.go` の `Create` / `FindByToken` / `ConsumeByToken` / `Delete` は `context.Context` を受け取りながら `_ context.Context` として無視しています。インメモリ実装でも、ロック取得前後や重いペイロード処理前にキャンセルを確認するなど、リポジトリ契約の一貫性を保つべきです。 |
 | **INFRA-016** | **Medium** | スコアVOからの変換でエラー無視 | `internal/infra/models/player_record_model.go` と `player_worldsend_record_model.go` が `Value()` のエラーを `_` で破棄し、`scoreVal.(int64)` の型アサーション前提で変換しています。`#nosec G115` コメントに範囲保証の根拠は記述されましたが、`scoreVal` が `nil` の場合（`Value()` が失敗した場合）にパニックが発生するリスクは残存しています。 |
 
 ### ユースケース層 (UC)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-011** | **Medium** | `Service` / `Usecase` 命名が混在 | `NewAPITokenService`, `NewUserService`, `NewSongService`, `NewPlayerDataService` と `NewAuthUsecase`, `NewGoalUsecase` などが混在しています。 |
+| **UC-011** | **Medium** | `Service` / `Usecase` 命名が混在 | `NewAPITokenService`, `NewUserService`, `NewSongService`, `NewPlayerDataService`, `NewPlayerService` と `NewFirebaseAuthUsecase`, `NewSignupUsecase`, `NewGoalUsecase` などが混在しています。 |
 | **UC-013** | **Medium** | `goalUsecase.Update` が非トランザクション | `Create` は `tm.Transactional` を使う一方、`Update` は `u.db` へ直接アクセスしています。 |
 
 ### ハンドラー / ルーター層 (HDL)
@@ -85,7 +86,7 @@
 | **HDL-001** | **Medium** | `RealIP()` の信頼境界未設定 | `router.go` で `e.IPExtractor` を設定しておらず、リバースプロキシ配下での `RealIP()` 利用が危険です。レートリミットやログに影響します。 |
 | **HDL-002** | **Medium** | `displayid` パスパラメータ未検証 | `song_handler.go` などで `displayid` をそのままUsecaseへ渡しています。更新APIのリクエストボディでは長さ検証しており、方針が不統一です。 |
 | **HDL-003** | **Medium** | `username` パスパラメータ未検証 | `user_handler.go` / `api_v1/user_handler.go` などで `username` を境界で検証していません。 |
-| **HDL-004** | **Medium** | Usecaseエラー変換の不統一 | `DeleteSong`, `RestoreSong`, `AuthHandler.Logout`, `APITokenHandler.Generate/Delete`, `ProfileHandler.UpdatePrivacy` などで `apierror.FromUsecaseError` を使わず、一律 `internal_error` に寄せています。 |
+| **HDL-004** | **Medium** | Usecaseエラー変換の不統一 | `DeleteSong`, `RestoreSong`, `APITokenHandler.GetStatus/Generate/Delete`, `ProfileHandler.UpdatePrivacy`, `UserHandler.DeleteUser`, `api_v1.UserHandler.GetUser` などで `apierror.FromUsecaseError` を使わず、一律または個別の `internal_error` 寄せが残っています。 |
 | **HDL-010** | **Low** | `knownFields` が手書きハードコード | `me_handler.go` 内の未知フィールド検出は `PlayerDataPayload` と手動同期になっており、メンテナンス漏れの温床です。 |
 
 ---
@@ -93,5 +94,5 @@
 ## まとめ
 
 - 優先度が高いのは、**Goal更新の非トランザクション** と **Domain層の `sqlx` 依存** です。
-- 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視** を詰めると、APIの安定性と保守性が上がります。
+- 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視**, **Context伝播の不徹底** を詰めると、APIの安定性と保守性が上がります。
 - `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。
