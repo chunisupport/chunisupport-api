@@ -279,7 +279,7 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 		total += best
 	}
 	value := max(roundFloat(total, 3), 0.0)
-	stats, err := u.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true})
+	stats, err := u.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: &player.ID})
 	if err != nil {
 		return err
 	}

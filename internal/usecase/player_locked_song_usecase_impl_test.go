@@ -115,7 +115,9 @@ func (s *stubPlayerRecordRepositoryForLockedSong) GetLastScoreUpdate(ctx context
 	return nil, nil
 }
 
-type stubPlayerDataRepositoryForLockedSong struct{}
+type stubPlayerDataRepositoryForLockedSong struct {
+	receivedFilter repository.OverpowerTargetFilter
+}
 
 func (s *stubPlayerDataRepositoryForLockedSong) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
 	return nil, nil
@@ -124,6 +126,7 @@ func (s *stubPlayerDataRepositoryForLockedSong) SavePlayerData(ctx context.Conte
 	return nil
 }
 func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	s.receivedFilter = filter
 	return &repository.OverpowerTargetStats{MaxOverpowerTotal: 100}, nil
 }
 
@@ -262,11 +265,12 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			songRepo := new(MockSongRepository)
 			songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").Return(tt.song, nil).Once()
 			lockedRepo := &spyPlayerLockedSongRepository{}
+			playerDataRepo := &stubPlayerDataRepositoryForLockedSong{}
 			u := &playerLockedSongUsecase{
 				tm:             &passthroughTransactionManager{},
 				playerRepo:     &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10}},
 				playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
-				playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+				playerDataRepo: playerDataRepo,
 				songRepo:       songRepo,
 				lockedRepo:     lockedRepo,
 			}
@@ -281,6 +285,9 @@ func TestPlayerLockedSongLock(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantCreateCall, lockedRepo.createCalled)
+			if tt.wantCreateCall {
+				assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: ptrInt(10)}, playerDataRepo.receivedFilter)
+			}
 			songRepo.AssertExpectations(t)
 		})
 	}
