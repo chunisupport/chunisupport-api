@@ -57,6 +57,8 @@ type DbConfig struct {
 	MaxIdleConns       int
 	ConnMaxLifetimeSec int
 	ConnMaxIdleTimeSec int
+	StartupMaxWaitSec  int
+	StartupIntervalSec int
 }
 
 type DatabasePoolConfig struct {
@@ -66,8 +68,14 @@ type DatabasePoolConfig struct {
 	ConnMaxIdleTimeSec *int `json:"conn_max_idle_time_sec"`
 }
 
+type DatabaseStartupConfig struct {
+	MaxWaitSec  *int `json:"max_wait_sec"`
+	IntervalSec *int `json:"interval_sec"`
+}
+
 type Database struct {
-	Pool     DatabasePoolConfig `json:"pool"`
+	Pool     DatabasePoolConfig    `json:"pool"`
+	Startup  DatabaseStartupConfig `json:"startup"`
 	DbConfig DbConfig
 }
 
@@ -117,6 +125,21 @@ func LoadConfig() (Config, error) {
 
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
 		// normalizeAndValidateDatabasePoolConfigが返すエラーからプレフィックスを削除して個別のエラーとして追加
+		errMsg := err.Error()
+		prefix := "configuration validation failed: "
+		if strings.HasPrefix(errMsg, prefix) {
+			errMsg = strings.TrimPrefix(errMsg, prefix)
+			// セミコロンで分割して個別のエラーとして追加
+			for _, msg := range strings.Split(errMsg, "; ") {
+				errors = append(errors, strings.TrimSpace(msg))
+			}
+		} else {
+			errors = append(errors, errMsg)
+		}
+	}
+
+	if err := normalizeAndValidateDatabaseStartupConfig(&config.Database.Startup); err != nil {
+		// normalizeAndValidateDatabaseStartupConfigが返すエラーからプレフィックスを削除して個別のエラーとして追加
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
 		if strings.HasPrefix(errMsg, prefix) {
@@ -183,6 +206,8 @@ func LoadConfig() (Config, error) {
 		MaxIdleConns:       *config.Database.Pool.MaxIdleConns,
 		ConnMaxLifetimeSec: *config.Database.Pool.ConnMaxLifetimeSec,
 		ConnMaxIdleTimeSec: *config.Database.Pool.ConnMaxIdleTimeSec,
+		StartupMaxWaitSec:  *config.Database.Startup.MaxWaitSec,
+		StartupIntervalSec: *config.Database.Startup.IntervalSec,
 	}
 
 	return config, nil
@@ -196,6 +221,32 @@ func normalizeAndValidateFirebaseConfig(firebase *Firebase) error {
 	firebase.CredentialsFile = strings.TrimSpace(firebase.CredentialsFile)
 	if firebase.CredentialsFile == "" {
 		return fmt.Errorf("FIREBASE_CREDENTIALS_FILE environment variable is required")
+	}
+
+	return nil
+}
+
+// normalizeAndValidateDatabaseStartupConfig は起動時のDB接続待機設定の検証と正規化を行います。
+func normalizeAndValidateDatabaseStartupConfig(startup *DatabaseStartupConfig) error {
+	if startup.MaxWaitSec == nil {
+		defaultMaxWaitSec := info.DefaultDBStartupMaxWaitSec
+		startup.MaxWaitSec = &defaultMaxWaitSec
+	}
+	if startup.IntervalSec == nil {
+		defaultIntervalSec := info.DefaultDBStartupIntervalSec
+		startup.IntervalSec = &defaultIntervalSec
+	}
+
+	var errors []string
+	if *startup.MaxWaitSec < 0 {
+		errors = append(errors, "database.startup.max_wait_sec must be 0 or greater")
+	}
+	if *startup.IntervalSec <= 0 {
+		errors = append(errors, "database.startup.interval_sec must be greater than 0")
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
 
 	return nil

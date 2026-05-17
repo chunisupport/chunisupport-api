@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -48,10 +49,25 @@ func run() int {
 		}
 	}()
 
-	database, err := db.Connect(cfg.Database.DbConfig)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	database, err := db.ConnectWithRetry(signalCtx, cfg.Database.DbConfig)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Info("Startup canceled")
+			return 0
+		}
 		slog.Error("Failed to connect to database", "error", err)
 		return 1
+	}
+	if err := signalCtx.Err(); err != nil {
+		if closeErr := database.Close(); closeErr != nil {
+			slog.Error("Failed to close database after startup cancellation", "error", closeErr)
+			return 1
+		}
+		slog.Info("Startup canceled")
+		return 0
 	}
 
 	slog.Info("Connected to the database")
@@ -96,9 +112,20 @@ func run() int {
 	}
 
 	// サーバーの作成と起動
+	if err := signalCtx.Err(); err != nil {
+		if closeErr := database.Close(); closeErr != nil {
+			slog.Error("Failed to close database after startup cancellation", "error", closeErr)
+			return 1
+		}
+		if closeErr := staticDatabase.Close(); closeErr != nil {
+			slog.Error("Failed to close static database after startup cancellation", "error", closeErr)
+			return 1
+		}
+		slog.Info("Startup canceled")
+		return 0
+	}
+
 	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter)
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	serverErrCh := make(chan error, 1)
 	go func() {

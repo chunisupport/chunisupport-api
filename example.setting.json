@@ -15,6 +15,10 @@
     "max_age": 3600
   },
   "database": {
+    "startup": {
+      "max_wait_sec": 600,
+      "interval_sec": 1
+    },
     "pool": {
       "max_open_conns": 25,
       "max_idle_conns": 25,

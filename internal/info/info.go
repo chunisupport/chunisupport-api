@@ -66,6 +66,8 @@ const (
 	DefaultDBMaxIdleConns       = 25
 	DefaultDBConnMaxLifetimeSec = 300
 	DefaultDBConnMaxIdleTimeSec = 60
+	DefaultDBStartupMaxWaitSec  = 120
+	DefaultDBStartupIntervalSec = 5
 )
 
 // 対応アプリバージョン設定
