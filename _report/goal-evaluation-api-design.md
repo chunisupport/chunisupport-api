@@ -1,5 +1,27 @@
 # 目標評価API 設計書
 
+## 0. 現行実装との差分（2026-05-18時点）
+
+この文書は **未実装の設計案** です。現行実装に存在する目標APIは以下のCRUDのみで、評価APIはまだルーティングされていません。
+
+- `GET /internal/me/goals`
+- `POST /internal/me/goals`
+- `PUT /internal/me/goals/:id`
+- `DELETE /internal/me/goals/:id`
+
+現行の目標CRUDでは、`invert` は保存・返却されるUI表示用フラグであり、サーバー側の達成判定には使われていません。本設計で `invert` を評価条件として扱う場合は、CRUD側の説明と責務差分を `docs/API.md` に明記する必要があります。
+
+また、現行CRUDでは以下のパラメータが省略または `null` を許容します。
+
+- `rank_count.count`
+- `score_count.count`
+- `hardlamp_count.count`
+- `combolamp_count.count`
+- `total_score.total`
+- `overpower_value.total`
+
+評価APIを実装する場合、これらの未指定値はレスポンスの `evaluation.target` で動的上限値へ解決して返す方針とします。
+
 ## 1. 目的
 
 本設計書は、既存の目標（Goal）定義CRUD APIとは分離して、
@@ -51,7 +73,7 @@
 - `goal`: 既存Goalレスポンス互換の目標定義
 - `evaluation.is_achieved`: 達成可否
 - `evaluation.actual`: 実績値（achievement_typeごとの可変構造）
-- `evaluation.target`: 目標値（achievement_paramsの正規化表現）
+- `evaluation.target`: 目標値（achievement_paramsの正規化表現。未指定/nullの動的目標値は評価時に解決済みの値）
 - `evaluation.remaining`: 不足値（達成時は0）
 - `evaluation.progress_rate`: 進捗率（0.0〜1.0）
 - `evaluation.evaluated_at`: 判定時刻（RFC3339）
@@ -142,8 +164,19 @@
   - actual: `{ "total": float64 }`
   - 判定: `invert=false` の場合は `actual.total >= target.total`、`invert=true` の場合は `actual.total <= target.total`
 - `overpower_percent`
-  - actual: `{ "percent": float64 }`
-  - 判定: `invert=false` の場合は `actual.percent >= target.percent`、`invert=true` の場合は `actual.percent <= target.percent`
+  - actual: `{ "total": float64 }`
+  - 判定: `invert=false` の場合は `actual.total >= target.total`、`invert=true` の場合は `actual.total <= target.total`
+
+### 5.1 未指定・nullパラメータの評価時解決
+
+現行CRUDで省略または `null` が許容される値は、評価時に以下の動的目標値へ解決する。
+
+- `rank_count.count` / `score_count.count`: 対象譜面数
+- `hardlamp_count.count` / `combolamp_count.count`: 対象譜面数
+- `total_score.total`: 対象譜面数 × 1,010,000
+- `overpower_value.total`: 対象譜面の理論値OverPower合計
+
+`overpower_percent.total` は現行CRUDでも省略不可のため、評価時解決は不要。
 
 ---
 

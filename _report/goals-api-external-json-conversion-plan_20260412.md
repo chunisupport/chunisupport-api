@@ -1,5 +1,25 @@
 # 目標API 外向きJSON変換計画書
 
+## 0. 現行状況（2026-05-18時点）
+
+本計画はまだ実装されていません。現行の `/internal/me/goals` 系APIは、以下の通り内部IDを含むJSON契約のままです。
+
+- `achievement_type`: コード文字列
+- `attributes.diff`: difficulty ID（1〜5）
+- `attributes.genre`: genre ID
+- `attributes.ver`: version ID
+
+一方で、`achievement_params` は当初調査時より許容形が広がっており、以下は省略または `null` を受け付けます。
+
+- `rank_count.count`
+- `score_count.count`
+- `hardlamp_count.count`
+- `combolamp_count.count`
+- `total_score.total`
+- `overpower_value.total`
+
+上記は「対象譜面数」や「対象譜面の理論値合計」などの動的上限値を目標値として扱うための入力です。外向きJSON変換を実装する場合も、この省略/null許容仕様は維持する必要があります。
+
 ## 1. 目的
 
 本計画書は、`/internal/me/goals` 系APIが現在フロントエンドに露出している
@@ -193,6 +213,8 @@ goalsテーブルの `achievement_params` / `attributes` に保存するJSON。
 
 - 現在の問題の中心は `attributes` 側の内部値露出である
 - `achievement_type` ごとの構造変更まで同時に行うと影響範囲が広がりすぎる
+
+ただし、現行仕様では `count` 系の `count`、`total_score.total`、`overpower_value.total` が省略または `null` を許容する。この互換性は外向きJSON化後も維持する。
 
 ## 6.7 旧形式と新形式のイメージ
 

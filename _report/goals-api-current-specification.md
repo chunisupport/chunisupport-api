@@ -9,8 +9,10 @@
 - `internal/usecase/goal_usecase.go`
 - `internal/usecase/goal_usecase_impl.go`
 - `internal/infra/repository/goal_repository_impl.go`
+- `migration/schema_mysql.sql`
 - `migration/mysql/000005_add_goals.up.sql`
 - `migration/mysql/000010_add_updated_at_to_song_tables.up.sql`
+- `migration/mysql/000013_optimize_player_records_last_update_index.up.sql`
 
 ## 1. 概要
 
@@ -41,7 +43,8 @@ CREATE TABLE goals (
   invert BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_goals_user_id (user_id),
+  KEY fk_goals_achievement_type_id (achievement_type_id),
+  KEY idx_goals_user_created_id (user_id, created_at, id),
   CONSTRAINT fk_goals_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_goals_achievement_type_id FOREIGN KEY (achievement_type_id) REFERENCES achievement_types (id) ON DELETE RESTRICT
 );
@@ -51,6 +54,7 @@ CREATE TABLE goals (
 
 - `updated_at` はありません。更新後も返却される日時は `created_at` のみです。
 - 一覧取得順のために `idx_goals_user_created_id(user_id, created_at, id)` が追加されています。
+- 初期マイグレーションにあった `idx_goals_user_id(user_id)` は、`idx_goals_user_created_id` に包含されるため `000013` で削除されています。
 - `achievement_type` はDBに文字列では保存されず、`achievement_type_id` で保存されます。
 - `achievement_params` と `attributes` は JSON 型で保存されます。
 
@@ -253,6 +257,12 @@ CREATE TABLE goals (
 `achievement_params` は `achievement_type` ごとに厳密な形状を要求されます。
 不要キーの混入も許可されません。
 
+補足:
+
+- `count` 系の `count`、`total_score.total`、`overpower_value.total` は省略または `null` を許容します。
+- これらを省略または `null` にした場合、保存JSON上も省略または `null` のまま返ります。動的上限チェックでは未指定として扱い、上限超過エラーにはなりません。
+- `overpower_percent.total` は省略不可です。
+
 ### 7.1 `rank_count`
 
 ```json
@@ -264,14 +274,16 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `score` と `count` の2つだけ
+- キーは `score` が必須、`count` は任意
 - `score` は整数、`0 <= score <= 1010000`
-- `count` は整数、`count >= 1`
+- `count` は整数または `null`、整数の場合は `count >= 1`
+- キーは `score` / `count` のみ
 
 注意:
 
 - 名前は `rank_count` ですが、現行実装では `rank` 文字列ではなく `score` 閾値を受け取ります。
 - つまり「指定スコア以上の譜面数」を数えるための形状です。
+- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.2 `score_count`
 
@@ -308,13 +320,15 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `lamp` と `count` の2つだけ
-- `count` は整数、`count >= 1`
+- キーは `lamp` が必須、`count` は任意
+- `count` は整数または `null`、整数の場合は `count >= 1`
 - `lamp` は以下のいずれか
   - `HRD`
   - `BRV`
   - `ABS`
   - `CTS`
+- キーは `lamp` / `count` のみ
+- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.5 `combolamp_count`
 
@@ -327,11 +341,13 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `lamp` と `count` の2つだけ
-- `count` は整数、`count >= 1`
+- キーは `lamp` が必須、`count` は任意
+- `count` は整数または `null`、整数の場合は `count >= 1`
 - `lamp` は以下のいずれか
   - `FC`
   - `AJ`
+- キーは `lamp` / `count` のみ
+- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.6 `total_score`
 
@@ -343,9 +359,10 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `total` のみ
-- `total` は整数
-- `total >= 0`
+- キーは `total` のみ。ただし空オブジェクト `{}` も許容されます。
+- `total` は整数または `null`
+- 整数の場合は `total >= 0`
+- `total` が省略または `null` の場合は、対象譜面数 × 1,010,000 を目標値として扱う想定です。
 
 実装上、Go側では `int64` として受けています。
 
@@ -359,9 +376,11 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `total` のみ
-- `total >= 0`
-- 小数第3位まで許可
+- キーは `total` のみ。ただし空オブジェクト `{}` も許容されます。
+- `total` は数値または `null`
+- 数値の場合は `total >= 0`
+- 数値の場合は小数第3位まで許可
+- `total` が省略または `null` の場合は、対象譜面の理論値OverPower合計を目標値として扱う想定です。
 
 ### 7.8 `overpower_percent`
 
@@ -376,6 +395,7 @@ CREATE TABLE goals (
 - キーは `total` のみ
 - `0 <= total <= 100`
 - 小数第3位まで許可
+- `total` は省略不可で、`null` も不可です。
 
 ## 8. `attributes` 仕様
 
@@ -570,19 +590,22 @@ CREATE TABLE goals (
 
 条件:
 
-- `count <= 対象譜面数`
+- `count` が整数で指定されている場合のみ `count <= 対象譜面数`
+- `count` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.2 `total_score`
 
 条件:
 
-- `total <= 対象譜面数 * 1010000`
+- `total` が整数で指定されている場合のみ `total <= 対象譜面数 * 1010000`
+- `total` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.3 `overpower_value`
 
 条件:
 
-- `total <= ((対象譜面定数合計 + 対象譜面数 * 2.0) * 5.0) + 対象譜面数 * 5.0`
+- `total` が数値で指定されている場合のみ `total <= ((対象譜面定数合計 + 対象譜面数 * 2.0) * 5.0) + 対象譜面数 * 5.0`
+- `total` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.4 `overpower_percent`
 
@@ -659,6 +682,7 @@ CREATE TABLE goals (
 - `diff` / `genre` / `ver` は、入力時に配列でも返却時はスカラーになる場合があります。
 - `created_at` は常に文字列で返り、UNIX時刻ではありません。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
+- `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。受信側は欠落・`null` を許容してください。
 - `invert` はサーバー側で評価条件に使われていません。保存・返却される表示用フラグです。
 
 ## 14. 実装から見える補足事項
