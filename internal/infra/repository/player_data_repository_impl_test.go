@@ -223,6 +223,66 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 	}
 }
 
+func TestGetOverpowerTargetStatsWithExecutor_トランザクション内の未解禁設定を反映する(t *testing.T) {
+	// Given
+	ctx := context.Background()
+	db := setupTestDB(t)
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, official_idx, is_worldsend, is_deleted)
+		VALUES
+			(1, 'c1', 'Song 1', 'Artist 1', 1, 180, 'idx-1', 0, 0),
+			(2, 'c2', 'Song 2', 'Artist 2', 1, 180, 'idx-2', 0, 0)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO charts (id, song_id, difficulty_id, const, is_const_unknown, notes)
+		VALUES
+			(1, 1, 4, 15.0, 0, 1200),
+			(2, 2, 4, 14.5, 0, 1100)
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS player_locked_songs (
+			player_id INTEGER NOT NULL,
+			song_id INTEGER NOT NULL,
+			is_ultima BOOLEAN NOT NULL,
+			PRIMARY KEY (player_id, song_id, is_ultima)
+		)
+	`)
+	require.NoError(t, err)
+
+	tx, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO player_locked_songs (player_id, song_id, is_ultima)
+		VALUES (100, 1, 0)
+	`)
+	require.NoError(t, err)
+
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	stats, err := repo.GetOverpowerTargetStatsWithExecutor(ctx, tx, domainrepo.OverpowerTargetFilter{
+		ExcludeWorldsend: true,
+		ExcludeDeleted:   true,
+		PlayerID:         intPtrForPlayerDataRepositoryTest(100),
+	})
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, stats)
+	assert.Equal(t, 1, stats.SongCount)
+	assert.InDelta(t, service.CalcSongMaxOP(14.5), stats.MaxOverpowerTotal, 0.0001)
+}
+
 func intPtrForPlayerDataRepositoryTest(value int) *int {
 	return &value
 }

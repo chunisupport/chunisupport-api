@@ -129,6 +129,9 @@ func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStats(ctx cont
 	s.receivedFilter = filter
 	return &repository.OverpowerTargetStats{MaxOverpowerTotal: 100}, nil
 }
+func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	return s.GetOverpowerTargetStats(ctx, filter)
+}
 
 type stubPlayerLockedSongQueryService struct {
 	gotPlayerID int

@@ -134,7 +134,18 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 // GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
 // songs/chartsの読み取りのみのためトランザクション外で呼び出せます。
 func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
-	executor := r.db
+	return r.getOverpowerTargetStats(ctx, r.db, filter)
+}
+
+// GetOverpowerTargetStatsWithExecutor は指定されたExecutorでOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
+func (r *playerDataRepository) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	if exec == nil {
+		exec = r.db
+	}
+	return r.getOverpowerTargetStats(ctx, exec, filter)
+}
+
+func (r *playerDataRepository) getOverpowerTargetStats(ctx context.Context, executor repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
 
 	where := make([]string, 0, 2)
 	if filter.ExcludeWorldsend {

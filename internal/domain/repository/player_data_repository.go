@@ -46,4 +46,7 @@ type PlayerDataRepository interface {
 	// GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
 	// songs/chartsの読み取りのみのためトランザクション外で呼び出せます。
 	GetOverpowerTargetStats(ctx context.Context, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
+
+	// GetOverpowerTargetStatsWithExecutor は指定されたExecutorでOVER POWER割合計算の分母を取得します。
+	GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec Executor, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
 }

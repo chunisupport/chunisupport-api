@@ -206,6 +206,10 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStats(_ c
 	return s.overpowerStats, s.overpowerErr
 }
 
+func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	return s.GetOverpowerTargetStats(ctx, filter)
+}
+
 func newApplyScoresTestMasters() *playerDataMaster {
 	return &playerDataMaster{
 		PlayerDataMasters: &domainmasterdata.PlayerDataMasters{
