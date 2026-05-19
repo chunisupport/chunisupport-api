@@ -844,6 +844,13 @@ curl -X POST \
 | `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
 | `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
 
+**作成・更新リクエストでの省略可否**:
+
+- `title` / `achievement_type` / `achievement_params` は必須です。
+- `attributes` は省略可能です。省略時は絞り込み条件なしとして扱います。明示する場合は空オブジェクト `{}` を推奨します。
+- `invert` は省略可能です。省略時は `false` として扱います。
+- `id` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
+
 ### `achievement_type` 一覧
 
 | code | 意味 |
@@ -858,6 +865,17 @@ curl -X POST \
 | `overpower_percent` | 全譜面に対するOverPower達成割合（%） |
 
 ### `achievement_params` 仕様
+
+`achievement_params` オブジェクト自体は必須です。ただし、成果種別によってはオブジェクト内の一部パラメータを省略または `null` にできます。省略可能なパラメータは以下の通りです。
+
+| `achievement_type` | 省略可能なパラメータ | 省略/null時の扱い |
+|---|---|---|
+| `rank_count` / `score_count` | `count` | 対象譜面数（動的上限） |
+| `hardlamp_count` / `combolamp_count` | `count` | 対象譜面数（動的上限） |
+| `total_score` | `total` | 対象譜面数 × 1,010,000（動的上限） |
+| `overpower_value` | `total` | 対象譜面の理論値OP合計（動的上限） |
+
+上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
 #### `rank_count` / `score_count`
 
