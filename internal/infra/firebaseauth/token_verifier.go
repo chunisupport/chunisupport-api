@@ -53,8 +53,6 @@ func (v *tokenVerifier) VerifyIDToken(ctx context.Context, idToken string) (stri
 	return normalizeUID(token.UID), nil
 }
 
-// VerifyRecentSignIn は Firebase ID トークンを検証し、UID と auth_time を返します。
-
 // VerifyIDTokenWithoutRevocationCheck は Firebase ID トークンを失効確認なしで検証し、UID を返します。
 func (v *tokenVerifier) VerifyIDTokenWithoutRevocationCheck(ctx context.Context, idToken string) (string, error) {
 	token, err := v.verifyTokenWithoutRevocationCheck(ctx, idToken)
@@ -65,6 +63,7 @@ func (v *tokenVerifier) VerifyIDTokenWithoutRevocationCheck(ctx context.Context,
 	return normalizeUID(token.UID), nil
 }
 
+// VerifyRecentSignIn は Firebase ID トークンを検証し、UID と auth_time を返します。
 func (v *tokenVerifier) VerifyRecentSignIn(ctx context.Context, idToken string) (*usecase.RecentSignInInfo, error) {
 	token, err := v.verifyTokenWithRevocationCheck(ctx, idToken)
 	if err != nil {
