@@ -13,9 +13,20 @@ import (
 )
 
 type stubAuthClient struct {
+	verifyIDTokenToken *firebaseauthsdk.Token
+	verifyIDTokenErr   error
+
 	token         *firebaseauthsdk.Token
 	err           error
 	receivedToken string
+}
+
+func (s *stubAuthClient) VerifyIDToken(_ context.Context, idToken string) (*firebaseauthsdk.Token, error) {
+	s.receivedToken = idToken
+	if s.verifyIDTokenToken != nil || s.verifyIDTokenErr != nil {
+		return s.verifyIDTokenToken, s.verifyIDTokenErr
+	}
+	return s.token, s.err
 }
 
 func (s *stubAuthClient) VerifyIDTokenAndCheckRevoked(_ context.Context, idToken string) (*firebaseauthsdk.Token, error) {
@@ -219,6 +230,38 @@ func TestTokenVerifier_VerifyRecentSignIn(t *testing.T) {
 				assert.Equal(t, tt.wantUID, info.UID)
 				assert.Equal(t, time.Unix(tt.wantAuthTime, 0).UTC(), info.AuthTime)
 			}
+		})
+	}
+}
+
+func TestTokenVerifier_VerifyIDTokenWithoutRevocationCheck(t *testing.T) {
+	originalIsFirebaseInvalidIDToken := isFirebaseInvalidIDToken
+	t.Cleanup(func() { isFirebaseInvalidIDToken = originalIsFirebaseInvalidIDToken })
+	invalidErr := errors.New("invalid token from firebase sdk")
+	isFirebaseInvalidIDToken = func(err error) bool { return errors.Is(err, invalidErr) }
+
+	tests := []struct {
+		name    string
+		client  authClient
+		idToken string
+		wantUID string
+		wantErr error
+	}{
+		{name: "UID を返せる", client: &stubAuthClient{verifyIDTokenToken: &firebaseauthsdk.Token{UID: "uid"}}, idToken: "ok", wantUID: "uid"},
+		{name: "不正トークンは ErrInvalidIDToken", client: &stubAuthClient{verifyIDTokenErr: invalidErr}, idToken: "invalid", wantErr: usecase.ErrInvalidIDToken},
+		{name: "内部エラーは ErrInternalError", client: &stubAuthClient{verifyIDTokenErr: errors.New("boom")}, idToken: "err", wantErr: usecase.ErrInternalError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verifier := &tokenVerifier{client: tt.client}
+			uid, err := verifier.VerifyIDTokenWithoutRevocationCheck(context.Background(), tt.idToken)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantUID, uid)
 		})
 	}
 }

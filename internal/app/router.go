@@ -143,7 +143,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
-	firebaseAuthUsecase := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
 	handlers := &Handlers{
 		Signup:              api_internal.NewSignupHandler(signupUsecase),
@@ -182,7 +183,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, firebaseAuthUsecase, apiTokenUsecase, cfg)
+	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, cfg)
 
 	return e
 }
@@ -201,13 +202,13 @@ func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) us
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator middleware.FirebaseAuthenticator, apiTokenUsecase usecase.APITokenUsecase, cfg config.Config) {
+func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStrict middleware.FirebaseAuthenticator, firebaseAuthenticatorReadOptimized middleware.FirebaseAuthenticator, apiTokenUsecase usecase.APITokenUsecase, cfg config.Config) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
 	// Firebase認証ミドルウェア
-	firebaseAuth := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticator)
-	optionalFirebaseAuth := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticator)
+	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
+	optionalFirebaseAuthReadOptimized := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
@@ -227,14 +228,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuth)
-		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuth)
-		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuth)
+		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuthStrict)
+		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuthStrict)
+		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuthStrict)
 	}
 
 	// api.chunisupport.net/internal/me
 	meGroup := internal.Group("/me")
-	meGroup.Use(firebaseAuth)
+	meGroup.Use(firebaseAuthStrict)
 	{
 		meGroup.GET("", handlers.Profile.Me)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
@@ -262,14 +263,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))
-	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, firebaseAuth, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, firebaseAuthStrict, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.RegisterDataRateLimitRequests,
 		Window:   info.RegisterDataRateLimitWindow,
 	}))
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
+	publicUsersGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
@@ -280,7 +281,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	}
 
 	usersGroup := internal.Group("/users")
-	usersGroup.Use(firebaseAuth)
+	usersGroup.Use(firebaseAuthStrict)
 	{
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
@@ -288,7 +289,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 
 	// api.chunisupport.net/internal/songs
 	publicSongsGroup := internal.Group("/songs")
-	publicSongsGroup.Use(optionalFirebaseAuth, anonymousRateLimit)
+	publicSongsGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
 		publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
@@ -304,7 +305,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	}
 
 	songsGroup := internal.Group("/songs")
-	songsGroup.Use(firebaseAuth)
+	songsGroup.Use(firebaseAuthStrict)
 	{
 		songsGroup.POST("", handlers.Song.CreateSong, requireAdmin)
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
@@ -322,7 +323,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 	}
 
 	editorSongsGroup := internal.Group("/editor/songs")
-	editorSongsGroup.Use(firebaseAuth, requireEditor)
+	editorSongsGroup.Use(firebaseAuthStrict, requireEditor)
 	{
 		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
 		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
@@ -332,7 +333,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticator midd
 
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
-	masterGroup.Use(firebaseAuth)
+	masterGroup.Use(firebaseAuthStrict)
 	{
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
 	}

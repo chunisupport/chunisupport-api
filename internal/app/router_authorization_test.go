@@ -56,7 +56,7 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			// Given
 			e := echo.New()
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
-			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, nil, config.Config{})
+			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, config.Config{})
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			req.Header.Set(echo.HeaderAuthorization, "Bearer editor-token")
