@@ -888,13 +888,17 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 		value = *fullChain
 	}
 	var name string
+	// 外部プレイヤーデータ側の過去実装との後方互換性を維持するため、
+	// fch_lv の 2/3 は一般的な GOLD/PLATINUM の順序と逆で解釈する。
+	// - 2 -> FULL CHAIN PLATINUM
+	// - 3 -> FULL CHAIN GOLD
 	switch value {
 	case 1:
 		name = "none"
 	case 2:
-		name = "full chain gold"
-	case 3:
 		name = "full chain platinum"
+	case 3:
+		name = "full chain gold"
 	default:
 		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
 	}
