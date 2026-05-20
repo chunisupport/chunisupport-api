@@ -755,9 +755,12 @@ func optionalIntValue(value *int) string {
 }
 
 func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
-	overpowerRecords, err := playerRecordsToOverpowerRecords(records, true, nil)
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, nil)
 	if err != nil {
 		return calculatedOverpowerSummary{}, err
+	}
+	if len(overpowerRecords) != len(records) {
+		slog.Warn("skipped player records with missing related data during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords))
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
