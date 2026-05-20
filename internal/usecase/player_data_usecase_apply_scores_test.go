@@ -173,6 +173,32 @@ func TestApplyScores_既存レコード取得失敗時はエラーを返す(t *t
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
+func TestApplyScores_既存レコードの関連情報欠損時はエラーを返す(t *testing.T) {
+	// Given
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
+	}
+	uc := &playerDataUsecase{
+		playerDataRepo: repo,
+		playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{
+			records: []*entity.PlayerRecord{{
+				Score:       1009000,
+				ComboLampID: 2,
+				Song:        nil,
+				Chart:       &entity.Chart{Const: chartconstant.ChartConstant(15.0)},
+			}},
+		},
+	}
+
+	// When
+	_, _, _, err := uc.applyScores(context.Background(), nil, 99, PlayerDataScorePayload{}, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC))
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to aggregate overpower from player records")
+	assert.ErrorContains(t, err, "song is nil")
+}
+
 func TestApplyScores_不正レコードをスキップして理由を保持する(t *testing.T) {
 	tests := []struct {
 		name              string

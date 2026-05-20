@@ -575,7 +575,10 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if recErr != nil {
 		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
-	overpowerSummary := calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+	if err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
+	}
 
 	return counts, skipped, overpowerSummary, nil
 }
@@ -751,11 +754,17 @@ func optionalIntValue(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
-func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) calculatedOverpowerSummary {
+func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
 	overpowerRecords := make([]service.OverpowerRecord, 0, len(records))
-	for _, record := range records {
-		if record == nil || record.Song == nil || record.Chart == nil {
-			continue
+	for i, record := range records {
+		if record == nil {
+			return calculatedOverpowerSummary{}, fmt.Errorf("player record is nil at index=%d", i)
+		}
+		if record.Song == nil {
+			return calculatedOverpowerSummary{}, fmt.Errorf("song is nil in player record at index=%d", i)
+		}
+		if record.Chart == nil {
+			return calculatedOverpowerSummary{}, fmt.Errorf("chart is nil in player record at index=%d", i)
 		}
 		scoreValue, ok := validatedScoreUint32(int(record.Score))
 		if !ok {
@@ -769,7 +778,7 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 		})
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
-	return calculatedOverpowerSummary{Value: &value, Percent: &percent}
+	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
 }
 
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
