@@ -53,7 +53,8 @@ func (v *tokenVerifier) VerifyIDToken(ctx context.Context, idToken string) (stri
 	return normalizeUID(token.UID), nil
 }
 
-// VerifyIDTokenWithoutRevocationCheck は Firebase ID トークンを失効確認なしで検証し、UID を返します。
+// VerifyIDTokenWithoutRevocationCheck は read 系の性能最適化向けに、Firebase ID トークンを失効確認なしで検証し UID を返します。
+// 公開 read エンドポイントに限定して利用し、書き込み・権限変更・セキュリティクリティカルな操作では利用してはいけません。
 func (v *tokenVerifier) VerifyIDTokenWithoutRevocationCheck(ctx context.Context, idToken string) (string, error) {
 	token, err := v.verifyTokenWithoutRevocationCheck(ctx, idToken)
 	if err != nil {
