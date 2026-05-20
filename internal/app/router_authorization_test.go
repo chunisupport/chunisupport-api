@@ -74,7 +74,7 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, config.Config{})
 
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
 			req.Header.Set(echo.HeaderAuthorization, "Bearer editor-token")
 			rec := httptest.NewRecorder()
 
@@ -97,12 +97,12 @@ func TestRegisterRoutes_公開GETはread最適化認証を使い書き込みはs
 	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
 
 	// When
-	getReq := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+	getReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/songs", nil)
 	getReq.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
 	getRec := httptest.NewRecorder()
 	e.ServeHTTP(getRec, getReq)
 
-	postReq := httptest.NewRequest(http.MethodPost, "/internal/songs", nil)
+	postReq := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/internal/songs", nil)
 	postReq.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
 	postRec := httptest.NewRecorder()
 	e.ServeHTTP(postRec, postReq)
