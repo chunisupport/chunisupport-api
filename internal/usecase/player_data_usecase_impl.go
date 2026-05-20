@@ -166,6 +166,10 @@ func NewPlayerDataUsecase(
 	playerDataRepo repository.PlayerDataRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
+	if playerRecRepo == nil {
+		panic("player record repository is required")
+	}
+
 	return &playerDataUsecase{
 		tm:               tm,
 		userRepo:         userRepo,
@@ -567,7 +571,16 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal), nil
+	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	if recErr != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
+	}
+	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+	if err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
+	}
+
+	return counts, skipped, overpowerSummary, nil
 }
 
 type resolvedLampIDs struct {
@@ -741,48 +754,16 @@ func optionalIntValue(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
-func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart, maxOverpowerTotal float64) calculatedOverpowerSummary {
-	type songBestRecord struct {
-		overpower float64
+func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, nil)
+	if err != nil {
+		return calculatedOverpowerSummary{}, err
 	}
-
-	bestBySongID := make(map[int]songBestRecord, len(fullRecords))
-
-	for _, record := range fullRecords {
-		chart, ok := chartsByID[record.ChartID]
-		if !ok {
-			continue
-		}
-
-		scoreValue, ok := validatedScoreUint32(record.State.Score)
-		if !ok {
-			continue
-		}
-
-		overpower := service.CalcSingleOverpower(scoreValue, float64(chart.Const), record.State.ComboLampID)
-		best, exists := bestBySongID[chart.SongID]
-		if !exists || overpower > best.overpower {
-			bestBySongID[chart.SongID] = songBestRecord{
-				overpower: overpower,
-			}
-		}
+	if len(overpowerRecords) != len(records) {
+		slog.Warn("skipped player records with missing related data during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords))
 	}
-
-	totalOverpower := 0.0
-	for _, best := range bestBySongID {
-		totalOverpower += best.overpower
-	}
-
-	value := max(roundFloat(totalOverpower, 3), 0.0)
-	percent := 0.0
-	if maxOverpowerTotal > 0 {
-		percent = min(max(roundFloat(totalOverpower/maxOverpowerTotal*100, 4), 0.0), 100.0)
-	}
-
-	return calculatedOverpowerSummary{
-		Value:   &value,
-		Percent: &percent,
-	}
+	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
+	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
 }
 
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
