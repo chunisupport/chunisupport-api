@@ -567,16 +567,15 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	var overpowerSummary calculatedOverpowerSummary
-	if us.playerRecRepo != nil {
-		records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
-		if recErr != nil {
-			return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
-		}
-		overpowerSummary = calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
-	} else {
-		overpowerSummary = calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal)
+	if us.playerRecRepo == nil {
+		return counts, skipped, calculatedOverpowerSummary{}, errors.New("player record repository is required")
 	}
+
+	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	if recErr != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
+	}
+	overpowerSummary := calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
 
 	return counts, skipped, overpowerSummary, nil
 }
