@@ -567,7 +567,14 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, calculatedOverpowerSummary{}, err
 	}
 
-	return counts, skipped, calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal), nil
+	overpowerSummary := calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal)
+	if us.playerRecRepo != nil {
+		if records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID); recErr == nil {
+			overpowerSummary = calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+		}
+	}
+
+	return counts, skipped, overpowerSummary, nil
 }
 
 type resolvedLampIDs struct {
@@ -739,6 +746,33 @@ func optionalIntValue(value *int) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%d", *value)
+}
+
+func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) calculatedOverpowerSummary {
+	bestBySongID := make(map[int]float64, len(records))
+	for _, record := range records {
+		if record == nil || record.Song == nil || record.Chart == nil {
+			continue
+		}
+		scoreValue, ok := validatedScoreUint32(int(record.Score))
+		if !ok {
+			continue
+		}
+		overpower := service.CalcSingleOverpower(scoreValue, float64(record.Chart.Const), record.ComboLampID)
+		if best, exists := bestBySongID[record.Song.ID]; !exists || overpower > best {
+			bestBySongID[record.Song.ID] = overpower
+		}
+	}
+	totalOverpower := 0.0
+	for _, best := range bestBySongID {
+		totalOverpower += best
+	}
+	value := max(roundFloat(totalOverpower, 3), 0.0)
+	percent := 0.0
+	if maxOverpowerTotal > 0 {
+		percent = min(max(roundFloat(totalOverpower/maxOverpowerTotal*100, 4), 0.0), 100.0)
+	}
+	return calculatedOverpowerSummary{Value: &value, Percent: &percent}
 }
 
 func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart, maxOverpowerTotal float64) calculatedOverpowerSummary {
