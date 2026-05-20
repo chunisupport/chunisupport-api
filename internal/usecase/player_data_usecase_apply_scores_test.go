@@ -155,6 +155,68 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
 
+func TestApplyScores_未解禁曲を除外してOVERPOWERを再計算する(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 4, 27, 12, 34, 56, 0, time.UTC)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{
+			MaxOverpowerTotal: service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(13.0),
+		},
+	}
+	playerRecRepo := &stubPlayerRecordRepositoryForApplyScoresTest{
+		records: []*entity.PlayerRecord{
+			{
+				Score:           1010000,
+				ComboLampID:     3,
+				Song:            &entity.Song{ID: 1},
+				Chart:           &entity.Chart{Const: chartconstant.ChartConstant(15.0)},
+				ChartDifficulty: &entity.ChartDifficulty{Name: "MASTER"},
+			},
+			{
+				Score:           1010000,
+				ComboLampID:     3,
+				Song:            &entity.Song{ID: 2},
+				Chart:           &entity.Chart{Const: chartconstant.ChartConstant(14.0)},
+				ChartDifficulty: &entity.ChartDifficulty{Name: "MASTER"},
+			},
+			{
+				Score:           1009000,
+				ComboLampID:     3,
+				Song:            &entity.Song{ID: 3},
+				Chart:           &entity.Chart{Const: chartconstant.ChartConstant(13.0)},
+				ChartDifficulty: &entity.ChartDifficulty{Name: "MASTER"},
+			},
+			{
+				Score:           1010000,
+				ComboLampID:     3,
+				Song:            &entity.Song{ID: 3},
+				Chart:           &entity.Chart{Const: chartconstant.ChartConstant(15.0)},
+				ChartDifficulty: &entity.ChartDifficulty{Name: "ULTIMA"},
+			},
+		},
+	}
+	lockedRepo := &stubPlayerLockedSongRepositoryForApplyScoresTest{
+		lockedSongs: []*entity.PlayerLockedSong{
+			{PlayerID: 99, SongID: 2, IsUltima: false},
+			{PlayerID: 99, SongID: 3, IsUltima: true},
+		},
+	}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo, lockedRepo: lockedRepo}
+
+	// When
+	_, _, overpower, err := uc.applyScores(context.Background(), nil, 99, PlayerDataScorePayload{}, newApplyScoresTestMasters(), updatedAt)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, 99, lockedRepo.receivedPlayerID)
+	require.NotNil(t, overpower.Value)
+	require.NotNil(t, overpower.Percent)
+	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 13.0, 3)
+	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
+	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
+}
+
 func TestApplyScores_既存レコード取得失敗時はエラーを返す(t *testing.T) {
 	// Given
 	repo := &stubPlayerDataRepositoryForApplyScoresTest{
@@ -366,6 +428,33 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStats(_ c
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
 	return s.GetOverpowerTargetStats(ctx, filter)
+}
+
+type stubPlayerLockedSongRepositoryForApplyScoresTest struct {
+	lockedSongs      []*entity.PlayerLockedSong
+	receivedPlayerID int
+	err              error
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) ListByPlayerID(_ context.Context, _ repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	s.receivedPlayerID = playerID
+	return s.lockedSongs, s.err
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) Create(_ context.Context, _ repository.Executor, _ *entity.PlayerLockedSong) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) Delete(_ context.Context, _ repository.Executor, _ int, _ int, _ bool) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) BulkCreate(_ context.Context, _ repository.Executor, _ []*entity.PlayerLockedSong) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) BulkDelete(_ context.Context, _ repository.Executor, _ int, _ []int, _ []bool) error {
+	return nil
 }
 
 func newApplyScoresTestMasters() *playerDataMaster {

@@ -152,6 +152,7 @@ type playerDataUsecase struct {
 	worldsendRecRepo repository.WorldsendRecordRepository
 	honorRepo        repository.HonorRepository
 	playerDataRepo   repository.PlayerDataRepository
+	lockedRepo       repository.PlayerLockedSongRepository
 	masterCache      repository.PlayerDataMasterProvider
 }
 
@@ -164,10 +165,14 @@ func NewPlayerDataUsecase(
 	worldsendRecRepo repository.WorldsendRecordRepository,
 	honorRepo repository.HonorRepository,
 	playerDataRepo repository.PlayerDataRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
 	if playerRecRepo == nil {
 		panic("player record repository is required")
+	}
+	if lockedRepo == nil {
+		panic("player locked song repository is required")
 	}
 
 	return &playerDataUsecase{
@@ -178,6 +183,7 @@ func NewPlayerDataUsecase(
 		worldsendRecRepo: worldsendRecRepo,
 		honorRepo:        honorRepo,
 		playerDataRepo:   playerDataRepo,
+		lockedRepo:       lockedRepo,
 		masterCache:      masterCache,
 	}
 }
@@ -575,12 +581,23 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if recErr != nil {
 		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
-	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+	lockedSongs, lockedErr := us.listLockedSongsForOverpower(ctx, tx, playerID)
+	if lockedErr != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
+	}
+	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
 	if err != nil {
 		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
 	}
 
 	return counts, skipped, overpowerSummary, nil
+}
+
+func (us *playerDataUsecase) listLockedSongsForOverpower(ctx context.Context, tx repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	if us.lockedRepo == nil {
+		return nil, nil
+	}
+	return us.lockedRepo.ListByPlayerID(ctx, tx, playerID)
 }
 
 type resolvedLampIDs struct {
@@ -754,8 +771,24 @@ func optionalIntValue(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
-func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
-	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, nil)
+func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, lockedSongs []*entity.PlayerLockedSong, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
+	lockedSet := make(map[string]struct{}, len(lockedSongs))
+	for _, lockedSong := range lockedSongs {
+		if lockedSong == nil {
+			continue
+		}
+		lockedSet[lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)] = struct{}{}
+	}
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, func(record *entity.PlayerRecord) bool {
+		if len(lockedSet) == 0 {
+			return true
+		}
+		if record.ChartDifficulty == nil {
+			return false
+		}
+		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
+		return !exists
+	})
 	if err != nil {
 		return calculatedOverpowerSummary{}, err
 	}
