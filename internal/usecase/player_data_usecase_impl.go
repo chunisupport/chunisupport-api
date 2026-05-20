@@ -166,6 +166,10 @@ func NewPlayerDataUsecase(
 	playerDataRepo repository.PlayerDataRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
+	if playerRecRepo == nil {
+		panic("player record repository is required")
+	}
+
 	return &playerDataUsecase{
 		tm:               tm,
 		userRepo:         userRepo,
@@ -565,10 +569,6 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	})
 	if err != nil {
 		return counts, skipped, calculatedOverpowerSummary{}, err
-	}
-
-	if us.playerRecRepo == nil {
-		return counts, skipped, calculatedOverpowerSummary{}, errors.New("player record repository is required")
 	}
 
 	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)

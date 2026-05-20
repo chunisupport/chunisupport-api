@@ -199,3 +199,9 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
+	assert.PanicsWithValue(t, "player record repository is required", func() {
+		NewPlayerDataUsecase(nil, nil, nil, nil, nil, nil, nil, nil)
+	})
+}
