@@ -892,9 +892,9 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 	case 1:
 		name = "none"
 	case 2:
-		name = "full chain gold"
-	case 3:
 		name = "full chain platinum"
+	case 3:
+		name = "full chain gold"
 	default:
 		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
 	}
