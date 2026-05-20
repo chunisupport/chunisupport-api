@@ -2,7 +2,6 @@ package service
 
 import (
 	"math"
-	"sort"
 )
 
 // OverpowerRecord はOVER POWER集計に必要な単曲情報です。

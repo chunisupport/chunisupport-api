@@ -772,31 +772,6 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}
 }
 
-func calculateOverpowerSummary(fullRecords []repository.PlayerRecordForUpsert, chartsByID map[int]entity.PlayerDataChart, maxOverpowerTotal float64) calculatedOverpowerSummary {
-	overpowerRecords := make([]service.OverpowerRecord, 0, len(fullRecords))
-	for _, record := range fullRecords {
-		chart, ok := chartsByID[record.ChartID]
-		if !ok {
-			continue
-		}
-		scoreValue, ok := validatedScoreUint32(record.State.Score)
-		if !ok {
-			continue
-		}
-		overpowerRecords = append(overpowerRecords, service.OverpowerRecord{
-			SongID:      chart.SongID,
-			Score:       scoreValue,
-			ChartConst:  float64(chart.Const),
-			ComboLampID: record.State.ComboLampID,
-		})
-	}
-	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
-	return calculatedOverpowerSummary{
-		Value:   &value,
-		Percent: &percent,
-	}
-}
-
 func validatedScoreUint32(scoreValue int) (uint32, bool) {
 	if scoreValue < 0 || uint64(scoreValue) > math.MaxUint32 {
 		return 0, false
