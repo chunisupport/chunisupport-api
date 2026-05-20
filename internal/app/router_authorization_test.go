@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,21 @@ func (stubFirebaseAuthenticator) Authenticate(ctx context.Context, idToken strin
 
 func (stubFirebaseAuthenticator) AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error) {
 	return authenticateTestUser(idToken), nil
+}
+
+type countingAuthenticator struct {
+	authenticateCalls         int
+	authenticateOptionalCalls int
+}
+
+func (a *countingAuthenticator) Authenticate(_ context.Context, _ string) (*entity.User, error) {
+	a.authenticateCalls++
+	return nil, usecase.ErrInvalidIDToken
+}
+
+func (a *countingAuthenticator) AuthenticateOptional(_ context.Context, _ string) (*entity.User, error) {
+	a.authenticateOptionalCalls++
+	return nil, usecase.ErrInvalidIDToken
 }
 
 func authenticateTestUser(idToken string) *entity.User {
@@ -56,9 +72,9 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			// Given
 			e := echo.New()
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
-			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, nil, config.Config{})
+			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, config.Config{})
 
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
 			req.Header.Set(echo.HeaderAuthorization, "Bearer editor-token")
 			rec := httptest.NewRecorder()
 
@@ -70,6 +86,54 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			assert.Contains(t, rec.Body.String(), "forbidden")
 		})
 	}
+}
+
+func TestRegisterRoutes_公開GETはread最適化認証を使い書き込みはstrict認証を使う(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	strictAuth := &countingAuthenticator{}
+	readOptimizedAuth := &countingAuthenticator{}
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+
+	// When
+	getReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/songs", nil)
+	getReq.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
+	getRec := httptest.NewRecorder()
+	e.ServeHTTP(getRec, getReq)
+
+	postReq := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/internal/songs", nil)
+	postReq.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
+	postRec := httptest.NewRecorder()
+	e.ServeHTTP(postRec, postReq)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, getRec.Code)
+	require.Equal(t, http.StatusUnauthorized, postRec.Code)
+	assert.Equal(t, 1, readOptimizedAuth.authenticateOptionalCalls)
+	assert.Equal(t, 0, readOptimizedAuth.authenticateCalls)
+	assert.Equal(t, 1, strictAuth.authenticateCalls)
+	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
+}
+
+func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	strictAuth := &countingAuthenticator{}
+	readOptimizedAuth := &countingAuthenticator{}
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+
+	// When
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/users/test/profile", nil)
+	req.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, 1, strictAuth.authenticateOptionalCalls)
+	assert.Equal(t, 0, readOptimizedAuth.authenticateOptionalCalls)
 }
 
 func newAuthorizationTestHandlers() *Handlers {

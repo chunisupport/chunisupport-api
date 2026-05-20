@@ -13,14 +13,22 @@ import (
 )
 
 type stubAuthClient struct {
-	token         *firebaseauthsdk.Token
-	err           error
-	receivedToken string
+	verifyIDTokenToken *firebaseauthsdk.Token
+	verifyIDTokenErr   error
+
+	verifyIDTokenAndCheckRevokedToken *firebaseauthsdk.Token
+	verifyIDTokenAndCheckRevokedErr   error
+	receivedToken                     string
+}
+
+func (s *stubAuthClient) VerifyIDToken(_ context.Context, idToken string) (*firebaseauthsdk.Token, error) {
+	s.receivedToken = idToken
+	return s.verifyIDTokenToken, s.verifyIDTokenErr
 }
 
 func (s *stubAuthClient) VerifyIDTokenAndCheckRevoked(_ context.Context, idToken string) (*firebaseauthsdk.Token, error) {
 	s.receivedToken = idToken
-	return s.token, s.err
+	return s.verifyIDTokenAndCheckRevokedToken, s.verifyIDTokenAndCheckRevokedErr
 }
 
 func TestTokenVerifier_VerifyIDToken(t *testing.T) {
@@ -56,44 +64,44 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 	}{
 		{
 			name:    "UID を返せる場合はそのまま返す",
-			client:  &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid"}},
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{UID: "firebase-uid"}},
 			idToken: "valid-token",
 			wantUID: "firebase-uid",
 		},
 		{
 			name:    "UID に前後空白が含まれる場合は正規化して返す",
-			client:  &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  "}},
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{UID: "  firebase-uid  "}},
 			idToken: "valid-token-with-space",
 			wantUID: "firebase-uid",
 		},
 		{
 			name:    "SDK が不正トークンエラーを返す場合は ErrInvalidIDToken を返す",
-			client:  &stubAuthClient{err: invalidErr},
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedErr: invalidErr},
 			idToken: "invalid-token",
 			wantErr: usecase.ErrInvalidIDToken,
 		},
 		{
 			name:    "SDK が失効済みトークンエラーを返す場合は ErrInvalidIDToken を返す",
-			client:  &stubAuthClient{err: revokedErr},
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedErr: revokedErr},
 			idToken: "revoked-token",
 			wantErr: usecase.ErrInvalidIDToken,
 		},
 		{
 			name:    "SDK が無効化済みユーザーエラーを返す場合は ErrInvalidIDToken を返す",
-			client:  &stubAuthClient{err: disabledErr},
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedErr: disabledErr},
 			idToken: "disabled-user-token",
 			wantErr: usecase.ErrInvalidIDToken,
 		},
 		{
 			name:      "SDK の内部エラーは ErrInternalError で返す",
-			client:    &stubAuthClient{err: errors.New("verify failed")},
+			client:    &stubAuthClient{verifyIDTokenAndCheckRevokedErr: errors.New("verify failed")},
 			idToken:   "internal-error-token",
 			wantErr:   usecase.ErrInternalError,
 			wantErrIn: "verify failed",
 		},
 		{
 			name:      "UID が空なら ErrInternalError を返す",
-			client:    &stubAuthClient{token: &firebaseauthsdk.Token{}},
+			client:    &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{}},
 			idToken:   "empty-uid-token",
 			wantErr:   usecase.ErrInternalError,
 			wantErrIn: "firebase token uid is empty",
@@ -170,28 +178,28 @@ func TestTokenVerifier_VerifyRecentSignIn(t *testing.T) {
 	}{
 		{
 			name:         "AuthTime を返せる場合は recent sign-in 情報を返す",
-			client:       &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid", AuthTime: 1704067200}},
+			client:       &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{UID: "firebase-uid", AuthTime: 1704067200}},
 			idToken:      "valid-token",
 			wantUID:      "firebase-uid",
 			wantAuthTime: 1704067200,
 		},
 		{
 			name:         "recent sign-in UID に前後空白が含まれる場合は正規化して返す",
-			client:       &stubAuthClient{token: &firebaseauthsdk.Token{UID: "  firebase-uid  ", AuthTime: 1704067200}},
+			client:       &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{UID: "  firebase-uid  ", AuthTime: 1704067200}},
 			idToken:      "valid-token-with-space",
 			wantUID:      "firebase-uid",
 			wantAuthTime: 1704067200,
 		},
 		{
 			name:      "AuthTime が空なら専用の recent sign-in エラーを返す",
-			client:    &stubAuthClient{token: &firebaseauthsdk.Token{UID: "firebase-uid"}},
+			client:    &stubAuthClient{verifyIDTokenAndCheckRevokedToken: &firebaseauthsdk.Token{UID: "firebase-uid"}},
 			idToken:   "missing-auth-time-token",
 			wantErr:   usecase.ErrRecentSignInAuthTimeMissing,
 			wantErrIn: "firebase token auth_time is empty",
 		},
 		{
 			name:      "SDK が不正トークンエラーを返す場合は ErrInvalidIDToken を返す",
-			client:    &stubAuthClient{err: invalidErr},
+			client:    &stubAuthClient{verifyIDTokenAndCheckRevokedErr: invalidErr},
 			idToken:   "invalid-token",
 			wantErr:   usecase.ErrInvalidIDToken,
 			wantErrIn: "invalid token from firebase sdk",
@@ -219,6 +227,38 @@ func TestTokenVerifier_VerifyRecentSignIn(t *testing.T) {
 				assert.Equal(t, tt.wantUID, info.UID)
 				assert.Equal(t, time.Unix(tt.wantAuthTime, 0).UTC(), info.AuthTime)
 			}
+		})
+	}
+}
+
+func TestTokenVerifier_VerifyIDTokenWithoutRevocationCheck(t *testing.T) {
+	originalIsFirebaseInvalidIDToken := isFirebaseInvalidIDToken
+	t.Cleanup(func() { isFirebaseInvalidIDToken = originalIsFirebaseInvalidIDToken })
+	invalidErr := errors.New("invalid token from firebase sdk")
+	isFirebaseInvalidIDToken = func(err error) bool { return errors.Is(err, invalidErr) }
+
+	tests := []struct {
+		name    string
+		client  authClient
+		idToken string
+		wantUID string
+		wantErr error
+	}{
+		{name: "UID を返せる", client: &stubAuthClient{verifyIDTokenToken: &firebaseauthsdk.Token{UID: "uid"}}, idToken: "ok", wantUID: "uid"},
+		{name: "不正トークンは ErrInvalidIDToken", client: &stubAuthClient{verifyIDTokenErr: invalidErr}, idToken: "invalid", wantErr: usecase.ErrInvalidIDToken},
+		{name: "内部エラーは ErrInternalError", client: &stubAuthClient{verifyIDTokenErr: errors.New("boom")}, idToken: "err", wantErr: usecase.ErrInternalError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verifier := &tokenVerifier{client: tt.client}
+			uid, err := verifier.VerifyIDTokenWithoutRevocationCheck(context.Background(), tt.idToken)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantUID, uid)
 		})
 	}
 }
