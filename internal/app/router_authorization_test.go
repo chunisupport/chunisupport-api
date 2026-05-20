@@ -116,6 +116,26 @@ func TestRegisterRoutes_公開GETはread最適化認証を使い書き込みはs
 	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
 }
 
+func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	strictAuth := &countingAuthenticator{}
+	readOptimizedAuth := &countingAuthenticator{}
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+
+	// When
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/users/test/profile", nil)
+	req.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, 1, strictAuth.authenticateOptionalCalls)
+	assert.Equal(t, 0, readOptimizedAuth.authenticateOptionalCalls)
+}
+
 func newAuthorizationTestHandlers() *Handlers {
 	return &Handlers{
 		Signup:              new(internalhandler.SignupHandler),

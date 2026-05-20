@@ -208,6 +208,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	// Firebase認証ミドルウェア
 	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
+	optionalFirebaseAuthStrict := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
 	optionalFirebaseAuthReadOptimized := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
@@ -270,7 +271,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	publicUsersGroup.Use(optionalFirebaseAuthStrict, anonymousRateLimit)
 	{
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
