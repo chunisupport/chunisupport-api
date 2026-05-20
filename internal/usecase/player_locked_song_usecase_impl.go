@@ -269,7 +269,11 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 		if _, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]; exists {
 			continue
 		}
-		overpower := domainservice.CalcSingleOverpower(uint32(record.Score), float64(record.Chart.Const), record.ComboLampID)
+		scoreValue, ok := validatedScoreUint32(int(record.Score))
+		if !ok {
+			continue
+		}
+		overpower := domainservice.CalcSingleOverpower(scoreValue, float64(record.Chart.Const), record.ComboLampID)
 		if current, exists := bestBySong[record.Song.ID]; !exists || overpower > current {
 			bestBySong[record.Song.ID] = overpower
 		}
