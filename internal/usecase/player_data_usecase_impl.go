@@ -888,6 +888,10 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 		value = *fullChain
 	}
 	var name string
+	// 外部プレイヤーデータ側の過去実装との後方互換性を維持するため、
+	// fch_lv の 2/3 は一般的な GOLD/PLATINUM の順序と逆で解釈する。
+	// - 2 -> FULL CHAIN PLATINUM
+	// - 3 -> FULL CHAIN GOLD
 	switch value {
 	case 1:
 		name = "none"

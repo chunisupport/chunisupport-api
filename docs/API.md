@@ -671,7 +671,7 @@ curl -X POST \
 | `score` | number | ✓ | スコア (0〜1,010,000) |
 | `clear_lamp` | string \| null | | クリアランプ (`clear`, `hard`, `brave`, `absolute`, `catastrophy`, `null`=FAILED) |
 | `cmb_lv` | number \| null | | コンボランプ (1=NONE, 2=FULL COMBO, 3=ALL JUSTICE) |
-| `fch_lv` | number \| null | | フルチェイン (1=NONE, 2=GOLD, 3=PLATINUM) |
+| `fch_lv` | number \| null | | フルチェイン（後方互換のため **1=NONE, 2=PLATINUM, 3=GOLD** として解釈） |
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
 
