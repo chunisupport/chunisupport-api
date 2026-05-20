@@ -1,6 +1,9 @@
 package service
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // OverpowerRecord はOVER POWER集計に必要な単曲情報です。
 type OverpowerRecord struct {
@@ -20,9 +23,15 @@ func CalcOverpowerSummary(records []OverpowerRecord, maxOverpowerTotal float64) 
 		}
 	}
 
+	songIDs := make([]int, 0, len(bestBySongID))
+	for songID := range bestBySongID {
+		songIDs = append(songIDs, songID)
+	}
+	sort.Ints(songIDs)
+
 	totalOverpower := 0.0
-	for _, best := range bestBySongID {
-		totalOverpower += best
+	for _, songID := range songIDs {
+		totalOverpower += bestBySongID[songID]
 	}
 
 	value := max(roundToScale(totalOverpower, 3), 0.0)

@@ -136,6 +136,9 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 
 	// Then
 	require.NoError(t, err)
+	require.NotNil(t, overpower)
+	require.NotNil(t, overpower.Value)
+	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.0, 3)
 	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
