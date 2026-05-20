@@ -23,15 +23,9 @@ func CalcOverpowerSummary(records []OverpowerRecord, maxOverpowerTotal float64) 
 		}
 	}
 
-	songIDs := make([]int, 0, len(bestBySongID))
-	for songID := range bestBySongID {
-		songIDs = append(songIDs, songID)
-	}
-	sort.Ints(songIDs)
-
 	totalOverpower := 0.0
-	for _, songID := range songIDs {
-		totalOverpower += bestBySongID[songID]
+	for _, overpower := range bestBySongID {
+		totalOverpower += overpower
 	}
 
 	value := max(roundToScale(totalOverpower, 3), 0.0)
