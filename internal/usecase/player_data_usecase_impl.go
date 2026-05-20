@@ -755,27 +755,9 @@ func optionalIntValue(value *int) string {
 }
 
 func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
-	overpowerRecords := make([]service.OverpowerRecord, 0, len(records))
-	for i, record := range records {
-		if record == nil {
-			return calculatedOverpowerSummary{}, fmt.Errorf("player record is nil at index=%d", i)
-		}
-		if record.Song == nil {
-			return calculatedOverpowerSummary{}, fmt.Errorf("song is nil in player record at index=%d", i)
-		}
-		if record.Chart == nil {
-			return calculatedOverpowerSummary{}, fmt.Errorf("chart is nil in player record at index=%d", i)
-		}
-		scoreValue, ok := validatedScoreUint32(int(record.Score))
-		if !ok {
-			continue
-		}
-		overpowerRecords = append(overpowerRecords, service.OverpowerRecord{
-			SongID:      record.Song.ID,
-			Score:       scoreValue,
-			ChartConst:  float64(record.Chart.Const),
-			ComboLampID: record.ComboLampID,
-		})
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, true, nil)
+	if err != nil {
+		return calculatedOverpowerSummary{}, err
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil

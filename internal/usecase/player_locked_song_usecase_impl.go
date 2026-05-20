@@ -261,24 +261,15 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 		key := lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)
 		lockedSet[key] = struct{}{}
 	}
-	overpowerRecords := make([]domainservice.OverpowerRecord, 0, len(records))
-	for _, record := range records {
-		if record == nil || record.Song == nil || record.Chart == nil || record.ChartDifficulty == nil {
-			continue
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, func(record *entity.PlayerRecord) bool {
+		if record.ChartDifficulty == nil {
+			return false
 		}
-		if _, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]; exists {
-			continue
-		}
-		scoreValue, ok := validatedScoreUint32(int(record.Score))
-		if !ok {
-			continue
-		}
-		overpowerRecords = append(overpowerRecords, domainservice.OverpowerRecord{
-			SongID:      record.Song.ID,
-			Score:       scoreValue,
-			ChartConst:  float64(record.Chart.Const),
-			ComboLampID: record.ComboLampID,
-		})
+		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
+		return !exists
+	})
+	if err != nil {
+		return err
 	}
 
 	stats, err := u.playerDataRepo.GetOverpowerTargetStatsWithExecutor(ctx, exec, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: &player.ID})
