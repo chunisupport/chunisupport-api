@@ -569,9 +569,11 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 
 	overpowerSummary := calculateOverpowerSummary(fullRecordsToUpsert, masters.chartsByID, overpowerTargetStats.MaxOverpowerTotal)
 	if us.playerRecRepo != nil {
-		if records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID); recErr == nil {
-			overpowerSummary = calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
+		records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+		if recErr != nil {
+			return counts, skipped, calculatedOverpowerSummary{}, recErr
 		}
+		overpowerSummary = calculateOverpowerSummaryFromPlayerRecords(records, overpowerTargetStats.MaxOverpowerTotal)
 	}
 
 	return counts, skipped, overpowerSummary, nil

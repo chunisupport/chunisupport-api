@@ -99,6 +99,67 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
 
+func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 4, 27, 12, 34, 56, 0, time.UTC)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{
+			MaxOverpowerTotal: service.CalcSongMaxOP(15.0) + service.CalcSongMaxOP(14.0),
+		},
+	}
+	playerRecRepo := &stubPlayerRecordRepositoryForApplyScoresTest{
+		records: []*entity.PlayerRecord{
+			{
+				Score:       1010000,
+				ComboLampID: 3,
+				Song:        &entity.Song{ID: 1},
+				Chart:       &entity.Chart{Const: chartconstant.ChartConstant(15.0)},
+			},
+			{
+				Score:       1009000,
+				ComboLampID: 3,
+				Song:        &entity.Song{ID: 2},
+				Chart:       &entity.Chart{Const: chartconstant.ChartConstant(14.0)},
+			},
+		},
+	}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo}
+	masters := newApplyScoresTestMasters()
+	payload := PlayerDataScorePayload{
+		Full: []PlayerDataScoreEntry{{
+			Idx: "full-song", Diff: "MAS", Score: 1010000, ComboLv: intPtrForApplyScoresTest(3),
+		}},
+	}
+
+	// When
+	_, _, overpower, err := uc.applyScores(context.Background(), nil, 99, payload, masters, updatedAt)
+
+	// Then
+	require.NoError(t, err)
+	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.0, 3)
+	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
+	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
+}
+
+func TestApplyScores_既存レコード取得失敗時はエラーを返す(t *testing.T) {
+	// Given
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
+	}
+	uc := &playerDataUsecase{
+		playerDataRepo: repo,
+		playerRecRepo:  &stubPlayerRecordRepositoryForApplyScoresTest{err: context.DeadlineExceeded},
+	}
+
+	// When
+	_, _, _, err := uc.applyScores(context.Background(), nil, 99, PlayerDataScorePayload{}, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC))
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
 func TestApplyScores_不正レコードをスキップして理由を保持する(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -253,6 +314,26 @@ func newApplyScoresTestMasters() *playerDataMaster {
 			2: {ID: 201, SongID: 2},
 		},
 	}
+}
+
+type stubPlayerRecordRepositoryForApplyScoresTest struct {
+	records []*entity.PlayerRecord
+	err     error
+}
+
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerID(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDForRating(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerRecord, error) {
+	return nil, nil
+}
+
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) GetLastScoreUpdate(_ context.Context, _ repository.Executor, _ int) (*time.Time, error) {
+	return nil, nil
 }
 
 func stringPtrForApplyScoresTest(value string) *string {
