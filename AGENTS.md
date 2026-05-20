@@ -135,7 +135,7 @@ func TestPriceCalculator(t *testing.T) {
 
 ### エラーケースのテストテンプレート
 
-go```
+```go
 func TestPriceCalculator_Validation(t *testing.T) {
     tests := []struct {
         name    string
