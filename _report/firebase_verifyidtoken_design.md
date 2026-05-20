@@ -34,26 +34,15 @@
 
 ## 4. 設計案
 
-## 4.1 Usecase 抽象の拡張
+## 4.1 Usecase 構成（案Bに統一）
 
-`internal/usecase/firebase_auth_usecase.go` の `TokenVerifier` は現状 `VerifyIDToken` のみです。実装側で revoke チェック有無を切り替えられるよう、以下のいずれかを採用します。
+`internal/usecase/firebase_auth_usecase.go` の `TokenVerifier` インターフェース自体は変更せず、実装の注入を切り替える構成とする。
 
-### 案A（推奨）: 検証モード対応インターフェースを追加
+- revoke チェックありの厳格実装と、revoke チェックなしの read 最適化実装を用意する。
+- ルーター組み立て時に read 用 / write 用で `FirebaseAuthUsecase` を別インスタンスとして生成し、適切な実装を注入する。
+- ユースケース層はインフラ詳細（失効チェック有無）を意識せず、`TokenVerifier.VerifyIDToken` の呼び出しに統一する。
 
-- 新規インターフェース `TokenVerifierWithMode` を usecase 層に追加する。
-- 例:
-  - `VerifyIDToken(ctx, idToken)`（既存）
-  - `VerifyIDTokenWithoutRevocationCheck(ctx, idToken)`（新規）
-- `firebaseAuthUsecase` は通常モードを維持しつつ、read向け usecase だけ non-revocation メソッドを呼ぶ実装を追加する。
-
-**利点**: 依存逆転を守りつつ意図が明確。
-
-### 案B: Usecase を2種類用意
-
-- `firebaseAuthUsecase` に `checkRevoked bool` を持たせる。
-- ルーター組み立て時に read 用 / write 用で別インスタンスを作る。
-
-**利点**: 変更範囲が比較的狭い。
+**利点**: Clean Architecture の依存方向を保ちながら、既存の usecase 抽象への影響を最小化できる。
 
 ## 4.2 Infra 実装の拡張
 
