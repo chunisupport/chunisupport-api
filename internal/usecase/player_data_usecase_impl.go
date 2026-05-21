@@ -126,6 +126,13 @@ func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index in
 			recordType, index, entry.Idx)
 	}
 
+	// FULL CHAINは複数人でAJまたはFCを達成したときのランプなので、個人のAJ/FCなしでは成立しない
+	if entry.FullChain != nil && (*entry.FullChain == 2 || *entry.FullChain == 3) &&
+		(entry.ComboLv == nil || (*entry.ComboLv != 2 && *entry.ComboLv != 3)) {
+		return fmt.Errorf("%s[%d]: inconsistent data - FULL CHAIN (fch_lv=%d) without AJ/FC (cmb_lv=2 or 3), idx=%s",
+			recordType, index, *entry.FullChain, entry.Idx)
+	}
+
 	return nil
 }
 

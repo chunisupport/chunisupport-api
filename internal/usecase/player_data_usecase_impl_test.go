@@ -140,6 +140,84 @@ func TestValidatePlayerDataPayload_NilPayload(t *testing.T) {
 	require.ErrorAs(t, err, &validationErr, "validatePlayerDataPayload(nil) should return PlayerDataValidationError")
 }
 
+func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
+	tests := []struct {
+		name      string
+		entry     PlayerDataScoreEntry
+		wantError bool
+	}{
+		{
+			name: "FULL CHAIN GOLDでFCの場合は正常",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				ComboLv:   intPtrForApplyScoresTest(2),
+				FullChain: intPtrForApplyScoresTest(3),
+			},
+			wantError: false,
+		},
+		{
+			name: "FULL CHAIN PLATINUMでAJの場合は正常",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				ComboLv:   intPtrForApplyScoresTest(3),
+				FullChain: intPtrForApplyScoresTest(2),
+			},
+			wantError: false,
+		},
+		{
+			name: "FULL CHAINでコンボランプなしの場合は矛盾",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				FullChain: intPtrForApplyScoresTest(3),
+			},
+			wantError: true,
+		},
+		{
+			name: "FULL CHAINでNONEの場合は矛盾",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				ComboLv:   intPtrForApplyScoresTest(1),
+				FullChain: intPtrForApplyScoresTest(2),
+			},
+			wantError: true,
+		},
+		{
+			name: "FULL CHAINなしでコンボランプなしの場合は正常",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				FullChain: intPtrForApplyScoresTest(1),
+			},
+			wantError: false,
+		},
+		{
+			name: "未知のFULL CHAIN値はランプ解決側で扱うため正常",
+			entry: PlayerDataScoreEntry{
+				Idx:       "full-song",
+				Score:     1009000,
+				FullChain: intPtrForApplyScoresTest(9),
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateScoreEntry(&tt.entry, "full", 0)
+
+			if tt.wantError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestResolveClassEmblemIDs(t *testing.T) {
 	tests := []struct {
 		name        string
