@@ -16,7 +16,7 @@ type HonorRepository interface {
 	// EnsureHonor は称号を登録または既存のIDを取得します。
 	// 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
 	// imageURL が指定されている場合は更新します。
-	EnsureHonor(ctx context.Context, exec Executor, title string, honorTypeID int, imageURL *string) (int, error)
+	EnsureHonor(ctx context.Context, exec Executor, title *string, honorTypeID int, imageURL *string) (int, error)
 
 	// DeletePlayerHonors はプレイヤーの称号割り当てを全て削除します。
 	DeletePlayerHonors(ctx context.Context, exec Executor, playerID int) error

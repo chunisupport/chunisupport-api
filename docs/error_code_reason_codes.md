@@ -79,6 +79,7 @@
 | `invalid slot {slot}` | 称号スロットキー不正 |
 | `slot out of range: {slot}` | 称号スロット範囲外 |
 | `honor_type not found: {type}` | 称号タイプ未解決 |
+| `image_url required when title is empty` | 称号名が空のときに画像URL未指定 |
 | `failed to create honor` | 称号エンティティ生成失敗 |
 | `failed to insert player_honor (bulk)` | 称号一括保存失敗 |
 | `failed to resolve chart` | 通常譜面解決失敗 |
