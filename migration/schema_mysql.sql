@@ -109,7 +109,7 @@ CREATE TABLE `honor_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `honors` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `honor_type_id` tinyint unsigned NOT NULL,
   `image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

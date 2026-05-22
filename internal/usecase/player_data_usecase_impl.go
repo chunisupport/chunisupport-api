@@ -524,11 +524,8 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		title := strings.TrimSpace(honor.Title)
-		var honorTitle *string
-		if title != "" {
-			honorTitle = &title
-		} else if honor.Img == nil || strings.TrimSpace(*honor.Img) == "" {
+		honorTitle := strings.TrimSpace(honor.Title)
+		if honorTitle == "" && (honor.Img == nil || strings.TrimSpace(*honor.Img) == "") {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
 				Reason:     "image_url required when title is empty",

@@ -1,5 +1,5 @@
 ALTER TABLE honors
-    MODIFY COLUMN name VARCHAR(500) NULL;
+    MODIFY COLUMN name VARCHAR(500) NOT NULL DEFAULT '';
 
 ALTER TABLE honors
     DROP INDEX unique_honor_name_type,
