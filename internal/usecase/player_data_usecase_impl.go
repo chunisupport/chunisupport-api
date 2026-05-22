@@ -16,7 +16,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
@@ -804,18 +803,6 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
-}
-
-func validatedScoreUint32(scoreValue int) (uint32, bool) {
-	if scoreValue < 0 || uint64(scoreValue) > math.MaxUint32 {
-		return 0, false
-	}
-
-	score, err := score.NewScore(uint32(scoreValue))
-	if err != nil {
-		return 0, false
-	}
-	return uint32(score), true
 }
 
 func roundFloat(value float64, scale int) float64 {
