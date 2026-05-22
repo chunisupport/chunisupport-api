@@ -25,6 +25,8 @@ const (
 	minScoreValue   = 1
 	tokyoLayout     = "2006/01/02 15:04"
 	defaultSlotName = "none"
+	maxHonorTitle   = 500
+	maxHonorImage   = 255
 )
 
 var (
@@ -531,6 +533,22 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			if img != "" {
 				normalizedImg = &img
 			}
+		}
+		if len([]rune(honorTitle)) > maxHonorTitle {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("title too long: max %d", maxHonorTitle),
+				Details:    fmt.Sprintf("slot=%d, length=%d", slot, len([]rune(honorTitle))),
+			})
+			continue
+		}
+		if normalizedImg != nil && len([]rune(*normalizedImg)) > maxHonorImage {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("image_url too long: max %d", maxHonorImage),
+				Details:    fmt.Sprintf("slot=%d, length=%d", slot, len([]rune(*normalizedImg))),
+			})
+			continue
 		}
 		if honorTitle == "" && normalizedImg == nil {
 			skipped = append(skipped, api_internal.SkippedRecord{
