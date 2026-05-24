@@ -13,7 +13,7 @@ INNER JOIN (
         AND duplicated_group.keep_id <> h1.id
 ) duplicated ON duplicated.id = h.id
 SET h.name = CONCAT(
-    CASE WHEN h.name = '' THEN 'honor' ELSE h.name END,
+    LEFT(CASE WHEN h.name = '' THEN 'honor' ELSE h.name END, 479),
     '#',
     h.id
 );
