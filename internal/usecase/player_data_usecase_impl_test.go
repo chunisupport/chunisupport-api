@@ -1,9 +1,11 @@
 package usecase
 
 import (
+	"context"
 	"testing"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -278,8 +280,125 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 	}
 }
 
+func TestApplyHonors_SP称号はタイトル空文字と画像URLで登録する(t *testing.T) {
+	img1 := "https://example.com/sp-1.png"
+	img2 := "https://example.com/sp-2.png"
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Title: "ペイロード上の称号名", Class: "sp", Img: &img1},
+		"2": {Class: "sp", Img: &img2},
+	}, masters)
+
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	assert.Equal(t, 1, honorRepo.deleteCount)
+	require.Len(t, honorRepo.ensureCalls, 2)
+	assert.ElementsMatch(t, []string{img1, img2}, honorRepo.ensureImageURLs())
+	assert.ElementsMatch(t, []string{"", ""}, honorRepo.ensureTitles())
+	assert.Len(t, honorRepo.assignments, 2)
+}
+
+func TestApplyHonors_SP称号で画像URLがない場合はスキップする(t *testing.T) {
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Class: "sp"},
+	}, masters)
+
+	require.NoError(t, err)
+	require.Len(t, skipped, 1)
+	assert.Equal(t, "sp honor image_url is required", skipped[0].Reason)
+	assert.Empty(t, honorRepo.ensureCalls)
+	assert.Empty(t, honorRepo.assignments)
+}
+
+func TestApplyHonors_通常称号はタイトルと空画像URLで登録する(t *testing.T) {
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Title: "通常称号", Class: "normal"},
+	}, masters)
+
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	require.Len(t, honorRepo.ensureCalls, 1)
+	assert.Equal(t, "通常称号", honorRepo.ensureCalls[0].title)
+	assert.Nil(t, honorRepo.ensureCalls[0].imageURL)
+}
+
 func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
 	assert.PanicsWithValue(t, "player record repository is required", func() {
 		NewPlayerDataUsecase(nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	})
+}
+
+type honorEnsureCallForApplyHonorsTest struct {
+	title       string
+	honorTypeID int
+	imageURL    *string
+}
+
+type stubHonorRepositoryForApplyHonorsTest struct {
+	deleteCount int
+	ensureCalls []honorEnsureCallForApplyHonorsTest
+	assignments []repository.HonorAssignment
+	nextHonorID int
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _ repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
+	s.ensureCalls = append(s.ensureCalls, honorEnsureCallForApplyHonorsTest{
+		title:       title,
+		honorTypeID: honorTypeID,
+		imageURL:    imageURL,
+	})
+	s.nextHonorID++
+	return s.nextHonorID, nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonors(_ context.Context, _ repository.Executor, _ int) error {
+	s.deleteCount++
+	return nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) BulkAssignHonors(_ context.Context, _ repository.Executor, assignments []repository.HonorAssignment) error {
+	s.assignments = append(s.assignments, assignments...)
+	return nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) ensureImageURLs() []string {
+	imageURLs := make([]string, 0, len(s.ensureCalls))
+	for _, call := range s.ensureCalls {
+		if call.imageURL == nil {
+			imageURLs = append(imageURLs, "")
+			continue
+		}
+		imageURLs = append(imageURLs, *call.imageURL)
+	}
+	return imageURLs
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) ensureTitles() []string {
+	titles := make([]string, 0, len(s.ensureCalls))
+	for _, call := range s.ensureCalls {
+		titles = append(titles, call.title)
+	}
+	return titles
+}
+
+func newApplyHonorsTestMasters() *playerDataMaster {
+	return &playerDataMaster{
+		PlayerDataMasters: &domainmasterdata.PlayerDataMasters{
+			HonorTypes: map[string]mastervo.HonorType{
+				"normal": {ID: 1, Name: "normal"},
+				"sp":     {ID: 11, Name: "sp"},
+			},
+		},
+	}
 }

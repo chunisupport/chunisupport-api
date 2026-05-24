@@ -54,7 +54,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 			ph.slot AS honor_slot,
 			h.name AS honor_name,
 			ht.name AS honor_type_name,
-			h.image_url AS honor_image_url
+			NULLIF(h.image_url, '') AS honor_image_url
 		FROM players p
 		LEFT JOIN player_honors ph ON ph.player_id = p.id
 		LEFT JOIN honors h ON ph.honor_id = h.id
@@ -121,7 +121,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 // FindHonorsByPlayerID はプレイヤーIDで称号情報を取得します。スロット順（1,2,3）でソートされます。
 func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	query := `
-		SELECT ph.slot, h.name, ht.name AS type_name, h.image_url
+		SELECT ph.slot, h.name, ht.name AS type_name, NULLIF(h.image_url, '') AS image_url
 		FROM player_honors ph
 		INNER JOIN honors h ON ph.honor_id = h.id
 		INNER JOIN honor_types ht ON h.honor_type_id = ht.id

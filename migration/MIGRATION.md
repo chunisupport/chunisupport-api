@@ -167,3 +167,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000014**: プレイヤーごとの解禁済み楽曲を保持する `player_locked_songs` テーブルを追加。
 - **000015**: `genres` テーブルに `sort_order` カラムを追加し、ジャンルの表示順を投入。
 - **000016**: `songs` テーブルに楽曲の読みを保持する `reading` カラムを追加。
+- **000017**: `honors` テーブルの `image_url` を空文字デフォルトの非NULLに変更し、称号のユニーク制約を `(name, honor_type_id, image_url)` へ変更。`sp` 称号は空文字の `name` と画像URLの組み合わせで一意に扱えるようにする。
