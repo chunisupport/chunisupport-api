@@ -28,7 +28,7 @@ func TestEnsureHonor_称号の一意キー単位でUpsertする(t *testing.T) {
 	repo := &honorRepository{}
 
 	// When
-	id, err := repo.EnsureHonor(context.Background(), exec, "称号A", 2, &imageURL)
+	id, err := repo.EnsureHonor(context.Background(), exec, " 称号A ", 2, &imageURL)
 
 	// Then
 	require.NoError(t, err)
