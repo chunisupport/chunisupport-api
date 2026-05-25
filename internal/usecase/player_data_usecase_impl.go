@@ -524,7 +524,21 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honor.Title, typeItem.ID, honor.Img)
+		if honorTypeKey == "sp" && (honor.Img == nil || strings.TrimSpace(*honor.Img) == "") {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     "sp honor image_url is required",
+				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
+			})
+			continue
+		}
+
+		honorTitle := honor.Title
+		if honorTypeKey == "sp" {
+			honorTitle = ""
+		}
+
+		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, honor.Img)
 		if err != nil {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
