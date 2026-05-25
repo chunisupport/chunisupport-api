@@ -65,6 +65,8 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 		{name: "通常楽曲削除はEDITOR拒否", method: http.MethodDelete, path: "/internal/songs/abcd1234"},
 		{name: "WORLDS END楽曲追加はEDITOR拒否", method: http.MethodPost, path: "/internal/songs/worldsend"},
 		{name: "WORLDS END楽曲削除はEDITOR拒否", method: http.MethodDelete, path: "/internal/songs/worldsend/abcd1234"},
+		{name: "称号一覧はEDITOR拒否", method: http.MethodGet, path: "/internal/honors"},
+		{name: "称号追加はEDITOR拒否", method: http.MethodPost, path: "/internal/honors"},
 	}
 
 	for _, tt := range tests {
@@ -143,6 +145,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		User:                new(internalhandler.UserHandler),
 		AdminUser:           new(internalhandler.AdminUserHandler),
 		Song:                new(internalhandler.SongHandler),
+		Honor:               new(internalhandler.HonorHandler),
 		Worldsend:           new(internalhandler.WorldsendHandler),
 		APIToken:            new(internalhandler.APITokenHandler),
 		Me:                  new(internalhandler.MeHandler),

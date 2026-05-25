@@ -267,3 +267,49 @@ func TestMasterDataUsecase_GetVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestMasterDataUsecase_GetHonorTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		masters *masterdata.MasterDataMasters
+		// Then
+		wantNames []string
+	}{
+		{
+			name: "ID昇順で返る",
+			masters: &masterdata.MasterDataMasters{
+				HonorTypes: map[string]master.HonorType{
+					"gold":   {ID: 2, Name: "gold"},
+					"normal": {ID: 1, Name: "normal"},
+				},
+			},
+			wantNames: []string{"normal", "gold"},
+		},
+		{
+			name:      "mastersがnilなら空スライスを返す",
+			masters:   nil,
+			wantNames: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := usecase.NewMasterDataUsecase(
+				&masterDataMasterProviderMock{masters: tt.masters},
+				&chartStatsMasterProviderMock{},
+			)
+
+			// When
+			got := uc.GetHonorTypes(context.Background())
+
+			// Then
+			actualNames := make([]string, len(got))
+			for i, item := range got {
+				actualNames[i] = item.Name
+			}
+			assert.Equal(t, tt.wantNames, actualNames)
+		})
+	}
+}

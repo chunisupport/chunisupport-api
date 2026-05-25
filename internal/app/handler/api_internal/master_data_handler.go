@@ -72,3 +72,10 @@ func (h *MasterDataHandler) GetVersions(c echo.Context) error {
 		Versions: dto.ToVersionSummaryDTOs(h.masterDataUsecase.GetVersions(c.Request().Context())),
 	})
 }
+
+// GetHonorTypes は称号タイプ一覧を返却します。
+func (h *MasterDataHandler) GetHonorTypes(c echo.Context) error {
+	return c.JSON(http.StatusOK, &dto.HonorTypesResponse{
+		HonorTypes: itemsToDTOs(h.masterDataUsecase.GetHonorTypes(c.Request().Context())),
+	})
+}

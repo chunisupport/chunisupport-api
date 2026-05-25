@@ -69,6 +69,7 @@ type Handlers struct {
 	User                *api_internal.UserHandler
 	AdminUser           *api_internal.AdminUserHandler
 	Song                *api_internal.SongHandler
+	Honor               *api_internal.HonorHandler
 	Worldsend           *api_internal.WorldsendHandler
 	APIToken            *api_internal.APITokenHandler
 	Me                  *api_internal.MeHandler
@@ -130,6 +131,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongUsecase(songRepo, masterCache, tm, db)
+	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
@@ -152,6 +154,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		User:                api_internal.NewUserHandler(userUsecase),
 		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
 		Song:                api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Honor:               api_internal.NewHonorHandler(honorUsecase),
 		Worldsend:           api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
 		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:                  api_internal.NewMeHandler(playerDataUsecase),
@@ -288,6 +291,17 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
 	}
 
+	// api.chunisupport.net/internal/honors
+	honorsGroup := internal.Group("/honors")
+	honorsGroup.Use(firebaseAuthStrict, requireAdmin)
+	{
+		honorsGroup.GET("", handlers.Honor.ListHonors)
+		honorsGroup.GET("/:id", handlers.Honor.GetHonor)
+		honorsGroup.POST("", handlers.Honor.CreateHonor)
+		honorsGroup.PUT("/:id", handlers.Honor.UpdateHonor)
+		honorsGroup.DELETE("/:id", handlers.Honor.DeleteHonor)
+	}
+
 	// api.chunisupport.net/internal/songs
 	publicSongsGroup := internal.Group("/songs")
 	publicSongsGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
@@ -341,6 +355,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	{
 		masterGroup.GET("/versions", handlers.MasterData.GetVersions)
+		masterGroup.GET("/honor-types", handlers.MasterData.GetHonorTypes)
 	}
 
 	// 外部APIルートの登録

@@ -3,8 +3,12 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,4 +55,83 @@ func TestEnsureHonor_画像URLがnilの場合は空文字でUpsertする(t *test
 	require.NoError(t, err)
 	assert.Equal(t, 10, id)
 	assert.Equal(t, []any{"称号A", 2, ""}, exec.args)
+}
+
+type honorExecResultExecutor struct {
+	baseExecutor
+	result sql.Result
+	err    error
+}
+
+func (e *honorExecResultExecutor) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	if e.err != nil {
+		return nil, e.err
+	}
+	return e.result, nil
+}
+
+func TestHonorSave_更新対象がない場合はErrHonorNotFoundを返す(t *testing.T) {
+	// Given
+	exec := &honorExecResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.Save(context.Background(), exec, &entity.Honor{ID: 1, Name: "称号A", HonorTypeID: 1, ImageURL: ""})
+
+	// Then
+	assert.ErrorIs(t, err, domainrepo.ErrHonorNotFound)
+}
+
+func TestHonorSave_一意制約違反はErrHonorConflictへ変換する(t *testing.T) {
+	// Given
+	exec := &honorExecResultExecutor{err: &mysql.MySQLError{
+		Number:  mysqlDuplicateEntryErrorNumber,
+		Message: "Duplicate entry '称号A-1-' for key 'unique_honor_name_type_image_url'",
+	}}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.Save(context.Background(), exec, &entity.Honor{ID: 1, Name: "称号A", HonorTypeID: 1, ImageURL: ""})
+
+	// Then
+	assert.ErrorIs(t, err, domainrepo.ErrHonorConflict)
+}
+
+func TestHonorDelete_更新対象がない場合はErrHonorNotFoundを返す(t *testing.T) {
+	// Given
+	exec := &honorExecResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.Delete(context.Background(), exec, 1)
+
+	// Then
+	assert.ErrorIs(t, err, domainrepo.ErrHonorNotFound)
+}
+
+func TestHonorDelete_参照制約違反はErrHonorConflictへ変換する(t *testing.T) {
+	// Given
+	exec := &honorExecResultExecutor{err: &mysql.MySQLError{
+		Number:  mysqlCannotDeleteOrUpdateParentRowErrorNumber,
+		Message: "Cannot delete or update a parent row: a foreign key constraint fails",
+	}}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.Delete(context.Background(), exec, 1)
+
+	// Then
+	assert.ErrorIs(t, err, domainrepo.ErrHonorConflict)
+}
+
+func TestWrapHonorDuplicateError_対象外のエラーは変換しない(t *testing.T) {
+	// Given
+	err := errors.New("other error")
+
+	// When
+	got := wrapHonorDuplicateError(err)
+
+	// Then
+	assert.ErrorIs(t, got, err)
+	assert.NotErrorIs(t, got, domainrepo.ErrHonorConflict)
 }

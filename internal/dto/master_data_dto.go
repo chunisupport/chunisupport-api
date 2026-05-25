@@ -51,6 +51,11 @@ type VersionSummariesResponse struct {
 	Versions []*VersionSummaryDTO `json:"versions"`
 }
 
+// HonorTypesResponse は称号タイプ一覧取得APIのレスポンスを表します。
+type HonorTypesResponse struct {
+	HonorTypes []*MasterItemDTO `json:"honor_types"`
+}
+
 // MasterDataResponse はマスタデータ取得APIのレスポンスを表します。
 type MasterDataResponse struct {
 	Genres           []*MasterItemDTO `json:"genres"`

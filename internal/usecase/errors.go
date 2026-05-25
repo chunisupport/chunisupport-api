@@ -8,6 +8,7 @@ var (
 	ErrInvalidDifficulty     = errors.New("invalid difficulty")
 	ErrChartNotFound         = errors.New("chart not found")
 	ErrInvalidWorldsendInput = errors.New("invalid worldsend input")
+	ErrInvalidHonorInput     = errors.New("invalid honor input")
 
 	ErrAdminRequired = errors.New("admin permission required")
 

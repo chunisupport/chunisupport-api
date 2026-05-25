@@ -11,6 +11,7 @@ import (
 type MasterDataUsecase interface {
 	GetMasterData(ctx context.Context) *MasterDataOutput
 	GetVersions(ctx context.Context) []masterdata.Version
+	GetHonorTypes(ctx context.Context) []masterdata.Item
 }
 
 // MasterDataOutput はマスタデータAPIの出力です。

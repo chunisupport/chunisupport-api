@@ -20,6 +20,12 @@ var (
 	// ErrGoalNotFound は目標が見つからなかった場合に返されるエラーです。
 	ErrGoalNotFound = errors.New("goal not found")
 
+	// ErrHonorNotFound は称号が見つからなかった場合に返されるエラーです。
+	ErrHonorNotFound = errors.New("honor not found")
+
+	// ErrHonorConflict は称号の一意制約または参照制約により操作できない場合に返されるエラーです。
+	ErrHonorConflict = errors.New("honor conflict")
+
 	// ErrSongNotFound は楽曲が見つからなかった場合に返されるエラーです。
 	ErrSongNotFound = errors.New("song not found")
 

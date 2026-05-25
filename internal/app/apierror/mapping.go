@@ -48,6 +48,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrSongNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrDuplicateOfficialIdx):
 		return ErrDuplicateOfficialIdx.WithInternal(err)
+	case errors.Is(err, repository.ErrHonorNotFound):
+		return ErrNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrHonorConflict):
+		return ErrConflict.WithInternal(err)
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
@@ -56,6 +60,8 @@ func FromUsecaseError(err error) *APIError {
 	case errors.Is(err, usecase.ErrInvalidPlayerName):
 		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidWorldsendInput):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidHonorInput):
 		return ErrValidationFailed.WithInternal(err)
 	// ユーザー名バリデーションエラー
 	case errors.Is(err, usecase.ErrUsernameEmpty):

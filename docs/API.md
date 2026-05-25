@@ -148,12 +148,18 @@
 | `/internal/songs/worldsend` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
 | `/internal/songs/worldsend/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
+| `/internal/honors` | GET | Firebase Bearer (ADMIN+) | 称号一覧取得 |
+| `/internal/honors/:id` | GET | Firebase Bearer (ADMIN+) | 称号詳細取得 |
+| `/internal/honors` | POST | Firebase Bearer (ADMIN+) | 称号の新規追加 |
+| `/internal/honors/:id` | PUT | Firebase Bearer (ADMIN+) | 称号の更新 |
+| `/internal/honors/:id` | DELETE | Firebase Bearer (ADMIN+) | 称号の物理削除 |
 | `/internal/editor/songs` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/worldsend` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/worldsend/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/master` | GET | Firebase Bearer | フロントエンド向けマスターデータ取得 |
 | `/internal/master/versions` | GET | Firebase Bearer | バージョン一覧取得 |
+| `/internal/master/honor-types` | GET | Firebase Bearer | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
@@ -1193,7 +1199,7 @@ curl -X POST \
     "honors": [
       { "slot": 1, "name": "称号名（上段）", "type_name": "gold", "image_url": "https://..." },
       { "slot": 2, "name": "称号名（中段）", "type_name": "platina", "image_url": "https://..." },
-      { "slot": 3, "name": "称号名（下段）", "type_name": "rainbow", "image_url": null }
+      { "slot": 3, "name": "称号名（下段）", "type_name": "rainbow", "image_url": "" }
     ],
     "created_at": "2025-11-27T12:00:00+09:00",
     "updated_at": "2025-11-27T12:00:00+09:00"
@@ -2180,6 +2186,86 @@ curl -X POST \
 
 ---
 
+## `/internal/honors` グループ
+
+### GET `/internal/honors`
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN 権限が必要
+- **概要**: 称号マスタをID昇順で全件取得します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "honors": [
+    {
+      "id": 1,
+      "name": "称号名",
+      "type_name": "gold",
+      "image_url": "https://example.com/honor.png",
+      "created_at": "2025-11-27T12:00:00+09:00"
+    }
+  ]
+}
+```
+
+### GET `/internal/honors/:id`
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN 権限が必要
+- **パスパラメータ**: `id` - 称号ID
+- **概要**: 指定IDの称号を取得します。
+- **レスポンス**: 200 OK (`HonorDTO`)
+
+### POST `/internal/honors`
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN 権限が必要
+- **概要**: 称号を新規追加します。`type_name` は `GET /internal/master/honor-types` の `name` を指定します。
+- **リクエストボディ**:
+
+```json
+{
+  "name": "称号名",
+  "type_name": "gold",
+  "image_url": "https://example.com/honor.png"
+}
+```
+
+- **レスポンス**: 201 Created (`HonorDTO`)
+
+### PUT `/internal/honors/:id`
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN 権限が必要
+- **パスパラメータ**: `id` - 称号ID
+- **概要**: 指定IDの称号を更新します。`type_name` は `GET /internal/master/honor-types` の `name` を指定します。
+- **リクエストボディ**: `POST /internal/honors` と同一
+- **レスポンス**: 200 OK (`HonorDTO`)
+
+### DELETE `/internal/honors/:id`
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN 権限が必要
+- **パスパラメータ**: `id` - 称号ID
+- **概要**: 指定IDの称号を物理削除します。プレイヤーに割り当て済みの称号は削除できません。
+- **レスポンス**: 204 No Content
+
+**HonorDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | int | 称号ID |
+| `name` | string | 称号名 |
+| `type_name` | string | 称号タイプ名 |
+| `image_url` | string | 称号画像URL。未設定時は空文字 |
+| `created_at` | string \| null | 作成日時 |
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 403 Forbidden (`forbidden`): 権限不足（ADMIN権限が必要）
+  - 404 Not Found (`not_found`): 称号が見つからない
+  - 409 Conflict (`conflict`): 重複する称号、または割り当て済み称号の削除
+  - 422 Unprocessable Entity (`validation_failed`): 入力値が不正
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
+
 ## `/internal/editor/songs` グループ
 
 ### GET `/internal/editor/songs`
@@ -2435,6 +2521,30 @@ curl -X POST \
 - **認証**: Firebase Bearer 必須
 - **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
+
+- **主なエラー**:
+  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/master/honor-types`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: `/internal/master` の `honor_types` を単独で取得します。管理者向け称号CRUDの `type_name` 入力候補として利用します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "honor_types": [
+    { "id": 1, "name": "normal" },
+    { "id": 2, "name": "copper" },
+    { "id": 3, "name": "silver" }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID昇順） |
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
@@ -3011,7 +3121,7 @@ interface HonorDTO {
   slot: number;
   name: string;
   type_name: string;
-  image_url: string | null;
+  image_url: string;
 }
 
 // レコード関連

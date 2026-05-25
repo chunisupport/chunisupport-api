@@ -36,6 +36,14 @@ func (m *mockMasterDataUsecase) GetVersions(ctx context.Context) []masterdata.Ve
 	return args.Get(0).([]masterdata.Version)
 }
 
+func (m *mockMasterDataUsecase) GetHonorTypes(ctx context.Context) []masterdata.Item {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]masterdata.Item)
+}
+
 func TestMasterDataHandler_GetVersions(t *testing.T) {
 	e := newTestEcho()
 	usecaseMock := new(mockMasterDataUsecase)
@@ -61,6 +69,34 @@ func TestMasterDataHandler_GetVersions(t *testing.T) {
 	assert.Len(t, response.Versions, 1)
 	assert.Equal(t, "VERSE", response.Versions[0].Name)
 	assert.Equal(t, "2025-10-30T15:00:00+09:00", response.Versions[0].ReleasedAt)
+	usecaseMock.AssertExpectations(t)
+}
+
+func TestMasterDataHandler_GetHonorTypes(t *testing.T) {
+	e := newTestEcho()
+	usecaseMock := new(mockMasterDataUsecase)
+	handler := api_internal.NewMasterDataHandler(usecaseMock)
+
+	usecaseMock.On("GetHonorTypes", mock.Anything).Return([]masterdata.Item{
+		{ID: 1, Name: "normal"},
+		{ID: 2, Name: "gold"},
+	}).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/master/honor-types", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.GetHonorTypes(c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var response dto.HonorTypesResponse
+	err = json.Unmarshal(rec.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Len(t, response.HonorTypes, 2)
+	assert.Equal(t, "normal", response.HonorTypes[0].Name)
+	assert.Equal(t, "gold", response.HonorTypes[1].Name)
 	usecaseMock.AssertExpectations(t)
 }
 

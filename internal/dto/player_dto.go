@@ -8,10 +8,10 @@ import (
 
 // HonorDTO は称号情報を外部に公開するためのDTOです。
 type HonorDTO struct {
-	Slot     int     `json:"slot"`      // 称号スロット: 1=上段, 2=中段, 3=下段
-	Name     string  `json:"name"`      // 称号名
-	TypeName string  `json:"type_name"` // 称号タイプ名 (normal, copper, silver, gold, platina, rainbow, etc.)
-	ImageURL *string `json:"image_url"` // 称号画像URL
+	Slot     int    `json:"slot"`      // 称号スロット: 1=上段, 2=中段, 3=下段
+	Name     string `json:"name"`      // 称号名
+	TypeName string `json:"type_name"` // 称号タイプ名 (normal, copper, silver, gold, platina, rainbow, etc.)
+	ImageURL string `json:"image_url"` // 称号画像URL
 }
 
 // PlayerDTO はプレイヤー情報を外部に公開するためのDTOです。

@@ -577,11 +577,18 @@ func buildPlayerDTO(playerWithHonors *repository.PlayerWithHonors) *dto.PlayerDT
 			Slot:     honor.Slot,
 			Name:     honor.Name,
 			TypeName: honor.TypeName,
-			ImageURL: honor.ImageURL,
+			ImageURL: derefString(honor.ImageURL),
 		}
 	}
 	playerDTO.Honors = honors
 	return playerDTO
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。

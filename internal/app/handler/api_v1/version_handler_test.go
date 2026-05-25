@@ -36,6 +36,14 @@ func (m *mockV1MasterDataUsecase) GetVersions(ctx context.Context) []masterdata.
 	return args.Get(0).([]masterdata.Version)
 }
 
+func (m *mockV1MasterDataUsecase) GetHonorTypes(ctx context.Context) []masterdata.Item {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]masterdata.Item)
+}
+
 func TestV1VersionHandler_GetVersions(t *testing.T) {
 	e := echo.New()
 	usecaseMock := new(mockV1MasterDataUsecase)

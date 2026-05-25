@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
@@ -350,6 +351,26 @@ type stubHonorRepositoryForApplyHonorsTest struct {
 	ensureCalls []honorEnsureCallForApplyHonorsTest
 	assignments []repository.HonorAssignment
 	nextHonorID int
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) FindAll(_ context.Context, _ repository.Executor) ([]*entity.Honor, error) {
+	return []*entity.Honor{}, nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) FindByID(_ context.Context, _ repository.Executor, _ int) (*entity.Honor, error) {
+	return nil, repository.ErrHonorNotFound
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) Create(_ context.Context, _ repository.Executor, honor *entity.Honor) (*entity.Honor, error) {
+	return honor, nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) Save(_ context.Context, _ repository.Executor, _ *entity.Honor) error {
+	return nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) Delete(_ context.Context, _ repository.Executor, _ int) error {
+	return nil
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _ repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {

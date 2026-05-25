@@ -11,10 +11,10 @@ import (
 
 // V1HonorDTO は外部API v1 用の称号情報DTOです。
 type V1HonorDTO struct {
-	Slot     int     `json:"slot"`
-	Name     string  `json:"name"`
-	TypeName string  `json:"type_name"`
-	ImageURL *string `json:"image_url"`
+	Slot     int    `json:"slot"`
+	Name     string `json:"name"`
+	TypeName string `json:"type_name"`
+	ImageURL string `json:"image_url"`
 }
 
 // V1PlayerDTO は外部API v1 用のプレイヤー情報DTOです。

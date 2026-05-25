@@ -84,6 +84,18 @@ func (u *masterDataUsecase) GetVersions(_ context.Context) []masterdata.Version 
 	return sortedVersionsByReleasedAt(masters.Versions)
 }
 
+// GetHonorTypes はID昇順の称号タイプ一覧を返します。
+func (u *masterDataUsecase) GetHonorTypes(_ context.Context) []masterdata.Item {
+	masters := u.masterProvider.MasterDataMasters()
+	if masters == nil {
+		return []masterdata.Item{}
+	}
+
+	return sortedByID(masters.HonorTypes, func(v master.HonorType) masterdata.Item {
+		return masterdata.Item{ID: v.ID, Name: v.Name}
+	})
+}
+
 // sortedGenresBySortOrder はジャンルをゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。
 func sortedGenresBySortOrder(genres map[string]master.Genre) []masterdata.Item {
 	return sortedBySortOrder(genres, func(g master.Genre) (masterdata.Item, int) {
