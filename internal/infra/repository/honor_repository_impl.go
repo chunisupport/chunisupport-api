@@ -21,7 +21,6 @@ func NewHonorRepository(db *sqlx.DB) repository.HonorRepository {
 
 // EnsureHonor は称号を登録または既存のIDを取得します。
 // 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
-// imageURL が指定されている場合は更新します。
 func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
 	storedImageURL := ""
 	if imageURL != nil {
