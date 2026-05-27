@@ -348,7 +348,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
-	masterGroup.Use(firebaseAuthStrict)
 	{
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
 	}

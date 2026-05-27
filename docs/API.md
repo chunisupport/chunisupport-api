@@ -157,9 +157,9 @@
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/worldsend` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/worldsend/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/master` | GET | Firebase Bearer | フロントエンド向けマスターデータ取得 |
-| `/internal/master/versions` | GET | Firebase Bearer | バージョン一覧取得 |
-| `/internal/master/honor-types` | GET | Firebase Bearer | 称号タイプ一覧取得 |
+| `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
+| `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
+| `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
@@ -2378,7 +2378,7 @@ curl -X POST \
 
 ### GET `/internal/master`
 
-- **認証**: Firebase Bearer 必須
+- **認証**: 不要
 - **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
@@ -2513,22 +2513,20 @@ curl -X POST \
 | `sort_order` | int | 表示順 |
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/master/versions`
 
-- **認証**: Firebase Bearer 必須
+- **認証**: 不要
 - **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/master/honor-types`
 
-- **認証**: Firebase Bearer 必須
+- **認証**: 不要
 - **概要**: `/internal/master` の `honor_types` を単独で取得します。管理者向け称号CRUDの `type_name` 入力候補として利用します。
 - **レスポンス**: 200 OK
 
@@ -2547,7 +2545,6 @@ curl -X POST \
 | `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID昇順） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ---
