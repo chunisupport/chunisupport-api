@@ -46,9 +46,6 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	if token == "" {
 		return usecase.ErrInvalidTurnstileToken
 	}
-	if v == nil || strings.TrimSpace(v.secretKey) == "" {
-		return errors.Join(usecase.ErrInternalError, errors.New("turnstile secret key is empty"))
-	}
 
 	form := url.Values{}
 	form.Set("secret", v.secretKey)
