@@ -62,6 +62,7 @@ var (
 	ErrUnauthorized             = New(CodeUnauthorized, http.StatusUnauthorized)
 	ErrInvalidCredentials       = New(CodeInvalidCredentials, http.StatusUnauthorized)
 	ErrInvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized)
+	ErrInvalidTurnstileToken    = New(CodeInvalidTurnstileToken, http.StatusUnauthorized)
 	ErrTokenExpired             = New(CodeTokenExpired, http.StatusUnauthorized)
 	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
 	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)

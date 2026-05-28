@@ -15,13 +15,14 @@ import (
 // SignupUsecase はFirebase Bearerトークンを用いた初回ユーザー作成を扱います。
 type SignupUsecase interface {
 	// Signup はFirebase IDトークンとユーザー名でアプリ内ユーザーを作成します。
-	Signup(ctx context.Context, idToken string, usernameStr string) (*dto_internal.UserDTO, error)
+	Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error)
 }
 
 type signupUsecase struct {
 	tm                  TransactionManager
 	userRepo            repository.UserRepository
 	tokenVerifier       TokenVerifier
+	turnstileVerifier   TurnstileVerifier
 	accountTypeProvider AccountTypeProvider
 }
 
@@ -30,6 +31,7 @@ func NewSignupUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	tokenVerifier TokenVerifier,
+	turnstileVerifier TurnstileVerifier,
 	accountTypeProvider AccountTypeProvider,
 ) SignupUsecase {
 	if tm == nil {
@@ -41,6 +43,9 @@ func NewSignupUsecase(
 	if tokenVerifier == nil {
 		panic("signupUsecase: TokenVerifier is nil")
 	}
+	if turnstileVerifier == nil {
+		panic("signupUsecase: TurnstileVerifier is nil")
+	}
 	if accountTypeProvider == nil {
 		panic("signupUsecase: AccountTypeProvider is nil")
 	}
@@ -49,11 +54,16 @@ func NewSignupUsecase(
 		tm:                  tm,
 		userRepo:            userRepo,
 		tokenVerifier:       tokenVerifier,
+		turnstileVerifier:   turnstileVerifier,
 		accountTypeProvider: accountTypeProvider,
 	}
 }
 
-func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr string) (*dto_internal.UserDTO, error) {
+func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP); err != nil {
+		return nil, err
+	}
+
 	idToken = strings.TrimSpace(idToken)
 	if idToken == "" {
 		return nil, ErrInvalidIDToken

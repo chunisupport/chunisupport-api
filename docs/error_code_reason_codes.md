@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-04-13
+最終更新: 2026-05-28
 
 ## 更新ルール
 
@@ -17,6 +17,7 @@
 | `unauthorized` | 認証失敗 |
 | `invalid_credentials` | 認証情報不正 |
 | `invalid_token` | トークン不正 |
+| `invalid_turnstile_token` | Turnstileトークン不正 |
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン欠落 |
 | `forbidden` | 権限不足 |

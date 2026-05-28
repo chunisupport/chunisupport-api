@@ -26,6 +26,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrRecentSignInRequired.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidIDToken):
 		return ErrInvalidToken.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidTurnstileToken):
+		return ErrInvalidTurnstileToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
 		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):

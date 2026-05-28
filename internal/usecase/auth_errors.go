@@ -6,6 +6,7 @@ var (
 	ErrUsernameTaken               = errors.New("this username is already taken")
 	ErrInvalidCredentials          = errors.New("invalid credentials")
 	ErrInvalidIDToken              = errors.New("invalid firebase id token")
+	ErrInvalidTurnstileToken       = errors.New("invalid turnstile token")
 	ErrFirebaseUIDAlreadyLinked    = errors.New("firebase uid already linked to another user")
 	ErrRecentSignInRequired        = errors.New("recent sign-in required")
 	ErrRecentSignInExpired         = errors.New("recent sign-in expired")

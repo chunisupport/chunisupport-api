@@ -28,6 +28,10 @@ type Firebase struct {
 	CredentialsFile string
 }
 
+type Turnstile struct {
+	SecretKey string
+}
+
 // TempData は一時プレイヤーデータ保存設定です。
 type TempData struct {
 	MaxTotalMB int `json:"max_total_mb"`
@@ -40,11 +44,12 @@ type Config struct {
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
-	CORS                   CORS     `json:"cors"`
-	TempData               TempData `json:"temp_data"`
-	Firebase               Firebase // 環境変数から読み込み
-	Database               Database // 環境変数から読み込み
+	ShutdownTimeoutSeconds int       `json:"shutdown_timeout_seconds"`
+	CORS                   CORS      `json:"cors"`
+	TempData               TempData  `json:"temp_data"`
+	Firebase               Firebase  // 環境変数から読み込み
+	Turnstile              Turnstile // 環境変数から読み込み
+	Database               Database  // 環境変数から読み込み
 }
 
 type DbConfig struct {
@@ -158,6 +163,11 @@ func LoadConfig() (Config, error) {
 		errors = append(errors, err.Error())
 	}
 
+	config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
+	if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
+		errors = append(errors, err.Error())
+	}
+
 	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
@@ -221,6 +231,19 @@ func normalizeAndValidateFirebaseConfig(firebase *Firebase) error {
 	firebase.CredentialsFile = strings.TrimSpace(firebase.CredentialsFile)
 	if firebase.CredentialsFile == "" {
 		return fmt.Errorf("FIREBASE_CREDENTIALS_FILE environment variable is required")
+	}
+
+	return nil
+}
+
+func normalizeAndValidateTurnstileConfig(turnstile *Turnstile) error {
+	if turnstile == nil {
+		return fmt.Errorf("turnstile configuration is required")
+	}
+
+	turnstile.SecretKey = strings.TrimSpace(turnstile.SecretKey)
+	if turnstile.SecretKey == "" {
+		return fmt.Errorf("TURNSTILE_SECRET_KEY environment variable is required")
 	}
 
 	return nil

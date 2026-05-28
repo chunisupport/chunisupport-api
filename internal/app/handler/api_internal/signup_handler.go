@@ -10,7 +10,8 @@ import (
 )
 
 type signupRequest struct {
-	Username string `json:"username" validate:"username"`
+	Username       string `json:"username" validate:"username"`
+	TurnstileToken string `json:"turnstile_token" validate:"required"`
 }
 
 // SignupHandler は Firebase Bearer トークンを用いた初回登録を処理します。
@@ -38,7 +39,7 @@ func (h *SignupHandler) Signup(c echo.Context) error {
 		return apierror.ErrMissingToken
 	}
 
-	user, err := h.signupUsecase.Signup(c.Request().Context(), idToken, req.Username)
+	user, err := h.signupUsecase.Signup(c.Request().Context(), idToken, req.Username, req.TurnstileToken, c.RealIP())
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
