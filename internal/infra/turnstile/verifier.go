@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -69,6 +70,7 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 		return errors.Join(usecase.ErrInternalError, err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		if err := resp.Body.Close(); err != nil {
 			slog.Warn("failed to close response body", "error", err)
 		}
