@@ -11,8 +11,9 @@ const (
 	CodeUnauthorized             = "unauthorized"
 	CodeInvalidCredentials       = "invalid_credentials" // #nosec G101
 	CodeInvalidToken             = "invalid_token"       // #nosec G101
-	CodeTokenExpired             = "token_expired"       // #nosec G101
-	CodeMissingToken             = "missing_token"       // #nosec G101
+	CodeInvalidTurnstileToken    = "invalid_turnstile_token"
+	CodeTokenExpired             = "token_expired" // #nosec G101
+	CodeMissingToken             = "missing_token" // #nosec G101
 	CodeForbidden                = "forbidden"
 	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
 	CodeRecentSignInRequired     = "recent_sign_in_required"

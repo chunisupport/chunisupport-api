@@ -179,6 +179,35 @@ func TestNormalizeAndValidateFirebaseConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateTurnstileConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Turnstile
+		wantErr bool
+	}{
+		{
+			name:    "シークレットキーがなければエラーになる",
+			config:  Turnstile{},
+			wantErr: true,
+		},
+		{
+			name:    "シークレットキーがあれば通る",
+			config:  Turnstile{SecretKey: "  turnstile-secret  "},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := normalizeAndValidateTurnstileConfig(&tt.config)
+			assert.Equal(t, tt.wantErr, err != nil)
+			if !tt.wantErr {
+				assert.Equal(t, strings.TrimSpace(tt.config.SecretKey), tt.config.SecretKey)
+			}
+		})
+	}
+}
+
 func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 	tests := []struct {
 		name                string

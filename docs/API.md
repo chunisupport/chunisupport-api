@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年05月11日
+**最終更新日**: 2026年05月28日
 
 ## ベースURLと環境
 
@@ -84,6 +84,7 @@
 | `validation_failed` | 入力バリデーション失敗 |
 | `unauthorized` | 認証が必要 |
 | `invalid_token` | トークンが不正 |
+| `invalid_turnstile_token` | Turnstile トークンが不正 |
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン未指定 |
 | `forbidden` | 権限不足 |
@@ -108,6 +109,7 @@
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
+| `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
@@ -200,20 +202,56 @@
 
 ## 認証エンドポイント
 
-### POST `/internal/auth/signup`
-- **認証**: Firebase Bearer 必須
+### POST `/internal/auth/login`
+- **認証**: Firebase Bearer 必須 + Turnstile 必須
 - **リクエストヘッダー**: `Authorization: Bearer <Firebase ID Token>`
 - **リクエストボディ**:
 
 ```json
 {
-  "username": "sampleuser"
+  "turnstile_token": "0.xxxxx"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
+
+- **レスポンス**: 200 OK。`UserDTO` を返します。
+
+```json
+{
+  "username": "sampleuser",
+  "account_type": "PLAYER",
+  "is_private": false,
+  "last_score_update": null
+}
+```
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 401 Unauthorized (`missing_token`): Bearerトークン未指定
+  - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み、または未登録ユーザー
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
+  - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
+  - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
+
+### POST `/internal/auth/signup`
+- **認証**: Firebase Bearer 必須 + Turnstile 必須
+- **リクエストヘッダー**: `Authorization: Bearer <Firebase ID Token>`
+- **リクエストボディ**:
+
+```json
+{
+  "username": "sampleuser",
+  "turnstile_token": "0.xxxxx"
 }
 ```
 
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
 | `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
+| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
 
 - **レスポンス**: 201 Created。`UserDTO` を返します。
 
@@ -235,7 +273,9 @@
   - 400 Bad Request (`registration_failed`): ユーザー登録失敗（詳細隠蔽）
   - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
   - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
+  - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/api-tokens`

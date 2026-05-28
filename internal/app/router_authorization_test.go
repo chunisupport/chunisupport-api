@@ -140,6 +140,7 @@ func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
 
 func newAuthorizationTestHandlers() *Handlers {
 	return &Handlers{
+		Login:               new(internalhandler.LoginHandler),
 		Signup:              new(internalhandler.SignupHandler),
 		Profile:             new(internalhandler.ProfileHandler),
 		User:                new(internalhandler.UserHandler),

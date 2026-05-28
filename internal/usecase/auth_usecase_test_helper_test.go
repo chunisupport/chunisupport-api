@@ -42,6 +42,10 @@ type mockRecentSignInVerifier struct {
 	mock.Mock
 }
 
+type mockTurnstileVerifier struct {
+	mock.Mock
+}
+
 func (m *MockUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	args := m.Called(ctx, exec, id)
 	if args.Get(0) == nil {
@@ -111,6 +115,11 @@ func (m *mockRecentSignInVerifier) VerifyRecentSignIn(ctx context.Context, idTok
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*RecentSignInInfo), args.Error(1)
+}
+
+func (m *mockTurnstileVerifier) VerifyTurnstile(ctx context.Context, token string, remoteIP string) error {
+	args := m.Called(ctx, token, remoteIP)
+	return args.Error(0)
 }
 
 type mockTransactionManager struct {

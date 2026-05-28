@@ -22,8 +22,8 @@ type mockSignupUsecase struct {
 	mock.Mock
 }
 
-func (m *mockSignupUsecase) Signup(ctx context.Context, idToken string, username string) (*dto_internal.UserDTO, error) {
-	args := m.Called(ctx, idToken, username)
+func (m *mockSignupUsecase) Signup(ctx context.Context, idToken string, username string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+	args := m.Called(ctx, idToken, username, turnstileToken, remoteIP)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -38,15 +38,16 @@ func TestSignupHandler_Signup(t *testing.T) {
 	t.Run("正常系: Bearerトークンで初回登録できる", func(t *testing.T) {
 		signupUsecase := new(mockSignupUsecase)
 		h := api_internal.NewSignupHandler(signupUsecase)
-		signupUsecase.On("Signup", mock.Anything, "firebase-id-token", "newuser").Return(&dto_internal.UserDTO{
+		signupUsecase.On("Signup", mock.Anything, "firebase-id-token", "newuser", "turnstile-token", "192.0.2.1").Return(&dto_internal.UserDTO{
 			Username:    "newuser",
 			AccountType: "PLAYER",
 		}, nil).Once()
 
-		body := `{"username":"newuser"}`
+		body := `{"username":"newuser","turnstile_token":"turnstile-token"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/signup", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer firebase-id-token")
+		req.Header.Set(echo.HeaderXForwardedFor, "192.0.2.1")
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
@@ -61,7 +62,7 @@ func TestSignupHandler_Signup(t *testing.T) {
 	t.Run("異常系: Authorizationヘッダがない場合は401を返す", func(t *testing.T) {
 		signupUsecase := new(mockSignupUsecase)
 		h := api_internal.NewSignupHandler(signupUsecase)
-		body := `{"username":"newuser"}`
+		body := `{"username":"newuser","turnstile_token":"turnstile-token"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/signup", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -74,15 +75,15 @@ func TestSignupHandler_Signup(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeMissingToken, apiErr.Code)
-		signupUsecase.AssertNotCalled(t, "Signup", mock.Anything, mock.Anything, mock.Anything)
+		signupUsecase.AssertNotCalled(t, "Signup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("異常系: 無効トークンは401を返す", func(t *testing.T) {
 		signupUsecase := new(mockSignupUsecase)
 		h := api_internal.NewSignupHandler(signupUsecase)
-		signupUsecase.On("Signup", mock.Anything, "invalid-token", "newuser").Return(nil, usecase.ErrInvalidIDToken).Once()
+		signupUsecase.On("Signup", mock.Anything, "invalid-token", "newuser", "turnstile-token", "192.0.2.1").Return(nil, usecase.ErrInvalidIDToken).Once()
 
-		body := `{"username":"newuser"}`
+		body := `{"username":"newuser","turnstile_token":"turnstile-token"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/auth/signup", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid-token")

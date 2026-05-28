@@ -22,6 +22,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
+	"github.com/chunisupport/chunisupport-api/internal/infra/turnstile"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/jmoiron/sqlx"
@@ -64,6 +65,7 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
+	Login               *api_internal.LoginHandler
 	Signup              *api_internal.SignupHandler
 	Profile             *api_internal.ProfileHandler
 	User                *api_internal.UserHandler
@@ -145,10 +147,13 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
+	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
-	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, masterCache)
+	loginUsecase := usecase.NewLoginUsecase(db, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
+	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
 	handlers := &Handlers{
+		Login:               api_internal.NewLoginHandler(loginUsecase),
 		Signup:              api_internal.NewSignupHandler(signupUsecase),
 		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
 		User:                api_internal.NewUserHandler(userUsecase),
@@ -227,6 +232,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
 	{
+		authGroup.POST("/login", handlers.Login.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.RegisterRateLimitRequests,
+			Window:   info.RegisterRateLimitWindow,
+		}))
 		// Firebase経由の初回登録: 1分間に5回まで
 		authGroup.POST("/signup", handlers.Signup.Signup, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterRateLimitRequests,
