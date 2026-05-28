@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +19,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 		idToken   string
 		turnstile string
 		remoteIP  string
-		setup     func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository)
+		setup     func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier)
 		wantUser  string
 		wantErr   error
 	}{
@@ -29,12 +28,11 @@ func TestLoginUsecase_Login(t *testing.T) {
 			idToken:   "valid-token",
 			turnstile: "turnstile-token",
 			remoteIP:  "203.0.113.1",
-			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 				un := username.MustNewUserName("loginuser")
 				user := &entity.User{ID: 10, Username: un, AccountTypeID: info.AccountTypePlayer}
 				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
-				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(user, nil).Once()
+				authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()
 			},
 			wantUser: "loginuser",
 		},
@@ -42,7 +40,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			name:      "Turnstileトークンが空ならFirebase検証に進まない",
 			idToken:   "valid-token",
 			turnstile: " ",
-			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 			},
 			wantErr: ErrInvalidTurnstileToken,
 		},
@@ -50,7 +48,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			name:      "Turnstile検証に失敗したらErrInvalidTurnstileTokenを返す",
 			idToken:   "valid-token",
 			turnstile: "invalid-turnstile-token",
-			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "").Return(ErrInvalidTurnstileToken).Once()
 			},
 			wantErr: ErrInvalidTurnstileToken,
@@ -59,9 +57,9 @@ func TestLoginUsecase_Login(t *testing.T) {
 			name:      "Firebaseトークンが無効ならErrInvalidIDTokenを返す",
 			idToken:   "invalid-token",
 			turnstile: "turnstile-token",
-			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
-				verifier.On("VerifyIDToken", mock.Anything, "invalid-token").Return("", errors.Join(ErrInvalidIDToken, errors.New("invalid token"))).Once()
+				authUsecase.On("Authenticate", mock.Anything, "invalid-token").Return(nil, errors.Join(ErrInvalidIDToken, errors.New("invalid token"))).Once()
 			},
 			wantErr: ErrInvalidIDToken,
 		},
@@ -69,10 +67,9 @@ func TestLoginUsecase_Login(t *testing.T) {
 			name:      "未登録Firebase UIDならErrInvalidIDTokenを返す",
 			idToken:   "missing-user-token",
 			turnstile: "turnstile-token",
-			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
-				verifier.On("VerifyIDToken", mock.Anything, "missing-user-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(nil, repository.ErrUserNotFound).Once()
+				authUsecase.On("Authenticate", mock.Anything, "missing-user-token").Return(nil, ErrInvalidIDToken).Once()
 			},
 			wantErr: ErrInvalidIDToken,
 		},
@@ -80,11 +77,10 @@ func TestLoginUsecase_Login(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			verifier := new(mockTokenVerifier)
+			authUsecase := new(mockFirebaseAuthUsecase)
 			turnstileVerifier := new(mockTurnstileVerifier)
-			userRepo := new(MockUserRepository)
-			service := NewLoginUsecase(nil, userRepo, verifier, turnstileVerifier, newMockMasterCache())
-			tt.setup(verifier, turnstileVerifier, userRepo)
+			service := NewLoginUsecase(authUsecase, turnstileVerifier, newMockMasterCache())
+			tt.setup(authUsecase, turnstileVerifier)
 
 			got, err := service.Login(context.Background(), tt.idToken, tt.turnstile, tt.remoteIP)
 
@@ -100,8 +96,66 @@ func TestLoginUsecase_Login(t *testing.T) {
 			}
 
 			turnstileVerifier.AssertExpectations(t)
-			verifier.AssertExpectations(t)
-			userRepo.AssertExpectations(t)
+			authUsecase.AssertExpectations(t)
 		})
 	}
 }
+
+func TestNewLoginUsecase_必須依存がnilならpanicする(t *testing.T) {
+	tests := []struct {
+		name                string
+		authUsecase         FirebaseAuthUsecase
+		turnstileVerifier   TurnstileVerifier
+		accountTypeProvider AccountTypeProvider
+		wantPanic           string
+	}{
+		{
+			name:                "FirebaseAuthUsecaseがnil",
+			turnstileVerifier:   new(mockTurnstileVerifier),
+			accountTypeProvider: newMockMasterCache(),
+			wantPanic:           "loginUsecase: FirebaseAuthUsecase is nil",
+		},
+		{
+			name:                "TurnstileVerifierがnil",
+			authUsecase:         new(mockFirebaseAuthUsecase),
+			accountTypeProvider: newMockMasterCache(),
+			wantPanic:           "loginUsecase: TurnstileVerifier is nil",
+		},
+		{
+			name:              "AccountTypeProviderがnil",
+			authUsecase:       new(mockFirebaseAuthUsecase),
+			turnstileVerifier: new(mockTurnstileVerifier),
+			wantPanic:         "loginUsecase: AccountTypeProvider is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, tt.wantPanic, func() {
+				NewLoginUsecase(tt.authUsecase, tt.turnstileVerifier, tt.accountTypeProvider)
+			})
+		})
+	}
+}
+
+type mockFirebaseAuthUsecase struct {
+	mock.Mock
+}
+
+func (m *mockFirebaseAuthUsecase) Authenticate(ctx context.Context, idToken string) (*entity.User, error) {
+	args := m.Called(ctx, idToken)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
+func (m *mockFirebaseAuthUsecase) AuthenticateOptional(ctx context.Context, idToken string) (*entity.User, error) {
+	args := m.Called(ctx, idToken)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
+var _ FirebaseAuthUsecase = (*mockFirebaseAuthUsecase)(nil)

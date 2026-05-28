@@ -150,7 +150,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
-	loginUsecase := usecase.NewLoginUsecase(db, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
+	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
 	handlers := &Handlers{
 		Login:               api_internal.NewLoginHandler(loginUsecase),

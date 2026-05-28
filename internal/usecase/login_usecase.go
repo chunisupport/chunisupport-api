@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
@@ -22,17 +21,12 @@ type loginUsecase struct {
 
 // NewLoginUsecase はログイン用ユースケースを生成します。
 func NewLoginUsecase(
-	db repository.Executor,
-	userRepo repository.UserRepository,
-	tokenVerifier TokenVerifier,
+	authUsecase FirebaseAuthUsecase,
 	turnstileVerifier TurnstileVerifier,
 	accountTypeProvider AccountTypeProvider,
 ) LoginUsecase {
-	if userRepo == nil {
-		panic("loginUsecase: UserRepository is nil")
-	}
-	if tokenVerifier == nil {
-		panic("loginUsecase: TokenVerifier is nil")
+	if authUsecase == nil {
+		panic("loginUsecase: FirebaseAuthUsecase is nil")
 	}
 	if turnstileVerifier == nil {
 		panic("loginUsecase: TurnstileVerifier is nil")
@@ -42,7 +36,7 @@ func NewLoginUsecase(
 	}
 
 	return &loginUsecase{
-		authUsecase:         NewFirebaseAuthUsecase(db, userRepo, tokenVerifier),
+		authUsecase:         authUsecase,
 		turnstileVerifier:   turnstileVerifier,
 		accountTypeProvider: accountTypeProvider,
 	}
