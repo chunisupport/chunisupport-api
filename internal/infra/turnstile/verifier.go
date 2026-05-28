@@ -81,7 +81,7 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	}
 
 	var result siteverifyResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1024*10)).Decode(&result); err != nil {
 		return errors.Join(usecase.ErrInternalError, err)
 	}
 	if !result.Success {
