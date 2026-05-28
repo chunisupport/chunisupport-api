@@ -61,11 +61,7 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := v.client
-	if client == nil {
-		client = &http.Client{Timeout: requestTimeout}
-	}
-	resp, err := client.Do(req)
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return errors.Join(usecase.ErrInternalError, err)
 	}
