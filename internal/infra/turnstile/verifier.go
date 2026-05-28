@@ -65,13 +65,17 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 
 	client := v.client
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: requestTimeout}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return errors.Join(usecase.ErrInternalError, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("failed to close response body", "error", err)
+		}
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return errors.Join(usecase.ErrInternalError, fmt.Errorf("turnstile siteverify returned status %d", resp.StatusCode))
