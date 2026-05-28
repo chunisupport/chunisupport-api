@@ -233,8 +233,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	authGroup := internal.Group("/auth")
 	{
 		authGroup.POST("/login", handlers.Login.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.RegisterRateLimitRequests,
-			Window:   info.RegisterRateLimitWindow,
+			Requests: info.LoginRateLimitRequests,
+			Window:   info.LoginRateLimitWindow,
 		}))
 		// Firebase経由の初回登録: 1分間に5回まで
 		authGroup.POST("/signup", handlers.Signup.Signup, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
