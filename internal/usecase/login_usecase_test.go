@@ -73,6 +73,16 @@ func TestLoginUsecase_Login(t *testing.T) {
 			},
 			wantErr: ErrInvalidIDToken,
 		},
+		{
+			name:      "Authenticateが(nil, nil)を返す場合はErrInternalErrorを返す",
+			idToken:   "nil-nil-token",
+			turnstile: "turnstile-token",
+			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				authUsecase.On("Authenticate", mock.Anything, "nil-nil-token").Return(nil, nil).Once()
+			},
+			wantErr: ErrInternalError,
+		},
 	}
 
 	for _, tt := range tests {
