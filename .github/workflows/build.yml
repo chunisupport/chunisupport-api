@@ -88,7 +88,7 @@ jobs:
             '{
               "embeds": [{
                 "title": $title,
-                "description": "**\($repo)** のビルドを開始しました",
+                "description": ("**" + $repo + "** のビルドを開始しました"),
                 "color": 3447003,
                 "fields": [
                   {"name": "ブランチ", "value": $branch, "inline": true},
@@ -96,7 +96,7 @@ jobs:
                   {"name": "コミット", "value": $sha, "inline": true},
                   {"name": "実行者", "value": $actor, "inline": true},
                   {"name": "コミットメッセージ", "value": $msg},
-                  {"name": "詳細", "value": "[GitHub Actions](\($url\)) でビルド状況を確認できます"}
+                  {"name": "詳細", "value": ("[GitHub Actions](" + $url + ") でビルド状況を確認できます")}
                 ],
                 "timestamp": (now | todate)
               }]
@@ -163,7 +163,7 @@ jobs:
             '{
               "embeds": [{
                 "title": $title,
-                "description": (if $success then "**\($repo)** のビルドが正常に完了しました" elif $result == "キャンセル" then "**\($repo)** のビルドがキャンセルされました" else "**\($repo)** のビルドが失敗しました" end),
+                "description": (if $success then ("**" + $repo + "** のビルドが正常に完了しました") elif $result == "キャンセル" then ("**" + $repo + "** のビルドがキャンセルされました") else ("**" + $repo + "** のビルドが失敗しました") end),
                 "color": $color,
                 "fields": [
                   {"name": "ブランチ", "value": $branch, "inline": true},
@@ -172,7 +172,7 @@ jobs:
                   {"name": "結果", "value": $result, "inline": true},
                   {"name": "実行者", "value": $actor, "inline": true},
                   {"name": "コミットメッセージ", "value": $msg},
-                  {"name": "詳細", "value": "[GitHub Actions](\($url\)) でログを確認できます"}
+                  {"name": "詳細", "value": ("[GitHub Actions](" + $url + ") でログを確認できます")}
                 ],
                 "timestamp": (now | todate)
               }]
