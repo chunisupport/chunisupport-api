@@ -155,6 +155,12 @@ def update_discord_message(webhook_url: str, message_id: str, payload: dict) -> 
     return False
 
 
+def github_repo_url(env: dict) -> str:
+    server_url = env.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    repo = env.get("REPO", "unknown")
+    return f"{server_url}/{repo}"
+
+
 def build_build_start_embed(env: dict) -> dict:
     """ビルド開始通知用の embed を構築。"""
     repo = env.get("REPO", "unknown")
@@ -165,13 +171,14 @@ def build_build_start_embed(env: dict) -> dict:
     arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
     return {
-        "title": f"🚀 {repo} ビルド開始 ({arch})",
+        "author": {"name": repo, "url": github_repo_url(env)},
+        "title": f"🚀 ビルド開始 ({arch})",
         "description": f"{arch_label} ビルドを開始しました",
         "color": 3447003,
         "fields": [
-            {"name": "ブランチ", "value": branch, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
         ],
+        "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -221,13 +228,14 @@ def build_build_complete_embed(env: dict) -> dict:
         desc = f"{arch_label} ビルドが失敗しました"
 
     return {
-        "title": f"{status} {repo} {title_text} ({arch})",
+        "author": {"name": repo, "url": github_repo_url(env)},
+        "title": f"{status} {title_text} ({arch})",
         "description": desc,
         "color": color,
         "fields": [
-            {"name": "ブランチ", "value": branch, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
         ],
+        "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -314,6 +322,7 @@ def main() -> int:
     env = {
         "REPO": get_env("REPO"),
         "BRANCH": get_env("BRANCH"),
+        "GITHUB_SERVER_URL": get_env("GITHUB_SERVER_URL", "https://github.com"),
         "SHA": get_env("SHA"),
         "BUILD_RESULT": get_env("BUILD_RESULT"),
         "TARGET_ARCH": get_env("TARGET_ARCH"),
