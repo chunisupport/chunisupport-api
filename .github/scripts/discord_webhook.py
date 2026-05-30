@@ -229,7 +229,10 @@ def main() -> int:
         print(f"未知の DISCORD_NOTIFY_MODE: {mode}", file=sys.stderr)
         return 1
 
-    payload = {"embeds": [embed]}
+    payload = {
+        "username": "Build & Deploy | chunisupport-api",
+        "embeds": [embed],
+    }
     message_id_path = get_env("DISCORD_MESSAGE_ID_PATH")
     message_id = ""
     if message_id_path and os.path.exists(message_id_path):
