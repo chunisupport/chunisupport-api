@@ -1,19 +1,36 @@
 package api_internal
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
 )
+
+type testValidator struct {
+	validator *validator.Validate
+}
+
+func (tv *testValidator) Validate(i any) error {
+	// validator.v10のStruct()はスライスを直接サポートしないため、
+	// このテスト用バリデータは構造体のみを対象とします。
+	// スライスのバリデーションはハンドラ側でループ処理する必要があります。
+	return tv.validator.Struct(i)
+}
 
 // TestConvertToSongDTO はSongHandlerのconvertToSongDTOメソッドをテストします。
 func TestConvertToSongDTO(t *testing.T) {
@@ -43,12 +60,13 @@ func TestConvertToSongDTO(t *testing.T) {
 	imgURL := "https://example.com/jacket.jpg"
 
 	song := &entity.Song{
-		DisplayID: "test123456789012",
-		Title:     "テスト楽曲",
-		Artist:    "テストアーティスト",
-		GenreID:   &genreID,
-		BPM:       &bpm,
-		Jacket:    &imgURL,
+		DisplayID:      "test123456789012",
+		Title:          "テスト楽曲",
+		Artist:         "テストアーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 	}
 
 	notes1Value := 500
@@ -68,12 +86,14 @@ func TestConvertToSongDTO(t *testing.T) {
 			Const:          7.5,
 			IsConstUnknown: false,
 			Notes:          &notes1,
+			NotesDesigner:  stringPtr("譜面作者A"),
 		},
 		{
 			DifficultyID:   3, // expert
 			Const:          12.0,
 			IsConstUnknown: false,
 			Notes:          &notes2,
+			NotesDesigner:  stringPtr("譜面作者B"),
 		},
 	}
 
@@ -95,6 +115,11 @@ func TestConvertToSongDTO(t *testing.T) {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
 
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
@@ -107,6 +132,9 @@ func TestConvertToSongDTO(t *testing.T) {
 		if basicChart.Const != 7.5 {
 			t.Errorf("BASIC chart Const = %v, want %v", basicChart.Const, 7.5)
 		}
+		if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
+			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
+		}
 	}
 
 	// EXPERT 譜面が存在することを確認
@@ -115,6 +143,9 @@ func TestConvertToSongDTO(t *testing.T) {
 	} else {
 		if expertChart.Const != 12.0 {
 			t.Errorf("expert chart Const = %v, want %v", expertChart.Const, 12.0)
+		}
+		if expertChart.NotesDesigner == nil || *expertChart.NotesDesigner != "譜面作者B" {
+			t.Errorf("EXPERT chart NotesDesigner = %v, want %v", expertChart.NotesDesigner, "譜面作者B")
 		}
 	}
 
@@ -138,6 +169,128 @@ func TestConvertToSongDTO(t *testing.T) {
 	} else if ultimaChart != nil {
 		t.Error("ultima chart should be nil")
 	}
+}
+
+// TestUpdateSongs はUpdateSongsハンドラーの入力バリデーションをテストします。
+func TestUpdateSongs(t *testing.T) {
+	masterCache := &masterdata.Cache{}
+	staticMasterCache := &masterdata.StaticCache{}
+
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+
+	newPutSongsContext := func(body string) echo.Context {
+		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		return e.NewContext(req, rec)
+	}
+	testCases := []struct {
+		name             string
+		body             string
+		expectedStatus   int
+		expectedErrCode  string
+		expectUsecaseHit bool
+		assertUsecaseReq func(t *testing.T, requests []*api_internal.UpdateSongRequest)
+	}{
+		{
+			name:             "正常な配列で204が返る",
+			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":{"const":10.5,"notes_designer":"譜面作者A"}}}]`,
+			expectedStatus:   http.StatusNoContent,
+			expectUsecaseHit: true,
+			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
+				t.Helper()
+				if len(requests) != 1 {
+					t.Fatalf("requests len = %d, want 1", len(requests))
+				}
+				if requests[0] == nil {
+					t.Fatal("requests[0] should not be nil")
+				}
+				if requests[0].DisplayID != "1234567890123456" {
+					t.Fatalf("DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
+				}
+				if len(requests[0].Charts) != 1 {
+					t.Fatalf("Charts len = %d, want 1", len(requests[0].Charts))
+				}
+				if _, ok := requests[0].Charts["BASIC"]; !ok {
+					t.Fatal("Charts['BASIC'] should exist")
+				}
+				if requests[0].Charts["BASIC"].NotesDesigner == nil || *requests[0].Charts["BASIC"].NotesDesigner != "譜面作者A" {
+					t.Fatalf("Charts['BASIC'].NotesDesigner = %v, want %v", requests[0].Charts["BASIC"].NotesDesigner, "譜面作者A")
+				}
+			},
+		},
+		{
+			name:            "不正要素を含む配列でvalidation_failedが返る",
+			body:            `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "null要素を含む配列でvalidation_failedが返る",
+			body:            `[null]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "トップレベルnullでvalidation_failedが返る",
+			body:            `null`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "chartsにnull要素を含む配列でvalidation_failedが返る",
+			body:            `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":null}}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			mockUsecase := &testutil.MockSongUsecase{
+				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+					called = true
+					if tc.assertUsecaseReq != nil {
+						tc.assertUsecaseReq(t, requests)
+					}
+					return nil
+				},
+			}
+			handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+
+			c := newPutSongsContext(tc.body)
+			rec := c.Response().Writer.(*httptest.ResponseRecorder)
+
+			err := handler.UpdateSongs(c)
+
+			if tc.expectedErrCode == "" {
+				if err != nil {
+					t.Fatalf("UpdateSongs returned error: %v", err)
+				}
+				if rec.Code != tc.expectedStatus {
+					t.Fatalf("Status code = %d, want %d", rec.Code, tc.expectedStatus)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("UpdateSongs should return error")
+				}
+
+				apiErr, ok := err.(*apierror.APIError)
+				if !ok {
+					t.Fatalf("error type = %T, want *apierror.APIError", err)
+				}
+				if apiErr.Code != tc.expectedErrCode {
+					t.Fatalf("api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
+				}
+				if apiErr.Internal == nil {
+					t.Fatal("internal error should not be nil")
+				}
+			}
+
+			if called != tc.expectUsecaseHit {
+				t.Fatalf("UpdateSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
+			}
+		})
+	}
+
 }
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。
@@ -172,6 +325,7 @@ func TestGetSongs(t *testing.T) {
 					Const:          7.5,
 					IsConstUnknown: false,
 					Notes:          &notes1,
+					NotesDesigner:  stringPtr("譜面作者A"),
 				},
 			},
 		},
@@ -179,14 +333,14 @@ func TestGetSongs(t *testing.T) {
 
 	// モックUsecaseの準備
 	mockUsecase := &testutil.MockSongUsecase{
-		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool) ([]*entity.Song, error) {
+		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
 	}
 
 	// ハンドラーの準備
 	staticMasterCache := &masterdata.StaticCache{
-		RatingBands: []*entity.RatingBand{},
+		RatingBands: []*ratingband.RatingBand{},
 	}
 	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
@@ -242,6 +396,8 @@ func TestGetSongs(t *testing.T) {
 		// BASICは存在するはず
 		if basicChart := song.Charts["BASIC"]; basicChart == nil {
 			t.Error("BASIC chart should not be nil")
+		} else if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
+			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
 		}
 
 		// ADVANCED, EXPERT, MASTER, ULTIMAはnullのはず（テストデータにないため）
@@ -249,4 +405,72 @@ func TestGetSongs(t *testing.T) {
 			t.Error("ADVANCED chart should be nil")
 		}
 	}
+}
+
+func TestSongHandler_DeleteSong(t *testing.T) {
+	e := echo.New()
+	staticMasterCache := &masterdata.StaticCache{}
+	masterCache := &masterdata.Cache{}
+
+	t.Run("楽曲が存在しない場合はsong_not_foundを返す", func(t *testing.T) {
+		// Given
+		mockUsecase := &testutil.MockSongUsecase{
+			DeleteSongFunc: func(ctx context.Context, displayID string) error {
+				assert.Equal(t, "missing", displayID)
+				return repository.ErrSongNotFound
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/missing", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("missing")
+
+		// When
+		err := handler.DeleteSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
+	})
+}
+
+func TestSongHandler_RestoreSong(t *testing.T) {
+	e := echo.New()
+	staticMasterCache := &masterdata.StaticCache{}
+	masterCache := &masterdata.Cache{}
+
+	t.Run("楽曲が存在しない場合はsong_not_foundを返す", func(t *testing.T) {
+		// Given
+		mockUsecase := &testutil.MockSongUsecase{
+			RestoreSongFunc: func(ctx context.Context, displayID string) error {
+				assert.Equal(t, "missing", displayID)
+				return repository.ErrSongNotFound
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodPost, "/internal/songs/missing/restore", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("missing")
+
+		// When
+		err := handler.RestoreSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
+	})
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

@@ -2,12 +2,15 @@ package api_internal
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestToSongDTO はToSongDTO関数の基本的な変換をテストします。
@@ -16,18 +19,21 @@ func TestToSongDTO(t *testing.T) {
 	genreID := 1
 	bpm := 180
 	imgURL := "https://example.com/jacket.jpg"
+	reading := "テストガッキョク"
 	releaseDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	masterConst, _ := chartconstant.NewChartConstant(13.0)
 	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
 
 	song := &entity.Song{
-		DisplayID:  "test123456789012",
-		Title:      "テスト楽曲",
-		Artist:     "テストアーティスト",
-		GenreID:    &genreID,
-		BPM:        &bpm,
-		ReleasedAt: &releaseDate,
-		Jacket:     &imgURL,
+		DisplayID:      "test123456789012",
+		Title:          "テスト楽曲",
+		Reading:        &reading,
+		Artist:         "テストアーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		ReleasedAt:     &releaseDate,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -54,6 +60,9 @@ func TestToSongDTO(t *testing.T) {
 	if dto.Title != "テスト楽曲" {
 		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
 	}
+
+	require.NotNil(t, dto.Reading)
+	assert.Equal(t, "テストガッキョク", *dto.Reading)
 
 	if dto.Artist != "テストアーティスト" {
 		t.Errorf("Artist = %v, want %v", dto.Artist, "テストアーティスト")
@@ -88,6 +97,11 @@ func TestToSongDTO(t *testing.T) {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90.0)
 	}
 
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
 	// Charts は空の map として初期化される
 	if dto.Charts == nil {
 		t.Error("Charts is nil, want empty map")
@@ -113,6 +127,7 @@ func TestToChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: false,
 		Notes:          &notesObj,
+		NotesDesigner:  stringPtr("譜面作者A"),
 	}
 
 	// 変換実行
@@ -136,6 +151,11 @@ func TestToChartDTO(t *testing.T) {
 	} else if *dto.Notes != 1234 {
 		t.Errorf("Notes = %v, want %v", *dto.Notes, 1234)
 	}
+	if dto.NotesDesigner == nil {
+		t.Error("NotesDesigner is nil")
+	} else if *dto.NotesDesigner != "譜面作者A" {
+		t.Errorf("NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者A")
+	}
 }
 
 // TestSongDTO_JSONMarshal はSongDTOのJSONマーシャリングをテストします。
@@ -147,6 +167,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	jacket := "jacket123"
 	bpm := 180
 	genre := "ORIGINAL"
+	reading := "テストガッキョク"
 
 	chartBasic, _ := chartconstant.NewChartConstant(3.0)
 	chartAdvanced, _ := chartconstant.NewChartConstant(5.0)
@@ -156,6 +177,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	songDTO := &SongDTO{
 		DisplayID: "92eaa42ee1d1a70f",
 		Title:     "テスト楽曲",
+		Reading:   &reading,
 		Artist:    "テストアーティスト",
 		Genre:     &genre,
 		BPM:       &bpm,
@@ -178,31 +200,40 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 
 	jsonString := string(jsonBytes)
 
-	if !containsString(jsonString, `"maxop":85`) {
+	if !strings.Contains(jsonString, `"maxop":85`) {
 		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
 	}
 
+	// is_maxop_unknown がJSONに含まれることを確認
+	if !strings.Contains(jsonString, `"is_maxop_unknown":`) {
+		t.Errorf("JSON should contain is_maxop_unknown field, got: %s", jsonString)
+	}
+
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
-	if !containsString(jsonString, `"release":"2024-01-15"`) {
+	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
 	}
 
+	if !strings.Contains(jsonString, `"reading":"テストガッキョク"`) {
+		t.Errorf("JSON should contain reading field, got: %s", jsonString)
+	}
+
 	// constが小数点以下1桁表記であることを確認
-	if !containsString(jsonString, `"const":3.0`) && !containsString(jsonString, `"const":3`) {
+	if !strings.Contains(jsonString, `"const":3.0`) && !strings.Contains(jsonString, `"const":3`) {
 		t.Errorf("JSON should contain const:3.0, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"const":11.3`) {
+	if !strings.Contains(jsonString, `"const":11.3`) {
 		t.Errorf("JSON should contain const:11.3, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"const":14.0`) && !containsString(jsonString, `"const":14`) {
+	if !strings.Contains(jsonString, `"const":14.0`) && !strings.Contains(jsonString, `"const":14`) {
 		t.Errorf("JSON should contain const:14.0, got: %s", jsonString)
 	}
 
 	// charts内のキー順序を確認（BASIC→ADVANCED→EXPERT→MASTER の順）
-	basicIdx := indexOfString(jsonString, `"BASIC"`)
-	advancedIdx := indexOfString(jsonString, `"ADVANCED"`)
-	expertIdx := indexOfString(jsonString, `"EXPERT"`)
-	masterIdx := indexOfString(jsonString, `"MASTER"`)
+	basicIdx := strings.Index(jsonString, `"BASIC"`)
+	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
+	expertIdx := strings.Index(jsonString, `"EXPERT"`)
+	masterIdx := strings.Index(jsonString, `"MASTER"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 {
 		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)
@@ -233,39 +264,39 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 	jsonString := string(jsonBytes)
 
 	// 全ての難易度キーが含まれることを確認
-	if !containsString(jsonString, `"BASIC"`) {
+	if !strings.Contains(jsonString, `"BASIC"`) {
 		t.Errorf("JSON should contain 'BASIC' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ADVANCED"`) {
+	if !strings.Contains(jsonString, `"ADVANCED"`) {
 		t.Errorf("JSON should contain 'ADVANCED' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"EXPERT"`) {
+	if !strings.Contains(jsonString, `"EXPERT"`) {
 		t.Errorf("JSON should contain 'EXPERT' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"MASTER"`) {
+	if !strings.Contains(jsonString, `"MASTER"`) {
 		t.Errorf("JSON should contain 'MASTER' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA"`) {
+	if !strings.Contains(jsonString, `"ULTIMA"`) {
 		t.Errorf("JSON should contain 'ULTIMA' key, got: %s", jsonString)
 	}
 
 	// 譜面がない難易度はnullになることを確認
-	if !containsString(jsonString, `"ADVANCED":null`) {
+	if !strings.Contains(jsonString, `"ADVANCED":null`) {
 		t.Errorf("JSON should contain 'ADVANCED':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"EXPERT":null`) {
+	if !strings.Contains(jsonString, `"EXPERT":null`) {
 		t.Errorf("JSON should contain 'EXPERT':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA":null`) {
+	if !strings.Contains(jsonString, `"ULTIMA":null`) {
 		t.Errorf("JSON should contain 'ULTIMA':null, got: %s", jsonString)
 	}
 
 	// BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順で出力されることを確認
-	basicIdx := indexOfString(jsonString, `"BASIC"`)
-	advancedIdx := indexOfString(jsonString, `"ADVANCED"`)
-	expertIdx := indexOfString(jsonString, `"EXPERT"`)
-	masterIdx := indexOfString(jsonString, `"MASTER"`)
-	ultimaIdx := indexOfString(jsonString, `"ULTIMA"`)
+	basicIdx := strings.Index(jsonString, `"BASIC"`)
+	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
+	expertIdx := strings.Index(jsonString, `"EXPERT"`)
+	masterIdx := strings.Index(jsonString, `"MASTER"`)
+	ultimaIdx := strings.Index(jsonString, `"ULTIMA"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 || ultimaIdx == -1 {
 		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)
@@ -276,17 +307,6 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 	}
 }
 
-// containsString はstrがsubstrを含むかどうかを判定します。
-func containsString(str, substr string) bool {
-	return indexOfString(str, substr) != -1
-}
-
-// indexOfString はstrの中でsubstrが最初に現れる位置を返します。見つからない場合は-1を返します。
-func indexOfString(str, substr string) int {
-	for i := 0; i <= len(str)-len(substr); i++ {
-		if str[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+func stringPtr(value string) *string {
+	return &value
 }

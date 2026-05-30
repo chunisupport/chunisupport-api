@@ -16,16 +16,24 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type mockAPITokenService struct {
+type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenService) Generate(ctx context.Context, userID int) (string, error) {
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
 	args := m.Called(ctx, userID)
 	return args.String(0), args.Error(1)
 }
 
-func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
+func (m *mockAPITokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.APIToken), args.Error(1)
+}
+
+func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
 	args := m.Called(ctx, rawToken)
 	if args.Get(0) == nil || args.Get(1) == nil {
 		return nil, nil, args.Error(2)
@@ -33,7 +41,7 @@ func (m *mockAPITokenService) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenService) Delete(ctx context.Context, userID int) error {
+func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
@@ -41,8 +49,8 @@ func (m *mockAPITokenService) Delete(ctx context.Context, userID int) error {
 func TestAPITokenMiddleware(t *testing.T) {
 	e := echo.New()
 	e.Validator = nil
-	mockService := new(mockAPITokenService)
-	middlewareFunc := middleware.APITokenMiddleware(mockService)
+	mockUsecase := new(mockAPITokenUsecase)
+	middlewareFunc := middleware.APITokenMiddleware(mockUsecase)
 
 	t.Run("Bearerトークンが有効な場合は次のハンドラーが実行される", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
@@ -52,7 +60,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 		user := &entity.User{ID: 1}
 		token := &entity.APIToken{ID: 2}
-		mockService.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
+		mockUsecase.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
 
 		handlerCalled := false
 		handler := middlewareFunc(func(c echo.Context) error {
@@ -64,7 +72,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, handlerCalled)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("トークンが指定されていない場合は401", func(t *testing.T) {
@@ -105,7 +113,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		mockService.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
+		mockUsecase.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
 
 		handler := middlewareFunc(func(c echo.Context) error {
 			return c.NoContent(http.StatusOK)
@@ -116,7 +124,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeInvalidToken, apiErr.Code)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 
 	t.Run("内部エラーの場合は500", func(t *testing.T) {
@@ -125,7 +133,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		mockService.On("Validate", mock.Anything, "error").Return(nil, nil, errors.New("boom")).Once()
+		mockUsecase.On("Validate", mock.Anything, "error").Return(nil, nil, errors.New("boom")).Once()
 
 		handler := middlewareFunc(func(c echo.Context) error {
 			return c.NoContent(http.StatusOK)
@@ -135,8 +143,8 @@ func TestAPITokenMiddleware(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
-		mockService.AssertExpectations(t)
+		mockUsecase.AssertExpectations(t)
 	})
 }
 
-var _ usecase.APITokenUsecase = (*mockAPITokenService)(nil)
+var _ usecase.APITokenUsecase = (*mockAPITokenUsecase)(nil)

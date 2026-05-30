@@ -55,8 +55,11 @@ go.work
 
 # バイナリ
 chunisupport-api*
+_chunisupport-api*
 *.sqlite
 *.db
+*.db-shm
+*.db-wal
 
 # 個人用メモ
 MEMO.md
@@ -67,3 +70,6 @@ Taskfile.yml
 
 # Logs
 .log/
+
+# 認証データなど
+.auth/

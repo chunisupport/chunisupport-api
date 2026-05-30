@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -23,6 +24,13 @@ func ConnectStatic(dbPath string) (*sqlx.DB, error) {
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
+
+	if err := db.Ping(); err != nil {
+		if closeErr := db.Close(); closeErr != nil {
+			slog.Error("Failed to close static database connection after ping failure", "error", closeErr)
+		}
+		return nil, fmt.Errorf("failed to ping static database: %w", err)
+	}
 
 	return db, nil
 }

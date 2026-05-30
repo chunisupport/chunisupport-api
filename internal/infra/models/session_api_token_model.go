@@ -1,52 +1,10 @@
 package models
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/google/uuid"
 )
-
-// SessionModel はデータベース用のSessionモデルです。
-type SessionModel struct {
-	ID        []byte    `db:"id"` // BINARY(16) でUUIDを保存
-	UserID    int       `db:"user_id"`
-	ExpiresAt time.Time `db:"expires_at"`
-	CreatedAt time.Time `db:"created_at"`
-}
-
-// UUIDのパースに失敗した場合はエラーを返します。
-func (m *SessionModel) ToEntity() (*entity.Session, error) {
-	if len(m.ID) != 16 {
-		return nil, fmt.Errorf("invalid session ID length: expected 16 bytes, got %d", len(m.ID))
-	}
-
-	var uuidObj uuid.UUID
-	copy(uuidObj[:], m.ID)
-
-	return &entity.Session{
-		ID:        uuidObj.String(),
-		UserID:    m.UserID,
-		ExpiresAt: m.ExpiresAt,
-		CreatedAt: m.CreatedAt,
-	}, nil
-}
-
-// UUIDのパースに失敗した場合はエラーを返します。
-func FromSessionEntity(e *entity.Session) (*SessionModel, error) {
-	uuidObj, err := uuid.Parse(e.ID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid session ID format: %w", err)
-	}
-
-	return &SessionModel{
-		ID:        uuidObj[:],
-		UserID:    e.UserID,
-		ExpiresAt: e.ExpiresAt,
-		CreatedAt: e.CreatedAt,
-	}, nil
-}
 
 // APITokenModel はデータベース用のAPITokenモデルです。
 type APITokenModel struct {

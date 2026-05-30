@@ -2,23 +2,74 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
+
+const worldsendChartKey = "WORLDSEND"
+
+// UpdateWorldsendChartInput は WORLD'S END 譜面更新入力を表します。
+type UpdateWorldsendChartInput struct {
+	Attribute     *string
+	LevelStar     *int
+	Notes         *int
+	NotesDesigner *string
+}
+
+// UpdateWorldsendSongInput は WORLD'S END 楽曲更新入力を表します。
+type UpdateWorldsendSongInput struct {
+	DisplayID  string
+	Title      string
+	Reading    *string
+	Artist     string
+	Genre      *string
+	BPM        *int
+	ReleasedAt *time.Time
+	Jacket     *string
+	Charts     map[string]*UpdateWorldsendChartInput
+}
+
+// CreateWorldsendChartInput は WORLD'S END 譜面追加入力を表します。nil の場合は空行を挿入します。
+type CreateWorldsendChartInput struct {
+	Attribute     *string
+	LevelStar     *int
+	Notes         *int
+	NotesDesigner *string
+}
+
+// CreateWorldsendSongInput は WORLD'S END 楽曲追加入力を表します。
+type CreateWorldsendSongInput struct {
+	OfficialIdx string
+	Title       string
+	Reading     *string
+	Artist      string
+	Genre       string
+	BPM         *int
+	ReleasedAt  *time.Time
+	Jacket      *string
+	Chart       *CreateWorldsendChartInput
+}
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
 type WorldsendUsecase interface {
 	// GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-	// includeDeleted が false の場合、削除済み楽曲は除外されます。
-	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*dto.WorldsendSongDTO, error)
+	// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
+	GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error)
 
 	// GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-	GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*dto.WorldsendSongDTO, error)
+	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
+	GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error)
 
 	// DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 	DeleteWorldsendSong(ctx context.Context, displayID string) error
@@ -27,7 +78,13 @@ type WorldsendUsecase interface {
 	RestoreWorldsendSong(ctx context.Context, displayID string) error
 
 	// UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-	UpdateWorldsendSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error
+	UpdateWorldsendSongs(ctx context.Context, requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error
+
+	// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
+	// display_id はサーバー側で crypto/rand を使って生成します。
+	// official_idx が重複する場合は repository.ErrDuplicateOfficialIdx を返します。
+	// masters が nil の場合は内部エラーを返します。
+	CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error)
 }
 
 // worldsendUsecase は WorldsendUsecase の実装です。
@@ -47,75 +104,96 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 }
 
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool) ([]*dto.WorldsendSongDTO, error) {
+// includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
+func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error) {
+	// 削除済み楽曲を含める場合はEDITOR権限が必要
+	if includeDeleted {
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
+			includeDeleted = false
+		}
+	}
+
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		slog.Error("failed to find all worldsend songs", "error", err)
 		return nil, err
 	}
 
-	results := make([]*dto.WorldsendSongDTO, len(songsWithCharts))
-	for i, swc := range songsWithCharts {
-		results[i] = toWorldsendSongDTO(swc)
-	}
-
-	return results, nil
+	return songsWithCharts, nil
 }
 
 // GetWorldsendSongByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
-func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string) (*dto.WorldsendSongDTO, error) {
+// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
+func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error) {
 	songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.defaultExecutor, displayID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrSongNotFound) {
 			return nil, repository.ErrSongNotFound
 		}
 		slog.Error("failed to find worldsend song by display_id", "display_id", displayID, "error", err)
 		return nil, err
 	}
 
-	return toWorldsendSongDTO(songWithChart), nil
+	// 削除済み楽曲の権限チェック
+	if !songWithChart.Song.IsActive() {
+		// EDITOR以上の権限を持たない場合は404を返す
+		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
+			return nil, repository.ErrSongNotFound
+		}
+	}
+
+	return songWithChart, nil
 }
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.DeleteSong(ctx, s.defaultExecutor, displayID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return repository.ErrSongNotFound
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		if err != nil {
+			return err
 		}
-		slog.Error("failed to delete worldsend song", "display_id", displayID, "error", err)
-		return err
-	}
-	return nil
+
+		songWithChart.Song.Delete()
+		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
+	})
 }
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
-	err := s.worldsendChartRepo.RestoreSong(ctx, s.defaultExecutor, displayID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return repository.ErrSongNotFound
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		if err != nil {
+			return err
 		}
-		slog.Error("failed to restore worldsend song", "display_id", displayID, "error", err)
-		return err
-	}
-	return nil
+
+		songWithChart.Song.Restore()
+		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
+	})
 }
 
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
-func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*entity.Song, charts []*entity.WorldsendChart) error {
-	// バリデーション
-	for i, chart := range charts {
-		if err := chart.Validate(); err != nil {
-			slog.Warn("worldsend chart validation failed", "index", i, "error", err)
-			return err
-		}
+
+func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error {
+	if masters == nil {
+		return fmt.Errorf("%w: masters is nil", ErrInternalError)
+	}
+
+	if len(requests) == 0 {
+		return nil
+	}
+
+	updates, err := convertWorldsendRequestsToEntities(requests, masters)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
 	}
 
 	// リポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.worldsendChartRepo.UpdateSongs(ctx, tx, songs, charts)
+		return s.worldsendChartRepo.UpdateSongs(ctx, tx, updates)
 	}); err != nil {
+		if errors.Is(err, repository.ErrDuplicateDisplayID) {
+			return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
+		}
 		slog.Error("failed to update worldsend songs", "error", err)
 		return err
 	}
@@ -123,33 +201,180 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, songs []*en
 	return nil
 }
 
-// toWorldsendSongDTO は WorldsendSongWithChart を WorldsendSongDTO に変換します。
-func toWorldsendSongDTO(swc *repository.WorldsendSongWithChart) *dto.WorldsendSongDTO {
-	if swc == nil {
+func convertWorldsendRequestsToEntities(requests []*UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) ([]*repository.WorldsendUpdate, error) {
+	updates := make([]*repository.WorldsendUpdate, 0, len(requests))
+
+	for idx, req := range requests {
+		if req == nil {
+			return nil, fmt.Errorf("requests[%d]: request is null", idx)
+		}
+
+		update, err := convertSingleRequestToUpdate(req, masters)
+		if err != nil {
+			return nil, fmt.Errorf("requests[%d].%w", idx, err)
+		}
+		updates = append(updates, update)
+	}
+
+	return updates, nil
+}
+
+func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*repository.WorldsendUpdate, error) {
+	chartReq, hasChartUpdate, err := validateAndGetWorldsendChartRequest(req.Charts)
+	if err != nil {
+		return nil, fmt.Errorf("charts: %w", err)
+	}
+
+	var genreID *int
+	if req.Genre != nil {
+		genreMaster, ok := masters.Genres[*req.Genre]
+		if !ok {
+			return nil, fmt.Errorf("invalid genre: %s", *req.Genre)
+		}
+		genreID = &genreMaster.ID
+	}
+
+	updatedSong := entity.NewSong()
+	updatedSong.DisplayID = req.DisplayID
+	updatedSong.Title = req.Title
+	updatedSong.Reading = req.Reading
+	updatedSong.Artist = req.Artist
+	updatedSong.GenreID = genreID
+	updatedSong.BPM = req.BPM
+	updatedSong.ReleasedAt = req.ReleasedAt
+	updatedSong.Jacket = req.Jacket
+	updatedSong.IsWorldsend = true
+
+	var updatedChart *entity.WorldsendChart
+	if hasChartUpdate {
+		var levelStarVO *levelstar.LevelStar
+		if chartReq.LevelStar != nil {
+			ls, err := levelstar.NewLevelStar(*chartReq.LevelStar)
+			if err != nil {
+				return nil, fmt.Errorf("charts.%s.level_star: %w", worldsendChartKey, err)
+			}
+			levelStarVO = &ls
+		}
+
+		var notesVO *notes.Notes
+		if chartReq.Notes != nil {
+			n, err := notes.NewNotes(*chartReq.Notes)
+			if err != nil {
+				return nil, fmt.Errorf("charts.%s.notes: %w", worldsendChartKey, err)
+			}
+			notesVO = &n
+		}
+
+		updatedChart = &entity.WorldsendChart{
+			LevelStar:     levelStarVO,
+			Attribute:     chartReq.Attribute,
+			Notes:         notesVO,
+			NotesDesigner: chartReq.NotesDesigner,
+		}
+	}
+
+	return &repository.WorldsendUpdate{
+		Song:  updatedSong,
+		Chart: updatedChart,
+	}, nil
+}
+
+func validateAndGetWorldsendChartRequest(charts map[string]*UpdateWorldsendChartInput) (*UpdateWorldsendChartInput, bool, error) {
+	if len(charts) == 0 {
+		return nil, false, nil
+	}
+
+	if len(charts) > 1 {
+		keys := slices.Sorted(maps.Keys(charts))
+		return nil, false, fmt.Errorf("only one chart key (%s) is allowed: got %v", worldsendChartKey, keys)
+	}
+
+	chart, ok := charts[worldsendChartKey]
+	if !ok {
+		var invalidKey string
+		for k := range charts {
+			invalidKey = k
+		}
+		return nil, false, fmt.Errorf("unsupported chart key: %s", invalidKey)
+	}
+
+	if chart == nil {
+		return nil, false, fmt.Errorf("chart for %s is null", worldsendChartKey)
+	}
+
+	return chart, true, nil
+}
+
+// CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
+func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error) {
+	if masters == nil {
+		return nil, fmt.Errorf("%w: masters is nil", ErrInternalError)
+	}
+
+	// ジャンル名の検証とID変換（UpdateWorldsendSongs と同様のパターン）
+	genreItem, ok := masters.Genres[input.Genre]
+	if !ok {
+		return nil, fmt.Errorf("%w: invalid genre=%s", ErrInvalidWorldsendInput, input.Genre)
+	}
+	genreID := genreItem.ID
+
+	displayID, err := generateDisplayID()
+	if err != nil {
+		return nil, err
+	}
+
+	song := entity.NewSong()
+	song.DisplayID = displayID
+	song.OfficialIdx = input.OfficialIdx
+	song.Title = input.Title
+	song.Reading = input.Reading
+	song.Artist = input.Artist
+	song.GenreID = &genreID
+	song.BPM = input.BPM
+	song.ReleasedAt = input.ReleasedAt
+	song.Jacket = input.Jacket
+	song.IsWorldsend = true
+
+	// 譜面情報の構築（全フィールド任意）
+	var chart *entity.WorldsendChart
+	if input.Chart != nil {
+		var levelStarVO *levelstar.LevelStar
+		if input.Chart.LevelStar != nil {
+			ls, err := levelstar.NewLevelStar(*input.Chart.LevelStar)
+			if err != nil {
+				return nil, fmt.Errorf("%w: level_star: %v", ErrInvalidWorldsendInput, err)
+			}
+			levelStarVO = &ls
+		}
+
+		var notesVO *notes.Notes
+		if input.Chart.Notes != nil {
+			n, err := notes.NewNotes(*input.Chart.Notes)
+			if err != nil {
+				return nil, fmt.Errorf("%w: notes: %v", ErrInvalidWorldsendInput, err)
+			}
+			notesVO = &n
+		}
+
+		chart = &entity.WorldsendChart{
+			LevelStar:     levelStarVO,
+			Attribute:     input.Chart.Attribute,
+			Notes:         notesVO,
+			NotesDesigner: input.Chart.NotesDesigner,
+		}
+	}
+
+	var created *entity.WorldsendSongWithChart
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		result, err := s.worldsendChartRepo.CreateSong(ctx, tx, song, chart)
+		if err != nil {
+			return err
+		}
+		created = result
 		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	result := &dto.WorldsendSongDTO{
-		IsDeleted: false,
-	}
-
-	if swc.Song != nil {
-		result.ID = swc.Song.DisplayID
-		result.Title = swc.Song.Title
-		result.Artist = swc.Song.Artist
-		result.GenreID = swc.Song.GenreID
-		result.BPM = swc.Song.BPM
-		result.ReleasedAt = swc.Song.ReleasedAt
-		result.OfficialIdx = swc.Song.OfficialIdx
-		result.Jacket = swc.Song.Jacket
-		result.IsDeleted = swc.Song.IsDeleted
-	}
-
-	if swc.Chart != nil {
-		result.WeStar = swc.Chart.WeStar
-		result.WeKanji = swc.Chart.WeKanji
-		result.Notes = dto.ToNotesIntPtr(swc.Chart.Notes)
-	}
-
-	return result
+	return created, nil
 }

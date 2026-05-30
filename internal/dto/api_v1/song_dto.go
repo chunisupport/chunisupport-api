@@ -12,6 +12,7 @@ type V1ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
+	NotesDesigner  *string                     `json:"notes_designer"`
 }
 
 // V1OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
@@ -62,15 +63,18 @@ func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
 
 // V1SongDTO は外部API v1 用の楽曲情報DTOです。
 type V1SongDTO struct {
-	DisplayID string             `json:"id"`
-	Title     string             `json:"title"`
-	Artist    string             `json:"artist"`
-	Genre     *string            `json:"genre"`
-	BPM       *int               `json:"bpm"`
-	Release   *string            `json:"release"`
-	Jacket    *string            `json:"jacket"`
-	MaxOP     float64            `json:"maxop"`
-	Charts    V1OrderedChartsMap `json:"charts"`
+	DisplayID      string             `json:"id"`
+	Title          string             `json:"title"`
+	Reading        *string            `json:"reading"`
+	Artist         string             `json:"artist"`
+	Genre          *string            `json:"genre"`
+	BPM            *int               `json:"bpm"`
+	Release        *string            `json:"release"`
+	Jacket         *string            `json:"jacket"`
+	OfficialIdx    string             `json:"official_idx"`
+	MaxOP          float64            `json:"maxop"`
+	IsMaxOPUnknown bool               `json:"is_maxop_unknown"`
+	Charts         V1OrderedChartsMap `json:"charts"`
 }
 
 // V1SongsResponse は外部API v1 用の楽曲一覧レスポンスです。
@@ -94,6 +98,7 @@ func ToV1ChartDTO(chart *entity.Chart) *V1ChartDTO {
 		Const:          chart.Const,
 		IsConstUnknown: chart.IsConstUnknown,
 		Notes:          notesPtr,
+		NotesDesigner:  chart.NotesDesigner,
 	}
 }
 
@@ -119,14 +124,17 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 	}
 
 	return &V1SongDTO{
-		DisplayID: song.DisplayID,
-		Title:     song.Title,
-		Artist:    song.Artist,
-		Genre:     genrePtr,
-		BPM:       song.BPM,
-		Release:   releaseDateStr,
-		Jacket:    song.Jacket,
-		MaxOP:     maxOP,
-		Charts:    make(V1OrderedChartsMap),
+		DisplayID:      song.DisplayID,
+		Title:          song.Title,
+		Reading:        song.Reading,
+		Artist:         song.Artist,
+		Genre:          genrePtr,
+		BPM:            song.BPM,
+		Release:        releaseDateStr,
+		Jacket:         song.Jacket,
+		OfficialIdx:    song.OfficialIdx,
+		MaxOP:          maxOP,
+		IsMaxOPUnknown: song.IsMaxOPUnknown,
+		Charts:         make(V1OrderedChartsMap),
 	}
 }

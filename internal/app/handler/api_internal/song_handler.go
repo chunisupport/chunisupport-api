@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -33,10 +34,12 @@ func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartS
 
 // GetSongs はWORLD'S END以外の全楽曲を取得します。
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
+// ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
 func (h *SongHandler) GetSongs(c echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
-	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted)
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
@@ -51,18 +54,56 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
+// GetSongsUpdatedAt は楽曲関連データの updated_at のみを返します。
+func (h *SongHandler) GetSongsUpdatedAt(c echo.Context) error {
+	updatedAt, err := h.songUsecase.GetSongsUpdatedAt(c.Request().Context())
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.SongUpdatedAtDTO{
+		UpdatedAt: updatedAt,
+	})
+}
+
 // GetSong は指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetSong(c echo.Context) error {
 	displayID := c.Param("displayid")
-	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	// DTOに変換
 	songDTO := h.convertToSongDTO(song)
 
 	return c.JSON(http.StatusOK, songDTO)
+}
+
+// GetEditorSongs は編集者向けにWORLD'S END以外の全楽曲を取得します。
+func (h *SongHandler) GetEditorSongs(c echo.Context) error {
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, &api_internal.EditorSongsResponse{
+		Songs: h.convertToEditorSongDTOs(songsWithCharts),
+	})
+}
+
+// GetEditorSong は編集者向けに指定されたDisplayIDの楽曲を取得します。
+func (h *SongHandler) GetEditorSong(c echo.Context) error {
+	displayID := c.Param("displayid")
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToEditorSongDTO(song))
 }
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
@@ -76,7 +117,8 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 		return apierror.ErrInvalidDifficulty
 	}
 
-	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	stats, err := h.statsUsecase.GetChartStatsByDisplayIDAndDifficulty(c.Request().Context(), displayID, difficultyName, requesterAccountTypeID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -91,16 +133,71 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 func (h *SongHandler) DeleteSong(c echo.Context) error {
 	displayID := c.Param("displayid")
 	if err := h.songUsecase.DeleteSong(c.Request().Context(), displayID); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// CreateSong は新規楽曲を追加します。
+func (h *SongHandler) CreateSong(c echo.Context) error {
+	var req api_internal.CreateSongRequest
+	if err := c.Bind(&req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	for _, chart := range req.Charts {
+		if chart == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("charts: chart element is null"))
+		}
+		if err := c.Validate(chart); err != nil {
+			return err
+		}
+	}
+
+	input := &usecase.CreateSongInput{
+		OfficialIdx: req.OfficialIdx,
+		Title:       req.Title,
+		Reading:     req.Reading,
+		Artist:      req.Artist,
+		Genre:       req.Genre,
+		BPM:         req.BPM,
+		ReleasedAt:  req.ReleasedAt.TimePtr(),
+		Jacket:      req.Jacket,
+		Charts:      convertToCreateChartInputs(req.Charts),
+	}
+
+	song, err := h.songUsecase.CreateSong(c.Request().Context(), input)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusCreated, h.convertToEditorSongDTO(song))
+}
+
+func convertToCreateChartInputs(reqs []*api_internal.CreateChartRequest) []*usecase.CreateChartInput {
+	inputs := make([]*usecase.CreateChartInput, 0, len(reqs))
+	for _, r := range reqs {
+		if r == nil {
+			continue
+		}
+		inputs = append(inputs, &usecase.CreateChartInput{
+			Difficulty:     r.Difficulty,
+			Const:          r.Const,
+			IsConstUnknown: r.IsConstUnknown,
+			Notes:          r.Notes,
+			NotesDesigner:  r.NotesDesigner,
+		})
+	}
+	return inputs
 }
 
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (h *SongHandler) RestoreSong(c echo.Context) error {
 	displayID := c.Param("displayid")
 	if err := h.songUsecase.RestoreSong(c.Request().Context(), displayID); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
@@ -111,15 +208,28 @@ func (h *SongHandler) UpdateSongs(c echo.Context) error {
 	if err := c.Bind(&requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-
-	// バリデーション
-	if err := c.Validate(requests); err != nil {
-		return apierror.ErrValidationFailed.WithInternal(err)
+	if requests == nil {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
 	}
 
-	// サービス層での更新処理
+	// バリデーション
+	for idx, req := range requests {
+		if req == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
+		}
+		for diff, chart := range req.Charts {
+			if chart == nil {
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%s]: chart is null", idx, diff))
+			}
+		}
+		if err := c.Validate(req); err != nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
+		}
+	}
+
+	// ユースケース層での更新処理
 	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -148,4 +258,35 @@ func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO 
 		return api_internal.ToChartDTO(chart)
 	})
 	return songDTO
+}
+
+// convertToEditorSongDTOs は Song のスライスを EditorSongDTO のスライスに変換します。
+func (h *SongHandler) convertToEditorSongDTOs(songs []*entity.Song) []*api_internal.EditorSongDTO {
+	songDTOs := make([]*api_internal.EditorSongDTO, 0, len(songs))
+	for _, song := range songs {
+		songDTOs = append(songDTOs, h.convertToEditorSongDTO(song))
+	}
+	return songDTOs
+}
+
+// convertToEditorSongDTO は Song を EditorSongDTO に変換します。
+// EditorOrderedChartsMap を使用して譜面の updated_at を含めます。
+func (h *SongHandler) convertToEditorSongDTO(song *entity.Song) *api_internal.EditorSongDTO {
+	if song == nil {
+		return nil
+	}
+	base := h.convertToSongDTO(song)
+
+	editorCharts := api_internal.EditorOrderedChartsMap(
+		handler.BuildChartsMap(song.Charts, h.masterCache.DifficultyNamesByID, func(chart *entity.Chart) *api_internal.EditorChartDTO {
+			return api_internal.ToEditorChartDTO(chart)
+		}),
+	)
+
+	return &api_internal.EditorSongDTO{
+		SongDTO:   base,
+		IsDeleted: song.IsDeleted,
+		UpdatedAt: song.UpdatedAt,
+		Charts:    editorCharts,
+	}
 }

@@ -6,6 +6,8 @@ import (
 	"cmp"
 	"math"
 	"slices"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
 // CalcSingleRating は指定されたスコアと譜面定数から単曲レーティングを計算します。
@@ -140,7 +142,7 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 	}
 
 	// コンボランプ補正
-	if score == theoreticalScore {
+	if score == constants.TheoreticalScore {
 		// AJC（理論値）: +1.25
 		overPower += 1.25
 	} else {
@@ -163,13 +165,13 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から、理論値(AJC)を取った際のOPを返します。
-// maxChartConst はリポジトリ層でSQL MAX集約により算出された値を受け取ります。
+// maxChartConst はドメインサービスの AggregateSongCharts で算出された値を受け取ります。
 func CalcSongMaxOP(maxChartConst float64) float64 {
 	if maxChartConst <= 0 {
 		return 0
 	}
 
-	return CalcSingleOverpower(theoreticalScore, maxChartConst, comboLampAllJustice)
+	return CalcSingleOverpower(constants.TheoreticalScore, maxChartConst, comboLampAllJustice)
 }
 
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。
@@ -258,22 +260,4 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 		BestAverage:  bestAvg,
 		NewAverage:   newAvg,
 	}
-}
-
-// CalcBestAverageRating はベスト枠の平均レーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcBestAverageRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).BestAverage
-}
-
-// CalcNewAverageRating は新曲枠の平均レーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcNewAverageRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).NewAverage
-}
-
-// CalcPlayerRating はプレイヤーレーティングを計算します。
-// Deprecated: CalcRatingStats を使用してください。
-func CalcPlayerRating(records []RatingRecord) float64 {
-	return CalcRatingStats(records).PlayerRating
 }

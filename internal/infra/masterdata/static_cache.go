@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/jmoiron/sqlx"
 )
 
 // StaticCache は統計DB（SQLite）から起動時にプリロードされるマスタのセットです。
 type StaticCache struct {
-	RatingBands        []*entity.RatingBand
-	RatingBandsByID    map[int]*entity.RatingBand
-	RatingBandsByLabel map[string]*entity.RatingBand
+	RatingBands        []*ratingband.RatingBand
+	RatingBandsByID    map[int]*ratingband.RatingBand
+	RatingBandsByLabel map[string]*ratingband.RatingBand
 }
 
 // PreloadStatic は統計DBから固定値が INSERT されているマスタを読み込み、キャッシュを構築します。
@@ -22,8 +22,8 @@ func PreloadStatic(ctx context.Context, staticDB *sqlx.DB) (*StaticCache, error)
 		return nil, fmt.Errorf("failed to preload rating_bands: %w", err)
 	}
 
-	ratingBandsByID := make(map[int]*entity.RatingBand, len(ratingBands))
-	ratingBandsByLabel := make(map[string]*entity.RatingBand, len(ratingBands))
+	ratingBandsByID := make(map[int]*ratingband.RatingBand, len(ratingBands))
+	ratingBandsByLabel := make(map[string]*ratingband.RatingBand, len(ratingBands))
 	for _, band := range ratingBands {
 		ratingBandsByID[band.ID] = band
 		ratingBandsByLabel[band.Label] = band
@@ -36,7 +36,7 @@ func PreloadStatic(ctx context.Context, staticDB *sqlx.DB) (*StaticCache, error)
 	}, nil
 }
 
-func loadRatingBands(ctx context.Context, db *sqlx.DB) ([]*entity.RatingBand, error) {
+func loadRatingBands(ctx context.Context, db *sqlx.DB) ([]*ratingband.RatingBand, error) {
 	const query = `
 		SELECT id, label, min_inclusive, max_exclusive, sort_order
 		FROM rating_bands
@@ -56,9 +56,9 @@ func loadRatingBands(ctx context.Context, db *sqlx.DB) ([]*entity.RatingBand, er
 		return nil, err
 	}
 
-	results := make([]*entity.RatingBand, 0, len(rows))
+	results := make([]*ratingband.RatingBand, 0, len(rows))
 	for _, row := range rows {
-		results = append(results, &entity.RatingBand{
+		results = append(results, &ratingband.RatingBand{
 			ID:           row.ID,
 			Label:        row.Label,
 			MinInclusive: row.MinInclusive,
@@ -70,9 +70,36 @@ func loadRatingBands(ctx context.Context, db *sqlx.DB) ([]*entity.RatingBand, er
 	return results, nil
 }
 
+// RatingBandsSnapshot はレーティング帯の防衛的コピーを返します。
+func (c *StaticCache) RatingBandsSnapshot() []*ratingband.RatingBand {
+	if c == nil || len(c.RatingBands) == 0 {
+		return []*ratingband.RatingBand{}
+	}
+
+	res := make([]*ratingband.RatingBand, len(c.RatingBands))
+	for i, band := range c.RatingBands {
+		if band == nil {
+			continue
+		}
+		copied := *band
+		// Deep copy pointer fields to prevent mutation of cached values
+		if band.MinInclusive != nil {
+			minVal := *band.MinInclusive
+			copied.MinInclusive = &minVal
+		}
+		if band.MaxExclusive != nil {
+			maxVal := *band.MaxExclusive
+			copied.MaxExclusive = &maxVal
+		}
+		res[i] = &copied
+	}
+
+	return res
+}
+
 // GetRatingBandByID はIDからRatingBandを取得します。
 // 見つからない場合はnilを返します。
-func (c *StaticCache) GetRatingBandByID(id int) *entity.RatingBand {
+func (c *StaticCache) GetRatingBandByID(id int) *ratingband.RatingBand {
 	if c == nil {
 		return nil
 	}
@@ -81,7 +108,7 @@ func (c *StaticCache) GetRatingBandByID(id int) *entity.RatingBand {
 
 // GetRatingBandByLabel はラベルからRatingBandを取得します。
 // 見つからない場合はnilを返します。
-func (c *StaticCache) GetRatingBandByLabel(label string) *entity.RatingBand {
+func (c *StaticCache) GetRatingBandByLabel(label string) *ratingband.RatingBand {
 	if c == nil {
 		return nil
 	}

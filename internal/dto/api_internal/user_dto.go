@@ -9,6 +9,7 @@ import (
 
 // UserProfileWithRecordsDTO はユーザープロファイルとレコードを統合したDTOです。
 type UserProfileWithRecordsDTO struct {
+	UserID    int                        `json:"-"`
 	Username  string                     `json:"username"`
 	Player    *dto.PlayerDTO             `json:"player"`
 	Records   *dto.UserRecordResponseDTO `json:"records"`
@@ -24,12 +25,59 @@ type UserRatingRecordResponseDTO struct {
 	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
 }
 
+// UserRatingMetaDTO はレーティングAPIのメタ情報です。
+type UserRatingMetaDTO struct {
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// UserRatingDTO は公開向けのレーティング枠レスポンスです。
+type UserRatingDTO struct {
+	Best          []*dto.PlayerRecordDTO `json:"best"`
+	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
+	New           []*dto.PlayerRecordDTO `json:"new"`
+	NewCandidate  []*dto.PlayerRecordDTO `json:"new_candidate"`
+	Meta          *UserRatingMetaDTO     `json:"meta"`
+}
+
+// UserRecordMetaDTO はレコードAPIのメタ情報です。
+type UserRecordMetaDTO struct {
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// UserRecordDTO は公開向けのレコードレスポンスです。
+type UserRecordDTO struct {
+	All       []*dto.PlayerRecordDTO    `json:"all"`
+	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+	Meta      *UserRecordMetaDTO        `json:"meta"`
+}
+
+// UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
+type UserRecordViewResponseDTO struct {
+	UpdatedAt time.Time                 `json:"updated_at"`
+	All       []*dto.PlayerRecordDTO    `json:"all"`
+	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+}
+
 // UserProfileRatingViewDTO はレーティングビュー用のユーザープロファイルDTOです。
 type UserProfileRatingViewDTO struct {
 	Username  string                       `json:"username"`
 	Player    *dto.PlayerDTO               `json:"player"`
 	Records   *UserRatingRecordResponseDTO `json:"records"`
 	UpdatedAt *time.Time                   `json:"updated_at"` // プレイヤーデータの最終更新日時
+}
+
+// UserProfileRecordViewDTO はレコードビュー用のユーザープロファイルDTOです。
+type UserProfileRecordViewDTO struct {
+	Username  string                     `json:"username"`
+	Player    *dto.PlayerDTO             `json:"player"`
+	Records   *UserRecordViewResponseDTO `json:"records"`
+	UpdatedAt *time.Time                 `json:"updated_at"` // プレイヤーデータの最終更新日時
+}
+
+// UserProfileDTO はユーザー名とプレイヤー情報のみを含む軽量なプロファイルDTOです。
+type UserProfileDTO struct {
+	Username string         `json:"username"`
+	Player   *dto.PlayerDTO `json:"player"`
 }
 
 // UserDTO はユーザー情報を外部に公開するためのDTOです。

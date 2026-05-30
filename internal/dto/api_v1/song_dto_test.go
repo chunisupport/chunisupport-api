@@ -16,18 +16,21 @@ func TestToV1SongDTO(t *testing.T) {
 	genreID := 2
 	bpm := 200
 	imgURL := "https://example.com/v1jacket.jpg"
+	reading := "ブイワンテストガッキョク"
 	releaseDate := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
 	masterConst, _ := chartconstant.NewChartConstant(13.0)
 	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
 
 	song := &entity.Song{
-		DisplayID:  "test123456789012",
-		Title:      "テスト楽曲",
-		Artist:     "テストアーティスト",
-		GenreID:    &genreID,
-		BPM:        &bpm,
-		ReleasedAt: &releaseDate,
-		Jacket:     &imgURL,
+		DisplayID:      "test123456789012",
+		Title:          "テスト楽曲",
+		Reading:        &reading,
+		Artist:         "テストアーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		ReleasedAt:     &releaseDate,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -53,6 +56,10 @@ func TestToV1SongDTO(t *testing.T) {
 
 	if dto.Title != "テスト楽曲" {
 		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
+	}
+
+	if dto.Reading == nil || *dto.Reading != "ブイワンテストガッキョク" {
+		t.Errorf("Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
 	}
 
 	if dto.Artist != "テストアーティスト" {
@@ -88,6 +95,11 @@ func TestToV1SongDTO(t *testing.T) {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90.0)
 	}
 
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
 	// Charts は空の map として初期化される
 	if dto.Charts == nil {
 		t.Error("Charts is nil, want empty map")
@@ -113,6 +125,7 @@ func TestToV1ChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: true,
 		Notes:          &notesObj,
+		NotesDesigner:  stringPtr("譜面作者B"),
 	}
 
 	// 変換実行
@@ -136,6 +149,11 @@ func TestToV1ChartDTO(t *testing.T) {
 	} else if *dto.Notes != 999 {
 		t.Errorf("Notes = %v, want %v", *dto.Notes, 999)
 	}
+	if dto.NotesDesigner == nil {
+		t.Error("NotesDesigner is nil")
+	} else if *dto.NotesDesigner != "譜面作者B" {
+		t.Errorf("NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者B")
+	}
 }
 
 // TestV1SongDTO_JSONMarshal はV1SongDTOのJSONマーシャリングをテストします。
@@ -146,6 +164,7 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 	jacket := "jacket456"
 	bpm := 150
 	genre := "VARIETY"
+	reading := "ブイワンテスト"
 
 	chartBasic, _ := chartconstant.NewChartConstant(2.0)
 	chartExpert, _ := chartconstant.NewChartConstant(10.5)
@@ -153,6 +172,7 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 	v1SongDTO := &V1SongDTO{
 		DisplayID: "v1abc123456789ab",
 		Title:     "V1テスト楽曲",
+		Reading:   &reading,
 		Artist:    "V1アーティスト",
 		Genre:     &genre,
 		BPM:       &bpm,
@@ -177,9 +197,18 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
 	}
 
+	// is_maxop_unknown がJSONに含まれることを確認
+	if !containsString(jsonString, `"is_maxop_unknown":`) {
+		t.Errorf("JSON should contain is_maxop_unknown field, got: %s", jsonString)
+	}
+
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
 	if !containsString(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
+	}
+
+	if !containsString(jsonString, `"reading":"ブイワンテスト"`) {
+		t.Errorf("JSON should contain reading field, got: %s", jsonString)
 	}
 
 	// 全ての難易度キーが含まれることを確認
@@ -239,4 +268,8 @@ func indexOfString(str, substr string) int {
 		}
 	}
 	return -1
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

@@ -2,7 +2,10 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -26,9 +29,26 @@ func NewUserRepository(db *sqlx.DB) repository.UserRepository {
 // FindByID はIDでユーザーを検索します。
 func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE id = ?`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ?`
 	err := exec.GetContext(ctx, &userModel, query, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
+		return nil, err
+	}
+	return userModel.ToEntity()
+}
+
+// FindByIDForUpdate はIDでユーザーを検索し、更新用に行ロックします。
+func (r *userRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	var userModel models.UserModel
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE id = ? FOR UPDATE`
+	err := exec.GetContext(ctx, &userModel, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
 		return nil, err
 	}
 	return userModel.ToEntity()
@@ -37,12 +57,44 @@ func (r *userRepository) FindByID(ctx context.Context, exec repository.Executor,
 // FindByUsername はユーザー名でユーザーを検索します。
 func (r *userRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
 	var userModel models.UserModel
-	query := `SELECT id, username, password_hash, created_at, updated_at, player_id, account_type_id, is_deleted, is_private FROM users WHERE username = ?`
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE username = ?`
 	err := exec.GetContext(ctx, &userModel, query, username)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
 		return nil, err
 	}
 	return userModel.ToEntity()
+}
+
+// FindByFirebaseUID はFirebase UIDでユーザーを検索します。
+func (r *userRepository) FindByFirebaseUID(ctx context.Context, exec repository.Executor, uid string) (*entity.User, error) {
+	var userModel models.UserModel
+	query := `SELECT id, username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private FROM users WHERE firebase_uid = ?`
+	err := exec.GetContext(ctx, &userModel, query, uid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Join(repository.ErrUserNotFound, err)
+		}
+		return nil, err
+	}
+	return userModel.ToEntity()
+}
+
+// LinkFirebaseUID は現在の Firebase UID が一致する場合のみ更新します。
+func (r *userRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	whereClause, whereArgs := userFirebaseUIDWhereClause(currentUID)
+	query := fmt.Sprintf("UPDATE users SET firebase_uid = ?, updated_at = ? WHERE id = ? AND %s", whereClause)
+	args := []any{newUID, updatedAt, userID}
+	args = append(args, whereArgs...)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return wrapFirebaseUIDDuplicateError(err)
+	}
+
+	return r.validateSingleUserUpdate(ctx, exec, userID, result)
 }
 
 // FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。
@@ -59,8 +111,7 @@ func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.
 			p.overpower_value AS player_overpower_value
 		FROM users u
 		LEFT JOIN players p ON u.player_id = p.id
-		WHERE u.is_deleted = FALSE
-		AND u.is_private = FALSE
+		WHERE u.is_private = FALSE
 		AND u.player_id IS NOT NULL
 	`
 	args := []any{}
@@ -136,9 +187,13 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 		SELECT
 			u.id AS user_id,
 			u.username,
+			u.firebase_uid,
+			u.account_type_id AS user_account_type_id,
 			u.player_id AS user_player_id,
+			u.created_at AS user_created_at,
+			u.updated_at AS user_updated_at,
+			u.is_suspicious AS user_is_suspicious,
 			u.is_private AS user_is_private,
-			u.is_deleted AS user_is_deleted,
 			p.id AS player_id,
 			p.player_name,
 			p.official_player_rating AS player_official_rating,
@@ -172,8 +227,11 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	for rows.Next() {
 		var row struct {
 			models.UserWithPlayerRow
-			UserIsPrivate *bool `db:"user_is_private"`
-			UserIsDeleted *bool `db:"user_is_deleted"`
+			UserAccountTypeID int       `db:"user_account_type_id"`
+			UserCreatedAt     time.Time `db:"user_created_at"`
+			UserUpdatedAt     time.Time `db:"user_updated_at"`
+			UserIsSuspicious  *bool     `db:"user_is_suspicious"`
+			UserIsPrivate     *bool     `db:"user_is_private"`
 		}
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("scan error: %w", err)
@@ -187,11 +245,15 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 
 		result := entity.UserWithPlayer{
 			User: entity.User{
-				ID:        row.UserID,
-				Username:  uname,
-				PlayerID:  row.UserPlayerID,
-				IsPrivate: row.UserIsPrivate != nil && *row.UserIsPrivate,
-				IsDeleted: row.UserIsDeleted != nil && *row.UserIsDeleted,
+				ID:            row.UserID,
+				Username:      uname,
+				FirebaseUID:   row.FirebaseUID,
+				AccountTypeID: row.UserAccountTypeID,
+				CreatedAt:     row.UserCreatedAt,
+				UpdatedAt:     row.UserUpdatedAt,
+				PlayerID:      row.UserPlayerID,
+				IsSuspicious:  row.UserIsSuspicious != nil && *row.UserIsSuspicious,
+				IsPrivate:     row.UserIsPrivate != nil && *row.UserIsPrivate,
 			},
 		}
 
@@ -219,30 +281,17 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	return results, nil
 }
 
-// Create は新しいユーザーをデータベースに保存します。保存後、user.IDに自動採番されたIDが設定されます。
-func (r *userRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	query := `INSERT INTO users (username, password_hash, account_type_id) VALUES (?, ?, ?)`
-	result, err := exec.ExecContext(ctx, query, user.Username, user.PasswordHash, user.AccountTypeID)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	user.ID = int(id)
-	return nil
-}
-
 // Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 func (r *userRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	userModel := models.FromUserEntity(user)
 
 	if user.ID == 0 {
 		// 新規作成
-		query := `INSERT INTO users (username, password_hash, account_type_id, is_deleted, is_private) VALUES (?, ?, ?, ?, ?)`
-		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.IsDeleted, userModel.IsPrivate)
+		query := `INSERT INTO users (username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate)
 		if err != nil {
+			err = wrapFirebaseUIDDuplicateError(err)
+			err = wrapUsernameDuplicateError(err)
 			return err
 		}
 		id, err := result.LastInsertId()
@@ -253,43 +302,63 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return nil
 	}
 
-	// 更新
-	query := `UPDATE users SET username = ?, password_hash = ?, account_type_id = ?, player_id = ?, is_deleted = ?, is_private = ?, updated_at = ? WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userModel.Username, userModel.PasswordHash, userModel.AccountTypeID, userModel.PlayerID, userModel.IsDeleted, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID)
-	return err
+	// 更新。部分取得エンティティで取りこぼし得る不変項目は更新前提としてのみ扱います。
+	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
+	query := "UPDATE users SET player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
+	args := []any{userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, userModel.AccountTypeID}
+	args = append(args, whereArgs...)
+
+	result, err := exec.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return r.validateSingleUserUpdate(ctx, exec, userModel.ID, result)
 }
 
-// UpdatePrivacy はユーザーの非公開設定を更新します。
-func (r *userRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	query := `UPDATE users SET is_private = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, isPrivate, userID)
-	return err
+// DeleteByID はユーザーを物理削除します。
+func (r *userRepository) DeleteByID(ctx context.Context, exec repository.Executor, id int) error {
+	result, err := exec.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return repository.ErrUserNotFound
+	}
+
+	return nil
 }
 
-// UpdatePassword はユーザーのパスワードハッシュを更新します。
-func (r *userRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	query := `UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, passwordHash, userID)
-	return err
+func userFirebaseUIDWhereClause(firebaseUID *string) (string, []any) {
+	if firebaseUID == nil {
+		return "firebase_uid IS NULL", nil
+	}
+
+	return "firebase_uid = ?", []any{*firebaseUID}
 }
 
-// SoftDelete はユーザーを論理削除（is_deletedフラグをtrueに設定）します。
-func (r *userRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	query := `UPDATE users SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userID)
-	return err
-}
+func (r *userRepository) validateSingleUserUpdate(ctx context.Context, exec repository.Executor, userID int, result sql.Result) error {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected > 0 {
+		return nil
+	}
 
-// Restore はユーザーを復活（is_deletedフラグをfalseに設定）します。
-func (r *userRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	query := `UPDATE users SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, userID)
-	return err
-}
+	var exists int
+	err = exec.GetContext(ctx, &exists, `SELECT 1 FROM users WHERE id = ?`, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return repository.ErrUserNotFound
+		}
+		return err
+	}
 
-// LinkPlayer はユーザーとプレイヤーを紐づけます。
-func (r *userRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	query := `UPDATE users SET player_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := exec.ExecContext(ctx, query, playerID, userID)
-	return err
+	return repository.ErrUserConflict
 }

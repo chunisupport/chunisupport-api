@@ -1,12 +1,14 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -15,11 +17,12 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
+	"github.com/chunisupport/chunisupport-api/internal/infra/turnstile"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/jmoiron/sqlx"
@@ -34,7 +37,16 @@ type CustomValidator struct {
 
 // NewCustomValidator は新しいCustomValidatorを生成します。
 func NewCustomValidator() *CustomValidator {
-	return &CustomValidator{Validator: validator.New()}
+	v := validator.New()
+	if err := v.RegisterValidation("username", validateUsername); err != nil {
+		panic(err)
+	}
+	return &CustomValidator{Validator: v}
+}
+
+func validateUsername(fl validator.FieldLevel) bool {
+	_, err := vo_username.NewUserName(fl.Field().String())
+	return err == nil
 }
 
 // Validate は与えられた構造体を検証します。
@@ -42,6 +54,10 @@ func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		// 詳細なエラーはログに出力し、クライアントには汎用的なエラーコードを返す
 		slog.Warn("Validation error", "error", err.Error())
+		var validationErrors validator.ValidationErrors
+		if ok := errors.As(err, &validationErrors); ok {
+			return apierror.ErrValidationFailed.WithInternal(apierror.ValidationErrors(validationErrors))
+		}
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 	return nil
@@ -49,26 +65,32 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Auth       *api_internal.AuthHandler
-	User       *api_internal.UserHandler
-	AdminUser  *api_internal.AdminUserHandler
-	Song       *api_internal.SongHandler
-	Worldsend  *api_internal.WorldsendHandler
-	APIToken   *api_internal.APITokenHandler
-	Me         *api_internal.MeHandler
-	MasterData *api_internal.MasterDataHandler
-	Session    *api_internal.SessionHandler
+	Login               *api_internal.LoginHandler
+	Signup              *api_internal.SignupHandler
+	Profile             *api_internal.ProfileHandler
+	User                *api_internal.UserHandler
+	AdminUser           *api_internal.AdminUserHandler
+	Song                *api_internal.SongHandler
+	Honor               *api_internal.HonorHandler
+	Worldsend           *api_internal.WorldsendHandler
+	APIToken            *api_internal.APITokenHandler
+	Me                  *api_internal.MeHandler
+	MasterData          *api_internal.MasterDataHandler
+	Goal                *api_internal.GoalHandler
+	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
+	PlayerLockedSong    *api_internal.PlayerLockedSongHandler
 	// 外部API v1 用ハンドラ
 	V1Song      *api_v1.V1SongHandler
 	V1Worldsend *api_v1.V1WorldsendHandler
 	V1User      *api_v1.V1UserHandler
+	V1Version   *api_v1.V1VersionHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 }
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -87,27 +109,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	e.Use(echoMiddleware.BodyLimit(info.RequestBodyLimit))
 
 	// CORS設定を適用
-	e.Use(echoMiddleware.CORSWithConfig(echoMiddleware.CORSConfig{
-		AllowOrigins:     cfg.CORS.AllowOrigins,
-		AllowCredentials: cfg.CORS.AllowCredentials,
-		AllowMethods: []string{
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
-			http.MethodOptions,
-		},
-		AllowHeaders: []string{
-			echo.HeaderOrigin,
-			echo.HeaderContentType,
-			echo.HeaderAccept,
-			echo.HeaderAuthorization,
-		},
-		ExposeHeaders: []string{
-			echo.HeaderContentLength,
-		},
-		MaxAge: cfg.CORS.MaxAge,
-	}))
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
 
 	// DI - Services
 	userRepo := infra.NewUserRepository(db)
@@ -117,142 +119,203 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
-	sessionRepo := infra.NewSessionRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
-	recoveryCodeRepo := infra.NewRecoveryCodeRepository(db)
 	songRepo := infra.NewSongRepository(db)
+	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
+	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	tm := transaction.NewTransactionManager(db)
-	authUsecase := usecase.NewAuthService(db, tm, userRepo, sessionRepo, recoveryCodeRepo, playerRecordRepo, cfg.JWTSecret, cfg.Auth.JWTExpirationHour, cfg.Auth.SessionExpirationHour, cfg.PwPepper, masterCache)
-	apiTokenUsecase := usecase.NewAPITokenService(db, apiTokenRepo, userRepo)
-	playerUsecase := usecase.NewPlayerService(db, playerRepo)
-	userUsecase := usecase.NewUserService(db, userRepo, playerRecordRepo, playerUsecase)
-	// userUsecase に worldsendRecordRepo を設定（通常レコードとの依存関係を避けるため後から設定）
-	if uu, ok := userUsecase.(interface {
-		SetWorldsendRecordRepository(repository.WorldsendRecordRepository)
-	}); ok {
-		uu.SetWorldsendRecordRepository(worldsendRecordRepo)
-	}
-	playerDataUsecase := usecase.NewPlayerDataService(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, masterCache)
-	songUsecase := usecase.NewSongService(songRepo, masterCache, tm, db)
-	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, staticMasterCache, db, staticDB)
+	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
+	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
+	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache)
+	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
+	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
+	songUsecase := usecase.NewSongUsecase(songRepo, masterCache, tm, db)
+	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
+	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
+	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
-	sessionUsecase := usecase.NewSessionUsecase(sessionRepo, db)
+	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
+	playerSongIDResolver := infra.NewPlayerSongIDResolver()
+	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create player locked song usecase: %v", err))
+	}
+	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
-	sameSite := parseSameSite(cfg.Auth.CookieSameSite)
+	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
+	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
+	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
+	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache)
+	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
 	handlers := &Handlers{
-		Auth:       api_internal.NewAuthHandler(authUsecase, cfg.Auth.CookieSecure, sameSite, masterCache),
-		User:       api_internal.NewUserHandler(userUsecase),
-		AdminUser:  api_internal.NewAdminUserHandler(userUsecase),
-		Song:       api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Worldsend:  api_internal.NewWorldsendHandler(worldsendUsecase),
-		APIToken:   api_internal.NewAPITokenHandler(apiTokenUsecase),
-		Me:         api_internal.NewMeHandler(playerDataUsecase),
-		MasterData: api_internal.NewMasterDataHandler(masterCache, staticMasterCache),
-		Session:    api_internal.NewSessionHandler(sessionUsecase),
+		Login:               api_internal.NewLoginHandler(loginUsecase),
+		Signup:              api_internal.NewSignupHandler(signupUsecase),
+		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
+		User:                api_internal.NewUserHandler(userUsecase),
+		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
+		Song:                api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Honor:               api_internal.NewHonorHandler(honorUsecase),
+		Worldsend:           api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
+		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:                  api_internal.NewMeHandler(playerDataUsecase),
+		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
+		Goal:                api_internal.NewGoalHandler(goalUsecase),
+		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
+		PlayerLockedSong:    api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase),
+		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
 		V1User:      api_v1.NewV1UserHandler(userUsecase),
+		V1Version:   api_v1.NewV1VersionHandler(masterDataUsecase),
 		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, userRepo, db, masterCache),
+		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
 	}
 
 	// ルートの設定
+	rootCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	e.OPTIONS("/", func(c echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	}, rootCORS)
+	// TODO: 外部向けhealthエンドポイントを作る
 	e.GET("/", func(c echo.Context) error {
 		// 将来的に変更の可能性あり
 		return c.JSON(http.StatusOK, map[string]string{
 			"app_name": "chunisupport-api",
 		})
-	})
-	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(middleware.AccountTypeAdmin))
+	}, rootCORS)
+	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, authUsecase, apiTokenUsecase, cfg.JWTSecret)
+	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, cfg)
 
 	return e
 }
 
+func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) usecase.RecentSignInVerifier {
+	if firebaseTokenVerifier == nil {
+		return nil
+	}
+
+	recentSignInVerifier, ok := firebaseTokenVerifier.(usecase.RecentSignInVerifier)
+	if !ok {
+		panic(fmt.Sprintf("firebase token verifier must implement recent sign-in verifier: %T", firebaseTokenVerifier))
+	}
+
+	return recentSignInVerifier
+}
+
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUsecase, apiTokenUsecase usecase.APITokenUsecase, secret string) {
+func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStrict middleware.FirebaseAuthenticator, firebaseAuthenticatorReadOptimized middleware.FirebaseAuthenticator, apiTokenUsecase usecase.APITokenUsecase, cfg config.Config) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 
-	// JWT認証ミドルウェア
-	jwtAuth := middleware.JWTMiddleware(secret, authUsecase)
-	optionalJWTAuth := middleware.OptionalJWTMiddleware(secret, authUsecase)
+	// Firebase認証ミドルウェア
+	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
+	optionalFirebaseAuthStrict := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
+	optionalFirebaseAuthReadOptimized := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
 	})
 
 	// EDITOR以上の権限を要求するミドルウェア
-	requireEditor := middleware.RequireRole(middleware.AccountTypeEditor)
+	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
 
 	// ADMIN以上の権限を要求するミドルウェア
-	requireAdmin := middleware.RequireRole(middleware.AccountTypeAdmin)
+	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
 
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
 	{
-		// ログイン: 1分間に10回まで
-		authGroup.POST("/login", handlers.Auth.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		authGroup.POST("/login", handlers.Login.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.LoginRateLimitRequests,
 			Window:   info.LoginRateLimitWindow,
 		}))
-		authGroup.POST("/logout", handlers.Auth.Logout, jwtAuth)
-		// 登録: 1分間に5回まで
-		authGroup.POST("/register", handlers.Auth.Register, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		// Firebase経由の初回登録: 1分間に5回まで
+		authGroup.POST("/signup", handlers.Signup.Signup, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.POST("/recovery-codes", handlers.Auth.RecoverPassword, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
-			Requests: info.RecoveryCodeRateLimitRequests,
-			Window:   info.RecoveryCodeRateLimitWindow,
-		}))
-		authGroup.POST("/api-tokens", handlers.APIToken.Generate, jwtAuth)
-		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, jwtAuth)
+		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuthStrict)
+		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuthStrict)
+		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuthStrict)
 	}
 
 	// api.chunisupport.net/internal/me
 	meGroup := internal.Group("/me")
-	meGroup.Use(jwtAuth)
+	meGroup.Use(firebaseAuthStrict)
 	{
-		meGroup.GET("", handlers.Auth.Me)
-		meGroup.PUT("/privacy", handlers.Auth.UpdatePrivacy)
-		meGroup.PUT("/password", handlers.Auth.ChangePassword)
-		meGroup.POST("/recovery-codes", handlers.Auth.IssueRecoveryCodes)
-		meGroup.DELETE("", handlers.Auth.DeleteAccount)
+		meGroup.GET("", handlers.Profile.Me)
+		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
+		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
-		// セッション管理
-		meGroup.GET("/sessions", handlers.Session.GetSessionCount)
-		meGroup.DELETE("/sessions", handlers.Session.LogoutOtherSessions)
+		meGroup.GET("/goals", handlers.Goal.List)
+		meGroup.POST("/goals", handlers.Goal.Create)
+		meGroup.PUT("/goals/:id", handlers.Goal.Update)
+		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
+		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
+		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
+		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
 	}
+
+	temporaryPlayerDataGroup := internal.Group("/player-data")
+	tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	temporaryPlayerDataGroup.OPTIONS("/temp", func(c echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	}, tempDataCORS)
+	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, tempDataCORS, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.TempDataRateLimitPerMin,
+		Window:   info.TempDataRateLimitWindow,
+	}))
+	temporaryPlayerDataGroup.POST("/commit", handlers.TemporaryPlayerData.CommitTemporaryData, firebaseAuthStrict, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.RegisterDataRateLimitRequests,
+		Window:   info.RegisterDataRateLimitWindow,
+	}))
 
 	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(optionalJWTAuth, anonymousRateLimit)
+	publicUsersGroup.Use(optionalFirebaseAuthStrict, anonymousRateLimit)
 	{
+		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
+		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
+		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
+		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
+		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}
 
 	usersGroup := internal.Group("/users")
-	usersGroup.Use(jwtAuth)
+	usersGroup.Use(firebaseAuthStrict)
 	{
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
-		usersGroup.POST("/:username/restore", handlers.User.RestoreUser, requireAdmin)
+	}
+
+	// api.chunisupport.net/internal/honors
+	honorsGroup := internal.Group("/honors")
+	honorsGroup.Use(firebaseAuthStrict, requireAdmin)
+	{
+		honorsGroup.GET("", handlers.Honor.ListHonors)
+		honorsGroup.GET("/:id", handlers.Honor.GetHonor)
+		honorsGroup.POST("", handlers.Honor.CreateHonor)
+		honorsGroup.PUT("/:id", handlers.Honor.UpdateHonor)
+		honorsGroup.DELETE("/:id", handlers.Honor.DeleteHonor)
 	}
 
 	// api.chunisupport.net/internal/songs
 	publicSongsGroup := internal.Group("/songs")
-	publicSongsGroup.Use(optionalJWTAuth, anonymousRateLimit)
+	publicSongsGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
+		publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
@@ -266,25 +329,41 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	}
 
 	songsGroup := internal.Group("/songs")
-	songsGroup.Use(jwtAuth)
+	songsGroup.Use(firebaseAuthStrict)
 	{
+		songsGroup.POST("", handlers.Song.CreateSong, requireAdmin)
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
-		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireEditor)
+		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireAdmin)
 		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
 
 		// WORLD'S END 楽曲エンドポイント
 		worldsendGroup := songsGroup.Group("/worldsend")
 		{
-			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireEditor)
+			worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
+			worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
+			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
 			worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 		}
 	}
 
+	editorSongsGroup := internal.Group("/editor/songs")
+	editorSongsGroup.Use(firebaseAuthStrict, requireEditor)
+	{
+		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
+		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
+		editorSongsGroup.GET("/worldsend", handlers.Worldsend.GetEditorWorldsendSongs)
+		editorSongsGroup.GET("/worldsend/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
+	}
+
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
-	masterGroup.Use(jwtAuth)
 	{
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
+	}
+
+	{
+		masterGroup.GET("/versions", handlers.MasterData.GetVersions)
+		masterGroup.GET("/honor-types", handlers.MasterData.GetHonorTypes)
 	}
 
 	// 外部APIルートの登録
@@ -304,6 +383,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
+		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 
 	// chunirec互換APIルートの登録
@@ -325,6 +405,53 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, authUsecase usecase.AuthUs
 	}
 }
 
+func newDefaultCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
+	return newCORSConfig(cfg.CORS.AllowOrigins, cfg, func(c echo.Context) bool {
+		return isExternalCORSPath(c.Request().URL.Path)
+	})
+}
+
+func newExternalCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
+	allowOrigins := slices.Clone(cfg.CORS.AllowOrigins)
+	if !slices.Contains(allowOrigins, info.ExternalCORSAllowOrigin) {
+		allowOrigins = append(allowOrigins, info.ExternalCORSAllowOrigin)
+	}
+
+	return newCORSConfig(allowOrigins, cfg, nil)
+}
+
+func isExternalCORSPath(path string) bool {
+	// TODO: 前者は外部向けhealthエンドポイントに変えるつもり
+	return path == "/" || path == "/internal/player-data/temp"
+}
+
+func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddleware.Skipper) echoMiddleware.CORSConfig {
+	return echoMiddleware.CORSConfig{
+		Skipper:          skipper,
+		AllowOrigins:     allowOrigins,
+		AllowCredentials: cfg.CORS.AllowCredentials,
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowHeaders: []string{
+			echo.HeaderOrigin,
+			echo.HeaderContentType,
+			echo.HeaderContentEncoding,
+			echo.HeaderAccept,
+			echo.HeaderAuthorization,
+			"X-Reauth-Token",
+		},
+		ExposeHeaders: []string{
+			echo.HeaderContentLength,
+		},
+		MaxAge: cfg.CORS.MaxAge,
+	}
+}
+
 // handleHealth はヘルスチェックエンドポイントのハンドラを返します
 // セキュリティを考慮し、内部情報（バージョン、サービス名など）は一切返しません
 func handleHealth(db *sqlx.DB) echo.HandlerFunc {
@@ -336,20 +463,6 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 		}
 
 		return c.NoContent(http.StatusOK)
-	}
-}
-
-// parseSameSite は文字列をhttp.SameSite型に変換します
-func parseSameSite(value string) http.SameSite {
-	switch value {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		fallthrough
-	default:
-		return http.SameSiteLaxMode
 	}
 }
 

@@ -4,6 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
@@ -23,30 +26,30 @@ func NewWorldsendRecordRepository(db *sqlx.DB) repository.WorldsendRecordReposit
 
 // worldsendRecordRow は DB から WORLD'S END レコード取得用の JOIN 結果をマッピングする構造体です。
 type worldsendRecordRow struct {
-	PlayerID         int          `db:"player_id"`
-	WorldsendChartID int          `db:"worldsend_chart_id"`
-	Score            uint32       `db:"score"`
-	ClearLampID      int          `db:"clear_lamp_id"`
-	ComboLampID      int          `db:"combo_lamp_id"`
-	FullChainID      int          `db:"full_chain_id"`
-	UpdatedAt        time.Time    `db:"updated_at"`
-	ChartSongID      int          `db:"chart_song_id"`
-	ChartWeStar      *int         `db:"chart_we_star"`
-	ChartWeKanji     *string      `db:"chart_we_kanji"`
-	ChartNotes       *notes.Notes `db:"chart_notes"`
-	SongID           int          `db:"song_id"`
-	SongDisplayID    string       `db:"song_display_id"`
-	SongTitle        string       `db:"song_title"`
-	SongArtist       string       `db:"song_artist"`
-	SongGenreID      *int         `db:"song_genre_id"`
-	SongBPM          *int         `db:"song_bpm"`
-	SongReleasedAt   *time.Time   `db:"song_released_at"`
-	SongOfficialIdx  string       `db:"song_official_idx"`
-	SongJacket       *string      `db:"song_jacket"`
-	SongIsDeleted    bool         `db:"song_is_deleted"`
-	ClearLampName    string       `db:"clear_lamp_name"`
-	ComboLampName    string       `db:"combo_lamp_name"`
-	FullChainName    string       `db:"full_chain_name"`
+	PlayerID         int                  `db:"player_id"`
+	WorldsendChartID int                  `db:"worldsend_chart_id"`
+	Score            uint32               `db:"score"`
+	ClearLampID      int                  `db:"clear_lamp_id"`
+	ComboLampID      int                  `db:"combo_lamp_id"`
+	FullChainID      int                  `db:"full_chain_id"`
+	UpdatedAt        time.Time            `db:"updated_at"`
+	ChartSongID      int                  `db:"chart_song_id"`
+	ChartLevelStar   *levelstar.LevelStar `db:"chart_level_star"`
+	ChartAttribute   *string              `db:"chart_attribute"`
+	ChartNotes       *notes.Notes         `db:"chart_notes"`
+	SongID           int                  `db:"song_id"`
+	SongDisplayID    string               `db:"song_display_id"`
+	SongTitle        string               `db:"song_title"`
+	SongArtist       string               `db:"song_artist"`
+	SongGenreID      *int                 `db:"song_genre_id"`
+	SongBPM          *int                 `db:"song_bpm"`
+	SongReleasedAt   *time.Time           `db:"song_released_at"`
+	SongOfficialIdx  string               `db:"song_official_idx"`
+	SongJacket       *string              `db:"song_jacket"`
+	SongIsDeleted    bool                 `db:"song_is_deleted"`
+	ClearLampName    string               `db:"clear_lamp_name"`
+	ComboLampName    string               `db:"combo_lamp_name"`
+	FullChainName    string               `db:"full_chain_name"`
 }
 
 const worldsendRecordQuery = `
@@ -59,8 +62,8 @@ SELECT
     pwr.full_chain_id,
     pwr.updated_at,
     wc.song_id AS chart_song_id,
-    wc.we_star AS chart_we_star,
-    wc.we_kanji AS chart_we_kanji,
+    wc.level_star AS chart_level_star,
+    wc.attribute AS chart_attribute,
     wc.notes AS chart_notes,
     s.id AS song_id,
     s.display_id AS song_display_id,
@@ -108,11 +111,11 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 			FullChainID:      row.FullChainID,
 			UpdatedAt:        row.UpdatedAt,
 			WorldsendChart: &entity.WorldsendChart{
-				ID:      row.WorldsendChartID,
-				SongID:  row.ChartSongID,
-				WeStar:  row.ChartWeStar,
-				WeKanji: row.ChartWeKanji,
-				Notes:   row.ChartNotes,
+				ID:        row.WorldsendChartID,
+				SongID:    row.ChartSongID,
+				LevelStar: row.ChartLevelStar,
+				Attribute: row.ChartAttribute,
+				Notes:     row.ChartNotes,
 			},
 			// PlayerWorldsendRecord内のSongは楽曲メタデータの参照であり、完全な集約ではない。
 			// WORLD'S ENDの譜面情報はWorldsendChartで保持するため、Chartsは空スライスで初期化する。
@@ -129,15 +132,15 @@ func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec rep
 				Charts:      []*entity.Chart{},
 				IsDeleted:   row.SongIsDeleted,
 			},
-			ClearLamp: &entity.ClearLampType{
+			ClearLamp: &master.ClearLampType{
 				ID:   row.ClearLampID,
 				Name: row.ClearLampName,
 			},
-			ComboLamp: &entity.ComboLampType{
+			ComboLamp: &master.ComboLampType{
 				ID:   row.ComboLampID,
 				Name: row.ComboLampName,
 			},
-			FullChain: &entity.FullChainType{
+			FullChain: &master.FullChainType{
 				ID:   row.FullChainID,
 				Name: row.FullChainName,
 			},

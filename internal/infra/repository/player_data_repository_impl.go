@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
@@ -22,8 +24,9 @@ func NewPlayerDataRepository(db *sqlx.DB) repository.PlayerDataRepository {
 }
 
 // LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
-func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec repository.Executor, officialIdxList []string) (*repository.PlayerDataMaster, error) {
-	executor := r.resolveExecutor(exec)
+// songs/charts/worldsend_chartsの読み取りのみのためトランザクション外で呼び出せます。
+func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
+	executor := r.db
 	result := &repository.PlayerDataMaster{
 		Songs:             make(map[string]entity.PlayerDataSong),
 		ChartsByKey:       make(map[string]entity.PlayerDataChart),
@@ -40,7 +43,7 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec reposito
 		executor,
 		officialIdxList,
 		`
-			SELECT id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_deleted
+			SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_deleted
 			FROM songs
 			WHERE official_idx IN (?)
 		`,
@@ -77,7 +80,10 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec reposito
 	}
 
 	for _, model := range chartModels {
-		chart := model.ToEntity()
+		chart, err := model.ToEntity()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert chart model to entity: %w", err)
+		}
 		key := fmt.Sprintf("%d:%d", chart.SongID, chart.DifficultyID)
 		result.ChartsByKey[key] = *chart
 		result.ChartsByID[chart.ID] = *chart
@@ -107,8 +113,12 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, exec reposito
 }
 
 // SavePlayerData はプレイヤーデータを一括で保存します。
+// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。
 func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec repository.Executor, input repository.PlayerDataSaveInput) error {
-	executor := r.resolveExecutor(exec)
+	if exec == nil {
+		return fmt.Errorf("SavePlayerData requires a non-nil executor: must be called within a transaction")
+	}
+	executor := exec
 
 	if err := r.saveFullRecords(ctx, executor, input.FullRecords); err != nil {
 		return fmt.Errorf("failed to save player records (count=%d): %w", len(input.FullRecords), err)
@@ -119,6 +129,90 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	}
 
 	return nil
+}
+
+// GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
+// songs/chartsの読み取りのみのためトランザクション外で呼び出せます。
+func (r *playerDataRepository) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	return r.getOverpowerTargetStats(ctx, r.db, filter)
+}
+
+// GetOverpowerTargetStatsWithExecutor は指定されたExecutorでOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
+func (r *playerDataRepository) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+	if exec == nil {
+		exec = r.db
+	}
+	return r.getOverpowerTargetStats(ctx, exec, filter)
+}
+
+func (r *playerDataRepository) getOverpowerTargetStats(ctx context.Context, executor repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
+
+	where := make([]string, 0, 2)
+	if filter.ExcludeWorldsend {
+		where = append(where, "s.is_worldsend = 0")
+	}
+	if filter.ExcludeDeleted {
+		where = append(where, "s.is_deleted = 0")
+	}
+
+	maxConstExpr := "MAX(c.const)"
+	args := make([]any, 0, 2)
+	joins := `
+		INNER JOIN charts c ON c.song_id = s.id
+	`
+	if filter.PlayerID != nil {
+		maxConstExpr = `MAX(
+			CASE
+				WHEN pls_ultima.song_id IS NOT NULL AND d.name = 'ULTIMA' THEN NULL
+				ELSE c.const
+			END
+		)`
+		joins += `
+			INNER JOIN difficulties d ON d.id = c.difficulty_id
+			LEFT JOIN player_locked_songs pls_song
+				ON pls_song.song_id = s.id
+				AND pls_song.player_id = ?
+				AND pls_song.is_ultima = 0
+			LEFT JOIN player_locked_songs pls_ultima
+				ON pls_ultima.song_id = s.id
+				AND pls_ultima.player_id = ?
+				AND pls_ultima.is_ultima = 1
+		`
+		args = append(args, *filter.PlayerID, *filter.PlayerID)
+		where = append(where, "pls_song.song_id IS NULL")
+	}
+
+	query := `
+		SELECT
+			s.id AS song_id,
+			` + maxConstExpr + ` AS max_const
+		FROM songs s
+	` + joins
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " GROUP BY s.id"
+	if filter.PlayerID != nil {
+		query += " HAVING max_const IS NOT NULL"
+	}
+
+	var rows []struct {
+		SongID   int     `db:"song_id"`
+		MaxConst float64 `db:"max_const"`
+	}
+	if err := executor.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, fmt.Errorf("%w: failed to select overpower target stats: %w", repository.ErrRepositoryOperationFailed, err)
+	}
+
+	total := 0.0
+	for _, row := range rows {
+		total += service.CalcSongMaxOP(row.MaxConst)
+	}
+
+	return &repository.OverpowerTargetStats{
+		SongCount:         len(rows),
+		MaxOverpowerTotal: total,
+	}, nil
 }
 
 func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Executor, items []T, query string, queryName string) ([]M, error) {
@@ -169,6 +263,66 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
+const (
+	fullRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id)"
+
+	worldsendRecordChangedCondition = "score <> VALUES(score) OR " +
+		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
+		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
+		"full_chain_id <> VALUES(full_chain_id)"
+
+	changedConditionPlaceholder = "{{CHANGED_CONDITION}}"
+)
+
+var fullRecordUpsertQuery = replaceQueryPlaceholder(`
+		INSERT INTO player_records (
+			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
+			full_chain_id, slot_id, slot_order, updated_at
+		) VALUES (
+			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
+			:full_chain_id, :slot_id, :slot_order, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				{{CHANGED_CONDITION}},
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id),
+			slot_id = VALUES(slot_id),
+			slot_order = VALUES(slot_order)
+	`, changedConditionPlaceholder, fullRecordChangedCondition)
+
+var worldsendRecordUpsertQuery = replaceQueryPlaceholder(`
+		INSERT INTO player_worldsend_records (
+			player_id, worldsend_chart_id, score, clear_lamp_id,
+			combo_lamp_id, full_chain_id, updated_at
+		) VALUES (
+			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
+			:combo_lamp_id, :full_chain_id, :updated_at
+		)
+		ON DUPLICATE KEY UPDATE
+			updated_at = IF(
+				{{CHANGED_CONDITION}},
+				VALUES(updated_at),
+				updated_at
+			),
+			score = VALUES(score),
+			clear_lamp_id = VALUES(clear_lamp_id),
+			combo_lamp_id = VALUES(combo_lamp_id),
+			full_chain_id = VALUES(full_chain_id)
+	`, changedConditionPlaceholder, worldsendRecordChangedCondition)
+
+func replaceQueryPlaceholder(query string, placeholder string, replacement string) string {
+	return strings.ReplaceAll(query, placeholder, replacement)
+}
+
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
 	for _, record := range records {
@@ -185,25 +339,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	query := `
-		INSERT INTO player_records (
-			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
-			full_chain_id, slot_id, slot_order, updated_at
-		) VALUES (
-			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
-			:full_chain_id, :slot_id, :slot_order, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			slot_id = VALUES(slot_id),
-			slot_order = VALUES(slot_order),
-			updated_at = VALUES(updated_at)
-	`
-
-	return bulkUpsert(ctx, exec, rows, query, "player records")
+	return bulkUpsert(ctx, exec, rows, fullRecordUpsertQuery, "player records")
 }
 
 func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec repository.Executor, records []repository.WorldsendRecordForUpsert) error {
@@ -220,23 +356,7 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	query := `
-		INSERT INTO player_worldsend_records (
-			player_id, worldsend_chart_id, score, clear_lamp_id,
-			combo_lamp_id, full_chain_id, updated_at
-		) VALUES (
-			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
-			:combo_lamp_id, :full_chain_id, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			updated_at = VALUES(updated_at)
-	`
-
-	return bulkUpsert(ctx, exec, rows, query, "worldsend records")
+	return bulkUpsert(ctx, exec, rows, worldsendRecordUpsertQuery, "worldsend records")
 }
 
 func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, query string, recordType string) error {
@@ -254,11 +374,4 @@ func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, 
 	}
 
 	return nil
-}
-
-func (r *playerDataRepository) resolveExecutor(exec repository.Executor) repository.Executor {
-	if exec != nil {
-		return exec
-	}
-	return r.db
 }

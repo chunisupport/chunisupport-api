@@ -1,9 +1,11 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
@@ -12,6 +14,7 @@ type PlayerDataSongModel struct {
 	ID          int        `db:"id"`
 	DisplayID   string     `db:"display_id"`
 	Title       string     `db:"title"`
+	Reading     *string    `db:"reading"`
 	Artist      string     `db:"artist"`
 	GenreID     *int       `db:"genre_id"`
 	BPM         *int       `db:"bpm"`
@@ -27,6 +30,7 @@ func (m *PlayerDataSongModel) ToEntity() *entity.PlayerDataSong {
 		ID:          m.ID,
 		DisplayID:   m.DisplayID,
 		Title:       m.Title,
+		Reading:     m.Reading,
 		Artist:      m.Artist,
 		GenreID:     m.GenreID,
 		BPM:         m.BPM,
@@ -42,6 +46,7 @@ func FromPlayerDataSongEntity(e *entity.PlayerDataSong) *PlayerDataSongModel {
 		ID:          e.ID,
 		DisplayID:   e.DisplayID,
 		Title:       e.Title,
+		Reading:     e.Reading,
 		Artist:      e.Artist,
 		GenreID:     e.GenreID,
 		BPM:         e.BPM,
@@ -63,15 +68,20 @@ type PlayerDataChartModel struct {
 }
 
 // ToEntity は PlayerDataChartModel を entity.PlayerDataChart に変換します。
-func (m *PlayerDataChartModel) ToEntity() *entity.PlayerDataChart {
+func (m *PlayerDataChartModel) ToEntity() (*entity.PlayerDataChart, error) {
+	chartConst, err := chartconstant.NewChartConstant(m.Const)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chart constant (chart_id=%d): %w", m.ID, err)
+	}
+
 	return &entity.PlayerDataChart{
 		ID:             m.ID,
 		SongID:         m.SongID,
 		DifficultyID:   m.DifficultyID,
-		Const:          m.Const,
+		Const:          chartConst,
 		IsConstUnknown: m.IsConstUnknown,
 		Notes:          m.Notes,
-	}
+	}, nil
 }
 
 func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel {
@@ -79,7 +89,7 @@ func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel 
 		ID:             e.ID,
 		SongID:         e.SongID,
 		DifficultyID:   e.DifficultyID,
-		Const:          e.Const,
+		Const:          float64(e.Const),
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          e.Notes,
 	}

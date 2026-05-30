@@ -13,10 +13,23 @@ type ChartDTO struct {
 	Const          chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown bool                        `json:"is_const_unknown"`
 	Notes          *int                        `json:"notes"`
+	NotesDesigner  *string                     `json:"notes_designer"`
+}
+
+// EditorChartDTO は編集者向けの譜面情報DTOです。updated_at を含みます。
+type EditorChartDTO struct {
+	Const          chartconstant.ChartConstant `json:"const"`
+	IsConstUnknown bool                        `json:"is_const_unknown"`
+	Notes          *int                        `json:"notes"`
+	NotesDesigner  *string                     `json:"notes_designer"`
+	UpdatedAt      *time.Time                  `json:"updated_at"`
 }
 
 // OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
 type OrderedChartsMap map[string]*ChartDTO
+
+// EditorOrderedChartsMap は編集者向けchartsのキーを特定の順序でJSON出力するためのカスタム型です。
+type EditorOrderedChartsMap map[string]*EditorChartDTO
 
 // MarshalJSON はJSONマーシャリング時にchartsのキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順序で出力します。
@@ -61,17 +74,59 @@ func (o OrderedChartsMap) MarshalJSON() ([]byte, error) {
 	return []byte(result), nil
 }
 
+// MarshalJSON は EditorOrderedChartsMap のキーを
+// BASIC→ADVANCED→EXPERT→MASTER→ULTIMA の順序で JSON 出力します。
+// 譜面が存在しない難易度は null として出力されます。
+func (o EditorOrderedChartsMap) MarshalJSON() ([]byte, error) {
+	orderedKeys := []string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
+
+	var jsonParts []string
+	jsonParts = append(jsonParts, "{")
+
+	first := true
+	for _, key := range orderedKeys {
+		if !first {
+			jsonParts = append(jsonParts, ",")
+		}
+		first = false
+
+		jsonParts = append(jsonParts, `"`+key+`":`)
+
+		if chart, exists := o[key]; exists && chart != nil {
+			chartJSON, err := json.Marshal(chart)
+			if err != nil {
+				return nil, err
+			}
+			jsonParts = append(jsonParts, string(chartJSON))
+		} else {
+			jsonParts = append(jsonParts, "null")
+		}
+	}
+
+	jsonParts = append(jsonParts, "}")
+
+	result := ""
+	for _, part := range jsonParts {
+		result += part
+	}
+
+	return []byte(result), nil
+}
+
 // SongDTO は楽曲情報を外部に公開するためのDTOです。
 type SongDTO struct {
-	DisplayID string           `json:"id"`
-	Title     string           `json:"title"`
-	Artist    string           `json:"artist"`
-	Genre     *string          `json:"genre"`
-	BPM       *int             `json:"bpm"`
-	Release   *string          `json:"release"`
-	Jacket    *string          `json:"jacket"`
-	MaxOP     float64          `json:"maxop"`
-	Charts    OrderedChartsMap `json:"charts"`
+	DisplayID      string           `json:"id"`
+	Title          string           `json:"title"`
+	Reading        *string          `json:"reading"`
+	Artist         string           `json:"artist"`
+	Genre          *string          `json:"genre"`
+	BPM            *int             `json:"bpm"`
+	Release        *string          `json:"release"`
+	Jacket         *string          `json:"jacket"`
+	OfficialIdx    string           `json:"official_idx"`
+	MaxOP          float64          `json:"maxop"`
+	IsMaxOPUnknown bool             `json:"is_maxop_unknown"`
+	Charts         OrderedChartsMap `json:"charts"`
 }
 
 // SongsResponse は楽曲一覧のレスポンスを表します。
@@ -79,24 +134,61 @@ type SongsResponse struct {
 	Songs []*SongDTO `json:"songs"`
 }
 
+// EditorSongDTO は編集者向けの楽曲情報DTOです。
+// Charts は EditorOrderedChartsMap にオーバーライドして譜面の updated_at を含めます。
+type EditorSongDTO struct {
+	*SongDTO
+	IsDeleted bool                   `json:"is_deleted"`
+	UpdatedAt *time.Time             `json:"updated_at"`
+	Charts    EditorOrderedChartsMap `json:"charts"`
+}
+
+// EditorSongsResponse は編集者向け楽曲一覧のレスポンスを表します。
+type EditorSongsResponse struct {
+	Songs []*EditorSongDTO `json:"songs"`
+}
+
 // UpdateChartRequest は譜面更新リクエストを表します。
 type UpdateChartRequest struct {
-	DifficultyID   int     `json:"difficulty_id" validate:"required,gte=1"`
 	Const          float64 `json:"const" validate:"gte=0"`
 	IsConstUnknown bool    `json:"is_const_unknown"`
 	Notes          *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner  *string `json:"notes_designer" validate:"omitempty,max=100"`
 }
 
 // UpdateSongRequest は楽曲更新リクエストを表します。
 type UpdateSongRequest struct {
-	DisplayID  string                `json:"id" validate:"required,len=16"`
-	Title      string                `json:"title" validate:"required"`
-	Artist     string                `json:"artist" validate:"required"`
-	GenreID    *int                  `json:"genre_id" validate:"omitempty,gte=1"`
-	BPM        *int                  `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt *time.Time            `json:"released_at"`
-	Jacket     *string               `json:"jacket"`
-	Charts     []*UpdateChartRequest `json:"charts" validate:"dive"`
+	DisplayID  string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
+	Title      string                         `json:"title" validate:"required"`
+	Reading    *string                        `json:"reading" validate:"omitempty,max=300"`
+	Artist     string                         `json:"artist" validate:"required"`
+	Genre      *string                        `json:"genre"`
+	BPM        *int                           `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt *DateOnly                      `json:"released_at"`
+	Jacket     *string                        `json:"jacket"`
+	Charts     map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
+}
+
+// CreateChartRequest は譜面追加リクエストを表します。
+type CreateChartRequest struct {
+	Difficulty     string  `json:"difficulty" validate:"required"`
+	Const          float64 `json:"const" validate:"gte=0"`
+	IsConstUnknown bool    `json:"is_const_unknown"`
+	Notes          *int    `json:"notes" validate:"omitempty,gte=0"`
+	NotesDesigner  *string `json:"notes_designer" validate:"omitempty,max=100"`
+}
+
+// CreateSongRequest は楽曲追加リクエストを表します。
+type CreateSongRequest struct {
+	OfficialIdx string                `json:"official_idx" validate:"required,max=10"`
+	Title       string                `json:"title" validate:"required"`
+	Reading     *string               `json:"reading" validate:"omitempty,max=300"`
+	Artist      string                `json:"artist" validate:"required"`
+	Genre       string                `json:"genre" validate:"required"`
+	BPM         *int                  `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt  *DateOnly             `json:"released_at"`
+	Jacket      *string               `json:"jacket" validate:"omitempty,max=20"`
+	Charts      []*CreateChartRequest `json:"charts" validate:"dive"`
 }
 
 // ToChartDTO はChartエンティティからChartDTOへ変換します。
@@ -115,6 +207,29 @@ func ToChartDTO(chart *entity.Chart) *ChartDTO {
 		Const:          chart.Const,
 		IsConstUnknown: chart.IsConstUnknown,
 		Notes:          notesPtr,
+		NotesDesigner:  chart.NotesDesigner,
+	}
+}
+
+// ToEditorChartDTO は Chart エンティティから EditorChartDTO へ変換します。
+// updated_at を含みます。
+func ToEditorChartDTO(chart *entity.Chart) *EditorChartDTO {
+	if chart == nil {
+		return nil
+	}
+
+	var notesPtr *int
+	if chart.Notes != nil {
+		notes := int(*chart.Notes)
+		notesPtr = &notes
+	}
+
+	return &EditorChartDTO{
+		Const:          chart.Const,
+		IsConstUnknown: chart.IsConstUnknown,
+		Notes:          notesPtr,
+		NotesDesigner:  chart.NotesDesigner,
+		UpdatedAt:      chart.UpdatedAt,
 	}
 }
 
@@ -141,14 +256,17 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 	}
 
 	return &SongDTO{
-		DisplayID: song.DisplayID,
-		Title:     song.Title,
-		Artist:    song.Artist,
-		Genre:     genrePtr,
-		BPM:       song.BPM,
-		Release:   releaseDateStr,
-		Jacket:    song.Jacket,
-		MaxOP:     maxOP,
-		Charts:    make(OrderedChartsMap),
+		DisplayID:      song.DisplayID,
+		Title:          song.Title,
+		Reading:        song.Reading,
+		Artist:         song.Artist,
+		Genre:          genrePtr,
+		BPM:            song.BPM,
+		Release:        releaseDateStr,
+		Jacket:         song.Jacket,
+		OfficialIdx:    song.OfficialIdx,
+		MaxOP:          maxOP,
+		IsMaxOPUnknown: song.IsMaxOPUnknown,
+		Charts:         make(OrderedChartsMap),
 	}
 }

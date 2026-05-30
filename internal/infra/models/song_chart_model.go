@@ -14,6 +14,7 @@ type SongModel struct {
 	ID          int        `db:"id"`
 	DisplayID   string     `db:"display_id"`
 	Title       string     `db:"title"`
+	Reading     *string    `db:"reading"`
 	Artist      string     `db:"artist"`
 	GenreID     *int       `db:"genre_id"`
 	BPM         *int       `db:"bpm"`
@@ -22,24 +23,26 @@ type SongModel struct {
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
 	IsDeleted   bool       `db:"is_deleted"`
+	UpdatedAt   *time.Time `db:"updated_at"`
 }
 
 // ToEntity はSongModelをentity.Songに変換します。
 func (m *SongModel) ToEntity() *entity.Song {
-	return &entity.Song{
-		ID:          m.ID,
-		DisplayID:   m.DisplayID,
-		Title:       m.Title,
-		Artist:      m.Artist,
-		GenreID:     m.GenreID,
-		BPM:         m.BPM,
-		ReleasedAt:  m.ReleasedAt,
-		OfficialIdx: m.OfficialIdx,
-		Jacket:      m.Jacket,
-		Charts:      []*entity.Chart{},
-		IsWorldsend: m.IsWorldsend,
-		IsDeleted:   m.IsDeleted,
-	}
+	song := entity.NewSong()
+	song.ID = m.ID
+	song.DisplayID = m.DisplayID
+	song.Title = m.Title
+	song.Reading = m.Reading
+	song.Artist = m.Artist
+	song.GenreID = m.GenreID
+	song.BPM = m.BPM
+	song.ReleasedAt = m.ReleasedAt
+	song.OfficialIdx = m.OfficialIdx
+	song.Jacket = m.Jacket
+	song.IsWorldsend = m.IsWorldsend
+	song.IsDeleted = m.IsDeleted
+	song.UpdatedAt = m.UpdatedAt
+	return song
 }
 
 // FromSongEntity はentity.SongをSongModelに変換します。
@@ -48,6 +51,7 @@ func FromSongEntity(e *entity.Song) *SongModel {
 		ID:          e.ID,
 		DisplayID:   e.DisplayID,
 		Title:       e.Title,
+		Reading:     e.Reading,
 		Artist:      e.Artist,
 		GenreID:     e.GenreID,
 		BPM:         e.BPM,
@@ -56,17 +60,20 @@ func FromSongEntity(e *entity.Song) *SongModel {
 		Jacket:      e.Jacket,
 		IsWorldsend: e.IsWorldsend,
 		IsDeleted:   e.IsDeleted,
+		UpdatedAt:   e.UpdatedAt,
 	}
 }
 
 // ChartModel はデータベース用のChartモデルです。
 type ChartModel struct {
-	ID             int     `db:"id"`
-	SongID         int     `db:"song_id"`
-	DifficultyID   int     `db:"difficulty_id"`
-	Const          float64 `db:"const"`
-	IsConstUnknown bool    `db:"is_const_unknown"`
-	Notes          *int    `db:"notes"`
+	ID             int        `db:"id"`
+	SongID         int        `db:"song_id"`
+	DifficultyID   int        `db:"difficulty_id"`
+	Const          float64    `db:"const"`
+	IsConstUnknown bool       `db:"is_const_unknown"`
+	Notes          *int       `db:"notes"`
+	NotesDesigner  *string    `db:"notes_designer"`
+	UpdatedAt      *time.Time `db:"updated_at"`
 }
 
 func (m *ChartModel) ToEntity() (*entity.Chart, error) {
@@ -91,6 +98,8 @@ func (m *ChartModel) ToEntity() (*entity.Chart, error) {
 		Const:          chartConst,
 		IsConstUnknown: m.IsConstUnknown,
 		Notes:          n,
+		NotesDesigner:  m.NotesDesigner,
+		UpdatedAt:      m.UpdatedAt,
 	}, nil
 }
 
@@ -123,5 +132,7 @@ func FromChartEntity(e *entity.Chart) *ChartModel {
 		Const:          float64Const,
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          notesVal,
+		NotesDesigner:  e.NotesDesigner,
+		UpdatedAt:      e.UpdatedAt,
 	}
 }

@@ -37,12 +37,13 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	imgURL := "https://example.com/v1jacket.jpg"
 
 	song := &entity.Song{
-		DisplayID: "v1test1234567890",
-		Title:     "V1テスト楽曲",
-		Artist:    "V1アーティスト",
-		GenreID:   &genreID,
-		BPM:       &bpm,
-		Jacket:    &imgURL,
+		DisplayID:      "v1test1234567890",
+		Title:          "V1テスト楽曲",
+		Artist:         "V1アーティスト",
+		GenreID:        &genreID,
+		BPM:            &bpm,
+		Jacket:         &imgURL,
+		IsMaxOPUnknown: true,
 	}
 
 	notes1Value := 600
@@ -62,12 +63,14 @@ func TestConvertToV1SongDTO(t *testing.T) {
 			Const:          9.0,
 			IsConstUnknown: false,
 			Notes:          &notes1,
+			NotesDesigner:  stringPtr("譜面作者A"),
 		},
 		{
 			DifficultyID:   4, // master
 			Const:          13.7,
 			IsConstUnknown: false,
 			Notes:          &notes2,
+			NotesDesigner:  stringPtr("譜面作者B"),
 		},
 	}
 
@@ -89,6 +92,11 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
 
+	// IsMaxOPUnknown が反映されていることを確認
+	if !dto.IsMaxOPUnknown {
+		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
 		t.Fatal("Charts is nil")
@@ -101,6 +109,9 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		if advancedChart.Const != 9.0 {
 			t.Errorf("ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
 		}
+		if advancedChart.NotesDesigner == nil || *advancedChart.NotesDesigner != "譜面作者A" {
+			t.Errorf("ADVANCED chart NotesDesigner = %v, want %v", advancedChart.NotesDesigner, "譜面作者A")
+		}
 	}
 
 	// master 譜面が存在することを確認
@@ -109,6 +120,9 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	} else {
 		if masterChart.Const != 13.7 {
 			t.Errorf("MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
+		}
+		if masterChart.NotesDesigner == nil || *masterChart.NotesDesigner != "譜面作者B" {
+			t.Errorf("MASTER chart NotesDesigner = %v, want %v", masterChart.NotesDesigner, "譜面作者B")
 		}
 	}
 
@@ -132,4 +146,8 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	} else if ultimaChart != nil {
 		t.Error("ULTIMA chart should be nil")
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

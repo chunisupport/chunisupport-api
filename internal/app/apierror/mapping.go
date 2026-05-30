@@ -20,40 +20,51 @@ func FromUsecaseError(err error) *APIError {
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
 	case errors.Is(err, usecase.ErrInvalidCredentials):
 		return ErrInvalidCredentials.WithInternal(err)
-	case errors.Is(err, usecase.ErrIncorrectPassword):
-		return ErrInvalidCredentials.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidPassword):
-		return ErrInvalidPassword.WithInternal(err) // パスワード関連を統合
-	case errors.Is(err, usecase.ErrUserIDMismatch):
-		return ErrForbidden.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidSession):
-		return ErrInvalidSession.WithInternal(err) // セッション系を統合
-	case errors.Is(err, usecase.ErrUserDeleted):
-		return ErrUnauthorized.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecentSignInAuthTimeMissing):
+		return ErrRecentSignInRequired.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecentSignInRequired):
+		return ErrRecentSignInRequired.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidIDToken):
+		return ErrInvalidToken.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidTurnstileToken):
+		return ErrInvalidTurnstileToken.WithInternal(err)
+	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
+		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return ErrUserNotFound.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidRecoveryCredentials):
-		return ErrInvalidRecovery.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserPrivate):
 		return ErrUserNotFound.WithInternal(err) // 403 → 404 でユーザー存在を隠蔽
 	case errors.Is(err, usecase.ErrPlayerNotLinked):
-		return ErrUserNotFound.WithInternal(err) // プレイヤー未紐付も404で隠蔽
-	case errors.Is(err, usecase.ErrUserAlreadyDeleted):
-		return ErrOperationFailed.WithInternal(err) // 409 → 400 で詳細を隠蔽
-	case errors.Is(err, usecase.ErrUserNotDeleted):
-		return ErrOperationFailed.WithInternal(err) // 409 → 400 で詳細を隠蔽
+		return ErrPlayerNotLinked.WithInternal(err)
+
 	case errors.Is(err, usecase.ErrOperationFailed):
 		return ErrOperationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInternalError):
+		return ErrInternalError.WithInternal(err)
+	case errors.Is(err, usecase.ErrAdminRequired):
+		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPIToken):
 		return ErrInvalidToken.WithInternal(err)
 	// 楽曲関連エラー
 	case errors.Is(err, repository.ErrSongNotFound):
 		return ErrSongNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrDuplicateOfficialIdx):
+		return ErrDuplicateOfficialIdx.WithInternal(err)
+	case errors.Is(err, repository.ErrHonorNotFound):
+		return ErrNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrHonorConflict):
+		return ErrConflict.WithInternal(err)
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
 	case errors.Is(err, usecase.ErrChartNotFound):
 		return ErrChartNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidPlayerName):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidWorldsendInput):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidHonorInput):
+		return ErrValidationFailed.WithInternal(err)
 	// ユーザー名バリデーションエラー
 	case errors.Is(err, usecase.ErrUsernameEmpty):
 		return ErrUsernameEmpty.WithInternal(err)
@@ -63,14 +74,23 @@ func FromUsecaseError(err error) *APIError {
 		return ErrUsernameTooLong.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameInvalidChar):
 		return ErrUsernameInvalidChar.WithInternal(err)
-	// パスワードバリデーションエラー
-	case errors.Is(err, usecase.ErrPasswordTooShort):
-		return ErrPasswordTooShort.WithInternal(err)
-	case errors.Is(err, usecase.ErrPasswordTooLong):
-		return ErrPasswordTooLong.WithInternal(err)
 	// アプリバージョンバリデーションエラー
 	case errors.Is(err, usecase.ErrAppVersionUnsupported):
 		return ErrAppVersionUnsupported.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalNotFound):
+		return ErrGoalNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalLimitExceeded):
+		return ErrGoalLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalInput):
+		return ErrInvalidGoalInput.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalTitle):
+		return ErrGoalInvalidTitle.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAchievementType):
+		return ErrGoalInvalidAchievementType.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAchievementParam):
+		return ErrGoalInvalidAchievementParams.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
+		return ErrGoalInvalidAttributes.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

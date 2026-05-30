@@ -10,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 )
@@ -26,7 +27,7 @@ type Server struct {
 }
 
 // NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache) *Server {
+func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter) *Server {
 	// Echoのロガーを設定
 	var echoLogWriter io.WriteCloser
 	echoLogWriterResult, err := SetupEchoLogger(cfg)
@@ -37,7 +38,7 @@ func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 
 	return &Server{
-		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, echoLogWriter),
+		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
 		db:                db,
 		staticDB:          staticDB,
 		cfg:               cfg,

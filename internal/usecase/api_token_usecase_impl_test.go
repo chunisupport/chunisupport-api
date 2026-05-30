@@ -2,9 +2,9 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -13,6 +13,8 @@ import (
 type stubAPITokenRepository struct {
 	savedToken    *entity.APIToken
 	createErr     error
+	userLookup    *entity.APIToken
+	userLookupErr error
 	lookupToken   *entity.APIToken
 	lookupErr     error
 	deletedUserID int
@@ -28,15 +30,26 @@ func (s *stubAPITokenRepository) CreateOrReplace(ctx context.Context, exec repos
 	return nil
 }
 
+func (s *stubAPITokenRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.APIToken, error) {
+	if s.userLookupErr != nil {
+		return nil, s.userLookupErr
+	}
+	if s.userLookup == nil || s.userLookup.UserID != userID {
+		return nil, repository.ErrAPITokenNotFound
+	}
+	tokenCopy := *s.userLookup
+	return &tokenCopy, nil
+}
+
 func (s *stubAPITokenRepository) FindByHashedToken(ctx context.Context, exec repository.Executor, hashedToken string) (*entity.APIToken, error) {
 	if s.lookupErr != nil {
 		return nil, s.lookupErr
 	}
 	if s.lookupToken == nil {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrAPITokenNotFound
 	}
 	if s.lookupToken.HashedToken != hashedToken {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrAPITokenNotFound
 	}
 	tokenCopy := *s.lookupToken
 	return &tokenCopy, nil
@@ -60,10 +73,14 @@ func (s *tokenStubUserRepository) FindByID(ctx context.Context, exec repository.
 		return nil, s.findErr
 	}
 	if s.user == nil {
-		return nil, sql.ErrNoRows
+		return nil, repository.ErrUserNotFound
 	}
 	userCopy := *s.user
 	return &userCopy, nil
+}
+
+func (s *tokenStubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return s.FindByID(ctx, exec, id)
 }
 
 func (s *tokenStubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
@@ -78,38 +95,26 @@ func (s *tokenStubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context,
 	return nil, errors.New("not implemented")
 }
 
-func (s *tokenStubUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	return errors.New("not implemented")
-}
-
-func (s *tokenStubUserRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	return nil
-}
-
-func (s *tokenStubUserRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	return errors.New("not implemented")
-}
-
 func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	return errors.New("not implemented")
 }
 
-func TestAPITokenService_Generate(t *testing.T) {
+func (s *tokenStubUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
+	return errors.New("not implemented")
+}
+
+func (s *tokenStubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *tokenStubUserRepository) DeleteByID(_ context.Context, _ repository.Executor, _ int) error {
+	return errors.New("not implemented")
+}
+
+func TestAPITokenUsecase_Generate(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
 
 	token, err := service.Generate(context.Background(), 1)
 	if err != nil {
@@ -133,14 +138,71 @@ func TestAPITokenService_Generate(t *testing.T) {
 	}
 }
 
-func TestAPITokenService_Validate(t *testing.T) {
+func TestAPITokenUsecase_GetStatus(t *testing.T) {
+	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+	tokenRepo := &stubAPITokenRepository{
+		userLookup: &entity.APIToken{
+			ID:        10,
+			UserID:    123,
+			CreatedAt: createdAt,
+		},
+	}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if token == nil {
+		t.Fatalf("expected token status")
+	}
+	if token.ID != 10 {
+		t.Fatalf("expected token id 10, got %d", token.ID)
+	}
+	if !token.CreatedAt.Equal(createdAt) {
+		t.Fatalf("expected created_at %v, got %v", createdAt, token.CreatedAt)
+	}
+}
+
+func TestAPITokenUsecase_GetStatus_NotFound(t *testing.T) {
+	tokenRepo := &stubAPITokenRepository{}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token != nil {
+		t.Fatalf("expected nil token, got %#v", token)
+	}
+}
+
+func TestAPITokenUsecase_GetStatus_Error(t *testing.T) {
+	expectedErr := errors.New("find failed")
+	tokenRepo := &stubAPITokenRepository{userLookupErr: expectedErr}
+	userRepo := &tokenStubUserRepository{}
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
+
+	token, err := service.GetStatus(context.Background(), 123)
+	if err != expectedErr {
+		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+	if token != nil {
+		t.Fatalf("expected nil token, got %#v", token)
+	}
+}
+
+func TestAPITokenUsecase_Validate(t *testing.T) {
 	user := &entity.User{ID: 2}
 	hashed := hashToken("plain-token")
 	tokenRepo := &stubAPITokenRepository{
 		lookupToken: &entity.APIToken{ID: 10, UserID: user.ID, HashedToken: hashed},
 	}
 	userRepo := &tokenStubUserRepository{user: user}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
 
 	gotUser, apiToken, err := service.Validate(context.Background(), "plain-token")
 	if err != nil {
@@ -155,7 +217,7 @@ func TestAPITokenService_Validate(t *testing.T) {
 	}
 }
 
-func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
+func TestAPITokenUsecase_Validate_InvalidCases(t *testing.T) {
 	user := &entity.User{ID: 1}
 	hashed := hashToken("valid")
 	cases := map[string]struct {
@@ -178,16 +240,11 @@ func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
 			userRepo:  &tokenStubUserRepository{user: nil},
 			input:     "valid",
 		},
-		"user deleted": {
-			tokenRepo: &stubAPITokenRepository{lookupToken: &entity.APIToken{ID: 1, UserID: user.ID, HashedToken: hashed}},
-			userRepo:  &tokenStubUserRepository{user: &entity.User{ID: user.ID, IsDeleted: true}},
-			input:     "valid",
-		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			service := NewAPITokenService(nil, tc.tokenRepo, tc.userRepo)
+			service := NewAPITokenUsecase(nil, tc.tokenRepo, tc.userRepo)
 			_, _, err := service.Validate(context.Background(), tc.input)
 			if !errors.Is(err, ErrInvalidAPIToken) {
 				t.Fatalf("expected ErrInvalidAPIToken, got %v", err)
@@ -196,10 +253,10 @@ func TestAPITokenService_Validate_InvalidCases(t *testing.T) {
 	}
 }
 
-func TestAPITokenService_Delete(t *testing.T) {
+func TestAPITokenUsecase_Delete(t *testing.T) {
 	tokenRepo := &stubAPITokenRepository{}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
 
 	err := service.Delete(context.Background(), 123)
 	if err != nil {
@@ -211,11 +268,11 @@ func TestAPITokenService_Delete(t *testing.T) {
 	}
 }
 
-func TestAPITokenService_Delete_Error(t *testing.T) {
+func TestAPITokenUsecase_Delete_Error(t *testing.T) {
 	expectedErr := errors.New("delete failed")
 	tokenRepo := &stubAPITokenRepository{deleteErr: expectedErr}
 	userRepo := &tokenStubUserRepository{}
-	service := NewAPITokenService(nil, tokenRepo, userRepo)
+	service := NewAPITokenUsecase(nil, tokenRepo, userRepo)
 
 	err := service.Delete(context.Background(), 123)
 	if err != expectedErr {

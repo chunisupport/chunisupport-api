@@ -100,12 +100,17 @@ func validatePlayerName(value string) error {
 		return errors.New("player name cannot be empty")
 	}
 
-	// for _, r := range value {
-	// 	kind := width.LookupRune(r).Kind()
-	// 	if kind != width.EastAsianFullwidth && kind != width.EastAsianWide {
-	// 		return errors.New("player name must contain only full-width characters")
-	// 	}
-	// }
+	// 半角英数字と半角カタカナが含まれていないことを検証
+	for _, r := range value {
+		// 半角英数字のチェック
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return errors.New("player name must not contain half-width alphanumeric characters")
+		}
+		// 半角カタカナのチェック (U+FF61〜U+FF9F)
+		if r >= 0xFF61 && r <= 0xFF9F {
+			return errors.New("player name must not contain half-width katakana")
+		}
+	}
 
 	// 全角文字数をカウント（UTF-8のルーン数をカウント）
 	runeCount := utf8.RuneCountInString(value)

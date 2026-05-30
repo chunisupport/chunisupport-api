@@ -3,6 +3,9 @@ package info
 import "strings"
 
 const (
+	// DifficultyNameUltima は内部で扱うULTIMA難易度名です。
+	DifficultyNameUltima = "ULTIMA"
+
 	// StatsDifficultyWorldsend はWORLD'S END譜面を表す難易度名です。
 	// 通常の難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）と異なり、
 	// WORLD'S ENDは専用のマスタデータが存在しないため、定数として定義しています。
@@ -29,7 +32,7 @@ var difficultyPathToName = map[string]string{
 	string(DifficultyPathAdvanced):  "ADVANCED",
 	string(DifficultyPathExpert):    "EXPERT",
 	string(DifficultyPathMaster):    "MASTER",
-	string(DifficultyPathUltima):    "ULTIMA",
+	string(DifficultyPathUltima):    DifficultyNameUltima,
 	string(DifficultyPathWorldsend): StatsDifficultyWorldsend,
 }
 

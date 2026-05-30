@@ -1,6 +1,9 @@
 -- テーブルを逆順で削除(外部キー制約を考慮)
 -- インデックスは自動的に削除されるため明示的な削除は不要
 
+-- 外部キーチェックを一時無効化して循環依存を回避
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- バージョンマスタを削除
 DROP TABLE IF EXISTS versions;
 
@@ -14,7 +17,7 @@ DROP TABLE IF EXISTS sessions;
 -- 中間テーブル
 DROP TABLE IF EXISTS player_honors;
 
--- 親テーブル
+-- 親テーブル（外部キー制約を削除済みのため、順序は逆順でなくても大丈夫）
 DROP TABLE IF EXISTS players;
 DROP TABLE IF EXISTS users;
 
@@ -34,3 +37,5 @@ DROP TABLE IF EXISTS class_emblem_bases;
 DROP TABLE IF EXISTS class_emblems;
 DROP TABLE IF EXISTS difficulties;
 DROP TABLE IF EXISTS genres;
+
+SET FOREIGN_KEY_CHECKS = 1;

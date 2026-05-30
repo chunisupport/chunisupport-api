@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,11 +21,10 @@ import (
 )
 
 const (
-	maxScoreValue     = 1010000
-	minScoreValue     = 1
-	tokyoLayout       = "2006/01/02 15:04"
-	defaultSlotName   = "none"
-	worldsendDiffName = "WORLD'S END"
+	maxScoreValue   = 1010000
+	minScoreValue   = 1
+	tokyoLayout     = "2006/01/02 15:04"
+	defaultSlotName = "none"
 )
 
 var (
@@ -120,12 +119,20 @@ func validateScoreEntry(entry *PlayerDataScoreEntry, recordType string, index in
 		}
 	}
 
-	return nil
-}
+	// 1010000点かつAJでないのは矛盾している
+	if entry.Score == 1010000 && (entry.ComboLv == nil || *entry.ComboLv != 3) {
+		return fmt.Errorf("%s[%d]: inconsistent data - score=1,010,000 without AJ (cmb_lv=3), idx=%s",
+			recordType, index, entry.Idx)
+	}
 
-// isNoneValue は、「存在しない」を表す便宜上のマスタ値かどうかを判定します。
-func isNoneValue(name string) bool {
-	return name == "NONE" || name == "none"
+	// FULL CHAINは複数人でAJまたはFCを達成したときのランプなので、個人のAJ/FCなしでは成立しない
+	if entry.FullChain != nil && (*entry.FullChain == 2 || *entry.FullChain == 3) &&
+		(entry.ComboLv == nil || (*entry.ComboLv != 2 && *entry.ComboLv != 3)) {
+		return fmt.Errorf("%s[%d]: inconsistent data - FULL CHAIN (fch_lv=%d) without AJ/FC (cmb_lv=2 or 3), idx=%s",
+			recordType, index, *entry.FullChain, entry.Idx)
+	}
+
+	return nil
 }
 
 // playerDataMaster はプレイヤーデータ登録時に使用するマスターデータのキャッシュを保持します。
@@ -137,6 +144,11 @@ type playerDataMaster struct {
 	worldsendBySongID map[int]entity.PlayerDataWorldsendChart
 }
 
+type calculatedOverpowerSummary struct {
+	Value   *float64
+	Percent *float64
+}
+
 // playerDataUsecase は PlayerDataUsecase の実装です。
 type playerDataUsecase struct {
 	tm               TransactionManager
@@ -146,11 +158,12 @@ type playerDataUsecase struct {
 	worldsendRecRepo repository.WorldsendRecordRepository
 	honorRepo        repository.HonorRepository
 	playerDataRepo   repository.PlayerDataRepository
+	lockedRepo       repository.PlayerLockedSongRepository
 	masterCache      repository.PlayerDataMasterProvider
 }
 
-// NewPlayerDataService は PlayerDataUsecase の実装を生成します。
-func NewPlayerDataService(
+// NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
+func NewPlayerDataUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRepo repository.PlayerRepository,
@@ -158,8 +171,16 @@ func NewPlayerDataService(
 	worldsendRecRepo repository.WorldsendRecordRepository,
 	honorRepo repository.HonorRepository,
 	playerDataRepo repository.PlayerDataRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
+	if playerRecRepo == nil {
+		panic("player record repository is required")
+	}
+	if lockedRepo == nil {
+		panic("player locked song repository is required")
+	}
+
 	return &playerDataUsecase{
 		tm:               tm,
 		userRepo:         userRepo,
@@ -168,6 +189,7 @@ func NewPlayerDataService(
 		worldsendRecRepo: worldsendRecRepo,
 		honorRepo:        honorRepo,
 		playerDataRepo:   playerDataRepo,
+		lockedRepo:       lockedRepo,
 		masterCache:      masterCache,
 	}
 }
@@ -210,16 +232,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
-	overpowerValue := payload.Overpower.Value
-	overpowerPercent := payload.Overpower.Percentage
-
 	summaryInput := &PlayerDataSummaryInput{
-		Name:             nameVO.String(),
-		Level:            payload.Level,
-		OfficialRating:   payload.Rating,
-		LastPlayedAt:     lastPlayedAt,
-		OverpowerValue:   &overpowerValue,
-		OverpowerPercent: &overpowerPercent,
+		Name:           nameVO.String(),
+		Level:          payload.Level,
+		OfficialRating: payload.Rating,
+		LastPlayedAt:   lastPlayedAt,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -228,7 +245,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
-		masters, loadErr := us.loadMasterData(ctx, tx, payload)
+		masters, loadErr := us.loadMasterData(ctx, payload)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -245,14 +262,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return ensureErr
 		}
 		result.PlayerID = playerID
-		result.Summary = api_internal.PlayerDataSummary{
-			Name:             summaryInput.Name,
-			Level:            summaryInput.Level,
-			Rating:           summaryInput.OfficialRating,
-			LastPlayedAt:     summaryInput.LastPlayedAt,
-			OverpowerValue:   summaryInput.OverpowerValue,
-			OverpowerPercent: summaryInput.OverpowerPercent,
-		}
 
 		skippedRecords := make([]api_internal.SkippedRecord, 0, 4)
 
@@ -262,11 +271,19 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
 		if scoreErr != nil {
 			return scoreErr
 		}
 		skippedRecords = append(skippedRecords, scoreSkipped...)
+		summaryInput.OverpowerValue = overpowerSummary.Value
+		summaryInput.OverpowerPercent = overpowerSummary.Percent
+
+		playerID, ensureErr = us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		if ensureErr != nil {
+			return ensureErr
+		}
+		result.PlayerID = playerID
 
 		// レーティングを再計算して更新
 		ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
@@ -276,6 +293,14 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
+		result.Summary = api_internal.PlayerDataSummary{
+			Name:             summaryInput.Name,
+			Level:            summaryInput.Level,
+			Rating:           summaryInput.OfficialRating,
+			LastPlayedAt:     summaryInput.LastPlayedAt,
+			OverpowerValue:   summaryInput.OverpowerValue,
+			OverpowerPercent: summaryInput.OverpowerPercent,
+		}
 		if len(skippedRecords) > 0 {
 			result.SkippedRecords = skippedRecords
 		}
@@ -291,7 +316,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 }
 
 // loadMasterData はプレイヤーデータ登録に必要なマスターデータをキャッシュおよびDBから読み込みます。
-func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.Executor, payload *PlayerDataPayload) (*playerDataMaster, error) {
+func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *PlayerDataPayload) (*playerDataMaster, error) {
 	if us.masterCache == nil {
 		return nil, errors.New("master cache is not initialized")
 	}
@@ -330,9 +355,9 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.E
 	for idx := range idxSet {
 		idxList = append(idxList, idx)
 	}
-	sort.Strings(idxList)
+	slices.Sort(idxList)
 
-	loaded, err := us.playerDataRepo.LoadMasterData(ctx, tx, idxList)
+	loaded, err := us.playerDataRepo.LoadMasterData(ctx, idxList)
 	if err != nil {
 		return nil, err
 	}
@@ -349,13 +374,8 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 	var classID *int
 	var baseID *int
 
-	medalKey := strings.TrimSpace(payload.MedalClass)
+	medalKey := normalizeClassEmblemKey(payload.MedalClass)
 	if medalKey != "" {
-		medalKey = strings.TrimLeft(medalKey, "0")
-		if medalKey == "" {
-			medalKey = "0"
-		}
-		medalKey = strings.ToLower(medalKey)
 		if item, ok := masters.ClassEmblems[medalKey]; ok {
 			v := item.ID
 			classID = &v
@@ -363,13 +383,8 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 		// 見つからなくてもエラーにしない（classIDはnilのまま）
 	}
 
-	baseKey := strings.TrimSpace(payload.BaseClass)
+	baseKey := normalizeClassEmblemKey(payload.BaseClass)
 	if baseKey != "" {
-		baseKey = strings.TrimLeft(baseKey, "0")
-		if baseKey == "" {
-			baseKey = "0"
-		}
-		baseKey = strings.ToLower(baseKey)
 		if item, ok := masters.ClassEmblemBases[baseKey]; ok {
 			v := item.ID
 			baseID = &v
@@ -378,6 +393,29 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 	}
 
 	return classID, baseID, nil
+}
+
+func normalizeClassEmblemKey(raw string) string {
+	key := strings.TrimSpace(raw)
+	if key == "" {
+		return ""
+	}
+
+	key = strings.ToLower(key)
+	if key == "inf" {
+		return key
+	}
+
+	key = strings.TrimLeft(key, "0")
+	if key == "" {
+		return "0"
+	}
+
+	if key == "6" {
+		return "inf"
+	}
+
+	return key
 }
 
 // ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。
@@ -412,10 +450,13 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 	if existingPlayer != nil {
 		// 既存のプレイヤーを更新
 		player.ID = existingPlayer.ID
+		player.CreatedAt = existingPlayer.CreatedAt
 		// 計算レーティング等は既存の値を維持
 		player.CalculatedRating = existingPlayer.CalculatedRating
 		player.NewAverageRating = existingPlayer.NewAverageRating
 		player.BestAverageRating = existingPlayer.BestAverageRating
+	} else {
+		player.CreatedAt = time.Now()
 	}
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）
@@ -483,7 +524,21 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honor.Title, typeItem.ID, honor.Img)
+		if honorTypeKey == "sp" && (honor.Img == nil || strings.TrimSpace(*honor.Img) == "") {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     "sp honor image_url is required",
+				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
+			})
+			continue
+		}
+
+		honorTitle := honor.Title
+		if honorTypeKey == "sp" {
+			honorTitle = ""
+		}
+
+		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, honor.Img)
 		if err != nil {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
@@ -519,14 +574,64 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, error) {
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, calculatedOverpowerSummary, error) {
+	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Full, masters, updatedAt)
+	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
+	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
+	counts.WorldsendRecordsSkipped = worldsendCounts.WorldsendRecordsSkipped
+	skipped = append(skipped, worldsendSkipped...)
+
+	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
+		FullRecords:      fullRecordsToUpsert,
+		WorldsendRecords: worldsendRecordsToUpsert,
+	}); err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, err
+	}
+
+	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
+		ExcludeWorldsend: true,
+		ExcludeDeleted:   true,
+		PlayerID:         &playerID,
+	})
+	if err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, err
+	}
+
+	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	if recErr != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
+	}
+	lockedSongs, lockedErr := us.listLockedSongsForOverpower(ctx, tx, playerID)
+	if lockedErr != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
+	}
+	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
+	if err != nil {
+		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
+	}
+
+	return counts, skipped, overpowerSummary, nil
+}
+
+func (us *playerDataUsecase) listLockedSongsForOverpower(ctx context.Context, tx repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	if us.lockedRepo == nil {
+		return nil, nil
+	}
+	return us.lockedRepo.ListByPlayerID(ctx, tx, playerID)
+}
+
+type resolvedLampIDs struct {
+	clearLampID int
+	comboLampID int
+	fullChainID int
+}
+
+func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []repository.PlayerRecordForUpsert) {
 	counts := api_internal.PlayerDataCounts{}
-	skipped := make([]api_internal.SkippedRecord, 0, 4)
+	skipped := make([]api_internal.SkippedRecord, 0, len(entries))
+	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(entries))
 
-	// バルクインサート用のバッファ
-	fullRecordsToUpsert := make([]repository.PlayerRecordForUpsert, 0, len(scores.Full))
-
-	for _, entry := range scores.Full {
+	for _, entry := range entries {
 		counts.FullRecordsUpserted++
 
 		chart, song, _, err := resolveChart(entry, masters)
@@ -540,72 +645,34 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
-		if err != nil {
+		if skippedRecord, ok := validateScoreRange("full", entry, song); ok {
 			counts.FullRecordsSkipped++
-			clearLampStr := "nil"
-			if entry.ClearLamp != nil {
-				clearLampStr = *entry.ClearLamp
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve clear_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
-			})
-			continue
-		}
-		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			comboLvStr := "nil"
-			if entry.ComboLv != nil {
-				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve combo_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
-			})
-			continue
-		}
-		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			fullChainStr := "nil"
-			if entry.FullChain != nil {
-				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve full_chain",
-				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
-			})
-			continue
-		}
-		slotID, err := resolveSlotID(entry.Slot, masters)
-		if err != nil {
-			counts.FullRecordsSkipped++
-			slotStr := "nil"
-			if entry.Slot != nil {
-				slotStr = *entry.Slot
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
-				Reason:     "failed to resolve slot",
-				Details:    fmt.Sprintf("idx=%s (%s), slot=%s, error=%s", entry.Idx, song.Title, slotStr, err.Error()),
-			})
+			skipped = append(skipped, skippedRecord)
 			continue
 		}
 
-		// バルクインサート用のバッファに追加
+		lampIDs, skippedRecord := resolveCommonLampIDs("full", entry, song, masters)
+		if skippedRecord != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, *skippedRecord)
+			continue
+		}
+
+		slotID, err := resolveSlotID(entry.Slot, masters)
+		if err != nil {
+			counts.FullRecordsSkipped++
+			skipped = append(skipped, newResolveSkippedRecord("full", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
+			continue
+		}
+
 		fullRecordsToUpsert = append(fullRecordsToUpsert, repository.PlayerRecordForUpsert{
 			PlayerID: playerID,
 			ChartID:  chart.ID,
 			State: repository.PlayerRecordState{
 				Score:       entry.Score,
-				ClearLampID: clearLampID,
-				ComboLampID: comboLampID,
-				FullChainID: fullChainID,
+				ClearLampID: lampIDs.clearLampID,
+				ComboLampID: lampIDs.comboLampID,
+				FullChainID: lampIDs.fullChainID,
 				SlotID:      slotID,
 				SlotOrder:   entry.Order,
 				UpdatedAt:   updatedAt,
@@ -613,10 +680,15 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		})
 	}
 
-	// バルクインサート用のバッファ
-	worldsendRecordsToUpsert := make([]repository.WorldsendRecordForUpsert, 0, len(scores.Worldsend))
+	return counts, skipped, fullRecordsToUpsert
+}
 
-	for _, entry := range scores.Worldsend {
+func applyWorldsendScores(playerID int, entries []PlayerDataScoreEntry, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []repository.WorldsendRecordForUpsert) {
+	counts := api_internal.PlayerDataCounts{}
+	skipped := make([]api_internal.SkippedRecord, 0, len(entries))
+	worldsendRecordsToUpsert := make([]repository.WorldsendRecordForUpsert, 0, len(entries))
+
+	for _, entry := range entries {
 		counts.WorldsendRecordsUpserted++
 
 		chart, song, err := resolveWorldsendChart(entry, masters)
@@ -630,81 +702,126 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			continue
 		}
 
-		if entry.Score < minScoreValue || entry.Score > maxScoreValue {
+		if skippedRecord, ok := validateScoreRange("worldsend", entry, song); ok {
 			counts.WorldsendRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
-				Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
-			})
+			skipped = append(skipped, skippedRecord)
 			continue
 		}
 
-		clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
-		if err != nil {
+		lampIDs, skippedRecord := resolveCommonLampIDs("worldsend", entry, song, masters)
+		if skippedRecord != nil {
 			counts.WorldsendRecordsSkipped++
-			clearLampStr := "nil"
-			if entry.ClearLamp != nil {
-				clearLampStr = *entry.ClearLamp
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve clear_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), clear_lamp=%s, error=%s", entry.Idx, song.Title, clearLampStr, err.Error()),
-			})
-			continue
-		}
-		comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			comboLvStr := "nil"
-			if entry.ComboLv != nil {
-				comboLvStr = fmt.Sprintf("%d", *entry.ComboLv)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve combo_lamp",
-				Details:    fmt.Sprintf("idx=%s (%s), combo_lv=%s, error=%s", entry.Idx, song.Title, comboLvStr, err.Error()),
-			})
-			continue
-		}
-		fullChainID, err := resolveFullChainID(entry.FullChain, masters)
-		if err != nil {
-			counts.WorldsendRecordsSkipped++
-			fullChainStr := "nil"
-			if entry.FullChain != nil {
-				fullChainStr = fmt.Sprintf("%d", *entry.FullChain)
-			}
-			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "worldsend",
-				Reason:     "failed to resolve full_chain",
-				Details:    fmt.Sprintf("idx=%s (%s), full_chain=%s, error=%s", entry.Idx, song.Title, fullChainStr, err.Error()),
-			})
+			skipped = append(skipped, *skippedRecord)
 			continue
 		}
 
-		// バルクインサート用のバッファに追加
 		worldsendRecordsToUpsert = append(worldsendRecordsToUpsert, repository.WorldsendRecordForUpsert{
 			PlayerID: playerID,
 			ChartID:  chart.ID,
 			State: repository.WorldsendRecordState{
 				Score:       entry.Score,
-				ClearLampID: clearLampID,
-				ComboLampID: comboLampID,
-				FullChainID: fullChainID,
+				ClearLampID: lampIDs.clearLampID,
+				ComboLampID: lampIDs.comboLampID,
+				FullChainID: lampIDs.fullChainID,
 				UpdatedAt:   updatedAt,
 			},
 		})
 	}
 
-	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
-		FullRecords:      fullRecordsToUpsert,
-		WorldsendRecords: worldsendRecordsToUpsert,
-	}); err != nil {
-		return counts, skipped, err
+	return counts, skipped, worldsendRecordsToUpsert
+}
+
+func validateScoreRange(recordType string, entry PlayerDataScoreEntry, song entity.PlayerDataSong) (api_internal.SkippedRecord, bool) {
+	if entry.Score >= minScoreValue && entry.Score <= maxScoreValue {
+		return api_internal.SkippedRecord{}, false
 	}
 
-	return counts, skipped, nil
+	return api_internal.SkippedRecord{
+		RecordType: recordType,
+		Reason:     fmt.Sprintf("score out of range: %d", entry.Score),
+		Details:    fmt.Sprintf("idx=%s (%s), score=%d", entry.Idx, song.Title, entry.Score),
+	}, true
+}
+
+func resolveCommonLampIDs(recordType string, entry PlayerDataScoreEntry, song entity.PlayerDataSong, masters *playerDataMaster) (resolvedLampIDs, *api_internal.SkippedRecord) {
+	clearLampID, err := resolveClearLampID(entry.ClearLamp, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "clear_lamp", "clear_lamp", entry, song, optionalStringValue(entry.ClearLamp), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	comboLampID, err := resolveComboLampID(entry.ComboLv, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "combo_lamp", "combo_lv", entry, song, optionalIntValue(entry.ComboLv), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	fullChainID, err := resolveFullChainID(entry.FullChain, masters)
+	if err != nil {
+		skipped := newResolveSkippedRecord(recordType, "full_chain", "full_chain", entry, song, optionalIntValue(entry.FullChain), err)
+		return resolvedLampIDs{}, &skipped
+	}
+
+	return resolvedLampIDs{
+		clearLampID: clearLampID,
+		comboLampID: comboLampID,
+		fullChainID: fullChainID,
+	}, nil
+}
+
+func newResolveSkippedRecord(recordType, reasonField, detailField string, entry PlayerDataScoreEntry, song entity.PlayerDataSong, value string, err error) api_internal.SkippedRecord {
+	return api_internal.SkippedRecord{
+		RecordType: recordType,
+		Reason:     fmt.Sprintf("failed to resolve %s", reasonField),
+		Details:    fmt.Sprintf("idx=%s (%s), %s=%s, error=%s", entry.Idx, song.Title, detailField, value, err.Error()),
+	}
+}
+
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return "nil"
+	}
+	return *value
+}
+
+func optionalIntValue(value *int) string {
+	if value == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%d", *value)
+}
+
+func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, lockedSongs []*entity.PlayerLockedSong, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
+	lockedSet := make(map[string]struct{}, len(lockedSongs))
+	for _, lockedSong := range lockedSongs {
+		if lockedSong == nil {
+			continue
+		}
+		lockedSet[lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)] = struct{}{}
+	}
+	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, func(record *entity.PlayerRecord) bool {
+		if len(lockedSet) == 0 {
+			return true
+		}
+		if record.ChartDifficulty == nil {
+			return false
+		}
+		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
+		return !exists
+	})
+	if err != nil {
+		return calculatedOverpowerSummary{}, err
+	}
+	if len(overpowerRecords) != len(records) {
+		slog.Warn("skipped player records with missing related data during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords))
+	}
+	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
+	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
+}
+
+func roundFloat(value float64, scale int) float64 {
+	factor := math.Pow10(scale)
+	return math.Round(value*factor) / factor
 }
 
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {
@@ -793,13 +910,17 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 		value = *fullChain
 	}
 	var name string
+	// 外部プレイヤーデータ側の過去実装との後方互換性を維持するため、
+	// fch_lv の 2/3 は一般的な GOLD/PLATINUM の順序と逆で解釈する。
+	// - 2 -> FULL CHAIN PLATINUM
+	// - 3 -> FULL CHAIN GOLD
 	switch value {
 	case 1:
 		name = "none"
 	case 2:
-		name = "full chain gold"
-	case 3:
 		name = "full chain platinum"
+	case 3:
+		name = "full chain gold"
 	default:
 		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
 	}
@@ -828,8 +949,8 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
 // ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
 func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) error {
-	// プレイヤーレコードを全件取得
-	records, err := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
+	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch player records: %w", err)
 	}

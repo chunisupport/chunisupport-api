@@ -8,14 +8,15 @@ const (
 	CodeInternalError = "internal_error"
 
 	// 認証・認可エラー
-	CodeUnauthorized       = "unauthorized"
-	CodeInvalidCredentials = "invalid_credentials" // #nosec G101
-	CodeInvalidToken       = "invalid_token"       // #nosec G101
-	CodeTokenExpired       = "token_expired"       // #nosec G101
-	CodeMissingToken       = "missing_token"       // #nosec G101
-	CodeInvalidSession     = "invalid_session"     // セッション無効/期限切れを統一
-	CodeInvalidRecovery    = "invalid_recovery_credentials"
-	CodeForbidden          = "forbidden"
+	CodeUnauthorized             = "unauthorized"
+	CodeInvalidCredentials       = "invalid_credentials" // #nosec G101
+	CodeInvalidToken             = "invalid_token"       // #nosec G101
+	CodeInvalidTurnstileToken    = "invalid_turnstile_token"
+	CodeTokenExpired             = "token_expired" // #nosec G101
+	CodeMissingToken             = "missing_token" // #nosec G101
+	CodeForbidden                = "forbidden"
+	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
+	CodeRecentSignInRequired     = "recent_sign_in_required"
 
 	// ユーザー関連エラー
 	CodeRegistrationFailed = "registration_failed" // ユーザー登録失敗（詳細を隠蔽）
@@ -27,11 +28,12 @@ const (
 	CodePlayerNotFound  = "player_not_found"
 
 	// 楽曲・譜面関連エラー
-	CodeSongNotFound        = "song_not_found"
-	CodeChartNotFound       = "chart_not_found"
-	CodeInvalidGenreID      = "invalid_genre_id"
-	CodeInvalidDifficultyID = "invalid_difficulty_id"
-	CodeInvalidDifficulty   = "invalid_difficulty" // 無効な難易度パラメータ
+	CodeSongNotFound         = "song_not_found"
+	CodeChartNotFound        = "chart_not_found"
+	CodeInvalidGenreID       = "invalid_genre_id"
+	CodeInvalidDifficultyID  = "invalid_difficulty_id"
+	CodeInvalidDifficulty    = "invalid_difficulty"     // 無効な難易度パラメータ
+	CodeDuplicateOfficialIdx = "duplicate_official_idx" // official_idx 重複
 
 	// データ関連エラー
 	CodeValidationFailed   = "validation_failed"
@@ -50,8 +52,14 @@ const (
 	CodeUsernameTooShort      = "username_too_short"
 	CodeUsernameTooLong       = "username_too_long"
 	CodeUsernameInvalidChar   = "username_invalid_char"
-	CodePasswordTooShort      = "password_too_short"
-	CodePasswordTooLong       = "password_too_long"
-	CodeInvalidPassword       = "invalid_password"        // パスワードが無効（詳細を隠蔽）
 	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
+
+	// 目標関連エラー
+	CodeGoalNotFound                 = "goal_not_found"
+	CodeGoalLimitExceeded            = "goal_limit_exceeded"
+	CodeGoalInvalidTitle             = "goal_invalid_title"
+	CodeGoalInvalidAchievementType   = "goal_invalid_achievement_type"
+	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
+	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
+	CodeInvalidGoalInput             = "invalid_goal_input"
 )

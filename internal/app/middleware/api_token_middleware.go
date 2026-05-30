@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"strings"
-
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
@@ -12,7 +10,7 @@ import (
 func APITokenMiddleware(usecase usecase.APITokenUsecase) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			rawToken := extractAPIToken(c)
+			rawToken := extractBearerToken(c)
 			if rawToken == "" {
 				return apierror.ErrMissingToken
 			}
@@ -27,19 +25,4 @@ func APITokenMiddleware(usecase usecase.APITokenUsecase) echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
-}
-
-func extractAPIToken(c echo.Context) string {
-	authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
-	if authHeader != "" {
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-			token := strings.TrimSpace(parts[1])
-			if token != "" {
-				return token
-			}
-		}
-	}
-
-	return ""
 }

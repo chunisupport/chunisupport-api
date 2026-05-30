@@ -13,6 +13,19 @@ type UserName struct {
 	value string
 }
 
+var usernamePattern = regexp.MustCompile("^[a-z0-9]+$")
+
+var (
+	// ErrEmpty はユーザー名が空文字の場合に返されます。
+	ErrEmpty = errors.New("username cannot be empty")
+	// ErrTooShort はユーザー名が最小文字数に満たない場合に返されます。
+	ErrTooShort = errors.New("username must be at least 5 characters")
+	// ErrTooLong はユーザー名が最大文字数を超える場合に返されます。
+	ErrTooLong = errors.New("username must be 50 characters or less")
+	// ErrInvalidChar はユーザー名に許可されない文字が含まれる場合に返されます。
+	ErrInvalidChar = errors.New("username can only contain lowercase letters and numbers")
+)
+
 // NewUserName はバリデーション付きで新しい UserName を作成します
 func NewUserName(value string) (UserName, error) {
 	if err := validateUserName(value); err != nil {
@@ -96,20 +109,16 @@ func (u *UserName) UnmarshalJSON(data []byte) error {
 // validateUserName はユーザー名が空でないこと、5文字以上50文字以内、小文字英数字のみであることをバリデーションします
 func validateUserName(value string) error {
 	if value == "" {
-		return errors.New("username cannot be empty")
+		return ErrEmpty
 	}
 	if len(value) < 5 {
-		return errors.New("username must be at least 5 characters")
+		return ErrTooShort
 	}
 	if len(value) > 50 {
-		return errors.New("username must be 50 characters or less")
+		return ErrTooLong
 	}
-	matched, err := regexp.MatchString("^[a-z0-9]+$", value)
-	if err != nil {
-		return err
-	}
-	if !matched {
-		return errors.New("username can only contain lowercase letters and numbers")
+	if !usernamePattern.MatchString(value) {
+		return ErrInvalidChar
 	}
 	return nil
 }

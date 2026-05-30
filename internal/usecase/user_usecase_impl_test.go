@@ -2,30 +2,39 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 type stubUserRepository struct {
 	user            *entity.User
 	usersWithPlayer []entity.UserWithPlayer
 	err             error
-	softDeleteErr   error
-	restoreErr      error
+	saveErr         error
+	savedUser       *entity.User
+	deletedUserID   int
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -50,44 +59,35 @@ func (s *stubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 	return s.usersWithPlayer, nil
 }
 
-func (s *stubUserRepository) Create(ctx context.Context, exec repository.Executor, user *entity.User) error {
-	return errors.New("not implemented")
-}
-
-func (s *stubUserRepository) UpdatePrivacy(ctx context.Context, exec repository.Executor, userID int, isPrivate bool) error {
-	return errors.New("not implemented")
-}
-
-func (s *stubUserRepository) SoftDelete(ctx context.Context, exec repository.Executor, userID int) error {
-	if s.softDeleteErr != nil {
-		return s.softDeleteErr
-	}
-	return nil
-}
-
-func (s *stubUserRepository) Restore(ctx context.Context, exec repository.Executor, userID int) error {
-	if s.restoreErr != nil {
-		return s.restoreErr
-	}
-	return nil
-}
-
-func (s *stubUserRepository) LinkPlayer(ctx context.Context, exec repository.Executor, userID int, playerID int) error {
-	return nil
-}
-
-func (s *stubUserRepository) UpdatePassword(ctx context.Context, exec repository.Executor, userID int, passwordHash string) error {
-	return errors.New("not implemented")
-}
-
 func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
+	if s.saveErr != nil {
+		return s.saveErr
+	}
+	s.savedUser = user
+	return nil
+}
+
+func (s *stubUserRepository) LinkFirebaseUID(ctx context.Context, exec repository.Executor, userID int, currentUID *string, newUID string, updatedAt time.Time) error {
 	return errors.New("not implemented")
+}
+
+func (s *stubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.Executor, _ string) (*entity.User, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubUserRepository) DeleteByID(ctx context.Context, exec repository.Executor, id int) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.deletedUserID = id
+	return nil
 }
 
 type stubPlayerRecordRepository struct {
-	records       []*entity.PlayerRecord
-	ratingRecords []*entity.PlayerRecord
-	err           error
+	records         []*entity.PlayerRecord
+	ratingRecords   []*entity.PlayerRecord
+	lastScoreUpdate *time.Time
+	err             error
 }
 
 func (s *stubPlayerRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
@@ -108,45 +108,184 @@ func (s *stubPlayerRecordRepository) FindByPlayerIDForRating(ctx context.Context
 }
 
 func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
-	return nil, nil
-}
-
-type stubPlayerService struct {
-	player *dto.PlayerDTO
-	err    error
-}
-
-func (s *stubPlayerService) CreatePlayer(ctx context.Context, name string) (*dto.PlayerDTO, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *stubPlayerService) GetPlayerByID(ctx context.Context, id int) (*dto.PlayerDTO, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.player, nil
+	return s.lastScoreUpdate, nil
 }
 
-func TestUserService_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
-	service := NewUserService(nil, &stubUserRepository{err: sql.ErrNoRows}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+type stubPlayerRepository struct {
+	playerWithHonors *repository.PlayerWithHonors
+	err              error
+}
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil)
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
+type stubFirebaseUserEmailLookup struct {
+	emailsByUID map[string]string
+	err         error
+}
+
+func (s *stubFirebaseUserEmailLookup) LookupEmailsByUIDs(ctx context.Context, uids []string) (map[string]string, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.emailsByUID, nil
+}
+
+func (s *stubPlayerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.playerWithHonors == nil {
+		return nil, nil
+	}
+	return s.playerWithHonors.Player, nil
+}
+
+func (s *stubPlayerRepository) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.playerWithHonors, nil
+}
+
+func (s *stubPlayerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubPlayerRepository) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubPlayerRepository) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubPlayerRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	return errors.New("not implemented")
+}
+
+type stubWorldsendRecordRepository struct {
+	records []*entity.PlayerWorldsendRecord
+	err     error
+}
+
+func (s *stubWorldsendRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerWorldsendRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+type stubSongRepository struct {
+	songs []*entity.Song
+	err   error
+}
+
+func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.songs, nil
+}
+
+func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) FindByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) ([]*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) FindLatestUpdatedAt(ctx context.Context, exec repository.Executor) (*time.Time, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubSongRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+type stubSongMasterProvider struct {
+	masters *masterdata.SongMasters
+}
+
+func (s *stubSongMasterProvider) SongMasters() *masterdata.SongMasters {
+	return s.masters
+}
+
+func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
+	switch id {
+	case info.AccountTypePlayer:
+		return "PLAYER"
+	case info.AccountTypeEditor:
+		return "EDITOR"
+	case info.AccountTypeAdmin:
+		return "ADMIN"
+	default:
+		return "UNKNOWN"
 	}
 }
 
-func TestUserService_GetUserProfileWithRecords_PlayerNotLinked(t *testing.T) {
+type stubWorldsendChartRepository struct {
+	records []*entity.WorldsendSongWithChart
+	err     error
+}
+
+func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubWorldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
+	return nil, errors.New("not implemented")
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil, false)
+	require.ErrorIs(t, err, ErrUserNotFound)
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
 	user := &entity.User{ID: 1}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil)
-	if !errors.Is(err, ErrPlayerNotLinked) {
-		t.Fatalf("expected ErrPlayerNotLinked, got %v", err)
-	}
+	result, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 1, result.UserID)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
 }
 
-func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
+func TestUserUsecase_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 	now := time.Now()
 	un, _ := username.NewUserName("selfuser")
 	user := &entity.User{
@@ -155,20 +294,109 @@ func TestUserService_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 		PlayerID:  intPointer(1),
 		IsPrivate: true,
 	}
-	player := &dto.PlayerDTO{
-		Name:      "SelfPlayer",
+	player := &entity.Player{
+		ID:        1,
+		Name:      playername.MustNewPlayerName("セルフプレイヤー"),
 		Level:     1,
 		UpdatedAt: now,
 	}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{}, &stubPlayerService{player: player})
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1}, false)
+	require.NoError(t, err)
 }
 
-func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
+func TestUserUsecase_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilPlayerAndRecords(t *testing.T) {
+	un, _ := username.NewUserName("tester")
+	user := &entity.User{
+		ID:       1,
+		Username: un,
+		PlayerID: intPointer(1),
+	}
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
+	now := time.Now()
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	playerUpdatedAt := now
+	scoreUpdatedAt := now.Add(time.Hour)
+
+	t.Run("レコード更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
+		service := NewUserUsecase(
+			nil,
+			&stubUserRepository{user: user},
+			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
+				ID:        1,
+				Name:      playername.MustNewPlayerName("テストプレイヤー"),
+				Level:     1,
+				UpdatedAt: playerUpdatedAt,
+			}, Honors: []*entity.PlayerHonor{}}},
+			&stubPlayerRecordRepository{lastScoreUpdate: &scoreUpdatedAt},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.UpdatedAt)
+		assert.True(t, scoreUpdatedAt.Equal(*result.UpdatedAt))
+	})
+
+	t.Run("プロフィール更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
+		service := NewUserUsecase(
+			nil,
+			&stubUserRepository{user: user},
+			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
+				ID:        1,
+				Name:      playername.MustNewPlayerName("テストプレイヤー"),
+				Level:     1,
+				UpdatedAt: playerUpdatedAt,
+			}, Honors: []*entity.PlayerHonor{}}},
+			&stubPlayerRecordRepository{lastScoreUpdate: timePointer(now.Add(-time.Hour))},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.UpdatedAt)
+		assert.True(t, playerUpdatedAt.Equal(*result.UpdatedAt))
+	})
+
+	t.Run("プレイヤー未連携時は nil を返す", func(t *testing.T) {
+		service := NewUserUsecase(
+			nil,
+			&stubUserRepository{user: &entity.User{ID: 1}},
+			&stubPlayerRepository{},
+			&stubPlayerRecordRepository{},
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Nil(t, result.UpdatedAt)
+	})
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
@@ -202,11 +430,11 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 				Artist:    "Artist A",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 1, Name: "FAILED"},
-			ComboLamp:       &entity.ComboLampType{ID: 1, Name: "NONE"},
-			FullChain:       &entity.FullChainType{ID: 1, Name: "NONE"},
-			Slot:            &entity.Slot{ID: 1, Name: "best"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 2, Name: "EXPERT"},
+			ClearLamp:       &master.ClearLampType{ID: 1, Name: "FAILED"},
+			ComboLamp:       &master.ComboLampType{ID: 1, Name: "NONE"},
+			FullChain:       &master.FullChainType{ID: 1, Name: "NONE"},
+			Slot:            &master.Slot{ID: 1, Name: "best"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 2, Name: "EXPERT"},
 		},
 		{
 			PlayerID:    1,
@@ -231,66 +459,106 @@ func TestUserService_GetUserProfileWithRecords_Success(t *testing.T) {
 				Artist:    "Artist B",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 2, Name: "CLEAR"},
-			ComboLamp:       &entity.ComboLampType{ID: 2, Name: "FC"},
-			FullChain:       &entity.FullChainType{ID: 2, Name: "FC"},
-			Slot:            &entity.Slot{ID: 2, Name: "new_candidate"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "MASTER"},
+			ClearLamp:       &master.ClearLampType{ID: 2, Name: "CLEAR"},
+			ComboLamp:       &master.ComboLampType{ID: 2, Name: "FC"},
+			FullChain:       &master.FullChainType{ID: 2, Name: "FC"},
+			Slot:            &master.Slot{ID: 2, Name: "new_candidate"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "MASTER"},
 		},
 	}
 
 	playerUpdatedAt := now.Add(-time.Hour) // プレイヤーのupdated_atはレコードより前の時刻
 	rating := 15.0
-	player := &dto.PlayerDTO{
-		Name:      "TestPlayer",
-		Level:     100,
-		Rating:    &rating,
-		UpdatedAt: playerUpdatedAt,
-	}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, OfficialRating: &rating, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{records: records}, &stubPlayerService{player: player})
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.UserID)
 
 	// updated_atの検証
-	expectedRecordUpdatedAt := now
-	if !result.Records.UpdatedAt.Equal(expectedRecordUpdatedAt) {
-		t.Fatalf("expected updated_at to be %v, got %v", expectedRecordUpdatedAt, result.Records.UpdatedAt)
-	}
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
 
 	// 各スロットの長さを検証
-	if len(result.Records.Best) != 1 {
-		t.Fatalf("expected 1 record for best, got %d", len(result.Records.Best))
-	}
-	if len(result.Records.NewCandidate) != 1 {
-		t.Fatalf("expected 1 record for new_candidate, got %d", len(result.Records.NewCandidate))
-	}
-	if len(result.Records.BestCandidate) != 0 {
-		t.Fatalf("expected 0 records for best_candidate, got %d", len(result.Records.BestCandidate))
-	}
-	if len(result.Records.New) != 0 {
-		t.Fatalf("expected 0 records for new, got %d", len(result.Records.New))
-	}
-	if len(result.Records.All) != 2 {
-		t.Fatalf("expected 2 records for all, got %d", len(result.Records.All))
-	}
+	require.Len(t, result.Records.Best, 1)
+	assert.Len(t, result.Records.NewCandidate, 1)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Empty(t, result.Records.New)
+	assert.Len(t, result.Records.All, 2)
 
 	bestRecord := result.Records.Best[0]
-	if bestRecord.Const != chartConst {
-		t.Fatalf("expected chart const to be %v, got %v", chartConst, bestRecord.Const)
-	}
-	if bestRecord.Slot == nil || *bestRecord.Slot != "best" {
-		t.Fatalf("expected slot name best, got %v", bestRecord.Slot)
-	}
-	if bestRecord.Difficulty != "EXPERT" {
-		t.Fatalf("expected difficulty EXPERT, got %v", bestRecord.Difficulty)
-	}
+	assert.Equal(t, chartConst, bestRecord.Const)
+	require.NotNil(t, bestRecord.Slot)
+	assert.Equal(t, "best", *bestRecord.Slot)
+	assert.Equal(t, "EXPERT", bestRecord.Difficulty)
 }
 
-func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
+func TestUserUsecase_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t *testing.T) {
+	now := time.Now()
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 10, UpdatedAt: now}
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result.Player)
+	require.NotNil(t, result.Player.Honors)
+	assert.Empty(t, result.Player.Honors)
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
+	now := time.Now()
+	scorePlayed, _ := score.NewScore(1000000)
+	chartConst, _ := chartconstant.NewChartConstant(12.4)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: now.Add(-time.Hour)}
+	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
+	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
+	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
+	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
+
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			ChartID:         1001,
+			Score:           scorePlayed,
+			UpdatedAt:       now,
+			Chart:           playedSong.Charts[0],
+			Song:            playedSong,
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
+		}}},
+		&stubWorldsendRecordRepository{},
+		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
+		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
+	)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
+	require.NoError(t, err)
+
+	require.Len(t, result.Records.All, 2)
+	assert.True(t, result.Records.All[0].IsPlayed, "expected first record is played")
+	assert.False(t, result.Records.All[1].IsPlayed, "expected second record is unplayed")
+	assert.Empty(t, result.Records.Best)
+	assert.Empty(t, result.Records.New)
+	assert.Empty(t, result.Records.NewCandidate)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Nil(t, result.Records.All[1].UpdatedAt, "expected unplayed updated_at nil")
+	assert.Nil(t, result.Records.All[1].ClearLamp, "expected unplayed clear_lamp nil")
+	assert.Equal(t, "EXPERT", result.Records.All[0].Difficulty)
+	assert.Equal(t, "MASTER", result.Records.All[1].Difficulty)
+	require.Len(t, result.Records.WorldsEnd, 1)
+	assert.False(t, result.Records.WorldsEnd[0].IsPlayed, "expected worldsend completion record is unplayed")
+
+	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
+	assert.Nil(t, result.Records.All[0].Slot, "expected all record slot nil")
+}
+
+func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
@@ -324,11 +592,11 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 				Artist:    "Artist A",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 1, Name: "FAILED"},
-			ComboLamp:       &entity.ComboLampType{ID: 1, Name: "NONE"},
-			FullChain:       &entity.FullChainType{ID: 1, Name: "NONE"},
-			Slot:            &entity.Slot{ID: 1, Name: "best"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 2, Name: "EXPERT"},
+			ClearLamp:       &master.ClearLampType{ID: 1, Name: "FAILED"},
+			ComboLamp:       &master.ComboLampType{ID: 1, Name: "NONE"},
+			FullChain:       &master.FullChainType{ID: 1, Name: "NONE"},
+			Slot:            &master.Slot{ID: 1, Name: "best"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 2, Name: "EXPERT"},
 		},
 		{
 			PlayerID:    1,
@@ -353,61 +621,214 @@ func TestUserService_GetUserProfileRatingView_Success(t *testing.T) {
 				Artist:    "Artist B",
 				Charts:    []*entity.Chart{},
 			},
-			ClearLamp:       &entity.ClearLampType{ID: 2, Name: "CLEAR"},
-			ComboLamp:       &entity.ComboLampType{ID: 2, Name: "FC"},
-			FullChain:       &entity.FullChainType{ID: 2, Name: "FC"},
-			Slot:            &entity.Slot{ID: 2, Name: "new_candidate"},
-			ChartDifficulty: &entity.ChartDifficulty{ID: 3, Name: "MASTER"},
+			ClearLamp:       &master.ClearLampType{ID: 2, Name: "CLEAR"},
+			ComboLamp:       &master.ComboLampType{ID: 2, Name: "FC"},
+			FullChain:       &master.FullChainType{ID: 2, Name: "FC"},
+			Slot:            &master.Slot{ID: 2, Name: "new_candidate"},
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "MASTER"},
 		},
 	}
 
 	playerUpdatedAt := now.Add(-time.Hour)
-	player := &dto.PlayerDTO{
-		Name:      "TestPlayer",
-		Level:     100,
-		UpdatedAt: playerUpdatedAt,
-	}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserService(nil, &stubUserRepository{user: user}, &stubPlayerRecordRepository{ratingRecords: records}, &stubPlayerService{player: player})
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{ratingRecords: records}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	expectedRecordUpdatedAt := now
-	if !result.Records.UpdatedAt.Equal(expectedRecordUpdatedAt) {
-		t.Fatalf("expected updated_at to be %v, got %v", expectedRecordUpdatedAt, result.Records.UpdatedAt)
-	}
-
-	if len(result.Records.Best) != 1 {
-		t.Fatalf("expected 1 record for best, got %d", len(result.Records.Best))
-	}
-	if len(result.Records.NewCandidate) != 1 {
-		t.Fatalf("expected 1 record for new_candidate, got %d", len(result.Records.NewCandidate))
-	}
-	if len(result.Records.BestCandidate) != 0 {
-		t.Fatalf("expected 0 records for best_candidate, got %d", len(result.Records.BestCandidate))
-	}
-	if len(result.Records.New) != 0 {
-		t.Fatalf("expected 0 records for new, got %d", len(result.Records.New))
-	}
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
+	assert.Len(t, result.Records.Best, 1)
+	assert.Len(t, result.Records.NewCandidate, 1)
+	assert.Empty(t, result.Records.BestCandidate)
+	assert.Empty(t, result.Records.New)
 }
 
-func TestUserService_GetAllUsersForAdmin(t *testing.T) {
+func TestUserUsecase_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
+	user := &entity.User{ID: 1}
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileRatingView(context.Background(), "no-player", nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
+	now := time.Now()
+	scorePlayed, _ := score.NewScore(1000000)
+	chartConst, _ := chartconstant.NewChartConstant(12.4)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: now.Add(-time.Hour)}
+	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
+	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
+	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
+	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
+
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			ChartID:         1001,
+			Score:           scorePlayed,
+			UpdatedAt:       now,
+			Chart:           playedSong.Charts[0],
+			Song:            playedSong,
+			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
+		}}},
+		&stubWorldsendRecordRepository{},
+		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
+		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)
+	require.NoError(t, err)
+
+	require.NotNil(t, result)
+	require.NotNil(t, result.Records)
+	require.Len(t, result.Records.All, 2)
+	assert.True(t, result.Records.All[0].IsPlayed, "expected first record is played")
+	assert.False(t, result.Records.All[1].IsPlayed, "expected second record is unplayed")
+	assert.Nil(t, result.Records.All[1].UpdatedAt, "expected unplayed updated_at nil")
+	assert.Nil(t, result.Records.All[1].ClearLamp, "expected unplayed clear_lamp nil")
+	assert.Equal(t, "EXPERT", result.Records.All[0].Difficulty)
+	assert.Equal(t, "MASTER", result.Records.All[1].Difficulty)
+
+	require.Len(t, result.Records.Worldsend, 1)
+	assert.False(t, result.Records.Worldsend[0].IsPlayed, "expected worldsend completion record is unplayed")
+}
+
+func TestUserUsecase_GetUserProfileRecordView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
+	user := &entity.User{ID: 1}
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "no-player", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Player)
+	assert.Nil(t, result.Records)
+	assert.Nil(t, result.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerUpdatedAt(t *testing.T) {
+	now := time.Now()
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: now}
+
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+
+	assert.True(t, result.Records.UpdatedAt.Equal(now))
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
+	}
+
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
+}
+
+func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLatest(t *testing.T) {
+	playerUpdatedAt := time.Now().Add(-2 * time.Hour)
+	worldsendUpdatedAt := playerUpdatedAt.Add(time.Hour)
+	scorePlayed, err := score.NewScore(1000000)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: playerUpdatedAt}
+	worldsendRecord := &entity.PlayerWorldsendRecord{
+		PlayerID:         1,
+		WorldsendChartID: 3001,
+		Score:            scorePlayed,
+		UpdatedAt:        worldsendUpdatedAt,
+		Song:             &entity.Song{ID: 30, DisplayID: "we30", Title: "WE Song", Artist: "WE Artist"},
+		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
+	}
+
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{}},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{worldsendRecord}},
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	require.NoError(t, err)
+	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
+}
+
+func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
-	pn1, _ := playername.NewPlayerName("player1")
+	pn1, _ := playername.NewPlayerName("プレイヤー１")
+	uid1 := "firebase-uid-1"
+	email1 := "user1@example.com"
 	rating1 := 15.0
 	op1 := 10.0
+	createdAt1 := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	updatedAt1 := createdAt1.Add(2 * time.Hour)
 
 	un2, _ := username.NewUserName("user2")
+	createdAt2 := time.Date(2025, 2, 3, 4, 5, 6, 0, time.UTC)
+	updatedAt2 := createdAt2.Add(3 * time.Hour)
 
 	usersWithPlayer := []entity.UserWithPlayer{
 		{
 			User: entity.User{
-				ID:       1,
-				Username: un1,
-				PlayerID: intPointer(1),
+				ID:            1,
+				Username:      un1,
+				FirebaseUID:   &uid1,
+				AccountTypeID: info.AccountTypeAdmin,
+				CreatedAt:     createdAt1,
+				UpdatedAt:     updatedAt1,
+				PlayerID:      intPointer(1),
+				IsSuspicious:  true,
 			},
 			Player: &entity.Player{
 				ID:             1,
@@ -418,9 +839,13 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 		},
 		{
 			User: entity.User{
-				ID:       2,
-				Username: un2,
-				PlayerID: nil,
+				ID:            2,
+				Username:      un2,
+				AccountTypeID: info.AccountTypePlayer,
+				CreatedAt:     createdAt2,
+				UpdatedAt:     updatedAt2,
+				PlayerID:      nil,
+				IsSuspicious:  false,
 			},
 			Player: nil,
 		},
@@ -429,124 +854,97 @@ func TestUserService_GetAllUsersForAdmin(t *testing.T) {
 	repo := &stubUserRepository{
 		usersWithPlayer: usersWithPlayer,
 	}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, &stubSongMasterProvider{})
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.firebaseEmailLookup = &stubFirebaseUserEmailLookup{
+		emailsByUID: map[string]string{uid1: email1},
+	}
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(list) != 2 {
-		t.Fatalf("expected 2 users, got %d", len(list))
-	}
+	require.Len(t, list, 2)
 
 	// Verify User 1
-	if list[0].UserName != "user1" {
-		t.Errorf("expected username user1, got %s", list[0].UserName)
-	}
-	if list[0].PlayerName != "player1" {
-		t.Errorf("expected player name player1, got %s", list[0].PlayerName)
-	}
-	if list[0].Rating == nil || *list[0].Rating != 15.0 {
-		t.Errorf("expected rating 15.0, got %v", list[0].Rating)
-	}
-	if list[0].OverPowerValue == nil || *list[0].OverPowerValue != 10.0 {
-		t.Errorf("expected overpower 10.0, got %v", list[0].OverPowerValue)
-	}
+	assert.Equal(t, "user1", list[0].UserName)
+	assert.Equal(t, "ADMIN", list[0].AccountType)
+	assert.True(t, list[0].CreatedAt.Equal(createdAt1))
+	assert.True(t, list[0].UpdatedAt.Equal(updatedAt1))
+	assert.True(t, list[0].IsSuspicious)
+	require.NotNil(t, list[0].PlayerName)
+	assert.Equal(t, "プレイヤー１", *list[0].PlayerName)
+	require.NotNil(t, list[0].Rating)
+	assert.Equal(t, 15.0, *list[0].Rating)
+	require.NotNil(t, list[0].OverPowerValue)
+	assert.Equal(t, 10.0, *list[0].OverPowerValue)
+	require.NotNil(t, list[0].FirebaseUID)
+	assert.Equal(t, uid1, *list[0].FirebaseUID)
+	require.NotNil(t, list[0].Email)
+	assert.Equal(t, email1, *list[0].Email)
 
 	// Verify User 2 (No player)
-	if list[1].UserName != "user2" {
-		t.Errorf("expected username user2, got %s", list[1].UserName)
-	}
-	if list[1].PlayerName != "" {
-		t.Errorf("expected empty player name, got %s", list[1].PlayerName)
-	}
+	assert.Equal(t, "user2", list[1].UserName)
+	assert.Equal(t, "PLAYER", list[1].AccountType)
+	assert.True(t, list[1].CreatedAt.Equal(createdAt2))
+	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
+	assert.False(t, list[1].IsSuspicious)
+	assert.Nil(t, list[1].PlayerName)
+	assert.Nil(t, list[1].FirebaseUID)
+	assert.Nil(t, list[1].Email)
 }
 
 func intPointer(v int) *int {
 	return &v
 }
 
-func TestUserService_DeleteUser_Success(t *testing.T) {
+func timePointer(v time.Time) *time.Time {
+	return &v
+}
+
+func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
 	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: false,
+		ID:       1,
+		Username: un,
 	}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	err := service.DeleteUser(context.Background(), "testuser")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+	require.NoError(t, err)
+	assert.Equal(t, 1, repo.deletedUserID)
 }
 
-func TestUserService_DeleteUser_UserNotFound(t *testing.T) {
-	repo := &stubUserRepository{err: sql.ErrNoRows}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
+	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
+	repo := &stubUserRepository{err: repository.ErrUserNotFound}
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	err := service.DeleteUser(context.Background(), "missing")
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
+	err := service.DeleteUser(context.Background(), adminRequester, "missing")
+	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
-func TestUserService_DeleteUser_AlreadyDeleted(t *testing.T) {
-	un, _ := username.NewUserName("deleteduser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: true,
-	}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+func TestUserUsecase_DeleteUser_AdminRequired(t *testing.T) {
+	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	err := service.DeleteUser(context.Background(), "deleteduser")
-	if !errors.Is(err, ErrUserAlreadyDeleted) {
-		t.Fatalf("expected ErrUserAlreadyDeleted, got %v", err)
-	}
+	err := service.DeleteUser(context.Background(), normalUser, "testuser")
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
-func TestUserService_RestoreUser_Success(t *testing.T) {
-	un, _ := username.NewUserName("deleteduser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: true,
-	}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+func TestUserUsecase_DeleteUser_UnknownRoleRejected(t *testing.T) {
+	unknownRoleUser := &entity.User{ID: 1, AccountTypeID: 4}
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	err := service.RestoreUser(context.Background(), "deleteduser")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := service.DeleteUser(context.Background(), unknownRoleUser, "testuser")
+	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
-func TestUserService_RestoreUser_UserNotFound(t *testing.T) {
-	repo := &stubUserRepository{err: sql.ErrNoRows}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
+func TestUserUsecase_DeleteUser_NilRequester(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	err := service.RestoreUser(context.Background(), "missing")
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Fatalf("expected ErrUserNotFound, got %v", err)
-	}
-}
-
-func TestUserService_RestoreUser_NotDeleted(t *testing.T) {
-	un, _ := username.NewUserName("activeuser")
-	user := &entity.User{
-		ID:        1,
-		Username:  un,
-		IsDeleted: false,
-	}
-	repo := &stubUserRepository{user: user}
-	service := NewUserService(nil, repo, &stubPlayerRecordRepository{}, &stubPlayerService{})
-
-	err := service.RestoreUser(context.Background(), "activeuser")
-	if !errors.Is(err, ErrUserNotDeleted) {
-		t.Fatalf("expected ErrUserNotDeleted, got %v", err)
-	}
+	err := service.DeleteUser(context.Background(), nil, "testuser")
+	require.ErrorIs(t, err, ErrAdminRequired)
 }

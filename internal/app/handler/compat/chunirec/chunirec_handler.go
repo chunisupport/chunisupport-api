@@ -6,11 +6,11 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 )
 
@@ -18,18 +18,14 @@ import (
 type ChunirecHandler struct {
 	songUsecase usecase.SongUsecase
 	userUsecase usecase.UserUsecase
-	userRepo    repository.UserRepository
-	db          *sqlx.DB
 	masterCache *masterdata.Cache
 }
 
 // NewChunirecHandler はChunirecHandlerの新しいインスタンスを返します
-func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, userRepo repository.UserRepository, db *sqlx.DB, masterCache *masterdata.Cache) *ChunirecHandler {
+func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache) *ChunirecHandler {
 	return &ChunirecHandler{
 		songUsecase: songUsecase,
 		userUsecase: userUsecase,
-		userRepo:    userRepo,
-		db:          db,
 		masterCache: masterCache,
 	}
 }
@@ -39,8 +35,8 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	// 楽曲を取得 (削除済みを含まない)
-	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false)
+	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}
@@ -64,7 +60,8 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	}
 
 	// 楽曲を取得
-	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID)
+	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
+	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID, requesterAccountTypeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return apierror.ErrSongNotFound
@@ -105,7 +102,7 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 	}
 
 	// ユーザープロファイルとレコードを取得
-	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester)
+	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester, false)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
@@ -113,28 +110,14 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 		case errors.Is(err, usecase.ErrUserPrivate):
 			// セキュリティ: 非公開と未発見を区別しない
 			return apierror.ErrUserNotFound
-		case errors.Is(err, usecase.ErrPlayerNotLinked):
-			// セキュリティ: プレイヤー未紐付も404で隠蔽
-			return apierror.ErrUserNotFound
 		default:
 			slog.Error("failed to get user profile", "username", username, "error", err)
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}
 
-	// UserIDを取得するため、UserRepositoryから対象ユーザーのエンティティを取得
-	// TODO: UserProfileWithRecordsDTOにUserIDフィールドを追加してリファクタリング
-	user, err := h.userRepo.FindByUsername(ctx, h.db, username)
-	if err != nil {
-		slog.Error("failed to get user entity for UserID", "username", username, "error", err)
-		return apierror.ErrInternalError.WithInternal(err)
-	}
-	if user == nil {
-		return apierror.ErrUserNotFound
-	}
-
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, user.ID, h.masterCache)
+	response := ToChunirecUserDTO(result, h.masterCache)
 
 	return c.JSON(http.StatusOK, response)
 }

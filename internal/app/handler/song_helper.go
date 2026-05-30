@@ -2,12 +2,14 @@ package handler
 
 import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/labstack/echo/v4"
 )
 
 const (
-	MinDifficultyID = 1
-	MaxDifficultyID = 5
+	MinDifficultyID = domainservice.DifficultyIDBasic
+	MaxDifficultyID = domainservice.DifficultyIDUltima
 )
 
 // ParseDifficultyPath はパスパラメータを内部難易度名に変換します。
@@ -41,4 +43,20 @@ func BuildChartsMap[T any](
 	}
 
 	return chartsMap
+}
+
+// GetRequesterAccountTypeID はコンテキストからログインユーザーのAccountTypeIDを取得します。
+// ユーザーがログインしていない場合はnilを返します。
+func GetRequesterAccountTypeID(c echo.Context) *int {
+	userObj := c.Get("userEntity")
+	if userObj == nil {
+		return nil
+	}
+
+	user, ok := userObj.(*entity.User)
+	if !ok {
+		return nil
+	}
+
+	return &user.AccountTypeID
 }

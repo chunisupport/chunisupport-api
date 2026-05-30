@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -24,8 +23,8 @@ type apiTokenUsecase struct {
 	userRepo  repository.UserRepository
 }
 
-// NewAPITokenService はAPITokenUsecaseを生成します。
-func NewAPITokenService(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
+// NewAPITokenUsecase はAPITokenUsecaseを生成します。
+func NewAPITokenUsecase(db repository.Executor, tokenRepo repository.APITokenRepository, userRepo repository.UserRepository) APITokenUsecase {
 	return &apiTokenUsecase{
 		db:        db,
 		tokenRepo: tokenRepo,
@@ -55,6 +54,19 @@ func (us *apiTokenUsecase) Generate(ctx context.Context, userID int) (string, er
 	return plain, nil
 }
 
+// GetStatus はユーザーに紐づくAPIトークンの状態を返します。未発行の場合は nil を返します。
+func (us *apiTokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+	token, err := us.tokenRepo.FindByUserID(ctx, us.db, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAPITokenNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return token, nil
+}
+
 // Validate はAPIトークンを検証し、有効な場合はユーザーとトークン情報を返します。
 func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
 	if rawToken == "" {
@@ -64,7 +76,7 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 	hashed := hashToken(rawToken)
 	token, err := us.tokenRepo.FindByHashedToken(ctx, us.db, hashed)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrAPITokenNotFound) {
 			return nil, nil, ErrInvalidAPIToken
 		}
 		return nil, nil, err
@@ -72,14 +84,10 @@ func (us *apiTokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 
 	user, err := us.userRepo.FindByID(ctx, us.db, token.UserID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, nil, ErrInvalidAPIToken
 		}
 		return nil, nil, err
-	}
-
-	if !user.IsActive() {
-		return nil, nil, ErrInvalidAPIToken
 	}
 
 	return user, token, nil

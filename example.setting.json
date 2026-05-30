@@ -7,17 +7,23 @@
   },
   "static_db_path": "./static.db",
   "shutdown_timeout_seconds": 20,
-  "auth": {
-    "jwt_expiration_hour": 24,
-    "session_expiration_hour": 24,
-    "cookie_secure": false,
-    "cookie_same_site": "lax"
-  },
   "cors": {
     "allow_origins": [
       "http://localhost:3000"
     ],
     "allow_credentials": true,
     "max_age": 3600
+  },
+  "database": {
+    "startup": {
+      "max_wait_sec": 600,
+      "interval_sec": 1
+    },
+    "pool": {
+      "max_open_conns": 25,
+      "max_idle_conns": 25,
+      "conn_max_lifetime_sec": 300,
+      "conn_max_idle_time_sec": 60
+    }
   }
 }

@@ -13,10 +13,10 @@ type MockChartStatsUsecase struct {
 	Err         error
 }
 
-func (m *MockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string) (*entity.SongChartStats, error) {
+func (m *MockChartStatsUsecase) GetSongStatsByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SongChartStats, error) {
 	return m.Stats, m.Err
 }
 
-func (m *MockChartStatsUsecase) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string) (*entity.SingleChartStats, error) {
+func (m *MockChartStatsUsecase) GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error) {
 	return m.SingleStats, m.Err
 }

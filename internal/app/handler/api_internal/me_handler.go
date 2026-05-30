@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -80,7 +81,7 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 	hashText := hex.EncodeToString(hash[:])
 
 	// 未知のフィールドを検出するため、まずmapにデコード
-	var rawMap map[string]interface{}
+	var rawMap map[string]any
 	if err := json.Unmarshal(jsonData, &rawMap); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
@@ -110,7 +111,7 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 
 	// 未知のフィールドがあれば警告ログを出力
 	if len(unknownFields) > 0 {
-		c.Logger().Warnf("unknown fields in player data payload: %v (user: %s)", unknownFields, user.ID)
+		slog.Warn("unknown fields in player data payload", "unknown_fields", unknownFields, "user_id", user.ID)
 	}
 
 	// 正式な構造体にデコード（未知フィールドは無視される）
@@ -151,14 +152,16 @@ func decodeAndDecompressGzipBase64(data []byte) ([]byte, error) {
 	}
 	decoded = decoded[:n]
 
-	// Gzip解凍
+	// Gzip解凍（Gzip Bomb対策: 解凍後サイズに上限を設定）
 	gzipReader, err := gzip.NewReader(bytes.NewReader(decoded))
 	if err != nil {
 		return nil, err
 	}
 	defer gzipReader.Close()
 
-	decompressed, err := io.ReadAll(gzipReader)
+	// io.LimitReaderで解凍後サイズを制限し、圧縮爆弾によるメモリ枯渇を防止
+	limitedReader := io.LimitReader(gzipReader, int64(maxPlayerDataPayloadSize)+1)
+	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

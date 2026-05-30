@@ -34,7 +34,7 @@
 ### User（ユーザー集約ルート）
 
 #### 概要
-システム利用者を表す集約ルート。認証情報、プレイヤー紐付け、プライバシー設定を管理します。
+システム利用者を表す集約ルート。Firebase 連携、プレイヤー紐付け、プライバシー設定を管理します。
 
 #### フィールド
 
@@ -42,21 +42,17 @@
 |------------|-----|-----|------|
 | ID | int | ✓ | ユーザーID（主キー） |
 | Username | username.UserName | ✓ | ユーザー名（値オブジェクト） |
-| PasswordHash | passwordhash.PasswordHash | ✓ | パスワードハッシュ（値オブジェクト） |
+| FirebaseUID | *string | - | 連携済み Firebase UID |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
 | PlayerID | *int | - | 紐付けられたプレイヤーID |
 | AccountTypeID | int | ✓ | アカウント種別ID |
-| IsDeleted | bool | ✓ | 論理削除フラグ |
+| IsSuspicious | bool | ✓ | 不審アカウントフラグ |
 | IsPrivate | bool | ✓ | 非公開設定フラグ |
 
 #### 振る舞い（メソッド）
 
 ##### クエリメソッド
-
-- **IsActive() bool**
-  - ユーザーが有効（削除されていない）かを判定
-  - 返り値: `!IsDeleted`
 
 - **IsPublic() bool**
   - ユーザーが公開設定かを判定
@@ -66,29 +62,32 @@
   - ユーザーにプレイヤーが紐づいているかを判定
   - 返り値: `PlayerID != nil`
 
+- **HasLinkedFirebase() bool**
+  - ユーザーに Firebase UID が紐づいているかを判定
+  - 返り値: `FirebaseUID != nil && *FirebaseUID != ""`
+
 ##### コマンドメソッド
 
 - **ChangePrivacy(isPrivate bool)**
   - ユーザーの公開/非公開設定を変更
   - 副作用: `UpdatedAt` を現在時刻に更新
 
-- **ChangePassword(hash passwordhash.PasswordHash)**
-  - ユーザーのパスワードハッシュを変更
-  - 副作用: `UpdatedAt` を現在時刻に更新
-
-- **Delete()**
-  - ユーザーを論理削除
-  - 副作用: `IsDeleted = true`, `UpdatedAt` を現在時刻に更新
+- **LinkFirebaseUID(uid string)**
+  - ユーザーに Firebase UID を紐付ける（空文字や空白のみの場合は解除扱い）
+  - 副作用: `FirebaseUID` を更新し、`UpdatedAt` を現在時刻に更新
 
 - **LinkPlayer(playerID int)**
   - ユーザーにプレイヤーを紐付け
   - 副作用: `PlayerID` を設定、`UpdatedAt` を現在時刻に更新
 
+- **UnlinkPlayer()**
+  - ユーザーからプレイヤーとの紐付けを解除
+  - 副作用: `PlayerID = nil`, `UpdatedAt` を現在時刻に更新
+
 #### 不変条件
 
 - `Username` は5文字以上50文字以内の小文字英数字
-- `PasswordHash` はbcryptハッシュ形式
-- 削除済みユーザー（`IsDeleted = true`）は無効とみなされる
+- `FirebaseUID` を保持する場合は空文字や空白のみを許容しない
 
 ---
 
@@ -192,15 +191,32 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | Artist | string | ✓ | アーティスト名 |
 | GenreID | *int | - | ジャンルID |
 | BPM | *int | - | BPM（テンポ） |
-| ReleaseDate | *time.Time | - | リリース日 |
-| OfficialIdx | *string | - | 公式インデックス |
-| Img | *string | - | ジャケット画像URL |
+| ReleasedAt | *time.Time | - | リリース日 |
+| OfficialIdx | string | ✓ | 公式インデックス |
+| Jacket | *string | - | ジャケット画像URL |
+| Charts | []*Chart | - | この楽曲に紐づく譜面リスト |
+| MaxChartConst | float64 | - | 全譜面のうち最大の譜面定数（ドメインサービスで算出） |
+| IsMaxOPUnknown | bool | ✓ | MASTER/ULTIMAに未判明定数が含まれる場合true（ドメインサービスで算出） |
 | IsWorldsend | bool | ✓ | WORLD'S END楽曲フラグ |
 | IsDeleted | bool | ✓ | 削除フラグ |
 
 #### 振る舞い（メソッド）
 
-現在、振る舞いメソッドなし（データ保持のみ）。
+##### クエリメソッド
+
+- **IsActive() bool**
+  - 楽曲が有効（削除されていない）かを判定
+  - 返り値: `!IsDeleted`
+
+##### コマンドメソッド
+
+- **Delete()**
+  - 楽曲を論理削除
+  - 副作用: `IsDeleted = true`
+
+- **Restore()**
+  - 楽曲の論理削除を解除
+  - 副作用: `IsDeleted = false`
 
 #### 不変条件
 
@@ -221,7 +237,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 |------------|-----|-----|------|
 | ID | int | ✓ | 譜面ID（主キー） |
 | SongID | int | ✓ | 楽曲ID（外部キー） |
-| DifficultyID | int | ✓ | 難易度ID（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END） |
+| DifficultyID | int | ✓ | 難易度ID（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA） |
 | Const | chartconstant.ChartConstant | ✓ | 譜面定数（値オブジェクト） |
 | IsConstUnknown | bool | ✓ | 譜面定数が未確定かどうか |
 | Notes | *notes.Notes | - | ノーツ数（値オブジェクト） |
@@ -232,9 +248,36 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 #### 不変条件
 
-- `Const` は0.0～15.9の範囲（通常譜面の場合）
-- `Notes` は正の整数
+- `Const` は0.0～16.0の範囲（通常譜面の場合）
+- `Notes` は0以上の整数
 - `SongID` + `DifficultyID` の組み合わせは一意
+
+---
+
+### WorldsendChart（WORLD'S END譜面エンティティ）
+
+#### 概要
+WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。通常譜面の `Chart` とは別に管理します。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| ID | int | ✓ | WORLD'S END譜面ID（主キー） |
+| SongID | int | ✓ | 楽曲ID（外部キー） |
+| LevelStar | *levelstar.LevelStar | - | WORLD'S ENDレベル（1〜5） |
+| Attribute | *string | - | WORLD'S END属性 |
+| Notes | *notes.Notes | - | ノーツ数 |
+
+#### 振る舞い（メソッド）
+
+現在、振る舞いメソッドなし（データ保持のみ）。
+
+#### 不変条件
+
+- WORLD'S END は1曲につき1譜面のみ
+- `LevelStar` は 1〜5 の範囲
+- `Notes` は0以上の整数
 
 ---
 
@@ -243,7 +286,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 以下のエンティティは主にマスターデータとして機能します：
 
 - **AccountType**: アカウント種別（一般、管理者など）
-- **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA, WORLD'S END）
+- **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）
 - **ClearLampType**: クリアランプ種別（FAILED, CLEAR, HARD, AB, AJなど）
 - **ComboLampType**: コンボランプ種別（NONE, FC, AJ）
 - **FullChainType**: フルチェーン種別（NONE, FULL CHAIN, FULL CHAIN PLATINUM）
@@ -252,7 +295,62 @@ CHUNITHM の楽曲情報を表すエンティティ。
 - **ClassEmblem**: クラスエンブレム（称号）
 - **ClassEmblemBase**: クラスエンブレムベース（称号の基礎デザイン）
 - **APIToken**: API認証トークン
-- **Session**: ユーザーセッション
+- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count` 等）
+
+---
+
+### Goal（目標エンティティ）
+
+#### 概要
+ユーザーが設定する目標を表すエンティティ。成果種別（`achievement_type`）と対象譜面の絞り込み条件（`attributes`）を持ち、達成状況の追跡に使用されます。1ユーザーあたり最大100件まで作成可能です。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| ID | uint32 | ✓ | 目標ID（主キー、自動採番） |
+| UserID | int | ✓ | 所属ユーザーID（外部キー） |
+| Title | string | ✓ | 目標タイトル（trim後30文字以内、空文字不可、制御文字不可） |
+| AchievementTypeID | int | ✓ | 成果種別ID（`achievement_types.id` への外部キー） |
+| AchievementType | string | - | 成果種別コード（DBには永続化されない。マスタ逆引きで出力時に解決） |
+| AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
+| Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
+| Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
+| CreatedAt | time.Time | ✓ | 作成日時 |
+
+#### 振る舞い（メソッド）
+
+現在、振る舞いメソッドなし。将来的に型安全な `AchievementParams` / `Attributes` 構造体への段階移行を予定。
+
+#### 不変条件
+
+- `Title` はtrim後に1文字以上30文字（ルーン単位）以内。制御文字を含まない
+- `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
+- `AchievementParams` は `AchievementType` に対応する構造のJSON
+- `Attributes` は許可キー（`diff`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
+
+#### `AchievementParams` の型整合ルール
+
+`achievement_type` と `achievement_params` の構造は厳密に対応しなければなりません。不一致は不正入力として4xxエラーを返します。詳細な仕様は `docs/API.md` の「`achievement_params` 仕様」を参照してください。
+
+#### `Attributes` の仕様
+
+| キー | 型 | 説明 |
+|---|---|---|
+| `diff` | `integer` | 難易度ID（`difficulties.id` と同値、1〜5）。IDの数値は順序を表すが、`genre`/`ver` とは異なり固定序列 |
+| `const` | `object` | 譜面定数レンジ（`min`/`max`。`float64`、小数1桁）。有効範囲: `1.0 ≤ min, max ≤ 16.0` |
+| `genre` | `integer` | ジャンルマスタID（単値）。IDの数値は順序を表さない |
+| `ver` | `integer` | バージョンマスタID（単値）。IDの数値は順序を表さない |
+
+`genre` / `ver` のIDは**存在確認（一致判定）のみに使用**し、IDの数値による順序比較・レンジ判定は行ってはなりません。
+
+#### DB設計の補足
+
+- `achievement_params` / `attributes` はDB上ではJSON型で保存されます
+- DB保存時はコンパクトJSON（インデントなし）で、バリデーション済み構造体から再エンコードしたJSONを保存します（入力原文をそのまま保持しません）
+- `updated_at` / 達成日時カラムは持ちません（楽曲追加により達成状態が揺らぐ可能性があるため）
+- `created_at` はソート基準として使用されます
 
 ---
 
@@ -401,8 +499,10 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 #### 制約
 
-- 1文字以上20文字以内
+- 1文字以上8文字以内（UTF-8のルーン数でカウント）
 - 空文字列は不可
+- 半角英数字（a-z, A-Z, 0-9）を含まない
+- 半角カタカナ（U+FF61〜U+FF9F）を含まない
 
 #### ファクトリメソッド
 
@@ -440,29 +540,6 @@ CHUNITHM の楽曲情報を表すエンティティ。
 - `Value() (driver.Value, error)`: int64に変換してDB保存
 - `Scan(value any) error`: int64/[]byte/stringからパース
 
----
-
-### passwordhash.PasswordHash
-
-#### 概要
-bcryptハッシュ化されたパスワードを表す値オブジェクト。
-
-#### 制約
-
-- bcrypt形式（`$2a$`で始まる60文字のハッシュ）
-- 空文字列は不可
-
-#### ファクトリメソッド
-
-- `NewPasswordHash(hash string) (PasswordHash, error)`: バリデーション付き生成
-- `HashFromPassword(password string) (PasswordHash, error)`: 平文パスワードからハッシュ生成
-
-#### メソッド
-
-- `String() string`
-- `Value() (driver.Value, error)`
-- `Scan(src any) error`
-- `ComparePassword(password string) bool`: パスワード一致検証
 
 ---
 
@@ -474,7 +551,7 @@ bcryptハッシュ化されたパスワードを表す値オブジェクト。
 #### 制約
 
 - 型: `float64`
-- 範囲: 通常は0.0～15.9（WORLD'S ENDは例外）
+- 範囲: 通常は0.0～16.0（WORLD'S ENDは例外）
 - 0.1刻みで管理
 
 #### ファクトリメソッド
@@ -497,7 +574,7 @@ bcryptハッシュ化されたパスワードを表す値オブジェクト。
 #### 制約
 
 - 型: `int`
-- 範囲: 正の整数（1以上）
+- 範囲: 0以上の整数
 
 #### ファクトリメソッド
 
@@ -541,6 +618,28 @@ bcryptハッシュ化されたパスワードを表す値オブジェクト。
 CHUNITHMのレーティングおよびオーバーパワー計算ロジックを提供するドメインサービス。
 
 #### 提供関数
+
+##### AggregateSongCharts
+
+```go
+func AggregateSongCharts(charts []*entity.Chart) SongAggregation
+```
+
+- **概要**: 譜面リストから楽曲の最大譜面定数とMAXOP確度を計算する
+- **引数**:
+  - `charts`: 楽曲に紐づく譜面リスト
+- **返り値**: `SongAggregation`（`MaxChartConst float64`, `IsMaxOPUnknown bool`）
+- **判定ルール**:
+  - `MaxChartConst`: 全譜面のうち最大の定数値
+  - `IsMaxOPUnknown`: MASTER(ID=4)またはULTIMA(ID=5)の譜面に`is_const_unknown=true`が1件でも含まれればtrue。EXPERT以下のunknownは対象外
+
+##### ApplyAggregation
+
+```go
+func ApplyAggregation(song *entity.Song)
+```
+
+- **概要**: 楽曲エンティティの譜面リストから集約結果を計算し、`MaxChartConst`と`IsMaxOPUnknown`をエンティティに適用する
 
 ##### CalcSingleRating
 
@@ -623,7 +722,7 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 ### 集約境界
 
-- **User**: 集約ルート。プライバシー設定、パスワード変更、プレイヤー紐付けはUserが管理
+- **User**: 集約ルート。プライバシー設定、Firebase UID連携、プレイヤー紐付けはUserが管理
 - **Player**: 別の集約。UserとはIDで参照（直接の親子関係を持たない）
 - **PlayerRecord**: Playerの子エンティティではなく、独立したエンティティとして扱う（Chart/Songとの多対多の関係を持つため）
 
@@ -631,4 +730,4 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 - 集約ルートごとにリポジトリを定義
 - `Save(ctx, entity)` メソッドで集約全体を永続化（INSERT/UPDATE判定は内部で実施）
-- 部分更新メソッド（`UpdatePassword`, `UpdatePrivacy`など）は廃止し、集約指向の永続化を推進
+- 部分更新メソッド（`UpdatePrivacy`, `LinkFirebaseUID`相当など）は廃止し、集約指向の永続化を推進

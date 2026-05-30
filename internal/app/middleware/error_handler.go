@@ -16,11 +16,14 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	var apiErr *apierror.APIError
 	var httpStatus int
 	var errorCode string
+	errorMessage := ""
+	var errorDetails []apierror.ValidationErrorDetail
 
 	// APIErrorの場合
 	if errors.As(err, &apiErr) {
 		httpStatus = apiErr.HTTPStatus
 		errorCode = apiErr.Code
+		errorMessage, errorDetails = buildClientErrorInfo(apiErr)
 	} else if he, ok := err.(*echo.HTTPError); ok {
 		// echo.HTTPErrorの場合（フォールバック）
 		httpStatus = he.Code
@@ -42,12 +45,36 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	// エラーレスポンスの送信（コードとステータス）
 	if err := c.JSON(httpStatus, apierror.ErrorResponse{
 		Error: struct {
-			Status int    `json:"status"`
-			Code   string `json:"code"`
-		}{Status: httpStatus, Code: errorCode},
+			Status  int                              `json:"status"`
+			Code    string                           `json:"code"`
+			Message string                           `json:"message,omitempty"`
+			Details []apierror.ValidationErrorDetail `json:"details,omitempty"`
+		}{
+			Status:  httpStatus,
+			Code:    errorCode,
+			Message: errorMessage,
+			Details: errorDetails,
+		},
 	}); err != nil {
 		slog.Error("Failed to send error response", "error", err)
 	}
+}
+
+func buildClientErrorInfo(apiErr *apierror.APIError) (string, []apierror.ValidationErrorDetail) {
+	if apiErr == nil || apiErr.Code != apierror.CodeValidationFailed {
+		return "", nil
+	}
+
+	if apiErr.Internal == nil {
+		return "入力値の形式を確認してください。", nil
+	}
+
+	var validationErrors apierror.ValidationErrors
+	if !errors.As(apiErr.Internal, &validationErrors) {
+		return "入力値の形式を確認してください。", nil
+	}
+
+	return "入力値の形式に誤りがあります。", validationErrors.Details()
 }
 
 // httpStatusToErrorCode はHTTPステータスコードからエラーコードを生成します

@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -10,7 +12,8 @@ import (
 
 // PlayerRecordDTO はプレイヤーレコードを外部へ公開するためのDTOです。
 type PlayerRecordDTO struct {
-	UpdatedAt      time.Time                   `json:"updated_at"`
+	UpdatedAt      *time.Time                  `json:"updated_at"`
+	IsPlayed       bool                        `json:"is_played"`
 	Difficulty     string                      `json:"difficulty"`
 	ID             string                      `json:"id"`
 	Title          string                      `json:"title"`
@@ -21,7 +24,7 @@ type PlayerRecordDTO struct {
 	Rating         float64                     `json:"rating"`
 	Overpower      float64                     `json:"overpower"`
 	Img            string                      `json:"img"`
-	ClearLamp      string                      `json:"clear_lamp"`
+	ClearLamp      *string                     `json:"clear_lamp"`
 	ComboLamp      *string                     `json:"combo_lamp"`
 	FullChain      *string                     `json:"full_chain"`
 	Slot           *string                     `json:"slot"`
@@ -43,20 +46,23 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 	}
 
 	dto := &PlayerRecordDTO{
-		UpdatedAt:      record.UpdatedAt,
 		Const:          chartConst,
 		IsConstUnknown: isConstUnknown,
 		Score:          score,
 		Rating:         service.CalcSingleRating(score, float64(chartConst)),
 		Overpower:      service.CalcSingleOverpower(score, float64(chartConst), record.ComboLampID),
-		ClearLamp:      toMasterName(record.ClearLamp),
+		ClearLamp:      toMasterNamePtr(record.ClearLamp),
 		ComboLamp:      toMasterNamePtr(record.ComboLamp),
 		FullChain:      toMasterNamePtr(record.FullChain),
 		Slot:           toMasterNamePtr(record.Slot),
 	}
+	if !record.UpdatedAt.IsZero() {
+		dto.UpdatedAt = &record.UpdatedAt
+		dto.IsPlayed = true
+	}
 
 	if record.ChartDifficulty != nil {
-		dto.Difficulty = record.ChartDifficulty.Name
+		dto.Difficulty = strings.ToUpper(record.ChartDifficulty.Name)
 	}
 
 	if record.Song != nil {
@@ -72,24 +78,24 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 }
 
 // toMasterName はマスタエンティティからName文字列を取り出します。nilの場合は空文字を返します。
-func toMasterName(master any) string {
-	switch v := master.(type) {
-	case *entity.ClearLampType:
+func toMasterName(masterValue any) string {
+	switch v := masterValue.(type) {
+	case *master.ClearLampType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.ComboLampType:
+	case *master.ComboLampType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.FullChainType:
+	case *master.FullChainType:
 		if v == nil {
 			return ""
 		}
 		return v.Name
-	case *entity.Slot:
+	case *master.Slot:
 		if v == nil {
 			return ""
 		}
@@ -106,8 +112,8 @@ func isNoneValue(name string) bool {
 
 // toMasterNamePtr はマスタエンティティからName文字列のポインタを取り出します。
 // nilの場合、または「NONE」「none」など便宜上の値の場合はnilを返します。
-func toMasterNamePtr(master any) *string {
-	name := toMasterName(master)
+func toMasterNamePtr(masterValue any) *string {
+	name := toMasterName(masterValue)
 	if name == "" || isNoneValue(name) {
 		return nil
 	}

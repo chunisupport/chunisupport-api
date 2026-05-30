@@ -3,9 +3,10 @@ package chartconstant
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
 // ChartConstant は譜面定数の値オブジェクトです。
@@ -14,9 +15,10 @@ type ChartConstant float64
 
 // NewChartConstant は新しい ChartConstant を生成します。
 // 譜面定数は0以上である必要があります。
+// 通常譜面の上限を超える値は許可しません。
 func NewChartConstant(value float64) (ChartConstant, error) {
-	if value < 0 {
-		return 0, errors.New("chart constant must be 0 or greater")
+	if value < constants.ChartConstValueMin || value > constants.ChartConstMax {
+		return 0, fmt.Errorf("chart constant must be between %.1f and %.1f", constants.ChartConstValueMin, constants.ChartConstMax)
 	}
 	return ChartConstant(value), nil
 }
@@ -37,7 +39,11 @@ func (c ChartConstant) Value() (driver.Value, error) {
 // データベースから値を読み取る際に呼び出されます。
 func (c *ChartConstant) Scan(value any) error {
 	if value == nil {
-		*c = 0
+		chartConst, err := NewChartConstant(0)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	}
 
@@ -46,16 +52,24 @@ func (c *ChartConstant) Scan(value any) error {
 		// DECIMAL型は[]byteで返されることがあります。
 		f, err := strconv.ParseFloat(string(v), 64)
 		if err != nil {
-			return fmt.Errorf("[]byteからfloat64への変換に失敗しました: %w", err)
+			return fmt.Errorf("failed to convert []byte to float64: %w", err)
 		}
-		*c = ChartConstant(f)
+		chartConst, err := NewChartConstant(f)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	case float64:
 		// 数値型として返される場合。
-		*c = ChartConstant(v)
+		chartConst, err := NewChartConstant(v)
+		if err != nil {
+			return err
+		}
+		*c = chartConst
 		return nil
 	default:
-		return fmt.Errorf("サポートされていない型(%T)です", v)
+		return fmt.Errorf("unsupported type: %T", v)
 	}
 }
 
@@ -74,6 +88,10 @@ func (c *ChartConstant) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return err
 	}
-	*c = ChartConstant(f)
+	chartConst, err := NewChartConstant(f)
+	if err != nil {
+		return err
+	}
+	*c = chartConst
 	return nil
 }

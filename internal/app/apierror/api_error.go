@@ -59,14 +59,15 @@ var (
 	ErrInternalError = New(CodeInternalError, http.StatusInternalServerError)
 
 	// 認証・認可エラー
-	ErrUnauthorized       = New(CodeUnauthorized, http.StatusUnauthorized)
-	ErrInvalidCredentials = New(CodeInvalidCredentials, http.StatusUnauthorized)
-	ErrInvalidToken       = New(CodeInvalidToken, http.StatusUnauthorized)
-	ErrTokenExpired       = New(CodeTokenExpired, http.StatusUnauthorized)
-	ErrMissingToken       = New(CodeMissingToken, http.StatusUnauthorized)
-	ErrInvalidSession     = New(CodeInvalidSession, http.StatusUnauthorized) // セッション無効/期限切れ統一
-	ErrInvalidRecovery    = New(CodeInvalidRecovery, http.StatusUnauthorized)
-	ErrForbidden          = New(CodeForbidden, http.StatusForbidden)
+	ErrUnauthorized             = New(CodeUnauthorized, http.StatusUnauthorized)
+	ErrInvalidCredentials       = New(CodeInvalidCredentials, http.StatusUnauthorized)
+	ErrInvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized)
+	ErrInvalidTurnstileToken    = New(CodeInvalidTurnstileToken, http.StatusUnauthorized)
+	ErrTokenExpired             = New(CodeTokenExpired, http.StatusUnauthorized)
+	ErrMissingToken             = New(CodeMissingToken, http.StatusUnauthorized)
+	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
+	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)
+	ErrRecentSignInRequired     = New(CodeRecentSignInRequired, http.StatusUnauthorized)
 
 	// ユーザー関連エラー
 	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest) // 409→400に変更
@@ -78,9 +79,10 @@ var (
 	ErrPlayerNotFound  = New(CodePlayerNotFound, http.StatusNotFound)
 
 	// 楽曲・譜面関連エラー
-	ErrSongNotFound      = New(CodeSongNotFound, http.StatusNotFound)
-	ErrChartNotFound     = New(CodeChartNotFound, http.StatusNotFound)
-	ErrInvalidDifficulty = New(CodeInvalidDifficulty, http.StatusBadRequest)
+	ErrSongNotFound         = New(CodeSongNotFound, http.StatusNotFound)
+	ErrChartNotFound        = New(CodeChartNotFound, http.StatusNotFound)
+	ErrInvalidDifficulty    = New(CodeInvalidDifficulty, http.StatusBadRequest)
+	ErrDuplicateOfficialIdx = New(CodeDuplicateOfficialIdx, http.StatusConflict)
 
 	// データ関連エラー
 	ErrValidationFailed   = New(CodeValidationFailed, http.StatusUnprocessableEntity)
@@ -99,17 +101,31 @@ var (
 	ErrUsernameTooShort      = New(CodeUsernameTooShort, http.StatusBadRequest)
 	ErrUsernameTooLong       = New(CodeUsernameTooLong, http.StatusBadRequest)
 	ErrUsernameInvalidChar   = New(CodeUsernameInvalidChar, http.StatusBadRequest)
-	ErrPasswordTooShort      = New(CodePasswordTooShort, http.StatusBadRequest)
-	ErrPasswordTooLong       = New(CodePasswordTooLong, http.StatusBadRequest)
-	ErrInvalidPassword       = New(CodeInvalidPassword, http.StatusBadRequest)       // パスワード無効（詳細隠蔽）
 	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
+
+	ErrGoalNotFound                 = New(CodeGoalNotFound, http.StatusNotFound)
+	ErrGoalLimitExceeded            = New(CodeGoalLimitExceeded, http.StatusBadRequest)
+	ErrGoalInvalidTitle             = New(CodeGoalInvalidTitle, http.StatusBadRequest)
+	ErrGoalInvalidAchievementType   = New(CodeGoalInvalidAchievementType, http.StatusBadRequest)
+	ErrGoalInvalidAchievementParams = New(CodeGoalInvalidAchievementParams, http.StatusBadRequest)
+	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
+	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です
 // クライアントにはエラーコードとステータスを返します
 type ErrorResponse struct {
 	Error struct {
-		Status int    `json:"status"`
-		Code   string `json:"code"`
+		Status  int                     `json:"status"`
+		Code    string                  `json:"code"`
+		Message string                  `json:"message,omitempty"`
+		Details []ValidationErrorDetail `json:"details,omitempty"`
 	} `json:"error"`
+}
+
+// ValidationErrorDetail は入力バリデーション失敗時の詳細情報です。
+// 入力フォーマットに関する情報のみを返し、認証成否などの機微情報は含めません。
+type ValidationErrorDetail struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
 }

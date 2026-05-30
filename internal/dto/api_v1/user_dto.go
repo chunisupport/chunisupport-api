@@ -11,10 +11,10 @@ import (
 
 // V1HonorDTO は外部API v1 用の称号情報DTOです。
 type V1HonorDTO struct {
-	Slot     int     `json:"slot"`
-	Name     string  `json:"name"`
-	TypeName string  `json:"type_name"`
-	ImageURL *string `json:"image_url"`
+	Slot     int    `json:"slot"`
+	Name     string `json:"name"`
+	TypeName string `json:"type_name"`
+	ImageURL string `json:"image_url"`
 }
 
 // V1PlayerDTO は外部API v1 用のプレイヤー情報DTOです。
@@ -34,7 +34,8 @@ type V1PlayerDTO struct {
 
 // V1PlayerRecordDTO は外部API v1 用のプレイヤーレコードDTOです。
 type V1PlayerRecordDTO struct {
-	UpdatedAt      time.Time                   `json:"updated_at"`
+	UpdatedAt      *time.Time                  `json:"updated_at"`
+	IsPlayed       bool                        `json:"is_played"`
 	Difficulty     string                      `json:"difficulty"`
 	ID             string                      `json:"id"`
 	Title          string                      `json:"title"`
@@ -45,7 +46,7 @@ type V1PlayerRecordDTO struct {
 	Rating         float64                     `json:"rating"`
 	Overpower      float64                     `json:"overpower"`
 	Img            string                      `json:"img"`
-	ClearLamp      string                      `json:"clear_lamp"`
+	ClearLamp      *string                     `json:"clear_lamp"`
 	ComboLamp      *string                     `json:"combo_lamp"`
 	FullChain      *string                     `json:"full_chain"`
 	Slot           *string                     `json:"slot"`
@@ -53,18 +54,19 @@ type V1PlayerRecordDTO struct {
 
 // V1WorldsendRecordDTO は外部API v1 用の WORLD'S END レコードDTOです。
 type V1WorldsendRecordDTO struct {
-	UpdatedAt time.Time `json:"updated_at"`
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Artist    string    `json:"artist"`
-	WeStar    *int      `json:"we_star"`
-	WeKanji   *string   `json:"we_kanji"`
-	Notes     *int      `json:"notes"`
-	Score     uint32    `json:"score"`
-	Img       string    `json:"img"`
-	ClearLamp string    `json:"clear_lamp"`
-	ComboLamp *string   `json:"combo_lamp"`
-	FullChain *string   `json:"full_chain"`
+	UpdatedAt *time.Time `json:"updated_at"`
+	IsPlayed  bool       `json:"is_played"`
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	Artist    string     `json:"artist"`
+	LevelStar *int       `json:"level_star"`
+	Attribute *string    `json:"attribute"`
+	Notes     *int       `json:"notes"`
+	Score     uint32     `json:"score"`
+	Img       string     `json:"img"`
+	ClearLamp *string    `json:"clear_lamp"`
+	ComboLamp *string    `json:"combo_lamp"`
+	FullChain *string    `json:"full_chain"`
 }
 
 // V1UserRecordResponseDTO は外部API v1 用のユーザーレコードレスポンスDTOです。
@@ -128,6 +130,7 @@ func ToV1PlayerRecordDTO(record *dto.PlayerRecordDTO) *V1PlayerRecordDTO {
 	}
 	return &V1PlayerRecordDTO{
 		UpdatedAt:      record.UpdatedAt,
+		IsPlayed:       record.IsPlayed,
 		Difficulty:     record.Difficulty,
 		ID:             record.ID,
 		Title:          record.Title,
@@ -152,11 +155,12 @@ func ToV1WorldsendRecordDTO(record *dto.WorldsendRecordDTO) *V1WorldsendRecordDT
 	}
 	return &V1WorldsendRecordDTO{
 		UpdatedAt: record.UpdatedAt,
+		IsPlayed:  record.IsPlayed,
 		ID:        record.ID,
 		Title:     record.Title,
 		Artist:    record.Artist,
-		WeStar:    record.WeStar,
-		WeKanji:   record.WeKanji,
+		LevelStar: record.LevelStar,
+		Attribute: record.Attribute,
 		Notes:     record.Notes,
 		Score:     record.Score,
 		Img:       record.Img,

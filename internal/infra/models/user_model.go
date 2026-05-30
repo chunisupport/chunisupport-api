@@ -1,10 +1,10 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/passwordhash"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
@@ -12,12 +12,12 @@ import (
 type UserModel struct {
 	ID            int       `db:"id"`
 	Username      string    `db:"username"`
-	PasswordHash  string    `db:"password_hash"`
+	FirebaseUID   *string   `db:"firebase_uid"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`
 	PlayerID      *int      `db:"player_id"`
 	AccountTypeID int       `db:"account_type_id"`
-	IsDeleted     bool      `db:"is_deleted"`
+	IsSuspicious  bool      `db:"is_suspicious"`
 	IsPrivate     bool      `db:"is_private"`
 }
 
@@ -27,20 +27,23 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		return nil, err
 	}
 
-	phash, err := passwordhash.NewPasswordHash(m.PasswordHash)
-	if err != nil {
-		return nil, err
+	var firebaseUID *string
+	if m.FirebaseUID != nil {
+		normalizedUID := strings.TrimSpace(*m.FirebaseUID)
+		if normalizedUID != "" {
+			firebaseUID = &normalizedUID
+		}
 	}
 
 	return &entity.User{
 		ID:            m.ID,
 		Username:      uname,
-		PasswordHash:  phash,
+		FirebaseUID:   firebaseUID,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		PlayerID:      m.PlayerID,
 		AccountTypeID: m.AccountTypeID,
-		IsDeleted:     m.IsDeleted,
+		IsSuspicious:  m.IsSuspicious,
 		IsPrivate:     m.IsPrivate,
 	}, nil
 }
@@ -50,12 +53,12 @@ func FromUserEntity(e *entity.User) *UserModel {
 	return &UserModel{
 		ID:            e.ID,
 		Username:      e.Username.String(),
-		PasswordHash:  e.PasswordHash.String(),
+		FirebaseUID:   e.FirebaseUID,
 		CreatedAt:     e.CreatedAt,
 		UpdatedAt:     e.UpdatedAt,
 		PlayerID:      e.PlayerID,
 		AccountTypeID: e.AccountTypeID,
-		IsDeleted:     e.IsDeleted,
+		IsSuspicious:  e.IsSuspicious,
 		IsPrivate:     e.IsPrivate,
 	}
 }
@@ -64,9 +67,10 @@ func FromUserEntity(e *entity.User) *UserModel {
 // StructScanでLEFT JOIN結果を取得するために使用します。
 type UserWithPlayerRow struct {
 	// ユーザー情報
-	UserID       int    `db:"user_id"`
-	Username     string `db:"username"`
-	UserPlayerID *int   `db:"user_player_id"`
+	UserID       int     `db:"user_id"`
+	Username     string  `db:"username"`
+	FirebaseUID  *string `db:"firebase_uid"`
+	UserPlayerID *int    `db:"user_player_id"`
 
 	// プレイヤー情報（LEFT JOINなのでnull許容）
 	PlayerID             *int     `db:"player_id"`

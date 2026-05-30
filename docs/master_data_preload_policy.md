@@ -5,7 +5,7 @@
 ## 起動時に読み込む
 | テーブル | 理由 |
 | --- | --- |
-| `genres` | 7件のみの楽曲ジャンルマスタで固定値。 |
+| `genres` | 7件のみの楽曲ジャンルマスタで固定値。表示順は `sort_order` で管理する。 |
 | `difficulties` | 5件のみの難易度マスタで固定値。 |
 | `class_emblems` / `class_emblem_bases` | クラスエンブレム種別で件数少、定義済みマスタ。 |
 | `clear_lamp_types` / `combo_lamp_types` | クリア・コンボランプ種別で件数少、定義済みマスタ。 |
@@ -14,6 +14,7 @@
 | `honor_types` | 称号の種類マスタで固定値が事前投入されている。 |
 | `account_types` | ユーザー権限区分。3件のみで固定値。 |
 | `versions` | CHUNITHMバージョン名マスタで固定値。 |
+| `achievement_types` | 目標機能の成果種別マスタ（8件の固定値）。`goals.achievement_type_id` の外部キー参照元で、実体は `code` 列の固定値です。 |
 
 ## 読み込まない（随時参照）
 | テーブル | 理由 |
@@ -23,7 +24,7 @@
 | `charts` | 譜面情報。楽曲ごとに複数行がありデータ量が大きいため除外。 |
 | `worldsend_charts` | WORLD'S END譜面情報。件数は多く、曲データと同様に除外。 |
 | `users` / `players` / `player_honors` | ユーザーやプレイヤープロフィールの動的データで更新が入るためキャッシュしない。 |
-| `sessions` / `api_tokens` | 認証系の揮発データで有効期限・更新が頻繁に変わるため除外。 |
+| `api_tokens` | 認証系の動的データで更新が入るため除外。 |
 | `player_records` / `player_worldsend_records` | スコア記録。更新頻度が高く件数も多いためプリロードしない。 |
 
 ## 補足
@@ -39,5 +40,6 @@
 | --- | --- |
 | `rating_bands` | レーティング帯マスタ（28件の固定値）。起動時にメモリへ読み込まれます。 |
 | `chart_stats_by_rating_band` | 譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
+| `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 
 統計データベースは読み取り専用で使用され、メインのMySQLデータベースとは独立して管理されます。
