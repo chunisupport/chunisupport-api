@@ -30,12 +30,25 @@ import os
 import sys
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
 def get_env(key: str, default: str = "") -> str:
     """環境変数を取得。デフォルト値を指定可能。"""
     return os.environ.get(key, default)
+
+
+def with_query_param(url: str, key: str, value: str) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query[key] = value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def discord_message_url(webhook_url: str, message_id: str) -> str:
+    base_url = webhook_url.split("?", 1)[0].rstrip("/")
+    return f"{base_url}/messages/{message_id}"
 
 
 def send_discord(webhook_url: str, payload: dict) -> None:
@@ -63,6 +76,60 @@ def send_discord(webhook_url: str, payload: dict) -> None:
         print(f"Discord通知の送信に失敗しました（継続します）: {e.reason}", file=sys.stderr)
     except Exception as e:
         print(f"Discord通知の送信中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+
+
+def send_discord_and_get_message_id(webhook_url: str, payload: dict) -> str:
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = Request(
+        with_query_param(webhook_url, "wait", "true"),
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "chunisupport-api-ci/1.0 (urllib)",
+        },
+    )
+
+    try:
+        with urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+            message = json.loads(body)
+            message_id = str(message.get("id", ""))
+            print(f"Discord通知を送信しました (HTTP {resp.status})")
+            return message_id
+    except HTTPError as e:
+        # Discord 側で 400/429 などが返る場合も CI は止めない
+        print(f"Discord通知の送信に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+    except URLError as e:
+        print(f"Discord通知の送信に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+    except Exception as e:
+        print(f"Discord通知の送信中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+    return ""
+
+
+def update_discord_message(webhook_url: str, message_id: str, payload: dict) -> bool:
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = Request(
+        discord_message_url(webhook_url, message_id),
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "chunisupport-api-ci/1.0 (urllib)",
+        },
+        method="PATCH",
+    )
+
+    try:
+        with urlopen(req, timeout=10) as resp:
+            print(f"Discord通知を更新しました (HTTP {resp.status})")
+            return True
+    except HTTPError as e:
+        # Discord 側で 400/429 などが返る場合も CI は止めない
+        print(f"Discord通知の更新に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+    except URLError as e:
+        print(f"Discord通知の更新に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+    except Exception as e:
+        print(f"Discord通知の更新中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+    return False
 
 
 def build_build_start_embed(env: dict) -> dict:
@@ -163,7 +230,27 @@ def main() -> int:
         return 1
 
     payload = {"embeds": [embed]}
-    send_discord(webhook_url, payload)
+    message_id_path = get_env("DISCORD_MESSAGE_ID_PATH")
+    message_id = ""
+    if message_id_path and os.path.exists(message_id_path):
+        with open(message_id_path, encoding="utf-8") as f:
+            message_id = f.read().strip()
+
+    if message_id and update_discord_message(webhook_url, message_id, payload):
+        return 0
+
+    if not message_id_path:
+        send_discord(webhook_url, payload)
+        return 0
+
+    message_id = send_discord_and_get_message_id(webhook_url, payload)
+    if message_id:
+        message_id_dir = os.path.dirname(message_id_path)
+        if message_id_dir:
+            os.makedirs(message_id_dir, exist_ok=True)
+        with open(message_id_path, "w", encoding="utf-8") as f:
+            f.write(message_id)
+
     return 0
 
 
