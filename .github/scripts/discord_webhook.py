@@ -161,24 +161,16 @@ def build_build_start_embed(env: dict) -> dict:
     branch = env.get("BRANCH", "unknown")
     sha = env.get("SHA", "unknown")
     short_sha = sha[:7] if len(sha) >= 7 else sha
-    actor = env.get("ACTOR", "unknown")
-    commit_msg = env.get("COMMIT_MESSAGE", "N/A")
-    run_url = env.get("RUN_URL", "")
     arch = env.get("TARGET_ARCH", "unknown")
     arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
     return {
-        "title": f"🚀 ビルド開始 ({arch})",
-        "description": f"**{repo}** の {arch_label} ビルドを開始しました",
+        "title": f"🚀 {repo} ビルド開始 ({arch})",
+        "description": f"{arch_label} ビルドを開始しました",
         "color": 3447003,
         "fields": [
             {"name": "ブランチ", "value": branch, "inline": True},
-            {"name": "対象アーキテクチャ", "value": arch_label, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
-            {"name": "実行者", "value": actor, "inline": True},
-            {"name": "成果物", "value": f"chunisupport-api-linux-{arch}.tar.gz", "inline": True},
-            {"name": "コミットメッセージ", "value": commit_msg},
-            {"name": "詳細", "value": f"[GitHub Actions]({run_url}) でビルド状況を確認できます"},
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -208,42 +200,33 @@ def build_build_complete_embed(env: dict) -> dict:
     branch = env.get("BRANCH", "unknown")
     sha = env.get("SHA", "unknown")
     short_sha = sha[:7] if len(sha) >= 7 else sha
-    actor = env.get("ACTOR", "unknown")
-    commit_msg = env.get("COMMIT_MESSAGE", "N/A")
-    run_url = env.get("RUN_URL", "")
     build_result = env.get("BUILD_RESULT", "failure")
     arch = env.get("TARGET_ARCH", "unknown")
     arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
     if build_result == "success":
-        title = "✅ ビルド完了"
+        status = "✅"
+        title_text = "ビルド完了"
         color = 3066993
-        result_text = "成功"
-        desc = f"**{repo}** の {arch_label} ビルドが正常に完了しました"
+        desc = f"{arch_label} ビルドが正常に完了しました"
     elif build_result == "cancelled":
-        title = "⚠️ ビルドキャンセル"
+        status = "⚠️"
+        title_text = "ビルドキャンセル"
         color = 16776960
-        result_text = "キャンセル"
-        desc = f"**{repo}** の {arch_label} ビルドがキャンセルされました"
+        desc = f"{arch_label} ビルドがキャンセルされました"
     else:
-        title = "❌ ビルド失敗"
+        status = "❌"
+        title_text = "ビルド失敗"
         color = 15158332
-        result_text = build_result
-        desc = f"**{repo}** の {arch_label} ビルドが失敗しました"
+        desc = f"{arch_label} ビルドが失敗しました"
 
     return {
-        "title": f"{title} ({arch})",
+        "title": f"{status} {repo} {title_text} ({arch})",
         "description": desc,
         "color": color,
         "fields": [
             {"name": "ブランチ", "value": branch, "inline": True},
-            {"name": "対象アーキテクチャ", "value": arch_label, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
-            {"name": "結果", "value": result_text, "inline": True},
-            {"name": "実行者", "value": actor, "inline": True},
-            {"name": "成果物", "value": f"chunisupport-api-linux-{arch}.tar.gz", "inline": True},
-            {"name": "コミットメッセージ", "value": commit_msg},
-            {"name": "詳細", "value": f"[GitHub Actions]({run_url}) でログを確認できます"},
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -262,6 +245,10 @@ def embed_target_arch(embed: dict) -> str:
             value = field.get("value", "")
             if value.startswith("linux/"):
                 return value.removeprefix("linux/")
+    title = embed.get("title", "")
+    for target_arch, _ in target_arches():
+        if title.endswith(f"({target_arch})"):
+            return target_arch
     return ""
 
 
@@ -328,9 +315,6 @@ def main() -> int:
         "REPO": get_env("REPO"),
         "BRANCH": get_env("BRANCH"),
         "SHA": get_env("SHA"),
-        "ACTOR": get_env("ACTOR"),
-        "COMMIT_MESSAGE": get_env("COMMIT_MESSAGE"),
-        "RUN_URL": get_env("RUN_URL"),
         "BUILD_RESULT": get_env("BUILD_RESULT"),
         "TARGET_ARCH": get_env("TARGET_ARCH"),
     }
