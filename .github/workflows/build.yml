@@ -59,7 +59,7 @@ jobs:
   notify-start:
     runs-on: ubuntu-latest
     steps:
-      - name: Discord 通知 (ビルド開始)
+      - name: Discord Notification (Build Start)
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_NOTIFY_MODE: build-start
@@ -76,7 +76,7 @@ jobs:
     needs: build
     if: always()
     steps:
-      - name: Discord 通知 (ビルド完了)
+      - name: Discord Notification (Build Complete)
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_NOTIFY_MODE: build-complete
