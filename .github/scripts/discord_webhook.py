@@ -69,14 +69,14 @@ def send_discord(webhook_url: str, payload: dict) -> None:
 
     try:
         with urlopen(req, timeout=10) as resp:
-            print(f"Discord通知を送信しました (HTTP {resp.status})")
+            print(f"Sent Discord notification (HTTP {resp.status})")
     except HTTPError as e:
         # Discord 側で 400/429 などが返る場合も CI は止めない
-        print(f"Discord通知の送信に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+        print(f"Failed to send Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
-        print(f"Discord通知の送信に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+        print(f"Failed to send Discord notification; continuing: {e.reason}", file=sys.stderr)
     except Exception as e:
-        print(f"Discord通知の送信中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+        print(f"Unexpected error while sending Discord notification; continuing: {e}", file=sys.stderr)
 
 
 def send_discord_and_get_message_id(webhook_url: str, payload: dict) -> str:
@@ -95,15 +95,15 @@ def send_discord_and_get_message_id(webhook_url: str, payload: dict) -> str:
             body = resp.read().decode("utf-8")
             message = json.loads(body)
             message_id = str(message.get("id", ""))
-            print(f"Discord通知を送信しました (HTTP {resp.status})")
+            print(f"Sent Discord notification (HTTP {resp.status})")
             return message_id
     except HTTPError as e:
         # Discord 側で 400/429 などが返る場合も CI は止めない
-        print(f"Discord通知の送信に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+        print(f"Failed to send Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
-        print(f"Discord通知の送信に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+        print(f"Failed to send Discord notification; continuing: {e.reason}", file=sys.stderr)
     except Exception as e:
-        print(f"Discord通知の送信中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+        print(f"Unexpected error while sending Discord notification; continuing: {e}", file=sys.stderr)
     return ""
 
 
@@ -121,11 +121,11 @@ def get_discord_message(webhook_url: str, message_id: str) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except HTTPError as e:
         # Discord 側で 400/429 などが返る場合も CI は止めない
-        print(f"Discord通知の取得に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+        print(f"Failed to fetch Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
-        print(f"Discord通知の取得に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+        print(f"Failed to fetch Discord notification; continuing: {e.reason}", file=sys.stderr)
     except Exception as e:
-        print(f"Discord通知の取得中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+        print(f"Unexpected error while fetching Discord notification; continuing: {e}", file=sys.stderr)
     return {}
 
 
@@ -143,15 +143,15 @@ def update_discord_message(webhook_url: str, message_id: str, payload: dict) -> 
 
     try:
         with urlopen(req, timeout=10) as resp:
-            print(f"Discord通知を更新しました (HTTP {resp.status})")
+            print(f"Updated Discord notification (HTTP {resp.status})")
             return True
     except HTTPError as e:
         # Discord 側で 400/429 などが返る場合も CI は止めない
-        print(f"Discord通知の更新に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+        print(f"Failed to update Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
-        print(f"Discord通知の更新に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+        print(f"Failed to update Discord notification; continuing: {e.reason}", file=sys.stderr)
     except Exception as e:
-        print(f"Discord通知の更新中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+        print(f"Unexpected error while updating Discord notification; continuing: {e}", file=sys.stderr)
     return False
 
 
@@ -159,6 +159,11 @@ def github_repo_url(env: dict) -> str:
     server_url = env.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
     repo = env.get("REPO", "unknown")
     return f"{server_url}/{repo}"
+
+
+def commit_link(env: dict, short_sha: str) -> str:
+    sha = env.get("SHA", "unknown")
+    return f"[{short_sha}]({github_repo_url(env)}/commit/{sha})"
 
 
 def build_build_start_embed(env: dict) -> dict:
@@ -172,12 +177,9 @@ def build_build_start_embed(env: dict) -> dict:
 
     return {
         "author": {"name": repo, "url": github_repo_url(env)},
-        "title": f"🚀 ビルド開始 ({arch})",
-        "description": f"{arch_label} ビルドを開始しました",
+        "title": f"🚀 Build Started ({arch})",
+        "description": f"Started {arch_label} build\nCommit: {commit_link(env, short_sha)}",
         "color": 3447003,
-        "fields": [
-            {"name": "コミット", "value": short_sha, "inline": True},
-        ],
         "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -213,28 +215,25 @@ def build_build_complete_embed(env: dict) -> dict:
 
     if build_result == "success":
         status = "✅"
-        title_text = "ビルド完了"
+        title_text = "Build Completed"
         color = 3066993
-        desc = f"{arch_label} ビルドが正常に完了しました"
+        desc = f"Completed {arch_label} build successfully"
     elif build_result == "cancelled":
         status = "⚠️"
-        title_text = "ビルドキャンセル"
+        title_text = "Build Cancelled"
         color = 16776960
-        desc = f"{arch_label} ビルドがキャンセルされました"
+        desc = f"Cancelled {arch_label} build"
     else:
         status = "❌"
-        title_text = "ビルド失敗"
+        title_text = "Build Failed"
         color = 15158332
-        desc = f"{arch_label} ビルドが失敗しました"
+        desc = f"Failed {arch_label} build"
 
     return {
         "author": {"name": repo, "url": github_repo_url(env)},
         "title": f"{status} {title_text} ({arch})",
-        "description": desc,
+        "description": f"{desc}\nCommit: {commit_link(env, short_sha)}",
         "color": color,
-        "fields": [
-            {"name": "コミット", "value": short_sha, "inline": True},
-        ],
         "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -284,7 +283,7 @@ def has_arch_embed(embeds: list[dict], arch: str, title: str) -> bool:
 def update_discord_arch_embed(webhook_url: str, message_id: str, env: dict) -> bool:
     arch = env.get("TARGET_ARCH", "")
     if not arch:
-        print("TARGET_ARCH が未設定のためアーキテクチャ別更新をスキップします", file=sys.stderr)
+        print("TARGET_ARCH is not set; skipping per-architecture update", file=sys.stderr)
         return False
 
     target_embed = build_build_complete_embed(env | {"TARGET_ARCH_LABEL": arch_label(arch)})
@@ -304,7 +303,7 @@ def update_discord_arch_embed(webhook_url: str, message_id: str, env: dict) -> b
         if has_arch_embed(latest_message.get("embeds", []), arch, target_embed["title"]):
             return True
 
-        print("Discord通知が他の更新で上書きされた可能性があるため再試行します")
+        print("Discord notification may have been overwritten by another update; retrying")
         time.sleep(2**attempt)
 
     return False
@@ -313,7 +312,7 @@ def update_discord_arch_embed(webhook_url: str, message_id: str, env: dict) -> b
 def main() -> int:
     webhook_url = get_env("DISCORD_WEBHOOK_URL")
     if not webhook_url:
-        print("DISCORD_WEBHOOK_URL が未設定のため通知をスキップします")
+        print("DISCORD_WEBHOOK_URL is not set; skipping notification")
         return 0
 
     mode = get_env("DISCORD_NOTIFY_MODE", "build-start")
@@ -338,7 +337,7 @@ def main() -> int:
         if message_id:
             update_discord_arch_embed(webhook_url, message_id, env)
         else:
-            print("Discord Message ID が未取得のためアーキテクチャ別更新をスキップします")
+            print("Discord message ID is not available; skipping per-architecture update")
         return 0
 
     if mode == "build-start":
@@ -346,7 +345,7 @@ def main() -> int:
     elif mode == "build-complete":
         embeds = build_build_complete_embeds(env)
     else:
-        print(f"未知の DISCORD_NOTIFY_MODE: {mode}", file=sys.stderr)
+        print(f"Unknown DISCORD_NOTIFY_MODE: {mode}", file=sys.stderr)
         return 1
 
     payload = {
