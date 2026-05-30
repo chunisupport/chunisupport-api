@@ -54,7 +54,7 @@ jobs:
   # - notify-start:    プッシュ検知と同時に「ビルド開始」通知を送信（build完了を待たない）
   # - notify-complete: build ジョブ完了後（成功・失敗・キャンセル問わず）に結果通知を送信
   # 実際の通知送信処理は .github/scripts/discord_webhook.py に委譲（urllibのみで依存なし）
-  # secrets.DISCORD_WEBHOOK_URL が未設定の場合はスクリプト側で自動スキップ
+  # 対象ブランチ用の Discord Webhook Secret が未設定の場合はスクリプト側で自動スキップ
   # ------------------------------------------------------------
   notify-start:
     runs-on: ubuntu-latest
@@ -64,7 +64,7 @@ jobs:
 
       - name: Discord Notification (Build Start)
         env:
-          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_MAIN || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL || '' }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
           DISCORD_NOTIFY_MODE: build-start
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Discord Notification (Build Complete)
         env:
-          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_MAIN || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL || '' }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
           DISCORD_NOTIFY_MODE: build-complete
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
