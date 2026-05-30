@@ -73,3 +73,7 @@ Taskfile.yml
 
 # 認証データなど
 .auth/
+
+# Python系
+__pycache__/
+*.pyc
