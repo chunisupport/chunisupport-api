@@ -64,7 +64,7 @@ jobs:
 
       - name: Discord Notification (Build Start)
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_MAIN || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL || '' }}
           DISCORD_NOTIFY_MODE: build-start
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Discord Notification (Build Complete)
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_MAIN || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL || '' }}
           DISCORD_NOTIFY_MODE: build-complete
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
