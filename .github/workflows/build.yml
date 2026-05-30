@@ -1,0 +1,49 @@
+name: Build and Upload Artifact
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+
+      - name: Determine target
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "goarch=arm64" >> $GITHUB_OUTPUT
+            echo "artifact_name=chunisupport-api-main" >> $GITHUB_OUTPUT
+          else
+            echo "goarch=amd64" >> $GITHUB_OUTPUT
+            echo "artifact_name=chunisupport-api-develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ steps.target.outputs.goarch }} \
+            go build -o chunisupport-api -ldflags="-s -w -trimpath" .
+
+      - name: Package (binary + migration, flat structure)
+        run: |
+          tar -czf ${{ steps.target.outputs.artifact_name }}.tar.gz \
+            chunisupport-api migration/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.target.outputs.artifact_name }}
+          path: ${{ steps.target.outputs.artifact_name }}.tar.gz
+          archive: false
+          overwrite: true
+          retention-days: 3
