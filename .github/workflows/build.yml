@@ -48,3 +48,137 @@ jobs:
           archive: false
           overwrite: true
           retention-days: 3
+
+  # ------------------------------------------------------------
+  # Discord 通知ジョブ
+  # - notify-start:    プッシュ検知と同時に「ビルド開始」通知を送信（build完了を待たない）
+  # - notify-complete: build ジョブ完了後（成功・失敗・キャンセル問わず）に結果通知を送信
+  # どちらのジョブも、secrets.DISCORD_WEBHOOK_URL が未設定の場合は通知をスキップする
+  # ------------------------------------------------------------
+  notify-start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord 通知 (ビルド開始)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'N/A' }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL が未設定のため通知をスキップします"
+            exit 0
+          fi
+
+          SHORT_SHA=$(echo "$SHA" | cut -c1-7)
+          ESCAPED_MSG=$(jq -Rs . <<< "$COMMIT_MESSAGE")
+
+          PAYLOAD=$(jq -n \
+            --arg title "🚀 ビルド開始" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHORT_SHA" \
+            --argjson msg "$ESCAPED_MSG" \
+            --arg actor "$ACTOR" \
+            --arg url "$SERVER_URL/$REPO/actions/runs/$RUN_ID" \
+            '{
+              "embeds": [{
+                "title": $title,
+                "description": "**\($repo)** のビルドを開始しました",
+                "color": 3447003,
+                "fields": [
+                  {"name": "ブランチ", "value": $branch, "inline": true},
+                  {"name": "対象アーキテクチャ", "value": "linux/amd64, linux/arm64", "inline": true},
+                  {"name": "コミット", "value": $sha, "inline": true},
+                  {"name": "実行者", "value": $actor, "inline": true},
+                  {"name": "コミットメッセージ", "value": $msg},
+                  {"name": "詳細", "value": "[GitHub Actions](\($url\)) でビルド状況を確認できます"}
+                ],
+                "timestamp": (now | todate)
+              }]
+            }')
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$PAYLOAD" \
+               "$DISCORD_WEBHOOK_URL" || echo "Discord通知の送信に失敗しました（継続します）"
+
+  notify-complete:
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Discord 通知 (ビルド完了)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'N/A' }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL が未設定のため通知をスキップします"
+            exit 0
+          fi
+
+          SHORT_SHA=$(echo "$SHA" | cut -c1-7)
+          ESCAPED_MSG=$(jq -Rs . <<< "$COMMIT_MESSAGE")
+
+          if [ "$BUILD_RESULT" = "success" ]; then
+            TITLE="✅ ビルド完了"
+            COLOR=3066993
+            RESULT_TEXT="成功"
+            SUCCESS=true
+          elif [ "$BUILD_RESULT" = "cancelled" ]; then
+            TITLE="⚠️ ビルドキャンセル"
+            COLOR=16776960
+            RESULT_TEXT="キャンセル"
+            SUCCESS=false
+          else
+            TITLE="❌ ビルド失敗"
+            COLOR=15158332
+            RESULT_TEXT="$BUILD_RESULT"
+            SUCCESS=false
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHORT_SHA" \
+            --argjson msg "$ESCAPED_MSG" \
+            --arg actor "$ACTOR" \
+            --arg result "$RESULT_TEXT" \
+            --arg url "$SERVER_URL/$REPO/actions/runs/$RUN_ID" \
+            --argjson color "$COLOR" \
+            --argjson success "$SUCCESS" \
+            '{
+              "embeds": [{
+                "title": $title,
+                "description": (if $success then "**\($repo)** のビルドが正常に完了しました" elif $result == "キャンセル" then "**\($repo)** のビルドがキャンセルされました" else "**\($repo)** のビルドが失敗しました" end),
+                "color": $color,
+                "fields": [
+                  {"name": "ブランチ", "value": $branch, "inline": true},
+                  {"name": "対象アーキテクチャ", "value": "linux/amd64, linux/arm64", "inline": true},
+                  {"name": "コミット", "value": $sha, "inline": true},
+                  {"name": "結果", "value": $result, "inline": true},
+                  {"name": "実行者", "value": $actor, "inline": true},
+                  {"name": "コミットメッセージ", "value": $msg},
+                  {"name": "詳細", "value": "[GitHub Actions](\($url\)) でログを確認できます"}
+                ],
+                "timestamp": (now | todate)
+              }]
+            }')
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$PAYLOAD" \
+               "$DISCORD_WEBHOOK_URL" || echo "Discord通知の送信に失敗しました"
