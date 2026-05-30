@@ -28,6 +28,7 @@ Discord Webhook 通知送信スクリプト（依存なし版）
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -106,6 +107,28 @@ def send_discord_and_get_message_id(webhook_url: str, payload: dict) -> str:
     return ""
 
 
+def get_discord_message(webhook_url: str, message_id: str) -> dict:
+    req = Request(
+        discord_message_url(webhook_url, message_id),
+        headers={
+            "User-Agent": "chunisupport-api-ci/1.0 (urllib)",
+        },
+        method="GET",
+    )
+
+    try:
+        with urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as e:
+        # Discord 側で 400/429 などが返る場合も CI は止めない
+        print(f"Discord通知の取得に失敗しました（継続します）: {e.code} {e.reason}", file=sys.stderr)
+    except URLError as e:
+        print(f"Discord通知の取得に失敗しました（継続します）: {e.reason}", file=sys.stderr)
+    except Exception as e:
+        print(f"Discord通知の取得中に予期しないエラー（継続します）: {e}", file=sys.stderr)
+    return {}
+
+
 def update_discord_message(webhook_url: str, message_id: str, payload: dict) -> bool:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = Request(
@@ -141,21 +164,42 @@ def build_build_start_embed(env: dict) -> dict:
     actor = env.get("ACTOR", "unknown")
     commit_msg = env.get("COMMIT_MESSAGE", "N/A")
     run_url = env.get("RUN_URL", "")
+    arch = env.get("TARGET_ARCH", "unknown")
+    arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
     return {
-        "title": "🚀 ビルド開始",
-        "description": f"**{repo}** のビルドを開始しました",
+        "title": f"🚀 ビルド開始 ({arch})",
+        "description": f"**{repo}** の {arch_label} ビルドを開始しました",
         "color": 3447003,
         "fields": [
             {"name": "ブランチ", "value": branch, "inline": True},
-            {"name": "対象アーキテクチャ", "value": "linux/amd64, linux/arm64", "inline": True},
+            {"name": "対象アーキテクチャ", "value": arch_label, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
             {"name": "実行者", "value": actor, "inline": True},
+            {"name": "成果物", "value": f"chunisupport-api-linux-{arch}.tar.gz", "inline": True},
             {"name": "コミットメッセージ", "value": commit_msg},
             {"name": "詳細", "value": f"[GitHub Actions]({run_url}) でビルド状況を確認できます"},
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def build_build_start_embeds(env: dict) -> list[dict]:
+    return [
+        build_build_start_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
+        for arch, label in target_arches()
+    ]
+
+
+def target_arches() -> tuple[tuple[str, str], ...]:
+    return (("amd64", "linux/amd64"), ("arm64", "linux/arm64"))
+
+
+def arch_label(arch: str) -> str:
+    for target_arch, label in target_arches():
+        if target_arch == arch:
+            return label
+    return f"linux/{arch}"
 
 
 def build_build_complete_embed(env: dict) -> dict:
@@ -168,38 +212,107 @@ def build_build_complete_embed(env: dict) -> dict:
     commit_msg = env.get("COMMIT_MESSAGE", "N/A")
     run_url = env.get("RUN_URL", "")
     build_result = env.get("BUILD_RESULT", "failure")
+    arch = env.get("TARGET_ARCH", "unknown")
+    arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
     if build_result == "success":
         title = "✅ ビルド完了"
         color = 3066993
         result_text = "成功"
-        desc = f"**{repo}** のビルドが正常に完了しました"
+        desc = f"**{repo}** の {arch_label} ビルドが正常に完了しました"
     elif build_result == "cancelled":
         title = "⚠️ ビルドキャンセル"
         color = 16776960
         result_text = "キャンセル"
-        desc = f"**{repo}** のビルドがキャンセルされました"
+        desc = f"**{repo}** の {arch_label} ビルドがキャンセルされました"
     else:
         title = "❌ ビルド失敗"
         color = 15158332
         result_text = build_result
-        desc = f"**{repo}** のビルドが失敗しました"
+        desc = f"**{repo}** の {arch_label} ビルドが失敗しました"
 
     return {
-        "title": title,
+        "title": f"{title} ({arch})",
         "description": desc,
         "color": color,
         "fields": [
             {"name": "ブランチ", "value": branch, "inline": True},
-            {"name": "対象アーキテクチャ", "value": "linux/amd64, linux/arm64", "inline": True},
+            {"name": "対象アーキテクチャ", "value": arch_label, "inline": True},
             {"name": "コミット", "value": short_sha, "inline": True},
             {"name": "結果", "value": result_text, "inline": True},
             {"name": "実行者", "value": actor, "inline": True},
+            {"name": "成果物", "value": f"chunisupport-api-linux-{arch}.tar.gz", "inline": True},
             {"name": "コミットメッセージ", "value": commit_msg},
             {"name": "詳細", "value": f"[GitHub Actions]({run_url}) でログを確認できます"},
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def build_build_complete_embeds(env: dict) -> list[dict]:
+    return [
+        build_build_complete_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
+        for arch, label in target_arches()
+    ]
+
+
+def embed_target_arch(embed: dict) -> str:
+    for field in embed.get("fields", []):
+        if field.get("name") == "対象アーキテクチャ":
+            value = field.get("value", "")
+            if value.startswith("linux/"):
+                return value.removeprefix("linux/")
+    return ""
+
+
+def replace_arch_embed(embeds: list[dict], arch: str, new_embed: dict) -> list[dict]:
+    replaced = False
+    next_embeds = []
+
+    for embed in embeds:
+        if embed_target_arch(embed) == arch:
+            next_embeds.append(new_embed)
+            replaced = True
+        else:
+            next_embeds.append(embed)
+
+    if not replaced:
+        next_embeds.append(new_embed)
+
+    return next_embeds
+
+
+def has_arch_embed(embeds: list[dict], arch: str, title: str) -> bool:
+    return any(embed_target_arch(embed) == arch and embed.get("title") == title for embed in embeds)
+
+
+def update_discord_arch_embed(webhook_url: str, message_id: str, env: dict) -> bool:
+    arch = env.get("TARGET_ARCH", "")
+    if not arch:
+        print("TARGET_ARCH が未設定のためアーキテクチャ別更新をスキップします", file=sys.stderr)
+        return False
+
+    target_embed = build_build_complete_embed(env | {"TARGET_ARCH_LABEL": arch_label(arch)})
+    for attempt in range(3):
+        message = get_discord_message(webhook_url, message_id)
+        current_embeds = message.get("embeds", [])
+        payload = {
+            "username": "Build & Deploy | chunisupport-api",
+            "embeds": replace_arch_embed(current_embeds, arch, target_embed),
+        }
+        if not update_discord_message(webhook_url, message_id, payload):
+            time.sleep(2**attempt)
+            continue
+
+        time.sleep(1)
+        latest_message = get_discord_message(webhook_url, message_id)
+        if has_arch_embed(latest_message.get("embeds", []), arch, target_embed["title"]):
+            return True
+
+        print("Discord通知が他の更新で上書きされた可能性があるため再試行します")
+        time.sleep(2**attempt)
+
+    return False
 
 
 def main() -> int:
@@ -219,25 +332,34 @@ def main() -> int:
         "COMMIT_MESSAGE": get_env("COMMIT_MESSAGE"),
         "RUN_URL": get_env("RUN_URL"),
         "BUILD_RESULT": get_env("BUILD_RESULT"),
+        "TARGET_ARCH": get_env("TARGET_ARCH"),
     }
 
+    message_id_path = get_env("DISCORD_MESSAGE_ID_PATH")
+    message_id = ""
+    if message_id_path and os.path.exists(message_id_path):
+        with open(message_id_path, encoding="utf-8") as f:
+            message_id = f.read().strip()
+
+    if mode == "build-arch-complete":
+        if message_id:
+            update_discord_arch_embed(webhook_url, message_id, env)
+        else:
+            print("Discord Message ID が未取得のためアーキテクチャ別更新をスキップします")
+        return 0
+
     if mode == "build-start":
-        embed = build_build_start_embed(env)
+        embeds = build_build_start_embeds(env)
     elif mode == "build-complete":
-        embed = build_build_complete_embed(env)
+        embeds = build_build_complete_embeds(env)
     else:
         print(f"未知の DISCORD_NOTIFY_MODE: {mode}", file=sys.stderr)
         return 1
 
     payload = {
         "username": "Build & Deploy | chunisupport-api",
-        "embeds": [embed],
+        "embeds": embeds,
     }
-    message_id_path = get_env("DISCORD_MESSAGE_ID_PATH")
-    message_id = ""
-    if message_id_path and os.path.exists(message_id_path):
-        with open(message_id_path, encoding="utf-8") as f:
-            message_id = f.read().strip()
 
     if message_id and update_discord_message(webhook_url, message_id, payload):
         return 0
