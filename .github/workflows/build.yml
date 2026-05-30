@@ -23,27 +23,32 @@ jobs:
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
             echo "goarch=arm64" >> $GITHUB_OUTPUT
+            echo "binary_name=chunisupport-api-linux-arm64" >> $GITHUB_OUTPUT
             echo "artifact_name=chunisupport-api-main" >> $GITHUB_OUTPUT
           else
             echo "goarch=amd64" >> $GITHUB_OUTPUT
+            echo "binary_name=chunisupport-api-linux-amd64" >> $GITHUB_OUTPUT
             echo "artifact_name=chunisupport-api-develop" >> $GITHUB_OUTPUT
           fi
 
       - name: Build binary
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: ${{ steps.target.outputs.goarch }}
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=${{ steps.target.outputs.goarch }} \
-            go build -o chunisupport-api -ldflags="-s -w -trimpath" .
+          go build -trimpath -ldflags="-s -w" -o ${{ steps.target.outputs.binary_name }} .
 
       - name: Package (binary + migration, flat structure)
         run: |
-          tar -czf ${{ steps.target.outputs.artifact_name }}.tar.gz \
-            chunisupport-api migration/
+          tar -czf ${{ steps.target.outputs.binary_name }}.tar.gz \
+            ${{ steps.target.outputs.binary_name }} migration/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.target.outputs.artifact_name }}
-          path: ${{ steps.target.outputs.artifact_name }}.tar.gz
+          path: ${{ steps.target.outputs.binary_name }}.tar.gz
           archive: false
           overwrite: true
           retention-days: 3
