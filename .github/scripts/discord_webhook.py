@@ -163,8 +163,6 @@ def build_build_start_embed(env: dict) -> dict:
     """ビルド開始通知用の embed を構築。"""
     repo = env.get("REPO", "unknown")
     branch = env.get("BRANCH", "unknown")
-    sha = env.get("SHA", "unknown")
-    short_sha = sha[:7] if len(sha) >= 7 else sha
     arch = env.get("TARGET_ARCH", "unknown")
     arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
 
@@ -214,8 +212,6 @@ def build_build_complete_embed(env: dict) -> dict:
     """ビルド完了通知用の embed を構築（結果によりタイトル・色・文言を切り替え）。"""
     repo = env.get("REPO", "unknown")
     branch = env.get("BRANCH", "unknown")
-    sha = env.get("SHA", "unknown")
-    short_sha = sha[:7] if len(sha) >= 7 else sha
     build_result = env.get("BUILD_RESULT", "failure")
     arch = env.get("TARGET_ARCH", "unknown")
     arch_label = env.get("TARGET_ARCH_LABEL", f"linux/{arch}")
