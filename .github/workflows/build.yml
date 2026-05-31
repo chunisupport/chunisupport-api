@@ -9,14 +9,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    needs: notify-start
-    if: always()
     strategy:
+      fail-fast: false
       matrix:
         goarch: [amd64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Discord Notification (Build Start)
+        # 各アーキテクチャごとに独立した「開始」メッセージを即時投稿
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
+          DISCORD_NOTIFY_MODE: build-start
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'N/A' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_ARCH: ${{ matrix.goarch }}
+          # DISCORD_MESSAGE_ID_PATH は指定しない → 新規メッセージとして投稿される
+        run: python .github/scripts/discord_webhook.py
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -54,19 +69,12 @@ jobs:
           overwrite: true
           retention-days: 3
 
-      - name: Download Discord Message ID
-        if: always()
-        uses: actions/download-artifact@v7
-        with:
-          name: discord-message-id-${{ github.run_id }}
-          path: .discord
-        continue-on-error: true
-
-      - name: Discord Notification (Build Complete by Arch)
+      - name: Discord Notification (Build Complete)
+        # 各アーキテクチャごとに独立した「完了/失敗」メッセージを新規投稿
         if: always()
         env:
           DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
-          DISCORD_NOTIFY_MODE: build-arch-complete
+          DISCORD_NOTIFY_MODE: build-complete
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
@@ -75,40 +83,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BUILD_RESULT: ${{ steps.build-binary.outcome == 'success' && steps.package.outcome == 'success' && steps.upload-artifact.outcome == 'success' && 'success' || 'failure' }}
           TARGET_ARCH: ${{ matrix.goarch }}
-          DISCORD_MESSAGE_ID_PATH: .discord/message_id
+          # DISCORD_MESSAGE_ID_PATH は指定しない → 新規メッセージとして投稿される
         run: python .github/scripts/discord_webhook.py
 
   # ------------------------------------------------------------
-  # Discord 通知ジョブ
-  # - notify-start:    プッシュ検知と同時に「ビルド開始」通知を送信（build完了を待たない）
-  # - build:           各アーキテクチャのビルド完了時に該当 Embed のみ結果へ更新
-  # 実際の通知送信処理は .github/scripts/discord_webhook.py に委譲（urllibのみで依存なし）
-  # 対象ブランチ用の Discord Webhook Secret が未設定の場合はスクリプト側で自動スキップ
+  # Discord 通知
+  # - amd64 と arm64 はそれぞれ完全に独立した Discord メッセージを投稿する
+  # - 旧設計（notify-start ジョブ + discord-message-id-*** artifact による共有メッセージ更新）は廃止
+  # - 実際の通知送信処理は .github/scripts/discord_webhook.py に委譲（urllibのみで依存なし）
+  # - 対象ブランチ用の Discord Webhook Secret が未設定の場合はスクリプト側で自動スキップ
   # ------------------------------------------------------------
-  notify-start:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Discord Notification (Build Start)
-        env:
-          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
-          DISCORD_NOTIFY_MODE: build-start
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          ACTOR: ${{ github.actor }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'N/A' }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          DISCORD_MESSAGE_ID_PATH: .discord/message_id
-        run: python .github/scripts/discord_webhook.py
-
-      - name: Upload Discord Message ID
-        uses: actions/upload-artifact@v7
-        with:
-          name: discord-message-id-${{ github.run_id }}
-          path: .discord/message_id
-          if-no-files-found: ignore
-          retention-days: 1
 
