@@ -107,7 +107,8 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
+| `/` | GET | 不要 | 互換性のためアプリケーション名を固定で返します |
+| `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
@@ -181,16 +182,22 @@
 
 ### GET `/`
 - **認証**: 不要
-- **CORS**:
-  - `https://new.chunithm-net.com` からの `GET` / `OPTIONS` を許可します。
-  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
-- **レスポンス**: 常に 200 OK で固定のアプリケーション名を返します（将来的に変更の可能性あり）。
+- **レスポンス**: 互換性のため、常に 200 OK で固定のアプリケーション名を返します。
 
 ```json
 {
   "app_name": "chunisupport-api"
 }
 ```
+
+### GET `/healthz`
+- **認証**: 不要
+- **CORS**:
+  - `https://new.chunithm-net.com` からの `GET` / `OPTIONS` を許可します。
+  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
+- **チェック内容**: APIプロセスがHTTP応答できることのみを確認します。DBなどの依存サービスは確認しません。
+- **レスポンス**:
+  - 204 No Content: 空レスポンス
 
 ### GET `/health`
 - **認証**: APIトークン (ADMIN)
