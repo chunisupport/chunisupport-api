@@ -144,6 +144,21 @@ def commit_link(env: dict, short_sha: str) -> str:
     return f"[{short_sha}]({github_repo_url(env)}/commit/{sha})"
 
 
+def build_commit_section(env: dict) -> str:
+    """「Commit: {短縮ハッシュ}(リンク)」行とその下にコミットメッセージを表示する文字列を返す。
+
+    Discord通知の「Commit:」行の下にコミットメッセージを追加する（ユーザーリクエスト）。
+    コミットメッセージが空または 'N/A' の場合はハッシュ行のみとする。
+    """
+    sha = env.get("SHA", "unknown")
+    short_sha = sha[:7] if len(sha) >= 7 else sha
+    link = commit_link(env, short_sha)
+    msg = env.get("COMMIT_MESSAGE", "").strip()
+    if msg and msg != "N/A":
+        return f"Commit: {link}\n{msg}"
+    return f"Commit: {link}"
+
+
 def build_build_start_embed(env: dict) -> dict:
     """ビルド開始通知用の embed を構築。"""
     repo = env.get("REPO", "unknown")
@@ -156,7 +171,7 @@ def build_build_start_embed(env: dict) -> dict:
     return {
         "author": {"name": repo, "url": github_repo_url(env)},
         "title": f"🚀 Build Started ({arch})",
-        "description": f"Started {arch_label} build\nCommit: {commit_link(env, short_sha)}",
+        "description": f"Started {arch_label} build\n{build_commit_section(env)}",
         "color": 3447003,
         "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -224,7 +239,7 @@ def build_build_complete_embed(env: dict) -> dict:
     return {
         "author": {"name": repo, "url": github_repo_url(env)},
         "title": f"{status} {title_text} ({arch})",
-        "description": f"{desc}\nCommit: {commit_link(env, short_sha)}",
+        "description": f"{desc}\n{build_commit_section(env)}",
         "color": color,
         "footer": {"text": branch},
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -270,6 +285,7 @@ def main() -> int:
         "SHA": get_env("SHA"),
         "BUILD_RESULT": get_env("BUILD_RESULT"),
         "TARGET_ARCH": get_env("TARGET_ARCH"),
+        "COMMIT_MESSAGE": get_env("COMMIT_MESSAGE"),
     }
 
     if mode == "build-start":
