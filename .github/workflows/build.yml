@@ -30,7 +30,7 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'N/A' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           TARGET_ARCH: ${{ matrix.goarch }}
-          # DISCORD_MESSAGE_ID_PATH は指定しない → 新規メッセージとして投稿される
+          DISCORD_MESSAGE_ID_PATH: .discord/message_id
         run: python .github/scripts/discord_webhook.py
 
       - name: Set up Go
@@ -70,7 +70,7 @@ jobs:
           retention-days: 3
 
       - name: Discord Notification (Build Complete)
-        # 各アーキテクチャごとに独立した「完了/失敗」メッセージを新規投稿
+        # 各アーキテクチャごとの開始メッセージを「完了/失敗」に編集
         if: always()
         env:
           DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
@@ -83,7 +83,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BUILD_RESULT: ${{ steps.build-binary.outcome == 'success' && steps.package.outcome == 'success' && steps.upload-artifact.outcome == 'success' && 'success' || 'failure' }}
           TARGET_ARCH: ${{ matrix.goarch }}
-          # DISCORD_MESSAGE_ID_PATH は指定しない → 新規メッセージとして投稿される
+          DISCORD_MESSAGE_ID_PATH: .discord/message_id
         run: python .github/scripts/discord_webhook.py
 
   # ------------------------------------------------------------
