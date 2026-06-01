@@ -3,6 +3,8 @@ package service
 import (
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // floatEquals は浮動小数点数の比較を行います（許容誤差: 1e-9）
@@ -344,6 +346,48 @@ func TestCalcSongMaxOP(t *testing.T) {
 			if !floatEquals(got, tt.want) {
 				t.Errorf("CalcSongMaxOP() = %.6f, want %.6f", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestCalcSingleOverpowerPercent(t *testing.T) {
+	tests := []struct {
+		name        string
+		score       uint32
+		chartConst  float64
+		comboLampID int
+		expected    float64
+	}{
+		{
+			name:        "理論値の場合100%になる",
+			score:       1010000,
+			chartConst:  14.0,
+			comboLampID: 3,
+			expected:    100.0,
+		},
+		{
+			name:        "譜面別理論値に対する割合を小数点以下4桁で返す",
+			score:       1009000,
+			chartConst:  14.0,
+			comboLampID: 3,
+			expected:    97.9412,
+		},
+		{
+			name:        "譜面定数が0の場合0%になる",
+			score:       1009000,
+			chartConst:  0,
+			comboLampID: 3,
+			expected:    0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			actual := CalcSingleOverpowerPercent(tt.score, tt.chartConst, tt.comboLampID)
+
+			// Then
+			assert.Equal(t, tt.expected, actual)
 		})
 	}
 }

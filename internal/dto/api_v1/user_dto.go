@@ -34,22 +34,23 @@ type V1PlayerDTO struct {
 
 // V1PlayerRecordDTO は外部API v1 用のプレイヤーレコードDTOです。
 type V1PlayerRecordDTO struct {
-	UpdatedAt      *time.Time                  `json:"updated_at"`
-	IsPlayed       bool                        `json:"is_played"`
-	Difficulty     string                      `json:"difficulty"`
-	ID             string                      `json:"id"`
-	Title          string                      `json:"title"`
-	Artist         string                      `json:"artist"`
-	Const          chartconstant.ChartConstant `json:"const"`
-	IsConstUnknown bool                        `json:"is_const_unknown"`
-	Score          uint32                      `json:"score"`
-	Rating         float64                     `json:"rating"`
-	Overpower      float64                     `json:"overpower"`
-	Img            string                      `json:"img"`
-	ClearLamp      *string                     `json:"clear_lamp"`
-	ComboLamp      *string                     `json:"combo_lamp"`
-	FullChain      *string                     `json:"full_chain"`
-	Slot           *string                     `json:"slot"`
+	UpdatedAt        *time.Time                  `json:"updated_at"`
+	IsPlayed         bool                        `json:"is_played"`
+	Difficulty       string                      `json:"difficulty"`
+	ID               string                      `json:"id"`
+	Title            string                      `json:"title"`
+	Artist           string                      `json:"artist"`
+	Const            chartconstant.ChartConstant `json:"const"`
+	IsConstUnknown   bool                        `json:"is_const_unknown"`
+	Score            uint32                      `json:"score"`
+	Rating           float64                     `json:"rating"`
+	Overpower        float64                     `json:"overpower"`
+	OverpowerPercent float64                     `json:"overpower_percent"`
+	Img              string                      `json:"img"`
+	ClearLamp        *string                     `json:"clear_lamp"`
+	ComboLamp        *string                     `json:"combo_lamp"`
+	FullChain        *string                     `json:"full_chain"`
+	Slot             *string                     `json:"slot"`
 }
 
 // V1WorldsendRecordDTO は外部API v1 用の WORLD'S END レコードDTOです。
@@ -129,22 +130,23 @@ func ToV1PlayerRecordDTO(record *dto.PlayerRecordDTO) *V1PlayerRecordDTO {
 		return nil
 	}
 	return &V1PlayerRecordDTO{
-		UpdatedAt:      record.UpdatedAt,
-		IsPlayed:       record.IsPlayed,
-		Difficulty:     record.Difficulty,
-		ID:             record.ID,
-		Title:          record.Title,
-		Artist:         record.Artist,
-		Const:          record.Const,
-		IsConstUnknown: record.IsConstUnknown,
-		Score:          record.Score,
-		Rating:         record.Rating,
-		Overpower:      record.Overpower,
-		Img:            record.Img,
-		ClearLamp:      record.ClearLamp,
-		ComboLamp:      record.ComboLamp,
-		FullChain:      record.FullChain,
-		Slot:           record.Slot,
+		UpdatedAt:        record.UpdatedAt,
+		IsPlayed:         record.IsPlayed,
+		Difficulty:       record.Difficulty,
+		ID:               record.ID,
+		Title:            record.Title,
+		Artist:           record.Artist,
+		Const:            record.Const,
+		IsConstUnknown:   record.IsConstUnknown,
+		Score:            record.Score,
+		Rating:           record.Rating,
+		Overpower:        record.Overpower,
+		OverpowerPercent: record.OverpowerPercent,
+		Img:              record.Img,
+		ClearLamp:        record.ClearLamp,
+		ComboLamp:        record.ComboLamp,
+		FullChain:        record.FullChain,
+		Slot:             record.Slot,
 	}
 }
 

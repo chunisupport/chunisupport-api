@@ -1270,6 +1270,7 @@ curl -X POST \
         "score": 1009975,
         "rating": 16.45,
         "overpower": 86.21,
+        "overpower_percent": 99.6647,
         "img": "9f060e856cb7ad10",
         "clear_lamp": "ABSOLUTE",
         "combo_lamp": "ALL JUSTICE",
@@ -1404,6 +1405,7 @@ curl -X POST \
       "score": 1009500,
       "rating": 17.14,
       "overpower": 5.67,
+      "overpower_percent": 98.2857,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": "FULL COMBO",
@@ -1479,6 +1481,7 @@ curl -X POST \
       "score": 1009500,
       "rating": 17.14,
       "overpower": 5.67,
+      "overpower_percent": 98.2857,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": "FULL COMBO",
@@ -1579,6 +1582,7 @@ curl -X POST \
 | `score` | number | スコア |
 | `rating` | number | 単曲レーティング（譜面定数とスコアから計算） |
 | `overpower` | number | 単曲OVER POWER（譜面定数・スコア・コンボランプから計算） |
+| `overpower_percent` | number | 譜面別理論値OVER POWERに対する単曲OVER POWER達成割合（%） |
 | `img` | string | 楽曲画像ID |
 | `clear_lamp` | string \\| null | クリアランプ名称。未プレイ補完データは `null` |
 | `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
@@ -2891,6 +2895,7 @@ curl -X POST \
         "score": 1009500,
         "rating": 17.14,
         "overpower": 5.67,
+        "overpower_percent": 98.2857,
         "img": "https://example.com/jacket.png",
         "clear_lamp": "CLEAR",
         "combo_lamp": "FULL COMBO",
@@ -3181,6 +3186,7 @@ interface PlayerRecordDTO {
   score: number;
   rating: number;
   overpower: number;
+  overpower_percent: number;
   img: string;
   clear_lamp: string | null;
   combo_lamp: string | null;  // マスタ値が「NONE」の場合はnull

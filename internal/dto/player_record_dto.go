@@ -1,33 +1,34 @@
 package dto
 
 import (
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 )
 
 // PlayerRecordDTO はプレイヤーレコードを外部へ公開するためのDTOです。
 type PlayerRecordDTO struct {
-	UpdatedAt      *time.Time                  `json:"updated_at"`
-	IsPlayed       bool                        `json:"is_played"`
-	Difficulty     string                      `json:"difficulty"`
-	ID             string                      `json:"id"`
-	Title          string                      `json:"title"`
-	Artist         string                      `json:"artist"`
-	Const          chartconstant.ChartConstant `json:"const"`
-	IsConstUnknown bool                        `json:"is_const_unknown"`
-	Score          uint32                      `json:"score"`
-	Rating         float64                     `json:"rating"`
-	Overpower      float64                     `json:"overpower"`
-	Img            string                      `json:"img"`
-	ClearLamp      *string                     `json:"clear_lamp"`
-	ComboLamp      *string                     `json:"combo_lamp"`
-	FullChain      *string                     `json:"full_chain"`
-	Slot           *string                     `json:"slot"`
+	UpdatedAt        *time.Time                  `json:"updated_at"`
+	IsPlayed         bool                        `json:"is_played"`
+	Difficulty       string                      `json:"difficulty"`
+	ID               string                      `json:"id"`
+	Title            string                      `json:"title"`
+	Artist           string                      `json:"artist"`
+	Const            chartconstant.ChartConstant `json:"const"`
+	IsConstUnknown   bool                        `json:"is_const_unknown"`
+	Score            uint32                      `json:"score"`
+	Rating           float64                     `json:"rating"`
+	Overpower        float64                     `json:"overpower"`
+	OverpowerPercent float64                     `json:"overpower_percent"`
+	Img              string                      `json:"img"`
+	ClearLamp        *string                     `json:"clear_lamp"`
+	ComboLamp        *string                     `json:"combo_lamp"`
+	FullChain        *string                     `json:"full_chain"`
+	Slot             *string                     `json:"slot"`
 }
 
 // ToPlayerRecordDTO は PlayerRecord エンティティをDTOへ変換します。
@@ -46,15 +47,16 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 	}
 
 	dto := &PlayerRecordDTO{
-		Const:          chartConst,
-		IsConstUnknown: isConstUnknown,
-		Score:          score,
-		Rating:         service.CalcSingleRating(score, float64(chartConst)),
-		Overpower:      service.CalcSingleOverpower(score, float64(chartConst), record.ComboLampID),
-		ClearLamp:      toMasterNamePtr(record.ClearLamp),
-		ComboLamp:      toMasterNamePtr(record.ComboLamp),
-		FullChain:      toMasterNamePtr(record.FullChain),
-		Slot:           toMasterNamePtr(record.Slot),
+		Const:            chartConst,
+		IsConstUnknown:   isConstUnknown,
+		Score:            score,
+		Rating:           service.CalcSingleRating(score, float64(chartConst)),
+		Overpower:        service.CalcSingleOverpower(score, float64(chartConst), record.ComboLampID),
+		OverpowerPercent: service.CalcSingleOverpowerPercent(score, float64(chartConst), record.ComboLampID),
+		ClearLamp:        toMasterNamePtr(record.ClearLamp),
+		ComboLamp:        toMasterNamePtr(record.ComboLamp),
+		FullChain:        toMasterNamePtr(record.FullChain),
+		Slot:             toMasterNamePtr(record.Slot),
 	}
 	if !record.UpdatedAt.IsZero() {
 		dto.UpdatedAt = &record.UpdatedAt

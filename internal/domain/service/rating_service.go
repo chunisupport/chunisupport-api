@@ -174,6 +174,17 @@ func CalcSongMaxOP(maxChartConst float64) float64 {
 	return CalcSingleOverpower(constants.TheoreticalScore, maxChartConst, comboLampAllJustice)
 }
 
+// CalcSingleOverpowerPercent は譜面別の理論値OVER POWERに対する達成割合を計算します。
+func CalcSingleOverpowerPercent(score uint32, chartConst float64, comboLampID int) float64 {
+	maxOverpower := CalcSongMaxOP(chartConst)
+	if maxOverpower <= 0 {
+		return 0
+	}
+
+	overpower := CalcSingleOverpower(score, chartConst, comboLampID)
+	return min(max(roundToScale(overpower/maxOverpower*100, 4), 0.0), 100.0)
+}
+
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。
 type RatingRecord struct {
 	Score      uint32  // スコア
