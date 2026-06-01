@@ -1403,6 +1403,7 @@ curl -X POST \
       "const": 14.5,
       "is_const_unknown": false,
       "score": 1009500,
+      "justice_count": null,
       "rating": 17.14,
       "overpower": 5.67,
       "overpower_percent": 98.2857,
@@ -1580,6 +1581,7 @@ curl -X POST \
 | `const` | number | 譜面定数 |
 | `is_const_unknown` | boolean | 譜面定数が不明か |
 | `score` | number | スコア |
+| `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `rating` | number | 単曲レーティング（譜面定数とスコアから計算） |
 | `overpower` | number | 単曲OVER POWER（譜面定数・スコア・コンボランプから計算） |
 | `overpower_percent` | number | 譜面別理論値OVER POWERに対する単曲OVER POWER達成割合（%） |
@@ -3184,6 +3186,7 @@ interface PlayerRecordDTO {
   const: number;
   is_const_unknown: boolean;
   score: number;
+  justice_count: number | null;
   rating: number;
   overpower: number;
   overpower_percent: number;
