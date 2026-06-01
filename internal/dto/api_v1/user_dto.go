@@ -43,6 +43,7 @@ type V1PlayerRecordDTO struct {
 	Const            chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown   bool                        `json:"is_const_unknown"`
 	Score            uint32                      `json:"score"`
+	JusticeCount     *int                        `json:"justice_count"`
 	Rating           float64                     `json:"rating"`
 	Overpower        float64                     `json:"overpower"`
 	OverpowerPercent float64                     `json:"overpower_percent"`
@@ -55,19 +56,20 @@ type V1PlayerRecordDTO struct {
 
 // V1WorldsendRecordDTO は外部API v1 用の WORLD'S END レコードDTOです。
 type V1WorldsendRecordDTO struct {
-	UpdatedAt *time.Time `json:"updated_at"`
-	IsPlayed  bool       `json:"is_played"`
-	ID        string     `json:"id"`
-	Title     string     `json:"title"`
-	Artist    string     `json:"artist"`
-	LevelStar *int       `json:"level_star"`
-	Attribute *string    `json:"attribute"`
-	Notes     *int       `json:"notes"`
-	Score     uint32     `json:"score"`
-	Img       string     `json:"img"`
-	ClearLamp *string    `json:"clear_lamp"`
-	ComboLamp *string    `json:"combo_lamp"`
-	FullChain *string    `json:"full_chain"`
+	UpdatedAt    *time.Time `json:"updated_at"`
+	IsPlayed     bool       `json:"is_played"`
+	ID           string     `json:"id"`
+	Title        string     `json:"title"`
+	Artist       string     `json:"artist"`
+	LevelStar    *int       `json:"level_star"`
+	Attribute    *string    `json:"attribute"`
+	Notes        *int       `json:"notes"`
+	Score        uint32     `json:"score"`
+	JusticeCount *int       `json:"justice_count"`
+	Img          string     `json:"img"`
+	ClearLamp    *string    `json:"clear_lamp"`
+	ComboLamp    *string    `json:"combo_lamp"`
+	FullChain    *string    `json:"full_chain"`
 }
 
 // V1UserRecordResponseDTO は外部API v1 用のユーザーレコードレスポンスDTOです。
@@ -139,6 +141,7 @@ func ToV1PlayerRecordDTO(record *dto.PlayerRecordDTO) *V1PlayerRecordDTO {
 		Const:            record.Const,
 		IsConstUnknown:   record.IsConstUnknown,
 		Score:            record.Score,
+		JusticeCount:     record.JusticeCount,
 		Rating:           record.Rating,
 		Overpower:        record.Overpower,
 		OverpowerPercent: record.OverpowerPercent,
@@ -156,19 +159,20 @@ func ToV1WorldsendRecordDTO(record *dto.WorldsendRecordDTO) *V1WorldsendRecordDT
 		return nil
 	}
 	return &V1WorldsendRecordDTO{
-		UpdatedAt: record.UpdatedAt,
-		IsPlayed:  record.IsPlayed,
-		ID:        record.ID,
-		Title:     record.Title,
-		Artist:    record.Artist,
-		LevelStar: record.LevelStar,
-		Attribute: record.Attribute,
-		Notes:     record.Notes,
-		Score:     record.Score,
-		Img:       record.Img,
-		ClearLamp: record.ClearLamp,
-		ComboLamp: record.ComboLamp,
-		FullChain: record.FullChain,
+		UpdatedAt:    record.UpdatedAt,
+		IsPlayed:     record.IsPlayed,
+		ID:           record.ID,
+		Title:        record.Title,
+		Artist:       record.Artist,
+		LevelStar:    record.LevelStar,
+		Attribute:    record.Attribute,
+		Notes:        record.Notes,
+		Score:        record.Score,
+		JusticeCount: record.JusticeCount,
+		Img:          record.Img,
+		ClearLamp:    record.ClearLamp,
+		ComboLamp:    record.ComboLamp,
+		FullChain:    record.FullChain,
 	}
 }
 

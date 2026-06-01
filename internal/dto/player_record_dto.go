@@ -1,18 +1,14 @@
 package dto
 
 import (
-	"math"
 	"strings"
 	"time"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 )
-
-const playerRecordComboLampAllJustice = 3
 
 // PlayerRecordDTO はプレイヤーレコードを外部へ公開するためのDTOです。
 type PlayerRecordDTO struct {
@@ -55,7 +51,7 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 		Const:            chartConst,
 		IsConstUnknown:   isConstUnknown,
 		Score:            score,
-		JusticeCount:     calcJusticeCount(record, score),
+		JusticeCount:     calcJusticeCount(score, record.ComboLampID, playerRecordNotes(record)),
 		Rating:           service.CalcSingleRating(score, float64(chartConst)),
 		Overpower:        service.CalcSingleOverpower(score, float64(chartConst), record.ComboLampID),
 		OverpowerPercent: service.CalcSingleOverpowerPercent(score, float64(chartConst), record.ComboLampID),
@@ -85,18 +81,11 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 	return dto
 }
 
-func calcJusticeCount(record *entity.PlayerRecord, score uint32) *int {
-	if score == constants.TheoreticalScore {
-		justiceCount := 0
-		return &justiceCount
-	}
-	if record.ComboLampID != playerRecordComboLampAllJustice || record.Chart == nil || record.Chart.Notes == nil {
+func playerRecordNotes(record *entity.PlayerRecord) *int {
+	if record.Chart == nil {
 		return nil
 	}
-
-	diff := constants.TheoreticalScore - int(score)
-	justiceCount := int(math.Round(float64(*record.Chart.Notes) * float64(diff) / 10000))
-	return &justiceCount
+	return ToNotesIntPtr(record.Chart.Notes)
 }
 
 // toMasterName はマスタエンティティからName文字列を取り出します。nilの場合は空文字を返します。

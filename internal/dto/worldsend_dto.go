@@ -11,19 +11,20 @@ import (
 // WorldsendRecordDTO は WORLD'S END レコードを外部へ公開するための DTO です。
 // WORLD'S END はレーティング計算の対象外であり、スロット（Best/New等）の概念を持ちません。
 type WorldsendRecordDTO struct {
-	UpdatedAt *time.Time `json:"updated_at"`
-	IsPlayed  bool       `json:"is_played"`
-	ID        string     `json:"id"`         // 楽曲の DisplayID
-	Title     string     `json:"title"`      // 楽曲タイトル
-	Artist    string     `json:"artist"`     // アーティスト名
-	LevelStar *int       `json:"level_star"` // WORLD'S END レベル（1～5）
-	Attribute *string    `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
-	Notes     *int       `json:"notes"`      // ノーツ数
-	Score     uint32     `json:"score"`      // スコア
-	Img       string     `json:"img"`        // ジャケット画像URL
-	ClearLamp *string    `json:"clear_lamp"` // クリアランプ
-	ComboLamp *string    `json:"combo_lamp"` // コンボランプ（マスタ値が「NONE」の場合はnull）
-	FullChain *string    `json:"full_chain"` // フルチェイン（マスタ値が「NONE」の場合はnull）
+	UpdatedAt    *time.Time `json:"updated_at"`
+	IsPlayed     bool       `json:"is_played"`
+	ID           string     `json:"id"`            // 楽曲の DisplayID
+	Title        string     `json:"title"`         // 楽曲タイトル
+	Artist       string     `json:"artist"`        // アーティスト名
+	LevelStar    *int       `json:"level_star"`    // WORLD'S END レベル（1～5）
+	Attribute    *string    `json:"attribute"`     // WORLD'S END 属性（光、蔵、改、狂、etc.）
+	Notes        *int       `json:"notes"`         // ノーツ数
+	Score        uint32     `json:"score"`         // スコア
+	JusticeCount *int       `json:"justice_count"` // JUSTICE数
+	Img          string     `json:"img"`           // ジャケット画像URL
+	ClearLamp    *string    `json:"clear_lamp"`    // クリアランプ
+	ComboLamp    *string    `json:"combo_lamp"`    // コンボランプ（マスタ値が「NONE」の場合はnull）
+	FullChain    *string    `json:"full_chain"`    // フルチェイン（マスタ値が「NONE」の場合はnull）
 }
 
 // ToWorldsendRecordDTO は PlayerWorldsendRecord エンティティを DTO へ変換します。
@@ -39,10 +40,11 @@ func ToWorldsendRecordDTO(record *entity.PlayerWorldsendRecord) *WorldsendRecord
 	}
 
 	dto := &WorldsendRecordDTO{
-		Score:     score,
-		ClearLamp: toMasterNamePtr(record.ClearLamp),
-		ComboLamp: toMasterNamePtr(record.ComboLamp),
-		FullChain: toMasterNamePtr(record.FullChain),
+		Score:        score,
+		JusticeCount: calcJusticeCount(score, record.ComboLampID, worldsendRecordNotes(record)),
+		ClearLamp:    toMasterNamePtr(record.ClearLamp),
+		ComboLamp:    toMasterNamePtr(record.ComboLamp),
+		FullChain:    toMasterNamePtr(record.FullChain),
 	}
 	if !record.UpdatedAt.IsZero() {
 		dto.UpdatedAt = &record.UpdatedAt
@@ -67,6 +69,13 @@ func ToWorldsendRecordDTO(record *entity.PlayerWorldsendRecord) *WorldsendRecord
 	}
 
 	return dto
+}
+
+func worldsendRecordNotes(record *entity.PlayerWorldsendRecord) *int {
+	if record.WorldsendChart == nil {
+		return nil
+	}
+	return ToNotesIntPtr(record.WorldsendChart.Notes)
 }
 
 // ToNotesIntPtr は Notes の値オブジェクトを *int に変換します。

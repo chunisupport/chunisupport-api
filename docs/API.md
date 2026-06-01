@@ -1500,6 +1500,7 @@ curl -X POST \
       "attribute": "狂",
       "notes": 2000,
       "score": 1000000,
+      "justice_count": null,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": null,
@@ -1604,6 +1605,7 @@ curl -X POST \
 | `attribute` | string \| null | WORLD'S END 属性 |
 | `notes` | number \| null | ノーツ数 |
 | `score` | number | スコア |
+| `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `img` | string | 楽曲画像ID |
 | `clear_lamp` | string \| null | クリアランプ名称。未プレイ補完データは `null` |
 | `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
@@ -3218,6 +3220,7 @@ interface WorldsendRecordDTO {
   attribute: string | null;       // WORLD'S END 属性（光、蔵、改、狂、etc.）
   notes: number | null;
   score: number;
+  justice_count: number | null;
   img: string;
   clear_lamp: string | null;
   combo_lamp: string | null;      // マスタ値が「NONE」の場合はnull
