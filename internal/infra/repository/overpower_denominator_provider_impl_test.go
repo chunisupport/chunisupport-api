@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -73,6 +75,23 @@ func TestOverpowerDenominatorProvider_Snapshot(t *testing.T) {
 	assert.InDelta(t, service.CalcSongMaxOP(14.0), snapshot.SongMaxOPWithoutUltima[10], 0.0001)
 	assert.NotContains(t, snapshot.SongMaxOP, 30)
 	assert.NotContains(t, snapshot.SongMaxOP, 40)
+}
+
+func TestOverpowerDenominatorProvider_SnapshotはULTIMA以外の譜面がない楽曲をエラーにする(t *testing.T) {
+	db := setupOverpowerDenominatorProviderSQLite(t)
+	provider := NewOverpowerDenominatorProviderWithTTL(db, time.Hour)
+
+	_, err := db.Exec(`INSERT INTO songs (id, is_worldsend, is_deleted) VALUES (50, 0, 0)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES (501, 50, 5, 15.5)`)
+	require.NoError(t, err)
+
+	snapshot, err := provider.Snapshot(context.Background())
+
+	require.Error(t, err)
+	assert.Nil(t, snapshot)
+	assert.True(t, errors.Is(err, domainrepo.ErrRepositoryOperationFailed))
+	assert.Contains(t, err.Error(), "missing non-ULTIMA chart")
 }
 
 func TestOverpowerDenominatorProvider_キャッシュとInvalidate(t *testing.T) {

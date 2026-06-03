@@ -121,10 +121,14 @@ func (p *OverpowerDenominatorProvider) buildSnapshot(ctx context.Context) (*doma
 		SongMaxOPWithoutUltima: make(map[int]float64, len(maxConstBySongID)),
 	}
 	for songID, maxConst := range maxConstBySongID {
+		maxConstWithoutUltima, ok := maxConstWithoutUltimaBySongID[songID]
+		if !ok {
+			return nil, fmt.Errorf("%w: missing non-ULTIMA chart for song_id=%d", domainrepo.ErrRepositoryOperationFailed, songID)
+		}
 		maxOP := service.CalcSongMaxOP(maxConst)
 		snapshot.SongMaxOP[songID] = maxOP
 		snapshot.GlobalTotal += maxOP
-		snapshot.SongMaxOPWithoutUltima[songID] = service.CalcSongMaxOP(maxConstWithoutUltimaBySongID[songID])
+		snapshot.SongMaxOPWithoutUltima[songID] = service.CalcSongMaxOP(maxConstWithoutUltima)
 	}
 
 	return snapshot, nil
