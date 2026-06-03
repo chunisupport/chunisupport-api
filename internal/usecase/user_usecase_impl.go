@@ -17,17 +17,19 @@ import (
 
 // userUsecase は UserUsecase の実装です。
 type userUsecase struct {
-	db                  repository.Executor
-	userRepo            repository.UserRepository
-	playerRepo          repository.PlayerRepository
-	playerRecordRepo    repository.PlayerRecordRepository
-	worldsendRecordRepo repository.WorldsendRecordRepository
-	songRepo            repository.SongRepository
-	worldsendChartRepo  repository.WorldsendChartRepository
-	recordCompletionSvc *service.RecordCompletionService
-	masterProvider      userMasterProvider
-	firebaseDeleter     FirebaseUserDeleter
-	firebaseEmailLookup FirebaseUserEmailLookup
+	db                           repository.Executor
+	userRepo                     repository.UserRepository
+	playerRepo                   repository.PlayerRepository
+	playerRecordRepo             repository.PlayerRecordRepository
+	worldsendRecordRepo          repository.WorldsendRecordRepository
+	songRepo                     repository.SongRepository
+	worldsendChartRepo           repository.WorldsendChartRepository
+	playerLockedSongRepo         repository.PlayerLockedSongRepository
+	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
+	recordCompletionSvc          *service.RecordCompletionService
+	masterProvider               userMasterProvider
+	firebaseDeleter              FirebaseUserDeleter
+	firebaseEmailLookup          FirebaseUserEmailLookup
 }
 
 type userMasterProvider interface {
@@ -58,6 +60,18 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 	}
 }
 
+// NewUserUsecaseWithOverpowerDenominator はOVER POWER割合の随時計算Provider付きで UserUsecase を生成します。
+func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+	impl, ok := usecase.(*userUsecase)
+	if !ok {
+		return usecase
+	}
+	impl.playerLockedSongRepo = playerLockedSongRepo
+	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	return impl
+}
+
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
 func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
 	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
@@ -71,6 +85,18 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 			impl.firebaseEmailLookup = firebaseEmailLookup
 		}
 	}
+	return impl
+}
+
+// NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
+func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, firebaseDeleter)
+	impl, ok := usecase.(*userUsecase)
+	if !ok {
+		return usecase
+	}
+	impl.playerLockedSongRepo = playerLockedSongRepo
+	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
 	return impl
 }
 
@@ -657,5 +683,42 @@ func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) 
 		return nil, nil
 	}
 
-	return buildPlayerDTO(playerWithHonors), nil
+	player := buildPlayerDTO(playerWithHonors)
+	if err := s.applyDynamicOverpowerPercent(ctx, player, *user.PlayerID); err != nil {
+		return nil, err
+	}
+	return player, nil
+}
+
+func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *dto.PlayerDTO, playerID int) error {
+	if player == nil || player.OverpowerValue == nil || s.overpowerDenominatorProvider == nil {
+		return nil
+	}
+
+	snapshot, err := s.overpowerDenominatorProvider.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+
+	denominator := snapshot.GlobalTotal
+	if s.playerLockedSongRepo != nil {
+		lockedSongs, err := s.playerLockedSongRepo.ListByPlayerID(ctx, s.db, playerID)
+		if err != nil {
+			return err
+		}
+		for _, lockedSong := range lockedSongs {
+			if lockedSong == nil {
+				continue
+			}
+			if !lockedSong.IsUltima {
+				denominator -= snapshot.SongMaxOP[lockedSong.SongID]
+				continue
+			}
+			denominator -= snapshot.SongMaxOP[lockedSong.SongID] - snapshot.SongMaxOPWithoutUltima[lockedSong.SongID]
+		}
+	}
+
+	percent := service.CalcOverpowerPercent(*player.OverpowerValue, denominator)
+	player.OverpowerPercent = &percent
+	return nil
 }

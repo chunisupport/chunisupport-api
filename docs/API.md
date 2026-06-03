@@ -729,6 +729,8 @@ curl -X POST \
 | `order` | number \| null | | スロット内順序 |
 
 - **レスポンス**: 200 OK。登録結果 `PlayerDataResult` を返します。
+  - `summary.overpower_value` は通常楽曲レコードから再集計して保存されるOVER POWER値です。
+  - `summary.overpower_percentage` は登録処理時点の計算結果です。`players` テーブルには保存されず、プロフィール系レスポンスでは最新マスタを使って再計算された `overpower_percent` が返ります。
 
 #### レスポンス例
 
@@ -1228,6 +1230,8 @@ curl -X POST \
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`all`/`worldsend` のみを返します。
     - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+  - `player.overpower_value` は保存済みの楽曲OP合計です。
+  - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
 
 #### レスポンス例
 

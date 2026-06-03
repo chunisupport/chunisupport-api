@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
@@ -118,6 +119,48 @@ type stubPlayerRepository struct {
 	playerWithHonors *repository.PlayerWithHonors
 	err              error
 }
+
+type stubPlayerLockedSongRepository struct {
+	lockedSongs []*entity.PlayerLockedSong
+	err         error
+}
+
+func (s *stubPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.lockedSongs, nil
+}
+
+func (s *stubPlayerLockedSongRepository) Create(ctx context.Context, exec repository.Executor, lockedSong *entity.PlayerLockedSong) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubPlayerLockedSongRepository) BulkCreate(ctx context.Context, exec repository.Executor, lockedSongs []*entity.PlayerLockedSong) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec repository.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
+	return errors.New("not implemented")
+}
+
+type stubOverpowerDenominatorProvider struct {
+	snapshot *repository.OverpowerDenominatorSnapshot
+	err      error
+}
+
+func (s *stubOverpowerDenominatorProvider) Snapshot(ctx context.Context) (*repository.OverpowerDenominatorSnapshot, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.snapshot, nil
+}
+
+func (s *stubOverpowerDenominatorProvider) Invalidate() {}
 
 type stubFirebaseUserEmailLookup struct {
 	emailsByUID map[string]string
@@ -505,6 +548,99 @@ func TestUserUsecase_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t 
 	require.NotNil(t, result.Player)
 	require.NotNil(t, result.Player.Honors)
 	assert.Empty(t, result.Player.Honors)
+}
+
+func TestUserUsecase_GetUserProfile_OverpowerPercentを最新分母で随時計算する(t *testing.T) {
+	now := time.Now()
+	un, err := username.NewUserName("tester")
+	require.NoError(t, err)
+	oldPercent := 1.0
+	overpowerValue := 50.0
+	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	player := &entity.Player{
+		ID:               1,
+		Name:             playername.MustNewPlayerName("テストプレイヤー"),
+		Level:            1,
+		OverpowerValue:   &overpowerValue,
+		OverpowerPercent: &oldPercent,
+		UpdatedAt:        now,
+	}
+	provider := &stubOverpowerDenominatorProvider{
+		snapshot: &repository.OverpowerDenominatorSnapshot{
+			GlobalTotal:            100,
+			SongMaxOP:              map[int]float64{},
+			SongMaxOPWithoutUltima: map[int]float64{},
+		},
+	}
+	usecase := NewUserUsecaseWithOverpowerDenominator(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		provider,
+	)
+
+	result, err := usecase.GetUserProfile(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Player)
+	require.NotNil(t, result.Player.OverpowerPercent)
+	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 100), *result.Player.OverpowerPercent)
+}
+
+func TestUserUsecase_GetUserProfile_未解禁設定を分母に反映する(t *testing.T) {
+	now := time.Now()
+	un, err := username.NewUserName("tester")
+	require.NoError(t, err)
+	overpowerValue := 50.0
+	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	player := &entity.Player{
+		ID:             1,
+		Name:           playername.MustNewPlayerName("テストプレイヤー"),
+		Level:          1,
+		OverpowerValue: &overpowerValue,
+		UpdatedAt:      now,
+	}
+	lockedSong, err := entity.NewPlayerLockedSong(1, 10, false)
+	require.NoError(t, err)
+	lockedUltima, err := entity.NewPlayerLockedSong(1, 20, true)
+	require.NoError(t, err)
+	provider := &stubOverpowerDenominatorProvider{
+		snapshot: &repository.OverpowerDenominatorSnapshot{
+			GlobalTotal: 100,
+			SongMaxOP: map[int]float64{
+				10: 20,
+				20: 30,
+			},
+			SongMaxOPWithoutUltima: map[int]float64{
+				20: 25,
+			},
+		},
+	}
+	usecase := NewUserUsecaseWithOverpowerDenominator(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{},
+		nil,
+		nil,
+		nil,
+		nil,
+		&stubPlayerLockedSongRepository{lockedSongs: []*entity.PlayerLockedSong{lockedSong, lockedUltima}},
+		provider,
+	)
+
+	result, err := usecase.GetUserProfile(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Player)
+	require.NotNil(t, result.Player.OverpowerPercent)
+	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 75), *result.Player.OverpowerPercent)
 }
 
 func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {

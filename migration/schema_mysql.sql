@@ -198,7 +198,6 @@ CREATE TABLE `players` (
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
-  `overpower_percentage` decimal(7,4) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
