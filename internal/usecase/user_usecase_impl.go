@@ -706,30 +706,44 @@ func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *
 		if err != nil {
 			return err
 		}
+		type lockState struct {
+			normal bool
+			ultima bool
+		}
+		lockedMap := make(map[int]lockState, len(lockedSongs))
 		for _, lockedSong := range lockedSongs {
 			if lockedSong == nil {
 				continue
 			}
-			if !lockedSong.IsUltima {
-				maxOP, ok := snapshot.SongMaxOP[lockedSong.SongID]
+			state := lockedMap[lockedSong.SongID]
+			if lockedSong.IsUltima {
+				state.ultima = true
+			} else {
+				state.normal = true
+			}
+			lockedMap[lockedSong.SongID] = state
+		}
+		for songID, state := range lockedMap {
+			if state.normal {
+				maxOP, ok := snapshot.SongMaxOP[songID]
 				if !ok {
-					slog.Warn("applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", lockedSong.SongID, "player_id", playerID)
+					slog.Warn("applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", songID, "player_id", playerID)
 					continue
 				}
 				denominator -= maxOP
-				continue
+			} else if state.ultima {
+				maxOP, ok := snapshot.SongMaxOP[songID]
+				if !ok {
+					slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", songID, "player_id", playerID)
+					continue
+				}
+				maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[songID]
+				if !ok {
+					slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", songID, "player_id", playerID)
+					continue
+				}
+				denominator -= maxOP - maxOPWithoutUltima
 			}
-			maxOP, ok := snapshot.SongMaxOP[lockedSong.SongID]
-			if !ok {
-				slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", lockedSong.SongID, "player_id", playerID)
-				continue
-			}
-			maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[lockedSong.SongID]
-			if !ok {
-				slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", lockedSong.SongID, "player_id", playerID)
-				continue
-			}
-			denominator -= maxOP - maxOPWithoutUltima
 		}
 	}
 
