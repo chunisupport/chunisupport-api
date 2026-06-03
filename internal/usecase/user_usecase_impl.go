@@ -711,10 +711,25 @@ func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *
 				continue
 			}
 			if !lockedSong.IsUltima {
-				denominator -= snapshot.SongMaxOP[lockedSong.SongID]
+				maxOP, ok := snapshot.SongMaxOP[lockedSong.SongID]
+				if !ok {
+					slog.Warn("applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", lockedSong.SongID, "player_id", playerID)
+					continue
+				}
+				denominator -= maxOP
 				continue
 			}
-			denominator -= snapshot.SongMaxOP[lockedSong.SongID] - snapshot.SongMaxOPWithoutUltima[lockedSong.SongID]
+			maxOP, ok := snapshot.SongMaxOP[lockedSong.SongID]
+			if !ok {
+				slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", lockedSong.SongID, "player_id", playerID)
+				continue
+			}
+			maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[lockedSong.SongID]
+			if !ok {
+				slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", lockedSong.SongID, "player_id", playerID)
+				continue
+			}
+			denominator -= maxOP - maxOPWithoutUltima
 		}
 	}
 

@@ -17,6 +17,8 @@ func setupOverpowerDenominatorProviderSQLite(t *testing.T) *sqlx.DB {
 
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
 	})
@@ -90,7 +92,7 @@ func TestOverpowerDenominatorProvider_キャッシュとInvalidate(t *testing.T)
 	assert.InDelta(t, first.GlobalTotal, cached.GlobalTotal, 0.0001)
 	assert.NotContains(t, cached.SongMaxOP, 50)
 
-	provider.Invalidate()
+	provider.Invalidate(context.Background())
 	rebuilt, err := provider.Snapshot(context.Background())
 	require.NoError(t, err)
 	assert.InDelta(t, first.GlobalTotal+service.CalcSongMaxOP(12.0), rebuilt.GlobalTotal, 0.0001)

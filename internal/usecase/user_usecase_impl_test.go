@@ -160,7 +160,7 @@ func (s *stubOverpowerDenominatorProvider) Snapshot(ctx context.Context) (*repos
 	return s.snapshot, nil
 }
 
-func (s *stubOverpowerDenominatorProvider) Invalidate() {}
+func (s *stubOverpowerDenominatorProvider) Invalidate(ctx context.Context) {}
 
 type stubFirebaseUserEmailLookup struct {
 	emailsByUID map[string]string

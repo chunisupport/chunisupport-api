@@ -12,5 +12,5 @@ type OverpowerDenominatorSnapshot struct {
 // OverpowerDenominatorProvider はプロフィール返却時のOVER POWER割合分母を提供します。
 type OverpowerDenominatorProvider interface {
 	Snapshot(ctx context.Context) (*OverpowerDenominatorSnapshot, error)
-	Invalidate()
+	Invalidate(ctx context.Context)
 }

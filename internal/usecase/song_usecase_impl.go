@@ -53,7 +53,7 @@ func NewSongUsecaseWithOverpowerDenominator(
 	usecase := NewSongUsecase(songRepo, masterCache, tm, defaultExecutor)
 	impl, ok := usecase.(*songUsecaseImpl)
 	if !ok {
-		return usecase
+		panic("NewSongUsecaseWithOverpowerDenominator: NewSongUsecase returned unexpected type, expected *songUsecaseImpl")
 	}
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
 	return impl
@@ -109,7 +109,7 @@ func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) erro
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator()
+	s.invalidateOverpowerDenominator(ctx)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator()
+	s.invalidateOverpowerDenominator(ctx)
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator()
+	s.invalidateOverpowerDenominator(ctx)
 	return nil
 }
 
@@ -334,12 +334,12 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 		return nil, err
 	}
 
-	s.invalidateOverpowerDenominator()
+	s.invalidateOverpowerDenominator(ctx)
 	return created, nil
 }
 
-func (s *songUsecaseImpl) invalidateOverpowerDenominator() {
+func (s *songUsecaseImpl) invalidateOverpowerDenominator(ctx context.Context) {
 	if s.overpowerDenominatorProvider != nil {
-		s.overpowerDenominatorProvider.Invalidate()
+		s.overpowerDenominatorProvider.Invalidate(ctx)
 	}
 }

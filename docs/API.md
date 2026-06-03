@@ -730,7 +730,7 @@ curl -X POST \
 
 - **レスポンス**: 200 OK。登録結果 `PlayerDataResult` を返します。
   - `summary.overpower_value` は通常楽曲レコードから再集計して保存されるOVER POWER値です。
-  - `summary.overpower_percentage` は登録処理時点の計算結果です。`players` テーブルには保存されず、プロフィール系レスポンスでは最新マスタを使って再計算された `overpower_percent` が返ります。
+  - `summary.overpower_percentage` は登録処理時点の計算結果です。`players` テーブルには保存されず、プロフィール系レスポンスでは最新マスタデータとプレイヤーの未解禁設定（未解放/解放済みの譜面）を組み合わせて分母を再計算し、その分母を使って随時計算された `overpower_percent` が返ります。
 
 #### レスポンス例
 

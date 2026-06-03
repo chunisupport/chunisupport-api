@@ -72,7 +72,7 @@ func (p *OverpowerDenominatorProvider) Snapshot(ctx context.Context) (*domainrep
 	return cloneOverpowerDenominatorSnapshot(snapshot), nil
 }
 
-func (p *OverpowerDenominatorProvider) Invalidate() {
+func (p *OverpowerDenominatorProvider) Invalidate(ctx context.Context) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
