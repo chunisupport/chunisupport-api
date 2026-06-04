@@ -614,11 +614,13 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 
 	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
 	// ただし通常利用では同時登録が起きない前提のため許容し、発生した場合はユーザの責任として扱う。
-	fullChanges := computeFullRecordChanges(fullBefore, fullRecordsToUpsert, masters)
-	worldsendChanges := computeWorldsendRecordChanges(worldsendBefore, worldsendRecordsToUpsert, masters)
-	changes := append(fullChanges, worldsendChanges...)
-	counts.FullRecordsActuallyChanged = len(fullChanges)
-	counts.WorldsendRecordsActuallyChanged = len(worldsendChanges)
+	fullRecordChanges := computeFullRecordChanges(fullBefore, fullRecordsToUpsert, masters)
+	worldsendRecordChanges := computeWorldsendRecordChanges(worldsendBefore, worldsendRecordsToUpsert, masters)
+	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
+	changes = append(changes, playerRecordChangesDTO(fullRecordChanges)...)
+	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges)...)
+	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
+	counts.WorldsendRecordsActuallyChanged = len(worldsendRecordChanges)
 
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
@@ -814,7 +816,7 @@ func collectWorldsendChartIDs(records []repository.WorldsendRecordForUpsert) []i
 	return ids
 }
 
-func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
+func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.PlayerRecordState] {
 	return computeRecordChanges(
 		before,
 		after,
@@ -825,12 +827,11 @@ func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after
 			return fullRecordDisplayKeys(record.ChartID, masters, lookup)
 		},
 		playerRecordMeaningfullyChanged,
-		playerRecordStateDTO,
 		"full",
 	)
 }
 
-func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
+func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.WorldsendRecordState] {
 	return computeRecordChanges(
 		before,
 		after,
@@ -841,13 +842,21 @@ func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordStat
 			return worldsendRecordDisplayKeys(record.ChartID, lookup)
 		},
 		worldsendRecordMeaningfullyChanged,
-		worldsendRecordStateDTO,
 		"worldsend",
 	)
 }
 
+type playerDataRecordChange[State any] struct {
+	RecordType string
+	ChangeType string
+	Idx        string
+	Diff       string
+	Before     *State
+	After      State
+}
+
 // computeRecordChanges は通常譜面とWORLD'S ENDで共通する差分生成の流れを集約します。
-// 表示用マスタをIDキーのマップへ事前変換し、各レコード処理中の線形探索を避けます。
+// 差分計算そのものをAPI DTOに固定しないため、レスポンス変換は呼び出し側で行います。
 func computeRecordChanges[State any, Record any](
 	before map[int]State,
 	after []Record,
@@ -856,25 +865,23 @@ func computeRecordChanges[State any, Record any](
 	getState func(Record) State,
 	getDisplayKeys func(Record, recordDisplayLookup) (string, string),
 	meaningfullyChanged func(State, State) bool,
-	stateDTO func(State) api_internal.PlayerDataRecordState,
 	recordType string,
-) []api_internal.PlayerDataRecordChange {
+) []playerDataRecordChange[State] {
 	lookup := newRecordDisplayLookup(masters)
-	changes := make([]api_internal.PlayerDataRecordChange, 0, len(after))
+	changes := make([]playerDataRecordChange[State], 0, len(after))
 	for _, record := range after {
 		chartID := getChartID(record)
 		afterState := getState(record)
 		idx, diff := getDisplayKeys(record, lookup)
 		beforeState, exists := before[chartID]
 		if !exists {
-			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: recordType, ChangeType: "new", Idx: idx, Diff: diff, After: stateDTO(afterState)})
+			changes = append(changes, playerDataRecordChange[State]{RecordType: recordType, ChangeType: "new", Idx: idx, Diff: diff, After: afterState})
 			continue
 		}
 		if !meaningfullyChanged(beforeState, afterState) {
 			continue
 		}
-		beforeDTO := stateDTO(beforeState)
-		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: recordType, ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeDTO, After: stateDTO(afterState)})
+		changes = append(changes, playerDataRecordChange[State]{RecordType: recordType, ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeState, After: afterState})
 	}
 	return changes
 }
@@ -926,6 +933,33 @@ func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string
 		idx = fmt.Sprintf("%d", chartID)
 	}
 	return idx, "WE"
+}
+
+func playerRecordChangesDTO(changes []playerDataRecordChange[repository.PlayerRecordState]) []api_internal.PlayerDataRecordChange {
+	return recordChangesDTO(changes, playerRecordStateDTO)
+}
+
+func worldsendRecordChangesDTO(changes []playerDataRecordChange[repository.WorldsendRecordState]) []api_internal.PlayerDataRecordChange {
+	return recordChangesDTO(changes, worldsendRecordStateDTO)
+}
+
+func recordChangesDTO[State any](changes []playerDataRecordChange[State], stateDTO func(State) api_internal.PlayerDataRecordState) []api_internal.PlayerDataRecordChange {
+	dtos := make([]api_internal.PlayerDataRecordChange, 0, len(changes))
+	for _, change := range changes {
+		dto := api_internal.PlayerDataRecordChange{
+			RecordType: change.RecordType,
+			ChangeType: change.ChangeType,
+			Idx:        change.Idx,
+			Diff:       change.Diff,
+			After:      stateDTO(change.After),
+		}
+		if change.Before != nil {
+			before := stateDTO(*change.Before)
+			dto.Before = &before
+		}
+		dtos = append(dtos, dto)
+	}
+	return dtos
 }
 
 func playerRecordStateDTO(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
