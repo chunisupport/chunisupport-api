@@ -123,7 +123,8 @@ func (p *OverpowerDenominatorProvider) buildSnapshot(ctx context.Context) (*doma
 	for songID, maxConst := range maxConstBySongID {
 		maxConstWithoutUltima, ok := maxConstWithoutUltimaBySongID[songID]
 		if !ok {
-			return nil, fmt.Errorf("%w: missing non-ULTIMA chart for song_id=%d", domainrepo.ErrRepositoryOperationFailed, songID)
+			slog.Warn("missing non-ULTIMA chart for song", "song_id", songID)
+			continue
 		}
 		maxOP := service.CalcSongMaxOP(maxConst)
 		snapshot.SongMaxOP[songID] = maxOP
