@@ -615,7 +615,11 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.wantChanges, changes)
 			}
-			assert.Len(t, repo.savedInput.FullRecords, len(collectFullChartIDs(repo.savedInput.FullRecords)))
+			uniqueChartIDs := map[int]struct{}{}
+			for _, r := range repo.savedInput.FullRecords {
+				uniqueChartIDs[r.ChartID] = struct{}{}
+			}
+			assert.Len(t, uniqueChartIDs, len(repo.savedInput.FullRecords))
 		})
 	}
 }
