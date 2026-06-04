@@ -624,6 +624,23 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 	}
 }
 
+func TestWorldsendRecordDisplayKeys_楽曲マスタ欠損時は楽曲IDをIdxにする(t *testing.T) {
+	// Given
+	lookup := recordDisplayLookup{
+		songsByID: map[int]string{},
+		worldsendByChartID: map[int]entity.PlayerDataWorldsendChart{
+			201: {ID: 201, SongID: 2},
+		},
+	}
+
+	// When
+	idx, diff := worldsendRecordDisplayKeys(201, lookup)
+
+	// Then
+	assert.Equal(t, "2", idx)
+	assert.Equal(t, "WE", diff)
+}
+
 func TestPlayerRecordMeaningfullyChanged_DB更新条件と同じ対象だけを比較する(t *testing.T) {
 	base := repository.PlayerRecordState{Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1, SlotOrder: intPtrForApplyScoresTest(1), UpdatedAt: time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)}
 	tests := []struct {

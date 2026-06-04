@@ -930,7 +930,7 @@ func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string
 	}
 	idx, ok := lookup.songsByID[chart.SongID]
 	if !ok {
-		idx = fmt.Sprintf("%d", chartID)
+		idx = fmt.Sprintf("%d", chart.SongID)
 	}
 	return idx, "WE"
 }
