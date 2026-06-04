@@ -405,7 +405,7 @@ func TestFindPlayerRecordStatesByChartIDs_保存前状態を譜面IDキーで返
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	states, err := repo.FindPlayerRecordStatesByChartIDs(context.Background(), db, 10, []int{101, 999})
+	states, err := repo.FindPlayerRecordStatesByChartIDs(context.Background(), 10, []int{101, 999})
 
 	// Then
 	require.NoError(t, err)
@@ -436,7 +436,7 @@ func TestFindWorldsendRecordStatesByChartIDs_保存前状態を譜面IDキーで
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	states, err := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), db, 10, []int{201, 999})
+	states, err := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), 10, []int{201, 999})
 
 	// Then
 	require.NoError(t, err)
@@ -448,21 +448,30 @@ func TestFindWorldsendRecordStatesByChartIDs_保存前状態を譜面IDキーで
 	assert.Equal(t, 1, state.FullChainID)
 }
 
-func TestFindRecordStatesByChartIDs_execがnilならエラーを返す(t *testing.T) {
+func TestFindRecordStatesByChartIDs_トランザクションに束縛したExecutorで保存前状態を取得する(t *testing.T) {
 	// Given
 	db := setupTestDB(t)
 	defer db.Close()
-	repo := NewPlayerDataRepository(db)
+	setupPlayerRecordRepositoryDB(t, db)
+	ctx := context.Background()
+	tx, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, updated_at)
+		VALUES (10, 101, 1000000, 2, 3, 1, 1, ?)
+	`, "2026-04-27T00:00:00Z")
+	require.NoError(t, err)
+	repo := NewPlayerDataRepository(db).(*playerDataRepository).WithExecutor(tx)
 
 	// When
-	fullStates, fullErr := repo.FindPlayerRecordStatesByChartIDs(context.Background(), nil, 10, []int{101})
-	worldsendStates, worldsendErr := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), nil, 10, []int{201})
+	states, err := repo.FindPlayerRecordStatesByChartIDs(ctx, 10, []int{101})
 
 	// Then
-	assert.Nil(t, fullStates)
-	require.Error(t, fullErr)
-	assert.ErrorContains(t, fullErr, "executor")
-	assert.Nil(t, worldsendStates)
-	require.Error(t, worldsendErr)
-	assert.ErrorContains(t, worldsendErr, "executor")
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	assert.Equal(t, 1000000, states[101].Score)
 }

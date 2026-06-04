@@ -149,6 +149,20 @@ type calculatedOverpowerSummary struct {
 	Percent *float64
 }
 
+// playerDataRepositoryExecutorBinder はトランザクションに束縛したリポジトリを生成するための内部補助IFです。
+// ドメインリポジトリIFにExecutorを露出させず、ユースケースのトランザクション境界だけで利用します。
+type playerDataRepositoryExecutorBinder interface {
+	WithExecutor(exec repository.Executor) repository.PlayerDataRepository
+}
+
+func bindPlayerDataRepositoryExecutor(repo repository.PlayerDataRepository, exec repository.Executor) repository.PlayerDataRepository {
+	binder, ok := repo.(playerDataRepositoryExecutorBinder)
+	if !ok {
+		return repo
+	}
+	return binder.WithExecutor(exec)
+}
+
 // playerDataUsecase は PlayerDataUsecase の実装です。
 type playerDataUsecase struct {
 	tm               TransactionManager
@@ -587,11 +601,13 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	fullRecordsToUpsert = normalizeFullRecordsForUpsert(fullRecordsToUpsert)
 	worldsendRecordsToUpsert = normalizeWorldsendRecordsForUpsert(worldsendRecordsToUpsert)
 
-	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))
+	scoreRepo := bindPlayerDataRepositoryExecutor(us.playerDataRepo, tx)
+
+	fullBefore, err := scoreRepo.FindPlayerRecordStatesByChartIDs(ctx, playerID, collectFullChartIDs(fullRecordsToUpsert))
 	if err != nil {
 		return counts, skipped, nil, calculatedOverpowerSummary{}, err
 	}
-	worldsendBefore, err := us.playerDataRepo.FindWorldsendRecordStatesByChartIDs(ctx, tx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
+	worldsendBefore, err := scoreRepo.FindWorldsendRecordStatesByChartIDs(ctx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
 	if err != nil {
 		return counts, skipped, nil, calculatedOverpowerSummary{}, err
 	}

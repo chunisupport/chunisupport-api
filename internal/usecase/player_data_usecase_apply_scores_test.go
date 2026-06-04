@@ -414,14 +414,14 @@ type stubPlayerDataRepositoryForApplyScoresTest struct {
 	worldsendBefore map[int]repository.WorldsendRecordState
 }
 
-func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, _ []int) (map[int]repository.PlayerRecordState, error) {
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ int, _ []int) (map[int]repository.PlayerRecordState, error) {
 	if s.fullBefore == nil {
 		return map[int]repository.PlayerRecordState{}, nil
 	}
 	return s.fullBefore, nil
 }
 
-func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, _ []int) (map[int]repository.WorldsendRecordState, error) {
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesByChartIDs(_ context.Context, _ int, _ []int) (map[int]repository.WorldsendRecordState, error) {
 	if s.worldsendBefore == nil {
 		return map[int]repository.WorldsendRecordState{}, nil
 	}

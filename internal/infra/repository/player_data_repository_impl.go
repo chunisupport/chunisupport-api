@@ -15,12 +15,26 @@ import (
 )
 
 type playerDataRepository struct {
-	db *sqlx.DB
+	db   *sqlx.DB
+	exec repository.Executor
 }
 
 // NewPlayerDataRepository は PlayerDataRepository の実装を生成します。
 func NewPlayerDataRepository(db *sqlx.DB) repository.PlayerDataRepository {
 	return &playerDataRepository{db: db}
+}
+
+// WithExecutor はトランザクション境界で使用する Executor を束縛したリポジトリを返します。
+// ドメインリポジトリIFへ Executor を露出させないため、ユースケース側の内部補助IFからのみ利用します。
+func (r *playerDataRepository) WithExecutor(exec repository.Executor) repository.PlayerDataRepository {
+	return &playerDataRepository{db: r.db, exec: exec}
+}
+
+func (r *playerDataRepository) executor() repository.Executor {
+	if r.exec != nil {
+		return r.exec
+	}
+	return r.db
 }
 
 // LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
@@ -132,11 +146,9 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 }
 
 // FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
-func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
-	if exec == nil {
-		return nil, fmt.Errorf("FindPlayerRecordStatesByChartIDs requires a non-nil executor: must be called within a transaction")
-	}
-	rows, err := selectModelsInChunks[int, playerDataRecordRow](ctx, exec, chartIDs, `
+func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Context, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
+	executor := r.executor()
+	rows, err := selectModelsInChunks[int, playerDataRecordRow](ctx, executor, chartIDs, `
 		SELECT
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
 			full_chain_id, slot_id, slot_order, updated_at
@@ -164,11 +176,9 @@ func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Cont
 }
 
 // FindWorldsendRecordStatesByChartIDs は保存前のWORLD'S ENDレコード状態を譜面IDキーで取得します。
-func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
-	if exec == nil {
-		return nil, fmt.Errorf("FindWorldsendRecordStatesByChartIDs requires a non-nil executor: must be called within a transaction")
-	}
-	rows, err := selectModelsInChunks[int, playerDataWorldsendRecordRow](ctx, exec, worldsendChartIDs, `
+func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.Context, playerID int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
+	executor := r.executor()
+	rows, err := selectModelsInChunks[int, playerDataWorldsendRecordRow](ctx, executor, worldsendChartIDs, `
 		SELECT
 			player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id,
 			full_chain_id, updated_at
