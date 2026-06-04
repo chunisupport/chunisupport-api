@@ -271,7 +271,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, changes, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
 		if scoreErr != nil {
 			return scoreErr
 		}
@@ -293,6 +293,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
+		if len(changes) > 0 {
+			result.Changes = changes
+		}
 		result.Summary = api_internal.PlayerDataSummary{
 			Name:             summaryInput.Name,
 			Level:            summaryInput.Level,
@@ -574,18 +577,36 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, calculatedOverpowerSummary, error) {
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error) {
 	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Full, masters, updatedAt)
 	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
 	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
 	counts.WorldsendRecordsSkipped = worldsendCounts.WorldsendRecordsSkipped
 	skipped = append(skipped, worldsendSkipped...)
 
+	fullRecordsToUpsert = normalizeFullRecordsForUpsert(fullRecordsToUpsert)
+	worldsendRecordsToUpsert = normalizeWorldsendRecordsForUpsert(worldsendRecordsToUpsert)
+
+	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))
+	if err != nil {
+		return counts, skipped, nil, calculatedOverpowerSummary{}, err
+	}
+	worldsendBefore, err := us.playerDataRepo.FindWorldsendRecordStatesByChartIDs(ctx, tx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
+	if err != nil {
+		return counts, skipped, nil, calculatedOverpowerSummary{}, err
+	}
+
+	fullChanges := computeFullRecordChanges(fullBefore, fullRecordsToUpsert, masters)
+	worldsendChanges := computeWorldsendRecordChanges(worldsendBefore, worldsendRecordsToUpsert, masters)
+	changes := append(fullChanges, worldsendChanges...)
+	counts.FullRecordsActuallyChanged = len(fullChanges)
+	counts.WorldsendRecordsActuallyChanged = len(worldsendChanges)
+
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
 	}); err != nil {
-		return counts, skipped, calculatedOverpowerSummary{}, err
+		return counts, skipped, changes, calculatedOverpowerSummary{}, err
 	}
 
 	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
@@ -594,23 +615,23 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		PlayerID:         &playerID,
 	})
 	if err != nil {
-		return counts, skipped, calculatedOverpowerSummary{}, err
+		return counts, skipped, changes, calculatedOverpowerSummary{}, err
 	}
 
 	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
 	if recErr != nil {
-		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
+		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
 	lockedSongs, lockedErr := us.listLockedSongsForOverpower(ctx, tx, playerID)
 	if lockedErr != nil {
-		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
+		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
 	}
 	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
 	if err != nil {
-		return counts, skipped, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
+		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
 	}
 
-	return counts, skipped, overpowerSummary, nil
+	return counts, skipped, changes, overpowerSummary, nil
 }
 
 func (us *playerDataUsecase) listLockedSongsForOverpower(ctx context.Context, tx repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
@@ -729,6 +750,146 @@ func applyWorldsendScores(playerID int, entries []PlayerDataScoreEntry, masters 
 	}
 
 	return counts, skipped, worldsendRecordsToUpsert
+}
+
+func normalizeFullRecordsForUpsert(records []repository.PlayerRecordForUpsert) []repository.PlayerRecordForUpsert {
+	positions := make(map[int]int, len(records))
+	normalized := make([]repository.PlayerRecordForUpsert, 0, len(records))
+	for _, record := range records {
+		if pos, ok := positions[record.ChartID]; ok {
+			normalized[pos] = record
+			continue
+		}
+		positions[record.ChartID] = len(normalized)
+		normalized = append(normalized, record)
+	}
+	return normalized
+}
+
+func normalizeWorldsendRecordsForUpsert(records []repository.WorldsendRecordForUpsert) []repository.WorldsendRecordForUpsert {
+	positions := make(map[int]int, len(records))
+	normalized := make([]repository.WorldsendRecordForUpsert, 0, len(records))
+	for _, record := range records {
+		if pos, ok := positions[record.ChartID]; ok {
+			normalized[pos] = record
+			continue
+		}
+		positions[record.ChartID] = len(normalized)
+		normalized = append(normalized, record)
+	}
+	return normalized
+}
+
+func collectFullChartIDs(records []repository.PlayerRecordForUpsert) []int {
+	ids := make([]int, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.ChartID)
+	}
+	return ids
+}
+
+func collectWorldsendChartIDs(records []repository.WorldsendRecordForUpsert) []int {
+	ids := make([]int, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.ChartID)
+	}
+	return ids
+}
+
+func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
+	changes := make([]api_internal.PlayerDataRecordChange, 0)
+	for _, record := range after {
+		idx, diff := fullRecordDisplayKeys(record.ChartID, masters)
+		beforeState, exists := before[record.ChartID]
+		if !exists {
+			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "full", ChangeType: "new", Idx: idx, Diff: diff, After: playerRecordStateDTO(record.State)})
+			continue
+		}
+		if !playerRecordMeaningfullyChanged(beforeState, record.State) {
+			continue
+		}
+		beforeDTO := playerRecordStateDTO(beforeState)
+		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "full", ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeDTO, After: playerRecordStateDTO(record.State)})
+	}
+	return changes
+}
+
+func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
+	changes := make([]api_internal.PlayerDataRecordChange, 0)
+	for _, record := range after {
+		idx := worldsendRecordIdx(record.ChartID, masters)
+		beforeState, exists := before[record.ChartID]
+		if !exists {
+			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "worldsend", ChangeType: "new", Idx: idx, Diff: "WE", After: worldsendRecordStateDTO(record.State)})
+			continue
+		}
+		if !worldsendRecordMeaningfullyChanged(beforeState, record.State) {
+			continue
+		}
+		beforeDTO := worldsendRecordStateDTO(beforeState)
+		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "worldsend", ChangeType: "updated", Idx: idx, Diff: "WE", Before: &beforeDTO, After: worldsendRecordStateDTO(record.State)})
+	}
+	return changes
+}
+
+func fullRecordDisplayKeys(chartID int, masters *playerDataMaster) (string, string) {
+	chart, ok := masters.chartsByID[chartID]
+	if !ok {
+		return fmt.Sprintf("%d", chartID), ""
+	}
+	idx := fmt.Sprintf("%d", chart.SongID)
+	for _, song := range masters.songs {
+		if song.ID == chart.SongID {
+			idx = song.OfficialIdx
+			break
+		}
+	}
+	diff := ""
+	for _, difficulty := range masters.Difficulties {
+		if difficulty.ID == chart.DifficultyID {
+			diff = difficulty.Name
+			break
+		}
+	}
+	return idx, diff
+}
+
+func worldsendRecordIdx(chartID int, masters *playerDataMaster) string {
+	for _, chart := range masters.worldsendBySongID {
+		if chart.ID != chartID {
+			continue
+		}
+		for _, song := range masters.songs {
+			if song.ID == chart.SongID {
+				return song.OfficialIdx
+			}
+		}
+	}
+	return fmt.Sprintf("%d", chartID)
+}
+
+func playerRecordStateDTO(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
+	return api_internal.PlayerDataRecordState{Score: state.Score, ClearLampID: state.ClearLampID, ComboLampID: state.ComboLampID, FullChainID: state.FullChainID}
+}
+
+func worldsendRecordStateDTO(state repository.WorldsendRecordState) api_internal.PlayerDataRecordState {
+	return api_internal.PlayerDataRecordState{Score: state.Score, ClearLampID: state.ClearLampID, ComboLampID: state.ComboLampID, FullChainID: state.FullChainID}
+}
+
+// playerRecordMeaningfullyChanged はDB側の fullRecordChangedCondition と同じ比較対象だけを差分として扱います。
+func playerRecordMeaningfullyChanged(before, after repository.PlayerRecordState) bool {
+	return before.Score != after.Score ||
+		before.ClearLampID != after.ClearLampID ||
+		before.ComboLampID != after.ComboLampID ||
+		before.FullChainID != after.FullChainID
+}
+
+// worldsendRecordMeaningfullyChanged はDB側の worldsendRecordChangedCondition と同じ比較対象だけを差分として扱います。
+func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecordState) bool {
+	return before.Score != after.Score ||
+		before.ClearLampID != after.ClearLampID ||
+		before.ComboLampID != after.ComboLampID ||
+		before.FullChainID != after.FullChainID
 }
 
 func validateScoreRange(recordType string, entry PlayerDataScoreEntry, song entity.PlayerDataSong) (api_internal.SkippedRecord, bool) {
