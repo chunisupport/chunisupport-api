@@ -596,6 +596,8 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, nil, calculatedOverpowerSummary{}, err
 	}
 
+	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
+	// ただし通常利用では同時登録が起きない前提のため許容し、発生した場合はユーザの責任として扱う。
 	fullChanges := computeFullRecordChanges(fullBefore, fullRecordsToUpsert, masters)
 	worldsendChanges := computeWorldsendRecordChanges(worldsendBefore, worldsendRecordsToUpsert, masters)
 	changes := append(fullChanges, worldsendChanges...)
