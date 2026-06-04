@@ -1,161 +1,191 @@
 # プレイヤーデータ登録時差分計算機能 設計書
 
-作成日: 2026-06-04
+作成日: 2026-06-04  
+最終更新日: 2026-06-04
 
-## 0. 現行実装との差分（2026-06-04時点）
+## 0. 位置づけ
 
-本設計書は **未実装の機能** に対する設計・計画です。
+本設計書は、プレイヤーデータ登録時に「今回の登録で実際に変化したスコア」をレスポンスへ含めるための未実装機能の設計である。
 
-現在のプレイヤーデータ登録（スコアデータ登録）処理は以下の通りです。
+現在の登録エンドポイントは以下の通り。
 
-- エンドポイント
-  - `POST /internal/me/player-data`（直接登録）
-  - `POST /internal/player-data/temp` + `POST /internal/player-data/commit`（一時保存→確定フロー）
-- `PlayerDataPayload.scores`（full + worldsend）でクライアントから全譜面の現在ベストを送信（理論値現在約7000件、将来1万件程度想定）。
-- `usecase/player_data_usecase_impl.go` の `Register` → `applyScores` → `applyFullScores` / `applyWorldsendScores` で payload を検証・変換し、`PlayerRecordForUpsert` / `WorldsendRecordForUpsert` リストを作成。
-- `playerDataRepo.SavePlayerData` で `player_records` / `player_worldsend_records` に対して `INSERT ... ON DUPLICATE KEY UPDATE` を実行。
-  - `updated_at` の更新は `IF(score <> VALUES(score) OR clear_lamp_id <> ... OR ...)` の条件でのみ行われる（`fullRecordChangedCondition` / `worldsendRecordChangedCondition` 参照）。
-  - それ以外のカラム（score, lamps, slot など）は常に上書き。
-- レスポンス `PlayerDataResult`（`api_internal`）は以下のみ:
-  - `counts`: `full_records_upserted`（payload 内の件数）、`full_records_skipped` など（「処理しようとした件数」であって「実際に値が更新された件数」ではない）。
-  - `skipped_records`: 検証失敗などでスキップされたもの。
-  - `summary`: 再計算された overpower など。
-- 差分（この登録で何が「改善・新規」になったか）は一切計算・返却されていない。
-- 登録後、overpower/rating 再計算のために `FindByPlayerID` で全レコードを再取得している（JOIN 重め）。
+- `POST /internal/me/register-data`
+- `POST /internal/player-data/temp` + `POST /internal/player-data/commit`
 
-クライアントはこれまで「登録した」という事実と upsert 件数しか得られず、「今回のプレイ/データ更新で何が変わったか」をサーバに聞くことができなかった。
+`/internal/player-data/commit` は一時保存済み本文を `PlayerDataPayload` として解釈し、最終的に通常の `PlayerDataUsecase.Register` を通る。そのため、差分計算は `PlayerDataUsecase.Register` 配下に実装すれば、直接登録と一時保存確定の両方を同じ仕様で扱える。
 
----
+現行実装では、`PlayerDataPayload.scores.full` / `scores.worldsend` に含まれる全譜面の現在ベストを受け取り、`applyScores` で `PlayerRecordForUpsert` / `WorldsendRecordForUpsert` に変換し、`playerDataRepo.SavePlayerData` で bulk upsert している。`PlayerDataCounts` の `*_upserted` は「payload 内で処理対象になった件数」であり、DB上で実際に値が変わった件数ではない。
+
+また、`player_records.updated_at` / `player_worldsend_records.updated_at` はサーバの登録時刻ではなく、payload の `updated_at` を格納する。現在も `ON DUPLICATE KEY UPDATE` 内で、score / lamp が変化した場合にのみ `updated_at` を更新しているが、その変化内容はレスポンスに含まれていない。
 
 ## 1. 目的
 
-スコアデータ登録完了時に「更新差分」をサーバ側で計算し、レスポンスに含めてクライアントに返す機能を提供する。
+プレイヤーデータ登録完了時に、サーバ側で前回状態と今回payloadを比較し、実際に変化したレコード数と変更内容を返す。
 
-- クライアントが「この登録で X 件のスコアが更新され、Y 件が新規クリアになった」といったフィードバックを即座にユーザーに示せるようにする。
-- 差分計算の責務をサーバ（信頼できる唯一の情報源）に置き、クライアント側の状態管理負担と不整合リスクを排除する。
-- 既存の登録処理（トランザクション、overpower 再計算、rating 計算、スキップ処理など）のセマンティクスを維持したまま、最小限の変更で実現する。
+目的は以下。
 
-対象エンドポイント:
-- 直接登録と temp+commit 両方（内部的には同一の `PlayerDataUsecase.Register` を通るため自動的にカバー）。
+- クライアントが「今回の登録でスコアが何件変わったか」「どの譜面が新規登録または更新されたか」を即座に表示できるようにする。
+- 複数端末・複数クライアント間の状態差による比較ミスを避ける。
+- `updated_at` の時刻フィルタに頼らず、DBの現在状態とpayloadから生成したupsert対象を直接比較する。
+- 既存の登録セマンティクス、トランザクション境界、rating / overpower 再計算を維持する。
 
----
+本機能で扱う「差分」は、ユーザー向けには「更新差分」と呼ぶが、内部仕様上は「改善」だけではなく「値の変化」を意味する。再取り込みや公式側データ訂正によりスコア・ランプが下がった場合も、DBに保存される値が変わるため差分に含める。
 
-## 2. 背景と方針
+## 2. 採用方針
 
-### 2.1 サーバ側計算 vs クライアント側比較
+### 2.1 採用する方式
 
-- クライアント側で前回状態を保持して比較する場合、複数クライアント・デバイス間での不整合、一時登録フローでの認証前状態取得困難、fetch-then-send によるラウンドトリップ増・レース条件などが懸念される。
-- サーバ側が前回状態を DB から読み、payload と比較するのが信頼性・一貫性・将来拡張性の観点で優位。
-- 規模（1 万件程度）であれば in-memory 比較のコストは無視できる。
+登録トランザクション内で、保存前の軽量な現在状態を読み込み、payloadから作った upsert 対象と比較する。
 
-### 2.2 「登録後 updated_at 10分以内フィルタ」案の評価
+```text
+tx 開始
+  masters ロード
+  ensurePlayer
+  applyHonors
+  counts, skipped, changes, overpower := applyScores(...)
+    applyScores内で保存前stateを軽量ロード
+    payloadをupsert対象へ変換
+    upsert対象と保存前stateを比較
+    SavePlayerData
+  overpower / rating 再計算
+  result.Counts / result.Changes を設定
+tx commit
+```
 
-ユーザ提案の「前回全件取得 → 登録 → updated_at が最近（10分以内）のものを取得して差分とする」アプローチは以下の理由で不採用とする。
+前回状態のロードは `SavePlayerData` より前に行う。保存後に読むと before 値が失われるためである。
 
-- `player_records.updated_at` はクライアント由来の `payload.UpdatedAt`（データ取得時点）を格納するものであり、「このインポートで最後に触られた」というサーバ側タイムスタンプではない。
-- 10分という閾値が恣意的。クライアント時計ずれ、同一時刻での複数登録、遅延したインポートなどで誤検知・取りこぼしが発生しやすい。
-- before 値を得るには結局前回状態の保持が必要になり、時刻フィルタのメリットが薄れる。
-- より正確にするには `updated_at = <この登録で使った正確な値> AND chart_id IN (この payload で送った全 chart_id)` のようなクエリが必要になるが、それでも時刻依存の脆さと追加クエリコストが残る。
+### 2.2 不採用: `updated_at` の最近値フィルタ
 
-結論: 前回状態をロードするなら、そのデータを使って**アプリケーション層で直接比較**するのが最もシンプルで堅牢。
+「登録後に `updated_at` が直近10分以内のレコードを読む」方式は採用しない。
 
-### 2.3 全体方針
+- `updated_at` は payload 由来であり、サーバの登録時刻ではない。
+- 10分という閾値はクライアント時計、遅延、再送、同時登録で破綻しやすい。
+- before 値を返すには結局保存前状態が必要になる。
+- exact timestamp と chart_id の IN 条件を組み合わせても、時刻依存の脆さが残る。
 
-1. Clean Architecture / DDD を厳守（Usecase 層が差分計算のオーナー、Domain は純粋、Infra への依存禁止）。
-2. 既存の `changedCondition`（score またはいずれかの lamp の変化）と**厳密に同一の条件**で差分を判定（ロジック乖離防止）。
-3. slot / slot_order の変化は現時点では差分対象外（DB の timestamp 更新条件に合わせる。将来的に別途要否検討）。
-4. 過剰実装を避け、シンプルに。初版は「件数サマリ + 変更のあった譜面の最小識別子＋主要値の before/after」を返す。
-5. 既存登録処理のトランザクション境界・エラーセマンティクス・パフォーマンス特性を崩さない。
-6. TDD（Red → Green → Refactor）を基本とし、テストは `assert` を用いたテーブルテスト中心に記述。
-7. 実装完了後 `go test ./...` と `gofmt -s -w .` を必須とする。
+保存前状態を読むなら、その状態を使ってアプリケーション層で直接比較するのが最も単純で正確である。
 
----
+## 3. 差分の定義
 
-## 3. 機能要件
+### 3.1 差分対象カラム
 
-### 3.1 差分の定義（判定条件）
-
-`player_records` / `player_worldsend_records` の以下のいずれかが異なる場合に「更新」とみなす（DB の `fullRecordChangedCondition` / `worldsend...` と完全一致）。
+通常譜面、WORLD'S END ともに、以下のいずれかが異なる場合に `updated` とする。
 
 - `score`
 - `clear_lamp_id`
 - `combo_lamp_id`
 - `full_chain_id`
 
-前回レコードが存在しない場合（初回登録、またはその譜面が未プレイ）は「新規」として差分に含める。
+前回レコードが存在しない場合は `new` とする。
 
-スキップされたレコード（検証失敗など）は差分に含めない。
+この条件は `internal/infra/repository/player_data_repository_impl.go` の `fullRecordChangedCondition` / `worldsendRecordChangedCondition` と一致させる。Go側の差分判定は、DB側の `updated_at = IF(...)` 条件と同期していなければならない。
 
-### 3.2 出力内容
+### 3.2 差分対象外
 
-- **必須**: `counts` への追加フィールドで「実際に値が変わった件数」を返す。
-  - `full_records_actually_changed`
-  - `worldsend_records_actually_changed`
-- **推奨（初版で実装）**: 変更のあった譜面のリストを `changes` として返す（`skipped_records` と同様に 0 件時は省略可）。
-  - 各要素はクライアントが簡単に扱える `idx` + `diff` をキーとする。
-  - before/after を含め、UI で「スコア 990000 → 1001000」「新たに AJ 達成」などを表示可能にする。
-- 詳細リストが巨大になる初回登録時などの配慮: リストは常に返す（1万件 JSON は profile 系の "all" ですでに類似規模を返しており、クライアント側で扱える前提）。必要に応じて将来「詳細省略モード」や件数上限を検討。
+以下は初版では差分対象外とする。
 
-### 3.3 非機能
+- `slot_id`
+- `slot_order`
+- `updated_at`
+- 楽曲名、譜面定数、スロット分類などの表示用派生情報
+- 称号、プレイヤー名、レベル、rating、overpower
 
-- 登録処理全体のレイテンシ増加を最小限に（軽量クエリ 1 回 + in-memory 比較）。
-- 差分計算に失敗した場合の扱い: 登録トランザクション自体を失敗させる（現状のエラー伝播に合わせる）。差分は「付加価値」ではなく「登録結果の一部」と位置づける。
-- 後方互換: 既存 JSON フィールドは変更せず、フィールド追加のみ。
+`slot_id` / `slot_order` はDBでは常に上書きされるが、現行の `updated_at` 更新条件には含まれていない。初版ではDBの意味的更新条件に合わせ、ユーザー向け差分にも含めない。
 
----
+### 3.3 スキップとの関係
 
-## 4. レスポンス設計（提案）
+マスタ解決失敗、スコア範囲外、ランプ変換失敗などで `SkippedRecord` になった入力は差分に含めない。差分計算は、既存の `applyFullScores` / `applyWorldsendScores` が upsert 対象として受理したレコードだけに対して行う。
 
-### 4.1 追加/変更 DTO（`internal/dto/api_internal/player_data_dto.go`）
+### 3.4 payload内重複
+
+通常の入力では、同一譜面は payload 内に1件だけ存在する前提とする。
+
+同一 `chart_id` または `worldsend_chart_id` が同一payload内に複数回現れた場合、初版では既存の保存処理と同じく入力順に upsert 対象へ積む。ただし、差分レスポンスに同一譜面が複数回出るとクライアント表示が不安定になるため、実装時には以下のどちらかを明確に選ぶ。
+
+- 推奨: upsert 対象生成後、`chart_id` / `worldsend_chart_id` ごとに最後の1件へ正規化してから保存・差分計算する。
+- 最小変更: 既存保存挙動を維持し、重複入力は未定義として扱う。テストでは重複を正常系に含めない。
+
+将来の保守性を考えると、前者を別タスクで実施する余地がある。
+
+## 4. レスポンス設計
+
+### 4.1 Counts
+
+`internal/dto/api_internal/player_data_dto.go` の `PlayerDataCounts` に以下を追加する。
 
 ```go
-// PlayerDataCounts に以下を追加
 type PlayerDataCounts struct {
-	FullRecordsUpserted        int `json:"full_records_upserted"`
-	WorldsendRecordsUpserted   int `json:"worldsend_records_upserted"`
-	FullRecordsSkipped         int `json:"full_records_skipped"`
-	WorldsendRecordsSkipped    int `json:"worldsend_records_skipped"`
-	HonorsSkipped              int `json:"honors_skipped"`
+	FullRecordsUpserted      int `json:"full_records_upserted"`
+	WorldsendRecordsUpserted int `json:"worldsend_records_upserted"`
+	FullRecordsSkipped       int `json:"full_records_skipped"`
+	WorldsendRecordsSkipped  int `json:"worldsend_records_skipped"`
+	HonorsSkipped            int `json:"honors_skipped"`
 
-	// 新規: 実際に値が変化した件数（差分計算結果）
 	FullRecordsActuallyChanged      int `json:"full_records_actually_changed"`
 	WorldsendRecordsActuallyChanged int `json:"worldsend_records_actually_changed"`
 }
-
-// 新規構造体
-type PlayerDataRecordChange struct {
-	RecordType string `json:"record_type"` // "full" | "worldsend"
-	Idx        string `json:"idx"`
-	Diff       string `json:"diff"`
-
-	// "new" = 前回レコードなし / "updated" = 値が改善
-	ChangeType string `json:"change_type"`
-
-	// 新規の場合は before を省略（または null）
-	Before *PlayerDataScoreEntry `json:"before,omitempty"`
-	After  PlayerDataScoreEntry  `json:"after"`
-}
 ```
 
-`PlayerDataResult` に追加:
+`*_actually_changed` は `new` と `updated` の合計である。`*_upserted` から `*_skipped` を引いた件数とは一致しない。同一値の再登録は upsert 対象になっても `actually_changed` には含めない。
+
+### 4.2 Changes
+
+`PlayerDataResult` に `changes` を追加する。
 
 ```go
 type PlayerDataResult struct {
-	...
-	Counts  PlayerDataCounts         `json:"counts"`
-	Changes []PlayerDataRecordChange `json:"changes,omitempty"`
-	SkippedRecords []SkippedRecord   `json:"skipped_records,omitempty"`
+	PlayerID       int                      `json:"player_id"`
+	AppVersion     string                   `json:"app_ver"`
+	ImportedAt     time.Time                `json:"imported_at"`
+	Summary        PlayerDataSummary        `json:"summary"`
+	Counts         PlayerDataCounts         `json:"counts"`
+	Changes        []PlayerDataRecordChange `json:"changes,omitempty"`
+	SkippedRecords []SkippedRecord          `json:"skipped_records,omitempty"`
 }
 ```
 
-### 4.2 レスポンス例（通常ケース）
+差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。理由は、入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
+
+```go
+type PlayerDataRecordChange struct {
+	RecordType string                 `json:"record_type"` // "full" | "worldsend"
+	ChangeType string                 `json:"change_type"` // "new" | "updated"
+	Idx        string                 `json:"idx"`
+	Diff       string                 `json:"diff,omitempty"`
+	Before     *PlayerDataRecordState `json:"before,omitempty"`
+	After      PlayerDataRecordState  `json:"after"`
+}
+
+type PlayerDataRecordState struct {
+	Score       int     `json:"score"`
+	ClearLampID int     `json:"clear_lamp_id"`
+	ComboLampID int     `json:"combo_lamp_id"`
+	FullChainID int     `json:"full_chain_id"`
+	ClearLamp   *string `json:"clear_lamp,omitempty"`
+	ComboLamp   *string `json:"combo_lamp,omitempty"`
+	FullChain   *string `json:"full_chain,omitempty"`
+}
+```
+
+IDフィールドは必須、名前フィールドは任意とする。初版では、UIがすぐ表示しやすいように `ClearLamp` / `ComboLamp` / `FullChain` も返す方針を推奨する。名前の復元は `masters` から逆引きする。逆引き実装が過剰になる場合はIDのみで初版を出し、API.mdに明記する。
+
+WORLD'S END の `diff` は入力値に依存せず、レスポンスでは省略または `"WE"` に統一する。クライアントの扱いやすさを優先するなら `"WE"` 固定を推奨する。
+
+### 4.3 レスポンス例
 
 ```json
 {
   "player_id": 42,
-  "app_ver": "0.0.1a",
-  "imported_at": "2025-11-27T10:45:00+09:00",
-  "summary": { ... },
+  "app_ver": "0.1.0",
+  "imported_at": "2026-06-04T10:45:00Z",
+  "summary": {
+    "name": "プレイヤー名",
+    "level": 217,
+    "rating": 17.29,
+    "last_played_at": "2026-06-04T16:42:00+09:00",
+    "overpower_value": 96123.91,
+    "overpower_percentage": 76.27
+  },
   "counts": {
     "full_records_upserted": 1185,
     "worldsend_records_upserted": 120,
@@ -168,204 +198,262 @@ type PlayerDataResult struct {
   "changes": [
     {
       "record_type": "full",
-      "idx": "1234",
-      "diff": "MAS",
       "change_type": "updated",
-      "before": { "score": 990000, "clear_lamp": "clear", "cmb_lv": 2, "fch_lv": 1 },
-      "after":  { "score": 1001000, "clear_lamp": "clear", "cmb_lv": 3, "fch_lv": 1 }
+      "idx": "1234",
+      "diff": "MASTER",
+      "before": {
+        "score": 990000,
+        "clear_lamp_id": 2,
+        "combo_lamp_id": 1,
+        "full_chain_id": 1,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "NONE",
+        "full_chain": "NONE"
+      },
+      "after": {
+        "score": 1001000,
+        "clear_lamp_id": 2,
+        "combo_lamp_id": 3,
+        "full_chain_id": 1,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "ALL JUSTICE",
+        "full_chain": "NONE"
+      }
     },
     {
-      "record_type": "full",
-      "idx": "5678",
-      "diff": "EXP",
+      "record_type": "worldsend",
       "change_type": "new",
-      "after": { "score": 950000, "clear_lamp": "hard", "cmb_lv": 2, "fch_lv": null }
+      "idx": "5678",
+      "diff": "WE",
+      "after": {
+        "score": 950000,
+        "clear_lamp_id": 2,
+        "combo_lamp_id": 1,
+        "full_chain_id": 1,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "NONE",
+        "full_chain": "NONE"
+      }
     }
   ]
 }
 ```
 
-### 4.3 初回登録時の例
+`changes` は0件の場合、省略する。`skipped_records` も既存実装と同様に0件時は省略する。
 
-`before` がすべて省略され、`change_type: "new"` が多数並ぶ。クライアントは「全件新規登録」として扱う想定。
+## 5. アーキテクチャ設計
 
-### 4.4 docs/API.md への反映
+### 5.1 Domain / Repository
 
-- レスポンス説明・例・テーブルを更新。
-- 最下部の TypeScript interface `PlayerDataCounts` / `PlayerDataResult` に新フィールドを追加。
-- 「差分計算はサーバ側で行い、changed_condition と同一の条件で判定する」旨を補足。
+既存の `repository.PlayerRecordState` と `repository.WorldsendRecordState` を前回状態・今回状態の比較に流用する。
 
----
+`internal/domain/repository/player_data_repository.go` に軽量ロード用メソッドを追加する。
 
-## 5. アーキテクチャ設計（Clean Architecture 準拠）
+```go
+type PlayerDataRepository interface {
+	LoadMasterData(ctx context.Context, officialIdxList []string) (*PlayerDataMaster, error)
+	SavePlayerData(ctx context.Context, exec Executor, input PlayerDataSaveInput) error
 
-### 5.1 責務分担
+	FindCurrentPlayerRecordStates(ctx context.Context, exec Executor, playerID int) (map[int]PlayerRecordState, error)
+	FindCurrentWorldsendRecordStates(ctx context.Context, exec Executor, playerID int) (map[int]WorldsendRecordState, error)
 
-- **Usecase 層**（オーナー）:
-  - トランザクション内で前回状態の軽量ロード。
-  - payload 処理中に差分計算（または準備した upsert リストに対して比較）。
-  - `api_internal.PlayerDataResult` への差分情報のセット。
-  - 比較ロジックはここ（または呼び出す domain ヘルパー）。
-- **Domain 層**:
-  - 可能なら `PlayerRecordState`（repository 定義）に `Equals(other PlayerRecordState) bool` や `HasMeaningfulChange(...)` を追加して Rich Model 化（必須ではないが望ましい）。
-  - 値オブジェクト的な不変性は維持。
-- **Repository 層（Domain interface）**:
-  - 新規メソッド: 軽量な現在状態取得（重い JOIN なし）。
-  - `PlayerDataRepository` に追加（player data import 専用の責務として自然）。
-- **Infra 層**:
-  - インターフェースの実装のみ。比較ロジックは一切持たない。
-- **DTO / Handler**:
-  - 既存の result パススルー。handler 変更不要。
-- **禁止**:
-  - usecase が infra の具体実装を直接 import。
-  - 差分ロジックの controller への流出。
-  - `SELECT *` や無駄な全カラムロード。
-
-### 5.2 新規/変更ファイル一覧（最小限）
-
-- `internal/domain/repository/player_data_repository.go`
-  - `GetCurrentRecordStates(ctx, exec, playerID) (map[int]PlayerRecordState, error)`
-  - `GetCurrentWorldsendRecordStates(...)` （worldsend_chart_id → state）
-- `internal/infra/repository/player_data_repository_impl.go`
-  - 上記 2 メソッドの実装（明示的カラム SELECT + map 構築、バッチ不要）。
-  - 既存の `playerDataRecordRow` 構造体を流用または最小サブセット定義。
-- `internal/dto/api_internal/player_data_dto.go`
-  - `PlayerDataRecordChange` 追加、`PlayerDataCounts` フィールド追加。
-- `internal/usecase/player_data_usecase_impl.go`
-  - `applyScores` 内で前回状態ロード（save より前）。
-  - `applyFullScores` / `applyWorldsendScores` を拡張（prev map を受け取り、差分スライスも返す形にリファクタ推奨）。
-  - または別ヘルパー `computeScoreDiffs(...)` を新設して呼び出し。
-  - 差分を `result` に設定。
-- `internal/usecase/player_data_usecase_apply_scores_test.go`
-  - 差分計算ケースをテーブルテストで多数追加（before 状態を stub 的に与える）。
-- `docs/API.md`
-  - 説明・例・TS interface 更新。
-
-テストファイルの追加は最小限に留め、既存の apply テストを拡張する。
-
-### 5.3 処理フロー（トランザクション内）
-
-```text
-tx 開始
-  masters ロード
-  ensurePlayer
-  applyHonors
-  prevFullStates     := playerDataRepo.GetCurrentRecordStates(...)        // NEW: 軽量
-  prevWorldsendStates:= ...
-  counts, skipped, changes, overpower, err := applyScoresWithDiff(
-      ctx, tx, playerID, payload.Scores, masters, updatedAt,
-      prevFullStates, prevWorldsendStates)
-  save
-  overpower 再計算用 FindByPlayerID（既存）
-  ensurePlayer 2回目
-  rating 計算
-  result.Changes = changes
-  result.Counts に actually_changed をセット
-tx コミット
-return result
+	GetOverpowerTargetStats(ctx context.Context, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
+	GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec Executor, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
+}
 ```
 
-`applyScores` のシグネチャ変更は内部的なので、公開インターフェース（`PlayerDataUsecase`）には影響なし。
+キーは以下。
 
-### 5.4 比較ロジックの実装場所
+- 通常譜面: `chart_id`
+- WORLD'S END: `worldsend_chart_id`
 
-- 条件を `internal/usecase/player_data_usecase_impl.go` 内に `const` または `func recordStateChanged(old, new repository.PlayerRecordState) bool` として定義（DB の文字列条件と並べてコメントで同期を明記）。
-- または `PlayerRecordState` にメソッドを追加して `state.ChangedFrom(prev)` を呼ぶ。
-- テストで「この条件で変わった/変わらない」ケースを厳密に検証し、DB 側条件との一致を担保。
+`exec` は nil を許容しない方針を推奨する。保存前状態は登録トランザクション内で読む必要があり、呼び出し側の誤用を早期に検出できるためである。`SavePlayerData` と同じく nil の場合は repository error を返す。
 
----
+### 5.2 Infra
 
-## 6. パフォーマンス・規模設計
+`internal/infra/repository/player_data_repository_impl.go` に実装する。
 
-- **ロード**: chart_id をキーにした map[int]PlayerRecordState。1 万件でもメモリ数十〜数百 KB。
-- **クエリ追加**: player_records / player_worldsend_records それぞれ 1 回のシンプル SELECT（player_id 条件のみ、JOIN なし）。既存の重い FindByPlayerID とは別。
-- **比較**: O(N) in-memory ループ。N=10k でも 1ms 未満。
-- **レスポンス**: 変更件数が通常数十件程度。初回のみ大規模になるが、profile record view で既に全件返却している実績があるため許容。
-- **全体**: 登録処理の DB ラウンドトリップは +1〜2 回程度に留める。既存の bulk upsert チャンク処理に影響なし。
-- N+1 厳禁: 差分用ロードは 1 クエリで全件取得。
+通常譜面:
 
-将来的に「差分詳細は別途取得する軽量 counts のみ返すモード」が必要になった場合、フラグで制御可能にする拡張性を持たせる。
+```sql
+SELECT
+    chart_id,
+    score,
+    clear_lamp_id,
+    combo_lamp_id,
+    full_chain_id,
+    slot_id,
+    slot_order,
+    updated_at
+FROM player_records
+WHERE player_id = ?
+```
 
----
+WORLD'S END:
 
-## 7. 実装タスク分解（提案、TDD 推奨順）
+```sql
+SELECT
+    worldsend_chart_id,
+    score,
+    clear_lamp_id,
+    combo_lamp_id,
+    full_chain_id,
+    updated_at
+FROM player_worldsend_records
+WHERE player_id = ?
+```
 
-1. DTO 定義（`player_data_dto.go` に `PlayerDataRecordChange` と counts フィールド追加）。
-2. Repository interface 拡張（`player_data_repository.go`）。
-3. Infra 実装 + 単体テスト（`player_data_repository_impl_test.go` に軽量ロードのテスト追加）。
-4. Usecase 差分計算ロジック実装（ヘルパー関数 + apply 系への統合）。
-5. Register フローへの組み込み（前回ロード、結果セット）。
-6. 既存 apply テストの大幅拡張（before 状態を与えたテーブルテストで new/updated/no-change/skip 網羅）。
-7. `docs/API.md` のレスポンス説明・例・TS interface 更新。
-8. `go test ./...` 全パス確認 + `gofmt -s -w .`。
-9. セルフレビュー（AGENTS.md チェックリスト準拠）。
-10. （任意）手動で実データ規模の登録を実行し、レスポンスと DB updated_at の一致を確認。
+`SELECT *` は使用しない。JOINもしない。N+1を避けるため、それぞれ1クエリで全件をmapへ詰める。
 
-タスクは小さい単位で commit（`feat: ...` プレフィックス）。
+### 5.3 Usecase
 
----
+`PlayerDataUsecase` が差分計算のオーナーである。handlerやinfraへ比較ロジックを置かない。
 
-## 8. テスト観点（優先順）
+推奨する内部構成は以下。
 
-- 正常系
-  - スコアのみ改善
-  - ランプのみ改善（clear / combo / full_chain 個別・複合）
-  - スコア + ランプ同時改善
-  - 新規レコード（前回なし）
-  - 同一値（no change）多数混在 → actually_changed = 0
-  - full と worldsend の混在
-- 初回登録（player_records が空）
-- スキップされたエントリが差分に混入しないこと
-- 条件の厳密一致: Go 側の `changed` 判定結果と、実際に DB が updated_at を更新した行が一致すること（統合テストまたはリポジトリテストで担保）
-- 異常系: ロード失敗時、比較中の不正データ時 → エラーが登録全体を失敗させる（現状セマンティクス維持）
-- 性能・規模: 5000 件規模の before/after でクエリ回数・メモリが想定内であること（テスト内で簡易計測可）
-- テーブルテスト + Given-When-Then コメントを徹底（AGENTS.md テンプレート準拠）
+- `applyFullScores` / `applyWorldsendScores` は、従来通り「入力検証・マスタ解決・upsert用state生成」を担当する。
+- `computeFullRecordChanges` / `computeWorldsendRecordChanges` を新設し、受理済み upsert list と前回state mapを比較する。
+- `applyScores` は前回stateをロードし、upsert list生成後、保存前に差分を計算し、保存後に counts / changes を返す。
 
-`require` は前条件で、`assert` は結果検証で使用。
+`applyScores` の戻り値は以下のように変更する。
 
----
+```go
+func (us *playerDataUsecase) applyScores(
+	ctx context.Context,
+	tx repository.Executor,
+	playerID int,
+	scores PlayerDataScorePayload,
+	masters *playerDataMaster,
+	updatedAt time.Time,
+) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error)
+```
 
-## 9. リスク・未決事項
+`Register` 側では `result.Changes = changes` を設定し、0件なら空のままにする。
 
-### 9.1 未決（初版で判断が必要なもの）
+### 5.4 差分判定関数
 
-- `changes` リストを**常に**返すか（0 件時も空配列）、`skipped_records` のように「存在時のみ」にするか。
-- before/after に `PlayerDataScoreEntry` をそのまま使うか、より軽量な専用構造体（`{Score, ClearLamp, ComboLv, FullChain}`）にするか（後者の方がレスポンスが少し軽くなる）。
-- change_type の値: `"new"` / `"updated"` で十分か、`"score"` / `"lamp_clear"` など細かく分類するか。
-- slot/order 変化を将来的に「ユーザー向け更新差分」として含めるか（現在 DB timestamp 条件外）。
-- 差分リストに楽曲タイトルなどを enrich するか（masters から引けるが、初版では最小に留める）。
+DBの `changedCondition` と同期するため、比較関数は小さく明示的に書く。
+
+```go
+func playerRecordMeaningfullyChanged(before, after repository.PlayerRecordState) bool {
+	return before.Score != after.Score ||
+		before.ClearLampID != after.ClearLampID ||
+		before.ComboLampID != after.ComboLampID ||
+		before.FullChainID != after.FullChainID
+}
+
+func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecordState) bool {
+	return before.Score != after.Score ||
+		before.ClearLampID != after.ClearLampID ||
+		before.ComboLampID != after.ComboLampID ||
+		before.FullChainID != after.FullChainID
+}
+```
+
+この関数には、DB側の `fullRecordChangedCondition` / `worldsendRecordChangedCondition` と同じ条件であることを日本語コメントで明記する。
+
+## 6. パフォーマンス設計
+
+- 追加クエリは通常譜面1回、WORLD'S END1回の合計2回。
+- どちらも `player_id` 条件の単純SELECTで、JOINしない。
+- 比較は payload 件数に対する O(N)。
+- 1万件規模でも map と slice のメモリ使用量は許容範囲。
+- 初回登録では `changes` が全件分になる可能性がある。これは既存のプロフィール系APIで全件レコードを返している規模と同程度だが、実運用で重ければ将来 `changes` 省略フラグを追加する。
+
+差分詳細の上限は初版では設けない。上限を設けると counts と details の不一致説明が必要になり、APIが複雑になるためである。
+
+## 7. テスト計画
+
+### 7.1 Usecaseテスト
+
+`internal/usecase/player_data_usecase_apply_scores_test.go` を中心に追加する。
+
+優先ケース:
+
+- 前回なしの通常譜面は `new` になり、`full_records_actually_changed` が増える。
+- 前回なしの WORLD'S END は `new` になり、`worldsend_records_actually_changed` が増える。
+- score のみ変化したら `updated`。
+- `clear_lamp_id` のみ変化したら `updated`。
+- `combo_lamp_id` のみ変化したら `updated`。
+- `full_chain_id` のみ変化したら `updated`。
+- score / lamp が同一で slot / order だけ違う場合は差分なし。
+- スキップされた入力は `changes` に入らない。
+- full と worldsend の件数が独立して集計される。
+
+テストはテーブルテスト + Given / When / Then コメントで書き、結果検証は `assert`、前提確認は `require` を使う。
+
+### 7.2 Repositoryテスト
+
+`internal/infra/repository/player_data_repository_impl_test.go` に軽量ロードのテストを追加する。
+
+- `player_records` から必要カラムだけを読み、`chart_id` keyed map を返す。
+- `player_worldsend_records` から必要カラムだけを読み、`worldsend_chart_id` keyed map を返す。
+- 対象プレイヤーにレコードがない場合は空mapを返す。
+- `exec == nil` の場合はエラーを返す。
+
+### 7.3 DB条件との同期テスト
+
+既存の `fullRecordChangedCondition` / `worldsendRecordChangedCondition` の文字列テストに加え、Go側の差分判定関数のテストを追加する。
+
+完全な機械同期は難しいが、以下の観点を固定テストにする。
+
+- score差分あり
+- clear lamp差分あり
+- combo lamp差分あり
+- full chain差分あり
+- slot差分のみ
+- updated_at差分のみ
+- 全値同一
+
+## 8. 実装タスク
+
+1. DTO追加: `PlayerDataCounts` に `*_actually_changed`、`PlayerDataResult` に `changes`、差分用DTOを追加。
+2. Repository interface追加: `FindCurrentPlayerRecordStates` / `FindCurrentWorldsendRecordStates`。
+3. Infra実装: 明示カラムSELECTで現在state mapを返す。
+4. Usecaseテスト追加: 差分判定・counts・changesの期待値を先に書く。
+5. Usecase実装: 保存前stateロード、upsert listとの比較、resultへの反映。
+6. API.md更新: レスポンス例、スキーマ、TypeScript interface、差分定義のNoteを更新。
+7. `gofmt -s -w` を対象Goファイルに実行。
+8. `go test ./...` を実行。
+9. セルフレビュー: AGENTS.md のチェックリストに沿って、文字化け・N+1・不要実装・API.md反映を確認。
+
+ドキュメントのみを変更する場合は `go test ./...` は必須ではない。ただしGoコードを変更した実装PRでは必須とする。
+
+## 9. リスクと未決事項
+
+### 9.1 初版で決めるべき事項
+
+- ランプ名を `changes` に含めるか、IDだけにするか。
+- WORLD'S END の `diff` を省略するか、`"WE"` 固定にするか。
+- payload内重複を正規化するか、未定義として扱うか。
+
+推奨は「ランプ名を含める」「WORLD'S ENDは `diff: "WE"` 固定」「payload内重複は別タスクで正規化検討」である。
 
 ### 9.2 リスク
 
-- 初回登録で `changes` が 7000 件になる場合の JSON サイズ・クライアント処理負荷（実運用で観測し、必要なら上限や省略オプションを追加）。
-- 既存の `updated_at` セマンティクス（クライアント時刻）を変更しないことの確認。
-- 差分計算ロジックと DB の `IF` 条件の同期漏れ（テストで機械的にガード）。
+- DB側条件とGo側条件が将来ずれる。
+- 初回登録で `changes` が数千件になり、クライアント処理が重くなる。
+- before/afterにランプ名を含める場合、マスタ逆引きの実装が少し増える。
+- 「改善」という表示文言にすると、スコア下降やランプ下降を誤表現する可能性がある。
 
-### 9.3 将来拡張の余地
+### 9.3 将来拡張
 
-- 差分に基づく「この登録で rating がどれだけ上がったか」のサマリ追加。
-- 変更履歴テーブルの別途記録（今回はスコープ外）。
-- クライアントが「差分詳細は不要、件数だけ欲しい」場合の軽量モード。
-
----
+- `change_fields: ["score", "combo_lamp"]` のような変更カラム一覧。
+- `score_delta`、rating delta、overpower delta。
+- `?include_changes=false` のような軽量モード。
+- 変更履歴テーブルへの保存。
 
 ## 10. 関連ドキュメント更新
 
-- **必須**: `docs/API.md`（レスポンス仕様、例、TS interface、補足説明）。
-- 任意: `docs/domain_model_specification.md`（PlayerRecordState などの言及があれば）。
-- 本設計書自体を `_report/` に残し、実装 PR で「この設計に基づく」と参照。
-- 実装完了後、AGENTS.md の「変更時の必須ステップ」を厳守。
+実装時に必ず `docs/API.md` を更新する。
 
----
+更新対象:
 
-## 11. 参考: 代替アプローチ（記録用）
+- `/internal/me/register-data` のレスポンス例
+- `PlayerDataResult` レスポンススキーマ
+- `PlayerDataCounts` 説明
+- `changes` のスキーマ
+- TypeScript interface
+- 「差分情報は返却されません」という現行Noteの削除・置換
 
-- 後方取得 + exact timestamp + IN (chart list): 検討したが、時刻依存と before 値取得の二重コストで却下。
-- 登録前に全件ロード → save → 登録後全件再ロード → 2 つの map を diff: シンプルだが重い JOIN を 2 回呼ぶことになり非効率。
-- 純粋に DB の affected 情報を使う: MySQL の ON DUPLICATE + IF では ROW_COUNT() が「実際に timestamp を更新したか」を正確に教えてくれないため不採用。
-
-サーバ側 in-memory 比較（前回軽量状態 + payload 処理時）が、現時点で最もバランスが良い。
-
----
-
-本設計書に基づき実装を進める場合、まずリポジトリの軽量 state 取得から着手し、Usecase のテストを厚く書くことを推奨する。追加質問や設計の微調整は随時受け付ける。
+`/internal/player-data/commit` は `/internal/me/register-data` と同じ `PlayerDataResult` を返すため、個別の詳細更新は不要。ただし、差分も含まれることを一文補足する。
