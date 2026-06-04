@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -90,7 +89,7 @@ func TestOverpowerDenominatorProvider_SnapshotはULTIMA以外の譜面がない�
 
 	require.Error(t, err)
 	assert.Nil(t, snapshot)
-	assert.True(t, errors.Is(err, domainrepo.ErrRepositoryOperationFailed))
+	assert.ErrorIs(t, err, domainrepo.ErrRepositoryOperationFailed)
 	assert.Contains(t, err.Error(), "missing non-ULTIMA chart")
 }
 
