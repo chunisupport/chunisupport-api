@@ -797,75 +797,117 @@ func collectWorldsendChartIDs(records []repository.WorldsendRecordForUpsert) []i
 }
 
 func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
-	changes := make([]api_internal.PlayerDataRecordChange, 0)
-	for _, record := range after {
-		idx, diff := fullRecordDisplayKeys(record.ChartID, masters)
-		beforeState, exists := before[record.ChartID]
-		if !exists {
-			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "full", ChangeType: "new", Idx: idx, Diff: diff, After: playerRecordStateDTO(record.State)})
-			continue
-		}
-		if !playerRecordMeaningfullyChanged(beforeState, record.State) {
-			continue
-		}
-		beforeDTO := playerRecordStateDTO(beforeState)
-		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "full", ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeDTO, After: playerRecordStateDTO(record.State)})
-	}
-	return changes
+	return computeRecordChanges(
+		before,
+		after,
+		masters,
+		func(record repository.PlayerRecordForUpsert) int { return record.ChartID },
+		func(record repository.PlayerRecordForUpsert) repository.PlayerRecordState { return record.State },
+		func(record repository.PlayerRecordForUpsert, lookup recordDisplayLookup) (string, string) {
+			return fullRecordDisplayKeys(record.ChartID, masters, lookup)
+		},
+		playerRecordMeaningfullyChanged,
+		playerRecordStateDTO,
+		"full",
+	)
 }
 
 func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []api_internal.PlayerDataRecordChange {
-	changes := make([]api_internal.PlayerDataRecordChange, 0)
+	return computeRecordChanges(
+		before,
+		after,
+		masters,
+		func(record repository.WorldsendRecordForUpsert) int { return record.ChartID },
+		func(record repository.WorldsendRecordForUpsert) repository.WorldsendRecordState { return record.State },
+		func(record repository.WorldsendRecordForUpsert, lookup recordDisplayLookup) (string, string) {
+			return worldsendRecordDisplayKeys(record.ChartID, lookup)
+		},
+		worldsendRecordMeaningfullyChanged,
+		worldsendRecordStateDTO,
+		"worldsend",
+	)
+}
+
+// computeRecordChanges は通常譜面とWORLD'S ENDで共通する差分生成の流れを集約します。
+// 表示用マスタをIDキーのマップへ事前変換し、各レコード処理中の線形探索を避けます。
+func computeRecordChanges[State any, Record any](
+	before map[int]State,
+	after []Record,
+	masters *playerDataMaster,
+	getChartID func(Record) int,
+	getState func(Record) State,
+	getDisplayKeys func(Record, recordDisplayLookup) (string, string),
+	meaningfullyChanged func(State, State) bool,
+	stateDTO func(State) api_internal.PlayerDataRecordState,
+	recordType string,
+) []api_internal.PlayerDataRecordChange {
+	lookup := newRecordDisplayLookup(masters)
+	changes := make([]api_internal.PlayerDataRecordChange, 0, len(after))
 	for _, record := range after {
-		idx := worldsendRecordIdx(record.ChartID, masters)
-		beforeState, exists := before[record.ChartID]
+		chartID := getChartID(record)
+		afterState := getState(record)
+		idx, diff := getDisplayKeys(record, lookup)
+		beforeState, exists := before[chartID]
 		if !exists {
-			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "worldsend", ChangeType: "new", Idx: idx, Diff: "WE", After: worldsendRecordStateDTO(record.State)})
+			changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: recordType, ChangeType: "new", Idx: idx, Diff: diff, After: stateDTO(afterState)})
 			continue
 		}
-		if !worldsendRecordMeaningfullyChanged(beforeState, record.State) {
+		if !meaningfullyChanged(beforeState, afterState) {
 			continue
 		}
-		beforeDTO := worldsendRecordStateDTO(beforeState)
-		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: "worldsend", ChangeType: "updated", Idx: idx, Diff: "WE", Before: &beforeDTO, After: worldsendRecordStateDTO(record.State)})
+		beforeDTO := stateDTO(beforeState)
+		changes = append(changes, api_internal.PlayerDataRecordChange{RecordType: recordType, ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeDTO, After: stateDTO(afterState)})
 	}
 	return changes
 }
 
-func fullRecordDisplayKeys(chartID int, masters *playerDataMaster) (string, string) {
+type recordDisplayLookup struct {
+	songsByID          map[int]string
+	difficultiesByID   map[int]string
+	worldsendByChartID map[int]entity.PlayerDataWorldsendChart
+}
+
+func newRecordDisplayLookup(masters *playerDataMaster) recordDisplayLookup {
+	lookup := recordDisplayLookup{
+		songsByID:          make(map[int]string, len(masters.songs)),
+		difficultiesByID:   make(map[int]string, len(masters.Difficulties)),
+		worldsendByChartID: make(map[int]entity.PlayerDataWorldsendChart, len(masters.worldsendBySongID)),
+	}
+	for _, song := range masters.songs {
+		lookup.songsByID[song.ID] = song.OfficialIdx
+	}
+	for _, difficulty := range masters.Difficulties {
+		lookup.difficultiesByID[difficulty.ID] = difficulty.Name
+	}
+	for _, chart := range masters.worldsendBySongID {
+		lookup.worldsendByChartID[chart.ID] = chart
+	}
+	return lookup
+}
+
+func fullRecordDisplayKeys(chartID int, masters *playerDataMaster, lookup recordDisplayLookup) (string, string) {
 	chart, ok := masters.chartsByID[chartID]
 	if !ok {
 		return fmt.Sprintf("%d", chartID), ""
 	}
-	idx := fmt.Sprintf("%d", chart.SongID)
-	for _, song := range masters.songs {
-		if song.ID == chart.SongID {
-			idx = song.OfficialIdx
-			break
-		}
+	idx, ok := lookup.songsByID[chart.SongID]
+	if !ok {
+		idx = fmt.Sprintf("%d", chart.SongID)
 	}
-	diff := ""
-	for _, difficulty := range masters.Difficulties {
-		if difficulty.ID == chart.DifficultyID {
-			diff = difficulty.Name
-			break
-		}
-	}
+	diff := lookup.difficultiesByID[chart.DifficultyID]
 	return idx, diff
 }
 
-func worldsendRecordIdx(chartID int, masters *playerDataMaster) string {
-	for _, chart := range masters.worldsendBySongID {
-		if chart.ID != chartID {
-			continue
-		}
-		for _, song := range masters.songs {
-			if song.ID == chart.SongID {
-				return song.OfficialIdx
-			}
-		}
+func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string, string) {
+	chart, ok := lookup.worldsendByChartID[chartID]
+	if !ok {
+		return fmt.Sprintf("%d", chartID), "WE"
 	}
-	return fmt.Sprintf("%d", chartID)
+	idx, ok := lookup.songsByID[chart.SongID]
+	if !ok {
+		idx = fmt.Sprintf("%d", chartID)
+	}
+	return idx, "WE"
 }
 
 func playerRecordStateDTO(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
