@@ -20,10 +20,11 @@ import (
 
 // songUsecaseImpl は SongUsecase の実装です。
 type songUsecaseImpl struct {
-	songRepo        repository.SongRepository
-	masterCache     repository.SongMasterProvider
-	tm              TransactionManager
-	defaultExecutor repository.Executor
+	songRepo                     repository.SongRepository
+	masterCache                  repository.SongMasterProvider
+	tm                           TransactionManager
+	defaultExecutor              repository.Executor
+	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
 }
 
 // NewSongUsecase は新しい SongUsecase を生成します。
@@ -39,6 +40,23 @@ func NewSongUsecase(
 		tm:              tm,
 		defaultExecutor: defaultExecutor,
 	}
+}
+
+// NewSongUsecaseWithOverpowerDenominator はOVER POWER分母キャッシュの無効化付きで SongUsecase を生成します。
+func NewSongUsecaseWithOverpowerDenominator(
+	songRepo repository.SongRepository,
+	masterCache repository.SongMasterProvider,
+	tm TransactionManager,
+	defaultExecutor repository.Executor,
+	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
+) SongUsecase {
+	usecase := NewSongUsecase(songRepo, masterCache, tm, defaultExecutor)
+	impl, ok := usecase.(*songUsecaseImpl)
+	if !ok {
+		panic("NewSongUsecaseWithOverpowerDenominator: NewSongUsecase returned unexpected type, expected *songUsecaseImpl")
+	}
+	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	return impl
 }
 
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
@@ -80,7 +98,7 @@ func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, er
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) error {
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
 		if err != nil {
 			return err
@@ -88,12 +106,16 @@ func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) erro
 
 		song.Delete()
 		return s.songRepo.Save(ctx, tx, song)
-	})
+	}); err != nil {
+		return err
+	}
+	s.invalidateOverpowerDenominator(ctx)
+	return nil
 }
 
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) error {
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
 		if err != nil {
 			return err
@@ -101,7 +123,11 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 
 		song.Restore()
 		return s.songRepo.Save(ctx, tx, song)
-	})
+	}); err != nil {
+		return err
+	}
+	s.invalidateOverpowerDenominator(ctx)
+	return nil
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
@@ -123,9 +149,13 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	}
 
 	// トランザクション内でリポジトリに委譲
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
-	})
+	}); err != nil {
+		return err
+	}
+	s.invalidateOverpowerDenominator(ctx)
+	return nil
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。
@@ -304,5 +334,12 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 		return nil, err
 	}
 
+	s.invalidateOverpowerDenominator(ctx)
 	return created, nil
+}
+
+func (s *songUsecaseImpl) invalidateOverpowerDenominator(ctx context.Context) {
+	if s.overpowerDenominatorProvider != nil {
+		s.overpowerDenominatorProvider.Invalidate(ctx)
+	}
 }
