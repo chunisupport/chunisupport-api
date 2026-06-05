@@ -598,8 +598,8 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 
 	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
 	// ただし通常利用では同時登録が起きない前提のため許容し、発生した場合はユーザの責任として扱う。
-	fullRecordChanges := computeFullRecordChanges(fullBefore, fullRecordsToUpsert, masters)
-	worldsendRecordChanges := computeWorldsendRecordChanges(worldsendBefore, worldsendRecordsToUpsert, masters)
+	fullRecordChanges := computeFullRecordChanges(ctx, fullBefore, fullRecordsToUpsert, masters)
+	worldsendRecordChanges := computeWorldsendRecordChanges(ctx, worldsendBefore, worldsendRecordsToUpsert, masters)
 	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
 	changes = append(changes, playerRecordChangesDTO(fullRecordChanges)...)
 	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges)...)
@@ -800,30 +800,32 @@ func collectWorldsendChartIDs(records []repository.WorldsendRecordForUpsert) []i
 	return ids
 }
 
-func computeFullRecordChanges(before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.PlayerRecordState] {
+func computeFullRecordChanges(ctx context.Context, before map[int]repository.PlayerRecordState, after []repository.PlayerRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.PlayerRecordState] {
 	return computeRecordChanges(
+		ctx,
 		before,
 		after,
 		masters,
 		func(record repository.PlayerRecordForUpsert) int { return record.ChartID },
 		func(record repository.PlayerRecordForUpsert) repository.PlayerRecordState { return record.State },
-		func(record repository.PlayerRecordForUpsert, lookup recordDisplayLookup) (string, string) {
-			return fullRecordDisplayKeys(record.ChartID, masters, lookup)
+		func(ctx context.Context, record repository.PlayerRecordForUpsert, lookup recordDisplayLookup) (string, string) {
+			return fullRecordDisplayKeys(ctx, record.ChartID, masters, lookup)
 		},
 		playerRecordMeaningfullyChanged,
 		"full",
 	)
 }
 
-func computeWorldsendRecordChanges(before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.WorldsendRecordState] {
+func computeWorldsendRecordChanges(ctx context.Context, before map[int]repository.WorldsendRecordState, after []repository.WorldsendRecordForUpsert, masters *playerDataMaster) []playerDataRecordChange[repository.WorldsendRecordState] {
 	return computeRecordChanges(
+		ctx,
 		before,
 		after,
 		masters,
 		func(record repository.WorldsendRecordForUpsert) int { return record.ChartID },
 		func(record repository.WorldsendRecordForUpsert) repository.WorldsendRecordState { return record.State },
-		func(record repository.WorldsendRecordForUpsert, lookup recordDisplayLookup) (string, string) {
-			return worldsendRecordDisplayKeys(record.ChartID, lookup)
+		func(ctx context.Context, record repository.WorldsendRecordForUpsert, lookup recordDisplayLookup) (string, string) {
+			return worldsendRecordDisplayKeys(ctx, record.ChartID, lookup)
 		},
 		worldsendRecordMeaningfullyChanged,
 		"worldsend",
@@ -842,12 +844,13 @@ type playerDataRecordChange[State any] struct {
 // computeRecordChanges は通常譜面とWORLD'S ENDで共通する差分生成の流れを集約します。
 // 差分計算そのものをAPI DTOに固定しないため、レスポンス変換は呼び出し側で行います。
 func computeRecordChanges[State any, Record any](
+	ctx context.Context,
 	before map[int]State,
 	after []Record,
 	masters *playerDataMaster,
 	getChartID func(Record) int,
 	getState func(Record) State,
-	getDisplayKeys func(Record, recordDisplayLookup) (string, string),
+	getDisplayKeys func(context.Context, Record, recordDisplayLookup) (string, string),
 	meaningfullyChanged func(State, State) bool,
 	recordType string,
 ) []playerDataRecordChange[State] {
@@ -856,7 +859,7 @@ func computeRecordChanges[State any, Record any](
 	for _, record := range after {
 		chartID := getChartID(record)
 		afterState := getState(record)
-		idx, diff := getDisplayKeys(record, lookup)
+		idx, diff := getDisplayKeys(ctx, record, lookup)
 		beforeState, exists := before[chartID]
 		if !exists {
 			changes = append(changes, playerDataRecordChange[State]{RecordType: recordType, ChangeType: "new", Idx: idx, Diff: diff, After: afterState})
@@ -865,7 +868,8 @@ func computeRecordChanges[State any, Record any](
 		if !meaningfullyChanged(beforeState, afterState) {
 			continue
 		}
-		changes = append(changes, playerDataRecordChange[State]{RecordType: recordType, ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeState, After: afterState})
+		beforeCopy := beforeState
+		changes = append(changes, playerDataRecordChange[State]{RecordType: recordType, ChangeType: "updated", Idx: idx, Diff: diff, Before: &beforeCopy, After: afterState})
 	}
 	return changes
 }
@@ -894,7 +898,7 @@ func newRecordDisplayLookup(masters *playerDataMaster) recordDisplayLookup {
 	return lookup
 }
 
-func fullRecordDisplayKeys(chartID int, masters *playerDataMaster, lookup recordDisplayLookup) (string, string) {
+func fullRecordDisplayKeys(ctx context.Context, chartID int, masters *playerDataMaster, lookup recordDisplayLookup) (string, string) {
 	chart, ok := masters.chartsByID[chartID]
 	if !ok {
 		return fmt.Sprintf("%d", chartID), ""
@@ -905,13 +909,13 @@ func fullRecordDisplayKeys(chartID int, masters *playerDataMaster, lookup record
 	}
 	diff, ok := lookup.difficultiesByID[chart.DifficultyID]
 	if !ok {
-		slog.Warn("difficulty not found for player data change display", "difficulty_id", chart.DifficultyID, "chart_id", chartID)
+		slog.WarnContext(ctx, "difficulty not found for player data change display", "difficulty_id", chart.DifficultyID, "chart_id", chartID)
 		diff = fmt.Sprintf("%d", chart.DifficultyID)
 	}
 	return idx, diff
 }
 
-func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string, string) {
+func worldsendRecordDisplayKeys(ctx context.Context, chartID int, lookup recordDisplayLookup) (string, string) {
 	chart, ok := lookup.worldsendByChartID[chartID]
 	if !ok {
 		return fmt.Sprintf("%d", chartID), "WE"
