@@ -31,11 +31,12 @@ type SkippedRecord struct {
 }
 
 // PlayerDataRecordState は差分表示で比較対象にするスコア状態です。
+// ランプ名はマスタの Name を返し、none 相当および未設定は null で返します。
 type PlayerDataRecordState struct {
-	Score       int `json:"score"`
-	ClearLampID int `json:"clear_lamp_id"`
-	ComboLampID int `json:"combo_lamp_id"`
-	FullChainID int `json:"full_chain_id"`
+	Score     int     `json:"score"`
+	ClearLamp *string `json:"clear_lamp"`
+	ComboLamp *string `json:"combo_lamp"`
+	FullChain *string `json:"full_chain"`
 }
 
 // PlayerDataRecordChange は登録前後で実際に変化したレコードの差分です。
@@ -44,7 +45,7 @@ type PlayerDataRecordChange struct {
 	ChangeType string                 `json:"change_type"`
 	Idx        string                 `json:"idx"`
 	Diff       string                 `json:"diff,omitempty"`
-	Before     *PlayerDataRecordState `json:"before,omitempty"`
+	Before     *PlayerDataRecordState `json:"before"`
 	After      PlayerDataRecordState  `json:"after"`
 }
 

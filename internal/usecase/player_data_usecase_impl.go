@@ -600,9 +600,10 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	// ただし通常利用では同時登録が起きない前提のため許容し、発生した場合はユーザの責任として扱う。
 	fullRecordChanges := computeFullRecordChanges(ctx, fullBefore, fullRecordsToUpsert, masters)
 	worldsendRecordChanges := computeWorldsendRecordChanges(ctx, worldsendBefore, worldsendRecordsToUpsert, masters)
+	lampLookup := newLampNameLookup(masters)
 	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
-	changes = append(changes, playerRecordChangesDTO(fullRecordChanges)...)
-	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges)...)
+	changes = append(changes, playerRecordChangesDTO(fullRecordChanges, lampLookup)...)
+	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges, lampLookup)...)
 	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
 	counts.WorldsendRecordsActuallyChanged = len(worldsendRecordChanges)
 
@@ -927,12 +928,16 @@ func worldsendRecordDisplayKeys(ctx context.Context, chartID int, lookup recordD
 	return idx, "WE"
 }
 
-func playerRecordChangesDTO(changes []playerDataRecordChange[repository.PlayerRecordState]) []api_internal.PlayerDataRecordChange {
-	return recordChangesDTO(changes, playerRecordStateDTO)
+func playerRecordChangesDTO(changes []playerDataRecordChange[repository.PlayerRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
+	return recordChangesDTO(changes, func(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
+		return playerRecordStateDTO(state, lookup)
+	})
 }
 
-func worldsendRecordChangesDTO(changes []playerDataRecordChange[repository.WorldsendRecordState]) []api_internal.PlayerDataRecordChange {
-	return recordChangesDTO(changes, worldsendRecordStateDTO)
+func worldsendRecordChangesDTO(changes []playerDataRecordChange[repository.WorldsendRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
+	return recordChangesDTO(changes, func(state repository.WorldsendRecordState) api_internal.PlayerDataRecordState {
+		return worldsendRecordStateDTO(state, lookup)
+	})
 }
 
 func recordChangesDTO[State any](changes []playerDataRecordChange[State], stateDTO func(State) api_internal.PlayerDataRecordState) []api_internal.PlayerDataRecordChange {
@@ -954,12 +959,72 @@ func recordChangesDTO[State any](changes []playerDataRecordChange[State], stateD
 	return dtos
 }
 
-func playerRecordStateDTO(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
-	return api_internal.PlayerDataRecordState{Score: state.Score, ClearLampID: state.ClearLampID, ComboLampID: state.ComboLampID, FullChainID: state.FullChainID}
+type lampNameLookup struct {
+	clearLamps map[int]string
+	comboLamps map[int]string
+	fullChains map[int]string
 }
 
-func worldsendRecordStateDTO(state repository.WorldsendRecordState) api_internal.PlayerDataRecordState {
-	return api_internal.PlayerDataRecordState{Score: state.Score, ClearLampID: state.ClearLampID, ComboLampID: state.ComboLampID, FullChainID: state.FullChainID}
+func newLampNameLookup(masters *playerDataMaster) lampNameLookup {
+	lookup := lampNameLookup{
+		clearLamps: make(map[int]string, len(masters.ClearLamps)),
+		comboLamps: make(map[int]string, len(masters.ComboLamps)),
+		fullChains: make(map[int]string, len(masters.FullChains)),
+	}
+	for _, item := range masters.ClearLamps {
+		lookup.clearLamps[item.ID] = item.Name
+	}
+	for _, item := range masters.ComboLamps {
+		lookup.comboLamps[item.ID] = item.Name
+	}
+	for _, item := range masters.FullChains {
+		lookup.fullChains[item.ID] = item.Name
+	}
+	return lookup
+}
+
+func (l lampNameLookup) clearLampName(id int) *string {
+	return playerDataLampNamePtr(l.clearLamps[id], id, "clear_lamp")
+}
+
+func (l lampNameLookup) comboLampName(id int) *string {
+	return playerDataLampNamePtr(l.comboLamps[id], id, "combo_lamp")
+}
+
+func (l lampNameLookup) fullChainName(id int) *string {
+	return playerDataLampNamePtr(l.fullChains[id], id, "full_chain")
+}
+
+// playerDataLampNamePtr は none 相当およびマスタ未解決を null として返します。
+func playerDataLampNamePtr(name string, id int, resource string) *string {
+	if name == "" {
+		if id != 0 {
+			slog.Warn("lamp name not found for player data change display", "resource", resource, "id", id)
+		}
+		return nil
+	}
+	if strings.EqualFold(name, "none") {
+		return nil
+	}
+	return &name
+}
+
+func playerRecordStateDTO(state repository.PlayerRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
+	return api_internal.PlayerDataRecordState{
+		Score:     state.Score,
+		ClearLamp: lookup.clearLampName(state.ClearLampID),
+		ComboLamp: lookup.comboLampName(state.ComboLampID),
+		FullChain: lookup.fullChainName(state.FullChainID),
+	}
+}
+
+func worldsendRecordStateDTO(state repository.WorldsendRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
+	return api_internal.PlayerDataRecordState{
+		Score:     state.Score,
+		ClearLamp: lookup.clearLampName(state.ClearLampID),
+		ComboLamp: lookup.comboLampName(state.ComboLampID),
+		FullChain: lookup.fullChainName(state.FullChainID),
+	}
 }
 
 // playerRecordMeaningfullyChanged はDB側の fullRecordChangedCondition と同じ比較対象だけを差分として扱います。

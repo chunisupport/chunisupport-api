@@ -764,15 +764,15 @@ curl -X POST \
       "diff": "MASTER",
       "before": {
         "score": 990000,
-        "clear_lamp_id": 2,
-        "combo_lamp_id": 1,
-        "full_chain_id": 1
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       },
       "after": {
         "score": 1002345,
-        "clear_lamp_id": 4,
-        "combo_lamp_id": 2,
-        "full_chain_id": 1
+        "clear_lamp": "BRAVE",
+        "combo_lamp": "full combo",
+        "full_chain": null
       }
     },
     {
@@ -780,11 +780,12 @@ curl -X POST \
       "change_type": "new",
       "idx": "8001",
       "diff": "WE",
+      "before": null,
       "after": {
         "score": 990000,
-        "clear_lamp_id": 2,
-        "combo_lamp_id": 1,
-        "full_chain_id": 1
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       }
     }
   ],
@@ -818,10 +819,10 @@ curl -X POST \
 | `change_type` | string | 未登録レコードは `new`、保存済みレコードの比較対象カラムが変化した場合は `updated` |
 | `idx` | string | 楽曲の公式インデックス |
 | `diff` | string | 通常譜面は大文字難易度名、WORLD'S END は入力値にかかわらず `WE` |
-| `before` | object | 更新前状態。`change_type=new` では省略 |
+| `before` | object \| null | 更新前状態。`change_type=new` では `null` |
 | `after` | object | 登録後状態 |
 
-`before` / `after` は `score`, `clear_lamp_id`, `combo_lamp_id`, `full_chain_id` のID値のみを含みます。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
+`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
@@ -3325,15 +3326,15 @@ interface PlayerDataRecordChange {
   change_type: 'new' | 'updated';
   idx: string;
   diff?: string;
-  before?: PlayerDataRecordState;
+  before: PlayerDataRecordState | null;
   after: PlayerDataRecordState;
 }
 
 interface PlayerDataRecordState {
   score: number;
-  clear_lamp_id: number;
-  combo_lamp_id: number;
-  full_chain_id: number;
+  clear_lamp: string | null;
+  combo_lamp: string | null;
+  full_chain: string | null;
 }
 
 interface SkippedRecord {
