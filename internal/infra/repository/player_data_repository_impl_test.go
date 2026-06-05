@@ -405,7 +405,7 @@ func TestFindPlayerRecordStatesByChartIDs_保存前状態を譜面IDキーで返
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	states, err := repo.FindPlayerRecordStatesByChartIDs(context.Background(), 10, []int{101, 999})
+	states, err := repo.FindPlayerRecordStatesByChartIDs(context.Background(), db, 10, []int{101, 999})
 
 	// Then
 	require.NoError(t, err)
@@ -436,7 +436,7 @@ func TestFindWorldsendRecordStatesByChartIDs_保存前状態を譜面IDキーで
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	states, err := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), 10, []int{201, 999})
+	states, err := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), db, 10, []int{201, 999})
 
 	// Then
 	require.NoError(t, err)
@@ -465,10 +465,10 @@ func TestFindRecordStatesByChartIDs_トランザクションに束縛したExecu
 		VALUES (10, 101, 1000000, 2, 3, 1, 1, ?)
 	`, "2026-04-27T00:00:00Z")
 	require.NoError(t, err)
-	repo := NewPlayerDataRepository(db).(*playerDataRepository).WithExecutor(tx)
+	repo := NewPlayerDataRepository(db)
 
 	// When
-	states, err := repo.FindPlayerRecordStatesByChartIDs(ctx, 10, []int{101})
+	states, err := repo.FindPlayerRecordStatesByChartIDs(ctx, tx, 10, []int{101})
 
 	// Then
 	require.NoError(t, err)

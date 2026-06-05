@@ -414,18 +414,26 @@ type stubPlayerDataRepositoryForApplyScoresTest struct {
 	worldsendBefore map[int]repository.WorldsendRecordState
 }
 
-func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ int, _ []int) (map[int]repository.PlayerRecordState, error) {
-	if s.fullBefore == nil {
-		return map[int]repository.PlayerRecordState{}, nil
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
+	states := map[int]repository.PlayerRecordState{}
+	for _, chartID := range chartIDs {
+		state, ok := s.fullBefore[chartID]
+		if ok {
+			states[chartID] = state
+		}
 	}
-	return s.fullBefore, nil
+	return states, nil
 }
 
-func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesByChartIDs(_ context.Context, _ int, _ []int) (map[int]repository.WorldsendRecordState, error) {
-	if s.worldsendBefore == nil {
-		return map[int]repository.WorldsendRecordState{}, nil
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
+	states := map[int]repository.WorldsendRecordState{}
+	for _, chartID := range worldsendChartIDs {
+		state, ok := s.worldsendBefore[chartID]
+		if ok {
+			states[chartID] = state
+		}
 	}
-	return s.worldsendBefore, nil
+	return states, nil
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) LoadMasterData(_ context.Context, _ []string) (*repository.PlayerDataMaster, error) {
@@ -622,6 +630,26 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 			assert.Len(t, uniqueChartIDs, len(repo.savedInput.FullRecords))
 		})
 	}
+}
+
+func TestFullRecordDisplayKeys_難易度マスタ欠損時は難易度IDをDiffにする(t *testing.T) {
+	// Given
+	masters := &playerDataMaster{
+		chartsByID: map[int]entity.PlayerDataChart{
+			101: {ID: 101, SongID: 1, DifficultyID: 99},
+		},
+	}
+	lookup := recordDisplayLookup{
+		songsByID:        map[int]string{1: "idx-1"},
+		difficultiesByID: map[int]string{},
+	}
+
+	// When
+	idx, diff := fullRecordDisplayKeys(101, masters, lookup)
+
+	// Then
+	assert.Equal(t, "idx-1", idx)
+	assert.Equal(t, "99", diff)
 }
 
 func TestWorldsendRecordDisplayKeys_楽曲マスタ欠損時は楽曲IDをIdxにする(t *testing.T) {

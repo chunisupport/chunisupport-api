@@ -126,11 +126,11 @@ func (s *stubPlayerDataRepositoryForLockedSong) SavePlayerData(ctx context.Conte
 	return nil
 }
 
-func (s *stubPlayerDataRepositoryForLockedSong) FindPlayerRecordStatesByChartIDs(ctx context.Context, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
+func (s *stubPlayerDataRepositoryForLockedSong) FindPlayerRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
 	return map[int]repository.PlayerRecordState{}, nil
 }
 
-func (s *stubPlayerDataRepositoryForLockedSong) FindWorldsendRecordStatesByChartIDs(ctx context.Context, playerID int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
+func (s *stubPlayerDataRepositoryForLockedSong) FindWorldsendRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
 	return map[int]repository.WorldsendRecordState{}, nil
 }
 func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStats(ctx context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {

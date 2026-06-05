@@ -149,20 +149,6 @@ type calculatedOverpowerSummary struct {
 	Percent *float64
 }
 
-// playerDataRepositoryExecutorBinder はトランザクションに束縛したリポジトリを生成するための内部補助IFです。
-// ドメインリポジトリIFにExecutorを露出させず、ユースケースのトランザクション境界だけで利用します。
-type playerDataRepositoryExecutorBinder interface {
-	WithExecutor(exec repository.Executor) repository.PlayerDataRepository
-}
-
-func bindPlayerDataRepositoryExecutor(repo repository.PlayerDataRepository, exec repository.Executor) repository.PlayerDataRepository {
-	binder, ok := repo.(playerDataRepositoryExecutorBinder)
-	if !ok {
-		return repo
-	}
-	return binder.WithExecutor(exec)
-}
-
 // playerDataUsecase は PlayerDataUsecase の実装です。
 type playerDataUsecase struct {
 	tm               TransactionManager
@@ -601,13 +587,11 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	fullRecordsToUpsert = normalizeFullRecordsForUpsert(fullRecordsToUpsert)
 	worldsendRecordsToUpsert = normalizeWorldsendRecordsForUpsert(worldsendRecordsToUpsert)
 
-	scoreRepo := bindPlayerDataRepositoryExecutor(us.playerDataRepo, tx)
-
-	fullBefore, err := scoreRepo.FindPlayerRecordStatesByChartIDs(ctx, playerID, collectFullChartIDs(fullRecordsToUpsert))
+	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))
 	if err != nil {
 		return counts, skipped, nil, calculatedOverpowerSummary{}, err
 	}
-	worldsendBefore, err := scoreRepo.FindWorldsendRecordStatesByChartIDs(ctx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
+	worldsendBefore, err := us.playerDataRepo.FindWorldsendRecordStatesByChartIDs(ctx, tx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
 	if err != nil {
 		return counts, skipped, nil, calculatedOverpowerSummary{}, err
 	}
@@ -919,7 +903,11 @@ func fullRecordDisplayKeys(chartID int, masters *playerDataMaster, lookup record
 	if !ok {
 		idx = fmt.Sprintf("%d", chart.SongID)
 	}
-	diff := lookup.difficultiesByID[chart.DifficultyID]
+	diff, ok := lookup.difficultiesByID[chart.DifficultyID]
+	if !ok {
+		slog.Warn("difficulty not found for player data change display", "difficulty_id", chart.DifficultyID, "chart_id", chartID)
+		diff = fmt.Sprintf("%d", chart.DifficultyID)
+	}
 	return idx, diff
 }
 
