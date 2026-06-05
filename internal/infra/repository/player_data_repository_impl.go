@@ -287,9 +287,9 @@ func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Exe
 	for i := 0; i < len(items); i += batchSize {
 		end := min(i+batchSize, len(items))
 		batch := items[i:end]
-		args := make([]any, 0, len(leadingArgs)+1)
-		args = append(args, leadingArgs...)
-		args = append(args, batch)
+		args := make([]any, len(leadingArgs)+1)
+		copy(args, leadingArgs)
+		args[len(leadingArgs)] = batch
 		batchQuery, batchArgs, err := sqlx.In(query, args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build %s query: %w", queryName, err)
