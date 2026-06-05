@@ -387,3 +387,91 @@ func TestReplaceQueryPlaceholder_パーセント記号を含む置換文字列�
 		})
 	}
 }
+
+func TestFindPlayerRecordStatesByChartIDs_保存前状態を譜面IDキーで返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupPlayerRecordRepositoryDB(t, db)
+	updatedAt := "2026-04-27T00:00:00Z"
+	_, err := db.Exec(`
+		INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, slot_order, updated_at)
+		VALUES
+			(10, 101, 1000000, 2, 3, 1, 2, 5, ?),
+			(10, 102, 990000, 1, 1, 1, 1, NULL, ?),
+			(20, 101, 980000, 1, 1, 1, 1, NULL, ?)
+	`, updatedAt, updatedAt, updatedAt)
+	require.NoError(t, err)
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	states, err := repo.FindPlayerRecordStatesByChartIDs(context.Background(), db, 10, []int{101, 999})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	state := states[101]
+	assert.Equal(t, 1000000, state.Score)
+	assert.Equal(t, 2, state.ClearLampID)
+	assert.Equal(t, 3, state.ComboLampID)
+	assert.Equal(t, 1, state.FullChainID)
+	assert.Equal(t, 2, state.SlotID)
+	require.NotNil(t, state.SlotOrder)
+	assert.Equal(t, 5, *state.SlotOrder)
+}
+
+func TestFindWorldsendRecordStatesByChartIDs_保存前状態を譜面IDキーで返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupPlayerRecordRepositoryDB(t, db)
+	updatedAt := "2026-04-27T00:00:00Z"
+	_, err := db.Exec(`
+		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)
+		VALUES
+			(10, 201, 1000000, 2, 3, 1, ?),
+			(20, 201, 980000, 1, 1, 1, ?)
+	`, updatedAt, updatedAt)
+	require.NoError(t, err)
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	states, err := repo.FindWorldsendRecordStatesByChartIDs(context.Background(), db, 10, []int{201, 999})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	state := states[201]
+	assert.Equal(t, 1000000, state.Score)
+	assert.Equal(t, 2, state.ClearLampID)
+	assert.Equal(t, 3, state.ComboLampID)
+	assert.Equal(t, 1, state.FullChainID)
+}
+
+func TestFindRecordStatesByChartIDs_トランザクションに束縛したExecutorで保存前状態を取得する(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupPlayerRecordRepositoryDB(t, db)
+	ctx := context.Background()
+	tx, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, updated_at)
+		VALUES (10, 101, 1000000, 2, 3, 1, 1, ?)
+	`, "2026-04-27T00:00:00Z")
+	require.NoError(t, err)
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	states, err := repo.FindPlayerRecordStatesByChartIDs(ctx, tx, 10, []int{101})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	assert.Equal(t, 1000000, states[101].Score)
+}

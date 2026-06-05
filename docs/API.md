@@ -752,8 +752,42 @@ curl -X POST \
     "worldsend_records_upserted": 120,
     "full_records_skipped": 0,
     "worldsend_records_skipped": 0,
-    "honors_skipped": 0
+    "honors_skipped": 0,
+    "full_records_actually_changed": 12,
+    "worldsend_records_actually_changed": 3
   },
+  "changes": [
+    {
+      "record_type": "full",
+      "change_type": "updated",
+      "idx": "2849",
+      "diff": "MASTER",
+      "before": {
+        "score": 990000,
+        "clear_lamp_id": 2,
+        "combo_lamp_id": 1,
+        "full_chain_id": 1
+      },
+      "after": {
+        "score": 1002345,
+        "clear_lamp_id": 4,
+        "combo_lamp_id": 2,
+        "full_chain_id": 1
+      }
+    },
+    {
+      "record_type": "worldsend",
+      "change_type": "new",
+      "idx": "8001",
+      "diff": "WE",
+      "after": {
+        "score": 990000,
+        "clear_lamp_id": 2,
+        "combo_lamp_id": 1,
+        "full_chain_id": 1
+      }
+    }
+  ],
   "skipped_records": [
     {
       "record_type": "full",
@@ -772,10 +806,22 @@ curl -X POST \
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `summary` | object | プレイヤーサマリー情報 |
-| `counts` | object | 各種レコードの処理件数 |
+| `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
+| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は省略 |
 | `skipped_records` | array | スキップされたレコード情報（存在する場合） |
 
-> **Note**: 差分情報（変更前後の比較）は返却されません。差分を取得する場合は、登録前後でスコア一覧API（`GET /internal/users/:username`）を呼び出し、クライアント側で比較してください。
+**`changes` の要素スキーマ**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `record_type` | string | `full` または `worldsend` |
+| `change_type` | string | 未登録レコードは `new`、保存済みレコードの比較対象カラムが変化した場合は `updated` |
+| `idx` | string | 楽曲の公式インデックス |
+| `diff` | string | 通常譜面は大文字難易度名、WORLD'S END は入力値にかかわらず `WE` |
+| `before` | object | 更新前状態。`change_type=new` では省略 |
+| `after` | object | 登録後状態 |
+
+`before` / `after` は `score`, `clear_lamp_id`, `combo_lamp_id`, `full_chain_id` のID値のみを含みます。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
@@ -848,7 +894,7 @@ curl -X POST \
 
 #### レスポンス（200 OK）
 
-`/internal/me/register-data` と同じ `PlayerDataResult` を返します。
+`/internal/me/register-data` と同じ `PlayerDataResult` を返します。保存前状態との差分がある場合は `changes` も含まれます。
 
 #### 主なエラー
 
@@ -3251,6 +3297,7 @@ interface PlayerDataResult {
   imported_at: string;
   summary: PlayerDataSummary;
   counts: PlayerDataCounts;
+  changes?: PlayerDataRecordChange[];
   skipped_records: SkippedRecord[];
 }
 
@@ -3269,6 +3316,24 @@ interface PlayerDataCounts {
   full_records_skipped: number;
   worldsend_records_skipped: number;
   honors_skipped: number;
+  full_records_actually_changed: number;
+  worldsend_records_actually_changed: number;
+}
+
+interface PlayerDataRecordChange {
+  record_type: 'full' | 'worldsend';
+  change_type: 'new' | 'updated';
+  idx: string;
+  diff?: string;
+  before?: PlayerDataRecordState;
+  after: PlayerDataRecordState;
+}
+
+interface PlayerDataRecordState {
+  score: number;
+  clear_lamp_id: number;
+  combo_lamp_id: number;
+  full_chain_id: number;
 }
 
 interface SkippedRecord {

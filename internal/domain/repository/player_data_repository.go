@@ -43,6 +43,12 @@ type PlayerDataRepository interface {
 	// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。
 	SavePlayerData(ctx context.Context, exec Executor, input PlayerDataSaveInput) error
 
+	// FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
+	FindPlayerRecordStatesByChartIDs(ctx context.Context, exec Executor, playerID int, chartIDs []int) (map[int]PlayerRecordState, error)
+
+	// FindWorldsendRecordStatesByChartIDs は保存前のWORLD'S ENDレコード状態を譜面IDキーで取得します。
+	FindWorldsendRecordStatesByChartIDs(ctx context.Context, exec Executor, playerID int, worldsendChartIDs []int) (map[int]WorldsendRecordState, error)
+
 	// GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
 	// songs/chartsの読み取りのみのためトランザクション外で呼び出せます。
 	GetOverpowerTargetStats(ctx context.Context, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)

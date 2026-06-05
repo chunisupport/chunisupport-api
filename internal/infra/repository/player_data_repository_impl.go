@@ -48,6 +48,7 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxLi
 			WHERE official_idx IN (?)
 		`,
 		"songs",
+		func(batch []string) []any { return []any{batch} },
 	)
 	if err != nil {
 		return nil, err
@@ -74,6 +75,7 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxLi
 			WHERE song_id IN (?)
 		`,
 		"charts",
+		func(batch []int) []any { return []any{batch} },
 	)
 	if err != nil {
 		return nil, err
@@ -99,6 +101,7 @@ func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxLi
 			WHERE song_id IN (?)
 		`,
 		"worldsend_charts",
+		func(batch []int) []any { return []any{batch} },
 	)
 	if err != nil {
 		return nil, err
@@ -129,6 +132,68 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	}
 
 	return nil
+}
+
+// FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
+func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
+	if exec == nil {
+		return nil, fmt.Errorf("FindPlayerRecordStatesByChartIDs requires a non-nil executor")
+	}
+	rows, err := selectModelsInChunks[int, playerDataRecordRow](ctx, exec, chartIDs, `
+		SELECT
+			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
+			full_chain_id, slot_id, slot_order, updated_at
+		FROM player_records
+		WHERE player_id = ?
+		  AND chart_id IN (?)
+	`, "player record states", func(batch []int) []any { return []any{playerID, batch} })
+	if err != nil {
+		return nil, err
+	}
+
+	states := make(map[int]repository.PlayerRecordState, len(rows))
+	for _, row := range rows {
+		states[row.ChartID] = repository.PlayerRecordState{
+			Score:       row.Score,
+			ClearLampID: row.ClearLampID,
+			ComboLampID: row.ComboLampID,
+			FullChainID: row.FullChainID,
+			SlotID:      row.SlotID,
+			SlotOrder:   row.SlotOrder,
+			UpdatedAt:   row.UpdatedAt,
+		}
+	}
+	return states, nil
+}
+
+// FindWorldsendRecordStatesByChartIDs は保存前のWORLD'S ENDレコード状態を譜面IDキーで取得します。
+func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, worldsendChartIDs []int) (map[int]repository.WorldsendRecordState, error) {
+	if exec == nil {
+		return nil, fmt.Errorf("FindWorldsendRecordStatesByChartIDs requires a non-nil executor")
+	}
+	rows, err := selectModelsInChunks[int, playerDataWorldsendRecordRow](ctx, exec, worldsendChartIDs, `
+		SELECT
+			player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id,
+			full_chain_id, updated_at
+		FROM player_worldsend_records
+		WHERE player_id = ?
+		  AND worldsend_chart_id IN (?)
+	`, "worldsend record states", func(batch []int) []any { return []any{playerID, batch} })
+	if err != nil {
+		return nil, err
+	}
+
+	states := make(map[int]repository.WorldsendRecordState, len(rows))
+	for _, row := range rows {
+		states[row.WorldsendChartID] = repository.WorldsendRecordState{
+			Score:       row.Score,
+			ClearLampID: row.ClearLampID,
+			ComboLampID: row.ComboLampID,
+			FullChainID: row.FullChainID,
+			UpdatedAt:   row.UpdatedAt,
+		}
+	}
+	return states, nil
 }
 
 // GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。
@@ -215,7 +280,9 @@ func (r *playerDataRepository) getOverpowerTargetStats(ctx context.Context, exec
 	}, nil
 }
 
-func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Executor, items []T, query string, queryName string) ([]M, error) {
+// selectModelsInChunks はIN句に渡すitemsをチャンク分割してSELECTします。
+// buildArgsで各チャンクの引数順を明示することで、IN (?) の後にも別のプレースホルダを置けるようにします。
+func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Executor, items []T, query string, queryName string, buildArgs func([]T) []any) ([]M, error) {
 	if len(items) == 0 {
 		return nil, nil
 	}
@@ -225,7 +292,8 @@ func selectModelsInChunks[T any, M any](ctx context.Context, exec repository.Exe
 	for i := 0; i < len(items); i += batchSize {
 		end := min(i+batchSize, len(items))
 		batch := items[i:end]
-		batchQuery, batchArgs, err := sqlx.In(query, batch)
+		args := buildArgs(batch)
+		batchQuery, batchArgs, err := sqlx.In(query, args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build %s query: %w", queryName, err)
 		}
