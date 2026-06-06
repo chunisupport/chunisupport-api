@@ -1,7 +1,7 @@
 # プレイヤーデータ登録時差分計算機能 設計書
 
 作成日: 2026-06-04  
-最終更新日: 2026-06-04
+最終更新日: 2026-06-07
 
 ## 0. 位置づけ
 
@@ -131,32 +131,39 @@ type PlayerDataResult struct {
 	ImportedAt     time.Time                `json:"imported_at"`
 	Summary        PlayerDataSummary        `json:"summary"`
 	Counts         PlayerDataCounts         `json:"counts"`
-	Changes        []PlayerDataRecordChange `json:"changes,omitempty"`
+	Changes        []PlayerDataRecordChange `json:"changes"`
 	SkippedRecords []SkippedRecord          `json:"skipped_records"`
 }
 ```
 
 差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。理由は、入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
 
+レスポンスでは基本的に `omitempty` を使わず、値がない場合は `null` または空配列として明示する。`changes` は差分が0件の場合も空配列 `[]` を返す。`before` は `new` の場合に `null`、`updated` の場合に変更前状態を返す。
+
+`changes` の詳細は最大100件まで返す。`*_actually_changed` は実際に変化した全件数を表し、`changes` の件数とは一致しない場合がある。詳細に含める100件は `idx` を数値として昇順に並べて選ぶ。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。通常譜面と WORLD'S END の両方に差分がある場合も、同一レスポンス内の `changes` 全体で最大100件とする。
+
 ```go
 type PlayerDataRecordChange struct {
-	RecordType string                 `json:"record_type"` // "full" | "worldsend"
-	ChangeType string                 `json:"change_type"` // "new" | "updated"
-	Idx        string                 `json:"idx"`
-	Diff       string                 `json:"diff,omitempty"`
-	Before     *PlayerDataRecordState `json:"before,omitempty"`
-	After      PlayerDataRecordState  `json:"after"`
+	RecordType string                  `json:"record_type"` // "full" | "worldsend"
+	ChangeType string                  `json:"change_type"` // "new" | "updated"
+	Idx        string                  `json:"idx"`
+	Diff       string                  `json:"diff"`
+	Before     *PlayerDataRecordState  `json:"before"`
+	After      PlayerDataRecordState   `json:"after"`
 }
 
 type PlayerDataRecordState struct {
-	Score       int `json:"score"`
-	ClearLampID int `json:"clear_lamp_id"`
-	ComboLampID int `json:"combo_lamp_id"`
-	FullChainID int `json:"full_chain_id"`
+	Score         int    `json:"score"`
+	ClearLampID   int    `json:"clear_lamp_id"`
+	ClearLampName string `json:"clear_lamp_name"`
+	ComboLampID   int    `json:"combo_lamp_id"`
+	ComboLampName string `json:"combo_lamp_name"`
+	FullChainID   int    `json:"full_chain_id"`
+	FullChainName string `json:"full_chain_name"`
 }
 ```
 
-初版では実装をシンプルに保つためIDのみを返し、`clear_lamp` / `combo_lamp` / `full_chain` の名前フィールドは返さない。将来UI都合で必要になった場合に、`masters` からの逆引きmapを追加して名前フィールドを有効化する。
+フロントエンド側でランプIDから名前を解決しなくてよいよう、初版から `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` を返す。名前は登録処理でロード済みの `masters` から逆引きして設定する。IDはDB保存値との対応確認や将来の互換性のため残す。
 
 WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"` 固定にする。
 
@@ -193,14 +200,20 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "before": {
         "score": 990000,
         "clear_lamp_id": 2,
+        "clear_lamp_name": "CLEAR",
         "combo_lamp_id": 1,
-        "full_chain_id": 1
+        "combo_lamp_name": "NONE",
+        "full_chain_id": 1,
+        "full_chain_name": "NONE"
       },
       "after": {
         "score": 1001000,
         "clear_lamp_id": 2,
+        "clear_lamp_name": "CLEAR",
         "combo_lamp_id": 3,
-        "full_chain_id": 1
+        "combo_lamp_name": "FULL COMBO",
+        "full_chain_id": 1,
+        "full_chain_name": "NONE"
       }
     },
     {
@@ -208,18 +221,22 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "change_type": "new",
       "idx": "5678",
       "diff": "WE",
+      "before": null,
       "after": {
         "score": 950000,
         "clear_lamp_id": 2,
+        "clear_lamp_name": "CLEAR",
         "combo_lamp_id": 1,
-        "full_chain_id": 1
+        "combo_lamp_name": "NONE",
+        "full_chain_id": 1,
+        "full_chain_name": "NONE"
       }
     }
   ]
 }
 ```
 
-`changes` は0件の場合、省略する。`skipped_records` は既存DTOのJSONタグを維持し、0件時の表現を変更しない。
+`changes` は0件の場合も省略せず、空配列 `[]` を返す。`skipped_records` も省略せず、0件の場合は空配列 `[]` を返す。
 
 ## 5. アーキテクチャ設計
 
@@ -297,6 +314,7 @@ WHERE player_id = ?
 - `normalizeFullRecordsForUpsert` / `normalizeWorldsendRecordsForUpsert` を新設し、同一キーは最後の1件へ正規化する。
 - `collectFullChartIDs` / `collectWorldsendChartIDs` を新設し、受理済み upsert list から保存前ロード対象キーを作る。
 - `computeFullRecordChanges` / `computeWorldsendRecordChanges` を新設し、保存前 state map と upsert 予定値を比較する。
+- `sortAndLimitRecordChanges` を新設し、`idx` を数値として昇順に並べたうえでレスポンス詳細を最大100件に制限する。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
 - `applyScores` は upsert list生成後に正規化し、保存前stateをロードして changes を計算し、保存成功後に counts / changes を返す。
 
 `applyScores` の戻り値は以下のように変更する。
@@ -312,7 +330,7 @@ func (us *playerDataUsecase) applyScores(
 ) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error)
 ```
 
-`Register` 側では `result.Changes = changes` を設定し、0件なら空のままにする。
+`Register` 側では `result.Changes = changes` を設定する。0件の場合も `nil` ではなく空sliceを設定し、JSONでは `changes: []` として返す。
 
 正規化後の upsert 予定値だけを差分比較する。DB側で `updated_at` が更新される条件と、Go側の `new` / `updated` 判定対象を一致させるためである。
 
@@ -344,9 +362,9 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 - どちらも `player_id` 条件と対象キー条件の単純SELECTで、JOINを伴わない。チャンク分割するため、実際のクエリ数は `ceil(keys / BulkInsertChunkSize)` に応じて増える。
 - 比較は payload 件数に対する O(N)。
 - 1万件規模でも map と slice のメモリ使用量は許容範囲。
-- 初回登録では `changes` が全件分になる可能性がある。これは既存のプロフィール系APIで全件レコードを返している規模と同程度だが、実運用で重ければ将来 `changes` 省略フラグを追加する。
+- 初回登録では実際の差分件数が数千件になる可能性があるため、`*_actually_changed` は全件数を返し、`changes` の詳細は最大100件に制限する。
 
-差分詳細の上限は初版では設けない。上限を設けると counts と details の不一致説明が必要になり、APIが複雑になるためである。
+差分詳細の上限は初版から100件とする。レスポンスサイズとクライアント処理負荷を抑えるためである。詳細は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
 
 ## 7. テスト計画
 
@@ -366,6 +384,10 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 - スキップされた入力は `skipped_records` に反映される。
 - full と worldsend の件数が独立して集計される。
 - payload内で同一キーが重複した場合、最後の1件だけが保存・差分詳細の対象になる。
+- `new` の場合、`before` は `null` になる。
+- `changes` は `idx` を数値として昇順に並べ、最大100件まで返る。
+- `changes` が100件を超える場合も、`*_actually_changed` は全件数を返す。
+- ランプIDに対応するランプ名が `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` に設定される。
 
 テストはテーブルテスト + Given / When / Then コメントで書き、結果検証は `assert`、前提確認は `require` を使う。
 
@@ -410,15 +432,13 @@ Goコードを変更した実装PRでは `go test ./...` を実行する。
 
 ### 9.1 初版で決めるべき事項
 
-- `skipped_records` の0件時表現を、将来 `omitempty` に寄せるか。
-
-初版方針は「ランプ名は含めずIDのみ」「WORLD'S ENDは `diff: "WE"` 固定」「payload内重複は最後の1件へ正規化」で固定する。
+初版方針は「後方互換性は重視しない」「基本的に `omitempty` は使わない」「`changes` は最大100件」「`changes` は `idx` を数値として昇順」「`new` の `before` は `null`」「ランプ名はIDとあわせて返す」「WORLD'S ENDは `diff: "WE"` 固定」「payload内重複は最後の1件へ正規化」で固定する。
 
 ### 9.2 リスク
 
 - DB側条件とGo側条件が将来ずれる。
-- 初回登録で `changes` が数千件になり、クライアント処理が重くなる。
-- before/afterにランプ名を将来含める場合、マスタ逆引きの実装が少し増える。
+- 初回登録で実際の差分件数が数千件になった場合、`changes` 詳細は100件に制限されるため、クライアントは `*_actually_changed` と `changes.length` が一致しない前提で扱う必要がある。
+- before/afterにランプ名を含めるため、マスタ逆引きの実装が少し増える。
 - 「改善」という表示文言にすると、スコア下降やランプ下降を誤表現する可能性がある。
 
 ### 9.3 将来拡張
@@ -439,6 +459,9 @@ Goコードを変更した実装PRでは `go test ./...` を実行する。
 - `PlayerDataCounts` 説明
 - `changes` のスキーマ
 - TypeScript interface
+- `changes` が最大100件で、`*_actually_changed` は全件数であることの説明
+- `before` が `null` になり得ることの説明
+- ランプ名フィールドの説明
 - 差分情報を返す仕様Noteへの置換
 
 `/internal/player-data/commit` は `/internal/me/register-data` と同じ `PlayerDataResult` を返す。差分も含まれることを一文補足する。
