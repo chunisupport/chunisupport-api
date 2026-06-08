@@ -293,7 +293,7 @@ def main() -> int:
         return 1
 
     payload = {
-        "username": "Build & Deploy | chunisupport-api",
+        "username": "Build | chunisupport-api",
         "embeds": embeds,
     }
 
