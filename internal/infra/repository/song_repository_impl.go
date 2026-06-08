@@ -122,7 +122,7 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		results[idx].Charts = append(results[idx].Charts, chart)
 	}
 
-	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	// 6. ドメインサービスで譜面集約を適用
 	for _, song := range results {
 		service.ApplyAggregation(song)
 	}
@@ -289,7 +289,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
-	// 6. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	// 6. ドメインサービスで譜面集約を適用
 	for _, song := range songs {
 		service.ApplyAggregation(song)
 	}
@@ -335,7 +335,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	song.Charts = charts
 
-	// 3. ドメインサービスで譜面集約を適用（MaxChartConst, IsMaxOPUnknown）
+	// 3. ドメインサービスで譜面集約を適用
 	service.ApplyAggregation(song)
 
 	return song, nil

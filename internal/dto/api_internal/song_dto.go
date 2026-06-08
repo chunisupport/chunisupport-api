@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	sharedto "github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // ChartDTO は譜面情報を外部に公開するためのDTOです。
@@ -115,18 +116,19 @@ func (o EditorOrderedChartsMap) MarshalJSON() ([]byte, error) {
 
 // SongDTO は楽曲情報を外部に公開するためのDTOです。
 type SongDTO struct {
-	DisplayID      string           `json:"id"`
-	Title          string           `json:"title"`
-	Reading        *string          `json:"reading"`
-	Artist         string           `json:"artist"`
-	Genre          *string          `json:"genre"`
-	BPM            *int             `json:"bpm"`
-	Release        *string          `json:"release"`
-	Jacket         *string          `json:"jacket"`
-	OfficialIdx    string           `json:"official_idx"`
-	MaxOP          float64          `json:"maxop"`
-	IsMaxOPUnknown bool             `json:"is_maxop_unknown"`
-	Charts         OrderedChartsMap `json:"charts"`
+	DisplayID          string           `json:"id"`
+	Title              string           `json:"title"`
+	Reading            *string          `json:"reading"`
+	Artist             string           `json:"artist"`
+	Genre              *string          `json:"genre"`
+	BPM                *int             `json:"bpm"`
+	Release            *string          `json:"release"`
+	Jacket             *string          `json:"jacket"`
+	OfficialIdx        string           `json:"official_idx"`
+	MaxOP              float64          `json:"maxop"`
+	IsMaxOPUnknown     bool             `json:"is_maxop_unknown"`
+	OpTargetDifficulty *string          `json:"op_target_difficulty"`
+	Charts             OrderedChartsMap `json:"charts"`
 }
 
 // SongsResponse は楽曲一覧のレスポンスを表します。
@@ -256,17 +258,18 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 	}
 
 	return &SongDTO{
-		DisplayID:      song.DisplayID,
-		Title:          song.Title,
-		Reading:        song.Reading,
-		Artist:         song.Artist,
-		Genre:          genrePtr,
-		BPM:            song.BPM,
-		Release:        releaseDateStr,
-		Jacket:         song.Jacket,
-		OfficialIdx:    song.OfficialIdx,
-		MaxOP:          maxOP,
-		IsMaxOPUnknown: song.IsMaxOPUnknown,
-		Charts:         make(OrderedChartsMap),
+		DisplayID:          song.DisplayID,
+		Title:              song.Title,
+		Reading:            song.Reading,
+		Artist:             song.Artist,
+		Genre:              genrePtr,
+		BPM:                song.BPM,
+		Release:            releaseDateStr,
+		Jacket:             song.Jacket,
+		OfficialIdx:        song.OfficialIdx,
+		MaxOP:              maxOP,
+		IsMaxOPUnknown:     song.IsMaxOPUnknown,
+		OpTargetDifficulty: sharedto.OpTargetDifficultyPtr(song.OpTargetDifficultyID),
+		Charts:             make(OrderedChartsMap),
 	}
 }

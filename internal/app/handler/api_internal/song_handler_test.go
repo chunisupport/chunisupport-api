@@ -98,6 +98,7 @@ func TestConvertToSongDTO(t *testing.T) {
 	}
 
 	song.Charts = charts
+	song.OpTargetDifficultyID = 3
 
 	// 変換実行
 	dto := handler.convertToSongDTO(song)
@@ -118,6 +119,10 @@ func TestConvertToSongDTO(t *testing.T) {
 	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
 		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
+	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "EXPERT" {
+		t.Errorf("OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "EXPERT")
 	}
 
 	// Charts マップのキーが存在するか確認

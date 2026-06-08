@@ -25,15 +25,16 @@ func TestToSongDTO(t *testing.T) {
 	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
 
 	song := &entity.Song{
-		DisplayID:      "test123456789012",
-		Title:          "テスト楽曲",
-		Reading:        &reading,
-		Artist:         "テストアーティスト",
-		GenreID:        &genreID,
-		BPM:            &bpm,
-		ReleasedAt:     &releaseDate,
-		Jacket:         &imgURL,
-		IsMaxOPUnknown: true,
+		DisplayID:            "test123456789012",
+		Title:                "テスト楽曲",
+		Reading:              &reading,
+		Artist:               "テストアーティスト",
+		GenreID:              &genreID,
+		BPM:                  &bpm,
+		ReleasedAt:           &releaseDate,
+		Jacket:               &imgURL,
+		IsMaxOPUnknown:       true,
+		OpTargetDifficultyID: 5,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -101,6 +102,9 @@ func TestToSongDTO(t *testing.T) {
 	if !dto.IsMaxOPUnknown {
 		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
+
+	require.NotNil(t, dto.OpTargetDifficulty)
+	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
 
 	// Charts は空の map として初期化される
 	if dto.Charts == nil {
@@ -175,15 +179,16 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	chartMaster, _ := chartconstant.NewChartConstant(14.0)
 
 	songDTO := &SongDTO{
-		DisplayID: "92eaa42ee1d1a70f",
-		Title:     "テスト楽曲",
-		Reading:   &reading,
-		Artist:    "テストアーティスト",
-		Genre:     &genre,
-		BPM:       &bpm,
-		Release:   &releaseDate,
-		Jacket:    &jacket,
-		MaxOP:     85,
+		DisplayID:          "92eaa42ee1d1a70f",
+		Title:              "テスト楽曲",
+		Reading:            &reading,
+		Artist:             "テストアーティスト",
+		Genre:              &genre,
+		BPM:                &bpm,
+		Release:            &releaseDate,
+		Jacket:             &jacket,
+		MaxOP:              85,
+		OpTargetDifficulty: stringPtr("MASTER"),
 		Charts: OrderedChartsMap{
 			"BASIC":    &ChartDTO{Const: chartBasic, IsConstUnknown: false, Notes: nil},
 			"ADVANCED": &ChartDTO{Const: chartAdvanced, IsConstUnknown: false, Notes: nil},
@@ -209,6 +214,10 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		t.Errorf("JSON should contain is_maxop_unknown field, got: %s", jsonString)
 	}
 
+	if !strings.Contains(jsonString, `"op_target_difficulty":"MASTER"`) {
+		t.Errorf("JSON should contain op_target_difficulty field, got: %s", jsonString)
+	}
+
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
 	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
@@ -230,10 +239,11 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 	}
 
 	// charts内のキー順序を確認（BASIC→ADVANCED→EXPERT→MASTER の順）
-	basicIdx := strings.Index(jsonString, `"BASIC"`)
-	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
-	expertIdx := strings.Index(jsonString, `"EXPERT"`)
-	masterIdx := strings.Index(jsonString, `"MASTER"`)
+	chartsJSON := jsonString[strings.Index(jsonString, `"charts":`):]
+	basicIdx := strings.Index(chartsJSON, `"BASIC"`)
+	advancedIdx := strings.Index(chartsJSON, `"ADVANCED"`)
+	expertIdx := strings.Index(chartsJSON, `"EXPERT"`)
+	masterIdx := strings.Index(chartsJSON, `"MASTER"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 {
 		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)

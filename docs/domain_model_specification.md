@@ -625,12 +625,13 @@ CHUNITHMのレーティングおよびオーバーパワー計算ロジックを
 func AggregateSongCharts(charts []*entity.Chart) SongAggregation
 ```
 
-- **概要**: 譜面リストから楽曲の最大譜面定数とMAXOP確度を計算する
+- **概要**: 譜面リストから楽曲の最大譜面定数、MAXOP確度、OP対象難易度を計算する
 - **引数**:
   - `charts`: 楽曲に紐づく譜面リスト
-- **返り値**: `SongAggregation`（`MaxChartConst float64`, `IsMaxOPUnknown bool`）
+- **返り値**: `SongAggregation`（`MaxChartConst float64`, `IsMaxOPUnknown bool`, `OpTargetDifficultyID int`）
 - **判定ルール**:
   - `MaxChartConst`: 全譜面のうち最大の定数値
+  - `OpTargetDifficultyID`: 理論値OVER POWERが最大となる譜面の難易度ID。同じ定数の場合は難易度IDが大きい譜面を採用する
   - `IsMaxOPUnknown`: MASTER(ID=4)またはULTIMA(ID=5)の譜面に`is_const_unknown=true`が1件でも含まれればtrue。EXPERT以下のunknownは対象外
 
 ##### ApplyAggregation
@@ -639,7 +640,7 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation
 func ApplyAggregation(song *entity.Song)
 ```
 
-- **概要**: 楽曲エンティティの譜面リストから集約結果を計算し、`MaxChartConst`と`IsMaxOPUnknown`をエンティティに適用する
+- **概要**: 楽曲エンティティの譜面リストから集約結果を計算し、`MaxChartConst`、`IsMaxOPUnknown`、`OpTargetDifficultyID`をエンティティに適用する
 
 ##### CalcSingleRating
 

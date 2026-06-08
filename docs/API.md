@@ -1708,6 +1708,7 @@ curl -X POST \
       "official_idx": "123",
       "maxop": 82.5,
       "is_maxop_unknown": false,
+      "op_target_difficulty": "MASTER",
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -1748,6 +1749,7 @@ curl -X POST \
 | `official_idx` | string | 公式インデックス |
 | `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
+| `op_target_difficulty` | string \| null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -1782,6 +1784,7 @@ curl -X POST \
   "official_idx": "123",
   "maxop": 82.5,
   "is_maxop_unknown": false,
+  "op_target_difficulty": "MASTER",
   "charts": {
     "BASIC": {
       "const": 3.0,
@@ -2388,7 +2391,7 @@ curl -X POST \
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -2703,6 +2706,7 @@ curl -X POST \
       "official_idx": "123",
       "maxop": 86.25,
       "is_maxop_unknown": false,
+      "op_target_difficulty": "MASTER",
       "charts": {
         "MASTER": {
           "const": 14.5,
@@ -2736,6 +2740,7 @@ curl -X POST \
 | `songs[].official_idx` | string | 公式インデックス |
 | `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `songs[].is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
+| `songs[].op_target_difficulty` | string\|null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |
