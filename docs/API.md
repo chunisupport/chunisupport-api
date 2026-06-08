@@ -739,6 +739,17 @@ curl -X POST \
   "player_id": 42,
   "app_ver": "0.0.1a",
   "imported_at": "2025-11-27T10:45:00+09:00",
+  "profile": {
+    "player_id": 42,
+    "name": "プレイヤー名",
+    "level": 217,
+    "rating": 17.29,
+    "class_emblem_id": 6,
+    "class_emblem_base_id": 4,
+    "last_played_at": "2025-11-02T16:42:00+09:00",
+    "overpower_value": 96123.91,
+    "overpower_percent": 76.27
+  },
   "summary": {
     "name": "プレイヤー名",
     "level": 217,
@@ -746,6 +757,29 @@ curl -X POST \
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percentage": 76.27
+  },
+  "statistics": {
+    "total_high_score": 1183287650,
+    "lamp_counts": {
+      "clear": {
+        "FAILED": 12,
+        "CLEAR": 450,
+        "HARD": 300,
+        "BRAVE": 250,
+        "ABSOLUTE": 170,
+        "CATASTROPHY": 3
+      },
+      "combo": {
+        "none": 900,
+        "full combo": 220,
+        "all justice": 65
+      },
+      "full_chain": {
+        "none": 1160,
+        "full chain gold": 20,
+        "full chain platinum": 5
+      }
+    }
   },
   "counts": {
     "full_records_upserted": 1185,
@@ -806,10 +840,14 @@ curl -X POST \
 | `player_id` | number | 登録されたプレイヤーID |
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
+| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
+| `statistics` | object | 登録後の通常譜面集計。`total_high_score` とランプごとの件数を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
 | `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
 | `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
+
+`statistics.total_high_score` は削除済み楽曲を除く保存後の通常譜面スコア合計です。WORLD'S ENDは含みません。`statistics.lamp_counts.clear` / `combo` / `full_chain` はランプマスタの `Name` をキーにした件数です。`none` 相当のコンボランプ・フルチェインも集計では `none` キーとして返します。
 
 **`changes` の要素スキーマ**:
 
@@ -3301,19 +3339,42 @@ interface PlayerDataResult {
   player_id: number;
   app_ver: string;
   imported_at: string;
+  profile: PlayerDataProfile;
   summary: PlayerDataSummary;
+  statistics: PlayerDataStatistics;
   counts: PlayerDataCounts;
   changes: PlayerDataRecordChange[];
   skipped_records: SkippedRecord[];
 }
 
+interface PlayerDataProfile {
+  player_id: number;
+  name: string;
+  level: number;
+  rating: number | null;
+  class_emblem_id: number | null;
+  class_emblem_base_id: number | null;
+  last_played_at: string | null;
+  overpower_value: number | null;
+  overpower_percent: number | null;
+}
+
 interface PlayerDataSummary {
   name: string;
   level: number;
-  rating: number;
+  rating: number | null;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percentage: number | null;
+}
+
+interface PlayerDataStatistics {
+  total_high_score: number;
+  lamp_counts: {
+    clear: Record<string, number>;
+    combo: Record<string, number>;
+    full_chain: Record<string, number>;
+  };
 }
 
 interface PlayerDataCounts {
