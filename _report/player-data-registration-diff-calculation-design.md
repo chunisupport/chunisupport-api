@@ -5,7 +5,7 @@
 
 ## 0. 位置づけ
 
-本設計書は、プレイヤーデータ登録時に「今回の登録で実際に変化したスコア」をレスポンスへ含めるための未実装機能の設計である。
+本設計書は、プレイヤーデータ登録時に「今回の登録で実際に変化したスコア」をレスポンスへ含める機能の仕様を定義する。
 
 現在の登録エンドポイントは以下の通り。
 
@@ -16,7 +16,7 @@
 
 現行実装では、`PlayerDataPayload.scores.full` / `scores.worldsend` に含まれる全譜面の現在ベストを受け取り、`applyScores` で `PlayerRecordForUpsert` / `WorldsendRecordForUpsert` に変換し、`playerDataRepo.SavePlayerData` で bulk upsert している。`PlayerDataCounts` の `*_upserted` は「payload 内で処理対象になった件数」を表す。
 
-また、`player_records.updated_at` / `player_worldsend_records.updated_at` は payload の `updated_at` を格納する。現在も `ON DUPLICATE KEY UPDATE` 内で、score / lamp が変化した場合に `updated_at` を更新している。
+また、`player_records.updated_at` / `player_worldsend_records.updated_at` は payload の `updated_at` を格納する。`ON DUPLICATE KEY UPDATE` 内で、score / lamp が変化した場合に `updated_at` を更新している。
 
 ## 1. 目的
 
@@ -37,9 +37,7 @@
 
 登録トランザクション内で、保存前の対象 state を読み込み、payload から生成した upsert 予定値と比較して差分を確定する。
 
-payload 直下の `updated_at` は保存値として利用するが、差分候補抽出キーには使わない。秒精度の衝突や再送による誤検出を避けるため、差分は保存前 state と upsert 予定値の比較だけで判定する。
-
-`updated_at` はDB保存値とGo側の値がずれないよう、`time.Parse` 後に `updatedAt = updatedAt.Truncate(time.Second)` で秒精度へ正規化し、その値を `PlayerRecordState.UpdatedAt` / `WorldsendRecordState.UpdatedAt` に設定する。
+差分判定は保存前 state と upsert 予定値の `score` / `clear_lamp_id` / `combo_lamp_id` / `full_chain_id` の比較で行う。payload 直下の `updated_at` は各レコードの保存値として `PlayerRecordState.UpdatedAt` / `WorldsendRecordState.UpdatedAt` に設定し、DB の `TIMESTAMP` 列へ保存する。
 
 ```text
 tx 開始
@@ -57,9 +55,11 @@ tx 開始
 tx commit
 ```
 
-保存前状態のロードは `SavePlayerData` より前に行う。差分判定はDB側の `updated_at = IF(...)` 条件と同じ比較カラムで行い、`SavePlayerData` が成功した場合だけレスポンスへ反映される。
+保存前状態のロードは `SavePlayerData` より前に行う。差分判定はDB側の `updated_at = IF(...)` 条件と同じ比較カラムで行い、`SavePlayerData` 成功後にレスポンスへ反映する。
 
 同じ `updated_at` を持つ payload が再送された場合も、保存前stateとupsert予定値が同じなら `changes` には含めない。今回の保存処理で値が変化するレコードだけを `changes` に含める。
+
+差分計算は登録トランザクション内の保存前 state を基準とする。
 
 ## 3. 差分の定義
 
@@ -136,11 +136,11 @@ type PlayerDataResult struct {
 }
 ```
 
-差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。理由は、入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
+差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
 
-レスポンスでは基本的に `omitempty` を使わず、値がない場合は `null` または空配列として明示する。`changes` は差分が0件の場合も空配列 `[]` を返す。`before` は `new` の場合に `null`、`updated` の場合に変更前状態を返す。
+登録成功時は `changes` を常に配列として返す。差分が0件の場合は空配列 `[]` とする。`before` は `new` の場合に `null`、`updated` の場合に変更前状態を返す。`SavePlayerData` 成功後に `Register` が `result.Changes` を設定する。
 
-`changes` の詳細は最大100件まで返す。`*_actually_changed` は実際に変化した全件数を表し、`changes` の件数とは一致しない場合がある。詳細に含める100件は `idx` を数値として昇順に並べて選ぶ。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。通常譜面と WORLD'S END の両方に差分がある場合も、同一レスポンス内の `changes` 全体で最大100件とする。
+`changes` の詳細は最大100件まで返す。`*_actually_changed` は実際に変化した全件数を表し、`changes` の件数とは一致しない場合がある。詳細に含める100件は `idx` を数値として昇順に並べて選ぶ。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。通常譜面と WORLD'S END の両方に差分がある場合も、同一レスポンス内の `changes` 全体で最大100件とする。`idx` は公式インデックスの数値文字列のみを想定し、数値として解釈できない値があればソート順の末尾にまとめる。
 
 ```go
 type PlayerDataRecordChange struct {
@@ -153,17 +153,14 @@ type PlayerDataRecordChange struct {
 }
 
 type PlayerDataRecordState struct {
-	Score         int    `json:"score"`
-	ClearLampID   int    `json:"clear_lamp_id"`
-	ClearLampName string `json:"clear_lamp_name"`
-	ComboLampID   int    `json:"combo_lamp_id"`
-	ComboLampName string `json:"combo_lamp_name"`
-	FullChainID   int    `json:"full_chain_id"`
-	FullChainName string `json:"full_chain_name"`
+	Score     int     `json:"score"`
+	ClearLamp *string `json:"clear_lamp"`
+	ComboLamp *string `json:"combo_lamp"`
+	FullChain *string `json:"full_chain"`
 }
 ```
 
-フロントエンド側でランプIDから名前を解決しなくてよいよう、初版から `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` を返す。名前は登録処理でロード済みの `masters` から逆引きして設定する。IDはDB保存値との対応確認や将来の互換性のため残す。
+`before` / `after` は `score` と3種類のランプ名を返す。ランプ名は登録処理でロード済みの `masters` から逆引きし、マスタの `Name` をそのまま用いる。`none` 相当および未設定は `null` とする。
 
 WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"` 固定にする。
 
@@ -199,21 +196,15 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "diff": "MASTER",
       "before": {
         "score": 990000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 1,
-        "combo_lamp_name": "NONE",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       },
       "after": {
         "score": 1001000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 3,
-        "combo_lamp_name": "FULL COMBO",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "FULL COMBO",
+        "full_chain": null
       }
     },
     {
@@ -224,19 +215,17 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "before": null,
       "after": {
         "score": 950000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 1,
-        "combo_lamp_name": "NONE",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       }
     }
-  ]
+  ],
+  "skipped_records": []
 }
 ```
 
-`changes` は0件の場合も省略せず、空配列 `[]` を返す。`skipped_records` も省略せず、0件の場合は空配列 `[]` を返す。
+`skipped_records` も0件の場合は空配列 `[]` を返す。
 
 ## 5. アーキテクチャ設計
 
@@ -302,7 +291,7 @@ WHERE player_id = ?
   AND worldsend_chart_id IN (?)
 ```
 
-明示カラムSELECTを使う。JOINを伴わない単純SELECTで、`IN (?)` は既存の `selectModelsInChunks` と同じ考え方でチャンク分割する。
+明示カラムSELECTを使う。JOINを伴わない単純SELECTで、`IN (?)` は既存の `selectModelsInChunks` と同じ考え方で `info.BulkInsertChunkSize`（3000）単位でチャンク分割する。
 
 ### 5.3 Usecase
 
@@ -315,7 +304,7 @@ WHERE player_id = ?
 - `collectFullChartIDs` / `collectWorldsendChartIDs` を新設し、受理済み upsert list から保存前ロード対象キーを作る。
 - `computeFullRecordChanges` / `computeWorldsendRecordChanges` を新設し、保存前 state map と upsert 予定値を比較する。
 - `sortAndLimitRecordChanges` を新設し、`idx` を数値として昇順に並べたうえでレスポンス詳細を最大100件に制限する。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
-- `applyScores` は upsert list生成後に正規化し、保存前stateをロードして changes を計算し、保存成功後に counts / changes を返す。
+- `applyScores` は upsert list生成後に正規化し、保存前stateをロードして changes を計算し、`SavePlayerData` 成功後に counts / changes を返す。
 
 `applyScores` の戻り値は以下のように変更する。
 
@@ -330,7 +319,7 @@ func (us *playerDataUsecase) applyScores(
 ) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error)
 ```
 
-`Register` 側では `result.Changes = changes` を設定する。0件の場合も `nil` ではなく空sliceを設定し、JSONでは `changes: []` として返す。
+`Register` 側では `SavePlayerData` 成功後に `result.Changes = changes` を設定する。差分0件の場合も空sliceを設定し、JSONでは `changes: []` として返す。
 
 正規化後の upsert 予定値だけを差分比較する。DB側で `updated_at` が更新される条件と、Go側の `new` / `updated` 判定対象を一致させるためである。
 
@@ -359,9 +348,9 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 ## 6. パフォーマンス設計
 
 - 追加ロード処理は通常譜面の保存前、WORLD'S ENDの保存前の合計2種類。
-- どちらも `player_id` 条件と対象キー条件の単純SELECTで、JOINを伴わない。チャンク分割するため、実際のクエリ数は `ceil(keys / BulkInsertChunkSize)` に応じて増える。
+- どちらも `player_id` 条件と対象キー条件の単純SELECTで、JOINを伴わない。チャンク分割するため、実際のクエリ数は `ceil(keys / BulkInsertChunkSize)` に応じて増える。譜面7000件規模では `BulkInsertChunkSize`（3000）により種別あたり最大3クエリとなる。
 - 比較は payload 件数に対する O(N)。
-- 1万件規模でも map と slice のメモリ使用量は許容範囲。
+- 楽曲1700件・譜面7000件規模でも、リクエスト単位の map と slice のメモリ使用量は許容範囲である。マスタは payload 参照 idx のみ、保存前 state は upsert 対象キーのみをロードする。
 - 初回登録では実際の差分件数が数千件になる可能性があるため、`*_actually_changed` は全件数を返し、`changes` の詳細は最大100件に制限する。
 
 差分詳細の上限は初版から100件とする。レスポンスサイズとクライアント処理負荷を抑えるためである。詳細は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
@@ -387,7 +376,8 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 - `new` の場合、`before` は `null` になる。
 - `changes` は `idx` を数値として昇順に並べ、最大100件まで返る。
 - `changes` が100件を超える場合も、`*_actually_changed` は全件数を返す。
-- ランプIDに対応するランプ名が `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` に設定される。
+- ランプ名が `clear_lamp` / `combo_lamp` / `full_chain` に設定され、`none` 相当は `null` になる。
+- `SavePlayerData` 成功時のみ `changes` が返る。
 
 テストはテーブルテスト + Given / When / Then コメントで書き、結果検証は `assert`、前提確認は `require` を使う。
 
@@ -420,7 +410,7 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 2. Repository interface追加: 保存前キー指定ロードの2メソッド。
 3. Infra実装: 明示カラムSELECTで保存前state mapを返す。
 4. Usecaseテスト追加: 差分判定・counts・changesの期待値を先に書く。
-5. Usecase実装: `updatedAt` 秒精度正規化、upsert対象の重複正規化、保存前stateロード、upsert予定値との比較、resultへの反映。
+5. Usecase実装: upsert対象の重複正規化、保存前stateロード、upsert予定値との比較、`sortAndLimitRecordChanges`、保存成功後の result 反映。
 6. API.md更新: レスポンス例、スキーマ、TypeScript interface、差分定義のNoteを更新。
 7. `gofmt -s -w` を対象Goファイルに実行。
 8. `go test ./...` を実行。
@@ -428,11 +418,17 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 
 Goコードを変更した実装PRでは `go test ./...` を実行する。
 
-## 9. リスクと未決事項
+## 9. 初版仕様とリスク
 
-### 9.1 初版で決めるべき事項
+### 9.1 初版仕様
 
-初版方針は「後方互換性は重視しない」「基本的に `omitempty` は使わない」「`changes` は最大100件」「`changes` は `idx` を数値として昇順」「`new` の `before` は `null`」「ランプ名はIDとあわせて返す」「WORLD'S ENDは `diff: "WE"` 固定」「payload内重複は最後の1件へ正規化」で固定する。
+- `changes` は登録成功時に常に配列として返し、最大100件とする。
+- `changes` は `idx` を数値として昇順に並べる。
+- `new` の `before` は `null` とする。
+- `before` / `after` のランプは `clear_lamp` / `combo_lamp` / `full_chain` とし、マスタ `Name` を返す。`none` 相当は `null` とする。
+- WORLD'S END の `diff` は `"WE"` 固定とする。
+- payload内重複は最後の1件へ正規化する。
+- `SavePlayerData` 成功後に `result.Changes` を設定する。
 
 ### 9.2 リスク
 
