@@ -44,7 +44,7 @@ type PlayerDataRecordChange struct {
 	RecordType string                 `json:"record_type"`
 	ChangeType string                 `json:"change_type"`
 	Idx        string                 `json:"idx"`
-	Diff       string                 `json:"diff,omitempty"`
+	Diff       string                 `json:"diff"`
 	Before     *PlayerDataRecordState `json:"before"`
 	After      PlayerDataRecordState  `json:"after"`
 }
@@ -56,6 +56,6 @@ type PlayerDataResult struct {
 	ImportedAt     time.Time                `json:"imported_at"`
 	Summary        PlayerDataSummary        `json:"summary"`
 	Counts         PlayerDataCounts         `json:"counts"`
-	Changes        []PlayerDataRecordChange `json:"changes,omitempty"`
+	Changes        []PlayerDataRecordChange `json:"changes"`
 	SkippedRecords []SkippedRecord          `json:"skipped_records"`
 }

@@ -808,8 +808,8 @@ curl -X POST \
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `summary` | object | プレイヤーサマリー情報 |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
-| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は省略 |
-| `skipped_records` | array | スキップされたレコード情報（存在する場合） |
+| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
+| `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
 
 **`changes` の要素スキーマ**:
 
@@ -822,7 +822,7 @@ curl -X POST \
 | `before` | object \| null | 更新前状態。`change_type=new` では `null` |
 | `after` | object | 登録後状態 |
 
-`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
+`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。`changes` は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で並びます。`idx` を数値として解釈できない値は末尾に並びます。`counts.*_actually_changed` は実際に変化した全件数で、`changes` はレスポンスサイズ抑制のため最大100件です。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
@@ -3303,7 +3303,7 @@ interface PlayerDataResult {
   imported_at: string;
   summary: PlayerDataSummary;
   counts: PlayerDataCounts;
-  changes?: PlayerDataRecordChange[];
+  changes: PlayerDataRecordChange[];
   skipped_records: SkippedRecord[];
 }
 
@@ -3330,7 +3330,7 @@ interface PlayerDataRecordChange {
   record_type: 'full' | 'worldsend';
   change_type: 'new' | 'updated';
   idx: string;
-  diff?: string;
+  diff: string;
   before: PlayerDataRecordState | null;
   after: PlayerDataRecordState;
 }

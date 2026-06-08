@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	maxScoreValue   = 1010000
-	minScoreValue   = 1
-	tokyoLayout     = "2006/01/02 15:04"
-	defaultSlotName = "none"
+	maxPlayerDataChangeDetails = 100
+	maxScoreValue              = 1010000
+	minScoreValue              = 1
+	tokyoLayout                = "2006/01/02 15:04"
+	defaultSlotName            = "none"
 )
 
 var (
@@ -240,8 +241,10 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	result := &api_internal.PlayerDataResult{
-		AppVersion: payload.AppVersion,
-		ImportedAt: time.Now().UTC(),
+		AppVersion:     payload.AppVersion,
+		ImportedAt:     time.Now().UTC(),
+		Changes:        []api_internal.PlayerDataRecordChange{},
+		SkippedRecords: []api_internal.SkippedRecord{},
 	}
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
@@ -293,9 +296,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
-		if len(changes) > 0 {
-			result.Changes = changes
-		}
+		result.Changes = changes
 		result.Summary = api_internal.PlayerDataSummary{
 			Name:             summaryInput.Name,
 			Level:            summaryInput.Level,
@@ -304,9 +305,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			OverpowerValue:   summaryInput.OverpowerValue,
 			OverpowerPercent: summaryInput.OverpowerPercent,
 		}
-		if len(skippedRecords) > 0 {
-			result.SkippedRecords = skippedRecords
-		}
+		result.SkippedRecords = skippedRecords
 
 		return nil
 	})
@@ -604,6 +603,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
 	changes = append(changes, playerRecordChangesDTO(fullRecordChanges, lampLookup)...)
 	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges, lampLookup)...)
+	changes = sortAndLimitRecordChanges(changes)
 	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
 	counts.WorldsendRecordsActuallyChanged = len(worldsendRecordChanges)
 
@@ -957,6 +957,43 @@ func recordChangesDTO[State any](changes []playerDataRecordChange[State], stateD
 		dtos = append(dtos, dto)
 	}
 	return dtos
+}
+
+func sortAndLimitRecordChanges(changes []api_internal.PlayerDataRecordChange) []api_internal.PlayerDataRecordChange {
+	slices.SortStableFunc(changes, comparePlayerDataRecordChange)
+	if len(changes) <= maxPlayerDataChangeDetails {
+		return changes
+	}
+	return changes[:maxPlayerDataChangeDetails]
+}
+
+func comparePlayerDataRecordChange(a, b api_internal.PlayerDataRecordChange) int {
+	aIdx, aOK := parseChangeIdx(a.Idx)
+	bIdx, bOK := parseChangeIdx(b.Idx)
+	if aOK != bOK {
+		if aOK {
+			return -1
+		}
+		return 1
+	}
+	if aOK && aIdx != bIdx {
+		return aIdx - bIdx
+	}
+	if a.Idx != b.Idx {
+		return strings.Compare(a.Idx, b.Idx)
+	}
+	if a.RecordType != b.RecordType {
+		return strings.Compare(a.RecordType, b.RecordType)
+	}
+	if a.Diff != b.Diff {
+		return strings.Compare(a.Diff, b.Diff)
+	}
+	return strings.Compare(a.ChangeType, b.ChangeType)
+}
+
+func parseChangeIdx(idx string) (int, bool) {
+	value, err := strconv.Atoi(idx)
+	return value, err == nil
 }
 
 type lampNameLookup struct {
