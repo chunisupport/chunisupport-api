@@ -53,7 +53,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `best_average_rating`: ベスト枠の平均レーティング（DECIMAL(6,4)）。
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
     - `last_played_at`: 最終プレイ日時。
-    - `overpower_value`, `overpower_percentage`: オーバーパワー関連の値。
+    - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `created_at`, `updated_at`: 作成日時、更新日時。
 
 #### `player_records`
@@ -168,3 +168,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000015**: `genres` テーブルに `sort_order` カラムを追加し、ジャンルの表示順を投入。
 - **000016**: `songs` テーブルに楽曲の読みを保持する `reading` カラムを追加。
 - **000017**: `honors` テーブルの `image_url` を空文字デフォルトの非NULLに変更し、称号のユニーク制約を `(name, honor_type_id, image_url)` へ変更。`sp` 称号は空文字の `name` と画像URLの組み合わせで一意に扱えるようにする。
+- **000018**: `players.overpower_percentage` カラムを削除。OVER POWER割合は保存値ではなく、レスポンス時点の最新マスタと未解禁設定から随時計算する。

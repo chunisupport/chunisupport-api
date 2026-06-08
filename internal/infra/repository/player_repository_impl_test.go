@@ -172,7 +172,6 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			class_emblem_base_id INTEGER NULL,
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
-			overpower_percentage REAL NULL,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)`,
@@ -210,9 +209,9 @@ func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, overpower_percentage, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, nil, now, now)
+			overpower_value, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, now, now)
 	require.NoError(t, err)
 
 	if !withHonors {

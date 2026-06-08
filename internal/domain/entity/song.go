@@ -8,22 +8,23 @@ import (
 // Charts フィールドは常に初期化された状態（最低でも空スライス）でなければなりません。
 // nil は許容されません。Song を構築する際は必ず Charts: []*Chart{} 以上の値を設定してください。
 type Song struct {
-	ID             int
-	DisplayID      string
-	Title          string
-	Reading        *string
-	Artist         string
-	GenreID        *int
-	BPM            *int
-	ReleasedAt     *time.Time
-	OfficialIdx    string
-	Jacket         *string
-	Charts         []*Chart
-	MaxChartConst  float64
-	IsMaxOPUnknown bool
-	IsWorldsend    bool
-	IsDeleted      bool
-	UpdatedAt      *time.Time
+	ID                   int
+	DisplayID            string
+	Title                string
+	Reading              *string
+	Artist               string
+	GenreID              *int
+	BPM                  *int
+	ReleasedAt           *time.Time
+	OfficialIdx          string
+	Jacket               *string
+	Charts               []*Chart
+	MaxChartConst        float64
+	IsMaxOPUnknown       bool
+	OpTargetDifficultyID int
+	IsWorldsend          bool
+	IsDeleted            bool
+	UpdatedAt            *time.Time
 }
 
 // NewSong は Charts を必ず非nilで初期化した Song を生成します。

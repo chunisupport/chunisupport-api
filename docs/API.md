@@ -107,7 +107,8 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | 監視向けにアプリケーション名を固定で返します |
+| `/` | GET | 不要 | 互換性のためアプリケーション名を固定で返します |
+| `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
 | `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
@@ -181,16 +182,22 @@
 
 ### GET `/`
 - **認証**: 不要
-- **CORS**:
-  - `https://new.chunithm-net.com` からの `GET` / `OPTIONS` を許可します。
-  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
-- **レスポンス**: 常に 200 OK で固定のアプリケーション名を返します（将来的に変更の可能性あり）。
+- **レスポンス**: 互換性のため、常に 200 OK で固定のアプリケーション名を返します。
 
 ```json
 {
   "app_name": "chunisupport-api"
 }
 ```
+
+### GET `/healthz`
+- **認証**: 不要
+- **CORS**:
+  - `https://new.chunithm-net.com` からの `GET` / `OPTIONS` を許可します。
+  - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
+- **チェック内容**: APIプロセスがHTTP応答できることのみを確認します。DBなどの依存サービスは確認しません。
+- **レスポンス**:
+  - 204 No Content: 空レスポンス
 
 ### GET `/health`
 - **認証**: APIトークン (ADMIN)
@@ -722,6 +729,8 @@ curl -X POST \
 | `order` | number \| null | | スロット内順序 |
 
 - **レスポンス**: 200 OK。登録結果 `PlayerDataResult` を返します。
+  - `summary.overpower_value` は通常楽曲レコードから再集計して保存されるOVER POWER値です。
+  - `summary.overpower_percentage` は登録処理時点の計算結果です。`players` テーブルには保存されず、プロフィール系レスポンスでは最新マスタデータとプレイヤーの未解禁設定（未解放/解放済みの譜面）を組み合わせて分母を再計算し、その分母を使って随時計算された `overpower_percent` が返ります。
 
 #### レスポンス例
 
@@ -743,8 +752,43 @@ curl -X POST \
     "worldsend_records_upserted": 120,
     "full_records_skipped": 0,
     "worldsend_records_skipped": 0,
-    "honors_skipped": 0
+    "honors_skipped": 0,
+    "full_records_actually_changed": 12,
+    "worldsend_records_actually_changed": 3
   },
+  "changes": [
+    {
+      "record_type": "full",
+      "change_type": "updated",
+      "idx": "2849",
+      "diff": "MASTER",
+      "before": {
+        "score": 990000,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
+      },
+      "after": {
+        "score": 1002345,
+        "clear_lamp": "BRAVE",
+        "combo_lamp": "full combo",
+        "full_chain": null
+      }
+    },
+    {
+      "record_type": "worldsend",
+      "change_type": "new",
+      "idx": "8001",
+      "diff": "WE",
+      "before": null,
+      "after": {
+        "score": 990000,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
+      }
+    }
+  ],
   "skipped_records": [
     {
       "record_type": "full",
@@ -763,10 +807,22 @@ curl -X POST \
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `summary` | object | プレイヤーサマリー情報 |
-| `counts` | object | 各種レコードの処理件数 |
+| `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
+| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は省略 |
 | `skipped_records` | array | スキップされたレコード情報（存在する場合） |
 
-> **Note**: 差分情報（変更前後の比較）は返却されません。差分を取得する場合は、登録前後でスコア一覧API（`GET /internal/users/:username`）を呼び出し、クライアント側で比較してください。
+**`changes` の要素スキーマ**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `record_type` | string | `full` または `worldsend` |
+| `change_type` | string | 未登録レコードは `new`、保存済みレコードの比較対象カラムが変化した場合は `updated` |
+| `idx` | string | 楽曲の公式インデックス |
+| `diff` | string | 通常譜面は大文字難易度名、WORLD'S END は入力値にかかわらず `WE` |
+| `before` | object \| null | 更新前状態。`change_type=new` では `null` |
+| `after` | object | 登録後状態 |
+
+`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
@@ -839,7 +895,7 @@ curl -X POST \
 
 #### レスポンス（200 OK）
 
-`/internal/me/register-data` と同じ `PlayerDataResult` を返します。
+`/internal/me/register-data` と同じ `PlayerDataResult` を返します。保存前状態との差分がある場合は `changes` も含まれます。
 
 #### 主なエラー
 
@@ -1221,6 +1277,8 @@ curl -X POST \
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`all`/`worldsend` のみを返します。
     - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+  - `player.overpower_value` は保存済みの楽曲OP合計です。
+  - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
 
 #### レスポンス例
 
@@ -1263,6 +1321,7 @@ curl -X POST \
         "score": 1009975,
         "rating": 16.45,
         "overpower": 86.21,
+        "overpower_percent": 99.6647,
         "img": "9f060e856cb7ad10",
         "clear_lamp": "ABSOLUTE",
         "combo_lamp": "ALL JUSTICE",
@@ -1395,8 +1454,10 @@ curl -X POST \
       "const": 14.5,
       "is_const_unknown": false,
       "score": 1009500,
+      "justice_count": null,
       "rating": 17.14,
       "overpower": 5.67,
+      "overpower_percent": 98.2857,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": "FULL COMBO",
@@ -1472,6 +1533,7 @@ curl -X POST \
       "score": 1009500,
       "rating": 17.14,
       "overpower": 5.67,
+      "overpower_percent": 98.2857,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": "FULL COMBO",
@@ -1489,6 +1551,7 @@ curl -X POST \
       "attribute": "狂",
       "notes": 2000,
       "score": 1000000,
+      "justice_count": null,
       "img": "https://example.com/jacket.png",
       "clear_lamp": "CLEAR",
       "combo_lamp": null,
@@ -1570,8 +1633,10 @@ curl -X POST \
 | `const` | number | 譜面定数 |
 | `is_const_unknown` | boolean | 譜面定数が不明か |
 | `score` | number | スコア |
+| `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `rating` | number | 単曲レーティング（譜面定数とスコアから計算） |
 | `overpower` | number | 単曲OVER POWER（譜面定数・スコア・コンボランプから計算） |
+| `overpower_percent` | number | 譜面別理論値OVER POWERに対する単曲OVER POWER達成割合（%） |
 | `img` | string | 楽曲画像ID |
 | `clear_lamp` | string \\| null | クリアランプ名称。未プレイ補完データは `null` |
 | `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
@@ -1591,6 +1656,7 @@ curl -X POST \
 | `attribute` | string \| null | WORLD'S END 属性 |
 | `notes` | number \| null | ノーツ数 |
 | `score` | number | スコア |
+| `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `img` | string | 楽曲画像ID |
 | `clear_lamp` | string \| null | クリアランプ名称。未プレイ補完データは `null` |
 | `combo_lamp` | string \| null | コンボランプ名称（マスタ値が「NONE」の場合は `null`） |
@@ -1642,6 +1708,7 @@ curl -X POST \
       "official_idx": "123",
       "maxop": 82.5,
       "is_maxop_unknown": false,
+      "op_target_difficulty": "MASTER",
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -1682,6 +1749,7 @@ curl -X POST \
 | `official_idx` | string | 公式インデックス |
 | `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
+| `op_target_difficulty` | string \| null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -1716,6 +1784,7 @@ curl -X POST \
   "official_idx": "123",
   "maxop": 82.5,
   "is_maxop_unknown": false,
+  "op_target_difficulty": "MASTER",
   "charts": {
     "BASIC": {
       "const": 3.0,
@@ -2322,7 +2391,7 @@ curl -X POST \
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -2637,6 +2706,7 @@ curl -X POST \
       "official_idx": "123",
       "maxop": 86.25,
       "is_maxop_unknown": false,
+      "op_target_difficulty": "MASTER",
       "charts": {
         "MASTER": {
           "const": 14.5,
@@ -2670,6 +2740,7 @@ curl -X POST \
 | `songs[].official_idx` | string | 公式インデックス |
 | `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `songs[].is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
+| `songs[].op_target_difficulty` | string\|null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |
@@ -2884,6 +2955,7 @@ curl -X POST \
         "score": 1009500,
         "rating": 17.14,
         "overpower": 5.67,
+        "overpower_percent": 98.2857,
         "img": "https://example.com/jacket.png",
         "clear_lamp": "CLEAR",
         "combo_lamp": "FULL COMBO",
@@ -3172,8 +3244,10 @@ interface PlayerRecordDTO {
   const: number;
   is_const_unknown: boolean;
   score: number;
+  justice_count: number | null;
   rating: number;
   overpower: number;
+  overpower_percent: number;
   img: string;
   clear_lamp: string | null;
   combo_lamp: string | null;  // マスタ値が「NONE」の場合はnull
@@ -3202,6 +3276,7 @@ interface WorldsendRecordDTO {
   attribute: string | null;       // WORLD'S END 属性（光、蔵、改、狂、etc.）
   notes: number | null;
   score: number;
+  justice_count: number | null;
   img: string;
   clear_lamp: string | null;
   combo_lamp: string | null;      // マスタ値が「NONE」の場合はnull
@@ -3228,6 +3303,7 @@ interface PlayerDataResult {
   imported_at: string;
   summary: PlayerDataSummary;
   counts: PlayerDataCounts;
+  changes?: PlayerDataRecordChange[];
   skipped_records: SkippedRecord[];
 }
 
@@ -3246,6 +3322,24 @@ interface PlayerDataCounts {
   full_records_skipped: number;
   worldsend_records_skipped: number;
   honors_skipped: number;
+  full_records_actually_changed: number;
+  worldsend_records_actually_changed: number;
+}
+
+interface PlayerDataRecordChange {
+  record_type: 'full' | 'worldsend';
+  change_type: 'new' | 'updated';
+  idx: string;
+  diff?: string;
+  before: PlayerDataRecordState | null;
+  after: PlayerDataRecordState;
+}
+
+interface PlayerDataRecordState {
+  score: number;
+  clear_lamp: string | null;
+  combo_lamp: string | null;
+  full_chain: string | null;
 }
 
 interface SkippedRecord {

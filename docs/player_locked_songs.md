@@ -23,7 +23,8 @@ OP計算では、プレイヤーが解禁済みの楽曲・譜面のみを計算
 管理対象外:
 
 - OP計算ロジック本体
-- `players.overpower_value` / `players.overpower_percentage` の再計算・保存
+- `players.overpower_value` の再計算・保存
+- API返却時の `overpower_percent` 分母計算への反映
 - フロントエンド
 - 未解禁状態の履歴管理
 - 論理削除

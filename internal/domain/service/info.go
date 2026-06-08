@@ -19,3 +19,17 @@ const (
 	// comboLampFullCombo は FULL COMBO のコンボランプIDです。
 	comboLampFullCombo = 2
 )
+
+var difficultyNamesByID = map[int]string{
+	DifficultyIDBasic:    "BASIC",
+	DifficultyIDAdvanced: "ADVANCED",
+	DifficultyIDExpert:   "EXPERT",
+	DifficultyIDMaster:   "MASTER",
+	DifficultyIDUltima:   "ULTIMA",
+}
+
+// DifficultyNameByID は難易度IDに対応する難易度名を返します。
+func DifficultyNameByID(difficultyID int) (string, bool) {
+	name, ok := difficultyNamesByID[difficultyID]
+	return name, ok
+}

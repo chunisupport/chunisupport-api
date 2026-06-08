@@ -28,12 +28,18 @@ func CalcOverpowerSummary(records []OverpowerRecord, maxOverpowerTotal float64) 
 	}
 
 	value := max(roundToScale(totalOverpower, 3), 0.0)
-	percent := 0.0
-	if maxOverpowerTotal > 0 {
-		percent = min(max(roundToScale(totalOverpower/maxOverpowerTotal*100, 4), 0.0), 100.0)
-	}
+	percent := CalcOverpowerPercent(totalOverpower, maxOverpowerTotal)
 
 	return value, percent
+}
+
+// CalcOverpowerPercent は保存済みOVER POWER値と現在の最大OP合計から達成割合を計算します。
+func CalcOverpowerPercent(overpowerValue float64, maxOverpowerTotal float64) float64 {
+	if maxOverpowerTotal <= 0 {
+		return 0.0
+	}
+
+	return min(max(roundToScale(overpowerValue/maxOverpowerTotal*100, 4), 0.0), 100.0)
 }
 
 func roundToScale(value float64, scale int) float64 {

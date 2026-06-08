@@ -37,13 +37,14 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	imgURL := "https://example.com/v1jacket.jpg"
 
 	song := &entity.Song{
-		DisplayID:      "v1test1234567890",
-		Title:          "V1テスト楽曲",
-		Artist:         "V1アーティスト",
-		GenreID:        &genreID,
-		BPM:            &bpm,
-		Jacket:         &imgURL,
-		IsMaxOPUnknown: true,
+		DisplayID:            "v1test1234567890",
+		Title:                "V1テスト楽曲",
+		Artist:               "V1アーティスト",
+		GenreID:              &genreID,
+		BPM:                  &bpm,
+		Jacket:               &imgURL,
+		IsMaxOPUnknown:       true,
+		OpTargetDifficultyID: 4,
 	}
 
 	notes1Value := 600
@@ -95,6 +96,10 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
 		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+	}
+
+	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "MASTER" {
+		t.Errorf("OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "MASTER")
 	}
 
 	// Charts マップのキーが存在するか確認

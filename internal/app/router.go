@@ -124,15 +124,16 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	goalRepo := infra.NewGoalRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
+	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	tm := transaction.NewTransactionManager(db)
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider)
 	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
-	songUsecase := usecase.NewSongUsecase(songRepo, masterCache, tm, db)
+	songUsecase := usecase.NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, db, overpowerDenominatorProvider)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
@@ -177,17 +178,17 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}
 
 	// ルートの設定
-	rootCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-	e.OPTIONS("/", func(c echo.Context) error {
+	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	e.OPTIONS("/healthz", func(c echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
-	}, rootCORS)
-	// TODO: 外部向けhealthエンドポイントを作る
+	}, healthzCORS)
+	e.GET("/healthz", handleExternalHealth, healthzCORS)
 	e.GET("/", func(c echo.Context) error {
-		// 将来的に変更の可能性あり
+		// 互換性のためアプリケーション名を返すルートは残します。
 		return c.JSON(http.StatusOK, map[string]string{
 			"app_name": "chunisupport-api",
 		})
-	}, rootCORS)
+	})
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
@@ -421,8 +422,7 @@ func newExternalCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
 }
 
 func isExternalCORSPath(path string) bool {
-	// TODO: 前者は外部向けhealthエンドポイントに変えるつもり
-	return path == "/" || path == "/internal/player-data/temp"
+	return path == "/healthz" || path == "/internal/player-data/temp"
 }
 
 func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddleware.Skipper) echoMiddleware.CORSConfig {
@@ -450,6 +450,12 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 		},
 		MaxAge: cfg.CORS.MaxAge,
 	}
+}
+
+// handleExternalHealth は外部監視向けの軽量な死活チェック結果を返します。
+// 依存サービスの状態を返さないことで、外部公開しても内部構成を推測されにくくします。
+func handleExternalHealth(c echo.Context) error {
+	return c.NoContent(http.StatusNoContent)
 }
 
 // handleHealth はヘルスチェックエンドポイントのハンドラを返します
