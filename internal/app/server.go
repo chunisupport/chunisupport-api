@@ -23,20 +23,10 @@ type Server struct {
 	cfg               config.Config
 	masterCache       *masterdata.Cache
 	staticMasterCache *masterdata.StaticCache
-	echoLogWriter     io.WriteCloser
 }
 
 // NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter) *Server {
-	// Echoのロガーを設定
-	var echoLogWriter io.WriteCloser
-	echoLogWriterResult, err := SetupEchoLogger(cfg)
-	if err != nil {
-		slog.Error("Failed to setup echo logger", "error", err)
-	} else {
-		echoLogWriter = echoLogWriterResult
-	}
-
+func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *Server {
 	return &Server{
 		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
 		db:                db,
@@ -44,7 +34,6 @@ func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		cfg:               cfg,
 		masterCache:       masterCache,
 		staticMasterCache: staticMasterCache,
-		echoLogWriter:     echoLogWriter,
 	}
 }
 
@@ -68,14 +57,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.echo != nil {
 		if err := s.echo.Shutdown(ctx); err != nil {
 			slog.Error("Failed to shutdown echo server", "error", err)
-			shutdownErrs = append(shutdownErrs, err)
-		}
-	}
-
-	// Echoログファイルのクローズ
-	if s.echoLogWriter != nil {
-		if err := s.echoLogWriter.Close(); err != nil {
-			slog.Error("Failed to close echo log file", "error", err)
 			shutdownErrs = append(shutdownErrs, err)
 		}
 	}

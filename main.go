@@ -31,26 +31,35 @@ func run() int {
 	}
 
 	// アプリのロガーを設定
-	logLevel := logger.ParseLogLevel(cfg.LogLevel)
-	var appLogger *slog.Logger
-	var loggerHandler *logger.Handler
-	if appLoggerWithFile, err := logger.NewHandlerWithFile(cfg.LogPaths.App, logLevel); err == nil {
-		loggerHandler = appLoggerWithFile
-		appLogger = slog.New(loggerHandler)
-	} else {
-		slog.Error("Failed to create app logger with file", "error", err)
-		loggerHandler = logger.NewHandler(logLevel)
-		appLogger = slog.New(loggerHandler)
+	loggerHandler, err := logger.NewHandler(cfg.Logging)
+	if err != nil {
+		slog.Error("Failed to create app logger", "error", err)
+		return 1
 	}
-	slog.SetDefault(appLogger)
+	accessLogWriter, err := logger.NewAccessLogWriter(cfg.Logging)
+	if err != nil {
+		slog.Error("Failed to create access logger", "error", err)
+		if closeErr := loggerHandler.Close(); closeErr != nil {
+			slog.Error("Failed to close app logger", "error", closeErr)
+		}
+		return 1
+	}
+	logManager := &app.LogManager{
+		AppHandler:   loggerHandler,
+		AccessWriter: accessLogWriter,
+	}
+	slog.SetDefault(slog.New(loggerHandler))
 	defer func() {
-		if err := loggerHandler.Close(); err != nil {
-			slog.Error("Failed to close logger", "error", err)
+		if err := logManager.Close(); err != nil {
+			slog.Error("Failed to close log manager", "error", err)
 		}
 	}()
 
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	reloadCh := make(chan os.Signal, 1)
+	app.NotifyLogReload(reloadCh)
+	defer signal.Stop(reloadCh)
 
 	database, err := db.ConnectWithRetry(signalCtx, cfg.Database.DbConfig)
 	if err != nil {
@@ -125,39 +134,45 @@ func run() int {
 		return 0
 	}
 
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter)
+	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
 
 	serverErrCh := make(chan error, 1)
 	go func() {
 		serverErrCh <- server.Start()
 	}()
 
-	select {
-	case <-signalCtx.Done():
-		slog.Info("Starting graceful shutdown")
-	case err := <-serverErrCh:
-		if err != nil {
-			slog.Error("Server stopped with error", "error", err)
-			if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
-				slog.Error("Server shutdown after start failure failed", "error", shutdownErr)
+	for {
+		select {
+		case <-signalCtx.Done():
+			slog.Info("Starting graceful shutdown")
+			if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
+				slog.Error("Server shutdown failed", "error", err)
+				return 1
 			}
-			return 1
+			slog.Info("Graceful shutdown completed")
+			return 0
+		case <-reloadCh:
+			if err := logManager.ReopenAll(); err != nil {
+				slog.Error("Failed to reopen logs", "error", err)
+			} else {
+				slog.Info("Logs reopened")
+			}
+		case err := <-serverErrCh:
+			if err != nil {
+				slog.Error("Server stopped with error", "error", err)
+				if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+					slog.Error("Server shutdown after start failure failed", "error", shutdownErr)
+				}
+				return 1
+			}
+			slog.Info("Server stopped")
+			if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+				slog.Error("Server shutdown after stop failed", "error", shutdownErr)
+				return 1
+			}
+			return 0
 		}
-		slog.Info("Server stopped")
-		if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
-			slog.Error("Server shutdown after stop failed", "error", shutdownErr)
-			return 1
-		}
-		return 0
 	}
-
-	if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
-		slog.Error("Server shutdown failed", "error", err)
-		return 1
-	}
-
-	slog.Info("Graceful shutdown completed")
-	return 0
 }
 
 func shutdownServer(server *app.Server, shutdownTimeoutSeconds int) error {

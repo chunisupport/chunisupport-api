@@ -1,6 +1,9 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,6 +23,151 @@ func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestNormalizeAndValidateLoggingConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		logging    Logging
+		loggingSet bool
+		wantErr    bool
+	}{
+		{
+			name: "標準出力とファイル出力が指定されていれば通る",
+			logging: Logging{
+				Level:      "info",
+				AppFile:    ".log/app.log",
+				AccessFile: ".log/access.log",
+				Stdout:     true,
+				stdoutSet:  true,
+			},
+			loggingSet: true,
+			wantErr:    false,
+		},
+		{
+			name: "標準出力のみでも通る",
+			logging: Logging{
+				Level:     "debug",
+				Stdout:    true,
+				stdoutSet: true,
+			},
+			loggingSet: true,
+			wantErr:    false,
+		},
+		{
+			name: "loggingセクションがなければエラー",
+			logging: Logging{
+				Level:     "info",
+				Stdout:    true,
+				stdoutSet: true,
+			},
+			loggingSet: false,
+			wantErr:    true,
+		},
+		{
+			name: "stdout未指定ならエラー",
+			logging: Logging{
+				Level: "info",
+			},
+			loggingSet: true,
+			wantErr:    true,
+		},
+		{
+			name: "不正なログレベルならエラー",
+			logging: Logging{
+				Level:     "warning",
+				Stdout:    true,
+				stdoutSet: true,
+			},
+			loggingSet: true,
+			wantErr:    true,
+		},
+		{
+			name: "stdout=falseでapp_fileが空ならエラー",
+			logging: Logging{
+				Level:      "info",
+				AccessFile: ".log/access.log",
+				Stdout:     false,
+				stdoutSet:  true,
+			},
+			loggingSet: true,
+			wantErr:    true,
+		},
+		{
+			name: "stdout=falseでaccess_fileが空ならエラー",
+			logging: Logging{
+				Level:     "info",
+				AppFile:   ".log/app.log",
+				Stdout:    false,
+				stdoutSet: true,
+			},
+			loggingSet: true,
+			wantErr:    true,
+		},
+		{
+			name: "表記差がある同一パスならエラー",
+			logging: Logging{
+				Level:      "info",
+				AppFile:    filepath.Join(".", "log", "app.log"),
+				AccessFile: filepath.Join("log", "app.log"),
+				Stdout:     true,
+				stdoutSet:  true,
+			},
+			loggingSet: true,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := normalizeAndValidateLoggingConfig(&tt.logging, tt.loggingSet)
+			assert.Equal(t, tt.wantErr, err != nil)
+		})
+	}
+}
+
+func TestConfigUnmarshalJSON_LoggingStdoutSpecified(t *testing.T) {
+	var cfg Config
+	err := json.Unmarshal([]byte(`{
+		"app_port": 3000,
+		"logging": {
+			"level": "info",
+			"stdout": false,
+			"app_file": ".log/app.log",
+			"access_file": ".log/access.log"
+		}
+	}`), &cfg)
+
+	require.NoError(t, err)
+	assert.True(t, cfg.loggingSet)
+	assert.True(t, cfg.Logging.stdoutSet)
+	assert.False(t, cfg.Logging.Stdout)
+}
+
+func TestConfigUnmarshalJSON_LoggingStdoutMissing(t *testing.T) {
+	var cfg Config
+	err := json.Unmarshal([]byte(`{
+		"app_port": 3000,
+		"logging": {
+			"level": "info"
+		}
+	}`), &cfg)
+
+	require.NoError(t, err)
+	assert.True(t, cfg.loggingSet)
+	assert.False(t, cfg.Logging.stdoutSet)
+}
+
+func TestSameLogPath_ResolvesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	realDir := filepath.Join(dir, "real")
+	require.NoError(t, os.Mkdir(realDir, 0750))
+	linkDir := filepath.Join(dir, "link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlinkを作成できない環境のためスキップします: %v", err)
+	}
+
+	assert.True(t, sameLogPath(filepath.Join(realDir, "app.log"), filepath.Join(linkDir, "app.log")))
 }
 
 func TestNormalizeAndValidateDatabasePoolConfig_ZeroValues(t *testing.T) {

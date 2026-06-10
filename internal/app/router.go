@@ -6,10 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
@@ -89,7 +86,7 @@ type Handlers struct {
 }
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
-// echoLogWriterはnilの場合があります（ログ設定失敗時）
+// echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
 func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
@@ -470,49 +467,4 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 
 		return c.NoContent(http.StatusOK)
 	}
-}
-
-// echoLogWriter はEchoログ出力用のWriterで、ファイルハンドルのライフサイクル管理が可能
-type echoLogWriter struct {
-	writer io.Writer
-	file   *os.File
-}
-
-// Write はio.Writerインターフェースを実装
-func (w *echoLogWriter) Write(p []byte) (n int, err error) {
-	return w.writer.Write(p)
-}
-
-// Close はファイルハンドルをクローズ
-func (w *echoLogWriter) Close() error {
-	if w.file != nil {
-		return w.file.Close()
-	}
-	return nil
-}
-
-// SetupEchoLogger はEchoのロガーを設定します。
-// 戻り値のio.WriteCloserは呼び出し元でClose()を呼ぶ必要があります。
-func SetupEchoLogger(cfg config.Config) (io.WriteCloser, error) {
-	// ログディレクトリが存在しない場合は作成
-	if err := os.MkdirAll(cfg.LogPaths.Echo, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-
-	// 現在時刻からファイル名を生成
-	timestamp := time.Now().Format("20060102-150405")
-	filename := filepath.Join(cfg.LogPaths.Echo, fmt.Sprintf("%s.log", timestamp))
-
-	// ファイルを開く（存在しない場合は作成、存在する場合は追記）
-	// #nosec G304 -- LogPaths.Echo comes from trusted configuration
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	// 標準出力とファイルの両方にログを出力
-	return &echoLogWriter{
-		writer: io.MultiWriter(os.Stdout, file),
-		file:   file,
-	}, nil
 }

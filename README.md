@@ -13,6 +13,7 @@
 
 - [API仕様書（内部/公開）](docs/API.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
+- [logrotate設定手順](docs/logrotate.md)
 
 ## 技術スタック
 
@@ -53,10 +54,11 @@
    ```json
    {
       "app_port": 3000,
-      "log_level": "debug",
-      "log_paths": {
-         "app": ".log/app",
-         "echo": ".log/echo"
+      "logging": {
+         "level": "debug",
+         "app_file": ".log/app.log",
+         "access_file": ".log/access.log",
+         "stdout": true
       },
       "shutdown_timeout_seconds": 20,
       "cors": {
