@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年05月28日
+**最終更新日**: 2026年06月11日
 
 ## ベースURLと環境
 
@@ -164,6 +164,7 @@
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
+| `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
 | `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
@@ -2789,6 +2790,44 @@ curl -X POST \
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### PUT `/v1/songs`
+- **認証**: APIトークン必須
+- **権限**: EDITOR または ADMIN 権限が必要
+- **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
+- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
+
+```json
+[
+  {
+    "id": "0123456789abcdef",
+    "title": "楽曲タイトル",
+    "reading": "ガッキョクタイトル",
+    "artist": "アーティスト名",
+    "genre": "POPS & ANIME",
+    "bpm": 180,
+    "released_at": "2024-01-01",
+    "jacket": "jacket_img_name",
+    "charts": {
+      "MASTER": {
+        "const": 14.5,
+        "is_const_unknown": false,
+        "notes": 1234,
+        "notes_designer": "譜面作者A"
+      }
+    }
+  }
+]
+```
+
+- **レスポンス**: 204 No Content（成功時）
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 400 Bad Request (`validation_failed`): バリデーションエラー
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### GET `/v1/songs/worldsend`
 - **認証**: APIトークン必須

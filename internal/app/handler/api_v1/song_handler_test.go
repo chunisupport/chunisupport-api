@@ -1,13 +1,31 @@
 package api_v1
 
 import (
+	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type testValidator struct {
+	validator *validator.Validate
+}
+
+func (tv *testValidator) Validate(i any) error {
+	return tv.validator.Struct(i)
+}
 
 // TestConvertToV1SongDTO はV1SongHandlerのconvertToV1SongDTOメソッドをテストします。
 func TestConvertToV1SongDTO(t *testing.T) {
@@ -150,6 +168,86 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Error("ULTIMA key not found in map")
 	} else if ultimaChart != nil {
 		t.Error("ULTIMA chart should be nil")
+	}
+}
+
+func TestV1SongHandler_UpdateSongs(t *testing.T) {
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+
+	newContext := func(body string) echo.Context {
+		req := httptest.NewRequest(http.MethodPut, "/v1/songs", bytes.NewBufferString(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+		return e.NewContext(req, rec)
+	}
+
+	tests := []struct {
+		name             string
+		body             string
+		wantStatus       int
+		wantErrCode      string
+		wantUsecaseCall  bool
+		assertUsecaseReq func(t *testing.T, requests []*api_internal.UpdateSongRequest)
+	}{
+		{
+			name:            "正常な配列で204を返す",
+			body:            `[{"id":"1234567890abcdef","title":"テスト楽曲","artist":"テストアーティスト","charts":{"MASTER":{"const":14.5,"is_const_unknown":false,"notes":1234,"notes_designer":"譜面作者A"}}}]`,
+			wantStatus:      http.StatusNoContent,
+			wantUsecaseCall: true,
+			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
+				t.Helper()
+				require.Len(t, requests, 1)
+				assert.Equal(t, "1234567890abcdef", requests[0].DisplayID)
+				require.Contains(t, requests[0].Charts, "MASTER")
+				assert.InDelta(t, 14.5, requests[0].Charts["MASTER"].Const, 0.0001)
+			},
+		},
+		{
+			name:        "トップレベルnullはvalidation_failedを返す",
+			body:        `null`,
+			wantErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:        "不正なdisplay_idはvalidation_failedを返す",
+			body:        `[{"id":"short","title":"テスト楽曲","artist":"テストアーティスト"}]`,
+			wantErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:        "chartsのnull要素はvalidation_failedを返す",
+			body:        `[{"id":"1234567890abcdef","title":"テスト楽曲","artist":"テストアーティスト","charts":{"MASTER":null}}]`,
+			wantErrCode: apierror.CodeValidationFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			usecaseCalled := false
+			handler := NewV1SongHandler(&testutil.MockSongUsecase{
+				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+					usecaseCalled = true
+					if tt.assertUsecaseReq != nil {
+						tt.assertUsecaseReq(t, requests)
+					}
+					return nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+
+			c := newContext(tt.body)
+			rec := c.Response().Writer.(*httptest.ResponseRecorder)
+
+			err := handler.UpdateSongs(c)
+
+			if tt.wantErrCode == "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantStatus, rec.Code)
+			} else {
+				var apiErr *apierror.APIError
+				require.ErrorAs(t, err, &apiErr)
+				assert.Equal(t, tt.wantErrCode, apiErr.Code)
+			}
+			assert.Equal(t, tt.wantUsecaseCall, usecaseCalled)
+		})
 	}
 }
 
