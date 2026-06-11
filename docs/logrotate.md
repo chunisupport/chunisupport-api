@@ -21,11 +21,13 @@ Linux 環境で `chunisupport-api` のアプリログとアクセスログを `l
 
 ## ログディレクトリ作成
 
-アプリケーション実行ユーザーを `chunisupport` とする例です。
+アプリケーション実行ユーザーとグループは、実際の環境に合わせて `<app-user>` / `<app-group>` を置き換えてください。
 
 ```bash
-sudo install -d -o chunisupport -g chunisupport -m 0750 /var/log/chunisupport-api
+sudo install -d -o <app-user> -g <app-group> -m 0750 /var/log/chunisupport-api
 ```
+
+`<app-user>` / `<app-group>` には、systemd の `User=` / `Group=` で指定しているユーザーとグループ、またはアプリケーションを実行している既存のユーザーとグループを指定します。
 
 ## systemd設定
 
@@ -55,12 +57,20 @@ sudo systemctl daemon-reload
     compress
     delaycompress
     dateext
-    create 0640 chunisupport chunisupport
+    create 0640 <app-user> <app-group>
     sharedscripts
     postrotate
         systemctl reload chunisupport-api >/dev/null 2>&1 || true
     endscript
 }
+```
+
+`create` のユーザーとグループには、存在するユーザーを指定してください。`unknown user '<app-user>'` が出る場合は、指定したユーザーが存在しないため、実行ユーザーに合わせて変更します。
+
+設定ファイル内に `su <app-user> <app-group>` を書いている場合も同様に、存在するユーザーへ変更してください。
+
+```conf
+    su <app-user> <app-group>
 ```
 
 `copytruncate` は使用しません。ローテート後に `systemctl reload` でアプリケーションへ `SIGHUP` を送り、アプリケーション側でログファイルを再オープンします。
