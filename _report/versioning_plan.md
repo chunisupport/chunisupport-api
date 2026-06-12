@@ -49,7 +49,7 @@ go build -ldflags "-X 'github.com/chunisupport/chunisupport-api/internal/info.Ve
 }
 ```
 
-### B. 管理者・開発用 (`GET /health` または `/internal/me`)
+### B. 管理者・開発用 (`GET /health`)
 認証済みの管理者のみがアクセスできるエンドポイントでは、デバッグに必要な全情報を公開します。
 
 **レスポンス例**:
