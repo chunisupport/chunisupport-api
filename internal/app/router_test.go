@@ -154,6 +154,28 @@ func TestHandleRoot_公開情報としてビルド日だけを返す(t *testing.
 	assert.NotContains(t, response, "revision")
 }
 
+func TestHandleAdminBuildInfo_APIコミットハッシュを返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/admin/build-info", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handleAdminBuildInfo(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, info.Name, response["app_name"])
+	assert.Equal(t, info.BuildDate, response["build_date"])
+	assert.Equal(t, info.Revision, response["commit_hash"])
+	assert.Equal(t, runtime.Version(), response["go_version"])
+}
+
 func TestHandleHealth_DB接続とビルド識別子を返す(t *testing.T) {
 	// Given
 	database := sqlx.MustConnect("sqlite", ":memory:")

@@ -115,6 +115,7 @@
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
+| `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -215,6 +216,31 @@
   "go_version": "go1.26.4"
 }
 ```
+
+---
+
+## 管理者向け情報エンドポイント
+
+### GET `/internal/admin/build-info`
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: 管理者画面で表示するAPIのビルド情報を取得します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "app_name": "chunisupport-api",
+  "build_date": "20240528",
+  "commit_hash": "a1b2c3d",
+  "go_version": "go1.26.4"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `app_name` | string | APIアプリケーション名 |
+| `build_date` | string | ビルド日 |
+| `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
+| `go_version` | string | APIバイナリのGoバージョン |
 
 ---
 

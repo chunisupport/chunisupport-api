@@ -294,6 +294,12 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
 	}
 
+	adminGroup := internal.Group("/admin")
+	adminGroup.Use(firebaseAuthStrict, requireAdmin)
+	{
+		adminGroup.GET("/build-info", handleAdminBuildInfo)
+	}
+
 	// api.chunisupport.net/internal/honors
 	honorsGroup := internal.Group("/honors")
 	honorsGroup.Use(firebaseAuthStrict, requireAdmin)
@@ -456,6 +462,16 @@ func handleRoot(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"app_name":   info.Name,
 		"build_date": info.BuildDate,
+	})
+}
+
+// handleAdminBuildInfo は管理者画面向けにAPIのビルド情報を返します。
+func handleAdminBuildInfo(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":    info.Name,
+		"build_date":  info.BuildDate,
+		"commit_hash": info.Revision,
+		"go_version":  runtime.Version(),
 	})
 }
 

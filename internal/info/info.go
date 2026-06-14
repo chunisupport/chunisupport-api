@@ -70,8 +70,8 @@ const (
 )
 
 var (
-	BuildDate = "dev" // ビルド日: YYYYMMDD
-	Revision  = "dev" // Git短縮ハッシュ: a1b2c3d
+	BuildDate = "dev"  // ビルド日: YYYYMMDD
+	Revision  = "none" // Git短縮ハッシュ: a1b2c3d。開発起動時はnone
 )
 
 // 対応アプリバージョン設定

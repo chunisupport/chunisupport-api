@@ -8,7 +8,7 @@ import (
 
 func TestBuildIdentifiers_DefaultDev(t *testing.T) {
 	assert.Equal(t, "dev", BuildDate)
-	assert.Equal(t, "dev", Revision)
+	assert.Equal(t, "none", Revision)
 }
 
 func TestIsKnownAccountType(t *testing.T) {
