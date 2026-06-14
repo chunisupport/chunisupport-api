@@ -2,6 +2,8 @@ package api_v1
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -48,61 +50,61 @@ func TestToV1SongDTO(t *testing.T) {
 
 	// アサーション
 	if dto == nil {
-		t.Fatal("ToV1SongDTO returned nil")
+		require.Fail(t, "ToV1SongDTO returned nil")
 	}
 
 	if dto.DisplayID != "test123456789012" {
-		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
+		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
 	}
 
 	if dto.Title != "テスト楽曲" {
-		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
+		assert.Failf(t, "アサーション失敗", "Title = %v, want %v", dto.Title, "テスト楽曲")
 	}
 
 	if dto.Reading == nil || *dto.Reading != "ブイワンテストガッキョク" {
-		t.Errorf("Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
+		assert.Failf(t, "アサーション失敗", "Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
 	}
 
 	if dto.Artist != "テストアーティスト" {
-		t.Errorf("Artist = %v, want %v", dto.Artist, "テストアーティスト")
+		assert.Failf(t, "アサーション失敗", "Artist = %v, want %v", dto.Artist, "テストアーティスト")
 	}
 
 	// Genre は *string なので null チェック
 	if dto.Genre == nil {
 		t.Error("Genre is nil, want niconico")
 	} else if *dto.Genre != "niconico" {
-		t.Errorf("Genre = %v, want %v", *dto.Genre, "niconico")
+		assert.Failf(t, "アサーション失敗", "Genre = %v, want %v", *dto.Genre, "niconico")
 	}
 
 	if dto.BPM == nil || *dto.BPM != 200 {
-		t.Errorf("BPM = %v, want %v", dto.BPM, 200)
+		assert.Failf(t, "アサーション失敗", "BPM = %v, want %v", dto.BPM, 200)
 	}
 
 	// Release は *string で "YYYY-MM-DD" 形式
 	if dto.Release == nil {
 		t.Error("Release is nil")
 	} else if *dto.Release != "2023-12-31" {
-		t.Errorf("Release = %v, want %v", *dto.Release, "2023-12-31")
+		assert.Failf(t, "アサーション失敗", "Release = %v, want %v", *dto.Release, "2023-12-31")
 	}
 
 	// Jacket (旧 Img)
 	if dto.Jacket == nil {
 		t.Error("Jacket is nil")
 	} else if *dto.Jacket != "https://example.com/v1jacket.jpg" {
-		t.Errorf("Jacket = %v, want %v", *dto.Jacket, "https://example.com/v1jacket.jpg")
+		assert.Failf(t, "アサーション失敗", "Jacket = %v, want %v", *dto.Jacket, "https://example.com/v1jacket.jpg")
 	}
 
 	if dto.MaxOP != 90 {
-		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90.0)
+		assert.Failf(t, "アサーション失敗", "MaxOP = %v, want %v", dto.MaxOP, 90.0)
 	}
 
 	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
-		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
 
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "ULTIMA" {
-		t.Errorf("OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "ULTIMA")
+		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "ULTIMA")
 	}
 
 	// Charts は空の map として初期化される
@@ -117,12 +119,12 @@ func TestToV1ChartDTO(t *testing.T) {
 	notesValue := 999
 	notesObj, err := notes.NewNotes(notesValue)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed: %v", err)
+		require.Failf(t, "前提条件失敗", "notes.NewNotes failed: %v", err)
 	}
 
 	chartConst, err := chartconstant.NewChartConstant(14.9)
 	if err != nil {
-		t.Fatalf("chartconstant.NewChartConstant failed: %v", err)
+		require.Failf(t, "前提条件失敗", "chartconstant.NewChartConstant failed: %v", err)
 	}
 
 	chart := &entity.Chart{
@@ -138,26 +140,26 @@ func TestToV1ChartDTO(t *testing.T) {
 
 	// アサーション
 	if dto == nil {
-		t.Fatal("ToV1ChartDTO returned nil")
+		require.Fail(t, "ToV1ChartDTO returned nil")
 	}
 
 	if dto.Const != chartConst {
-		t.Errorf("Const = %v, want %v", dto.Const, chartConst)
+		assert.Failf(t, "アサーション失敗", "Const = %v, want %v", dto.Const, chartConst)
 	}
 
 	if dto.IsConstUnknown != true {
-		t.Errorf("IsConstUnknown = %v, want %v", dto.IsConstUnknown, true)
+		assert.Failf(t, "アサーション失敗", "IsConstUnknown = %v, want %v", dto.IsConstUnknown, true)
 	}
 
 	if dto.Notes == nil {
 		t.Error("Notes is nil")
 	} else if *dto.Notes != 999 {
-		t.Errorf("Notes = %v, want %v", *dto.Notes, 999)
+		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", *dto.Notes, 999)
 	}
 	if dto.NotesDesigner == nil {
 		t.Error("NotesDesigner is nil")
 	} else if *dto.NotesDesigner != "譜面作者B" {
-		t.Errorf("NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者B")
+		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者B")
 	}
 }
 
@@ -194,59 +196,59 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 	// JSONマーシャル
 	jsonBytes, err := json.Marshal(v1SongDTO)
 	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
+		require.Failf(t, "前提条件失敗", "json.Marshal failed: %v", err)
 	}
 
 	jsonString := string(jsonBytes)
 
 	if !containsString(jsonString, `"maxop":85`) {
-		t.Errorf("JSON should contain maxop field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain maxop field, got: %s", jsonString)
 	}
 
 	// is_maxop_unknown がJSONに含まれることを確認
 	if !containsString(jsonString, `"is_maxop_unknown":`) {
-		t.Errorf("JSON should contain is_maxop_unknown field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain is_maxop_unknown field, got: %s", jsonString)
 	}
 
 	if !containsString(jsonString, `"op_target_difficulty":"EXPERT"`) {
-		t.Errorf("JSON should contain op_target_difficulty field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain op_target_difficulty field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
 	if !containsString(jsonString, `"release":"2024-01-15"`) {
-		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'release' field, got: %s", jsonString)
 	}
 
 	if !containsString(jsonString, `"reading":"ブイワンテスト"`) {
-		t.Errorf("JSON should contain reading field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
 	}
 
 	// 全ての難易度キーが含まれることを確認
 	if !containsString(jsonString, `"BASIC"`) {
-		t.Errorf("JSON should contain 'BASIC' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'BASIC' key, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"ADVANCED"`) {
-		t.Errorf("JSON should contain 'ADVANCED' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED' key, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"EXPERT"`) {
-		t.Errorf("JSON should contain 'EXPERT' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'EXPERT' key, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"MASTER"`) {
-		t.Errorf("JSON should contain 'MASTER' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'MASTER' key, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"ULTIMA"`) {
-		t.Errorf("JSON should contain 'ULTIMA' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA' key, got: %s", jsonString)
 	}
 
 	// 譜面がない難易度はnullになることを確認
 	if !containsString(jsonString, `"ADVANCED":null`) {
-		t.Errorf("JSON should contain 'ADVANCED':null, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED':null, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"MASTER":null`) {
-		t.Errorf("JSON should contain 'MASTER':null, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'MASTER':null, got: %s", jsonString)
 	}
 	if !containsString(jsonString, `"ULTIMA":null`) {
-		t.Errorf("JSON should contain 'ULTIMA':null, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA':null, got: %s", jsonString)
 	}
 
 	// charts内のキー順序を確認（BASIC→ADVANCED→EXPERT→MASTER→ULTIMA の順）
@@ -258,11 +260,11 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 	ultimaIdx := indexOfString(chartsJSON, `"ULTIMA"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 || ultimaIdx == -1 {
-		t.Fatalf("Missing difficulty keys in JSON: %s", jsonString)
+		require.Failf(t, "前提条件失敗", "Missing difficulty keys in JSON: %s", jsonString)
 	}
 
 	if !(basicIdx < advancedIdx && advancedIdx < expertIdx && expertIdx < masterIdx && masterIdx < ultimaIdx) {
-		t.Errorf("Charts keys are not in correct order (BASIC→ADVANCED→EXPERT→MASTER→ULTIMA), got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "Charts keys are not in correct order (BASIC→ADVANCED→EXPERT→MASTER→ULTIMA), got: %s", jsonString)
 	}
 }
 

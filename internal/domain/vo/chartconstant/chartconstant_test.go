@@ -84,16 +84,16 @@ func TestChartConstantScan(t *testing.T) {
 
 			// Then
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+				require.Failf(t, "前提条件失敗", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				if err == nil || err.Error() != tt.expectedErr {
-					t.Fatalf("error = %v, want %q", err, tt.expectedErr)
+					require.Failf(t, "前提条件失敗", "error = %v, want %q", err, tt.expectedErr)
 				}
 				return
 			}
 			if got != tt.expected {
-				t.Fatalf("got = %v, want %v", got, tt.expected)
+				require.Failf(t, "前提条件失敗", "got = %v, want %v", got, tt.expected)
 			}
 		})
 	}
@@ -131,16 +131,16 @@ func TestChartConstantUnmarshalJSON(t *testing.T) {
 
 			// Then
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+				require.Failf(t, "前提条件失敗", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				if err == nil || err.Error() != tt.expectedErr {
-					t.Fatalf("error = %v, want %q", err, tt.expectedErr)
+					require.Failf(t, "前提条件失敗", "error = %v, want %q", err, tt.expectedErr)
 				}
 				return
 			}
 			if got != tt.expected {
-				t.Fatalf("got = %v, want %v", got, tt.expected)
+				require.Failf(t, "前提条件失敗", "got = %v, want %v", got, tt.expected)
 			}
 		})
 	}

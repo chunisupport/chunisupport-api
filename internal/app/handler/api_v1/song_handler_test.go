@@ -69,11 +69,11 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	notes2Value := 1200
 	notes1, err := notes.NewNotes(notes1Value)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes1Value: %v", err)
+		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes1Value: %v", err)
 	}
 	notes2, err := notes.NewNotes(notes2Value)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes2Value: %v", err)
+		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes2Value: %v", err)
 	}
 
 	charts := []*entity.Chart{
@@ -100,29 +100,29 @@ func TestConvertToV1SongDTO(t *testing.T) {
 
 	// アサーション
 	if dto == nil {
-		t.Fatal("convertToV1SongDTO returned nil")
+		require.Fail(t, "convertToV1SongDTO returned nil")
 	}
 
 	if dto.DisplayID != "v1test1234567890" {
-		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "v1test1234567890")
+		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "v1test1234567890")
 	}
 
 	if dto.MaxOP != 90 {
-		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
+		assert.Failf(t, "アサーション失敗", "MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
 
 	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
-		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
 
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "MASTER" {
-		t.Errorf("OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "MASTER")
+		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "MASTER")
 	}
 
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
-		t.Fatal("Charts is nil")
+		require.Fail(t, "Charts is nil")
 	}
 
 	// advanced 譜面が存在することを確認
@@ -130,10 +130,10 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Error("ADVANCED chart not found")
 	} else {
 		if advancedChart.Const != 9.0 {
-			t.Errorf("ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
+			assert.Failf(t, "アサーション失敗", "ADVANCED chart Const = %v, want %v", advancedChart.Const, 9.0)
 		}
 		if advancedChart.NotesDesigner == nil || *advancedChart.NotesDesigner != "譜面作者A" {
-			t.Errorf("ADVANCED chart NotesDesigner = %v, want %v", advancedChart.NotesDesigner, "譜面作者A")
+			assert.Failf(t, "アサーション失敗", "ADVANCED chart NotesDesigner = %v, want %v", advancedChart.NotesDesigner, "譜面作者A")
 		}
 	}
 
@@ -142,10 +142,10 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		t.Error("MASTER chart not found")
 	} else {
 		if masterChart.Const != 13.7 {
-			t.Errorf("MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
+			assert.Failf(t, "アサーション失敗", "MASTER chart Const = %v, want %v", masterChart.Const, 13.7)
 		}
 		if masterChart.NotesDesigner == nil || *masterChart.NotesDesigner != "譜面作者B" {
-			t.Errorf("MASTER chart NotesDesigner = %v, want %v", masterChart.NotesDesigner, "譜面作者B")
+			assert.Failf(t, "アサーション失敗", "MASTER chart NotesDesigner = %v, want %v", masterChart.NotesDesigner, "譜面作者B")
 		}
 	}
 

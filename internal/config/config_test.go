@@ -21,7 +21,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 }
 
@@ -179,20 +179,20 @@ func TestNormalizeAndValidateDatabasePoolConfig_ZeroValues(t *testing.T) {
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if *pool.MaxOpenConns != 0 {
-		t.Fatalf("MaxOpenConns = %d, want 0", *pool.MaxOpenConns)
+		require.Failf(t, "前提条件失敗", "MaxOpenConns = %d, want 0", *pool.MaxOpenConns)
 	}
 	if *pool.MaxIdleConns != 0 {
-		t.Fatalf("MaxIdleConns = %d, want 0", *pool.MaxIdleConns)
+		require.Failf(t, "前提条件失敗", "MaxIdleConns = %d, want 0", *pool.MaxIdleConns)
 	}
 	if *pool.ConnMaxLifetimeSec != 0 {
-		t.Fatalf("ConnMaxLifetimeSec = %d, want 0", *pool.ConnMaxLifetimeSec)
+		require.Failf(t, "前提条件失敗", "ConnMaxLifetimeSec = %d, want 0", *pool.ConnMaxLifetimeSec)
 	}
 	if *pool.ConnMaxIdleTimeSec != 0 {
-		t.Fatalf("ConnMaxIdleTimeSec = %d, want 0", *pool.ConnMaxIdleTimeSec)
+		require.Failf(t, "前提条件失敗", "ConnMaxIdleTimeSec = %d, want 0", *pool.ConnMaxIdleTimeSec)
 	}
 }
 
@@ -205,7 +205,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_InvalidValue(t *testing.T) {
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error, got nil")
 	}
 }
 
@@ -213,11 +213,11 @@ func TestNormalizeAndValidateDatabasePoolConfig_IdleGreaterThanOpen(t *testing.T
 	pool := DatabasePoolConfig{MaxOpenConns: new(10), MaxIdleConns: new(11), ConnMaxLifetimeSec: new(300), ConnMaxIdleTimeSec: new(60)}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if *pool.MaxIdleConns != 10 {
-		t.Fatalf("MaxIdleConns = %d, want 10", *pool.MaxIdleConns)
+		require.Failf(t, "前提条件失敗", "MaxIdleConns = %d, want 10", *pool.MaxIdleConns)
 	}
 }
 
@@ -235,7 +235,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_MissingValues(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := normalizeAndValidateDatabasePoolConfig(&tc.pool); err == nil {
-				t.Fatal("expected error, got nil")
+				require.Fail(t, "expected error, got nil")
 			}
 		})
 	}
@@ -247,7 +247,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleErrors(t *testing.T) {
 
 	err := normalizeAndValidateDatabasePoolConfig(&pool)
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error, got nil")
 	}
 
 	errMsg := err.Error()
@@ -262,7 +262,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleErrors(t *testing.T) {
 
 	for _, expected := range expectedErrors {
 		if !strings.Contains(errMsg, expected) {
-			t.Errorf("error message should contain %q, but got: %s", expected, errMsg)
+			assert.Failf(t, "アサーション失敗", "error message should contain %q, but got: %s", expected, errMsg)
 		}
 	}
 }
@@ -278,7 +278,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleInvalidValues(t *testing
 
 	err := normalizeAndValidateDatabasePoolConfig(&pool)
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error, got nil")
 	}
 
 	errMsg := err.Error()
@@ -293,7 +293,7 @@ func TestNormalizeAndValidateDatabasePoolConfig_MultipleInvalidValues(t *testing
 
 	for _, expected := range expectedErrors {
 		if !strings.Contains(errMsg, expected) {
-			t.Errorf("error message should contain %q, but got: %s", expected, errMsg)
+			assert.Failf(t, "アサーション失敗", "error message should contain %q, but got: %s", expected, errMsg)
 		}
 	}
 }

@@ -53,7 +53,6 @@
 | **QUAL-002** | **Medium** | セキュリティヘッダー未設定 | Echo の `Secure` ミドルウェア相当の設定がなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` などの標準ヘッダーが不足しています。 |
 | **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows`, `*sqlx.Row` を直接公開しており、ドメイン層がインフラ実装詳細に依存しています。 |
 | **QUAL-011** | **Low** | `interface{}` が残存 | AGENTS.md では `interface{}` を禁止し `any` を使用する方針ですが、`internal/infra/repository/player_locked_song_repository_impl.go` に `[]interface{}` が残っています。 |
-| **QUAL-012** | **Low** | テストコードに `t.Errorf` / `t.Fatalf` の直接使用が多数残存 | AGENTS.md では新規テストのアサーションに `assert` / `require` を使う方針ですが、既存テストには `t.Errorf` / `t.Fatalf` / `t.Fatal` の直接使用が多数残っています。既存テストの全面置換は優先度を下げつつ、新規・更新テストから統一すべきです。 |
 
 ### アーキテクチャ・ドメイン (ARCH / DOM / DTO)
 
@@ -99,5 +98,5 @@
 
 - 優先度が高いのは、**Goal更新の非トランザクション**、**Domain層の `sqlx` 依存**、**WORLD'S ENDレコード取得エラーの握りつぶし** です。
 - 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視**, **Context伝播の不徹底** を詰めると、APIの安定性と保守性が上がります。
-- AGENTS.md 準拠の観点では、**`interface{}` 残存**, **本番パッケージの `Must` 系関数**, **テストでの `t.Errorf` / `t.Fatalf` 直接使用**, **厳格JSONデコードの不統一** が追加の棚卸し対象です。
+- AGENTS.md 準拠の観点では、**`interface{}` 残存**, **本番パッケージの `Must` 系関数**, **厳格JSONデコードの不統一** が追加の棚卸し対象です。
 - `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。

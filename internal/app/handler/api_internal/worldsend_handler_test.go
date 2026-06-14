@@ -3,6 +3,7 @@ package api_internal
 import (
 	"bytes"
 	"context"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,57 +51,57 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
 				t.Helper()
 				if len(requests) != 1 {
-					t.Fatalf("requests len = %d, want 1", len(requests))
+					require.Failf(t, "前提条件失敗", "requests len = %d, want 1", len(requests))
 				}
 
 				req := requests[0]
 				if req.DisplayID != "1234567890abcdef" {
-					t.Fatalf("DisplayID = %s, want 1234567890abcdef", req.DisplayID)
+					require.Failf(t, "前提条件失敗", "DisplayID = %s, want 1234567890abcdef", req.DisplayID)
 				}
 				if req.Title != "WE曲" {
-					t.Fatalf("Title = %s, want WE曲", req.Title)
+					require.Failf(t, "前提条件失敗", "Title = %s, want WE曲", req.Title)
 				}
 				if req.Artist != "WEアーティスト" {
-					t.Fatalf("Artist = %s, want WEアーティスト", req.Artist)
+					require.Failf(t, "前提条件失敗", "Artist = %s, want WEアーティスト", req.Artist)
 				}
 				if req.Genre == nil || *req.Genre != "POPS & ANIME" {
-					t.Fatalf("Genre = %v, want POPS & ANIME", req.Genre)
+					require.Failf(t, "前提条件失敗", "Genre = %v, want POPS & ANIME", req.Genre)
 				}
 				if req.BPM == nil || *req.BPM != 180 {
-					t.Fatalf("BPM = %v, want 180", req.BPM)
+					require.Failf(t, "前提条件失敗", "BPM = %v, want 180", req.BPM)
 				}
 				if req.ReleasedAt == nil || req.ReleasedAt.Format("2006-01-02") != "2024-01-01" {
-					t.Fatalf("ReleasedAt = %v, want 2024-01-01", req.ReleasedAt)
+					require.Failf(t, "前提条件失敗", "ReleasedAt = %v, want 2024-01-01", req.ReleasedAt)
 				}
 				if req.Jacket == nil || *req.Jacket != "we_jacket" {
-					t.Fatalf("Jacket = %v, want we_jacket", req.Jacket)
+					require.Failf(t, "前提条件失敗", "Jacket = %v, want we_jacket", req.Jacket)
 				}
 				chart, ok := req.Charts["WORLDSEND"]
 				if !ok || chart == nil {
-					t.Fatalf("Charts[WORLDSEND] = %v, want non-nil", chart)
+					require.Failf(t, "前提条件失敗", "Charts[WORLDSEND] = %v, want non-nil", chart)
 				}
 				if chart.Attribute == nil || *chart.Attribute != "狂" {
-					t.Fatalf("chart.Attribute = %v, want 狂", chart.Attribute)
+					require.Failf(t, "前提条件失敗", "chart.Attribute = %v, want 狂", chart.Attribute)
 				}
 				if chart.LevelStar == nil || *chart.LevelStar != 5 {
-					t.Fatalf("chart.LevelStar = %v, want 5", chart.LevelStar)
+					require.Failf(t, "前提条件失敗", "chart.LevelStar = %v, want 5", chart.LevelStar)
 				}
 				if chart.Notes == nil || *chart.Notes != 2000 {
-					t.Fatalf("chart.Notes = %v, want 2000", chart.Notes)
+					require.Failf(t, "前提条件失敗", "chart.Notes = %v, want 2000", chart.Notes)
 				}
 				if chart.NotesDesigner == nil || *chart.NotesDesigner != "譜面作者A" {
-					t.Fatalf("chart.NotesDesigner = %v, want 譜面作者A", chart.NotesDesigner)
+					require.Failf(t, "前提条件失敗", "chart.NotesDesigner = %v, want 譜面作者A", chart.NotesDesigner)
 				}
 				if masters == nil {
-					t.Fatal("masters is nil")
+					require.Fail(t, "masters is nil")
 				}
 				if _, ok := masters.Genres["POPS & ANIME"]; !ok {
-					t.Fatal("genre master POPS & ANIME not found")
+					require.Fail(t, "genre master POPS & ANIME not found")
 				}
 
 				// UTC基準で日付境界が崩れていないことを確認
 				if req.ReleasedAt.Location() != time.UTC {
-					t.Fatalf("ReleasedAt location = %v, want UTC", req.ReleasedAt.Location())
+					require.Failf(t, "前提条件失敗", "ReleasedAt location = %v, want UTC", req.ReleasedAt.Location())
 				}
 			},
 		},
@@ -112,10 +113,10 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
 				t.Helper()
 				if len(requests) != 1 {
-					t.Fatalf("requests len = %d, want 1", len(requests))
+					require.Failf(t, "前提条件失敗", "requests len = %d, want 1", len(requests))
 				}
 				if requests[0].Charts != nil {
-					t.Fatalf("charts = %v, want nil", requests[0].Charts)
+					require.Failf(t, "前提条件失敗", "charts = %v, want nil", requests[0].Charts)
 				}
 			},
 		},
@@ -127,10 +128,10 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
 				t.Helper()
 				if len(requests) != 1 {
-					t.Fatalf("requests len = %d, want 1", len(requests))
+					require.Failf(t, "前提条件失敗", "requests len = %d, want 1", len(requests))
 				}
 				if requests[0].Charts != nil {
-					t.Fatalf("charts = %v, want nil", requests[0].Charts)
+					require.Failf(t, "前提条件失敗", "charts = %v, want nil", requests[0].Charts)
 				}
 			},
 		},
@@ -169,27 +170,27 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 
 			if tc.expectedErrCode == "" {
 				if err != nil {
-					t.Fatalf("UpdateWorldsendSongs returned error: %v", err)
+					require.Failf(t, "前提条件失敗", "UpdateWorldsendSongs returned error: %v", err)
 				}
 				if rec.Code != tc.expectedStatus {
-					t.Fatalf("status code = %d, want %d", rec.Code, tc.expectedStatus)
+					require.Failf(t, "前提条件失敗", "status code = %d, want %d", rec.Code, tc.expectedStatus)
 				}
 			} else {
 				if err == nil {
-					t.Fatal("UpdateWorldsendSongs should return error")
+					require.Fail(t, "UpdateWorldsendSongs should return error")
 				}
 
 				apiErr, ok := err.(*apierror.APIError)
 				if !ok {
-					t.Fatalf("error type = %T, want *apierror.APIError", err)
+					require.Failf(t, "前提条件失敗", "error type = %T, want *apierror.APIError", err)
 				}
 				if apiErr.Code != tc.expectedErrCode {
-					t.Fatalf("api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
+					require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
 				}
 			}
 
 			if called != tc.expectUsecaseHit {
-				t.Fatalf("UpdateWorldsendSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
+				require.Failf(t, "前提条件失敗", "UpdateWorldsendSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
 			}
 		})
 	}

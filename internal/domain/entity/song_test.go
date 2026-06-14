@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,10 +69,10 @@ func TestSongDeletionLifecycle(t *testing.T) {
 
 			// Then
 			if song.IsDeleted != tt.expectedDeleted {
-				t.Errorf("IsDeleted: got %v, want %v", song.IsDeleted, tt.expectedDeleted)
+				assert.Failf(t, "アサーション失敗", "IsDeleted: got %v, want %v", song.IsDeleted, tt.expectedDeleted)
 			}
 			if song.IsActive() != tt.expectedActive {
-				t.Errorf("IsActive(): got %v, want %v", song.IsActive(), tt.expectedActive)
+				assert.Failf(t, "アサーション失敗", "IsActive(): got %v, want %v", song.IsActive(), tt.expectedActive)
 			}
 		})
 	}
@@ -107,7 +108,7 @@ func TestSongActiveStatusByDeletionState(t *testing.T) {
 
 			// Then
 			if result != tt.expected {
-				t.Errorf("got %v, want %v", result, tt.expected)
+				assert.Failf(t, "アサーション失敗", "got %v, want %v", result, tt.expected)
 			}
 		})
 	}
@@ -117,10 +118,10 @@ func TestSongStartsWithEmptyCharts(t *testing.T) {
 	song := NewSong()
 
 	if song.Charts == nil {
-		t.Fatal("Charts must be initialized")
+		require.Fail(t, "Charts must be initialized")
 	}
 	if len(song.Charts) != 0 {
-		t.Fatalf("Charts length: got %d, want 0", len(song.Charts))
+		require.Failf(t, "前提条件失敗", "Charts length: got %d, want 0", len(song.Charts))
 	}
 }
 

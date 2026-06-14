@@ -3,6 +3,7 @@ package api_internal
 import (
 	"bytes"
 	"context"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,21 +45,21 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 
 		err := handler.UpdateSongs(c)
 		if err != nil {
-			t.Fatalf("UpdateSongs returned error: %v", err)
+			require.Failf(t, "前提条件失敗", "UpdateSongs returned error: %v", err)
 		}
 
 		if rec.Code != http.StatusNoContent {
-			t.Fatalf("Status code = %d, want %d", rec.Code, http.StatusNoContent)
+			require.Failf(t, "前提条件失敗", "Status code = %d, want %d", rec.Code, http.StatusNoContent)
 		}
 
 		if len(captured) != 1 {
-			t.Fatalf("captured len = %d, want 1", len(captured))
+			require.Failf(t, "前提条件失敗", "captured len = %d, want 1", len(captured))
 		}
 		if captured[0] == nil || captured[0].ReleasedAt == nil {
-			t.Fatal("released_at should be parsed")
+			require.Fail(t, "released_at should be parsed")
 		}
 		if got := captured[0].ReleasedAt.Format("2006-01-02"); got != "2024-01-01" {
-			t.Fatalf("ReleasedAt = %s, want 2024-01-01", got)
+			require.Failf(t, "前提条件失敗", "ReleasedAt = %s, want 2024-01-01", got)
 		}
 	})
 
@@ -76,19 +77,19 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 
 		err := handler.UpdateSongs(c)
 		if err == nil {
-			t.Fatal("UpdateSongs should return error")
+			require.Fail(t, "UpdateSongs should return error")
 		}
 
 		apiErr, ok := err.(*apierror.APIError)
 		if !ok {
-			t.Fatalf("error type = %T, want *apierror.APIError", err)
+			require.Failf(t, "前提条件失敗", "error type = %T, want *apierror.APIError", err)
 		}
 		if apiErr.Code != apierror.CodeBadRequest {
-			t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+			require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
 		}
 
 		if called {
-			t.Fatal("usecase should not be called")
+			require.Fail(t, "usecase should not be called")
 		}
 	})
 }
