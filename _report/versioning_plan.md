@@ -46,6 +46,17 @@ go build -ldflags "-X 'github.com/chunisupport/chunisupport-api/internal/info.Co
                    -X 'github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}'"
 ```
 
+既存のリリースビルドでは `-trimpath` と `-ldflags="-s -w"` を使用しているため、実装時は既存の最適化フラグを維持したまま `-X` を追加します。
+
+```bash
+COMMIT_DATE=$(git show -s --format=%cd --date=format:%Y%m%d HEAD)
+REVISION=$(git rev-parse --short HEAD)
+
+go build -trimpath \
+  -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.CommitDate=${COMMIT_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+  -o "${BINARY_NAME}" .
+```
+
 ## 3. 配信・露出戦略
 
 セキュリティと利便性のバランスを考え、情報の粒度をエンドポイントごとに分けます。
@@ -63,6 +74,8 @@ go build -ldflags "-X 'github.com/chunisupport/chunisupport-api/internal/info.Co
 
 ### B. 管理者・開発用 (`GET /health`)
 認証済みの管理者のみがアクセスできるエンドポイントでは、デバッグに必要な全情報を公開します。
+現状の `/health` は空レスポンスですが、現在は利用していないため後方互換性を破壊する仕様変更として扱います。
+実装時は `docs/API.md` と関連テストも新仕様へ更新します。
 
 **レスポンス例**:
 ```json
@@ -73,6 +86,8 @@ go build -ldflags "-X 'github.com/chunisupport/chunisupport-api/internal/info.Co
   "go_version": "go1.26.4"
 }
 ```
+
+`go_version` はビルド時注入ではなく、実行時に `runtime.Version()` から取得します。
 
 起動ログなど人間が読む表示では、`CommitDate` と `Revision` を必要な粒度で出力します。
 `v` プレフィックスは付けません。現在の起動ログにある `v` プレフィックスは削除します。
