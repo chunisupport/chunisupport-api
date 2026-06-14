@@ -8,7 +8,6 @@ import (
 
 const (
 	Name                 = "chunisupport-api"
-	Version              = "0.1.0"
 	ConfigDir            = ".config/"
 	ResourceDir          = ".resources/"
 	MigrationDir         = "migration/mysql/"
@@ -68,6 +67,11 @@ const (
 	DefaultDBConnMaxIdleTimeSec = 60
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
+)
+
+var (
+	BuildDate = "dev" // ビルド日: YYYYMMDD
+	Revision  = "dev" // Git短縮ハッシュ: a1b2c3d
 )
 
 // 対応アプリバージョン設定

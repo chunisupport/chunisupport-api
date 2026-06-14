@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -180,12 +181,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		return c.NoContent(http.StatusNoContent)
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
-	e.GET("/", func(c echo.Context) error {
-		// 互換性のためアプリケーション名を返すルートは残します。
-		return c.JSON(http.StatusOK, map[string]string{
-			"app_name": "chunisupport-api",
-		})
-	})
+	e.GET("/", handleRoot)
 	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
@@ -456,8 +452,15 @@ func handleExternalHealth(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func handleRoot(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":   info.Name,
+		"build_date": info.BuildDate,
+	})
+}
+
 // handleHealth はヘルスチェックエンドポイントのハンドラを返します
-// セキュリティを考慮し、内部情報（バージョン、サービス名など）は一切返しません
+// ADMIN向けにDB接続状態とビルド識別子を返します。
 func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		// データベース接続状態をチェック
@@ -466,6 +469,11 @@ func handleHealth(db *sqlx.DB) echo.HandlerFunc {
 			return c.NoContent(http.StatusServiceUnavailable)
 		}
 
-		return c.NoContent(http.StatusOK)
+		return c.JSON(http.StatusOK, map[string]string{
+			"status":     "ok",
+			"build_date": info.BuildDate,
+			"revision":   info.Revision,
+			"go_version": runtime.Version(),
+		})
 	}
 }

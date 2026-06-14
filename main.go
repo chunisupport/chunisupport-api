@@ -22,7 +22,7 @@ func main() {
 }
 
 func run() int {
-	slog.Info(info.Name + " v" + info.Version)
+	slog.Info(info.Name, "build_date", info.BuildDate, "revision", info.Revision)
 
 	cfg, err := config.LoadConfig()
 	if err != nil {

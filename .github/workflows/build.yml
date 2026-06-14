@@ -52,7 +52,11 @@ jobs:
           GOOS: linux
           GOARCH: ${{ steps.target.outputs.goarch }}
         run: |
-          go build -trimpath -ldflags="-s -w" -o ${{ steps.target.outputs.binary_name }} .
+          BUILD_DATE=$(date -u +%Y%m%d)
+          REVISION=$(git rev-parse --short HEAD)
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+            -o "${{ steps.target.outputs.binary_name }}" .
 
       - name: Package (binary + migration, flat structure)
         id: package

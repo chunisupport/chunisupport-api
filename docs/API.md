@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年06月11日
+**最終更新日**: 2026年06月14日
 
 ## ベースURLと環境
 
@@ -107,9 +107,9 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | 互換性のためアプリケーション名を固定で返します |
+| `/` | GET | 不要 | アプリケーション名とビルド日を返します |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
-| `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
+| `/health` | GET | APIトークン(ADMIN) | DB接続とビルド識別子を含むヘルスチェック |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
@@ -183,11 +183,12 @@
 
 ### GET `/`
 - **認証**: 不要
-- **レスポンス**: 互換性のため、常に 200 OK で固定のアプリケーション名を返します。
+- **レスポンス**: 常に 200 OK で、アプリケーション名とビルド日を返します。リビジョン（Git短縮ハッシュ）は公開しません。
 
 ```json
 {
-  "app_name": "chunisupport-api"
+  "app_name": "chunisupport-api",
+  "build_date": "20240528"
 }
 ```
 
@@ -203,8 +204,17 @@
 ### GET `/health`
 - **認証**: APIトークン (ADMIN)
 - **レスポンス**:
-  - 200 OK: 空レスポンス
+  - 200 OK: DB接続が正常な場合、ビルド識別子とGoバージョンを返します。
   - 503 Service Unavailable: DB接続エラーを通知。
+
+```json
+{
+  "status": "ok",
+  "build_date": "20240528",
+  "revision": "a1b2c3d",
+  "go_version": "go1.26.4"
+}
+```
 
 ---
 
