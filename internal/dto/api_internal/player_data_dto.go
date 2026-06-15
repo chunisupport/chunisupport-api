@@ -40,18 +40,18 @@ type PlayerDataStatistics struct {
 
 // PlayerDataCounts は各種レコードのアップサート件数を表します。
 type PlayerDataCounts struct {
-	FullRecordsUpserted             int `json:"full_records_upserted"`
+	FullRecordsUpserted             int `json:"standard_records_upserted"`
 	WorldsendRecordsUpserted        int `json:"worldsend_records_upserted"`
-	FullRecordsSkipped              int `json:"full_records_skipped"`
+	FullRecordsSkipped              int `json:"standard_records_skipped"`
 	WorldsendRecordsSkipped         int `json:"worldsend_records_skipped"`
 	HonorsSkipped                   int `json:"honors_skipped"`
-	FullRecordsActuallyChanged      int `json:"full_records_actually_changed"`
+	FullRecordsActuallyChanged      int `json:"standard_records_actually_changed"`
 	WorldsendRecordsActuallyChanged int `json:"worldsend_records_actually_changed"`
 }
 
 // SkippedRecord はスキップされたレコードの情報です。
 type SkippedRecord struct {
-	RecordType string `json:"record_type"` // "full", "worldsend", "honor"
+	RecordType string `json:"record_type"` // "standard", "worldsend", "honor"
 	Reason     string `json:"reason"`
 	Details    string `json:"details"`
 }

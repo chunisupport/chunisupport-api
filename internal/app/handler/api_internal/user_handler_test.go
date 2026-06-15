@@ -153,7 +153,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
 		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
 		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
-		All:           []*dto.PlayerRecordDTO{{ID: "all1"}},
+		All:           []*dto.PlayerRecordDTO{{ID: "standard1"}},
 		WorldsEnd:     []*dto.WorldsendRecordDTO{{ID: "we1"}},
 	}
 	result := &dto_internal.UserProfileWithRecordsDTO{
@@ -193,9 +193,9 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		recordsBody, ok := body["records"].(map[string]any)
 		assert.True(t, ok)
-		_, hasAll := recordsBody["all"]
+		_, hasStandard := recordsBody["standard"]
 		_, hasWorldsend := recordsBody["worldsend"]
-		assert.True(t, hasAll)
+		assert.True(t, hasStandard)
 		assert.True(t, hasWorldsend)
 		mockUsecase.AssertExpectations(t)
 	})
@@ -246,9 +246,9 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		recordsBody, ok := body["records"].(map[string]any)
 		assert.True(t, ok)
-		_, hasAll := recordsBody["all"]
+		_, hasStandard := recordsBody["standard"]
 		_, hasWorldsend := recordsBody["worldsend"]
-		assert.False(t, hasAll)
+		assert.False(t, hasStandard)
 		assert.False(t, hasWorldsend)
 		mockUsecase.AssertExpectations(t)
 	})
@@ -406,7 +406,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		},
 		Records: &dto_internal.UserRecordViewResponseDTO{
 			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
 			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
 		},
 		UpdatedAt: &now,
@@ -427,7 +427,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Len(t, body["all"], 1)
+		assert.Len(t, body["standard"], 1)
 		assert.Len(t, body["worldsend"], 1)
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
@@ -459,7 +459,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Empty(t, body["all"])
+		assert.Empty(t, body["standard"])
 		assert.Empty(t, body["worldsend"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
@@ -500,7 +500,7 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 		Player:   player,
 		Records: &dto_internal.UserRecordViewResponseDTO{
 			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
 			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
 		},
 		UpdatedAt: &now,
@@ -522,11 +522,11 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	recordsBody, ok := body["records"].(map[string]any)
 	assert.True(t, ok)
-	_, hasAll := recordsBody["all"]
+	_, hasStandard := recordsBody["standard"]
 	_, hasWorldsend := recordsBody["worldsend"]
 	_, hasBest := recordsBody["best"]
 	_, hasNew := recordsBody["new"]
-	assert.True(t, hasAll)
+	assert.True(t, hasStandard)
 	assert.True(t, hasWorldsend)
 	assert.False(t, hasBest)
 	assert.False(t, hasNew)

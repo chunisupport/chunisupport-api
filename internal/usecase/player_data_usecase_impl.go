@@ -74,11 +74,11 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 	errorMessages := make([]string, 0, maxErrorsToReport)
 
 	// 通常譜面のスコア検証
-	for i, entry := range payload.Scores.Full {
+	for i, entry := range payload.Scores.Standard {
 		if errorCount >= maxErrorsToReport {
 			break
 		}
-		if err := validateScoreEntry(&entry, "full", i); err != nil {
+		if err := validateScoreEntry(&entry, "standard", i); err != nil {
 			errorCount++
 			errorMessages = append(errorMessages, err.Error())
 		}
@@ -349,7 +349,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 	}
 
 	idxSet := make(map[string]struct{})
-	for _, entry := range payload.Scores.Full {
+	for _, entry := range payload.Scores.Standard {
 		idx := strings.TrimSpace(entry.Idx)
 		if idx != "" {
 			idxSet[idx] = struct{}{}
@@ -589,7 +589,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
 func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
-	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Full, masters, updatedAt)
+	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
 	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
 	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
 	counts.WorldsendRecordsSkipped = worldsendCounts.WorldsendRecordsSkipped
@@ -724,20 +724,20 @@ func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *play
 		if err != nil {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
+				RecordType: "standard",
 				Reason:     "failed to resolve chart",
 				Details:    fmt.Sprintf("idx=%s, diff=%s, error=%s", entry.Idx, entry.Diff, err.Error()),
 			})
 			continue
 		}
 
-		if skippedRecord, ok := validateScoreRange("full", entry, song); ok {
+		if skippedRecord, ok := validateScoreRange("standard", entry, song); ok {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, skippedRecord)
 			continue
 		}
 
-		lampIDs, skippedRecord := resolveCommonLampIDs("full", entry, song, masters)
+		lampIDs, skippedRecord := resolveCommonLampIDs("standard", entry, song, masters)
 		if skippedRecord != nil {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, *skippedRecord)
@@ -747,7 +747,7 @@ func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *play
 		slotID, err := resolveSlotID(entry.Slot, masters)
 		if err != nil {
 			counts.FullRecordsSkipped++
-			skipped = append(skipped, newResolveSkippedRecord("full", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
+			skipped = append(skipped, newResolveSkippedRecord("standard", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
 			continue
 		}
 
@@ -873,7 +873,7 @@ func computeFullRecordChanges(ctx context.Context, before map[int]repository.Pla
 			return fullRecordDisplayKeys(ctx, record.ChartID, masters, lookup)
 		},
 		playerRecordMeaningfullyChanged,
-		"full",
+		"standard",
 	)
 }
 

@@ -74,7 +74,7 @@ func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
 				},
 				Honors: map[string]PlayerDataHonorPayload{},
 				Scores: PlayerDataScorePayload{
-					Full:      []PlayerDataScoreEntry{},
+					Standard:  []PlayerDataScoreEntry{},
 					Worldsend: []PlayerDataScoreEntry{},
 				},
 				UpdatedAt: "2024-01-01T00:00:00Z",
@@ -124,7 +124,7 @@ func TestValidatePlayerDataPayload_MultipleVersions(t *testing.T) {
 		},
 		Honors: map[string]PlayerDataHonorPayload{},
 		Scores: PlayerDataScorePayload{
-			Full:      []PlayerDataScoreEntry{},
+			Standard:  []PlayerDataScoreEntry{},
 			Worldsend: []PlayerDataScoreEntry{},
 		},
 		UpdatedAt: "2024-01-01T00:00:00Z",
@@ -210,7 +210,7 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateScoreEntry(&tt.entry, "full", 0)
+			err := validateScoreEntry(&tt.entry, "standard", 0)
 
 			if tt.wantError {
 				assert.Error(t, err)

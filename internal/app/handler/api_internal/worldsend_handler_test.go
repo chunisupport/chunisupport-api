@@ -26,7 +26,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	e.Validator = &testValidator{validator: validator.New()}
 
 	newPutWorldsendContext := func(body string) echo.Context {
-		req := httptest.NewRequest(http.MethodPut, "/internal/songs/worldsend", bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPut, "/internal/worldsend-songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)

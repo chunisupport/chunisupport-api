@@ -319,13 +319,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
+	}
 
-		// WORLD'S END 楽曲エンドポイント
-		publicWorldsendGroup := publicSongsGroup.Group("/worldsend")
-		{
-			publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
-			publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
-		}
+	// api.chunisupport.net/internal/worldsend-songs
+	publicWorldsendGroup := internal.Group("/worldsend-songs")
+	publicWorldsendGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	{
+		publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
+		publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
 	}
 
 	songsGroup := internal.Group("/songs")
@@ -335,15 +336,15 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
 		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireAdmin)
 		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
+	}
 
-		// WORLD'S END 楽曲エンドポイント
-		worldsendGroup := songsGroup.Group("/worldsend")
-		{
-			worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
-			worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
-			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
-			worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
-		}
+	worldsendGroup := internal.Group("/worldsend-songs")
+	worldsendGroup.Use(firebaseAuthStrict)
+	{
+		worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
+		worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
+		worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
+		worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 	}
 
 	editorSongsGroup := internal.Group("/editor/songs")
@@ -351,8 +352,13 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
 		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
-		editorSongsGroup.GET("/worldsend", handlers.Worldsend.GetEditorWorldsendSongs)
-		editorSongsGroup.GET("/worldsend/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
+	}
+
+	editorWorldsendGroup := internal.Group("/editor/worldsend-songs")
+	editorWorldsendGroup.Use(firebaseAuthStrict, requireEditor)
+	{
+		editorWorldsendGroup.GET("", handlers.Worldsend.GetEditorWorldsendSongs)
+		editorWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
 	}
 
 	// api.chunisupport.net/internal/master
@@ -381,8 +387,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
 		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
 		apiV1.GET("/songs/:displayid/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
-		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
-		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
+		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)
+		apiV1.GET("/worldsend-songs/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}

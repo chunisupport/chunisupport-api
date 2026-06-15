@@ -138,6 +138,6 @@ type UserRecordResponseDTO struct {
 	BestCandidate []*PlayerRecordDTO    `json:"best_candidate"`
 	New           []*PlayerRecordDTO    `json:"new"`
 	NewCandidate  []*PlayerRecordDTO    `json:"new_candidate"`
-	All           []*PlayerRecordDTO    `json:"all"`
+	All           []*PlayerRecordDTO    `json:"standard"`
 	WorldsEnd     []*WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
 }
