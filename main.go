@@ -55,8 +55,17 @@ func run() int {
 		}
 	}()
 
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	signalCtx, cancelSignalCtx := context.WithCancel(context.Background())
+	defer cancelSignalCtx()
+	terminationCh := make(chan os.Signal, 1)
+	receivedTerminationCh := make(chan os.Signal, 1)
+	signal.Notify(terminationCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(terminationCh)
+	go func() {
+		sig := <-terminationCh
+		receivedTerminationCh <- sig
+		cancelSignalCtx()
+	}()
 	reloadCh := make(chan os.Signal, 1)
 	app.NotifyLogReload(reloadCh)
 	defer signal.Stop(reloadCh)
@@ -64,7 +73,7 @@ func run() int {
 	database, err := db.ConnectWithRetry(signalCtx, cfg.Database.DbConfig)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			slog.Info("Startup canceled")
+			slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 			return 0
 		}
 		slog.Error("Failed to connect to database", "error", err)
@@ -75,7 +84,7 @@ func run() int {
 			slog.Error("Failed to close database after startup cancellation", "error", closeErr)
 			return 1
 		}
-		slog.Info("Startup canceled")
+		slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 		return 0
 	}
 
@@ -142,7 +151,7 @@ func run() int {
 			slog.Error("Failed to close small data database after startup cancellation", "error", closeErr)
 			return 1
 		}
-		slog.Info("Startup canceled")
+		slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 		return 0
 	}
 
@@ -155,13 +164,13 @@ func run() int {
 
 	for {
 		select {
-		case <-signalCtx.Done():
-			slog.Info("Starting graceful shutdown")
+		case sig := <-receivedTerminationCh:
+			slog.Info("Starting graceful shutdown", "signal", signalName(sig))
 			if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
 				slog.Error("Server shutdown failed", "error", err)
 				return 1
 			}
-			slog.Info("Graceful shutdown completed")
+			slog.Info("Graceful shutdown completed", "signal", signalName(sig))
 			return 0
 		case <-reloadCh:
 			if err := logManager.ReopenAll(); err != nil {
@@ -193,4 +202,26 @@ func shutdownServer(server *app.Server, shutdownTimeoutSeconds int) error {
 	defer cancel()
 
 	return server.Shutdown(shutdownCtx)
+}
+
+func pendingSignalName(ch <-chan os.Signal) string {
+	select {
+	case sig := <-ch:
+		return signalName(sig)
+	default:
+		return ""
+	}
+}
+
+func signalName(sig os.Signal) string {
+	if sig == nil {
+		return ""
+	}
+	if sig == os.Interrupt {
+		return "SIGINT"
+	}
+	if sig == syscall.SIGTERM {
+		return "SIGTERM"
+	}
+	return sig.String()
 }
