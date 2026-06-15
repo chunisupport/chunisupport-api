@@ -130,6 +130,10 @@
 | `/internal/me/goals` | POST | Firebase Bearer | 目標を作成 |
 | `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
+| `/internal/me/record-filters` | GET | Firebase Bearer | 保存済みレコードフィルタ一覧を取得 |
+| `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
+| `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
+| `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
@@ -1279,6 +1283,115 @@ curl -X POST \
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
 | `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
+
+---
+
+## `/internal/me/record-filters` グループ
+
+認証済みユーザーが保存したレコードフィルタをサーバーに保存します。通常レコードと WORLD'S END は `filter_type` で区別します。
+
+サーバーは `filter` の内部フィールドを解釈しません。`filter` が JSON オブジェクトであること、`schema_version` が正の整数であること、圧縮前の保存ペイロードが 8KB 以下であることのみ検証し、gzip 圧縮して保存します。
+
+### RecordFilter オブジェクト
+
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "高難度FC狙い",
+  "filter_type": "standard",
+  "schema_version": 3,
+  "filter": {
+    "title": "",
+    "difficulties": ["MASTER", "ULTIMA"]
+  },
+  "created_at": "2026-06-15T12:00:00Z",
+  "updated_at": "2026-06-15T12:00:00Z"
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `id` | string | サーバー生成 UUID |
+| `name` | string | 保存名。trim 後 1〜30文字、制御文字不可 |
+| `filter_type` | `"standard"` \| `"worldsend"` | 通常レコードまたは WORLD'S END の区別 |
+| `schema_version` | number | フロント側フィルタスキーマのバージョン。正の整数 |
+| `filter` | object | フロント側のフィルタ状態 JSON。サーバーでは中身を解釈しない |
+| `created_at` | string | 作成日時（ISO 8601） |
+| `updated_at` | string | 更新日時（ISO 8601） |
+
+### GET `/internal/me/record-filters`
+
+保存済みレコードフィルタ一覧を返します。`filter_type` クエリで種別を絞り込めます。省略時は全件を返します。ソート順は `updated_at` 降順です。
+
+**クエリパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `filter_type` | `"standard"` \| `"worldsend"` | いいえ | 取得対象のフィルタ種別 |
+
+**レスポンス**: 200 OK
+
+```json
+{
+  "filters": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "高難度FC狙い",
+      "filter_type": "standard",
+      "schema_version": 3,
+      "filter": {
+        "title": "",
+        "difficulties": ["MASTER", "ULTIMA"]
+      },
+      "created_at": "2026-06-15T12:00:00Z",
+      "updated_at": "2026-06-15T12:00:00Z"
+    }
+  ]
+}
+```
+
+### POST `/internal/me/record-filters`
+
+レコードフィルタを新規保存します。1ユーザーあたり最大100件です。
+
+**リクエストボディ**
+
+```json
+{
+  "name": "高難度FC狙い",
+  "filter_type": "standard",
+  "schema_version": 3,
+  "filter": {
+    "title": "",
+    "difficulties": ["MASTER", "ULTIMA"]
+  }
+}
+```
+
+**レスポンス**: 201 Created（作成された RecordFilter オブジェクト）
+
+### PUT `/internal/me/record-filters/:id`
+
+指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+
+**リクエストボディ**: POST と同じ
+
+**レスポンス**: 200 OK（更新後の RecordFilter オブジェクト）
+
+### DELETE `/internal/me/record-filters/:id`
+
+指定IDの保存済みレコードフィルタを削除します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+
+**レスポンス**: 204 No Content
+
+### RecordFilter API エラーコード
+
+| エラーコード | HTTP | 説明 |
+|---|---|---|
+| `record_filter_not_found` | 404 | 指定したフィルタが存在しない（他ユーザーのフィルタも含む） |
+| `record_filter_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `invalid_record_filter_input` | 400 | `name` / `filter_type` / `schema_version` / `filter` / サイズ制限のいずれかが不正 |
+| `invalid_record_filter_id` | 400 | `:id` が UUID 形式ではない |
 
 ---
 

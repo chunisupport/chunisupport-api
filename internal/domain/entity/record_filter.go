@@ -12,6 +12,7 @@ type RecordFilter struct {
 	name            string
 	filterValueGzip []byte
 	isWorldsend     bool
+	createdAt       time.Time
 	updatedAt       time.Time
 }
 
@@ -24,11 +25,11 @@ var (
 
 // NewRecordFilter は必須項目を検証した RecordFilter を生成します。
 func NewRecordFilter(id []byte, userID int, name string, filterValueGzip []byte, isWorldsend bool) (*RecordFilter, error) {
-	return RestoreRecordFilter(id, userID, name, filterValueGzip, isWorldsend, time.Time{})
+	return RestoreRecordFilter(id, userID, name, filterValueGzip, isWorldsend, time.Time{}, time.Time{})
 }
 
 // RestoreRecordFilter は永続化済みデータから RecordFilter を復元します。
-func RestoreRecordFilter(id []byte, userID int, name string, filterValueGzip []byte, isWorldsend bool, updatedAt time.Time) (*RecordFilter, error) {
+func RestoreRecordFilter(id []byte, userID int, name string, filterValueGzip []byte, isWorldsend bool, createdAt time.Time, updatedAt time.Time) (*RecordFilter, error) {
 	if len(id) == 0 {
 		return nil, ErrRecordFilterIDRequired
 	}
@@ -48,6 +49,7 @@ func RestoreRecordFilter(id []byte, userID int, name string, filterValueGzip []b
 		name:            name,
 		filterValueGzip: append([]byte(nil), filterValueGzip...),
 		isWorldsend:     isWorldsend,
+		createdAt:       createdAt,
 		updatedAt:       updatedAt,
 	}, nil
 }
@@ -75,6 +77,11 @@ func (r *RecordFilter) FilterValueGzip() []byte {
 // IsWorldsend はワールズエンド用フィルタかどうかを返します。
 func (r *RecordFilter) IsWorldsend() bool {
 	return r.isWorldsend
+}
+
+// CreatedAt は作成日時を返します。
+func (r *RecordFilter) CreatedAt() time.Time {
+	return r.createdAt
 }
 
 // UpdatedAt は最終更新日時を返します。

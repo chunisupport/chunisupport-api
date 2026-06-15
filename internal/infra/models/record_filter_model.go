@@ -13,11 +13,12 @@ type RecordFilterModel struct {
 	Name            string    `db:"name"`
 	FilterValueGzip []byte    `db:"filter_value_gzip"`
 	IsWorldsend     bool      `db:"is_worldsend"`
+	CreatedAt       time.Time `db:"created_at"`
 	UpdatedAt       time.Time `db:"updated_at"`
 }
 
 func (m *RecordFilterModel) ToEntity() (*entity.RecordFilter, error) {
-	return entity.RestoreRecordFilter(m.ID, m.UserID, m.Name, m.FilterValueGzip, m.IsWorldsend, m.UpdatedAt)
+	return entity.RestoreRecordFilter(m.ID, m.UserID, m.Name, m.FilterValueGzip, m.IsWorldsend, m.CreatedAt, m.UpdatedAt)
 }
 
 func FromRecordFilterEntity(e *entity.RecordFilter) *RecordFilterModel {
@@ -27,6 +28,7 @@ func FromRecordFilterEntity(e *entity.RecordFilter) *RecordFilterModel {
 		Name:            e.Name(),
 		FilterValueGzip: e.FilterValueGzip(),
 		IsWorldsend:     e.IsWorldsend(),
+		CreatedAt:       e.CreatedAt(),
 		UpdatedAt:       e.UpdatedAt(),
 	}
 }

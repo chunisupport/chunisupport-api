@@ -89,6 +89,14 @@ func run() int {
 
 	slog.Info("Connected to the static database")
 
+	smallDataDatabase, err := db.ConnectStatic(cfg.SmallDataDBPath)
+	if err != nil {
+		slog.Error("Failed to connect to small data database", "error", err)
+		return 1
+	}
+
+	slog.Info("Connected to the small data database")
+
 	// 必須データの存在チェック
 	// if err := db.ValidateRequiredData(database); err != nil {
 	// 	slog.Error("Required data validation failed", "error", err)
@@ -130,11 +138,15 @@ func run() int {
 			slog.Error("Failed to close static database after startup cancellation", "error", closeErr)
 			return 1
 		}
+		if closeErr := smallDataDatabase.Close(); closeErr != nil {
+			slog.Error("Failed to close small data database after startup cancellation", "error", closeErr)
+			return 1
+		}
 		slog.Info("Startup canceled")
 		return 0
 	}
 
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
+	server := app.NewServer(database, staticDatabase, smallDataDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
 
 	serverErrCh := make(chan error, 1)
 	go func() {

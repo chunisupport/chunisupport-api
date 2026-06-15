@@ -7,6 +7,7 @@
     "stdout": true
   },
   "static_db_path": "./static.db",
+  "smalldata_db_path": "./smalldata.db",
   "shutdown_timeout_seconds": 20,
   "cors": {
     "allow_origins": [

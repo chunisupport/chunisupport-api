@@ -29,6 +29,7 @@ func setupRecordFilterRepositorySQLite(t *testing.T) *sqlx.DB {
 			name TEXT NOT NULL,
 			filter_value_gzip BLOB NOT NULL,
 			is_worldsend BOOLEAN NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE INDEX idx_record_filters_user_id ON record_filters (user_id);
@@ -61,6 +62,7 @@ func TestRecordFilterRepository_SaveFindListCountAndDelete(t *testing.T) {
 	assert.Equal(t, "通常枠", found.Name())
 	assert.Equal(t, []byte{0x1f, 0x8b, 0x08}, found.FilterValueGzip())
 	assert.False(t, found.IsWorldsend())
+	assert.False(t, found.CreatedAt().IsZero())
 	assert.False(t, found.UpdatedAt().IsZero())
 
 	require.NoError(t, found.ChangeName("ワールズエンド枠"))

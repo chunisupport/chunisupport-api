@@ -75,6 +75,7 @@ type Handlers struct {
 	Me                  *api_internal.MeHandler
 	MasterData          *api_internal.MasterDataHandler
 	Goal                *api_internal.GoalHandler
+	RecordFilter        *api_internal.RecordFilterHandler
 	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong    *api_internal.PlayerLockedSongHandler
 	// 外部API v1 用ハンドラ
@@ -88,7 +89,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -120,6 +121,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
+	recordFilterRepo := infra.NewRecordFilterRepository(smallDataDB)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
@@ -137,6 +139,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	recordFilterUsecase := usecase.NewRecordFilterUsecase(recordFilterRepo)
 	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
 	playerSongIDResolver := infra.NewPlayerSongIDResolver()
 	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
@@ -164,6 +167,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		Me:                  api_internal.NewMeHandler(playerDataUsecase),
 		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
 		Goal:                api_internal.NewGoalHandler(goalUsecase),
+		RecordFilter:        api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:    api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		// 外部API v1 用ハンドラ
@@ -256,6 +260,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
+		meGroup.GET("/record-filters", handlers.RecordFilter.List)
+		meGroup.POST("/record-filters", handlers.RecordFilter.Create)
+		meGroup.PUT("/record-filters/:id", handlers.RecordFilter.Update)
+		meGroup.DELETE("/record-filters/:id", handlers.RecordFilter.Delete)
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)

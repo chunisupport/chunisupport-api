@@ -62,4 +62,10 @@ const (
 	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
 	CodeInvalidGoalInput             = "invalid_goal_input"
+
+	// 保存済みフィルタ関連エラー
+	CodeRecordFilterNotFound      = "record_filter_not_found"
+	CodeRecordFilterLimitExceeded = "record_filter_limit_exceeded"
+	CodeInvalidRecordFilterInput  = "invalid_record_filter_input"
+	CodeInvalidRecordFilterID     = "invalid_record_filter_id"
 )
