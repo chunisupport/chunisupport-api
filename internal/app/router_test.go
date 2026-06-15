@@ -12,12 +12,10 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	_ "modernc.org/sqlite"
 )
 
 func TestExternalCORS_対象エンドポイントのみ追加オリジンを許可する(t *testing.T) {
@@ -176,18 +174,15 @@ func TestHandleAdminBuildInfo_APIコミットハッシュを返す(t *testing.T)
 	assert.Equal(t, runtime.Version(), response["go_version"])
 }
 
-func TestHandleHealth_DB接続とビルド識別子を返す(t *testing.T) {
+func TestHandleVersion_APIバージョン識別子を返す(t *testing.T) {
 	// Given
-	database := sqlx.MustConnect("sqlite", ":memory:")
-	defer database.Close()
-
 	e := echo.New()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/health", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/version", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
 	// When
-	err := handleHealth(database)(c)
+	err := handleVersion(c)
 
 	// Then
 	require.NoError(t, err)
@@ -195,29 +190,10 @@ func TestHandleHealth_DB接続とビルド識別子を返す(t *testing.T) {
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, "ok", response["status"])
+	assert.Equal(t, info.Name, response["app_name"])
 	assert.Equal(t, info.BuildDate, response["build_date"])
-	assert.Equal(t, info.Revision, response["revision"])
+	assert.Equal(t, info.Revision, response["commit_hash"])
 	assert.Equal(t, runtime.Version(), response["go_version"])
-}
-
-func TestHandleHealth_DB接続エラー時は503を返す(t *testing.T) {
-	// Given
-	database := sqlx.MustConnect("sqlite", ":memory:")
-	require.NoError(t, database.Close())
-
-	e := echo.New()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/health", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	// When
-	err := handleHealth(database)(c)
-
-	// Then
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	assert.Empty(t, rec.Body.String())
 }
 
 func TestRequireRecentSignInVerifier(t *testing.T) {

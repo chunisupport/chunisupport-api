@@ -182,7 +182,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
 	e.GET("/", handleRoot)
-	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
+	e.GET("/version", handleVersion, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, cfg)
@@ -481,21 +481,12 @@ func handleAdminBuildInfo(c echo.Context) error {
 	})
 }
 
-// handleHealth はヘルスチェックエンドポイントのハンドラを返します
-// ADMIN向けにDB接続状態とビルド識別子を返します。
-func handleHealth(db *sqlx.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// データベース接続状態をチェック
-		if err := db.Ping(); err != nil {
-			slog.Error("Database health check failed: " + err.Error())
-			return c.NoContent(http.StatusServiceUnavailable)
-		}
-
-		return c.JSON(http.StatusOK, map[string]string{
-			"status":     "ok",
-			"build_date": info.BuildDate,
-			"revision":   info.Revision,
-			"go_version": runtime.Version(),
-		})
-	}
+// handleVersion はADMIN向けにAPIのバージョン識別子を返します。
+func handleVersion(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":    info.Name,
+		"build_date":  info.BuildDate,
+		"commit_hash": info.Revision,
+		"go_version":  runtime.Version(),
+	})
 }

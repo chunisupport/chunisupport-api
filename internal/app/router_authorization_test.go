@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -167,6 +168,51 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 			// Then
 			require.Equal(t, tt.wantStatus, rec.Code)
 			assert.Equal(t, tt.wantCalled, called)
+		})
+	}
+}
+
+func TestVersionRoute_ADMINのAPIトークンを要求する(t *testing.T) {
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{
+			name:       "PLAYERは拒否される",
+			token:      "player-token",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "ADMINは取得できる",
+			token:      "admin-token",
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			e.GET("/version", handleVersion, appmiddleware.APITokenMiddleware(stubAPITokenUsecase{}), appmiddleware.RequireRole(info.AccountTypeAdmin))
+
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/version", nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, tt.wantStatus, rec.Code)
+			if tt.wantStatus != http.StatusOK {
+				return
+			}
+
+			var response map[string]string
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			assert.Equal(t, info.Revision, response["commit_hash"])
 		})
 	}
 }

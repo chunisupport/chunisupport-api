@@ -109,7 +109,7 @@
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 不要 | アプリケーション名とビルド日を返します |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
-| `/health` | GET | APIトークン(ADMIN) | DB接続とビルド識別子を含むヘルスチェック |
+| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
@@ -202,17 +202,16 @@
 - **レスポンス**:
   - 204 No Content: 空レスポンス
 
-### GET `/health`
+### GET `/version`
 - **認証**: APIトークン (ADMIN)
 - **レスポンス**:
-  - 200 OK: DB接続が正常な場合、ビルド識別子とGoバージョンを返します。
-  - 503 Service Unavailable: DB接続エラーを通知。
+  - 200 OK: APIのビルド識別子とGoバージョンを返します。
 
 ```json
 {
-  "status": "ok",
+  "app_name": "chunisupport-api",
   "build_date": "20240528",
-  "revision": "a1b2c3d",
+  "commit_hash": "a1b2c3d",
   "go_version": "go1.26.4"
 }
 ```
