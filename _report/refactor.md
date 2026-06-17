@@ -52,7 +52,7 @@
 |---|---|---|---|
 | **QUAL-002** | **Medium** | セキュリティヘッダー未設定 | Echo の `Secure` ミドルウェア相当の設定がなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` などの標準ヘッダーが不足しています。 |
 | **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows`, `*sqlx.Row` を直接公開しており、ドメイン層がインフラ実装詳細に依存しています。 |
-| **QUAL-011** | **Low** | `interface{}` が残存 | AGENTS.md では `interface{}` を禁止し `any` を使用する方針ですが、`internal/infra/repository/player_locked_song_repository_impl.go` に `[]interface{}` が残っています。 |
+
 
 ### アーキテクチャ・ドメイン (ARCH / DOM / DTO)
 
