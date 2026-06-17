@@ -251,6 +251,31 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 	}
 }
 
+func TestV1SongHandler_GetSongRejectsInvalidDisplayID(t *testing.T) {
+	e := echo.New()
+	called := false
+	handler := NewV1SongHandler(&testutil.MockSongUsecase{
+		GetSongByDisplayIDFunc: func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error) {
+			called = true
+			return nil, nil
+		},
+	}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/songs/invalid", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("displayid")
+	c.SetParamValues("invalid")
+
+	err := handler.GetSong(c)
+
+	var apiErr *apierror.APIError
+	if assert.ErrorAs(t, err, &apiErr) {
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	}
+	assert.False(t, called)
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

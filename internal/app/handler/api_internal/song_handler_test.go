@@ -422,16 +422,16 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		// Given
 		mockUsecase := &testutil.MockSongUsecase{
 			DeleteSongFunc: func(ctx context.Context, displayID string) error {
-				assert.Equal(t, "missing", displayID)
+				assert.Equal(t, "0000000000000000", displayID)
 				return repository.ErrSongNotFound
 			},
 		}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/missing", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/0000000000000000", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetParamNames("displayid")
-		c.SetParamValues("missing")
+		c.SetParamValues("0000000000000000")
 
 		// When
 		err := handler.DeleteSong(c)
@@ -442,6 +442,33 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
 			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 		}
+	})
+
+	t.Run("不正なDisplayIDの場合はvalidation_failedを返しユースケースを呼ばない", func(t *testing.T) {
+		// Given
+		called := false
+		mockUsecase := &testutil.MockSongUsecase{
+			DeleteSongFunc: func(ctx context.Context, displayID string) error {
+				called = true
+				return nil
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/invalid", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("invalid")
+
+		// When
+		err := handler.DeleteSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+		}
+		assert.False(t, called)
 	})
 }
 
@@ -454,16 +481,16 @@ func TestSongHandler_RestoreSong(t *testing.T) {
 		// Given
 		mockUsecase := &testutil.MockSongUsecase{
 			RestoreSongFunc: func(ctx context.Context, displayID string) error {
-				assert.Equal(t, "missing", displayID)
+				assert.Equal(t, "0000000000000000", displayID)
 				return repository.ErrSongNotFound
 			},
 		}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-		req := httptest.NewRequest(http.MethodPost, "/internal/songs/missing/restore", nil)
+		req := httptest.NewRequest(http.MethodPost, "/internal/songs/0000000000000000/restore", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetParamNames("displayid")
-		c.SetParamValues("missing")
+		c.SetParamValues("0000000000000000")
 
 		// When
 		err := handler.RestoreSong(c)

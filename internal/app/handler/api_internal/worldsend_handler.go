@@ -47,7 +47,10 @@ func (h *WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 
 // GetWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を取得します。
 func (h *WorldsendHandler) GetWorldsendSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
@@ -73,7 +76,10 @@ func (h *WorldsendHandler) GetEditorWorldsendSongs(c echo.Context) error {
 
 // GetEditorWorldsendSong は編集者向けに指定された DisplayID の WORLD'S END 楽曲を取得します。
 func (h *WorldsendHandler) GetEditorWorldsendSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songWithChart, err := h.worldsendUsecase.GetWorldsendSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
@@ -85,7 +91,10 @@ func (h *WorldsendHandler) GetEditorWorldsendSong(c echo.Context) error {
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (h *WorldsendHandler) DeleteWorldsendSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	if err := h.worldsendUsecase.DeleteWorldsendSong(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -148,7 +157,10 @@ func (h *WorldsendHandler) CreateWorldsendSong(c echo.Context) error {
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (h *WorldsendHandler) RestoreWorldsendSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	if err := h.worldsendUsecase.RestoreWorldsendSong(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}

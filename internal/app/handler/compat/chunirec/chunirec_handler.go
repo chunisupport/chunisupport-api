@@ -58,10 +58,14 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	if displayID == "" {
 		return apierror.ErrValidationFailed
 	}
+	validDisplayID, apiErr := handler.ValidateDisplayID(displayID)
+	if apiErr != nil {
+		return apiErr
+	}
 
 	// 楽曲を取得
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
-	song, err := h.songUsecase.GetSongByDisplayID(ctx, displayID, requesterAccountTypeID)
+	song, err := h.songUsecase.GetSongByDisplayID(ctx, validDisplayID, requesterAccountTypeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return apierror.ErrSongNotFound
@@ -94,6 +98,10 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 			return apierror.ErrUnauthorized
 		}
 	}
+	validUsername, apiErr := handler.ValidateUsername(username)
+	if apiErr != nil {
+		return apiErr
+	}
 
 	// requester はAPIトークン所有者（非公開ユーザーの本人アクセス判定用）
 	var requester *entity.User
@@ -102,7 +110,7 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 	}
 
 	// ユーザープロファイルとレコードを取得
-	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, username, requester, false)
+	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, validUsername, requester, false)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):

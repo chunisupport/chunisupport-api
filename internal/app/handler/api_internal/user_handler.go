@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -27,7 +28,10 @@ func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
 
 // GetUserProfile はユーザー名とプレイヤーデータのみを返す軽量なハンドラです。
 func (h *UserHandler) GetUserProfile(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
@@ -43,7 +47,10 @@ func (h *UserHandler) GetUserProfile(c echo.Context) error {
 
 // GetUserUpdatedAt はユーザー関連データの updated_at のみを返す軽量なハンドラです。
 func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
@@ -59,7 +66,10 @@ func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
 
 // GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
 func (h *UserHandler) GetUserRating(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
@@ -75,7 +85,10 @@ func (h *UserHandler) GetUserRating(c echo.Context) error {
 
 // GetUserRecord はユーザー名をキーにレコード枠のみを返すハンドラです。
 func (h *UserHandler) GetUserRecord(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
@@ -92,7 +105,10 @@ func (h *UserHandler) GetUserRecord(c echo.Context) error {
 
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
 func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	view := c.QueryParam("view")
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
@@ -194,7 +210,10 @@ func toUserRecordDTO(result *dto_internal.UserProfileRecordViewDTO) *dto_interna
 
 // DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。
 func (h *UserHandler) DeleteUser(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requester, ok := c.Get("userEntity").(*entity.User)
 	if !ok {
 		// 認証ミドルウェアが正しく機能していれば、この分岐に入ることはありません。

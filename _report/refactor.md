@@ -86,8 +86,6 @@
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **HDL-001** | **Medium** | `RealIP()` の信頼境界未設定 | `router.go` で `e.IPExtractor` を設定しておらず、リバースプロキシ配下での `RealIP()` 利用が危険です。レートリミットやログに影響します。 |
-| **HDL-002** | **Medium** | `displayid` パスパラメータ未検証 | `song_handler.go` などで `displayid` をそのままUsecaseへ渡しています。更新APIのリクエストボディでは長さ検証しており、方針が不統一です。compat chunirec の `id` クエリも空文字以外の形式検証がありません。 |
-| **HDL-003** | **Medium** | `username` パスパラメータ未検証 | `user_handler.go` / `api_v1/user_handler.go` などで `username` を境界で検証していません。compat chunirec の `user_name` クエリも、未指定時のフォールバック以外に形式検証がありません。 |
 | **HDL-010** | **Low** | `knownFields` が手書きハードコード | `me_handler.go` 内の未知フィールド検出は `PlayerDataPayload` と手動同期になっており、メンテナンス漏れの温床です。 |
 | **HDL-011** | **Low** | `include_noplay` の不正値を黙って `false` 扱い | `user_handler.go` / `api_v1/user_handler.go` で `strconv.ParseBool(c.QueryParam("include_noplay"))` のエラーを `_` で破棄しており、不正なクエリ値がバリデーションエラーになりません。 |
 | **HDL-012** | **Low** | 厳格JSONデコードの適用が不統一 | `BindStrictJSON` が導入されていますが、`login_handler.go` / `song_handler.go` / `worldsend_handler.go` / `honor_handler.go` などに `c.Bind` が残っています。未知フィールドの扱いがエンドポイントごとに不統一です。 |
