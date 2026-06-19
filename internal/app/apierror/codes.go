@@ -48,11 +48,10 @@ const (
 	CodeServiceUnavailable = "service_unavailable"
 
 	// 入力バリデーション詳細エラー
-	CodeUsernameEmpty         = "username_empty"
-	CodeUsernameTooShort      = "username_too_short"
-	CodeUsernameTooLong       = "username_too_long"
-	CodeUsernameInvalidChar   = "username_invalid_char"
-	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
+	CodeUsernameEmpty       = "username_empty"
+	CodeUsernameTooShort    = "username_too_short"
+	CodeUsernameTooLong     = "username_too_long"
+	CodeUsernameInvalidChar = "username_invalid_char"
 
 	// 目標関連エラー
 	CodeGoalNotFound                 = "goal_not_found"

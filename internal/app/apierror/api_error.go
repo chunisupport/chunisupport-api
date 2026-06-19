@@ -97,11 +97,10 @@ var (
 	ErrServiceUnavailable = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
-	ErrUsernameEmpty         = New(CodeUsernameEmpty, http.StatusBadRequest)
-	ErrUsernameTooShort      = New(CodeUsernameTooShort, http.StatusBadRequest)
-	ErrUsernameTooLong       = New(CodeUsernameTooLong, http.StatusBadRequest)
-	ErrUsernameInvalidChar   = New(CodeUsernameInvalidChar, http.StatusBadRequest)
-	ErrAppVersionUnsupported = New(CodeAppVersionUnsupported, http.StatusBadRequest) // 対応していないアプリバージョン
+	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)
+	ErrUsernameTooShort    = New(CodeUsernameTooShort, http.StatusBadRequest)
+	ErrUsernameTooLong     = New(CodeUsernameTooLong, http.StatusBadRequest)
+	ErrUsernameInvalidChar = New(CodeUsernameInvalidChar, http.StatusBadRequest)
 
 	ErrGoalNotFound                 = New(CodeGoalNotFound, http.StatusNotFound)
 	ErrGoalLimitExceeded            = New(CodeGoalLimitExceeded, http.StatusBadRequest)

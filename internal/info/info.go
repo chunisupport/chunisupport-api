@@ -77,11 +77,6 @@ var (
 	Revision  = "none" // Git短縮ハッシュ: a1b2c3d。開発起動時はnone
 )
 
-// 対応アプリバージョン設定
-// プレイヤーデータ登録時に、このリストに含まれるバージョンのみ受け付ける
-// NOTE: ユーザーが設定ファイルで変更できるようにする必要があれば、example.setting.jsonに追加してください
-var SupportedAppVersions = []string{"0.1.0"}
-
 var (
 	knownAccountTypes       = make(map[int]struct{})
 	roleAllowedAccountTypes = map[int]map[int]struct{}{

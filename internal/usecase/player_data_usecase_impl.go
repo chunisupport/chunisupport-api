@@ -63,11 +63,6 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		}
 	}
 
-	// アプリバージョンのバリデーション
-	if !slices.Contains(info.SupportedAppVersions, payload.AppVersion) {
-		return ErrAppVersionUnsupported
-	}
-
 	// スコアデータの整合性検証
 	errorCount := 0
 	maxErrorsToReport := 10
