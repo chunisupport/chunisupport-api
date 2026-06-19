@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -73,11 +74,11 @@ func TestConvertToSongDTO(t *testing.T) {
 	notes2Value := 800
 	notes1, err := notes.NewNotes(notes1Value)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes1Value: %v", err)
+		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes1Value: %v", err)
 	}
 	notes2, err := notes.NewNotes(notes2Value)
 	if err != nil {
-		t.Fatalf("notes.NewNotes failed for notes2Value: %v", err)
+		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes2Value: %v", err)
 	}
 
 	charts := []*entity.Chart{
@@ -105,29 +106,29 @@ func TestConvertToSongDTO(t *testing.T) {
 
 	// アサーション
 	if dto == nil {
-		t.Fatal("convertToSongDTO returned nil")
+		require.Fail(t, "convertToSongDTO returned nil")
 	}
 
 	if dto.DisplayID != "test123456789012" {
-		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
+		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
 	}
 
 	if dto.MaxOP != 90 {
-		t.Errorf("MaxOP = %v, want %v", dto.MaxOP, 90)
+		assert.Failf(t, "アサーション失敗", "MaxOP = %v, want %v", dto.MaxOP, 90)
 	}
 
 	// IsMaxOPUnknown が反映されていることを確認
 	if !dto.IsMaxOPUnknown {
-		t.Errorf("IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
+		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
 	}
 
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "EXPERT" {
-		t.Errorf("OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "EXPERT")
+		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "EXPERT")
 	}
 
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
-		t.Fatal("Charts is nil")
+		require.Fail(t, "Charts is nil")
 	}
 
 	// BASIC 譜面が存在することを確認
@@ -135,10 +136,10 @@ func TestConvertToSongDTO(t *testing.T) {
 		t.Error("BASIC chart not found")
 	} else {
 		if basicChart.Const != 7.5 {
-			t.Errorf("BASIC chart Const = %v, want %v", basicChart.Const, 7.5)
+			assert.Failf(t, "アサーション失敗", "BASIC chart Const = %v, want %v", basicChart.Const, 7.5)
 		}
 		if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
-			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
+			assert.Failf(t, "アサーション失敗", "BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
 		}
 	}
 
@@ -147,10 +148,10 @@ func TestConvertToSongDTO(t *testing.T) {
 		t.Error("EXPERT chart not found")
 	} else {
 		if expertChart.Const != 12.0 {
-			t.Errorf("expert chart Const = %v, want %v", expertChart.Const, 12.0)
+			assert.Failf(t, "アサーション失敗", "expert chart Const = %v, want %v", expertChart.Const, 12.0)
 		}
 		if expertChart.NotesDesigner == nil || *expertChart.NotesDesigner != "譜面作者B" {
-			t.Errorf("EXPERT chart NotesDesigner = %v, want %v", expertChart.NotesDesigner, "譜面作者B")
+			assert.Failf(t, "アサーション失敗", "EXPERT chart NotesDesigner = %v, want %v", expertChart.NotesDesigner, "譜面作者B")
 		}
 	}
 
@@ -206,22 +207,22 @@ func TestUpdateSongs(t *testing.T) {
 			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
 				t.Helper()
 				if len(requests) != 1 {
-					t.Fatalf("requests len = %d, want 1", len(requests))
+					require.Failf(t, "前提条件失敗", "requests len = %d, want 1", len(requests))
 				}
 				if requests[0] == nil {
-					t.Fatal("requests[0] should not be nil")
+					require.Fail(t, "requests[0] should not be nil")
 				}
 				if requests[0].DisplayID != "1234567890123456" {
-					t.Fatalf("DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
+					require.Failf(t, "前提条件失敗", "DisplayID = %s, want 1234567890123456", requests[0].DisplayID)
 				}
 				if len(requests[0].Charts) != 1 {
-					t.Fatalf("Charts len = %d, want 1", len(requests[0].Charts))
+					require.Failf(t, "前提条件失敗", "Charts len = %d, want 1", len(requests[0].Charts))
 				}
 				if _, ok := requests[0].Charts["BASIC"]; !ok {
-					t.Fatal("Charts['BASIC'] should exist")
+					require.Fail(t, "Charts['BASIC'] should exist")
 				}
 				if requests[0].Charts["BASIC"].NotesDesigner == nil || *requests[0].Charts["BASIC"].NotesDesigner != "譜面作者A" {
-					t.Fatalf("Charts['BASIC'].NotesDesigner = %v, want %v", requests[0].Charts["BASIC"].NotesDesigner, "譜面作者A")
+					require.Failf(t, "前提条件失敗", "Charts['BASIC'].NotesDesigner = %v, want %v", requests[0].Charts["BASIC"].NotesDesigner, "譜面作者A")
 				}
 			},
 		},
@@ -268,30 +269,30 @@ func TestUpdateSongs(t *testing.T) {
 
 			if tc.expectedErrCode == "" {
 				if err != nil {
-					t.Fatalf("UpdateSongs returned error: %v", err)
+					require.Failf(t, "前提条件失敗", "UpdateSongs returned error: %v", err)
 				}
 				if rec.Code != tc.expectedStatus {
-					t.Fatalf("Status code = %d, want %d", rec.Code, tc.expectedStatus)
+					require.Failf(t, "前提条件失敗", "Status code = %d, want %d", rec.Code, tc.expectedStatus)
 				}
 			} else {
 				if err == nil {
-					t.Fatal("UpdateSongs should return error")
+					require.Fail(t, "UpdateSongs should return error")
 				}
 
 				apiErr, ok := err.(*apierror.APIError)
 				if !ok {
-					t.Fatalf("error type = %T, want *apierror.APIError", err)
+					require.Failf(t, "前提条件失敗", "error type = %T, want *apierror.APIError", err)
 				}
 				if apiErr.Code != tc.expectedErrCode {
-					t.Fatalf("api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
+					require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, tc.expectedErrCode)
 				}
 				if apiErr.Internal == nil {
-					t.Fatal("internal error should not be nil")
+					require.Fail(t, "internal error should not be nil")
 				}
 			}
 
 			if called != tc.expectUsecaseHit {
-				t.Fatalf("UpdateSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
+				require.Failf(t, "前提条件失敗", "UpdateSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
 			}
 		})
 	}
@@ -358,26 +359,26 @@ func TestGetSongs(t *testing.T) {
 	// テスト実行
 	err := handler.GetSongs(c)
 	if err != nil {
-		t.Fatalf("GetSongs returned error: %v", err)
+		require.Failf(t, "前提条件失敗", "GetSongs returned error: %v", err)
 	}
 
 	// レスポンスの確認
 	if rec.Code != http.StatusOK {
-		t.Errorf("Status code = %d, want %d", rec.Code, http.StatusOK)
+		assert.Failf(t, "アサーション失敗", "Status code = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// レスポンスボディの確認
 	var response api_internal.SongsResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+		require.Failf(t, "前提条件失敗", "Failed to unmarshal response: %v", err)
 	}
 
 	if len(response.Songs) != 1 {
-		t.Errorf("Songs count = %d, want %d", len(response.Songs), 1)
+		assert.Failf(t, "アサーション失敗", "Songs count = %d, want %d", len(response.Songs), 1)
 	}
 
 	if len(response.Songs) > 0 && response.Songs[0].DisplayID != "test123456789012" {
-		t.Errorf("DisplayID = %v, want %v", response.Songs[0].DisplayID, "test123456789012")
+		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", response.Songs[0].DisplayID, "test123456789012")
 	}
 
 	// JSONレスポンスの詳細確認
@@ -387,14 +388,14 @@ func TestGetSongs(t *testing.T) {
 	if len(response.Songs) > 0 {
 		song := response.Songs[0]
 		if song.Charts == nil {
-			t.Fatal("Charts is nil")
+			require.Fail(t, "Charts is nil")
 		}
 
 		// 全難易度のキーが存在するか確認
 		expectedDiffs := []string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 		for _, diff := range expectedDiffs {
 			if _, exists := song.Charts[diff]; !exists {
-				t.Errorf("Charts should contain key '%s'", diff)
+				assert.Failf(t, "アサーション失敗", "Charts should contain key '%s'", diff)
 			}
 		}
 
@@ -402,7 +403,7 @@ func TestGetSongs(t *testing.T) {
 		if basicChart := song.Charts["BASIC"]; basicChart == nil {
 			t.Error("BASIC chart should not be nil")
 		} else if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
-			t.Errorf("BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
+			assert.Failf(t, "アサーション失敗", "BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
 		}
 
 		// ADVANCED, EXPERT, MASTER, ULTIMAはnullのはず（テストデータにないため）
@@ -421,16 +422,16 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		// Given
 		mockUsecase := &testutil.MockSongUsecase{
 			DeleteSongFunc: func(ctx context.Context, displayID string) error {
-				assert.Equal(t, "missing", displayID)
+				assert.Equal(t, "0000000000000000", displayID)
 				return repository.ErrSongNotFound
 			},
 		}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/missing", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/0000000000000000", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetParamNames("displayid")
-		c.SetParamValues("missing")
+		c.SetParamValues("0000000000000000")
 
 		// When
 		err := handler.DeleteSong(c)
@@ -441,6 +442,33 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 			assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
 			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 		}
+	})
+
+	t.Run("不正なDisplayIDの場合はvalidation_failedを返しユースケースを呼ばない", func(t *testing.T) {
+		// Given
+		called := false
+		mockUsecase := &testutil.MockSongUsecase{
+			DeleteSongFunc: func(ctx context.Context, displayID string) error {
+				called = true
+				return nil
+			},
+		}
+		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/invalid", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("displayid")
+		c.SetParamValues("invalid")
+
+		// When
+		err := handler.DeleteSong(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+		}
+		assert.False(t, called)
 	})
 }
 
@@ -453,16 +481,16 @@ func TestSongHandler_RestoreSong(t *testing.T) {
 		// Given
 		mockUsecase := &testutil.MockSongUsecase{
 			RestoreSongFunc: func(ctx context.Context, displayID string) error {
-				assert.Equal(t, "missing", displayID)
+				assert.Equal(t, "0000000000000000", displayID)
 				return repository.ErrSongNotFound
 			},
 		}
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
-		req := httptest.NewRequest(http.MethodPost, "/internal/songs/missing/restore", nil)
+		req := httptest.NewRequest(http.MethodPost, "/internal/songs/0000000000000000/restore", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetParamNames("displayid")
-		c.SetParamValues("missing")
+		c.SetParamValues("0000000000000000")
 
 		// When
 		err := handler.RestoreSong(c)

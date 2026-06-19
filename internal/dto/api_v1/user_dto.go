@@ -79,7 +79,7 @@ type V1UserRecordResponseDTO struct {
 	BestCandidate []*V1PlayerRecordDTO    `json:"best_candidate"`
 	New           []*V1PlayerRecordDTO    `json:"new"`
 	NewCandidate  []*V1PlayerRecordDTO    `json:"new_candidate"`
-	All           []*V1PlayerRecordDTO    `json:"all"`
+	All           []*V1PlayerRecordDTO    `json:"standard"`
 	WorldsEnd     []*V1WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
 }
 

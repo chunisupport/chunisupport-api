@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -138,15 +139,15 @@ func TestAggregateSongCharts(t *testing.T) {
 			agg := AggregateSongCharts(tt.charts)
 
 			if agg.MaxChartConst != tt.wantMaxChartConst {
-				t.Errorf("MaxChartConst = %v, want %v", agg.MaxChartConst, tt.wantMaxChartConst)
+				assert.Failf(t, "アサーション失敗", "MaxChartConst = %v, want %v", agg.MaxChartConst, tt.wantMaxChartConst)
 			}
 
 			if agg.IsMaxOPUnknown != tt.wantIsMaxOPUnknown {
-				t.Errorf("IsMaxOPUnknown = %v, want %v", agg.IsMaxOPUnknown, tt.wantIsMaxOPUnknown)
+				assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", agg.IsMaxOPUnknown, tt.wantIsMaxOPUnknown)
 			}
 
 			if agg.OpTargetDifficultyID != tt.wantOpTargetDifficultyID {
-				t.Errorf("OpTargetDifficultyID = %v, want %v", agg.OpTargetDifficultyID, tt.wantOpTargetDifficultyID)
+				assert.Failf(t, "アサーション失敗", "OpTargetDifficultyID = %v, want %v", agg.OpTargetDifficultyID, tt.wantOpTargetDifficultyID)
 			}
 		})
 	}
@@ -163,14 +164,14 @@ func TestApplyAggregation(t *testing.T) {
 	ApplyAggregation(song)
 
 	if song.MaxChartConst != 14.6 {
-		t.Errorf("MaxChartConst = %v, want %v", song.MaxChartConst, 14.6)
+		assert.Failf(t, "アサーション失敗", "MaxChartConst = %v, want %v", song.MaxChartConst, 14.6)
 	}
 
 	if !song.IsMaxOPUnknown {
-		t.Errorf("IsMaxOPUnknown = %v, want %v", song.IsMaxOPUnknown, true)
+		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", song.IsMaxOPUnknown, true)
 	}
 
 	if song.OpTargetDifficultyID != DifficultyIDMaster {
-		t.Errorf("OpTargetDifficultyID = %v, want %v", song.OpTargetDifficultyID, DifficultyIDMaster)
+		assert.Failf(t, "アサーション失敗", "OpTargetDifficultyID = %v, want %v", song.OpTargetDifficultyID, DifficultyIDMaster)
 	}
 }

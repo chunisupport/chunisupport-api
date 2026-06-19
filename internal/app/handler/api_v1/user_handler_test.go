@@ -55,17 +55,17 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
 			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
-				assert.Equal(t, "private-user", username)
+				assert.Equal(t, "privateuser", username)
 				assert.True(t, includeNoPlay)
 				return nil, usecase.ErrUserPrivate
 			},
 		}
 		handler := NewV1UserHandler(mockUsecase)
-		req := httptest.NewRequest(http.MethodGet, "/v1/users/private-user?include_noplay=true", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetParamNames("username")
-		c.SetParamValues("private-user")
+		c.SetParamValues("privateuser")
 
 		// When
 		err := handler.GetUser(c)
@@ -76,6 +76,35 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 			assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
 			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 		}
+	})
+
+	t.Run("不正なusernameは境界で拒否する", func(t *testing.T) {
+		// Given
+		called := false
+		e := echo.New()
+		mockUsecase := &mockV1UserUsecase{
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+				called = true
+				return nil, nil
+			},
+		}
+		handler := NewV1UserHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/PrivateUser", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("PrivateUser")
+
+		// When
+		err := handler.GetUser(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUsernameInvalidChar, apiErr.Code)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+		}
+		assert.False(t, called)
 	})
 }
 

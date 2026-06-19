@@ -48,32 +48,61 @@ func (m *mockPlayerLockedSongUsecase) Batch(ctx context.Context, userID int, inp
 }
 
 func TestPlayerLockedSongHandler_List(t *testing.T) {
-	// Given
-	e := echo.New()
-	requester := &entity.User{ID: 1}
-	handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
-		listFunc: func(ctx context.Context, username string, gotRequester *entity.User) ([]*usecase.PlayerLockedSongOutput, error) {
-			assert.Equal(t, "testuser", username)
-			assert.Same(t, requester, gotRequester)
-			return []*usecase.PlayerLockedSongOutput{
-				{DisplayID: "1234567890abcdef", Title: "テスト楽曲", IsUltima: true},
-			}, nil
-		},
+	t.Run("有効なusernameで一覧を返す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		requester := &entity.User{ID: 1}
+		handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
+			listFunc: func(ctx context.Context, username string, gotRequester *entity.User) ([]*usecase.PlayerLockedSongOutput, error) {
+				assert.Equal(t, "testuser", username)
+				assert.Same(t, requester, gotRequester)
+				return []*usecase.PlayerLockedSongOutput{
+					{DisplayID: "1234567890abcdef", Title: "テスト楽曲", IsUltima: true},
+				}, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/locked-songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", requester)
+		c.SetParamNames("username")
+		c.SetParamValues("testuser")
+
+		// When
+		err := handler.List(c)
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"items":[{"display_id":"1234567890abcdef","title":"テスト楽曲","is_ultima":true}]}`, rec.Body.String())
 	})
-	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/locked-songs", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set("userEntity", requester)
-	c.SetParamNames("username")
-	c.SetParamValues("testuser")
 
-	// When
-	err := handler.List(c)
+	t.Run("不正なusernameは境界で拒否する", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		called := false
+		handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
+			listFunc: func(ctx context.Context, username string, gotRequester *entity.User) ([]*usecase.PlayerLockedSongOutput, error) {
+				called = true
+				return nil, nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodGet, "/internal/users/InvalidUser/locked-songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("InvalidUser")
 
-	// Then
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"items":[{"display_id":"1234567890abcdef","title":"テスト楽曲","is_ultima":true}]}`, rec.Body.String())
+		// When
+		err := handler.List(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUsernameInvalidChar, apiErr.Code)
+		}
+		assert.False(t, called)
+	})
 }
 
 func TestPlayerLockedSongHandler_Unlock(t *testing.T) {

@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	maxScoreValue   = 1010000
-	minScoreValue   = 1
-	tokyoLayout     = "2006/01/02 15:04"
-	defaultSlotName = "none"
+	maxPlayerDataChangeDetails = 100
+	maxScoreValue              = 1010000
+	minScoreValue              = 1
+	tokyoLayout                = "2006/01/02 15:04"
+	defaultSlotName            = "none"
 )
 
 var (
@@ -73,11 +74,11 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 	errorMessages := make([]string, 0, maxErrorsToReport)
 
 	// 通常譜面のスコア検証
-	for i, entry := range payload.Scores.Full {
+	for i, entry := range payload.Scores.Standard {
 		if errorCount >= maxErrorsToReport {
 			break
 		}
-		if err := validateScoreEntry(&entry, "full", i); err != nil {
+		if err := validateScoreEntry(&entry, "standard", i); err != nil {
 			errorCount++
 			errorMessages = append(errorMessages, err.Error())
 		}
@@ -240,8 +241,10 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	result := &api_internal.PlayerDataResult{
-		AppVersion: payload.AppVersion,
-		ImportedAt: time.Now().UTC(),
+		AppVersion:     payload.AppVersion,
+		ImportedAt:     time.Now().UTC(),
+		Changes:        []api_internal.PlayerDataRecordChange{},
+		SkippedRecords: []api_internal.SkippedRecord{},
 	}
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
@@ -271,7 +274,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, changes, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
 		if scoreErr != nil {
 			return scoreErr
 		}
@@ -293,8 +296,17 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
-		if len(changes) > 0 {
-			result.Changes = changes
+		result.Changes = changes
+		result.Profile = api_internal.PlayerDataProfile{
+			PlayerID:          playerID,
+			Name:              summaryInput.Name,
+			Level:             summaryInput.Level,
+			Rating:            summaryInput.OfficialRating,
+			ClassEmblemID:     summaryInput.ClassEmblemID,
+			ClassEmblemBaseID: summaryInput.ClassBaseID,
+			LastPlayedAt:      summaryInput.LastPlayedAt,
+			OverpowerValue:    summaryInput.OverpowerValue,
+			OverpowerPercent:  summaryInput.OverpowerPercent,
 		}
 		result.Summary = api_internal.PlayerDataSummary{
 			Name:             summaryInput.Name,
@@ -304,9 +316,8 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			OverpowerValue:   summaryInput.OverpowerValue,
 			OverpowerPercent: summaryInput.OverpowerPercent,
 		}
-		if len(skippedRecords) > 0 {
-			result.SkippedRecords = skippedRecords
-		}
+		result.Statistics = statistics
+		result.SkippedRecords = skippedRecords
 
 		return nil
 	})
@@ -338,7 +349,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 	}
 
 	idxSet := make(map[string]struct{})
-	for _, entry := range payload.Scores.Full {
+	for _, entry := range payload.Scores.Standard {
 		idx := strings.TrimSpace(entry.Idx)
 		if idx != "" {
 			idxSet[idx] = struct{}{}
@@ -577,8 +588,8 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error) {
-	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Full, masters, updatedAt)
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
+	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
 	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
 	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
 	counts.WorldsendRecordsSkipped = worldsendCounts.WorldsendRecordsSkipped
@@ -589,11 +600,11 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 
 	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))
 	if err != nil {
-		return counts, skipped, nil, calculatedOverpowerSummary{}, err
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 	worldsendBefore, err := us.playerDataRepo.FindWorldsendRecordStatesByChartIDs(ctx, tx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
 	if err != nil {
-		return counts, skipped, nil, calculatedOverpowerSummary{}, err
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 
 	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
@@ -604,6 +615,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
 	changes = append(changes, playerRecordChangesDTO(fullRecordChanges, lampLookup)...)
 	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges, lampLookup)...)
+	changes = sortAndLimitRecordChanges(changes)
 	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
 	counts.WorldsendRecordsActuallyChanged = len(worldsendRecordChanges)
 
@@ -611,7 +623,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
 	}); err != nil {
-		return counts, skipped, changes, calculatedOverpowerSummary{}, err
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 
 	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
@@ -620,23 +632,71 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		PlayerID:         &playerID,
 	})
 	if err != nil {
-		return counts, skipped, changes, calculatedOverpowerSummary{}, err
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 
 	records, recErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
 	if recErr != nil {
-		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
 	lockedSongs, lockedErr := us.listLockedSongsForOverpower(ctx, tx, playerID)
 	if lockedErr != nil {
-		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
 	}
 	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
 	if err != nil {
-		return counts, skipped, changes, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
 	}
 
-	return counts, skipped, changes, overpowerSummary, nil
+	return counts, skipped, changes, buildPlayerDataStatistics(records), overpowerSummary, nil
+}
+
+func buildPlayerDataStatistics(records []*entity.PlayerRecord) api_internal.PlayerDataStatistics {
+	statistics := api_internal.PlayerDataStatistics{
+		LampCounts: api_internal.PlayerDataLampCounts{
+			Clear:     map[string]int{},
+			Combo:     map[string]int{},
+			FullChain: map[string]int{},
+		},
+	}
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		statistics.TotalHighScore += int(record.Score)
+		incrementLampCount(statistics.LampCounts.Clear, clearLampCountName(record.ClearLamp))
+		incrementLampCount(statistics.LampCounts.Combo, comboLampCountName(record.ComboLamp))
+		incrementLampCount(statistics.LampCounts.FullChain, fullChainCountName(record.FullChain))
+	}
+	return statistics
+}
+
+func incrementLampCount(counts map[string]int, name string) {
+	if name == "" {
+		return
+	}
+	counts[name]++
+}
+
+func clearLampCountName(lamp *entity.ClearLampType) string {
+	if lamp == nil {
+		return ""
+	}
+	return lamp.Name
+}
+
+func comboLampCountName(lamp *entity.ComboLampType) string {
+	if lamp == nil {
+		return ""
+	}
+	return lamp.Name
+}
+
+func fullChainCountName(lamp *entity.FullChainType) string {
+	if lamp == nil {
+		return ""
+	}
+	return lamp.Name
 }
 
 func (us *playerDataUsecase) listLockedSongsForOverpower(ctx context.Context, tx repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
@@ -664,20 +724,20 @@ func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *play
 		if err != nil {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, api_internal.SkippedRecord{
-				RecordType: "full",
+				RecordType: "standard",
 				Reason:     "failed to resolve chart",
 				Details:    fmt.Sprintf("idx=%s, diff=%s, error=%s", entry.Idx, entry.Diff, err.Error()),
 			})
 			continue
 		}
 
-		if skippedRecord, ok := validateScoreRange("full", entry, song); ok {
+		if skippedRecord, ok := validateScoreRange("standard", entry, song); ok {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, skippedRecord)
 			continue
 		}
 
-		lampIDs, skippedRecord := resolveCommonLampIDs("full", entry, song, masters)
+		lampIDs, skippedRecord := resolveCommonLampIDs("standard", entry, song, masters)
 		if skippedRecord != nil {
 			counts.FullRecordsSkipped++
 			skipped = append(skipped, *skippedRecord)
@@ -687,7 +747,7 @@ func applyFullScores(playerID int, entries []PlayerDataScoreEntry, masters *play
 		slotID, err := resolveSlotID(entry.Slot, masters)
 		if err != nil {
 			counts.FullRecordsSkipped++
-			skipped = append(skipped, newResolveSkippedRecord("full", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
+			skipped = append(skipped, newResolveSkippedRecord("standard", "slot", "slot", entry, song, optionalStringValue(entry.Slot), err))
 			continue
 		}
 
@@ -813,7 +873,7 @@ func computeFullRecordChanges(ctx context.Context, before map[int]repository.Pla
 			return fullRecordDisplayKeys(ctx, record.ChartID, masters, lookup)
 		},
 		playerRecordMeaningfullyChanged,
-		"full",
+		"standard",
 	)
 }
 
@@ -957,6 +1017,43 @@ func recordChangesDTO[State any](changes []playerDataRecordChange[State], stateD
 		dtos = append(dtos, dto)
 	}
 	return dtos
+}
+
+func sortAndLimitRecordChanges(changes []api_internal.PlayerDataRecordChange) []api_internal.PlayerDataRecordChange {
+	slices.SortStableFunc(changes, comparePlayerDataRecordChange)
+	if len(changes) <= maxPlayerDataChangeDetails {
+		return changes
+	}
+	return changes[:maxPlayerDataChangeDetails]
+}
+
+func comparePlayerDataRecordChange(a, b api_internal.PlayerDataRecordChange) int {
+	aIdx, aOK := parseChangeIdx(a.Idx)
+	bIdx, bOK := parseChangeIdx(b.Idx)
+	if aOK != bOK {
+		if aOK {
+			return -1
+		}
+		return 1
+	}
+	if aOK && aIdx != bIdx {
+		return aIdx - bIdx
+	}
+	if a.Idx != b.Idx {
+		return strings.Compare(a.Idx, b.Idx)
+	}
+	if a.RecordType != b.RecordType {
+		return strings.Compare(a.RecordType, b.RecordType)
+	}
+	if a.Diff != b.Diff {
+		return strings.Compare(a.Diff, b.Diff)
+	}
+	return strings.Compare(a.ChangeType, b.ChangeType)
+}
+
+func parseChangeIdx(idx string) (int, bool) {
+	value, err := strconv.Atoi(idx)
+	return value, err == nil
 }
 
 type lampNameLookup struct {

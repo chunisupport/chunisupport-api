@@ -20,6 +20,9 @@ var (
 	// ErrGoalNotFound は目標が見つからなかった場合に返されるエラーです。
 	ErrGoalNotFound = errors.New("goal not found")
 
+	// ErrRecordFilterNotFound は譜面フィルタが見つからなかった場合に返されるエラーです。
+	ErrRecordFilterNotFound = errors.New("record filter not found")
+
 	// ErrHonorNotFound は称号が見つからなかった場合に返されるエラーです。
 	ErrHonorNotFound = errors.New("honor not found")
 

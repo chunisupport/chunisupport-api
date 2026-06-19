@@ -91,6 +91,14 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalInvalidAchievementParams.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
 		return ErrGoalInvalidAttributes.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecordFilterNotFound):
+		return ErrRecordFilterNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecordFilterLimitExceeded):
+		return ErrRecordFilterLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRecordFilterInput):
+		return ErrInvalidRecordFilterInput.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRecordFilterID):
+		return ErrInvalidRecordFilterID.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

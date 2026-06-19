@@ -1,6 +1,9 @@
 package displayid
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestNewDisplayID(t *testing.T) {
 	tests := []struct {
@@ -59,11 +62,11 @@ func TestNewDisplayID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewDisplayID(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewDisplayID() error = %v, wantErr %v", err, tt.wantErr)
+				assert.Failf(t, "アサーション失敗", "NewDisplayID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got.String() != tt.input {
-				t.Errorf("NewDisplayID() = %v, want %v", got, tt.input)
+				assert.Failf(t, "アサーション失敗", "NewDisplayID() = %v, want %v", got, tt.input)
 			}
 		})
 	}
@@ -95,7 +98,7 @@ func TestDisplayID_IsValid(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.id.IsValid(); got != tt.valid {
-				t.Errorf("DisplayID.IsValid() = %v, want %v", got, tt.valid)
+				assert.Failf(t, "アサーション失敗", "DisplayID.IsValid() = %v, want %v", got, tt.valid)
 			}
 		})
 	}

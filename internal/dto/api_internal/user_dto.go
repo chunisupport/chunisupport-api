@@ -46,7 +46,7 @@ type UserRecordMetaDTO struct {
 
 // UserRecordDTO は公開向けのレコードレスポンスです。
 type UserRecordDTO struct {
-	All       []*dto.PlayerRecordDTO    `json:"all"`
+	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
 	Meta      *UserRecordMetaDTO        `json:"meta"`
 }
@@ -54,7 +54,7 @@ type UserRecordDTO struct {
 // UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
 type UserRecordViewResponseDTO struct {
 	UpdatedAt time.Time                 `json:"updated_at"`
-	All       []*dto.PlayerRecordDTO    `json:"all"`
+	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
 }
 

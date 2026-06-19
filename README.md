@@ -13,6 +13,7 @@
 
 - [API仕様書（内部/公開）](docs/API.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
+- [logrotate設定手順](docs/logrotate.md)
 
 ## 技術スタック
 
@@ -53,10 +54,11 @@
    ```json
    {
       "app_port": 3000,
-      "log_level": "debug",
-      "log_paths": {
-         "app": ".log/app",
-         "echo": ".log/echo"
+      "logging": {
+         "level": "debug",
+         "app_file": ".log/app.log",
+         "access_file": ".log/access.log",
+         "stdout": true
       },
       "shutdown_timeout_seconds": 20,
       "cors": {
@@ -67,11 +69,12 @@
          "allow_credentials": true,
          "max_age": 3600
       },
-      "static_db_path": "./static.db"
+      "static_db_path": "./static.db",
+      "smalldata_db_path": "./smalldata.db"
    }
    ```
 4. データベースを作成してマイグレーションする。
-   - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。マイグレーションを実行する際は、コマンド内のパスをこの設定値と一致させてください。
+   - `static.db` の配置先は `.config/<環境>.settings.json` の `static_db_path` で指定します。`smalldata.db` の配置先は `smalldata_db_path` で指定します。マイグレーションを実行する際は、コマンド内のパスをこれらの設定値と一致させてください。
    ```bash
    mysql -u <DB_USER> -p -e "CREATE DATABASE IF NOT EXISTS <DB_NAME>;"
    ```
@@ -79,6 +82,7 @@
    go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
    migrate -database "mysql://<DB_USER>:<DB_PASS>@tcp(<DB_HOST>:<DB_PORT>)/<DB_NAME>" -path migration/mysql up
    migrate -database "sqlite3://./static.db" -path migration/sqlite up
+   migrate -database "sqlite3://./smalldata.db" -path migration/sqlite_smalldata up
    ```
 
 5. 起動する。

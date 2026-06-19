@@ -22,7 +22,7 @@ func main() {
 }
 
 func run() int {
-	slog.Info(info.Name + " v" + info.Version)
+	slog.Info(info.Name, "build_date", info.BuildDate, "revision", info.Revision)
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -31,31 +31,49 @@ func run() int {
 	}
 
 	// アプリのロガーを設定
-	logLevel := logger.ParseLogLevel(cfg.LogLevel)
-	var appLogger *slog.Logger
-	var loggerHandler *logger.Handler
-	if appLoggerWithFile, err := logger.NewHandlerWithFile(cfg.LogPaths.App, logLevel); err == nil {
-		loggerHandler = appLoggerWithFile
-		appLogger = slog.New(loggerHandler)
-	} else {
-		slog.Error("Failed to create app logger with file", "error", err)
-		loggerHandler = logger.NewHandler(logLevel)
-		appLogger = slog.New(loggerHandler)
+	loggerHandler, err := logger.NewHandler(cfg.Logging)
+	if err != nil {
+		slog.Error("Failed to create app logger", "error", err)
+		return 1
 	}
-	slog.SetDefault(appLogger)
+	accessLogWriter, err := logger.NewAccessLogWriter(cfg.Logging)
+	if err != nil {
+		slog.Error("Failed to create access logger", "error", err)
+		if closeErr := loggerHandler.Close(); closeErr != nil {
+			slog.Error("Failed to close app logger", "error", closeErr)
+		}
+		return 1
+	}
+	logManager := &app.LogManager{
+		AppHandler:   loggerHandler,
+		AccessWriter: accessLogWriter,
+	}
+	slog.SetDefault(slog.New(loggerHandler))
 	defer func() {
-		if err := loggerHandler.Close(); err != nil {
-			slog.Error("Failed to close logger", "error", err)
+		if err := logManager.Close(); err != nil {
+			slog.Error("Failed to close log manager", "error", err)
 		}
 	}()
 
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	signalCtx, cancelSignalCtx := context.WithCancel(context.Background())
+	defer cancelSignalCtx()
+	terminationCh := make(chan os.Signal, 1)
+	receivedTerminationCh := make(chan os.Signal, 1)
+	signal.Notify(terminationCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(terminationCh)
+	go func() {
+		sig := <-terminationCh
+		receivedTerminationCh <- sig
+		cancelSignalCtx()
+	}()
+	reloadCh := make(chan os.Signal, 1)
+	app.NotifyLogReload(reloadCh)
+	defer signal.Stop(reloadCh)
 
 	database, err := db.ConnectWithRetry(signalCtx, cfg.Database.DbConfig)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			slog.Info("Startup canceled")
+			slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 			return 0
 		}
 		slog.Error("Failed to connect to database", "error", err)
@@ -66,7 +84,7 @@ func run() int {
 			slog.Error("Failed to close database after startup cancellation", "error", closeErr)
 			return 1
 		}
-		slog.Info("Startup canceled")
+		slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 		return 0
 	}
 
@@ -79,6 +97,14 @@ func run() int {
 	}
 
 	slog.Info("Connected to the static database")
+
+	smallDataDatabase, err := db.ConnectStatic(cfg.SmallDataDBPath)
+	if err != nil {
+		slog.Error("Failed to connect to small data database", "error", err)
+		return 1
+	}
+
+	slog.Info("Connected to the small data database")
 
 	// 必須データの存在チェック
 	// if err := db.ValidateRequiredData(database); err != nil {
@@ -121,43 +147,53 @@ func run() int {
 			slog.Error("Failed to close static database after startup cancellation", "error", closeErr)
 			return 1
 		}
-		slog.Info("Startup canceled")
+		if closeErr := smallDataDatabase.Close(); closeErr != nil {
+			slog.Error("Failed to close small data database after startup cancellation", "error", closeErr)
+			return 1
+		}
+		slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 		return 0
 	}
 
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter)
+	server := app.NewServer(database, staticDatabase, smallDataDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
 
 	serverErrCh := make(chan error, 1)
 	go func() {
 		serverErrCh <- server.Start()
 	}()
 
-	select {
-	case <-signalCtx.Done():
-		slog.Info("Starting graceful shutdown")
-	case err := <-serverErrCh:
-		if err != nil {
-			slog.Error("Server stopped with error", "error", err)
-			if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
-				slog.Error("Server shutdown after start failure failed", "error", shutdownErr)
+	for {
+		select {
+		case sig := <-receivedTerminationCh:
+			slog.Info("Starting graceful shutdown", "signal", signalName(sig))
+			if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
+				slog.Error("Server shutdown failed", "error", err)
+				return 1
 			}
-			return 1
+			slog.Info("Graceful shutdown completed", "signal", signalName(sig))
+			return 0
+		case <-reloadCh:
+			if err := logManager.ReopenAll(); err != nil {
+				slog.Error("Failed to reopen logs", "error", err)
+			} else {
+				slog.Info("Logs reopened")
+			}
+		case err := <-serverErrCh:
+			if err != nil {
+				slog.Error("Server stopped with error", "error", err)
+				if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+					slog.Error("Server shutdown after start failure failed", "error", shutdownErr)
+				}
+				return 1
+			}
+			slog.Info("Server stopped")
+			if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
+				slog.Error("Server shutdown after stop failed", "error", shutdownErr)
+				return 1
+			}
+			return 0
 		}
-		slog.Info("Server stopped")
-		if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
-			slog.Error("Server shutdown after stop failed", "error", shutdownErr)
-			return 1
-		}
-		return 0
 	}
-
-	if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
-		slog.Error("Server shutdown failed", "error", err)
-		return 1
-	}
-
-	slog.Info("Graceful shutdown completed")
-	return 0
 }
 
 func shutdownServer(server *app.Server, shutdownTimeoutSeconds int) error {
@@ -166,4 +202,26 @@ func shutdownServer(server *app.Server, shutdownTimeoutSeconds int) error {
 	defer cancel()
 
 	return server.Shutdown(shutdownCtx)
+}
+
+func pendingSignalName(ch <-chan os.Signal) string {
+	select {
+	case sig := <-ch:
+		return signalName(sig)
+	default:
+		return ""
+	}
+}
+
+func signalName(sig os.Signal) string {
+	if sig == nil {
+		return ""
+	}
+	if sig == os.Interrupt {
+		return "SIGINT"
+	}
+	if sig == syscall.SIGTERM {
+		return "SIGTERM"
+	}
+	return sig.String()
 }

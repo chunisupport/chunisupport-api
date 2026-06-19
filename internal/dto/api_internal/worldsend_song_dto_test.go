@@ -22,7 +22,7 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	releasedAt := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	levelStar, levelStarErr := levelstar.NewLevelStar(5)
 	if levelStarErr != nil {
-		t.Fatalf("levelstar.NewLevelStar failed: %v", levelStarErr)
+		require.Failf(t, "前提条件失敗", "levelstar.NewLevelStar failed: %v", levelStarErr)
 	}
 	attribute := "狂"
 	notesObj, _ := notes.NewNotes(1500)
@@ -55,79 +55,79 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	dto := ToWorldsendSongDTO(song, chart, genreNamesByID)
 
 	if dto == nil {
-		t.Fatal("ToWorldsendSongDTO returned nil")
+		require.Fail(t, "ToWorldsendSongDTO returned nil")
 	}
 
 	if dto.DisplayID != "0123456789abcdef" {
-		t.Errorf("DisplayID = %v, want %v", dto.DisplayID, "0123456789abcdef")
+		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "0123456789abcdef")
 	}
 
 	if dto.Title != "テスト楽曲" {
-		t.Errorf("Title = %v, want %v", dto.Title, "テスト楽曲")
+		assert.Failf(t, "アサーション失敗", "Title = %v, want %v", dto.Title, "テスト楽曲")
 	}
 
 	require.NotNil(t, dto.Reading)
 	assert.Equal(t, "テストガッキョク", *dto.Reading)
 
 	if dto.Artist != "テストアーティスト" {
-		t.Errorf("Artist = %v, want %v", dto.Artist, "テストアーティスト")
+		assert.Failf(t, "アサーション失敗", "Artist = %v, want %v", dto.Artist, "テストアーティスト")
 	}
 
 	// Genre は *string でジャンル名に変換される
 	if dto.Genre == nil {
 		t.Error("Genre is nil, want POPS & ANIME")
 	} else if *dto.Genre != "POPS & ANIME" {
-		t.Errorf("Genre = %v, want %v", *dto.Genre, "POPS & ANIME")
+		assert.Failf(t, "アサーション失敗", "Genre = %v, want %v", *dto.Genre, "POPS & ANIME")
 	}
 
 	if dto.BPM == nil || *dto.BPM != 180 {
-		t.Errorf("BPM = %v, want %v", dto.BPM, 180)
+		assert.Failf(t, "アサーション失敗", "BPM = %v, want %v", dto.BPM, 180)
 	}
 
 	// Release は *string で "YYYY-MM-DD" 形式
 	if dto.Release == nil {
 		t.Error("Release is nil")
 	} else if *dto.Release != "2024-01-15" {
-		t.Errorf("Release = %v, want %v", *dto.Release, "2024-01-15")
+		assert.Failf(t, "アサーション失敗", "Release = %v, want %v", *dto.Release, "2024-01-15")
 	}
 
 	if dto.Jacket == nil {
 		t.Error("Jacket is nil")
 	} else if *dto.Jacket != "jacket.png" {
-		t.Errorf("Jacket = %v, want %v", *dto.Jacket, "jacket.png")
+		assert.Failf(t, "アサーション失敗", "Jacket = %v, want %v", *dto.Jacket, "jacket.png")
 	}
 
 	if dto.OfficialIdx != "123" {
-		t.Errorf("OfficialIdx = %v, want %v", dto.OfficialIdx, "123")
+		assert.Failf(t, "アサーション失敗", "OfficialIdx = %v, want %v", dto.OfficialIdx, "123")
 	}
 
 	// Charts に WORLDSEND キーが存在すること
 	if dto.Charts == nil {
-		t.Fatal("Charts is nil")
+		require.Fail(t, "Charts is nil")
 	}
 
 	weChart, ok := dto.Charts["WORLDSEND"]
 	if !ok {
-		t.Fatal("Charts does not contain WORLDSEND key")
+		require.Fail(t, "Charts does not contain WORLDSEND key")
 	}
 
 	if weChart == nil {
-		t.Fatal("WORLDSEND chart is nil")
+		require.Fail(t, "WORLDSEND chart is nil")
 	}
 
 	if weChart.LevelStar == nil || *weChart.LevelStar != 5 {
-		t.Errorf("LevelStar = %v, want %v", weChart.LevelStar, 5)
+		assert.Failf(t, "アサーション失敗", "LevelStar = %v, want %v", weChart.LevelStar, 5)
 	}
 
 	if weChart.Attribute == nil || *weChart.Attribute != "狂" {
-		t.Errorf("Attribute = %v, want %v", weChart.Attribute, "狂")
+		assert.Failf(t, "アサーション失敗", "Attribute = %v, want %v", weChart.Attribute, "狂")
 	}
 
 	if weChart.Notes == nil || *weChart.Notes != 1500 {
-		t.Errorf("Notes = %v, want %v", weChart.Notes, 1500)
+		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", weChart.Notes, 1500)
 	}
 	if weChart.NotesDesigner == nil || *weChart.NotesDesigner != "譜面作者A" {
-		t.Errorf("NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
+		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
 	}
 }
 
@@ -142,7 +142,7 @@ func TestToWorldsendSongDTO_ReleaseDateCanBeNil(t *testing.T) {
 
 	dto := ToWorldsendSongDTO(song, nil, map[int]string{})
 	if dto.Release != nil {
-		t.Errorf("Release = %v, want nil", *dto.Release)
+		assert.Failf(t, "アサーション失敗", "Release = %v, want nil", *dto.Release)
 	}
 }
 
@@ -150,7 +150,7 @@ func TestToWorldsendSongDTO_ReleaseDateCanBeNil(t *testing.T) {
 func TestToWorldsendSongDTO_NilSong(t *testing.T) {
 	dto := ToWorldsendSongDTO(nil, nil, map[int]string{})
 	if dto != nil {
-		t.Errorf("expected nil, got %v", dto)
+		assert.Failf(t, "アサーション失敗", "expected nil, got %v", dto)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestToWorldsendSongDTO_NilSong(t *testing.T) {
 func TestToWorldsendChartDTO(t *testing.T) {
 	levelStar, levelStarErr := levelstar.NewLevelStar(3)
 	if levelStarErr != nil {
-		t.Fatalf("levelstar.NewLevelStar failed: %v", levelStarErr)
+		require.Failf(t, "前提条件失敗", "levelstar.NewLevelStar failed: %v", levelStarErr)
 	}
 	attribute := "光"
 	notesObj, _ := notes.NewNotes(2000)
@@ -174,22 +174,22 @@ func TestToWorldsendChartDTO(t *testing.T) {
 	dto := ToWorldsendChartDTO(chart)
 
 	if dto == nil {
-		t.Fatal("ToWorldsendChartDTO returned nil")
+		require.Fail(t, "ToWorldsendChartDTO returned nil")
 	}
 
 	if dto.LevelStar == nil || *dto.LevelStar != 3 {
-		t.Errorf("LevelStar = %v, want %v", dto.LevelStar, 3)
+		assert.Failf(t, "アサーション失敗", "LevelStar = %v, want %v", dto.LevelStar, 3)
 	}
 
 	if dto.Attribute == nil || *dto.Attribute != "光" {
-		t.Errorf("Attribute = %v, want %v", dto.Attribute, "光")
+		assert.Failf(t, "アサーション失敗", "Attribute = %v, want %v", dto.Attribute, "光")
 	}
 
 	if dto.Notes == nil || *dto.Notes != 2000 {
-		t.Errorf("Notes = %v, want %v", dto.Notes, 2000)
+		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", dto.Notes, 2000)
 	}
 	if dto.NotesDesigner == nil || *dto.NotesDesigner != "譜面作者B" {
-		t.Errorf("NotesDesigner = %v, want %v", dto.NotesDesigner, "譜面作者B")
+		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", dto.NotesDesigner, "譜面作者B")
 	}
 }
 
@@ -197,7 +197,7 @@ func TestToWorldsendChartDTO(t *testing.T) {
 func TestToWorldsendChartDTO_NilChart(t *testing.T) {
 	dto := ToWorldsendChartDTO(nil)
 	if dto != nil {
-		t.Errorf("expected nil, got %v", dto)
+		assert.Failf(t, "アサーション失敗", "expected nil, got %v", dto)
 	}
 }
 
@@ -236,49 +236,49 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 
 	jsonBytes, err := json.Marshal(songDTO)
 	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
+		require.Failf(t, "前提条件失敗", "json.Marshal failed: %v", err)
 	}
 
 	jsonString := string(jsonBytes)
 
 	// release フィールド名であることを確認（released_at ではない）
 	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
-		t.Errorf("JSON should contain 'release' field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'release' field, got: %s", jsonString)
 	}
 
 	if !strings.Contains(jsonString, `"reading":"テストガッキョク"`) {
-		t.Errorf("JSON should contain reading field, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
 	}
 
 	// genre がジャンル名であることを確認（genre_id ではない）
 	// Goの json.Marshal は & を \u0026 にエスケープするため、エスケープ後の文字列で検証
 	if !strings.Contains(jsonString, `"genre":"POPS \u0026 ANIME"`) {
-		t.Errorf("JSON should contain genre name, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain genre name, got: %s", jsonString)
 	}
 
 	// official_idx が含まれること
 	if !strings.Contains(jsonString, `"official_idx":"123"`) {
-		t.Errorf("JSON should contain official_idx, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain official_idx, got: %s", jsonString)
 	}
 
 	// charts.WORLDSEND が含まれること
 	if !strings.Contains(jsonString, `"WORLDSEND"`) {
-		t.Errorf("JSON should contain 'WORLDSEND' key, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain 'WORLDSEND' key, got: %s", jsonString)
 	}
 
 	// attribute, level_star, notes が charts 内に含まれること
 	if !strings.Contains(jsonString, `"attribute":"狂"`) {
-		t.Errorf("JSON should contain attribute, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain attribute, got: %s", jsonString)
 	}
 
 	if !strings.Contains(jsonString, `"level_star":5`) {
-		t.Errorf("JSON should contain level_star, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain level_star, got: %s", jsonString)
 	}
 
 	if !strings.Contains(jsonString, `"notes":1500`) {
-		t.Errorf("JSON should contain notes, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain notes, got: %s", jsonString)
 	}
 	if !strings.Contains(jsonString, `"notes_designer":"譜面作者C"`) {
-		t.Errorf("JSON should contain notes_designer, got: %s", jsonString)
+		assert.Failf(t, "アサーション失敗", "JSON should contain notes_designer, got: %s", jsonString)
 	}
 }

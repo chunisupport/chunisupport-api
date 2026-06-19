@@ -116,7 +116,7 @@ func TestCalcSingleRating(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := CalcSingleRating(tt.score, tt.chartConst)
 			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcSingleRating(%d, %.1f) = %.6f, want %.6f", tt.score, tt.chartConst, got, tt.want)
+				assert.Failf(t, "アサーション失敗", "CalcSingleRating(%d, %.1f) = %.6f, want %.6f", tt.score, tt.chartConst, got, tt.want)
 			}
 		})
 	}
@@ -241,13 +241,13 @@ func TestCalcRatingStats(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := CalcRatingStats(tt.records)
 			if !floatEquals(got.PlayerRating, tt.wantPlayer) {
-				t.Errorf("PlayerRating = %.6f, want %.6f", got.PlayerRating, tt.wantPlayer)
+				assert.Failf(t, "アサーション失敗", "PlayerRating = %.6f, want %.6f", got.PlayerRating, tt.wantPlayer)
 			}
 			if !floatEquals(got.BestAverage, tt.wantBestAvg) {
-				t.Errorf("BestAverage = %.6f, want %.6f", got.BestAverage, tt.wantBestAvg)
+				assert.Failf(t, "アサーション失敗", "BestAverage = %.6f, want %.6f", got.BestAverage, tt.wantBestAvg)
 			}
 			if !floatEquals(got.NewAverage, tt.wantNewAvg) {
-				t.Errorf("NewAverage = %.6f, want %.6f", got.NewAverage, tt.wantNewAvg)
+				assert.Failf(t, "アサーション失敗", "NewAverage = %.6f, want %.6f", got.NewAverage, tt.wantNewAvg)
 			}
 		})
 	}
@@ -301,7 +301,7 @@ func TestCalcSingleOverpower(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := CalcSingleOverpower(tt.score, tt.chartConst, tt.comboLampID)
 			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", tt.score, tt.chartConst, tt.comboLampID, got, tt.want)
+				assert.Failf(t, "アサーション失敗", "CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", tt.score, tt.chartConst, tt.comboLampID, got, tt.want)
 			}
 		})
 	}
@@ -318,7 +318,7 @@ func TestCalcSingleOverpower_WikiExample(t *testing.T) {
 	want := 91.06
 
 	if !floatEquals(got, want) {
-		t.Errorf("Wiki example: CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", score, chartConst, comboLampID, got, want)
+		assert.Failf(t, "アサーション失敗", "Wiki example: CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", score, chartConst, comboLampID, got, want)
 	}
 }
 
@@ -344,7 +344,7 @@ func TestCalcSongMaxOP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := CalcSongMaxOP(tt.maxChartConst)
 			if !floatEquals(got, tt.want) {
-				t.Errorf("CalcSongMaxOP() = %.6f, want %.6f", got, tt.want)
+				assert.Failf(t, "アサーション失敗", "CalcSongMaxOP() = %.6f, want %.6f", got, tt.want)
 			}
 		})
 	}
@@ -408,7 +408,7 @@ func TestRoundN(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			got := roundN(tt.num, tt.n)
 			if !floatEquals(got, tt.want) {
-				t.Errorf("roundN(%.4f, %d) = %.6f, want %.6f", tt.num, tt.n, got, tt.want)
+				assert.Failf(t, "アサーション失敗", "roundN(%.4f, %d) = %.6f, want %.6f", tt.num, tt.n, got, tt.want)
 			}
 		})
 	}

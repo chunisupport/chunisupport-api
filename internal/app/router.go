@@ -6,10 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
+	"runtime"
 	"slices"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
@@ -77,6 +75,7 @@ type Handlers struct {
 	Me                  *api_internal.MeHandler
 	MasterData          *api_internal.MasterDataHandler
 	Goal                *api_internal.GoalHandler
+	RecordFilter        *api_internal.RecordFilterHandler
 	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong    *api_internal.PlayerLockedSongHandler
 	// 外部API v1 用ハンドラ
@@ -89,8 +88,8 @@ type Handlers struct {
 }
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
-// echoLogWriterはnilの場合があります（ログ設定失敗時）
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
+// echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 
@@ -122,6 +121,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
+	recordFilterRepo := infra.NewRecordFilterRepository(smallDataDB)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
@@ -139,6 +139,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	recordFilterUsecase := usecase.NewRecordFilterUsecase(recordFilterRepo)
 	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
 	playerSongIDResolver := infra.NewPlayerSongIDResolver()
 	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
@@ -166,6 +167,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		Me:                  api_internal.NewMeHandler(playerDataUsecase),
 		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
 		Goal:                api_internal.NewGoalHandler(goalUsecase),
+		RecordFilter:        api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:    api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		// 外部API v1 用ハンドラ
@@ -183,13 +185,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		return c.NoContent(http.StatusNoContent)
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
-	e.GET("/", func(c echo.Context) error {
-		// 互換性のためアプリケーション名を返すルートは残します。
-		return c.JSON(http.StatusOK, map[string]string{
-			"app_name": "chunisupport-api",
-		})
-	})
-	e.GET("/health", handleHealth(db), middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
+	e.GET("/", handleRoot)
+	e.GET("/version", handleVersion, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, cfg)
@@ -263,6 +260,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
+		meGroup.GET("/record-filters", handlers.RecordFilter.List)
+		meGroup.POST("/record-filters", handlers.RecordFilter.Create)
+		meGroup.PUT("/record-filters/:id", handlers.RecordFilter.Update)
+		meGroup.DELETE("/record-filters/:id", handlers.RecordFilter.Delete)
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
@@ -301,6 +302,12 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
 	}
 
+	adminGroup := internal.Group("/admin")
+	adminGroup.Use(firebaseAuthStrict, requireAdmin)
+	{
+		adminGroup.GET("/build-info", handleAdminBuildInfo)
+	}
+
 	// api.chunisupport.net/internal/honors
 	honorsGroup := internal.Group("/honors")
 	honorsGroup.Use(firebaseAuthStrict, requireAdmin)
@@ -320,13 +327,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
+	}
 
-		// WORLD'S END 楽曲エンドポイント
-		publicWorldsendGroup := publicSongsGroup.Group("/worldsend")
-		{
-			publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
-			publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
-		}
+	// api.chunisupport.net/internal/worldsend-songs
+	publicWorldsendGroup := internal.Group("/worldsend-songs")
+	publicWorldsendGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	{
+		publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
+		publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
 	}
 
 	songsGroup := internal.Group("/songs")
@@ -336,15 +344,15 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
 		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireAdmin)
 		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
+	}
 
-		// WORLD'S END 楽曲エンドポイント
-		worldsendGroup := songsGroup.Group("/worldsend")
-		{
-			worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
-			worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
-			worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
-			worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
-		}
+	worldsendGroup := internal.Group("/worldsend-songs")
+	worldsendGroup.Use(firebaseAuthStrict)
+	{
+		worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
+		worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
+		worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
+		worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 	}
 
 	editorSongsGroup := internal.Group("/editor/songs")
@@ -352,8 +360,13 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
 		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
-		editorSongsGroup.GET("/worldsend", handlers.Worldsend.GetEditorWorldsendSongs)
-		editorSongsGroup.GET("/worldsend/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
+	}
+
+	editorWorldsendGroup := internal.Group("/editor/worldsend-songs")
+	editorWorldsendGroup.Use(firebaseAuthStrict, requireEditor)
+	{
+		editorWorldsendGroup.GET("", handlers.Worldsend.GetEditorWorldsendSongs)
+		editorWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
 	}
 
 	// api.chunisupport.net/internal/master
@@ -379,10 +392,11 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	))
 	{
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
+		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
 		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
 		apiV1.GET("/songs/:displayid/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
-		apiV1.GET("/songs/worldsend", handlers.V1Worldsend.GetWorldsendSongs)
-		apiV1.GET("/songs/worldsend/:displayid", handlers.V1Worldsend.GetWorldsendSong)
+		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)
+		apiV1.GET("/worldsend-songs/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
@@ -458,61 +472,29 @@ func handleExternalHealth(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// handleHealth はヘルスチェックエンドポイントのハンドラを返します
-// セキュリティを考慮し、内部情報（バージョン、サービス名など）は一切返しません
-func handleHealth(db *sqlx.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// データベース接続状態をチェック
-		if err := db.Ping(); err != nil {
-			slog.Error("Database health check failed: " + err.Error())
-			return c.NoContent(http.StatusServiceUnavailable)
-		}
-
-		return c.NoContent(http.StatusOK)
-	}
+func handleRoot(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":   info.Name,
+		"build_date": info.BuildDate,
+	})
 }
 
-// echoLogWriter はEchoログ出力用のWriterで、ファイルハンドルのライフサイクル管理が可能
-type echoLogWriter struct {
-	writer io.Writer
-	file   *os.File
+// handleAdminBuildInfo は管理者画面向けにAPIのビルド情報を返します。
+func handleAdminBuildInfo(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":    info.Name,
+		"build_date":  info.BuildDate,
+		"commit_hash": info.Revision,
+		"go_version":  runtime.Version(),
+	})
 }
 
-// Write はio.Writerインターフェースを実装
-func (w *echoLogWriter) Write(p []byte) (n int, err error) {
-	return w.writer.Write(p)
-}
-
-// Close はファイルハンドルをクローズ
-func (w *echoLogWriter) Close() error {
-	if w.file != nil {
-		return w.file.Close()
-	}
-	return nil
-}
-
-// SetupEchoLogger はEchoのロガーを設定します。
-// 戻り値のio.WriteCloserは呼び出し元でClose()を呼ぶ必要があります。
-func SetupEchoLogger(cfg config.Config) (io.WriteCloser, error) {
-	// ログディレクトリが存在しない場合は作成
-	if err := os.MkdirAll(cfg.LogPaths.Echo, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-
-	// 現在時刻からファイル名を生成
-	timestamp := time.Now().Format("20060102-150405")
-	filename := filepath.Join(cfg.LogPaths.Echo, fmt.Sprintf("%s.log", timestamp))
-
-	// ファイルを開く（存在しない場合は作成、存在する場合は追記）
-	// #nosec G304 -- LogPaths.Echo comes from trusted configuration
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	// 標準出力とファイルの両方にログを出力
-	return &echoLogWriter{
-		writer: io.MultiWriter(os.Stdout, file),
-		file:   file,
-	}, nil
+// handleVersion はADMIN向けにAPIのバージョン識別子を返します。
+func handleVersion(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"app_name":    info.Name,
+		"build_date":  info.BuildDate,
+		"commit_hash": info.Revision,
+		"go_version":  runtime.Version(),
+	})
 }

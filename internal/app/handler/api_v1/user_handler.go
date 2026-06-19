@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -23,7 +24,10 @@ func NewV1UserHandler(userUsecase usecase.UserUsecase) *V1UserHandler {
 
 // GetUser は指定された username のユーザープロファイルを取得します。
 func (h *V1UserHandler) GetUser(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity

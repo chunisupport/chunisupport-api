@@ -13,4 +13,9 @@ var (
 	ErrAdminRequired = errors.New("admin permission required")
 
 	ErrAppVersionUnsupported = errors.New("unsupported app version")
+
+	ErrRecordFilterNotFound      = errors.New("record filter not found")
+	ErrRecordFilterLimitExceeded = errors.New("record filter limit exceeded")
+	ErrInvalidRecordFilterInput  = errors.New("invalid record filter input")
+	ErrInvalidRecordFilterID     = errors.New("invalid record filter id")
 )

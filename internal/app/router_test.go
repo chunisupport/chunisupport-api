@@ -2,16 +2,20 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExternalCORS_対象エンドポイントのみ追加オリジンを許可する(t *testing.T) {
@@ -125,6 +129,71 @@ func TestHandleExternalHealth_外部監視向けに204NoContentを返す(t *test
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNoContent, rec.Code)
 	assert.Empty(t, rec.Body.String())
+}
+
+func TestHandleRoot_公開情報としてビルド日だけを返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handleRoot(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, info.Name, response["app_name"])
+	assert.Equal(t, info.BuildDate, response["build_date"])
+	assert.NotContains(t, response, "revision")
+}
+
+func TestHandleAdminBuildInfo_APIコミットハッシュを返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/admin/build-info", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handleAdminBuildInfo(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, info.Name, response["app_name"])
+	assert.Equal(t, info.BuildDate, response["build_date"])
+	assert.Equal(t, info.Revision, response["commit_hash"])
+	assert.Equal(t, runtime.Version(), response["go_version"])
+}
+
+func TestHandleVersion_APIバージョン識別子を返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/version", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handleVersion(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, info.Name, response["app_name"])
+	assert.Equal(t, info.BuildDate, response["build_date"])
+	assert.Equal(t, info.Revision, response["commit_hash"])
+	assert.Equal(t, runtime.Version(), response["go_version"])
 }
 
 func TestRequireRecentSignInVerifier(t *testing.T) {

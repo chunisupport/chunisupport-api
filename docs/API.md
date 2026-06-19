@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年05月28日
+**最終更新日**: 2026年06月15日
 
 ## ベースURLと環境
 
@@ -107,14 +107,15 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | 互換性のためアプリケーション名を固定で返します |
+| `/` | GET | 不要 | アプリケーション名とビルド日を返します |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
-| `/health` | GET | APIトークン(ADMIN) | DB接続を含むヘルスチェック |
+| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
+| `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -129,6 +130,10 @@
 | `/internal/me/goals` | POST | Firebase Bearer | 目標を作成 |
 | `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
+| `/internal/me/record-filters` | GET | Firebase Bearer | 保存済みレコードフィルタ一覧を取得 |
+| `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
+| `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
+| `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
@@ -145,12 +150,12 @@
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
 | `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
-| `/internal/songs/worldsend` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
-| `/internal/songs/worldsend/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
-| `/internal/songs/worldsend` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
-| `/internal/songs/worldsend` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/worldsend/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
-| `/internal/songs/worldsend/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
+| `/internal/worldsend-songs` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
+| `/internal/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/worldsend-songs` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
+| `/internal/worldsend-songs` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
+| `/internal/worldsend-songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
+| `/internal/worldsend-songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
 | `/internal/honors` | GET | Firebase Bearer (ADMIN+) | 称号一覧取得 |
 | `/internal/honors/:id` | GET | Firebase Bearer (ADMIN+) | 称号詳細取得 |
 | `/internal/honors` | POST | Firebase Bearer (ADMIN+) | 称号の新規追加 |
@@ -158,16 +163,17 @@
 | `/internal/honors/:id` | DELETE | Firebase Bearer (ADMIN+) | 称号の物理削除 |
 | `/internal/editor/songs` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/worldsend` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/worldsend/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/worldsend-songs` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/worldsend-songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
+| `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
-| `/v1/songs/worldsend` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
-| `/v1/songs/worldsend/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
+| `/v1/worldsend-songs` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
+| `/v1/worldsend-songs/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
@@ -182,11 +188,12 @@
 
 ### GET `/`
 - **認証**: 不要
-- **レスポンス**: 互換性のため、常に 200 OK で固定のアプリケーション名を返します。
+- **レスポンス**: 常に 200 OK で、アプリケーション名とビルド日を返します。リビジョン（Git短縮ハッシュ）は公開しません。
 
 ```json
 {
-  "app_name": "chunisupport-api"
+  "app_name": "chunisupport-api",
+  "build_date": "20240528"
 }
 ```
 
@@ -199,11 +206,44 @@
 - **レスポンス**:
   - 204 No Content: 空レスポンス
 
-### GET `/health`
+### GET `/version`
 - **認証**: APIトークン (ADMIN)
 - **レスポンス**:
-  - 200 OK: 空レスポンス
-  - 503 Service Unavailable: DB接続エラーを通知。
+  - 200 OK: APIのビルド識別子とGoバージョンを返します。
+
+```json
+{
+  "app_name": "chunisupport-api",
+  "build_date": "20240528",
+  "commit_hash": "a1b2c3d",
+  "go_version": "go1.26.4"
+}
+```
+
+---
+
+## 管理者向け情報エンドポイント
+
+### GET `/internal/admin/build-info`
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: 管理者画面で表示するAPIのビルド情報を取得します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "app_name": "chunisupport-api",
+  "build_date": "20240528",
+  "commit_hash": "a1b2c3d",
+  "go_version": "go1.26.4"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `app_name` | string | APIアプリケーション名 |
+| `build_date` | string | ビルド日 |
+| `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
+| `go_version` | string | APIバイナリのGoバージョン |
 
 ---
 
@@ -668,7 +708,7 @@ curl -X POST \
     "3": { "title": "称号3", "class": "normal", "img_url": "https://..." }
   },
   "scores": {
-    "full": [
+    "standard": [
       {
         "diff": "MAS",
         "idx": "2849",
@@ -711,11 +751,11 @@ curl -X POST \
 | `team.name` | string | | チーム名 |
 | `team.color` | string | | チームカラー |
 | `honors` | object | | 称号情報（キー: スロット番号 "1"〜"3"） |
-| `scores.full` | array | ✓ | 通常譜面スコア配列 |
+| `scores.standard` | array | ✓ | 通常譜面スコア配列 |
 | `scores.worldsend` | array | ✓ | WORLD'S END スコア配列 |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
-**スコアエントリスキーマ (`scores.full` / `scores.worldsend` の各要素)**:
+**スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
@@ -739,6 +779,17 @@ curl -X POST \
   "player_id": 42,
   "app_ver": "0.0.1a",
   "imported_at": "2025-11-27T10:45:00+09:00",
+  "profile": {
+    "player_id": 42,
+    "name": "プレイヤー名",
+    "level": 217,
+    "rating": 17.29,
+    "class_emblem_id": 6,
+    "class_emblem_base_id": 4,
+    "last_played_at": "2025-11-02T16:42:00+09:00",
+    "overpower_value": 96123.91,
+    "overpower_percent": 76.27
+  },
   "summary": {
     "name": "プレイヤー名",
     "level": 217,
@@ -747,18 +798,41 @@ curl -X POST \
     "overpower_value": 96123.91,
     "overpower_percentage": 76.27
   },
+  "statistics": {
+    "total_high_score": 1183287650,
+    "lamp_counts": {
+      "clear": {
+        "FAILED": 12,
+        "CLEAR": 450,
+        "HARD": 300,
+        "BRAVE": 250,
+        "ABSOLUTE": 170,
+        "CATASTROPHY": 3
+      },
+      "combo": {
+        "none": 900,
+        "full combo": 220,
+        "all justice": 65
+      },
+      "full_chain": {
+        "none": 1160,
+        "full chain gold": 20,
+        "full chain platinum": 5
+      }
+    }
+  },
   "counts": {
-    "full_records_upserted": 1185,
+    "standard_records_upserted": 1185,
     "worldsend_records_upserted": 120,
-    "full_records_skipped": 0,
+    "standard_records_skipped": 0,
     "worldsend_records_skipped": 0,
     "honors_skipped": 0,
-    "full_records_actually_changed": 12,
+    "standard_records_actually_changed": 12,
     "worldsend_records_actually_changed": 3
   },
   "changes": [
     {
-      "record_type": "full",
+      "record_type": "standard",
       "change_type": "updated",
       "idx": "2849",
       "diff": "MASTER",
@@ -791,7 +865,7 @@ curl -X POST \
   ],
   "skipped_records": [
     {
-      "record_type": "full",
+      "record_type": "standard",
       "reason": "unknown_song",
       "details": "idx=9999"
     }
@@ -806,23 +880,27 @@ curl -X POST \
 | `player_id` | number | 登録されたプレイヤーID |
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
+| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
+| `statistics` | object | 登録後の通常譜面集計。`total_high_score` とランプごとの件数を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
-| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は省略 |
-| `skipped_records` | array | スキップされたレコード情報（存在する場合） |
+| `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
+| `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
+
+`statistics.total_high_score` は削除済み楽曲を除く保存後の通常譜面スコア合計です。WORLD'S ENDは含みません。`statistics.lamp_counts.clear` / `combo` / `full_chain` はランプマスタの `Name` をキーにした件数です。`none` 相当のコンボランプ・フルチェインも集計では `none` キーとして返します。
 
 **`changes` の要素スキーマ**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `record_type` | string | `full` または `worldsend` |
+| `record_type` | string | `standard` または `worldsend` |
 | `change_type` | string | 未登録レコードは `new`、保存済みレコードの比較対象カラムが変化した場合は `updated` |
 | `idx` | string | 楽曲の公式インデックス |
 | `diff` | string | 通常譜面は大文字難易度名、WORLD'S END は入力値にかかわらず `WE` |
 | `before` | object \| null | 更新前状態。`change_type=new` では `null` |
 | `after` | object | 登録後状態 |
 
-`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。
+`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。`changes` は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で並びます。`idx` を数値として解釈できない値は末尾に並びます。`counts.*_actually_changed` は実際に変化した全件数で、`changes` はレスポンスサイズ抑制のため最大100件です。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
@@ -1208,6 +1286,115 @@ curl -X POST \
 
 ---
 
+## `/internal/me/record-filters` グループ
+
+認証済みユーザーが保存したレコードフィルタをサーバーに保存します。通常レコードと WORLD'S END は `filter_type` で区別します。
+
+サーバーは `filter` の内部フィールドを解釈しません。`filter` が JSON オブジェクトであること、`schema_version` が正の整数であること、圧縮前の保存ペイロードが 8KB 以下であることのみ検証し、gzip 圧縮して保存します。
+
+### RecordFilter オブジェクト
+
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "高難度FC狙い",
+  "filter_type": "standard",
+  "schema_version": 3,
+  "filter": {
+    "title": "",
+    "difficulties": ["MASTER", "ULTIMA"]
+  },
+  "created_at": "2026-06-15T12:00:00Z",
+  "updated_at": "2026-06-15T12:00:00Z"
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `id` | string | サーバー生成 UUID |
+| `name` | string | 保存名。trim 後 1〜30文字、制御文字不可 |
+| `filter_type` | `"standard"` \| `"worldsend"` | 通常レコードまたは WORLD'S END の区別 |
+| `schema_version` | number | フロント側フィルタスキーマのバージョン。正の整数 |
+| `filter` | object | フロント側のフィルタ状態 JSON。サーバーでは中身を解釈しない |
+| `created_at` | string | 作成日時（ISO 8601） |
+| `updated_at` | string | 更新日時（ISO 8601） |
+
+### GET `/internal/me/record-filters`
+
+保存済みレコードフィルタ一覧を返します。`filter_type` クエリで種別を絞り込めます。省略時は全件を返します。ソート順は `updated_at` 降順です。
+
+**クエリパラメータ**
+
+| パラメータ | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `filter_type` | `"standard"` \| `"worldsend"` | いいえ | 取得対象のフィルタ種別 |
+
+**レスポンス**: 200 OK
+
+```json
+{
+  "filters": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "高難度FC狙い",
+      "filter_type": "standard",
+      "schema_version": 3,
+      "filter": {
+        "title": "",
+        "difficulties": ["MASTER", "ULTIMA"]
+      },
+      "created_at": "2026-06-15T12:00:00Z",
+      "updated_at": "2026-06-15T12:00:00Z"
+    }
+  ]
+}
+```
+
+### POST `/internal/me/record-filters`
+
+レコードフィルタを新規保存します。1ユーザーあたり最大100件です。
+
+**リクエストボディ**
+
+```json
+{
+  "name": "高難度FC狙い",
+  "filter_type": "standard",
+  "schema_version": 3,
+  "filter": {
+    "title": "",
+    "difficulties": ["MASTER", "ULTIMA"]
+  }
+}
+```
+
+**レスポンス**: 201 Created（作成された RecordFilter オブジェクト）
+
+### PUT `/internal/me/record-filters/:id`
+
+指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+
+**リクエストボディ**: POST と同じ
+
+**レスポンス**: 200 OK（更新後の RecordFilter オブジェクト）
+
+### DELETE `/internal/me/record-filters/:id`
+
+指定IDの保存済みレコードフィルタを削除します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+
+**レスポンス**: 204 No Content
+
+### RecordFilter API エラーコード
+
+| エラーコード | HTTP | 説明 |
+|---|---|---|
+| `record_filter_not_found` | 404 | 指定したフィルタが存在しない（他ユーザーのフィルタも含む） |
+| `record_filter_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `invalid_record_filter_input` | 400 | `name` / `filter_type` / `schema_version` / `filter` / サイズ制限のいずれかが不正 |
+| `invalid_record_filter_id` | 400 | `:id` が UUID 形式ではない |
+
+---
+
 ## `/internal/users` グループ
 
 ### GET `/internal/users/`
@@ -1232,8 +1419,7 @@ curl -X POST \
     "overpower_value": 9500.00,
     "is_suspicious": false,
     "is_private": false,
-    "firebase_uid": "firebase-uid-1",
-    "email": "user1@example.com"
+    "firebase_uid": "firebase-uid-1"
   },
   {
     "username": "user2",
@@ -1245,8 +1431,7 @@ curl -X POST \
     "overpower_value": null,
     "is_suspicious": true,
     "is_private": true,
-    "firebase_uid": null,
-    "email": null
+    "firebase_uid": null
   }
 ]
 ```
@@ -1265,7 +1450,6 @@ curl -X POST \
 | `is_suspicious` | boolean | 不審アカウントフラグ |
 | `is_private` | boolean | プライベートアカウントかどうか |
 | `firebase_uid` | string \| null | 連携済み Firebase UID（未連携の場合は `null`） |
-| `email` | string \| null | Firebase Auth 上のメールアドレス（未連携またはメール未設定の場合は `null`） |
 
 ---
 
@@ -1274,8 +1458,8 @@ curl -X POST \
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
-    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`all`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`all`/`worldsend` のみを返します。
-    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
+    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend` のみを返します。
+    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
@@ -1308,7 +1492,7 @@ curl -X POST \
     "best_candidate": [...],
     "new": [...],
     "new_candidate": [...],
-    "all": [
+    "standard": [
       {
         "is_played": true,
         "updated_at": "2025-11-28T22:23:32+09:00",
@@ -1507,7 +1691,7 @@ curl -X POST \
 ### GET `/internal/users/:username/record`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間10回/IP
-- **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `all` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
+- **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `standard` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
@@ -1515,13 +1699,13 @@ curl -X POST \
 | `username` | string | ユーザー名 |
 
 - **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`all` と `worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
+    - `include_noplay` (任意): `true` を指定すると、`standard` と `worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 - **レスポンス**: `UserRecordDTO`
 
 ```json
 {
-  "all": [
+  "standard": [
     {
       "updated_at": "2024-12-20T10:00:00Z",
       "difficulty": "MASTER",
@@ -1568,7 +1752,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `all` | PlayerRecordDTO[] | 通常譜面の全レコード |
+| `standard` | PlayerRecordDTO[] | 通常譜面の全レコード |
 | `worldsend` | WorldsendRecordDTO[] | WORLD'S END の全レコード |
 | `meta` | UserRecordMetaDTO | メタ情報 |
 
@@ -1582,7 +1766,7 @@ curl -X POST \
 
 ```json
 {
-  "all": [],
+  "standard": [],
   "worldsend": [],
   "meta": {
     "updated_at": null
@@ -1618,7 +1802,7 @@ curl -X POST \
 | `best_candidate` | PlayerRecordDTO[] | ベスト候補枠レコード |
 | `new` | PlayerRecordDTO[] | 新曲枠レコード |
 | `new_candidate` | PlayerRecordDTO[] | 新曲候補枠レコード |
-| `all` | PlayerRecordDTO[] | 全レコード |
+| `standard` | PlayerRecordDTO[] | 通常譜面の全レコード |
 
 #### PlayerRecordDTO スキーマ
 
@@ -2051,7 +2235,7 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/worldsend`
+### GET `/internal/worldsend-songs`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **クエリパラメータ**: 
@@ -2112,7 +2296,7 @@ curl -X POST \
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/worldsend/:displayid`
+### GET `/internal/worldsend-songs/:displayid`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分10回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
@@ -2144,7 +2328,7 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### POST `/internal/songs/worldsend`
+### POST `/internal/worldsend-songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
 - **概要**: 新規 WORLD'S END 楽曲を追加します。`display_id` はサーバーが自動生成します。
@@ -2187,7 +2371,7 @@ curl -X POST \
 
 - **レスポンス**: `201 Created` — 作成された WORLD'S END 楽曲情報（EditorWorldsendSong形式）
 
-レスポンスフィールドの詳細は GET `/internal/editor/songs/worldsend/:displayid` と同様です。
+レスポンスフィールドの詳細は GET `/internal/editor/worldsend-songs/:displayid` と同様です。
 
 - **エラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式が不正
@@ -2197,7 +2381,7 @@ curl -X POST \
   - 409 Conflict (`duplicate_official_idx`): `official_idx` が既に存在する
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### PUT `/internal/songs/worldsend`
+### PUT `/internal/worldsend-songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: WORLD'S END 楽曲および譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
@@ -2267,7 +2451,7 @@ curl -X POST \
   - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
-### DELETE `/internal/songs/worldsend/:displayid`
+### DELETE `/internal/worldsend-songs/:displayid`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
@@ -2280,7 +2464,7 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### POST `/internal/songs/worldsend/:displayid/restore`
+### POST `/internal/worldsend-songs/:displayid/restore`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
@@ -2429,7 +2613,7 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/editor/songs/worldsend`
+### GET `/internal/editor/worldsend-songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **概要**: 編集者向けに、全 WORLD'S END 楽曲を削除済みも含めて取得します。
@@ -2461,14 +2645,14 @@ curl -X POST \
 | `notes_designer` | string \| null | ノーツデザイナー名 |
 | `updated_at` | string \| null | 譜面の更新日時 (ISO8601) |
 
-`WorldsendSongDTO` の各フィールドの詳細は GET `/internal/songs/worldsend` の `WorldsendSongDTO` を参照してください。
+`WorldsendSongDTO` の各フィールドの詳細は GET `/internal/worldsend-songs` の `WorldsendSongDTO` を参照してください。
 
 - **主なエラー**:
   - 401 Unauthorized (`unauthorized`): 認証が必要
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/editor/songs/worldsend/:displayid`
+### GET `/internal/editor/worldsend-songs/:displayid`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
@@ -2752,7 +2936,45 @@ curl -X POST \
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/worldsend`
+### PUT `/v1/songs`
+- **認証**: APIトークン必須
+- **権限**: EDITOR または ADMIN 権限が必要
+- **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
+- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
+
+```json
+[
+  {
+    "id": "0123456789abcdef",
+    "title": "楽曲タイトル",
+    "reading": "ガッキョクタイトル",
+    "artist": "アーティスト名",
+    "genre": "POPS & ANIME",
+    "bpm": 180,
+    "released_at": "2024-01-01",
+    "jacket": "jacket_img_name",
+    "charts": {
+      "MASTER": {
+        "const": 14.5,
+        "is_const_unknown": false,
+        "notes": 1234,
+        "notes_designer": "譜面作者A"
+      }
+    }
+  }
+]
+```
+
+- **レスポンス**: 204 No Content（成功時）
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
+  - 400 Bad Request (`validation_failed`): バリデーションエラー
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
+
+### GET `/v1/worldsend-songs`
 - **認証**: APIトークン必須
 - **概要**: 全 WORLD'S END 楽曲を取得します（削除済み楽曲は除外）。WORLD'S END は1曲1譜面が保証されています。
 - **レスポンス**: 200 OK
@@ -2811,7 +3033,7 @@ curl -X POST \
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/worldsend/:displayid`
+### GET `/v1/worldsend-songs/:displayid`
 - **認証**: APIトークン必須
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。
@@ -2914,7 +3136,7 @@ curl -X POST \
 | `username` | string | ユーザー名 |
 
 - **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`records.all` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
+    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 - **レスポンス**: 200 OK
 
@@ -2966,7 +3188,7 @@ curl -X POST \
     "best_candidate": [],
     "new": [],
     "new_candidate": [],
-    "all": [],
+    "standard": [],
     "worldsend": []
   },
   "updated_at": "2024-12-20T10:00:00Z"
@@ -3178,7 +3400,6 @@ interface AdminUserListResponse {
   is_suspicious: boolean;
   is_private: boolean;
   firebase_uid: string | null;
-  email: string | null;
   is_deleted: boolean;
 }
 
@@ -3203,7 +3424,7 @@ interface UserRatingMetaDTO {
 }
 
 interface UserRecordDTO {
-  all: PlayerRecordDTO[];
+  standard: PlayerRecordDTO[];
   worldsend: WorldsendRecordDTO[];
   meta: UserRecordMetaDTO;
 }
@@ -3261,7 +3482,7 @@ interface UserRecordResponseDTO {
   best_candidate: PlayerRecordDTO[];
   new: PlayerRecordDTO[];
   new_candidate: PlayerRecordDTO[];
-  all: PlayerRecordDTO[];
+  standard: PlayerRecordDTO[];
   worldsend: WorldsendRecordDTO[];  // WORLD'S END レコード（レーティング計算対象外）
 }
 
@@ -3301,36 +3522,59 @@ interface PlayerDataResult {
   player_id: number;
   app_ver: string;
   imported_at: string;
+  profile: PlayerDataProfile;
   summary: PlayerDataSummary;
+  statistics: PlayerDataStatistics;
   counts: PlayerDataCounts;
-  changes?: PlayerDataRecordChange[];
+  changes: PlayerDataRecordChange[];
   skipped_records: SkippedRecord[];
+}
+
+interface PlayerDataProfile {
+  player_id: number;
+  name: string;
+  level: number;
+  rating: number | null;
+  class_emblem_id: number | null;
+  class_emblem_base_id: number | null;
+  last_played_at: string | null;
+  overpower_value: number | null;
+  overpower_percent: number | null;
 }
 
 interface PlayerDataSummary {
   name: string;
   level: number;
-  rating: number;
+  rating: number | null;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percentage: number | null;
 }
 
+interface PlayerDataStatistics {
+  total_high_score: number;
+  lamp_counts: {
+    clear: Record<string, number>;
+    combo: Record<string, number>;
+    full_chain: Record<string, number>;
+  };
+}
+
 interface PlayerDataCounts {
-  full_records_upserted: number;
+  standard_records_upserted: number;
   worldsend_records_upserted: number;
-  full_records_skipped: number;
+  standard_records_skipped: number;
   worldsend_records_skipped: number;
   honors_skipped: number;
-  full_records_actually_changed: number;
+  standard_records_actually_changed: number;
   worldsend_records_actually_changed: number;
 }
 
 interface PlayerDataRecordChange {
-  record_type: 'full' | 'worldsend';
+  record_type: 'standard' | 'worldsend';
   change_type: 'new' | 'updated';
   idx: string;
-  diff?: string;
+  diff: string;
   before: PlayerDataRecordState | null;
   after: PlayerDataRecordState;
 }
@@ -3343,7 +3587,7 @@ interface PlayerDataRecordState {
 }
 
 interface SkippedRecord {
-  record_type: 'full' | 'worldsend' | 'honor';
+  record_type: 'standard' | 'worldsend' | 'honor';
   reason: string;
   details: string;
 }

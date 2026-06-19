@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,10 +65,10 @@ func TestDecodeStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T)
 	var out map[string]any
 	err := apphandler.DecodeStrictJSON(body, header, &out)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	if err.Error() != "content-type header is missing" {
-		t.Fatalf("error = %q, want %q", err.Error(), "content-type header is missing")
+		require.Failf(t, "前提条件失敗", "error = %q, want %q", err.Error(), "content-type header is missing")
 	}
 }
 
@@ -79,10 +80,10 @@ func TestDecodeStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T)
 	var out map[string]any
 	err := apphandler.DecodeStrictJSON(body, header, &out)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	if err.Error() != "content-type must be application/json" {
-		t.Fatalf("error = %q, want %q", err.Error(), "content-type must be application/json")
+		require.Failf(t, "前提条件失敗", "error = %q, want %q", err.Error(), "content-type must be application/json")
 	}
 }
 
@@ -100,17 +101,17 @@ func TestGoalHandlerCreateRejectsMissingContentType(t *testing.T) {
 
 	err := h.Create(c)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	apiErr := &apierror.APIError{}
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("err type = %T, want *apierror.APIError", err)
+		require.Failf(t, "前提条件失敗", "err type = %T, want *apierror.APIError", err)
 	}
 	if apiErr.Code != apierror.CodeBadRequest {
-		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+		require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
 	}
 	if uc.createCalled {
-		t.Fatal("usecase Create should not be called")
+		require.Fail(t, "usecase Create should not be called")
 	}
 }
 
@@ -129,17 +130,17 @@ func TestGoalHandlerCreateRejectsNonJSONContentType(t *testing.T) {
 
 	err := h.Create(c)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	apiErr := &apierror.APIError{}
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("err type = %T, want *apierror.APIError", err)
+		require.Failf(t, "前提条件失敗", "err type = %T, want *apierror.APIError", err)
 	}
 	if apiErr.Code != apierror.CodeBadRequest {
-		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+		require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
 	}
 	if uc.createCalled {
-		t.Fatal("usecase Create should not be called")
+		require.Fail(t, "usecase Create should not be called")
 	}
 }
 
@@ -158,17 +159,17 @@ func TestGoalHandlerCreateRejectsUnknownTopLevelKey(t *testing.T) {
 
 	err := h.Create(c)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	apiErr := &apierror.APIError{}
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("err type = %T, want *apierror.APIError", err)
+		require.Failf(t, "前提条件失敗", "err type = %T, want *apierror.APIError", err)
 	}
 	if apiErr.Code != apierror.CodeBadRequest {
-		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+		require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
 	}
 	if uc.createCalled {
-		t.Fatal("usecase Create should not be called")
+		require.Fail(t, "usecase Create should not be called")
 	}
 }
 
@@ -190,17 +191,17 @@ func TestGoalHandlerUpdateRejectsUnknownTopLevelKey(t *testing.T) {
 
 	err := h.Update(c)
 	if err == nil {
-		t.Fatal("expected error")
+		require.Fail(t, "expected error")
 	}
 	apiErr := &apierror.APIError{}
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("err type = %T, want *apierror.APIError", err)
+		require.Failf(t, "前提条件失敗", "err type = %T, want *apierror.APIError", err)
 	}
 	if apiErr.Code != apierror.CodeBadRequest {
-		t.Fatalf("api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
+		require.Failf(t, "前提条件失敗", "api error code = %s, want %s", apiErr.Code, apierror.CodeBadRequest)
 	}
 	if uc.updateCalled {
-		t.Fatal("usecase Update should not be called")
+		require.Fail(t, "usecase Update should not be called")
 	}
 }
 
@@ -220,29 +221,29 @@ func TestToGoalInput(t *testing.T) {
 
 	in, err := toGoalInput(req)
 	if err != nil {
-		t.Fatalf("toGoalInput returned error: %v", err)
+		require.Failf(t, "前提条件失敗", "toGoalInput returned error: %v", err)
 	}
 	if in.Title != req.Title {
-		t.Fatalf("Title = %s, want %s", in.Title, req.Title)
+		require.Failf(t, "前提条件失敗", "Title = %s, want %s", in.Title, req.Title)
 	}
 	if in.AchievementType != req.AchievementType {
-		t.Fatalf("AchievementType = %s, want %s", in.AchievementType, req.AchievementType)
+		require.Failf(t, "前提条件失敗", "AchievementType = %s, want %s", in.AchievementType, req.AchievementType)
 	}
 	var gotParams map[string]any
 	if err := json.Unmarshal(in.AchievementParams, &gotParams); err != nil {
-		t.Fatalf("unmarshal AchievementParams: %v", err)
+		require.Failf(t, "前提条件失敗", "unmarshal AchievementParams: %v", err)
 	}
 	if gotParams["score"].(float64) != 1000000 || gotParams["count"].(float64) != 1 {
-		t.Fatalf("AchievementParams = %#v, want score=1000000,count=1", gotParams)
+		require.Failf(t, "前提条件失敗", "AchievementParams = %#v, want score=1000000,count=1", gotParams)
 	}
 	var gotAttrs map[string]any
 	if err := json.Unmarshal(in.Attributes, &gotAttrs); err != nil {
-		t.Fatalf("unmarshal Attributes: %v", err)
+		require.Failf(t, "前提条件失敗", "unmarshal Attributes: %v", err)
 	}
 	if gotAttrs["diff"].(float64) != 4 {
-		t.Fatalf("Attributes = %#v, want diff=4", gotAttrs)
+		require.Failf(t, "前提条件失敗", "Attributes = %#v, want diff=4", gotAttrs)
 	}
 	if !in.Invert {
-		t.Fatal("Invert = false, want true")
+		require.Fail(t, "Invert = false, want true")
 	}
 }

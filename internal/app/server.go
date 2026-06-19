@@ -20,31 +20,22 @@ type Server struct {
 	echo              *echo.Echo
 	db                *sqlx.DB
 	staticDB          *sqlx.DB
+	smallDataDB       *sqlx.DB
 	cfg               config.Config
 	masterCache       *masterdata.Cache
 	staticMasterCache *masterdata.StaticCache
-	echoLogWriter     io.WriteCloser
 }
 
 // NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter) *Server {
-	// Echoのロガーを設定
-	var echoLogWriter io.WriteCloser
-	echoLogWriterResult, err := SetupEchoLogger(cfg)
-	if err != nil {
-		slog.Error("Failed to setup echo logger", "error", err)
-	} else {
-		echoLogWriter = echoLogWriterResult
-	}
-
+func NewServer(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *Server {
 	return &Server{
-		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
+		echo:              NewRouter(db, staticDB, smallDataDB, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
 		db:                db,
 		staticDB:          staticDB,
+		smallDataDB:       smallDataDB,
 		cfg:               cfg,
 		masterCache:       masterCache,
 		staticMasterCache: staticMasterCache,
-		echoLogWriter:     echoLogWriter,
 	}
 }
 
@@ -72,14 +63,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	// Echoログファイルのクローズ
-	if s.echoLogWriter != nil {
-		if err := s.echoLogWriter.Close(); err != nil {
-			slog.Error("Failed to close echo log file", "error", err)
-			shutdownErrs = append(shutdownErrs, err)
-		}
-	}
-
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			slog.Error("Failed to close database connection", "error", err)
@@ -90,6 +73,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.staticDB != nil {
 		if err := s.staticDB.Close(); err != nil {
 			slog.Error("Failed to close static database connection", "error", err)
+			shutdownErrs = append(shutdownErrs, err)
+		}
+	}
+
+	if s.smallDataDB != nil {
+		if err := s.smallDataDB.Close(); err != nil {
+			slog.Error("Failed to close small data database connection", "error", err)
 			shutdownErrs = append(shutdownErrs, err)
 		}
 	}

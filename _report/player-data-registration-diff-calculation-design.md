@@ -5,7 +5,7 @@
 
 ## 0. 位置づけ
 
-本設計書は、プレイヤーデータ登録時に「今回の登録で実際に変化したスコア」をレスポンスへ含めるための未実装機能の設計である。
+本設計書は、プレイヤーデータ登録時に「今回の登録で実際に変化したスコア」をレスポンスへ含める機能の仕様を定義する。
 
 現在の登録エンドポイントは以下の通り。
 
@@ -16,7 +16,7 @@
 
 現行実装では、`PlayerDataPayload.scores.full` / `scores.worldsend` に含まれる全譜面の現在ベストを受け取り、`applyScores` で `PlayerRecordForUpsert` / `WorldsendRecordForUpsert` に変換し、`playerDataRepo.SavePlayerData` で bulk upsert している。`PlayerDataCounts` の `*_upserted` は「payload 内で処理対象になった件数」を表す。
 
-また、`player_records.updated_at` / `player_worldsend_records.updated_at` は payload の `updated_at` を格納する。現在も `ON DUPLICATE KEY UPDATE` 内で、score / lamp が変化した場合に `updated_at` を更新している。
+また、`player_records.updated_at` / `player_worldsend_records.updated_at` は payload の `updated_at` を格納する。`ON DUPLICATE KEY UPDATE` 内で、score / lamp が変化した場合に `updated_at` を更新している。
 
 ## 1. 目的
 
@@ -37,9 +37,7 @@
 
 登録トランザクション内で、保存前の対象 state を読み込み、payload から生成した upsert 予定値と比較して差分を確定する。
 
-payload 直下の `updated_at` は保存値として利用するが、差分候補抽出キーには使わない。秒精度の衝突や再送による誤検出を避けるため、差分は保存前 state と upsert 予定値の比較だけで判定する。
-
-`updated_at` はDB保存値とGo側の値がずれないよう、`time.Parse` 後に `updatedAt = updatedAt.Truncate(time.Second)` で秒精度へ正規化し、その値を `PlayerRecordState.UpdatedAt` / `WorldsendRecordState.UpdatedAt` に設定する。
+差分判定は保存前 state と upsert 予定値の `score` / `clear_lamp_id` / `combo_lamp_id` / `full_chain_id` の比較で行う。payload 直下の `updated_at` は各レコードの保存値として `PlayerRecordState.UpdatedAt` / `WorldsendRecordState.UpdatedAt` に設定し、DB の `TIMESTAMP` 列へ保存する。
 
 ```text
 tx 開始
@@ -53,13 +51,16 @@ tx 開始
     保存前stateとupsert予定値を比較してchangesを作成
     SavePlayerData
   overpower / rating 再計算
-  result.Counts / result.Changes を設定
+  登録前後の集計スナップショットを比較して aggregate_diff を作成
+  result.Counts / result.Changes / result.AggregateDiff を設定
 tx commit
 ```
 
-保存前状態のロードは `SavePlayerData` より前に行う。差分判定はDB側の `updated_at = IF(...)` 条件と同じ比較カラムで行い、`SavePlayerData` が成功した場合だけレスポンスへ反映される。
+保存前状態のロードは `SavePlayerData` より前に行う。差分判定はDB側の `updated_at = IF(...)` 条件と同じ比較カラムで行い、`SavePlayerData` 成功後にレスポンスへ反映する。
 
 同じ `updated_at` を持つ payload が再送された場合も、保存前stateとupsert予定値が同じなら `changes` には含めない。今回の保存処理で値が変化するレコードだけを `changes` に含める。
+
+差分計算は登録トランザクション内の保存前 state を基準とする。
 
 ## 3. 差分の定義
 
@@ -131,16 +132,17 @@ type PlayerDataResult struct {
 	ImportedAt     time.Time                `json:"imported_at"`
 	Summary        PlayerDataSummary        `json:"summary"`
 	Counts         PlayerDataCounts         `json:"counts"`
+	AggregateDiff  PlayerDataAggregateDiff  `json:"aggregate_diff"`
 	Changes        []PlayerDataRecordChange `json:"changes"`
 	SkippedRecords []SkippedRecord          `json:"skipped_records"`
 }
 ```
 
-差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。理由は、入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
+差分詳細は入力DTOの `PlayerDataScoreEntry` をそのまま返さず、比較対象カラムだけを持つ専用DTOにする。入力DTOには `slot` / `order` が含まれており、初版の差分対象と誤解されやすいためである。
 
-レスポンスでは基本的に `omitempty` を使わず、値がない場合は `null` または空配列として明示する。`changes` は差分が0件の場合も空配列 `[]` を返す。`before` は `new` の場合に `null`、`updated` の場合に変更前状態を返す。
+登録成功時は `changes` を常に配列として返す。差分が0件の場合は空配列 `[]` とする。`before` は `new` の場合に `null`、`updated` の場合に変更前状態を返す。`SavePlayerData` 成功後に `Register` が `result.Changes` を設定する。
 
-`changes` の詳細は最大100件まで返す。`*_actually_changed` は実際に変化した全件数を表し、`changes` の件数とは一致しない場合がある。詳細に含める100件は `idx` を数値として昇順に並べて選ぶ。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。通常譜面と WORLD'S END の両方に差分がある場合も、同一レスポンス内の `changes` 全体で最大100件とする。
+`changes` の詳細は最大100件まで返す。`*_actually_changed` は実際に変化した全件数を表し、`changes` の件数とは一致しない場合がある。詳細に含める100件は `idx` を数値として昇順に並べて選ぶ。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。通常譜面と WORLD'S END の両方に差分がある場合も、同一レスポンス内の `changes` 全体で最大100件とする。`idx` は公式インデックスの数値文字列のみを想定し、数値として解釈できない値があればソート順の末尾にまとめる。
 
 ```go
 type PlayerDataRecordChange struct {
@@ -153,21 +155,142 @@ type PlayerDataRecordChange struct {
 }
 
 type PlayerDataRecordState struct {
-	Score         int    `json:"score"`
-	ClearLampID   int    `json:"clear_lamp_id"`
-	ClearLampName string `json:"clear_lamp_name"`
-	ComboLampID   int    `json:"combo_lamp_id"`
-	ComboLampName string `json:"combo_lamp_name"`
-	FullChainID   int    `json:"full_chain_id"`
-	FullChainName string `json:"full_chain_name"`
+	Score     int     `json:"score"`
+	ClearLamp *string `json:"clear_lamp"`
+	ComboLamp *string `json:"combo_lamp"`
+	FullChain *string `json:"full_chain"`
 }
 ```
 
-フロントエンド側でランプIDから名前を解決しなくてよいよう、初版から `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` を返す。名前は登録処理でロード済みの `masters` から逆引きして設定する。IDはDB保存値との対応確認や将来の互換性のため残す。
+`before` / `after` は `score` と3種類のランプ名を返す。ランプ名は登録処理でロード済みの `masters` から逆引きし、マスタの `Name` をそのまま用いる。`none` 相当および未設定は `null` とする。
 
 WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"` 固定にする。
 
-### 4.3 レスポンス例
+### 4.3 集計差分
+
+譜面単位の `changes` とは別に、クライアントが登録完了画面で表示する集計値の差分を `aggregate_diff` として返す。
+
+対象は以下。
+
+- RATING
+- OVER POWER
+- TOTAL HIGH SCORE
+- 難易度別 TOTAL HIGH SCORE / 平均スコア
+- 難易度別 RECORD STATISTICS
+- ランプ・スコアランク別達成数
+
+`aggregate_diff` は登録成功時に常にオブジェクトとして返す。各フィールドは `before` / `after` / `delta` を持つ。初回登録などで登録前値が存在しない場合、数値の `before` は `0`、nullable なプロフィール由来値は `null` とする。
+
+RATING は `players.official_player_rating`、つまり payload の `rating` から保存される公式レーティングを対象にする。計算レーティング（`calculated_player_rating`、`best_average_rating`、`new_average_rating`）は別概念であり、初版の `aggregate_diff.rating` には含めない。
+
+OVER POWER は以下を返す。
+
+- `value`: 登録処理と同じ条件で通常譜面から再集計した OVER POWER 値
+- `percentage`: 登録処理時点の分母に対する OVER POWER 達成率
+
+OVER POWER の `before` は、保存前レコードと同じ未解禁曲設定・同じ分母を用いて再計算する。DB に保存済みの `players.overpower_value` をそのまま使うと、分母や未解禁設定の変更によって `after` と比較条件がずれる可能性があるためである。
+
+TOTAL HIGH SCORE は、通常譜面レコードの `score` 合計とする。WORLD'S END は初版の TOTAL HIGH SCORE 集計から除外する。難易度別集計は `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` をキーにし、レスポンスのキー・値はすべて大文字難易度名で扱う。
+
+平均スコアは `total_score / played_count` とし、未プレイ補完レコードは含めない。`played_count` が0の場合、平均スコアは `null` とする。
+
+RECORD STATISTICS は難易度別に以下を返す。各項目は `before` / `after` / `delta` を持つ。
+
+| 項目 | 判定 |
+| ---- | ---- |
+| `aj` | `combo_lamp` が `ALL JUSTICE` |
+| `fc` | `combo_lamp` が `FULL COMBO` または `ALL JUSTICE` |
+| `clr` | `clear_lamp` が `FAILED` / none 相当ではない |
+| `fch` | `full_chain` が none 相当ではない |
+| `max` | `score == 1010000` |
+| `sss_plus` | `score >= 1009000` |
+| `sss` | `score >= 1007500` |
+| `ss_plus` | `score >= 1005000` |
+| `ss` | `score >= 1000000` |
+
+スコアランク系の `sss_plus` / `sss` / `ss_plus` / `ss` は累積カウントとする。例えば `sss` は SSS 以上、`ss` は SS 以上の件数を表す。
+
+```go
+type PlayerDataAggregateDiff struct {
+	Rating         NullableFloatDiff                    `json:"rating"`
+	Overpower      PlayerDataOverpowerDiff              `json:"overpower"`
+	TotalHighScore IntDiff                              `json:"total_high_score"`
+	ByDifficulty   map[string]PlayerDataDifficultyDiff  `json:"by_difficulty"`
+}
+
+type PlayerDataOverpowerDiff struct {
+	Value      NullableFloatDiff `json:"value"`
+	Percentage NullableFloatDiff `json:"percentage"`
+}
+
+type PlayerDataDifficultyDiff struct {
+	TotalHighScore IntDiff                   `json:"total_high_score"`
+	AverageScore   NullableFloatDiff         `json:"average_score"`
+	PlayedCount    IntDiff                   `json:"played_count"`
+	Statistics     PlayerDataStatisticsDiff  `json:"statistics"`
+}
+
+type PlayerDataStatisticsDiff struct {
+	AJ      IntDiff `json:"aj"`
+	FC      IntDiff `json:"fc"`
+	CLR     IntDiff `json:"clr"`
+	FCH     IntDiff `json:"fch"`
+	MAX     IntDiff `json:"max"`
+	SSSPlus IntDiff `json:"sss_plus"`
+	SSS     IntDiff `json:"sss"`
+	SSPlus  IntDiff `json:"ss_plus"`
+	SS      IntDiff `json:"ss"`
+}
+
+type IntDiff struct {
+	Before int `json:"before"`
+	After  int `json:"after"`
+	Delta  int `json:"delta"`
+}
+
+type NullableFloatDiff struct {
+	Before *float64 `json:"before"`
+	After  *float64 `json:"after"`
+	Delta  *float64 `json:"delta"`
+}
+```
+
+`delta` は `after - before` とする。数値が低下した場合は負数を返す。`before` または `after` が `null` の nullable diff では、`delta` も `null` とする。
+
+レスポンス例:
+
+```json
+{
+  "aggregate_diff": {
+    "rating": { "before": 17.34, "after": 17.35, "delta": 0.01 },
+    "overpower": {
+      "value": { "before": 96110.42, "after": 96123.91, "delta": 13.49 },
+      "percentage": { "before": 76.26, "after": 76.27, "delta": 0.01 }
+    },
+    "total_high_score": { "before": 16363921404, "after": 16363979444, "delta": 58040 },
+    "by_difficulty": {
+      "MASTER": {
+        "total_high_score": { "before": 16363921404, "after": 16363979444, "delta": 58040 },
+        "average_score": { "before": 1009493.52, "after": 1009499.04, "delta": 5.52 },
+        "played_count": { "before": 1621, "after": 1621, "delta": 0 },
+        "statistics": {
+          "aj": { "before": 1234, "after": 1235, "delta": 1 },
+          "fc": { "before": 1366, "after": 1367, "delta": 1 },
+          "clr": { "before": 1613, "after": 1621, "delta": 8 },
+          "fch": { "before": 133, "after": 133, "delta": 0 },
+          "max": { "before": 89, "after": 89, "delta": 0 },
+          "sss_plus": { "before": 1347, "after": 1350, "delta": 3 },
+          "sss": { "before": 1546, "after": 1548, "delta": 2 },
+          "ss_plus": { "before": 1599, "after": 1599, "delta": 0 },
+          "ss": { "before": 1621, "after": 1621, "delta": 0 }
+        }
+      }
+    }
+  }
+}
+```
+
+### 4.4 レスポンス例
 
 ```json
 {
@@ -191,6 +314,32 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
     "full_records_actually_changed": 12,
     "worldsend_records_actually_changed": 3
   },
+  "aggregate_diff": {
+    "rating": { "before": 17.28, "after": 17.29, "delta": 0.01 },
+    "overpower": {
+      "value": { "before": 96110.42, "after": 96123.91, "delta": 13.49 },
+      "percentage": { "before": 76.26, "after": 76.27, "delta": 0.01 }
+    },
+    "total_high_score": { "before": 16363921404, "after": 16363979444, "delta": 58040 },
+    "by_difficulty": {
+      "MASTER": {
+        "total_high_score": { "before": 16363921404, "after": 16363979444, "delta": 58040 },
+        "average_score": { "before": 1009493.52, "after": 1009499.04, "delta": 5.52 },
+        "played_count": { "before": 1621, "after": 1621, "delta": 0 },
+        "statistics": {
+          "aj": { "before": 1234, "after": 1235, "delta": 1 },
+          "fc": { "before": 1366, "after": 1367, "delta": 1 },
+          "clr": { "before": 1613, "after": 1621, "delta": 8 },
+          "fch": { "before": 133, "after": 133, "delta": 0 },
+          "max": { "before": 89, "after": 89, "delta": 0 },
+          "sss_plus": { "before": 1347, "after": 1350, "delta": 3 },
+          "sss": { "before": 1546, "after": 1548, "delta": 2 },
+          "ss_plus": { "before": 1599, "after": 1599, "delta": 0 },
+          "ss": { "before": 1621, "after": 1621, "delta": 0 }
+        }
+      }
+    }
+  },
   "changes": [
     {
       "record_type": "full",
@@ -199,21 +348,15 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "diff": "MASTER",
       "before": {
         "score": 990000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 1,
-        "combo_lamp_name": "NONE",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       },
       "after": {
         "score": 1001000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 3,
-        "combo_lamp_name": "FULL COMBO",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "FULL COMBO",
+        "full_chain": null
       }
     },
     {
@@ -224,19 +367,17 @@ WORLD'S END の `diff` は入力値に依存せず、レスポンスでは `"WE"
       "before": null,
       "after": {
         "score": 950000,
-        "clear_lamp_id": 2,
-        "clear_lamp_name": "CLEAR",
-        "combo_lamp_id": 1,
-        "combo_lamp_name": "NONE",
-        "full_chain_id": 1,
-        "full_chain_name": "NONE"
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null
       }
     }
-  ]
+  ],
+  "skipped_records": []
 }
 ```
 
-`changes` は0件の場合も省略せず、空配列 `[]` を返す。`skipped_records` も省略せず、0件の場合は空配列 `[]` を返す。
+`skipped_records` も0件の場合は空配列 `[]` を返す。
 
 ## 5. アーキテクチャ設計
 
@@ -302,7 +443,7 @@ WHERE player_id = ?
   AND worldsend_chart_id IN (?)
 ```
 
-明示カラムSELECTを使う。JOINを伴わない単純SELECTで、`IN (?)` は既存の `selectModelsInChunks` と同じ考え方でチャンク分割する。
+明示カラムSELECTを使う。JOINを伴わない単純SELECTで、`IN (?)` は既存の `selectModelsInChunks` と同じ考え方で `info.BulkInsertChunkSize`（3000）単位でチャンク分割する。
 
 ### 5.3 Usecase
 
@@ -310,12 +451,15 @@ WHERE player_id = ?
 
 推奨する内部構成は以下。
 
+- `ensurePlayer` 実行前または直後に保存前プレイヤーサマリーを退避する。RATING は既存 `players.official_player_rating`、OVER POWER は保存前レコードから同一条件で再計算する。
 - `applyFullScores` / `applyWorldsendScores` は、従来通り「入力検証・マスタ解決・upsert用state生成」を担当する。
 - `normalizeFullRecordsForUpsert` / `normalizeWorldsendRecordsForUpsert` を新設し、同一キーは最後の1件へ正規化する。
 - `collectFullChartIDs` / `collectWorldsendChartIDs` を新設し、受理済み upsert list から保存前ロード対象キーを作る。
 - `computeFullRecordChanges` / `computeWorldsendRecordChanges` を新設し、保存前 state map と upsert 予定値を比較する。
 - `sortAndLimitRecordChanges` を新設し、`idx` を数値として昇順に並べたうえでレスポンス詳細を最大100件に制限する。同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
-- `applyScores` は upsert list生成後に正規化し、保存前stateをロードして changes を計算し、保存成功後に counts / changes を返す。
+- `applyScores` は upsert list生成後に正規化し、保存前stateをロードして changes を計算し、`SavePlayerData` 成功後に counts / changes を返す。
+- `buildPlayerDataAggregateSnapshot` を新設し、通常譜面レコード一覧から TOTAL HIGH SCORE、難易度別平均、ランプ・スコアランク別統計を作る。
+- `computePlayerDataAggregateDiff` を新設し、保存前 snapshot と保存後 snapshot を比較して `aggregate_diff` を作る。
 
 `applyScores` の戻り値は以下のように変更する。
 
@@ -330,9 +474,15 @@ func (us *playerDataUsecase) applyScores(
 ) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, calculatedOverpowerSummary, error)
 ```
 
-`Register` 側では `result.Changes = changes` を設定する。0件の場合も `nil` ではなく空sliceを設定し、JSONでは `changes: []` として返す。
+`Register` 側では `SavePlayerData` 成功後に `result.Changes = changes` を設定する。差分0件の場合も空sliceを設定し、JSONでは `changes: []` として返す。
 
 正規化後の upsert 予定値だけを差分比較する。DB側で `updated_at` が更新される条件と、Go側の `new` / `updated` 判定対象を一致させるためである。
+
+集計差分は、保存前レコード一覧と保存後レコード一覧の両方から snapshot を作って比較する。保存前 snapshot は `SavePlayerData` より前に取得した通常譜面レコードから作り、保存後 snapshot は `SavePlayerData` 後、OVER POWER / rating 再計算後に取得した通常譜面レコードとプレイヤー情報から作る。
+
+OVER POWER の before/after は同じ `OverpowerTargetStats` と同じ未解禁曲設定を使って計算する。これにより、登録中にマスタや未解禁曲設定が変化しない限り、`delta` はスコア登録による差分として解釈できる。
+
+TOTAL HIGH SCORE と RECORD STATISTICS は、通常譜面のみを対象にする。WORLD'S END を含めるかどうかは将来拡張で別フィールドとして検討する。
 
 ### 5.4 差分判定関数
 
@@ -359,9 +509,9 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 ## 6. パフォーマンス設計
 
 - 追加ロード処理は通常譜面の保存前、WORLD'S ENDの保存前の合計2種類。
-- どちらも `player_id` 条件と対象キー条件の単純SELECTで、JOINを伴わない。チャンク分割するため、実際のクエリ数は `ceil(keys / BulkInsertChunkSize)` に応じて増える。
+- どちらも `player_id` 条件と対象キー条件の単純SELECTで、JOINを伴わない。チャンク分割するため、実際のクエリ数は `ceil(keys / BulkInsertChunkSize)` に応じて増える。譜面7000件規模では `BulkInsertChunkSize`（3000）により種別あたり最大3クエリとなる。
 - 比較は payload 件数に対する O(N)。
-- 1万件規模でも map と slice のメモリ使用量は許容範囲。
+- 楽曲1700件・譜面7000件規模でも、リクエスト単位の map と slice のメモリ使用量は許容範囲である。マスタは payload 参照 idx のみ、保存前 state は upsert 対象キーのみをロードする。
 - 初回登録では実際の差分件数が数千件になる可能性があるため、`*_actually_changed` は全件数を返し、`changes` の詳細は最大100件に制限する。
 
 差分詳細の上限は初版から100件とする。レスポンスサイズとクライアント処理負荷を抑えるためである。詳細は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で安定させる。
@@ -387,7 +537,17 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 - `new` の場合、`before` は `null` になる。
 - `changes` は `idx` を数値として昇順に並べ、最大100件まで返る。
 - `changes` が100件を超える場合も、`*_actually_changed` は全件数を返す。
-- ランプIDに対応するランプ名が `clear_lamp_name` / `combo_lamp_name` / `full_chain_name` に設定される。
+- ランプ名が `clear_lamp` / `combo_lamp` / `full_chain` に設定され、`none` 相当は `null` になる。
+- `SavePlayerData` 成功時のみ `changes` が返る。
+- `aggregate_diff.rating` は保存前 `official_player_rating` と payload の `rating` の差分になる。
+- `aggregate_diff.overpower.value` / `percentage` は保存前後レコードを同じ分母で再計算した差分になる。
+- `aggregate_diff.total_high_score` は通常譜面スコア合計の before / after / delta を返す。
+- `aggregate_diff.by_difficulty.*.total_high_score` は難易度別スコア合計の差分を返す。
+- `aggregate_diff.by_difficulty.*.average_score` は難易度別平均スコアの差分を返し、played_count が0の場合は `null` になる。
+- `aggregate_diff.by_difficulty.*.statistics.aj/fc/clr/fch/max` はランプ・MAX達成数の差分を返す。
+- `aggregate_diff.by_difficulty.*.statistics.sss_plus/sss/ss_plus/ss` は累積スコアランク件数の差分を返す。
+- スコアやランプが下がった場合、各 `delta` は負数になる。
+- WORLD'S END は初版の TOTAL HIGH SCORE / RECORD STATISTICS に含まれない。
 
 テストはテーブルテスト + Given / When / Then コメントで書き、結果検証は `assert`、前提確認は `require` を使う。
 
@@ -420,19 +580,30 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 2. Repository interface追加: 保存前キー指定ロードの2メソッド。
 3. Infra実装: 明示カラムSELECTで保存前state mapを返す。
 4. Usecaseテスト追加: 差分判定・counts・changesの期待値を先に書く。
-5. Usecase実装: `updatedAt` 秒精度正規化、upsert対象の重複正規化、保存前stateロード、upsert予定値との比較、resultへの反映。
-6. API.md更新: レスポンス例、スキーマ、TypeScript interface、差分定義のNoteを更新。
-7. `gofmt -s -w` を対象Goファイルに実行。
-8. `go test ./...` を実行。
-9. セルフレビュー: AGENTS.md のチェックリストに沿って、文字化け・N+1・実装範囲・API.md反映を確認。
+5. Usecase実装: upsert対象の重複正規化、保存前stateロード、upsert予定値との比較、`sortAndLimitRecordChanges`、保存成功後の result 反映。
+6. DTO追加: `PlayerDataResult` に `aggregate_diff`、集計差分用DTO（`IntDiff` / `NullableFloatDiff` / 難易度別統計）を追加。
+7. Usecaseテスト追加: RATING、OVER POWER、TOTAL HIGH SCORE、難易度別平均、ランプ・スコアランク別統計の before / after / delta を先に書く。
+8. Usecase実装: 保存前後の通常譜面レコードから集計 snapshot を作り、`aggregate_diff` を計算する。
+9. API.md更新: レスポンス例、スキーマ、TypeScript interface、差分定義のNoteを更新。
+10. `gofmt -s -w` を対象Goファイルに実行。
+11. `go test ./...` を実行。
+12. セルフレビュー: AGENTS.md のチェックリストに沿って、文字化け・N+1・実装範囲・API.md反映を確認。
 
 Goコードを変更した実装PRでは `go test ./...` を実行する。
 
-## 9. リスクと未決事項
+## 9. 初版仕様とリスク
 
-### 9.1 初版で決めるべき事項
+### 9.1 初版仕様
 
-初版方針は「後方互換性は重視しない」「基本的に `omitempty` は使わない」「`changes` は最大100件」「`changes` は `idx` を数値として昇順」「`new` の `before` は `null`」「ランプ名はIDとあわせて返す」「WORLD'S ENDは `diff: "WE"` 固定」「payload内重複は最後の1件へ正規化」で固定する。
+- `changes` は登録成功時に常に配列として返し、最大100件とする。
+- `aggregate_diff` は登録成功時に常にオブジェクトとして返す。
+- `changes` は `idx` を数値として昇順に並べる。
+- `new` の `before` は `null` とする。
+- `before` / `after` のランプは `clear_lamp` / `combo_lamp` / `full_chain` とし、マスタ `Name` を返す。`none` 相当は `null` とする。
+- WORLD'S END の `diff` は `"WE"` 固定とする。
+- payload内重複は最後の1件へ正規化する。
+- `SavePlayerData` 成功後に `result.Changes` を設定する。
+- 集計差分の RATING は公式レーティング、OVER POWER は同一分母で再計算した値、TOTAL HIGH SCORE / RECORD STATISTICS は通常譜面のみを対象にする。
 
 ### 9.2 リスク
 
@@ -440,11 +611,17 @@ Goコードを変更した実装PRでは `go test ./...` を実行する。
 - 初回登録で実際の差分件数が数千件になった場合、`changes` 詳細は100件に制限されるため、クライアントは `*_actually_changed` と `changes.length` が一致しない前提で扱う必要がある。
 - before/afterにランプ名を含めるため、マスタ逆引きの実装が少し増える。
 - 「改善」という表示文言にすると、スコア下降やランプ下降を誤表現する可能性がある。
+- OVER POWER の `before` を再計算するため、保存前レコード一覧の取得・変換コストが増える。
+- RATING は公式レーティングと計算レーティングが別物であるため、APIドキュメントで `aggregate_diff.rating` の対象を明確にしないと誤解される。
+- TOTAL HIGH SCORE / RECORD STATISTICS は WORLD'S END を初版では含めないため、クライアント表示で対象範囲を明記する必要がある。
+- ランプやスコアランクの集計は累積件数であり、排他的な分布ではない。UI側のラベルと説明に注意する。
 
 ### 9.3 将来拡張
 
 - `change_fields: ["score", "combo_lamp"]` のような変更カラム一覧。
-- `score_delta`、rating delta、overpower delta。
+- 譜面単位の `score_delta`、rating delta、overpower delta。
+- 計算レーティング（`calculated_player_rating` / `best_average_rating` / `new_average_rating`）の差分。
+- WORLD'S END を含めた TOTAL HIGH SCORE / RECORD STATISTICS。
 - `?include_changes=false` のような軽量モード。
 - 変更履歴テーブルへの保存。
 
@@ -457,9 +634,13 @@ Goコードを変更した実装PRでは `go test ./...` を実行する。
 - `/internal/me/register-data` のレスポンス例
 - `PlayerDataResult` レスポンススキーマ
 - `PlayerDataCounts` 説明
+- `aggregate_diff` のスキーマ
 - `changes` のスキーマ
 - TypeScript interface
 - `changes` が最大100件で、`*_actually_changed` は全件数であることの説明
+- `aggregate_diff.rating` は公式レーティングであることの説明
+- `aggregate_diff.overpower` は同一分母で再計算した差分であることの説明
+- TOTAL HIGH SCORE / RECORD STATISTICS は通常譜面のみ対象であることの説明
 - `before` が `null` になり得ることの説明
 - ランプ名フィールドの説明
 - 差分情報を返す仕様Noteへの置換

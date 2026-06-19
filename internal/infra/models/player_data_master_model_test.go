@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
@@ -61,28 +62,28 @@ func TestPlayerDataChartModelToEntity(t *testing.T) {
 
 			// Then
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+				require.Failf(t, "前提条件失敗", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				if tt.expectedError != "" && !assertErrorContains(err, tt.expectedError) {
-					t.Fatalf("error = %v, want contain %q", err, tt.expectedError)
+					require.Failf(t, "前提条件失敗", "error = %v, want contain %q", err, tt.expectedError)
 				}
 				return
 			}
 			if got.Const != tt.expectedConst {
-				t.Fatalf("const = %v, want %v", got.Const, tt.expectedConst)
+				require.Failf(t, "前提条件失敗", "const = %v, want %v", got.Const, tt.expectedConst)
 			}
 			if got.ID != model.ID {
-				t.Fatalf("id = %d, want %d", got.ID, model.ID)
+				require.Failf(t, "前提条件失敗", "id = %d, want %d", got.ID, model.ID)
 			}
 			if got.SongID != model.SongID {
-				t.Fatalf("song_id = %d, want %d", got.SongID, model.SongID)
+				require.Failf(t, "前提条件失敗", "song_id = %d, want %d", got.SongID, model.SongID)
 			}
 			if got.DifficultyID != model.DifficultyID {
-				t.Fatalf("difficulty_id = %d, want %d", got.DifficultyID, model.DifficultyID)
+				require.Failf(t, "前提条件失敗", "difficulty_id = %d, want %d", got.DifficultyID, model.DifficultyID)
 			}
 			if got.IsConstUnknown != model.IsConstUnknown {
-				t.Fatalf("is_const_unknown = %v, want %v", got.IsConstUnknown, model.IsConstUnknown)
+				require.Failf(t, "前提条件失敗", "is_const_unknown = %v, want %v", got.IsConstUnknown, model.IsConstUnknown)
 			}
 		})
 	}
@@ -125,19 +126,19 @@ func TestPlayerDataChartEntityToModel(t *testing.T) {
 
 			// Then
 			if got.Const != tt.expectedConst {
-				t.Fatalf("const = %v, want %v", got.Const, tt.expectedConst)
+				require.Failf(t, "前提条件失敗", "const = %v, want %v", got.Const, tt.expectedConst)
 			}
 			if got.ID != playerDataChart.ID {
-				t.Fatalf("id = %d, want %d", got.ID, playerDataChart.ID)
+				require.Failf(t, "前提条件失敗", "id = %d, want %d", got.ID, playerDataChart.ID)
 			}
 			if got.SongID != playerDataChart.SongID {
-				t.Fatalf("song_id = %d, want %d", got.SongID, playerDataChart.SongID)
+				require.Failf(t, "前提条件失敗", "song_id = %d, want %d", got.SongID, playerDataChart.SongID)
 			}
 			if got.DifficultyID != playerDataChart.DifficultyID {
-				t.Fatalf("difficulty_id = %d, want %d", got.DifficultyID, playerDataChart.DifficultyID)
+				require.Failf(t, "前提条件失敗", "difficulty_id = %d, want %d", got.DifficultyID, playerDataChart.DifficultyID)
 			}
 			if got.IsConstUnknown != playerDataChart.IsConstUnknown {
-				t.Fatalf("is_const_unknown = %v, want %v", got.IsConstUnknown, playerDataChart.IsConstUnknown)
+				require.Failf(t, "前提条件失敗", "is_const_unknown = %v, want %v", got.IsConstUnknown, playerDataChart.IsConstUnknown)
 			}
 		})
 	}
@@ -148,7 +149,7 @@ func mustChartConstantForTest(t *testing.T, value float64) chartconstant.ChartCo
 
 	got, err := chartconstant.NewChartConstant(value)
 	if err != nil {
-		t.Fatalf("chartconstant.NewChartConstant failed: %v", err)
+		require.Failf(t, "前提条件失敗", "chartconstant.NewChartConstant failed: %v", err)
 	}
 
 	return got

@@ -7,19 +7,21 @@ import (
 )
 
 const (
-	Name                 = "chunisupport-api"
-	Version              = "0.1.0"
-	ConfigDir            = ".config/"
-	ResourceDir          = ".resources/"
-	MigrationDir         = "migration/mysql/"
-	StaticDBFilename     = "static.db"
-	BulkInsertChunkSize  = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
-	BulkSelectChunkSize  = 1000 // IN句のプレースホルダ上限を避けるための分割数
-	DefaultUserListLimit = 100
-	DefaultSongListLimit = 100
-	GoalMaxPerUser       = 100
-	ChartConstMin        = constants.ChartConstMin
-	ChartConstMax        = constants.ChartConstMax
+	Name                        = "chunisupport-api"
+	ConfigDir                   = ".config/"
+	ResourceDir                 = ".resources/"
+	MigrationDir                = "migration/mysql/"
+	StaticDBFilename            = "static.db"
+	BulkInsertChunkSize         = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
+	BulkSelectChunkSize         = 1000 // IN句のプレースホルダ上限を避けるための分割数
+	DefaultUserListLimit        = 100
+	DefaultSongListLimit        = 100
+	GoalMaxPerUser              = 100
+	RecordFilterMaxPerUser      = 100
+	RecordFilterNameMaxLength   = 30
+	RecordFilterMaxPayloadBytes = 8 * 1024
+	ChartConstMin               = constants.ChartConstMin
+	ChartConstMax               = constants.ChartConstMax
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
@@ -68,6 +70,11 @@ const (
 	DefaultDBConnMaxIdleTimeSec = 60
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
+)
+
+var (
+	BuildDate = "dev"  // ビルド日: YYYYMMDD
+	Revision  = "none" // Git短縮ハッシュ: a1b2c3d。開発起動時はnone
 )
 
 // 対応アプリバージョン設定

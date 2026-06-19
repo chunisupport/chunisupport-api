@@ -6,6 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBuildIdentifiers_DefaultDev(t *testing.T) {
+	assert.Equal(t, "dev", BuildDate)
+	assert.Equal(t, "none", Revision)
+}
+
 func TestIsKnownAccountType(t *testing.T) {
 	tests := []struct {
 		name          string

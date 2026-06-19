@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -118,23 +119,23 @@ func TestAPITokenUsecase_Generate(t *testing.T) {
 
 	token, err := service.Generate(context.Background(), 1)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if token == "" {
-		t.Fatalf("expected token to be generated")
+		require.Failf(t, "前提条件失敗", "expected token to be generated")
 	}
 
 	if tokenRepo.savedToken == nil {
-		t.Fatalf("expected token to be saved")
+		require.Failf(t, "前提条件失敗", "expected token to be saved")
 	}
 
 	expectedHash := hashToken(token)
 	if tokenRepo.savedToken.HashedToken != expectedHash {
-		t.Fatalf("expected hashed token %s, got %s", expectedHash, tokenRepo.savedToken.HashedToken)
+		require.Failf(t, "前提条件失敗", "expected hashed token %s, got %s", expectedHash, tokenRepo.savedToken.HashedToken)
 	}
 	if tokenRepo.savedToken.UserID != 1 {
-		t.Fatalf("expected user id 1, got %d", tokenRepo.savedToken.UserID)
+		require.Failf(t, "前提条件失敗", "expected user id 1, got %d", tokenRepo.savedToken.UserID)
 	}
 }
 
@@ -152,17 +153,17 @@ func TestAPITokenUsecase_GetStatus(t *testing.T) {
 
 	token, err := service.GetStatus(context.Background(), 123)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if token == nil {
-		t.Fatalf("expected token status")
+		require.Failf(t, "前提条件失敗", "expected token status")
 	}
 	if token.ID != 10 {
-		t.Fatalf("expected token id 10, got %d", token.ID)
+		require.Failf(t, "前提条件失敗", "expected token id 10, got %d", token.ID)
 	}
 	if !token.CreatedAt.Equal(createdAt) {
-		t.Fatalf("expected created_at %v, got %v", createdAt, token.CreatedAt)
+		require.Failf(t, "前提条件失敗", "expected created_at %v, got %v", createdAt, token.CreatedAt)
 	}
 }
 
@@ -173,10 +174,10 @@ func TestAPITokenUsecase_GetStatus_NotFound(t *testing.T) {
 
 	token, err := service.GetStatus(context.Background(), 123)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 	if token != nil {
-		t.Fatalf("expected nil token, got %#v", token)
+		require.Failf(t, "前提条件失敗", "expected nil token, got %#v", token)
 	}
 }
 
@@ -188,10 +189,10 @@ func TestAPITokenUsecase_GetStatus_Error(t *testing.T) {
 
 	token, err := service.GetStatus(context.Background(), 123)
 	if err != expectedErr {
-		t.Fatalf("expected error %v, got %v", expectedErr, err)
+		require.Failf(t, "前提条件失敗", "expected error %v, got %v", expectedErr, err)
 	}
 	if token != nil {
-		t.Fatalf("expected nil token, got %#v", token)
+		require.Failf(t, "前提条件失敗", "expected nil token, got %#v", token)
 	}
 }
 
@@ -206,14 +207,14 @@ func TestAPITokenUsecase_Validate(t *testing.T) {
 
 	gotUser, apiToken, err := service.Validate(context.Background(), "plain-token")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if gotUser.ID != user.ID {
-		t.Fatalf("expected user id %d, got %d", user.ID, gotUser.ID)
+		require.Failf(t, "前提条件失敗", "expected user id %d, got %d", user.ID, gotUser.ID)
 	}
 	if apiToken.ID != 10 {
-		t.Fatalf("expected token id 10, got %d", apiToken.ID)
+		require.Failf(t, "前提条件失敗", "expected token id 10, got %d", apiToken.ID)
 	}
 }
 
@@ -247,7 +248,7 @@ func TestAPITokenUsecase_Validate_InvalidCases(t *testing.T) {
 			service := NewAPITokenUsecase(nil, tc.tokenRepo, tc.userRepo)
 			_, _, err := service.Validate(context.Background(), tc.input)
 			if !errors.Is(err, ErrInvalidAPIToken) {
-				t.Fatalf("expected ErrInvalidAPIToken, got %v", err)
+				require.Failf(t, "前提条件失敗", "expected ErrInvalidAPIToken, got %v", err)
 			}
 		})
 	}
@@ -260,11 +261,11 @@ func TestAPITokenUsecase_Delete(t *testing.T) {
 
 	err := service.Delete(context.Background(), 123)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
 	}
 
 	if tokenRepo.deletedUserID != 123 {
-		t.Fatalf("expected deletedUserID to be 123, got %d", tokenRepo.deletedUserID)
+		require.Failf(t, "前提条件失敗", "expected deletedUserID to be 123, got %d", tokenRepo.deletedUserID)
 	}
 }
 
@@ -276,6 +277,6 @@ func TestAPITokenUsecase_Delete_Error(t *testing.T) {
 
 	err := service.Delete(context.Background(), 123)
 	if err != expectedErr {
-		t.Fatalf("expected error %v, got %v", expectedErr, err)
+		require.Failf(t, "前提条件失敗", "expected error %v, got %v", expectedErr, err)
 	}
 }
