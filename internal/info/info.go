@@ -39,7 +39,7 @@ const (
 	LoginRateLimitWindow            = 1 * time.Minute // ログインレートリミットのウィンドウ期間
 	RegisterRateLimitRequests       = 5               // 登録エンドポイントのリクエスト制限（1分間）
 	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
-	InternalPublicRateLimitRequests = 10
+	InternalPublicRateLimitRequests = 60
 	InternalPublicRateLimitWindow   = 1 * time.Minute
 	RegisterDataRateLimitRequests   = 1
 	RegisterDataRateLimitWindow     = 30 * time.Second

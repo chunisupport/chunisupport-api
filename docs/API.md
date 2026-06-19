@@ -45,7 +45,7 @@
 - `/internal/me/register-data`: **30秒あたり1回/ユーザー**
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
-- `/internal/users/*` および `/internal/songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり10回/IP**
+- `/internal/users/*`、`/internal/songs/*` および `/internal/worldsend-songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
 - `/v1/*`: **15分あたり150回（一般ユーザー） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 
@@ -1455,7 +1455,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend` のみを返します。
@@ -1542,7 +1542,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/profile`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` が `null` になります。
 
@@ -1592,7 +1592,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/updated-at`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
 
@@ -1620,7 +1620,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/rating`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: レーティング枠のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は各配列が空、`meta.updated_at` が `null` になります。
 
@@ -1690,7 +1690,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/record`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `standard` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
 - **パスパラメータ**:
 
@@ -1776,7 +1776,7 @@ curl -X POST \
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
 
 #### レスポンス例
@@ -1870,7 +1870,7 @@ curl -X POST \
 
 ### GET `/internal/songs`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **概要**: WORLD'S END以外の全楽曲を譜面情報付きで取得します。デフォルトでは削除済み楽曲は除外されます。
 - **クエリパラメータ**:
   - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
@@ -1951,7 +1951,7 @@ curl -X POST \
 
 ### GET `/internal/songs/:displayid`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
@@ -1992,7 +1992,7 @@ curl -X POST \
 
 ### GET `/internal/songs/:displayid/stats/:difficulty`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: 
   - `displayid` - 楽曲の表示用ID
   - `difficulty` - 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
@@ -2237,7 +2237,7 @@ curl -X POST \
 
 ### GET `/internal/worldsend-songs`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **クエリパラメータ**: 
   - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
 - **概要**: 全 WORLD'S END 楽曲を譜面情報付きで取得します。WORLD'S END は1曲1譜面が保証されています。
@@ -2298,7 +2298,7 @@ curl -X POST \
 
 ### GET `/internal/worldsend-songs/:displayid`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
