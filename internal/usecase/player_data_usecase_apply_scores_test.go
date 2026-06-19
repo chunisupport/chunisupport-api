@@ -808,7 +808,7 @@ func TestWorldsendRecordDisplayKeys_楽曲マスタ欠損時は楽曲IDをIdxに
 	}
 
 	// When
-	idx, diff := worldsendRecordDisplayKeys(context.Background(), 201, lookup)
+	idx, diff := worldsendRecordDisplayKeys(201, lookup)
 
 	// Then
 	assert.Equal(t, "2", idx)

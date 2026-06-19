@@ -881,7 +881,7 @@ func computeWorldsendRecordChanges(ctx context.Context, before map[int]repositor
 		func(record repository.WorldsendRecordForUpsert) int { return record.ChartID },
 		func(record repository.WorldsendRecordForUpsert) repository.WorldsendRecordState { return record.State },
 		func(ctx context.Context, record repository.WorldsendRecordForUpsert, lookup recordDisplayLookup) (string, string) {
-			return worldsendRecordDisplayKeys(ctx, record.ChartID, lookup)
+			return worldsendRecordDisplayKeys(record.ChartID, lookup)
 		},
 		worldsendRecordMeaningfullyChanged,
 		"worldsend",
@@ -971,7 +971,7 @@ func fullRecordDisplayKeys(ctx context.Context, chartID int, masters *playerData
 	return idx, diff
 }
 
-func worldsendRecordDisplayKeys(ctx context.Context, chartID int, lookup recordDisplayLookup) (string, string) {
+func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string, string) {
 	chart, ok := lookup.worldsendByChartID[chartID]
 	if !ok {
 		return fmt.Sprintf("%d", chartID), "WE"
