@@ -34,7 +34,7 @@ func NewReopenableFileWriter(path string) (*ReopenableFileWriter, error) {
 
 func openLogFile(path string) (*os.File, error) {
 	// #nosec G304 -- ログパスは設定ファイルで管理される運用値です。
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file %s: %w", path, err)
 	}
