@@ -1419,8 +1419,7 @@ curl -X POST \
     "overpower_value": 9500.00,
     "is_suspicious": false,
     "is_private": false,
-    "firebase_uid": "firebase-uid-1",
-    "email": "user1@example.com"
+    "firebase_uid": "firebase-uid-1"
   },
   {
     "username": "user2",
@@ -1432,8 +1431,7 @@ curl -X POST \
     "overpower_value": null,
     "is_suspicious": true,
     "is_private": true,
-    "firebase_uid": null,
-    "email": null
+    "firebase_uid": null
   }
 ]
 ```
@@ -1452,7 +1450,6 @@ curl -X POST \
 | `is_suspicious` | boolean | 不審アカウントフラグ |
 | `is_private` | boolean | プライベートアカウントかどうか |
 | `firebase_uid` | string \| null | 連携済み Firebase UID（未連携の場合は `null`） |
-| `email` | string \| null | Firebase Auth 上のメールアドレス（未連携またはメール未設定の場合は `null`） |
 
 ---
 
@@ -3403,7 +3400,6 @@ interface AdminUserListResponse {
   is_suspicious: boolean;
   is_private: boolean;
   firebase_uid: string | null;
-  email: string | null;
   is_deleted: boolean;
 }
 

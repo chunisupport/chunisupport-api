@@ -91,6 +91,21 @@ func TestReopenableFileWriter_Reopen(t *testing.T) {
 	assert.Contains(t, string(newContent), "after")
 }
 
+func TestReopenableFileWriter_CreatesLogFileWithOwnerOnlyPermission(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "app.log")
+
+	writer, err := NewReopenableFileWriter(logPath)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, writer.Close())
+	}()
+
+	info, err := os.Stat(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+}
+
 func TestReopenableFileWriter_ReopenFailureKeepsOldFile(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "app.log")
