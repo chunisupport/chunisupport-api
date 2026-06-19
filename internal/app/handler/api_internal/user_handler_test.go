@@ -541,7 +541,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	updatedAt := createdAt.Add(2 * time.Hour)
 
 	uid := "firebase-uid-1"
-	email := "user1@example.com"
 	expected := []dto_internal.AdminUserListResponse{
 		{
 			UserName:       "user1",
@@ -554,7 +553,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			IsSuspicious:   true,
 			IsPrivate:      false,
 			FirebaseUID:    &uid,
-			Email:          &email,
 		},
 		{
 			UserName:       "user2",
@@ -567,7 +565,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			IsSuspicious:   false,
 			IsPrivate:      true,
 			FirebaseUID:    nil,
-			Email:          nil,
 		},
 	}
 
@@ -595,7 +592,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
 	assert.Equal(t, uid, body[0]["firebase_uid"])
-	assert.Equal(t, email, body[0]["email"])
+	assert.NotContains(t, body[0], "email")
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])
 	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
@@ -606,7 +603,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
 	assert.Nil(t, body[1]["firebase_uid"])
-	assert.Nil(t, body[1]["email"])
+	assert.NotContains(t, body[1], "email")
 	mockUsecase.AssertExpectations(t)
 }
 

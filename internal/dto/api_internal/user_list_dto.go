@@ -15,5 +15,4 @@ type AdminUserListResponse struct {
 	IsSuspicious   bool      `json:"is_suspicious"`
 	IsPrivate      bool      `json:"is_private"`
 	FirebaseUID    *string   `json:"firebase_uid"`
-	Email          *string   `json:"email"`
 }
