@@ -2794,7 +2794,7 @@ curl -X POST \
 | `genres` | MasterItemDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
-| `versions` | VersionDTO[] | バージョン一覧（リリース日昇順） |
+| `versions` | VersionDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
 | `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`PlayerDTO.class_emblem_id` の解決に使用 |
@@ -2836,7 +2836,7 @@ curl -X POST \
 ### GET `/internal/master/versions`
 
 - **認証**: 不要
-- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
+- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。起動日時点でリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
 - **主なエラー**:
@@ -2873,7 +2873,7 @@ curl -X POST \
 
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
-- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。
+- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。起動日時点でリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -2888,7 +2888,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `versions` | VersionSummaryDTO[] | バージョン一覧（リリース日昇順） |
+| `versions` | VersionSummaryDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
