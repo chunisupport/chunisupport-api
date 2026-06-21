@@ -68,6 +68,17 @@ func (s *stubTM) Transactional(ctx context.Context, f func(tx repository.Executo
 	return f(nil)
 }
 
+// trackingTM は Transactional の呼び出しを記録し、渡された executor を closure に渡す。
+type trackingTM struct {
+	called      bool
+	passedFloor repository.Executor
+}
+
+func (s *trackingTM) Transactional(ctx context.Context, f func(tx repository.Executor) error) error {
+	s.called = true
+	return f(s.passedFloor)
+}
+
 type stubGoalMasterProvider struct{}
 
 type stubMissingTypeMasterProvider struct{}
@@ -457,6 +468,45 @@ func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, out)
+}
+
+func TestGoalUsecase_Update(t *testing.T) {
+	// Given: 既存の Goal が存在する状態
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}
+	tm := &trackingTM{passedFloor: nil}
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
+
+	// When: Update を呼び出す
+	out, err := u.Update(context.Background(), 1, 1, &GoalInput{
+		Title:             "updated",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+	})
+
+	// Then: トランザクションマネージャが使用され、更新された内容が返却される
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, "updated", out.Title)
+	assert.Equal(t, "score_count", out.AchievementType)
+	assert.True(t, tm.called, "Update は Transactional を経由すべき")
+}
+
+func TestGoalUsecase_UpdateReturnsNotFoundWhenGoalMissing(t *testing.T) {
+	// Given: 対象 Goal が存在しない
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	_, err := u.Update(context.Background(), 1, 999, &GoalInput{
+		Title:             "updated",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+
+	// Then
+	assert.True(t, errors.Is(err, ErrGoalNotFound))
 }
 
 func TestGoalUsecase_ListReturnsInternalErrorWhenAchievementTypeMissing(t *testing.T) {
