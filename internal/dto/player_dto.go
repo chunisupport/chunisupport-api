@@ -19,6 +19,9 @@ type PlayerDTO struct {
 	Name              string      `json:"name"`
 	Level             int         `json:"level"`
 	Rating            *float64    `json:"rating"`
+	CalculatedRating  *float64    `json:"-"`
+	BestAverageRating *float64    `json:"-"`
+	NewAverageRating  *float64    `json:"-"`
 	ClassEmblemID     *int        `json:"class_emblem_id"`
 	ClassEmblemBaseID *int        `json:"class_emblem_base_id"`
 	LastPlayedAt      *time.Time  `json:"last_played_at"`
@@ -40,6 +43,9 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 		Name:              player.Name.String(),
 		Level:             player.Level,
 		Rating:            player.OfficialRating,
+		CalculatedRating:  player.CalculatedRating,
+		BestAverageRating: player.BestAverageRating,
+		NewAverageRating:  player.NewAverageRating,
 		ClassEmblemID:     player.ClassEmblemID,
 		ClassEmblemBaseID: player.ClassEmblemBaseID,
 		LastPlayedAt:      player.LastPlayedAt,

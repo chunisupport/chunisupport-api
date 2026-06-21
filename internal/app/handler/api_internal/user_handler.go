@@ -170,6 +170,11 @@ func toUserRatingDTO(result *dto_internal.UserProfileRatingViewDTO) *dto_interna
 			UpdatedAt: result.UpdatedAt,
 		},
 	}
+	if result.Player != nil {
+		ratingDTO.Rating = result.Player.CalculatedRating
+		ratingDTO.BestAverage = result.Player.BestAverageRating
+		ratingDTO.NewAverage = result.Player.NewAverageRating
+	}
 
 	if result.Records == nil {
 		return ratingDTO

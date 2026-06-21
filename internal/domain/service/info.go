@@ -14,6 +14,11 @@ const (
 )
 
 const (
+	aggregateRatingDecimalPlaces = 4
+	playerRatingSlotCount        = 50
+)
+
+const (
 	playerRecordScoreMax     = 1010000
 	playerRecordScoreSSSPlus = 1009000
 	playerRecordScoreSSS     = 1007500

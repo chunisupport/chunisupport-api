@@ -678,6 +678,7 @@ curl -X POST \
 **注意事項**:
 - レーティング計算は毎回全レコードを対象に行うため、10万ユーザー規模でも問題なくスケール可能です
 - `official_player_rating` は入力データの `rating` フィールドから設定され、`calculated_player_rating` とは独立して保存されます
+- `calculated_player_rating`、`best_average_rating`、`new_average_rating` は単曲レーティングを集計し、小数点以下4桁で切り捨てて保存されます
 
 - **コンテンツタイプ**: `application/json`
 
@@ -1639,6 +1640,9 @@ curl -X POST \
 
 ```json
 {
+  "rating": 17.1234,
+  "best_average": 17.2345,
+  "new_average": 16.9567,
   "best": [
     {
       "updated_at": "2024-12-20T10:00:00Z",
@@ -1673,6 +1677,9 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `rating` | number \| null | BEST枠とNEW枠から計算したプレイヤーRATING（小数点以下4桁） |
+| `best_average` | number \| null | BEST枠の平均RATING（小数点以下4桁） |
+| `new_average` | number \| null | NEW枠の平均RATING（小数点以下4桁） |
 | `best` | PlayerRecordDTO[] | ベスト枠レコード |
 | `best_candidate` | PlayerRecordDTO[] | ベスト候補枠レコード |
 | `new` | PlayerRecordDTO[] | 新曲枠レコード |
@@ -1689,6 +1696,9 @@ curl -X POST \
 
 ```json
 {
+  "rating": null,
+  "best_average": null,
+  "new_average": null,
   "best": [],
   "best_candidate": [],
   "new": [],
@@ -3423,6 +3433,9 @@ interface UserProfileWithRecordsDTO {
 }
 
 interface UserRatingDTO {
+  rating: number | null;
+  best_average: number | null;
+  new_average: number | null;
   best: PlayerRecordDTO[];
   best_candidate: PlayerRecordDTO[];
   new: PlayerRecordDTO[];
