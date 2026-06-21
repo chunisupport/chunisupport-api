@@ -565,6 +565,9 @@
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/me/register-data`
+
+スコア差分、集計差分、件数の厳密な定義は [プレイヤーデータ登録時の差分仕様](./player_data_registration_diff_specification.md) を参照してください。
+
 - **認証**: Firebase Bearer 必須
 - **コンテンツタイプ**: 
   - デフォルト（クエリパラメータなし）: `application/octet-stream` または `text/plain`（base64+gzip形式）
