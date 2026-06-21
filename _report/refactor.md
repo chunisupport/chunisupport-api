@@ -78,7 +78,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **UC-013** | **Medium** | `goalUsecase.Update` が非トランザクション | `Create` は `tm.Transactional` を使う一方、`Update` は `u.db` へ直接アクセスしています。 |
 | **UC-014** | **Medium** | WORLD'S ENDレコード取得エラーを握りつぶしている | `user_usecase_impl.go` の `getUserProfileWorldsendRecords` は `worldsendRecordRepo.FindByPlayerID` のエラーをログ出力後に空スライス・nil errorとして返します。通常譜面側はエラーを返すため挙動が不一致で、障害時に部分的な欠損レスポンスを正常扱いするリスクがあります。 |
 
 ### ハンドラー / ルーター層 (HDL)
