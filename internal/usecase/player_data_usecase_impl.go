@@ -293,7 +293,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.PlayerID = playerID
 
 		// レーティングを再計算して更新
-		ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
+		ratingStats, ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
 		if ratingErr != nil {
 			return ratingErr
 		}
@@ -305,7 +305,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			PlayerID:          playerID,
 			Name:              summaryInput.Name,
 			Level:             summaryInput.Level,
-			Rating:            summaryInput.OfficialRating,
+			Rating:            &ratingStats.PlayerRating,
 			ClassEmblemID:     summaryInput.ClassEmblemID,
 			ClassEmblemBaseID: summaryInput.ClassBaseID,
 			LastPlayedAt:      summaryInput.LastPlayedAt,
@@ -315,7 +315,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.Summary = api_internal.PlayerDataSummary{
 			Name:             summaryInput.Name,
 			Level:            summaryInput.Level,
-			Rating:           summaryInput.OfficialRating,
+			Rating:           &ratingStats.PlayerRating,
 			LastPlayedAt:     summaryInput.LastPlayedAt,
 			OverpowerValue:   summaryInput.OverpowerValue,
 			OverpowerPercent: summaryInput.OverpowerPercent,
@@ -1345,11 +1345,11 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
 // ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
-func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) error {
+func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) (service.RatingStats, error) {
 	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
 	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch player records: %w", err)
+		return service.RatingStats{}, fmt.Errorf("failed to fetch player records: %w", err)
 	}
 
 	// レーティング計算用のレコードに変換
@@ -1380,7 +1380,11 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 	stats := service.CalcRatingStats(ratingRecords)
 
 	// データベースに保存
-	return us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage)
+	if err := us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage); err != nil {
+		return service.RatingStats{}, err
+	}
+
+	return stats, nil
 }
 
 func (us *playerDataUsecase) Delete(ctx context.Context, user *entity.User) error {
