@@ -799,25 +799,30 @@ curl -X POST \
     "overpower_percentage": 76.27
   },
   "statistics": {
-    "total_high_score": 1183287650,
-    "lamp_counts": {
-      "clear": {
-        "FAILED": 12,
-        "CLEAR": 450,
-        "HARD": 300,
-        "BRAVE": 250,
-        "ABSOLUTE": 170,
-        "CATASTROPHY": 3
-      },
-      "combo": {
-        "none": 900,
-        "full combo": 220,
-        "all justice": 65
-      },
-      "full_chain": {
-        "none": 1160,
-        "full chain gold": 20,
-        "full chain platinum": 5
+    "overall": {
+      "total_high_score": { "before": 1183268650, "after": 1183287650, "delta": 19000 },
+      "record_statistics": {
+        "aj": { "before": 64, "after": 65, "delta": 1 },
+        "fc": { "before": 284, "after": 285, "delta": 1 },
+        "clr": { "before": 1173, "after": 1173, "delta": 0 },
+        "fch": { "before": 25, "after": 25, "delta": 0 },
+        "max": { "before": 3, "after": 3, "delta": 0 },
+        "sss_plus": { "before": 120, "after": 121, "delta": 1 },
+        "sss": { "before": 300, "after": 301, "delta": 1 },
+        "ss_plus": { "before": 450, "after": 451, "delta": 1 },
+        "ss": { "before": 700, "after": 701, "delta": 1 }
+      }
+    },
+    "by_difficulty": {
+      "BASIC": {
+        "total_high_score": { "before": 1000000, "after": 1000000, "delta": 0 },
+        "record_statistics": {
+          "aj": { "before": 1, "after": 1, "delta": 0 }, "fc": { "before": 1, "after": 1, "delta": 0 },
+          "clr": { "before": 1, "after": 1, "delta": 0 }, "fch": { "before": 0, "after": 0, "delta": 0 },
+          "max": { "before": 0, "after": 0, "delta": 0 }, "sss_plus": { "before": 0, "after": 0, "delta": 0 },
+          "sss": { "before": 0, "after": 0, "delta": 0 }, "ss_plus": { "before": 0, "after": 0, "delta": 0 },
+          "ss": { "before": 1, "after": 1, "delta": 0 }
+        }
       }
     }
   },
@@ -882,12 +887,14 @@ curl -X POST \
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
-| `statistics` | object | 登録後の通常譜面集計。`total_high_score` とランプごとの件数を含みます |
+| `statistics` | object | 通常譜面の登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
 | `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
 | `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
 
-`statistics.total_high_score` は削除済み楽曲を除く保存後の通常譜面スコア合計です。WORLD'S ENDは含みません。`statistics.lamp_counts.clear` / `combo` / `full_chain` はランプマスタの `Name` をキーにした件数です。`none` 相当のコンボランプ・フルチェインも集計では `none` キーとして返します。
+`statistics.overall` は全難易度、`statistics.by_difficulty` は難易度別の集計です。`by_difficulty` にはデータの有無にかかわらず `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` の5キーを返します。例では簡略化のため `BASIC` だけを記載しています。
+
+`total_high_score` は削除済み楽曲を除く通常譜面スコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` の累積達成件数です。WORLD'S ENDは含みません。各値は `delta = after - before` で、減少時は負数になります。
 
 **`changes` の要素スキーマ**:
 
@@ -3552,12 +3559,19 @@ interface PlayerDataSummary {
 }
 
 interface PlayerDataStatistics {
-  total_high_score: number;
-  lamp_counts: {
-    clear: Record<string, number>;
-    combo: Record<string, number>;
-    full_chain: Record<string, number>;
-  };
+  overall: PlayerDataStatisticsGroup;
+  by_difficulty: Record<'BASIC' | 'ADVANCED' | 'EXPERT' | 'MASTER' | 'ULTIMA', PlayerDataStatisticsGroup>;
+}
+
+interface PlayerDataStatisticsGroup {
+  total_high_score: PlayerDataNumberDiff;
+  record_statistics: Record<'aj' | 'fc' | 'clr' | 'fch' | 'max' | 'sss_plus' | 'sss' | 'ss_plus' | 'ss', PlayerDataNumberDiff>;
+}
+
+interface PlayerDataNumberDiff {
+  before: number;
+  after: number;
+  delta: number;
 }
 
 interface PlayerDataCounts {
