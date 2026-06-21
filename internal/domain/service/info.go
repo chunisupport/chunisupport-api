@@ -19,6 +19,8 @@ const (
 	playerRecordScoreSSS     = 1007500
 	playerRecordScoreSSPlus  = 1005000
 	playerRecordScoreSS      = 1000000
+	playerRecordScoreSPlus   = 990000
+	playerRecordScoreS       = 975000
 )
 
 var playerRecordDifficultyNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}

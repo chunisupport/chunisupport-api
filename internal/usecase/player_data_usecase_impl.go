@@ -681,7 +681,8 @@ func buildPlayerDataStatisticsGroupDiff(before service.PlayerRecordStatistics, a
 			CLR: intDiff(before.Achievements.CLR, after.Achievements.CLR), FCH: intDiff(before.Achievements.FCH, after.Achievements.FCH),
 			MAX: intDiff(before.Achievements.MAX, after.Achievements.MAX), SSSPlus: intDiff(before.Achievements.SSSPlus, after.Achievements.SSSPlus),
 			SSS: intDiff(before.Achievements.SSS, after.Achievements.SSS), SSPlus: intDiff(before.Achievements.SSPlus, after.Achievements.SSPlus),
-			SS: intDiff(before.Achievements.SS, after.Achievements.SS),
+			SS: intDiff(before.Achievements.SS, after.Achievements.SS), SPlus: intDiff(before.Achievements.SPlus, after.Achievements.SPlus),
+			S: intDiff(before.Achievements.S, after.Achievements.S),
 		},
 	}
 }

@@ -718,13 +718,13 @@ func TestPlayerDataRecordChange_JSON_newではbeforeがnullになる(t *testing.
 func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *testing.T) {
 	// Given
 	before := service.PlayerRecordStatisticsSnapshot{
-		Overall: service.PlayerRecordStatistics{TotalHighScore: 2000000, Achievements: service.RecordAchievementStatistics{FC: 2, SS: 2}},
+		Overall: service.PlayerRecordStatistics{TotalHighScore: 2000000, Achievements: service.RecordAchievementStatistics{FC: 2, SS: 2, SPlus: 3, S: 4}},
 		ByDifficulty: map[string]service.PlayerRecordStatistics{
 			"MASTER": {TotalHighScore: 2000000, Achievements: service.RecordAchievementStatistics{FC: 2, SS: 2}},
 		},
 	}
 	after := service.PlayerRecordStatisticsSnapshot{
-		Overall: service.PlayerRecordStatistics{TotalHighScore: 1010000, Achievements: service.RecordAchievementStatistics{AJ: 1, FC: 1, MAX: 1, SS: 1}},
+		Overall: service.PlayerRecordStatistics{TotalHighScore: 1010000, Achievements: service.RecordAchievementStatistics{AJ: 1, FC: 1, MAX: 1, SS: 1, SPlus: 2, S: 3}},
 		ByDifficulty: map[string]service.PlayerRecordStatistics{
 			"MASTER": {TotalHighScore: 1010000, Achievements: service.RecordAchievementStatistics{AJ: 1, FC: 1, MAX: 1, SS: 1}},
 		},
@@ -736,6 +736,8 @@ func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *t
 	// Then
 	assert.Equal(t, api_internal.PlayerDataInt64Diff{Before: 2000000, After: 1010000, Delta: -990000}, statistics.Overall.TotalHighScore)
 	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 2, After: 1, Delta: -1}, statistics.Overall.RecordStatistics.FC)
+	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 3, After: 2, Delta: -1}, statistics.Overall.RecordStatistics.SPlus)
+	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 4, After: 3, Delta: -1}, statistics.Overall.RecordStatistics.S)
 	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 0, After: 1, Delta: 1}, statistics.ByDifficulty["MASTER"].RecordStatistics.AJ)
 	assert.Len(t, statistics.ByDifficulty, 5)
 }
@@ -776,6 +778,8 @@ func TestPlayerDataStatistics_JSON固定5難易度と全差分フィールドを
 	}
 	assert.Contains(t, string(encoded), `"total_high_score":{"before":0,"after":0,"delta":0}`)
 	assert.Contains(t, string(encoded), `"record_statistics":{"aj":`)
+	assert.Contains(t, string(encoded), `"s_plus":{"before":0,"after":0,"delta":0}`)
+	assert.Contains(t, string(encoded), `"s":{"before":0,"after":0,"delta":0}`)
 	assert.NotContains(t, string(encoded), `"lamp_counts"`)
 }
 

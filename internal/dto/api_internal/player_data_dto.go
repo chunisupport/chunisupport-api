@@ -50,6 +50,8 @@ type PlayerDataRecordStatisticsDiff struct {
 	SSS     PlayerDataIntDiff `json:"sss"`
 	SSPlus  PlayerDataIntDiff `json:"ss_plus"`
 	SS      PlayerDataIntDiff `json:"ss"`
+	SPlus   PlayerDataIntDiff `json:"s_plus"`
+	S       PlayerDataIntDiff `json:"s"`
 }
 
 // PlayerDataStatisticsGroup はスコア合計と達成件数の差分です。

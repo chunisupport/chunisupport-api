@@ -17,6 +17,8 @@ type RecordAchievementStatistics struct {
 	SSS     int
 	SSPlus  int
 	SS      int
+	SPlus   int
+	S       int
 }
 
 // PlayerRecordStatistics は通常譜面のスコア合計と達成件数を表します。
@@ -93,5 +95,11 @@ func addPlayerRecordStatistics(statistics *PlayerRecordStatistics, record *entit
 	}
 	if score >= playerRecordScoreSS {
 		achievements.SS++
+	}
+	if score >= playerRecordScoreSPlus {
+		achievements.SPlus++
+	}
+	if score >= playerRecordScoreS {
+		achievements.S++
 	}
 }

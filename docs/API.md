@@ -810,7 +810,9 @@ curl -X POST \
         "sss_plus": { "before": 120, "after": 121, "delta": 1 },
         "sss": { "before": 300, "after": 301, "delta": 1 },
         "ss_plus": { "before": 450, "after": 451, "delta": 1 },
-        "ss": { "before": 700, "after": 701, "delta": 1 }
+        "ss": { "before": 700, "after": 701, "delta": 1 },
+        "s_plus": { "before": 900, "after": 901, "delta": 1 },
+        "s": { "before": 1050, "after": 1051, "delta": 1 }
       }
     },
     "by_difficulty": {
@@ -821,7 +823,9 @@ curl -X POST \
           "clr": { "before": 1, "after": 1, "delta": 0 }, "fch": { "before": 0, "after": 0, "delta": 0 },
           "max": { "before": 0, "after": 0, "delta": 0 }, "sss_plus": { "before": 0, "after": 0, "delta": 0 },
           "sss": { "before": 0, "after": 0, "delta": 0 }, "ss_plus": { "before": 0, "after": 0, "delta": 0 },
-          "ss": { "before": 1, "after": 1, "delta": 0 }
+          "ss": { "before": 1, "after": 1, "delta": 0 },
+          "s_plus": { "before": 1, "after": 1, "delta": 0 },
+          "s": { "before": 1, "after": 1, "delta": 0 }
         }
       }
     }
@@ -894,7 +898,7 @@ curl -X POST \
 
 `statistics.overall` は全難易度、`statistics.by_difficulty` は難易度別の集計です。`by_difficulty` にはデータの有無にかかわらず `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` の5キーを返します。例では簡略化のため `BASIC` だけを記載しています。
 
-`total_high_score` は削除済み楽曲を除く通常譜面スコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` の累積達成件数です。WORLD'S ENDは含みません。各値は `delta = after - before` で、減少時は負数になります。
+`total_high_score` は削除済み楽曲を除く通常譜面スコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` / `s_plus` / `s` の累積達成件数です。WORLD'S ENDは含みません。スコアランクは各ボーダー以上を数え、`s_plus` は990,000点以上、`s` は975,000点以上です。各値は `delta = after - before` で、減少時は負数になります。
 
 **`changes` の要素スキーマ**:
 
@@ -3565,7 +3569,7 @@ interface PlayerDataStatistics {
 
 interface PlayerDataStatisticsGroup {
   total_high_score: PlayerDataNumberDiff;
-  record_statistics: Record<'aj' | 'fc' | 'clr' | 'fch' | 'max' | 'sss_plus' | 'sss' | 'ss_plus' | 'ss', PlayerDataNumberDiff>;
+  record_statistics: Record<'aj' | 'fc' | 'clr' | 'fch' | 'max' | 'sss_plus' | 'sss' | 'ss_plus' | 'ss' | 's_plus' | 's', PlayerDataNumberDiff>;
 }
 
 interface PlayerDataNumberDiff {

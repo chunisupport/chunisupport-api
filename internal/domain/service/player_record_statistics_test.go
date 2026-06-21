@@ -23,7 +23,7 @@ func TestCalculatePlayerRecordStatistics_全体と難易度別に累積集計す
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, int64(3018999), result.Overall.TotalHighScore)
-	assert.Equal(t, RecordAchievementStatistics{AJ: 1, FC: 2, CLR: 2, FCH: 2, MAX: 1, SSSPlus: 1, SSS: 2, SSPlus: 2, SS: 3}, result.Overall.Achievements)
+	assert.Equal(t, RecordAchievementStatistics{AJ: 1, FC: 2, CLR: 2, FCH: 2, MAX: 1, SSSPlus: 1, SSS: 2, SSPlus: 2, SS: 3, SPlus: 3, S: 3}, result.Overall.Achievements)
 	assert.Equal(t, int64(1010000), result.ByDifficulty["BASIC"].TotalHighScore)
 	assert.Equal(t, int64(1008999), result.ByDifficulty["MASTER"].TotalHighScore)
 	assert.Len(t, result.ByDifficulty, 5)
@@ -36,12 +36,14 @@ func TestCalculatePlayerRecordStatistics_スコア境界値を集計する(t *te
 		score    uint32
 		expected RecordAchievementStatistics
 	}{
-		{name: "MAX", score: 1010000, expected: RecordAchievementStatistics{MAX: 1, SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1}},
-		{name: "SSS+境界", score: 1009000, expected: RecordAchievementStatistics{SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1}},
-		{name: "SSS境界", score: 1007500, expected: RecordAchievementStatistics{SSS: 1, SSPlus: 1, SS: 1}},
-		{name: "SS+境界", score: 1005000, expected: RecordAchievementStatistics{SSPlus: 1, SS: 1}},
-		{name: "SS境界", score: 1000000, expected: RecordAchievementStatistics{SS: 1}},
-		{name: "SS未満", score: 999999, expected: RecordAchievementStatistics{}},
+		{name: "MAX", score: 1010000, expected: RecordAchievementStatistics{MAX: 1, SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SSS+境界", score: 1009000, expected: RecordAchievementStatistics{SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SSS境界", score: 1007500, expected: RecordAchievementStatistics{SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SS+境界", score: 1005000, expected: RecordAchievementStatistics{SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SS境界", score: 1000000, expected: RecordAchievementStatistics{SS: 1, SPlus: 1, S: 1}},
+		{name: "S+境界", score: 990000, expected: RecordAchievementStatistics{SPlus: 1, S: 1}},
+		{name: "S境界", score: 975000, expected: RecordAchievementStatistics{S: 1}},
+		{name: "S未満", score: 974999, expected: RecordAchievementStatistics{}},
 	}
 
 	for _, tt := range tests {
