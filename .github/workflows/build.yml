@@ -22,7 +22,7 @@ jobs:
         # 各アーキテクチャごとに独立した「開始」メッセージを即時投稿
         if: always()
         env:
-          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name == 'beta' && secrets.DISCORD_WEBHOOK_URL_BETA || secrets.DISCORD_WEBHOOK_URL_STAGING }}
           DISCORD_NOTIFY_MODE: build-start
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
@@ -78,7 +78,7 @@ jobs:
         # 各アーキテクチャごとの開始メッセージを「完了/失敗」に編集
         if: always()
         env:
-          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name != 'main' && secrets.DISCORD_WEBHOOK_URL_STAGING || '' }}
+          DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || github.ref_name == 'beta' && secrets.DISCORD_WEBHOOK_URL_BETA || secrets.DISCORD_WEBHOOK_URL_STAGING }}
           DISCORD_NOTIFY_MODE: build-complete
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
