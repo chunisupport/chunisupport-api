@@ -73,8 +73,8 @@ type UserWithPlayerRow struct {
 	UserPlayerID *int    `db:"user_player_id"`
 
 	// プレイヤー情報（LEFT JOINなのでnull許容）
-	PlayerID             *int     `db:"player_id"`
-	PlayerName           *string  `db:"player_name"`
-	PlayerOfficialRating *float64 `db:"player_official_rating"`
-	PlayerOverpowerValue *float64 `db:"player_overpower_value"`
+	PlayerID               *int     `db:"player_id"`
+	PlayerName             *string  `db:"player_name"`
+	PlayerCalculatedRating *float64 `db:"player_calculated_rating"`
+	PlayerOverpowerValue   *float64 `db:"player_overpower_value"`
 }

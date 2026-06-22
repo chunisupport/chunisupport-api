@@ -42,7 +42,7 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 	return &PlayerDTO{
 		Name:              player.Name.String(),
 		Level:             player.Level,
-		Rating:            player.OfficialRating,
+		Rating:            player.CalculatedRating,
 		CalculatedRating:  player.CalculatedRating,
 		BestAverageRating: player.BestAverageRating,
 		NewAverageRating:  player.NewAverageRating,

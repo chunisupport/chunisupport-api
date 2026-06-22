@@ -300,7 +300,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 		if u.Player != nil {
 			playerName := u.Player.Name.String()
 			resp.PlayerName = &playerName
-			resp.Rating = u.Player.OfficialRating
+			resp.Rating = u.Player.CalculatedRating
 			resp.OverPowerValue = u.Player.OverpowerValue
 		}
 		responses = append(responses, resp)
