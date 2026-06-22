@@ -172,14 +172,13 @@ func TestCalcRatingStats(t *testing.T) {
 				}
 				return records
 			}(),
-			// ベスト枠: 新曲20曲すべてが含まれる (count=20)
-			// ベスト枠合計: 17.15 + 17.05 + ... + 15.25 = 324.0
-			// ベスト平均: 324.0 / 20 = 16.2
+			// ベスト枠: 新曲は含まれない
+			// ベスト枠合計・平均: 0
 			// 新曲枠20曲合計: 324.0
 			// 新曲平均: 16.2
-			// プレイヤーレーティング: (324.0 + 324.0) / 50 = 648.0 / 50 = 12.96
-			wantPlayer:  12.96,
-			wantBestAvg: 16.2,
+			// プレイヤーレーティング: (0 + 324.0) / 50 = 6.48
+			wantPlayer:  6.48,
+			wantBestAvg: 0.0,
 			wantNewAvg:  16.2,
 		},
 		{
@@ -207,8 +206,8 @@ func TestCalcRatingStats(t *testing.T) {
 				{Score: 1009000, ChartConst: 10.0, IsNew: false},
 				{Score: 1009000, ChartConst: 10.0, IsNew: false},
 			},
-			wantPlayer:  7.166,
-			wantBestAvg: 15.9416,
+			wantPlayer:  3.826,
+			wantBestAvg: 12.15,
 			wantNewAvg:  16.7,
 		},
 		{
@@ -231,8 +230,8 @@ func TestCalcRatingStats(t *testing.T) {
 				}
 				return records
 			}(),
-			wantPlayer:  15.7,
-			wantBestAvg: 16.0333,
+			wantPlayer:  15.5,
+			wantBestAvg: 15.7,
 			wantNewAvg:  15.2,
 		},
 	}
