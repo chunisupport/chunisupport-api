@@ -49,6 +49,10 @@ func (m *mockV1UserUsecase) DeleteUser(ctx context.Context, requester *entity.Us
 	return nil
 }
 
+func (m *mockV1UserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
+	return nil, nil
+}
+
 func TestV1UserHandler_GetUser(t *testing.T) {
 	t.Run("非公開ユーザーはuser_not_foundを返す", func(t *testing.T) {
 		// Given

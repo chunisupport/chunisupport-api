@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
@@ -302,10 +303,17 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return nil
 	}
 
-	// 更新。部分取得エンティティで取りこぼし得る不変項目は更新前提としてのみ扱います。
+	// 更新。ユーザー集約の状態を保存するため、権限を含む変更可能項目をまとめて更新します。
+	if !constants.IsKnownAccountType(userModel.AccountTypeID) {
+		return repository.ErrUserConflict
+	}
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
-	query := "UPDATE users SET player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
-	args := []any{userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, userModel.AccountTypeID}
+	originalAccountTypeID := user.OriginalAccountTypeID
+	if originalAccountTypeID == 0 {
+		originalAccountTypeID = userModel.AccountTypeID
+	}
+	query := "UPDATE users SET player_id = ?, account_type_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
+	args := []any{userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, originalAccountTypeID}
 	args = append(args, whereArgs...)
 
 	result, err := exec.ExecContext(ctx, query, args...)

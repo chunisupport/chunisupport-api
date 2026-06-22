@@ -345,6 +345,42 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 	return nil
 }
 
+// ChangeUserAccountType はADMIN操作としてユーザー権限を変更します。
+// ハンドラの認可ミドルウェアだけに依存しないよう、ユースケースでもADMIN権限を検証します。
+func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
+	if err := s.ensureDeleteUserPermission(requester); err != nil {
+		return nil, err
+	}
+
+	accountTypeID, ok := info.AccountTypeIDByName(accountType)
+	if !ok {
+		return nil, ErrInvalidAccountType
+	}
+
+	user, err := s.userRepo.FindByID(ctx, s.db, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		slog.Error("failed to find user by id for account type change", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	if err := user.ChangeAccountType(accountTypeID); err != nil {
+		if errors.Is(err, entity.ErrInvalidAccountType) {
+			return nil, ErrInvalidAccountType
+		}
+		return nil, err
+	}
+
+	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
+		slog.Error("failed to save user account type", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
 	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired

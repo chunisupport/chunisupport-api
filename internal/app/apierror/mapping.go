@@ -43,6 +43,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInternalError.WithInternal(err)
 	case errors.Is(err, usecase.ErrAdminRequired):
 		return ErrForbidden.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAccountType):
+		return ErrBadRequest.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPIToken):
 		return ErrInvalidToken.WithInternal(err)
 	// 楽曲関連エラー

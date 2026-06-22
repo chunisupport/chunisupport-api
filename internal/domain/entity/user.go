@@ -1,11 +1,15 @@
 package entity
 
 import (
+	"errors"
 	"strings"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
+
+var ErrInvalidAccountType = errors.New("invalid account type")
 
 // User はユーザーのエンティティを表します。
 type User struct {
@@ -16,8 +20,11 @@ type User struct {
 	UpdatedAt     time.Time
 	PlayerID      *int
 	AccountTypeID int
-	IsSuspicious  bool
-	IsPrivate     bool
+	// OriginalAccountTypeID は永続化から復元した時点の権限IDです。
+	// Save時の競合検知に使い、権限変更の巻き戻しを防ぎます。
+	OriginalAccountTypeID int
+	IsSuspicious          bool
+	IsPrivate             bool
 }
 
 // NewUser は必須項目が設定された新規ユーザーを生成します。
@@ -25,10 +32,11 @@ func NewUser(userName username.UserName, accountTypeID int) *User {
 	now := time.Now()
 
 	return &User{
-		Username:      userName,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-		AccountTypeID: accountTypeID,
+		Username:              userName,
+		CreatedAt:             now,
+		UpdatedAt:             now,
+		AccountTypeID:         accountTypeID,
+		OriginalAccountTypeID: accountTypeID,
 	}
 }
 
@@ -38,11 +46,12 @@ func NewFirebaseUser(userName username.UserName, uid string, accountTypeID int) 
 	normalizedUID := strings.TrimSpace(uid)
 
 	return &User{
-		Username:      userName,
-		FirebaseUID:   &normalizedUID,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-		AccountTypeID: accountTypeID,
+		Username:              userName,
+		FirebaseUID:           &normalizedUID,
+		CreatedAt:             now,
+		UpdatedAt:             now,
+		AccountTypeID:         accountTypeID,
+		OriginalAccountTypeID: accountTypeID,
 	}
 }
 
@@ -65,6 +74,17 @@ func (u *User) HasLinkedFirebase() bool {
 func (u *User) ChangePrivacy(isPrivate bool) {
 	u.IsPrivate = isPrivate
 	u.UpdatedAt = time.Now()
+}
+
+// ChangeAccountType はユーザー権限を変更します。
+// 権限の正当性はユーザー集約の不変条件なので、ハンドラではなくドメインで検証します。
+func (u *User) ChangeAccountType(accountTypeID int) error {
+	if !constants.IsKnownAccountType(accountTypeID) {
+		return ErrInvalidAccountType
+	}
+	u.AccountTypeID = accountTypeID
+	u.UpdatedAt = time.Now()
+	return nil
 }
 
 // LinkFirebaseUID はユーザーに Firebase UID を紐付けます。

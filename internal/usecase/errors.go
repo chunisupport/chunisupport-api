@@ -10,7 +10,8 @@ var (
 	ErrInvalidWorldsendInput = errors.New("invalid worldsend input")
 	ErrInvalidHonorInput     = errors.New("invalid honor input")
 
-	ErrAdminRequired = errors.New("admin permission required")
+	ErrAdminRequired      = errors.New("admin permission required")
+	ErrInvalidAccountType = errors.New("invalid account type")
 
 	ErrRecordFilterNotFound      = errors.New("record filter not found")
 	ErrRecordFilterLimitExceeded = errors.New("record filter limit exceeded")

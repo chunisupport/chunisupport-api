@@ -32,7 +32,10 @@ type stubUserRepository struct {
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
-	return nil, errors.New("not implemented")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.user, nil
 }
 
 func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -1113,4 +1116,90 @@ func TestUserUsecase_DeleteUser_NilRequester(t *testing.T) {
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
+}
+
+func TestUserUsecase_ChangeUserAccountType(t *testing.T) {
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		requester       *entity.User
+		accountType     string
+		repo            *stubUserRepository
+		wantErr         error
+		wantAccountType int
+	}{
+		{
+			name:            "ADMINはPLAYERをADMINに変更できる",
+			requester:       &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "ADMIN",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantAccountType: info.AccountTypeAdmin,
+		},
+		{
+			name:            "ADMINはADMINをPLAYERに変更できる",
+			requester:       &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "PLAYER",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}},
+			wantAccountType: info.AccountTypePlayer,
+		},
+		{
+			name:            "ADMINは自分自身をEDITORに変更できる",
+			requester:       &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "EDITOR",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}},
+			wantAccountType: info.AccountTypeEditor,
+		},
+		{
+			name:        "小文字の権限は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "admin",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrInvalidAccountType,
+		},
+		{
+			name:        "存在しない権限は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "SUPER_ADMIN",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrInvalidAccountType,
+		},
+		{
+			name:        "ADMIN以外は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeEditor},
+			accountType: "ADMIN",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrAdminRequired,
+		},
+		{
+			name:        "対象ユーザーが存在しない場合はErrUserNotFound",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "ADMIN",
+			repo:        &stubUserRepository{err: repository.ErrUserNotFound},
+			wantErr:     ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			service := NewUserUsecase(nil, tt.repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+			// When
+			got, err := service.ChangeUserAccountType(context.Background(), tt.requester, 1, tt.accountType)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.NotNil(t, tt.repo.savedUser)
+			assert.Equal(t, tt.wantAccountType, tt.repo.savedUser.AccountTypeID)
+			assert.Equal(t, tt.wantAccountType, got.AccountTypeID)
+		})
+	}
 }

@@ -1,10 +1,13 @@
 package api_internal
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v4"
@@ -42,4 +45,37 @@ func (h *AdminUserHandler) GetAllUsers(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, users)
+}
+
+// UpdateUserAccountType はADMIN専用で、指定ユーザーの権限を変更します。
+func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
+	userID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || userID <= 0 {
+		return apierror.ErrBadRequest
+	}
+
+	var req dto_internal.UpdateUserAccountTypeRequest
+	if err := c.Bind(&req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+
+	requester, ok := c.Get("userEntity").(*entity.User)
+	if !ok {
+		return apierror.ErrUnauthorized
+	}
+
+	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, userID, req.AccountType)
+	if err != nil {
+		if !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrUserNotFound) && !errors.Is(err, usecase.ErrInvalidAccountType) {
+			return apierror.ErrInternalError.WithInternal(err)
+		}
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, dto_internal.AdminUserAccountTypeResponse{
+		ID:          result.ID,
+		UserName:    result.Username.String(),
+		AccountType: req.AccountType,
+		UpdatedAt:   result.UpdatedAt,
+	})
 }

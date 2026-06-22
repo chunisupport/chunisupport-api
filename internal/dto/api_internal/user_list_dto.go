@@ -16,3 +16,16 @@ type AdminUserListResponse struct {
 	IsPrivate      bool      `json:"is_private"`
 	FirebaseUID    *string   `json:"firebase_uid"`
 }
+
+// AdminUserAccountTypeResponse はADMINによるユーザー権限変更後のレスポンスです。
+type AdminUserAccountTypeResponse struct {
+	ID          int       `json:"id"`
+	UserName    string    `json:"username"`
+	AccountType string    `json:"account_type"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// UpdateUserAccountTypeRequest はユーザー権限変更APIのリクエストです。
+type UpdateUserAccountTypeRequest struct {
+	AccountType string `json:"account_type"`
+}

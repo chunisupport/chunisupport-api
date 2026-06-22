@@ -69,6 +69,14 @@ func (m *mockUserUsecase) DeleteUser(ctx context.Context, requester *entity.User
 	return args.Error(0)
 }
 
+func (m *mockUserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
+	args := m.Called(ctx, requester, userID, accountType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
 func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	e := newTestEcho()
 	mockUsecase := new(mockUserUsecase)
