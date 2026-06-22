@@ -63,11 +63,6 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		}
 	}
 
-	// アプリバージョンのバリデーション
-	if !slices.Contains(info.SupportedAppVersions, payload.AppVersion) {
-		return ErrAppVersionUnsupported
-	}
-
 	// スコアデータの整合性検証
 	errorCount := 0
 	maxErrorsToReport := 10
@@ -266,6 +261,15 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		result.PlayerID = playerID
 
+		beforeRecords, beforeRecordsErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
+		if beforeRecordsErr != nil {
+			return fmt.Errorf("failed to fetch player records before registration: %w", beforeRecordsErr)
+		}
+		beforeStatistics, beforeStatisticsErr := service.CalculatePlayerRecordStatistics(beforeRecords)
+		if beforeStatisticsErr != nil {
+			return fmt.Errorf("failed to aggregate player records before registration: %w", beforeStatisticsErr)
+		}
+
 		skippedRecords := make([]api_internal.SkippedRecord, 0, 4)
 
 		honorSkipped, honorErr := us.applyHonors(ctx, tx, playerID, payload.Honors, masters)
@@ -274,7 +278,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt)
+		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt, beforeStatistics)
 		if scoreErr != nil {
 			return scoreErr
 		}
@@ -289,7 +293,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.PlayerID = playerID
 
 		// レーティングを再計算して更新
-		ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
+		ratingStats, ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
 		if ratingErr != nil {
 			return ratingErr
 		}
@@ -301,7 +305,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			PlayerID:          playerID,
 			Name:              summaryInput.Name,
 			Level:             summaryInput.Level,
-			Rating:            summaryInput.OfficialRating,
+			Rating:            &ratingStats.PlayerRating,
 			ClassEmblemID:     summaryInput.ClassEmblemID,
 			ClassEmblemBaseID: summaryInput.ClassBaseID,
 			LastPlayedAt:      summaryInput.LastPlayedAt,
@@ -311,7 +315,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.Summary = api_internal.PlayerDataSummary{
 			Name:             summaryInput.Name,
 			Level:            summaryInput.Level,
-			Rating:           summaryInput.OfficialRating,
+			Rating:           &ratingStats.PlayerRating,
 			LastPlayedAt:     summaryInput.LastPlayedAt,
 			OverpowerValue:   summaryInput.OverpowerValue,
 			OverpowerPercent: summaryInput.OverpowerPercent,
@@ -588,7 +592,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
-func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
+func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time, beforeStatistics service.PlayerRecordStatisticsSnapshot) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
 	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
 	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
 	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
@@ -639,6 +643,10 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if recErr != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
+	afterStatistics, statisticsErr := service.CalculatePlayerRecordStatistics(records)
+	if statisticsErr != nil {
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate player records after registration: %w", statisticsErr)
+	}
 	lockedSongs, lockedErr := us.listLockedSongsForOverpower(ctx, tx, playerID)
 	if lockedErr != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
@@ -648,55 +656,35 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
 	}
 
-	return counts, skipped, changes, buildPlayerDataStatistics(records), overpowerSummary, nil
+	return counts, skipped, changes, buildPlayerDataStatisticsDiff(beforeStatistics, afterStatistics), overpowerSummary, nil
 }
 
-func buildPlayerDataStatistics(records []*entity.PlayerRecord) api_internal.PlayerDataStatistics {
+func buildPlayerDataStatisticsDiff(before service.PlayerRecordStatisticsSnapshot, after service.PlayerRecordStatisticsSnapshot) api_internal.PlayerDataStatistics {
 	statistics := api_internal.PlayerDataStatistics{
-		LampCounts: api_internal.PlayerDataLampCounts{
-			Clear:     map[string]int{},
-			Combo:     map[string]int{},
-			FullChain: map[string]int{},
-		},
+		Overall:      buildPlayerDataStatisticsGroupDiff(before.Overall, after.Overall),
+		ByDifficulty: make(map[string]api_internal.PlayerDataStatisticsGroup, len(service.PlayerRecordDifficultyNames())),
 	}
-	for _, record := range records {
-		if record == nil {
-			continue
-		}
-		statistics.TotalHighScore += int(record.Score)
-		incrementLampCount(statistics.LampCounts.Clear, clearLampCountName(record.ClearLamp))
-		incrementLampCount(statistics.LampCounts.Combo, comboLampCountName(record.ComboLamp))
-		incrementLampCount(statistics.LampCounts.FullChain, fullChainCountName(record.FullChain))
+	for _, difficulty := range service.PlayerRecordDifficultyNames() {
+		statistics.ByDifficulty[difficulty] = buildPlayerDataStatisticsGroupDiff(before.ByDifficulty[difficulty], after.ByDifficulty[difficulty])
 	}
 	return statistics
 }
 
-func incrementLampCount(counts map[string]int, name string) {
-	if name == "" {
-		return
+func buildPlayerDataStatisticsGroupDiff(before service.PlayerRecordStatistics, after service.PlayerRecordStatistics) api_internal.PlayerDataStatisticsGroup {
+	intDiff := func(beforeValue int, afterValue int) api_internal.PlayerDataIntDiff {
+		return api_internal.PlayerDataIntDiff{Before: beforeValue, After: afterValue, Delta: afterValue - beforeValue}
 	}
-	counts[name]++
-}
-
-func clearLampCountName(lamp *entity.ClearLampType) string {
-	if lamp == nil {
-		return ""
+	return api_internal.PlayerDataStatisticsGroup{
+		TotalHighScore: api_internal.PlayerDataInt64Diff{Before: before.TotalHighScore, After: after.TotalHighScore, Delta: after.TotalHighScore - before.TotalHighScore},
+		RecordStatistics: api_internal.PlayerDataRecordStatisticsDiff{
+			AJ: intDiff(before.Achievements.AJ, after.Achievements.AJ), FC: intDiff(before.Achievements.FC, after.Achievements.FC),
+			CLR: intDiff(before.Achievements.CLR, after.Achievements.CLR), FCH: intDiff(before.Achievements.FCH, after.Achievements.FCH),
+			MAX: intDiff(before.Achievements.MAX, after.Achievements.MAX), SSSPlus: intDiff(before.Achievements.SSSPlus, after.Achievements.SSSPlus),
+			SSS: intDiff(before.Achievements.SSS, after.Achievements.SSS), SSPlus: intDiff(before.Achievements.SSPlus, after.Achievements.SSPlus),
+			SS: intDiff(before.Achievements.SS, after.Achievements.SS), SPlus: intDiff(before.Achievements.SPlus, after.Achievements.SPlus),
+			S: intDiff(before.Achievements.S, after.Achievements.S),
+		},
 	}
-	return lamp.Name
-}
-
-func comboLampCountName(lamp *entity.ComboLampType) string {
-	if lamp == nil {
-		return ""
-	}
-	return lamp.Name
-}
-
-func fullChainCountName(lamp *entity.FullChainType) string {
-	if lamp == nil {
-		return ""
-	}
-	return lamp.Name
 }
 
 func (us *playerDataUsecase) listLockedSongsForOverpower(ctx context.Context, tx repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
@@ -886,7 +874,7 @@ func computeWorldsendRecordChanges(ctx context.Context, before map[int]repositor
 		func(record repository.WorldsendRecordForUpsert) int { return record.ChartID },
 		func(record repository.WorldsendRecordForUpsert) repository.WorldsendRecordState { return record.State },
 		func(ctx context.Context, record repository.WorldsendRecordForUpsert, lookup recordDisplayLookup) (string, string) {
-			return worldsendRecordDisplayKeys(ctx, record.ChartID, lookup)
+			return worldsendRecordDisplayKeys(record.ChartID, lookup)
 		},
 		worldsendRecordMeaningfullyChanged,
 		"worldsend",
@@ -976,7 +964,7 @@ func fullRecordDisplayKeys(ctx context.Context, chartID int, masters *playerData
 	return idx, diff
 }
 
-func worldsendRecordDisplayKeys(ctx context.Context, chartID int, lookup recordDisplayLookup) (string, string) {
+func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string, string) {
 	chart, ok := lookup.worldsendByChartID[chartID]
 	if !ok {
 		return fmt.Sprintf("%d", chartID), "WE"
@@ -1357,11 +1345,11 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
 // ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
-func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) error {
+func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) (service.RatingStats, error) {
 	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
 	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch player records: %w", err)
+		return service.RatingStats{}, fmt.Errorf("failed to fetch player records: %w", err)
 	}
 
 	// レーティング計算用のレコードに変換
@@ -1392,7 +1380,11 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 	stats := service.CalcRatingStats(ratingRecords)
 
 	// データベースに保存
-	return us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage)
+	if err := us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage); err != nil {
+		return service.RatingStats{}, err
+	}
+
+	return stats, nil
 }
 
 func (us *playerDataUsecase) Delete(ctx context.Context, user *entity.User) error {

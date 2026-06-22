@@ -45,7 +45,7 @@
 - `/internal/me/register-data`: **30秒あたり1回/ユーザー**
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
-- `/internal/users/*` および `/internal/songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり10回/IP**
+- `/internal/users/*`、`/internal/songs/*` および `/internal/worldsend-songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
 - `/v1/*`: **15分あたり150回（一般ユーザー） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 
@@ -565,6 +565,9 @@
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### POST `/internal/me/register-data`
+
+スコア差分、集計差分、件数の厳密な定義は [プレイヤーデータ登録時の差分仕様](./player_data_registration_diff_specification.md) を参照してください。
+
 - **認証**: Firebase Bearer 必須
 - **コンテンツタイプ**: 
   - デフォルト（クエリパラメータなし）: `application/octet-stream` または `text/plain`（base64+gzip形式）
@@ -678,6 +681,7 @@ curl -X POST \
 **注意事項**:
 - レーティング計算は毎回全レコードを対象に行うため、10万ユーザー規模でも問題なくスケール可能です
 - `official_player_rating` は入力データの `rating` フィールドから設定され、`calculated_player_rating` とは独立して保存されます
+- `calculated_player_rating`、`best_average_rating`、`new_average_rating` は単曲レーティングを集計し、小数点以下4桁で切り捨てて保存されます
 
 - **コンテンツタイプ**: `application/json`
 
@@ -769,6 +773,7 @@ curl -X POST \
 | `order` | number \| null | | スロット内順序 |
 
 - **レスポンス**: 200 OK。登録結果 `PlayerDataResult` を返します。
+  - `profile.rating` と `summary.rating` は保存済み全スコアから再計算した `calculated_player_rating` です。入力データの公式RATINGではありません。
   - `summary.overpower_value` は通常楽曲レコードから再集計して保存されるOVER POWER値です。
   - `summary.overpower_percentage` は登録処理時点の計算結果です。`players` テーブルには保存されず、プロフィール系レスポンスでは最新マスタデータとプレイヤーの未解禁設定（未解放/解放済みの譜面）を組み合わせて分母を再計算し、その分母を使って随時計算された `overpower_percent` が返ります。
 
@@ -799,25 +804,34 @@ curl -X POST \
     "overpower_percentage": 76.27
   },
   "statistics": {
-    "total_high_score": 1183287650,
-    "lamp_counts": {
-      "clear": {
-        "FAILED": 12,
-        "CLEAR": 450,
-        "HARD": 300,
-        "BRAVE": 250,
-        "ABSOLUTE": 170,
-        "CATASTROPHY": 3
-      },
-      "combo": {
-        "none": 900,
-        "full combo": 220,
-        "all justice": 65
-      },
-      "full_chain": {
-        "none": 1160,
-        "full chain gold": 20,
-        "full chain platinum": 5
+    "overall": {
+      "total_high_score": { "before": 1183268650, "after": 1183287650, "delta": 19000 },
+      "record_statistics": {
+        "aj": { "before": 64, "after": 65, "delta": 1 },
+        "fc": { "before": 284, "after": 285, "delta": 1 },
+        "clr": { "before": 1173, "after": 1173, "delta": 0 },
+        "fch": { "before": 25, "after": 25, "delta": 0 },
+        "max": { "before": 3, "after": 3, "delta": 0 },
+        "sss_plus": { "before": 120, "after": 121, "delta": 1 },
+        "sss": { "before": 300, "after": 301, "delta": 1 },
+        "ss_plus": { "before": 450, "after": 451, "delta": 1 },
+        "ss": { "before": 700, "after": 701, "delta": 1 },
+        "s_plus": { "before": 900, "after": 901, "delta": 1 },
+        "s": { "before": 1050, "after": 1051, "delta": 1 }
+      }
+    },
+    "by_difficulty": {
+      "BASIC": {
+        "total_high_score": { "before": 1000000, "after": 1000000, "delta": 0 },
+        "record_statistics": {
+          "aj": { "before": 1, "after": 1, "delta": 0 }, "fc": { "before": 1, "after": 1, "delta": 0 },
+          "clr": { "before": 1, "after": 1, "delta": 0 }, "fch": { "before": 0, "after": 0, "delta": 0 },
+          "max": { "before": 0, "after": 0, "delta": 0 }, "sss_plus": { "before": 0, "after": 0, "delta": 0 },
+          "sss": { "before": 0, "after": 0, "delta": 0 }, "ss_plus": { "before": 0, "after": 0, "delta": 0 },
+          "ss": { "before": 1, "after": 1, "delta": 0 },
+          "s_plus": { "before": 1, "after": 1, "delta": 0 },
+          "s": { "before": 1, "after": 1, "delta": 0 }
+        }
       }
     }
   },
@@ -882,12 +896,14 @@ curl -X POST \
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
-| `statistics` | object | 登録後の通常譜面集計。`total_high_score` とランプごとの件数を含みます |
+| `statistics` | object | 通常譜面の登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
 | `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
 | `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
 
-`statistics.total_high_score` は削除済み楽曲を除く保存後の通常譜面スコア合計です。WORLD'S ENDは含みません。`statistics.lamp_counts.clear` / `combo` / `full_chain` はランプマスタの `Name` をキーにした件数です。`none` 相当のコンボランプ・フルチェインも集計では `none` キーとして返します。
+`statistics.overall` は全難易度、`statistics.by_difficulty` は難易度別の集計です。`by_difficulty` にはデータの有無にかかわらず `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` の5キーを返します。例では簡略化のため `BASIC` だけを記載しています。
+
+`total_high_score` は削除済み楽曲を除く通常譜面スコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` / `s_plus` / `s` の累積達成件数です。WORLD'S ENDは含みません。スコアランクは各ボーダー以上を数え、`s_plus` は990,000点以上、`s` は975,000点以上です。各値は `delta = after - before` で、減少時は負数になります。
 
 **`changes` の要素スキーマ**:
 
@@ -903,7 +919,7 @@ curl -X POST \
 `before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。`changes` は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で並びます。`idx` を数値として解釈できない値は末尾に並びます。`counts.*_actually_changed` は実際に変化した全件数で、`changes` はレスポンスサイズ抑制のため最大100件です。
 
 - **主なエラー**:
-  - 400 Bad Request (`bad_request` / `resource_not_found` / `app_version_unsupported`): JSON構文不備・楽曲マスタ未登録・非対応バージョンなど
+  - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・楽曲マスタ未登録など
   - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
   - 409 Conflict (`conflict`): 別ユーザーのプレイヤーデータと競合
   - 413 Request Entity Too Large (`payload_too_large`): ボディサイズ5MB超過
@@ -1455,7 +1471,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend` のみを返します。
@@ -1542,7 +1558,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/profile`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` が `null` になります。
 
@@ -1592,7 +1608,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/updated-at`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
 
@@ -1620,7 +1636,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/rating`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: レーティング枠のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は各配列が空、`meta.updated_at` が `null` になります。
 
@@ -1628,6 +1644,9 @@ curl -X POST \
 
 ```json
 {
+  "rating": 17.1234,
+  "best_average": 17.2345,
+  "new_average": 16.9567,
   "best": [
     {
       "updated_at": "2024-12-20T10:00:00Z",
@@ -1662,6 +1681,9 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `rating` | number \| null | BEST枠とNEW枠から計算したプレイヤーRATING（小数点以下4桁） |
+| `best_average` | number \| null | BEST枠の平均RATING（小数点以下4桁） |
+| `new_average` | number \| null | NEW枠の平均RATING（小数点以下4桁） |
 | `best` | PlayerRecordDTO[] | ベスト枠レコード |
 | `best_candidate` | PlayerRecordDTO[] | ベスト候補枠レコード |
 | `new` | PlayerRecordDTO[] | 新曲枠レコード |
@@ -1678,6 +1700,9 @@ curl -X POST \
 
 ```json
 {
+  "rating": null,
+  "best_average": null,
+  "new_average": null,
   "best": [],
   "best_candidate": [],
   "new": [],
@@ -1690,7 +1715,7 @@ curl -X POST \
 
 ### GET `/internal/users/:username/record`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `standard` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
 - **パスパラメータ**:
 
@@ -1776,7 +1801,7 @@ curl -X POST \
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしで1分間10回/IP
+- **レートリミット**: 認証なしで1分間60回/IP
 - **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
 
 #### レスポンス例
@@ -1870,7 +1895,7 @@ curl -X POST \
 
 ### GET `/internal/songs`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **概要**: WORLD'S END以外の全楽曲を譜面情報付きで取得します。デフォルトでは削除済み楽曲は除外されます。
 - **クエリパラメータ**:
   - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
@@ -1951,7 +1976,7 @@ curl -X POST \
 
 ### GET `/internal/songs/:displayid`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
@@ -1992,7 +2017,7 @@ curl -X POST \
 
 ### GET `/internal/songs/:displayid/stats/:difficulty`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: 
   - `displayid` - 楽曲の表示用ID
   - `difficulty` - 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
@@ -2237,7 +2262,7 @@ curl -X POST \
 
 ### GET `/internal/worldsend-songs`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **クエリパラメータ**: 
   - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
 - **概要**: 全 WORLD'S END 楽曲を譜面情報付きで取得します。WORLD'S END は1曲1譜面が保証されています。
@@ -2298,7 +2323,7 @@ curl -X POST \
 
 ### GET `/internal/worldsend-songs/:displayid`
 - **認証**: Firebase Bearer (任意)
-- **レートリミット**: 認証なしは1分10回/IP
+- **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `displayid` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
@@ -2769,7 +2794,7 @@ curl -X POST \
 | `genres` | MasterItemDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
-| `versions` | VersionDTO[] | バージョン一覧（リリース日昇順） |
+| `versions` | VersionDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
 | `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`PlayerDTO.class_emblem_id` の解決に使用 |
@@ -2811,7 +2836,7 @@ curl -X POST \
 ### GET `/internal/master/versions`
 
 - **認証**: 不要
-- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。
+- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。起動日時点でリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
 - **主なエラー**:
@@ -2848,7 +2873,7 @@ curl -X POST \
 
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
-- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。
+- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。起動日時点でリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -2863,7 +2888,7 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `versions` | VersionSummaryDTO[] | バージョン一覧（リリース日昇順） |
+| `versions` | VersionSummaryDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
@@ -3412,6 +3437,9 @@ interface UserProfileWithRecordsDTO {
 }
 
 interface UserRatingDTO {
+  rating: number | null;
+  best_average: number | null;
+  new_average: number | null;
   best: PlayerRecordDTO[];
   best_candidate: PlayerRecordDTO[];
   new: PlayerRecordDTO[];
@@ -3552,12 +3580,19 @@ interface PlayerDataSummary {
 }
 
 interface PlayerDataStatistics {
-  total_high_score: number;
-  lamp_counts: {
-    clear: Record<string, number>;
-    combo: Record<string, number>;
-    full_chain: Record<string, number>;
-  };
+  overall: PlayerDataStatisticsGroup;
+  by_difficulty: Record<'BASIC' | 'ADVANCED' | 'EXPERT' | 'MASTER' | 'ULTIMA', PlayerDataStatisticsGroup>;
+}
+
+interface PlayerDataStatisticsGroup {
+  total_high_score: PlayerDataNumberDiff;
+  record_statistics: Record<'aj' | 'fc' | 'clr' | 'fch' | 'max' | 'sss_plus' | 'sss' | 'ss_plus' | 'ss' | 's_plus' | 's', PlayerDataNumberDiff>;
+}
+
+interface PlayerDataNumberDiff {
+  before: number;
+  after: number;
+  delta: number;
 }
 
 interface PlayerDataCounts {

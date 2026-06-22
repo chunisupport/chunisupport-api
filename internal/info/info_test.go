@@ -11,6 +11,10 @@ func TestBuildIdentifiers_DefaultDev(t *testing.T) {
 	assert.Equal(t, "none", Revision)
 }
 
+func TestInternalPublicRateLimitRequests(t *testing.T) {
+	assert.Equal(t, 60, InternalPublicRateLimitRequests)
+}
+
 func TestIsKnownAccountType(t *testing.T) {
 	tests := []struct {
 		name          string

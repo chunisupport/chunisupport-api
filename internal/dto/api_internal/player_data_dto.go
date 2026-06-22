@@ -25,17 +25,45 @@ type PlayerDataProfile struct {
 	OverpowerPercent  *float64   `json:"overpower_percent"`
 }
 
-// PlayerDataLampCounts はランプ種別ごとの譜面数です。
-type PlayerDataLampCounts struct {
-	Clear     map[string]int `json:"clear"`
-	Combo     map[string]int `json:"combo"`
-	FullChain map[string]int `json:"full_chain"`
+// PlayerDataInt64Diff は64bit整数の登録前後差分です。
+type PlayerDataInt64Diff struct {
+	Before int64 `json:"before"`
+	After  int64 `json:"after"`
+	Delta  int64 `json:"delta"`
 }
 
-// PlayerDataStatistics は登録後の通常譜面スコア集計です。
+// PlayerDataIntDiff は整数の登録前後差分です。
+type PlayerDataIntDiff struct {
+	Before int `json:"before"`
+	After  int `json:"after"`
+	Delta  int `json:"delta"`
+}
+
+// PlayerDataRecordStatisticsDiff は通常譜面の達成件数差分です。
+type PlayerDataRecordStatisticsDiff struct {
+	AJ      PlayerDataIntDiff `json:"aj"`
+	FC      PlayerDataIntDiff `json:"fc"`
+	CLR     PlayerDataIntDiff `json:"clr"`
+	FCH     PlayerDataIntDiff `json:"fch"`
+	MAX     PlayerDataIntDiff `json:"max"`
+	SSSPlus PlayerDataIntDiff `json:"sss_plus"`
+	SSS     PlayerDataIntDiff `json:"sss"`
+	SSPlus  PlayerDataIntDiff `json:"ss_plus"`
+	SS      PlayerDataIntDiff `json:"ss"`
+	SPlus   PlayerDataIntDiff `json:"s_plus"`
+	S       PlayerDataIntDiff `json:"s"`
+}
+
+// PlayerDataStatisticsGroup はスコア合計と達成件数の差分です。
+type PlayerDataStatisticsGroup struct {
+	TotalHighScore   PlayerDataInt64Diff            `json:"total_high_score"`
+	RecordStatistics PlayerDataRecordStatisticsDiff `json:"record_statistics"`
+}
+
+// PlayerDataStatistics は全体・難易度別の通常譜面集計差分です。
 type PlayerDataStatistics struct {
-	TotalHighScore int                  `json:"total_high_score"`
-	LampCounts     PlayerDataLampCounts `json:"lamp_counts"`
+	Overall      PlayerDataStatisticsGroup            `json:"overall"`
+	ByDifficulty map[string]PlayerDataStatisticsGroup `json:"by_difficulty"`
 }
 
 // PlayerDataCounts は各種レコードのアップサート件数を表します。

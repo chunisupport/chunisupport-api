@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"time"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
@@ -159,7 +160,18 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		accountTypes[row.Name] = master.AccountType{ID: row.ID, Name: row.Name}
 	}
 
-	versions, err := loadVersionMasters(ctx, db, "SELECT id, name, released_at FROM versions")
+	// 日本時間の当日を基準日として、未リリース版を除外する
+	japanLoc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		japanLoc = time.FixedZone("Asia/Tokyo", 9*60*60)
+	}
+	releaseDate := time.Now().In(japanLoc).Format(time.DateOnly)
+
+	// released_at は MySQL の DATE NOT NULL であるため、日付単位で判定する。
+	// SQL へ CURRENT_DATE を直接記述すると DB セッションのタイムゾーン設定に判定が依存するため、
+	// 起動時に一度だけ取得した日本時間の当日をプレースホルダー経由で渡す。
+	const versionQuery = `SELECT id, name, released_at FROM versions WHERE released_at <= ?`
+	versions, err := loadVersionMasters(ctx, db, versionQuery, releaseDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
 	}
@@ -231,8 +243,8 @@ func loadSortedRows(ctx context.Context, db *sqlx.DB, query string) ([]sortedRow
 	return rows, nil
 }
 
-func loadVersionMasters(ctx context.Context, db *sqlx.DB, query string) (map[string]Version, error) {
-	rows, err := db.QueryxContext(ctx, query)
+func loadVersionMasters(ctx context.Context, db *sqlx.DB, query string, args ...any) (map[string]Version, error) {
+	rows, err := db.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

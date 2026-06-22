@@ -187,7 +187,7 @@ func TestCalcRatingStats(t *testing.T) {
 			records: []RatingRecord{
 				{Score: 1009000, ChartConst: 15.0, IsNew: false},
 			},
-			wantPlayer:  0.34,
+			wantPlayer:  0.343,
 			wantBestAvg: 17.15,
 			wantNewAvg:  0.0,
 		},
@@ -207,8 +207,8 @@ func TestCalcRatingStats(t *testing.T) {
 				{Score: 1009000, ChartConst: 10.0, IsNew: false},
 				{Score: 1009000, ChartConst: 10.0, IsNew: false},
 			},
-			wantPlayer:  7.16,
-			wantBestAvg: 15.94,
+			wantPlayer:  7.166,
+			wantBestAvg: 15.9416,
 			wantNewAvg:  16.7,
 		},
 		{
@@ -232,7 +232,7 @@ func TestCalcRatingStats(t *testing.T) {
 				return records
 			}(),
 			wantPlayer:  15.7,
-			wantBestAvg: 16.03,
+			wantBestAvg: 16.0333,
 			wantNewAvg:  15.2,
 		},
 	}

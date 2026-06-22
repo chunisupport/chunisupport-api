@@ -94,22 +94,35 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 	if err != nil {
 		return nil, err
 	}
-	goal, err := u.goalRepo.FindByIDAndUserID(ctx, u.db, id, userID)
+	// Create と同様に、読み出しから保存までを単一トランザクションで扱い、
+	// 並行する削除/更新による read-modify-write の競合を防ぐ。
+	var goal *entity.Goal
+	err = u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
+			return err
+		}
+		g, err := u.goalRepo.FindByIDAndUserID(ctx, tx, id, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrGoalNotFound) {
+				return ErrGoalNotFound
+			}
+			return err
+		}
+		g.Title = validated.Title
+		g.AchievementTypeID = validated.AchievementTypeID
+		g.AchievementParams = validated.AchievementParams
+		g.Attributes = validated.Attributes
+		g.Invert = validated.Invert
+		if err := u.goalRepo.Update(ctx, tx, g); err != nil {
+			if errors.Is(err, repository.ErrGoalNotFound) {
+				return ErrGoalNotFound
+			}
+			return err
+		}
+		goal = g
+		return nil
+	})
 	if err != nil {
-		if errors.Is(err, repository.ErrGoalNotFound) {
-			return nil, ErrGoalNotFound
-		}
-		return nil, err
-	}
-	goal.Title = validated.Title
-	goal.AchievementTypeID = validated.AchievementTypeID
-	goal.AchievementParams = validated.AchievementParams
-	goal.Attributes = validated.Attributes
-	goal.Invert = validated.Invert
-	if err := u.goalRepo.Update(ctx, u.db, goal); err != nil {
-		if errors.Is(err, repository.ErrGoalNotFound) {
-			return nil, ErrGoalNotFound
-		}
 		return nil, err
 	}
 	outs, err := u.toOutputs([]*entity.Goal{goal})

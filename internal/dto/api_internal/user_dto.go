@@ -32,6 +32,9 @@ type UserRatingMetaDTO struct {
 
 // UserRatingDTO は公開向けのレーティング枠レスポンスです。
 type UserRatingDTO struct {
+	Rating        *float64               `json:"rating"`
+	BestAverage   *float64               `json:"best_average"`
+	NewAverage    *float64               `json:"new_average"`
 	Best          []*dto.PlayerRecordDTO `json:"best"`
 	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
 	New           []*dto.PlayerRecordDTO `json:"new"`

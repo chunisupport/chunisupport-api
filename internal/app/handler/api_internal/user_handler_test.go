@@ -295,12 +295,18 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	calculatedRating := 17.1234
+	bestAverageRating := 17.2345
+	newAverageRating := 16.9567
 	player := &dto.PlayerDTO{
-		Name:      "player",
-		Level:     10,
-		Honors:    []*dto.HonorDTO{},
-		CreatedAt: now,
-		UpdatedAt: now,
+		Name:              "player",
+		Level:             10,
+		CalculatedRating:  &calculatedRating,
+		BestAverageRating: &bestAverageRating,
+		NewAverageRating:  &newAverageRating,
+		Honors:            []*dto.HonorDTO{},
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	ratingResult := &dto_internal.UserProfileRatingViewDTO{
 		Username: "testuser",
@@ -334,6 +340,9 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.Len(t, body["best_candidate"], 1)
 		assert.Len(t, body["new"], 1)
 		assert.Len(t, body["new_candidate"], 1)
+		assert.Equal(t, calculatedRating, body["rating"])
+		assert.Equal(t, bestAverageRating, body["best_average"])
+		assert.Equal(t, newAverageRating, body["new_average"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Equal(t, now.Format(time.RFC3339), meta["updated_at"])
@@ -368,6 +377,9 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.Empty(t, body["best_candidate"])
 		assert.Empty(t, body["new"])
 		assert.Empty(t, body["new_candidate"])
+		assert.Nil(t, body["rating"])
+		assert.Nil(t, body["best_average"])
+		assert.Nil(t, body["new_average"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Nil(t, meta["updated_at"])

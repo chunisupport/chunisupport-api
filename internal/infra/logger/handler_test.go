@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
@@ -92,6 +93,10 @@ func TestReopenableFileWriter_Reopen(t *testing.T) {
 }
 
 func TestReopenableFileWriter_CreatesLogFileWithOwnerOnlyPermission(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("WindowsではPOSIX形式のファイル権限を取得できないためスキップします")
+	}
+
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "app.log")
 
