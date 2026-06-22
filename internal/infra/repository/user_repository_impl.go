@@ -107,7 +107,7 @@ func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.
 			u.player_id AS user_player_id,
 			p.id AS player_id,
 			p.player_name,
-			p.official_player_rating AS player_official_rating,
+			p.calculated_player_rating AS player_calculated_rating,
 			p.overpower_value AS player_overpower_value
 		FROM users u
 		LEFT JOIN players p ON u.player_id = p.id
@@ -165,7 +165,7 @@ func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.
 					return nil, fmt.Errorf("failed to create player name: %w", err)
 				}
 			}
-			pl.OfficialRating = row.PlayerOfficialRating
+			pl.CalculatedRating = row.PlayerCalculatedRating
 			pl.OverpowerValue = row.PlayerOverpowerValue
 			result.Player = &pl
 		}
@@ -196,7 +196,7 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 			u.is_private AS user_is_private,
 			p.id AS player_id,
 			p.player_name,
-			p.official_player_rating AS player_official_rating,
+			p.calculated_player_rating AS player_calculated_rating,
 			p.overpower_value AS player_overpower_value
 		FROM users u
 		LEFT JOIN players p ON u.player_id = p.id
@@ -266,7 +266,7 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 					return nil, fmt.Errorf("failed to create player name: %w", err)
 				}
 			}
-			pl.OfficialRating = row.PlayerOfficialRating
+			pl.CalculatedRating = row.PlayerCalculatedRating
 			pl.OverpowerValue = row.PlayerOverpowerValue
 			result.Player = &pl
 		}

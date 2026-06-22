@@ -101,7 +101,7 @@ func ToV1PlayerDTO(player *entity.Player) *V1PlayerDTO {
 	return &V1PlayerDTO{
 		Name:              player.Name.String(),
 		Level:             player.Level,
-		Rating:            player.OfficialRating,
+		Rating:            player.CalculatedRating,
 		ClassEmblemID:     player.ClassEmblemID,
 		ClassEmblemBaseID: player.ClassEmblemBaseID,
 		LastPlayedAt:      player.LastPlayedAt,
@@ -220,7 +220,7 @@ func ToV1UserProfileDTO(profile *api_internal.UserProfileWithRecordsDTO) *V1User
 		v1Player = &V1PlayerDTO{
 			Name:              profile.Player.Name,
 			Level:             profile.Player.Level,
-			Rating:            profile.Player.Rating,
+			Rating:            profile.Player.CalculatedRating,
 			ClassEmblemID:     profile.Player.ClassEmblemID,
 			ClassEmblemBaseID: profile.Player.ClassEmblemBaseID,
 			LastPlayedAt:      profile.Player.LastPlayedAt,
