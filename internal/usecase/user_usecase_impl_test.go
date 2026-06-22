@@ -981,7 +981,8 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	un1, _ := username.NewUserName("user1")
 	pn1, _ := playername.NewPlayerName("プレイヤー１")
 	uid1 := "firebase-uid-1"
-	rating1 := 15.0
+	officialRating1 := 15.0
+	calculatedRating1 := 14.9876
 	op1 := 10.0
 	createdAt1 := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt1 := createdAt1.Add(2 * time.Hour)
@@ -1003,10 +1004,11 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 				IsSuspicious:  true,
 			},
 			Player: &entity.Player{
-				ID:             1,
-				Name:           pn1,
-				OfficialRating: &rating1,
-				OverpowerValue: &op1,
+				ID:               1,
+				Name:             pn1,
+				OfficialRating:   &officialRating1,
+				CalculatedRating: &calculatedRating1,
+				OverpowerValue:   &op1,
 			},
 		},
 		{
@@ -1042,7 +1044,7 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	require.NotNil(t, list[0].PlayerName)
 	assert.Equal(t, "プレイヤー１", *list[0].PlayerName)
 	require.NotNil(t, list[0].Rating)
-	assert.Equal(t, 15.0, *list[0].Rating)
+	assert.Equal(t, calculatedRating1, *list[0].Rating)
 	require.NotNil(t, list[0].OverPowerValue)
 	assert.Equal(t, 10.0, *list[0].OverPowerValue)
 	require.NotNil(t, list[0].FirebaseUID)
