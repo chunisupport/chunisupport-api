@@ -87,7 +87,7 @@ func (r *PlayerLockedSongRepository) BulkCreate(ctx context.Context, exec domain
 	const baseQuery = `INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES `
 	const valueClause = `(?, ?, ?)`
 	query := baseQuery
-	args := make([]interface{}, 0, len(lockedSongs)*3)
+	args := make([]any, 0, len(lockedSongs)*3)
 	for i, lockedSong := range lockedSongs {
 		if i > 0 {
 			query += ", "
@@ -112,7 +112,7 @@ func (r *PlayerLockedSongRepository) BulkDelete(ctx context.Context, exec domain
 	}
 	const baseQuery = "DELETE FROM player_locked_songs WHERE player_id = ? AND (song_id, is_ultima) IN ("
 	query := baseQuery
-	args := []interface{}{playerID}
+	args := []any{playerID}
 	for i := range songIDs {
 		if i > 0 {
 			query += ", "

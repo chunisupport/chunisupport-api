@@ -8,46 +8,23 @@ import (
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
-	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestValidatePlayerDataPayload_AppVersion は、app_verのバリデーションが正しく動作することをテストします
-func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
-	// 対応バージョンを動的に取得（テストの脆弱性を回避）
-	require.NotEmpty(t, info.SupportedAppVersions, "info.SupportedAppVersions is empty - test cannot proceed")
-	supportedVersion := info.SupportedAppVersions[0]
-
+// TestValidatePlayerDataPayload_AppVersion は、app_verに関係なく登録できることをテストします。
+func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 	tests := []struct {
 		name       string
 		appVersion string
-		wantErr    bool
-		errType    error
 	}{
 		{
-			name:       "対応バージョン_正常",
-			appVersion: supportedVersion, // 動的に取得した対応バージョン
-			wantErr:    false,
-			errType:    nil,
-		},
-		{
-			name:       "非対応バージョン_空文字列",
+			name:       "空文字列でも正常",
 			appVersion: "",
-			wantErr:    true,
-			errType:    ErrAppVersionUnsupported,
 		},
 		{
-			name:       "非対応バージョン_不正な形式",
+			name:       "任意の文字列でも正常",
 			appVersion: "invalid_version_string",
-			wantErr:    true,
-			errType:    ErrAppVersionUnsupported,
-		},
-		{
-			name:       "非対応バージョン_確実に存在しない値",
-			appVersion: "definitely_not_supported_version_xyz_12345",
-			wantErr:    true,
-			errType:    ErrAppVersionUnsupported,
 		},
 	}
 
@@ -74,64 +51,16 @@ func TestValidatePlayerDataPayload_AppVersion(t *testing.T) {
 				},
 				Honors: map[string]PlayerDataHonorPayload{},
 				Scores: PlayerDataScorePayload{
-					Full:      []PlayerDataScoreEntry{},
+					Standard:  []PlayerDataScoreEntry{},
 					Worldsend: []PlayerDataScoreEntry{},
 				},
 				UpdatedAt: "2024-01-01T00:00:00Z",
 			}
 
 			err := validatePlayerDataPayload(payload)
-
-			if tt.wantErr {
-				require.Error(t, err, "validatePlayerDataPayload() error = nil, want error")
-				if tt.errType != nil {
-					assert.ErrorIs(t, err, tt.errType, "validatePlayerDataPayload() error = %v, want %v", err, tt.errType)
-				}
-			} else {
-				assert.NoError(t, err, "validatePlayerDataPayload() unexpected error = %v", err)
-			}
+			assert.NoError(t, err)
 		})
 	}
-}
-
-// TestValidatePlayerDataPayload_MultipleVersions は、複数のバージョンが対応リストに含まれる場合のテストです
-func TestValidatePlayerDataPayload_MultipleVersions(t *testing.T) {
-	// info.SupportedAppVersionsに複数のバージョンが含まれる場合を想定したテスト
-	// 実際の値を確認
-	t.Logf("Current supported versions: %v", info.SupportedAppVersions)
-
-	// 対応バージョンリストが空でないことを確認
-	require.NotEmpty(t, info.SupportedAppVersions, "info.SupportedAppVersions is empty - test cannot proceed")
-	supportedVersion := info.SupportedAppVersions[0]
-
-	payload := &PlayerDataPayload{
-		AppVersion: supportedVersion,
-		Name:       "テストプレイヤー",
-		Level:      1,
-		Rating:     new(0.0),
-		LastPlayed: "2024/01/01 00:00",
-		Overpower: PlayerDataOverpowerPayload{
-			Value:      0.0,
-			Percentage: 0.0,
-		},
-		ClassEmblem: PlayerDataClassPayload{
-			MedalClass: "none",
-			BaseClass:  "none",
-		},
-		Team: PlayerDataTeamPayload{
-			Name:  "none",
-			Color: "",
-		},
-		Honors: map[string]PlayerDataHonorPayload{},
-		Scores: PlayerDataScorePayload{
-			Full:      []PlayerDataScoreEntry{},
-			Worldsend: []PlayerDataScoreEntry{},
-		},
-		UpdatedAt: "2024-01-01T00:00:00Z",
-	}
-
-	err := validatePlayerDataPayload(payload)
-	assert.NoError(t, err, "validatePlayerDataPayload() with supported version %s should not error", supportedVersion)
 }
 
 // TestValidatePlayerDataPayload_NilPayload は、payloadがnilの場合のテストです
@@ -210,7 +139,7 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateScoreEntry(&tt.entry, "full", 0)
+			err := validateScoreEntry(&tt.entry, "standard", 0)
 
 			if tt.wantError {
 				assert.Error(t, err)

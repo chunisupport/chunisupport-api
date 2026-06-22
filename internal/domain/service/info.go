@@ -14,6 +14,23 @@ const (
 )
 
 const (
+	aggregateRatingDecimalPlaces = 4
+	playerRatingSlotCount        = 50
+)
+
+const (
+	playerRecordScoreMax     = 1010000
+	playerRecordScoreSSSPlus = 1009000
+	playerRecordScoreSSS     = 1007500
+	playerRecordScoreSSPlus  = 1005000
+	playerRecordScoreSS      = 1000000
+	playerRecordScoreSPlus   = 990000
+	playerRecordScoreS       = 975000
+)
+
+var playerRecordDifficultyNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
+
+const (
 	// comboLampAllJustice は ALL JUSTICE のコンボランプIDです。
 	comboLampAllJustice = 3
 	// comboLampFullCombo は FULL COMBO のコンボランプIDです。

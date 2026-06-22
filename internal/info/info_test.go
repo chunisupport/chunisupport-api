@@ -6,6 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBuildIdentifiers_DefaultDev(t *testing.T) {
+	assert.Equal(t, "dev", BuildDate)
+	assert.Equal(t, "none", Revision)
+}
+
+func TestInternalPublicRateLimitRequests(t *testing.T) {
+	assert.Equal(t, 60, InternalPublicRateLimitRequests)
+}
+
 func TestIsKnownAccountType(t *testing.T) {
 	tests := []struct {
 		name          string

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
@@ -49,16 +50,16 @@ func TestRecordCompletionService_CompletePlayerRecords(t *testing.T) {
 	completed := svc.CompletePlayerRecords(records, songs, map[int]string{2: "ADVANCED", 4: "MASTER"}, map[int]int{2: 1, 3: 2, 4: 3})
 
 	if len(completed) != 3 {
-		t.Fatalf("expected 3 records, got %d", len(completed))
+		require.Failf(t, "前提条件失敗", "expected 3 records, got %d", len(completed))
 	}
 	if completed[0].ChartID != 11 || completed[1].ChartID != 12 || completed[2].ChartID != 21 {
-		t.Fatalf("unexpected sorted chart ids: %d, %d, %d", completed[0].ChartID, completed[1].ChartID, completed[2].ChartID)
+		require.Failf(t, "前提条件失敗", "unexpected sorted chart ids: %d, %d, %d", completed[0].ChartID, completed[1].ChartID, completed[2].ChartID)
 	}
 	if completed[1].ChartDifficulty == nil || completed[1].ChartDifficulty.Name != "MASTER" {
-		t.Fatalf("expected completed difficulty MASTER, got %+v", completed[1].ChartDifficulty)
+		require.Failf(t, "前提条件失敗", "expected completed difficulty MASTER, got %+v", completed[1].ChartDifficulty)
 	}
 	if completed[2].ChartDifficulty == nil || completed[2].ChartDifficulty.Name != "ADVANCED" {
-		t.Fatalf("expected completed difficulty ADVANCED, got %+v", completed[2].ChartDifficulty)
+		require.Failf(t, "前提条件失敗", "expected completed difficulty ADVANCED, got %+v", completed[2].ChartDifficulty)
 	}
 }
 
@@ -84,9 +85,9 @@ func TestRecordCompletionService_CompleteWorldsendRecords(t *testing.T) {
 	completed := svc.CompleteWorldsendRecords(records, songCharts)
 
 	if len(completed) != 2 {
-		t.Fatalf("expected 2 records, got %d", len(completed))
+		require.Failf(t, "前提条件失敗", "expected 2 records, got %d", len(completed))
 	}
 	if completed[0].WorldsendChartID != 101 || completed[1].WorldsendChartID != 102 {
-		t.Fatalf("unexpected sorted worldsend chart ids: %d, %d", completed[0].WorldsendChartID, completed[1].WorldsendChartID)
+		require.Failf(t, "前提条件失敗", "unexpected sorted worldsend chart ids: %d, %d", completed[0].WorldsendChartID, completed[1].WorldsendChartID)
 	}
 }

@@ -47,7 +47,6 @@
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名の文字種不正 |
-| `app_version_unsupported` | アプリバージョン非対応 |
 | `goal_not_found` | goal未検出 |
 | `goal_limit_exceeded` | goal上限超過 |
 | `goal_invalid_title` | goalタイトル不正 |

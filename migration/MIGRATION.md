@@ -11,6 +11,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 マイグレーションファイルは `migration/mysql` ディレクトリに格納されており、`*.up.sql` ファイルがスキーマの追加・変更、`*.down.sql` ファイルが変更のロールバックを定義します。
 
 静的データ用のSQLiteスキーマは `migration/sqlite` ディレクトリに配置しています。
+保存済みフィルタなどの小規模データ用SQLiteスキーマは `migration/sqlite_smalldata` ディレクトリに配置しています。
 
 ## 主要テーブルの概要
 
@@ -138,7 +139,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
-- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からX-VERSE-Xまで）の情報とリリース日を格納。
+- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。
 
 #### ゲームコンテンツマスタ
 - `honors`: 称号マスタ。称号名、称号種別、画像URL等を格納。
@@ -169,3 +170,4 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000016**: `songs` テーブルに楽曲の読みを保持する `reading` カラムを追加。
 - **000017**: `honors` テーブルの `image_url` を空文字デフォルトの非NULLに変更し、称号のユニーク制約を `(name, honor_type_id, image_url)` へ変更。`sp` 称号は空文字の `name` と画像URLの組み合わせで一意に扱えるようにする。
 - **000018**: `players.overpower_percentage` カラムを削除。OVER POWER割合は保存値ではなく、レスポンス時点の最新マスタと未解禁設定から随時計算する。
+- **000019**: バージョンマスタに「CHUNITHM Mate」（2026年7月2日稼働）を追加。

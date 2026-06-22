@@ -50,7 +50,7 @@ type PlayerDataHonorPayload struct {
 
 // PlayerDataScorePayload はスコア配列を保持します。
 type PlayerDataScorePayload struct {
-	Full      []PlayerDataScoreEntry `json:"full"`
+	Standard  []PlayerDataScoreEntry `json:"standard"`
 	Worldsend []PlayerDataScoreEntry `json:"worldsend"`
 }
 

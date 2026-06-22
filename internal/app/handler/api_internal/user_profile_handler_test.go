@@ -123,4 +123,21 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("異常系: 不正なusernameは境界で拒否する", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/users/InvalidUser/profile", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("username")
+		c.SetParamValues("InvalidUser")
+
+		err := h.GetUserProfile(c)
+
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUsernameInvalidChar, apiErr.Code)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+		}
+		mockUsecase.AssertNotCalled(t, "GetUserProfile")
+	})
 }

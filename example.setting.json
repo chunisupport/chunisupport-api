@@ -1,11 +1,13 @@
 {
   "app_port": 3002,
-  "log_level": "debug",
-  "log_paths": {
-    "app": "log",
-    "echo": "log"
+  "logging": {
+    "level": "debug",
+    "app_file": ".log/app.log",
+    "access_file": ".log/access.log",
+    "stdout": true
   },
   "static_db_path": "./static.db",
+  "smalldata_db_path": "./smalldata.db",
   "shutdown_timeout_seconds": 20,
   "cors": {
     "allow_origins": [

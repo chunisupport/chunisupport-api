@@ -68,7 +68,10 @@ func (h *SongHandler) GetSongsUpdatedAt(c echo.Context) error {
 
 // GetSong は指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
@@ -96,7 +99,10 @@ func (h *SongHandler) GetEditorSongs(c echo.Context) error {
 
 // GetEditorSong は編集者向けに指定されたDisplayIDの楽曲を取得します。
 func (h *SongHandler) GetEditorSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
@@ -108,7 +114,10 @@ func (h *SongHandler) GetEditorSong(c echo.Context) error {
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	difficultyPath := c.Param("difficulty")
 
 	// パスパラメータを内部難易度名に変換
@@ -131,7 +140,10 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (h *SongHandler) DeleteSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	if err := h.songUsecase.DeleteSong(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -195,7 +207,10 @@ func convertToCreateChartInputs(reqs []*api_internal.CreateChartRequest) []*usec
 
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (h *SongHandler) RestoreSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	if err := h.songUsecase.RestoreSong(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}

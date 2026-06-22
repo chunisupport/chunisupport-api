@@ -74,9 +74,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrUsernameTooLong.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameInvalidChar):
 		return ErrUsernameInvalidChar.WithInternal(err)
-	// アプリバージョンバリデーションエラー
-	case errors.Is(err, usecase.ErrAppVersionUnsupported):
-		return ErrAppVersionUnsupported.WithInternal(err)
 	case errors.Is(err, usecase.ErrGoalNotFound):
 		return ErrGoalNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrGoalLimitExceeded):
@@ -91,6 +88,14 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalInvalidAchievementParams.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
 		return ErrGoalInvalidAttributes.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecordFilterNotFound):
+		return ErrRecordFilterNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrRecordFilterLimitExceeded):
+		return ErrRecordFilterLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRecordFilterInput):
+		return ErrInvalidRecordFilterInput.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRecordFilterID):
+		return ErrInvalidRecordFilterID.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

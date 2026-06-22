@@ -21,7 +21,10 @@ func NewPlayerLockedSongHandler(u usecase.PlayerLockedSongUsecase) *PlayerLocked
 }
 
 func (h *PlayerLockedSongHandler) List(c echo.Context) error {
-	username := c.Param("username")
+	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity

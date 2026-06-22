@@ -1,12 +1,14 @@
 package api_v1
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -50,7 +52,10 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 
 // GetSong は指定された displayid の楽曲を取得します。
 func (h *V1SongHandler) GetSong(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(c.Request().Context(), displayID, requesterAccountTypeID)
 	if err != nil {
@@ -66,7 +71,10 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
-	displayID := c.Param("displayid")
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	difficultyPath := c.Param("difficulty")
 
 	// パスパラメータを内部難易度名に変換
@@ -86,6 +94,37 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 	ratingBands := h.staticMasterCache.RatingBands
 
 	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
+}
+
+// UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
+func (h *V1SongHandler) UpdateSongs(c echo.Context) error {
+	var requests []*api_internal.UpdateSongRequest
+	if err := c.Bind(&requests); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if requests == nil {
+		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
+	}
+
+	for idx, req := range requests {
+		if req == nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
+		}
+		for diff, chart := range req.Charts {
+			if chart == nil {
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d].charts[%s]: chart is null", idx, diff))
+			}
+		}
+		if err := c.Validate(req); err != nil {
+			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
+		}
+	}
+
+	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 // convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。

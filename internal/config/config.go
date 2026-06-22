@@ -19,9 +19,34 @@ type CORS struct {
 	MaxAge           int      `json:"max_age"`
 }
 
-type LogPaths struct {
-	App  string `json:"app"`
-	Echo string `json:"echo"`
+type Logging struct {
+	Level      string `json:"level"`
+	AppFile    string `json:"app_file"`
+	AccessFile string `json:"access_file"`
+	Stdout     bool   `json:"stdout"`
+	stdoutSet  bool
+}
+
+func (l *Logging) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Level      string `json:"level"`
+		AppFile    string `json:"app_file"`
+		AccessFile string `json:"access_file"`
+		Stdout     *bool  `json:"stdout"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	l.Level = raw.Level
+	l.AppFile = raw.AppFile
+	l.AccessFile = raw.AccessFile
+	if raw.Stdout != nil {
+		l.Stdout = *raw.Stdout
+		l.stdoutSet = true
+	}
+
+	return nil
 }
 
 type Firebase struct {
@@ -38,11 +63,12 @@ type TempData struct {
 }
 
 type Config struct {
-	AppPort  int      `json:"app_port"`
-	LogLevel string   `json:"log_level"`
-	LogPaths LogPaths `json:"log_paths"`
+	AppPort int     `json:"app_port"`
+	Logging Logging `json:"logging"`
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
+	// SmallDataDBPath は小規模なユーザー補助データ用SQLiteのファイルパスです。
+	SmallDataDBPath string `json:"smalldata_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int       `json:"shutdown_timeout_seconds"`
 	CORS                   CORS      `json:"cors"`
@@ -50,6 +76,37 @@ type Config struct {
 	Firebase               Firebase  // 環境変数から読み込み
 	Turnstile              Turnstile // 環境変数から読み込み
 	Database               Database  // 環境変数から読み込み
+	loggingSet             bool
+}
+
+func (c *Config) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		AppPort                int      `json:"app_port"`
+		Logging                *Logging `json:"logging"`
+		StaticDBPath           string   `json:"static_db_path"`
+		SmallDataDBPath        string   `json:"smalldata_db_path"`
+		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
+		CORS                   CORS     `json:"cors"`
+		TempData               TempData `json:"temp_data"`
+		Database               Database `json:"database"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	c.AppPort = raw.AppPort
+	if raw.Logging != nil {
+		c.Logging = *raw.Logging
+		c.loggingSet = true
+	}
+	c.StaticDBPath = raw.StaticDBPath
+	c.SmallDataDBPath = raw.SmallDataDBPath
+	c.ShutdownTimeoutSeconds = raw.ShutdownTimeoutSeconds
+	c.CORS = raw.CORS
+	c.TempData = raw.TempData
+	c.Database = raw.Database
+
+	return nil
 }
 
 type DbConfig struct {
@@ -122,6 +179,16 @@ func LoadConfig() (Config, error) {
 
 	if strings.TrimSpace(config.StaticDBPath) == "" {
 		errors = append(errors, "static_db_path is required")
+	}
+	if strings.TrimSpace(config.SmallDataDBPath) == "" {
+		errors = append(errors, "smalldata_db_path is required")
+	}
+
+	if err := normalizeAndValidateLoggingConfig(&config.Logging, config.loggingSet); err != nil {
+		errMsg := strings.TrimPrefix(err.Error(), "configuration validation failed: ")
+		for _, msg := range strings.Split(errMsg, "; ") {
+			errors = append(errors, strings.TrimSpace(msg))
+		}
 	}
 
 	if config.TempData.MaxTotalMB <= 0 {
@@ -221,6 +288,73 @@ func LoadConfig() (Config, error) {
 	}
 
 	return config, nil
+}
+
+func normalizeAndValidateLoggingConfig(logging *Logging, loggingSet bool) error {
+	var errors []string
+
+	if !loggingSet {
+		errors = append(errors, "logging section is required")
+	}
+	if !logging.stdoutSet {
+		errors = append(errors, "logging.stdout is required")
+	}
+
+	logging.Level = strings.TrimSpace(logging.Level)
+	switch logging.Level {
+	case "debug", "info", "warn", "error":
+	default:
+		errors = append(errors, "logging.level must be one of debug, info, warn, error")
+	}
+
+	logging.AppFile = strings.TrimSpace(logging.AppFile)
+	logging.AccessFile = strings.TrimSpace(logging.AccessFile)
+
+	if !logging.Stdout && logging.AppFile == "" {
+		errors = append(errors, "logging.app_file is required when logging.stdout is false")
+	}
+	if !logging.Stdout && logging.AccessFile == "" {
+		errors = append(errors, "logging.access_file is required when logging.stdout is false")
+	}
+
+	if logging.AppFile != "" {
+		logging.AppFile = filepath.Clean(logging.AppFile)
+	}
+	if logging.AccessFile != "" {
+		logging.AccessFile = filepath.Clean(logging.AccessFile)
+	}
+	if logging.AppFile != "" && logging.AccessFile != "" && sameLogPath(logging.AppFile, logging.AccessFile) {
+		errors = append(errors, "logging.app_file and logging.access_file must be different paths")
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+func sameLogPath(a, b string) bool {
+	return canonicalLogPath(a) == canonicalLogPath(b)
+}
+
+func canonicalLogPath(path string) string {
+	cleanPath := filepath.Clean(path)
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return cleanPath
+	}
+
+	if resolvedPath, err := filepath.EvalSymlinks(absPath); err == nil {
+		return resolvedPath
+	}
+
+	dir := filepath.Dir(absPath)
+	if resolvedDir, err := filepath.EvalSymlinks(dir); err == nil {
+		return filepath.Join(resolvedDir, filepath.Base(absPath))
+	}
+
+	return absPath
 }
 
 func normalizeAndValidateFirebaseConfig(firebase *Firebase) error {

@@ -153,7 +153,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
 		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
 		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
-		All:           []*dto.PlayerRecordDTO{{ID: "all1"}},
+		All:           []*dto.PlayerRecordDTO{{ID: "standard1"}},
 		WorldsEnd:     []*dto.WorldsendRecordDTO{{ID: "we1"}},
 	}
 	result := &dto_internal.UserProfileWithRecordsDTO{
@@ -193,9 +193,9 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		recordsBody, ok := body["records"].(map[string]any)
 		assert.True(t, ok)
-		_, hasAll := recordsBody["all"]
+		_, hasStandard := recordsBody["standard"]
 		_, hasWorldsend := recordsBody["worldsend"]
-		assert.True(t, hasAll)
+		assert.True(t, hasStandard)
 		assert.True(t, hasWorldsend)
 		mockUsecase.AssertExpectations(t)
 	})
@@ -246,9 +246,9 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		recordsBody, ok := body["records"].(map[string]any)
 		assert.True(t, ok)
-		_, hasAll := recordsBody["all"]
+		_, hasStandard := recordsBody["standard"]
 		_, hasWorldsend := recordsBody["worldsend"]
-		assert.False(t, hasAll)
+		assert.False(t, hasStandard)
 		assert.False(t, hasWorldsend)
 		mockUsecase.AssertExpectations(t)
 	})
@@ -295,12 +295,18 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	calculatedRating := 17.1234
+	bestAverageRating := 17.2345
+	newAverageRating := 16.9567
 	player := &dto.PlayerDTO{
-		Name:      "player",
-		Level:     10,
-		Honors:    []*dto.HonorDTO{},
-		CreatedAt: now,
-		UpdatedAt: now,
+		Name:              "player",
+		Level:             10,
+		CalculatedRating:  &calculatedRating,
+		BestAverageRating: &bestAverageRating,
+		NewAverageRating:  &newAverageRating,
+		Honors:            []*dto.HonorDTO{},
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	ratingResult := &dto_internal.UserProfileRatingViewDTO{
 		Username: "testuser",
@@ -334,6 +340,9 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.Len(t, body["best_candidate"], 1)
 		assert.Len(t, body["new"], 1)
 		assert.Len(t, body["new_candidate"], 1)
+		assert.Equal(t, calculatedRating, body["rating"])
+		assert.Equal(t, bestAverageRating, body["best_average"])
+		assert.Equal(t, newAverageRating, body["new_average"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Equal(t, now.Format(time.RFC3339), meta["updated_at"])
@@ -368,6 +377,9 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.Empty(t, body["best_candidate"])
 		assert.Empty(t, body["new"])
 		assert.Empty(t, body["new_candidate"])
+		assert.Nil(t, body["rating"])
+		assert.Nil(t, body["best_average"])
+		assert.Nil(t, body["new_average"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
 		assert.Nil(t, meta["updated_at"])
@@ -406,7 +418,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		},
 		Records: &dto_internal.UserRecordViewResponseDTO{
 			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
 			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
 		},
 		UpdatedAt: &now,
@@ -427,7 +439,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Len(t, body["all"], 1)
+		assert.Len(t, body["standard"], 1)
 		assert.Len(t, body["worldsend"], 1)
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
@@ -459,7 +471,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Empty(t, body["all"])
+		assert.Empty(t, body["standard"])
 		assert.Empty(t, body["worldsend"])
 		meta, ok := body["meta"].(map[string]any)
 		assert.True(t, ok)
@@ -500,7 +512,7 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 		Player:   player,
 		Records: &dto_internal.UserRecordViewResponseDTO{
 			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "all1"}},
+			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
 			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
 		},
 		UpdatedAt: &now,
@@ -522,11 +534,11 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	recordsBody, ok := body["records"].(map[string]any)
 	assert.True(t, ok)
-	_, hasAll := recordsBody["all"]
+	_, hasStandard := recordsBody["standard"]
 	_, hasWorldsend := recordsBody["worldsend"]
 	_, hasBest := recordsBody["best"]
 	_, hasNew := recordsBody["new"]
-	assert.True(t, hasAll)
+	assert.True(t, hasStandard)
 	assert.True(t, hasWorldsend)
 	assert.False(t, hasBest)
 	assert.False(t, hasNew)
@@ -541,7 +553,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	updatedAt := createdAt.Add(2 * time.Hour)
 
 	uid := "firebase-uid-1"
-	email := "user1@example.com"
 	expected := []dto_internal.AdminUserListResponse{
 		{
 			UserName:       "user1",
@@ -554,7 +565,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			IsSuspicious:   true,
 			IsPrivate:      false,
 			FirebaseUID:    &uid,
-			Email:          &email,
 		},
 		{
 			UserName:       "user2",
@@ -567,7 +577,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			IsSuspicious:   false,
 			IsPrivate:      true,
 			FirebaseUID:    nil,
-			Email:          nil,
 		},
 	}
 
@@ -595,7 +604,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
 	assert.Equal(t, uid, body[0]["firebase_uid"])
-	assert.Equal(t, email, body[0]["email"])
+	assert.NotContains(t, body[0], "email")
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])
 	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
@@ -606,7 +615,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
 	assert.Nil(t, body[1]["firebase_uid"])
-	assert.Nil(t, body[1]["email"])
+	assert.NotContains(t, body[1], "email")
 	mockUsecase.AssertExpectations(t)
 }
 

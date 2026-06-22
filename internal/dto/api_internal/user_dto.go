@@ -32,6 +32,9 @@ type UserRatingMetaDTO struct {
 
 // UserRatingDTO は公開向けのレーティング枠レスポンスです。
 type UserRatingDTO struct {
+	Rating        *float64               `json:"rating"`
+	BestAverage   *float64               `json:"best_average"`
+	NewAverage    *float64               `json:"new_average"`
 	Best          []*dto.PlayerRecordDTO `json:"best"`
 	BestCandidate []*dto.PlayerRecordDTO `json:"best_candidate"`
 	New           []*dto.PlayerRecordDTO `json:"new"`
@@ -46,7 +49,7 @@ type UserRecordMetaDTO struct {
 
 // UserRecordDTO は公開向けのレコードレスポンスです。
 type UserRecordDTO struct {
-	All       []*dto.PlayerRecordDTO    `json:"all"`
+	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
 	Meta      *UserRecordMetaDTO        `json:"meta"`
 }
@@ -54,7 +57,7 @@ type UserRecordDTO struct {
 // UserRecordViewResponseDTO はレコードビュー向けのレコードDTOです。
 type UserRecordViewResponseDTO struct {
 	UpdatedAt time.Time                 `json:"updated_at"`
-	All       []*dto.PlayerRecordDTO    `json:"all"`
+	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
 }
 

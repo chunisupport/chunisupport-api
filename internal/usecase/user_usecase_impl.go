@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -29,7 +28,6 @@ type userUsecase struct {
 	recordCompletionSvc          *service.RecordCompletionService
 	masterProvider               userMasterProvider
 	firebaseDeleter              FirebaseUserDeleter
-	firebaseEmailLookup          FirebaseUserEmailLookup
 }
 
 type userMasterProvider interface {
@@ -56,7 +54,6 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		masterProvider:      masterProvider,
 		firebaseDeleter:     noopFirebaseUserDeleter{},
-		firebaseEmailLookup: noopFirebaseUserEmailLookup{},
 	}
 }
 
@@ -81,9 +78,6 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 	}
 	if firebaseDeleter != nil {
 		impl.firebaseDeleter = firebaseDeleter
-		if firebaseEmailLookup, ok := firebaseDeleter.(FirebaseUserEmailLookup); ok {
-			impl.firebaseEmailLookup = firebaseEmailLookup
-		}
 	}
 	return impl
 }
@@ -287,8 +281,6 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 		return nil, err
 	}
 
-	emailsByUID := s.lookupFirebaseEmailsByUIDs(ctx, users)
-
 	responses := make([]api_internal.AdminUserListResponse, 0, len(users))
 	for _, u := range users {
 		accountTypeName := "UNKNOWN"
@@ -311,51 +303,10 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 			resp.Rating = u.Player.OfficialRating
 			resp.OverPowerValue = u.Player.OverpowerValue
 		}
-		if u.User.FirebaseUID != nil {
-			if email, ok := emailsByUID[strings.TrimSpace(*u.User.FirebaseUID)]; ok {
-				emailCopy := email
-				resp.Email = &emailCopy
-			}
-		}
 		responses = append(responses, resp)
 	}
 
 	return responses, nil
-}
-
-func (s *userUsecase) lookupFirebaseEmailsByUIDs(ctx context.Context, users []entity.UserWithPlayer) map[string]string {
-	if s.firebaseEmailLookup == nil {
-		return map[string]string{}
-	}
-
-	uids := make([]string, 0, len(users))
-	seen := make(map[string]struct{}, len(users))
-	for _, u := range users {
-		if u.User.FirebaseUID == nil {
-			continue
-		}
-		uid := strings.TrimSpace(*u.User.FirebaseUID)
-		if uid == "" {
-			continue
-		}
-		if _, exists := seen[uid]; exists {
-			continue
-		}
-		seen[uid] = struct{}{}
-		uids = append(uids, uid)
-	}
-
-	if len(uids) == 0 {
-		return map[string]string{}
-	}
-
-	emailsByUID, err := s.firebaseEmailLookup.LookupEmailsByUIDs(ctx, uids)
-	if err != nil {
-		slog.Warn("failed to lookup firebase emails for admin user list", "uid_count", len(uids), "error", err)
-		return map[string]string{}
-	}
-
-	return emailsByUID
 }
 
 // DeleteUser はユーザーを物理削除します。

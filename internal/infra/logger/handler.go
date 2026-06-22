@@ -8,25 +8,30 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/config"
 )
 
-// Handler は標準出力とファイルの両方に出力するログハンドラーです。
-// 標準ライブラリの slog.TextHandler を内部で使用します。
-type Handler struct {
-	handler slog.Handler
-	file    *os.File
+// Reopenable はlogrotate後に同じパスのログファイルを開き直せるWriterです。
+type Reopenable interface {
+	io.WriteCloser
+	Reopen() error
 }
 
-// ParseLogLevel は文字列をslog.Levelに変換します。
-// 不正な値の場合は slog.LevelInfo を返します。
+// Handler は標準出力とファイルに出力できるログハンドラーです。
+type Handler struct {
+	handler slog.Handler
+	writer  Reopenable
+}
+
+// ParseLogLevel は検証済みのログレベル文字列をslog.Levelへ変換します。
 func ParseLogLevel(levelStr string) slog.Level {
 	switch strings.ToLower(levelStr) {
 	case "debug":
 		return slog.LevelDebug
 	case "info":
 		return slog.LevelInfo
-	case "warn", "warning":
+	case "warn":
 		return slog.LevelWarn
 	case "error":
 		return slog.LevelError
@@ -35,52 +40,35 @@ func ParseLogLevel(levelStr string) slog.Level {
 	}
 }
 
-// NewHandler は標準出力のみのHandlerを作成します。
-func NewHandler(level slog.Level) *Handler {
-	opts := &slog.HandlerOptions{
-		Level: level,
-	}
-	return &Handler{
-		handler: slog.NewTextHandler(os.Stdout, opts),
-		file:    nil,
-	}
-}
-
-// NewHandlerWithFile はファイル出力も行うHandlerを作成します。
-// 標準出力とファイルの両方にテキスト形式で出力します。
-func NewHandlerWithFile(logDir string, level slog.Level) (*Handler, error) {
-	if err := os.MkdirAll(logDir, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-
-	timestamp := time.Now().Format("20060102-150405")
-	filename := filepath.Join(logDir, fmt.Sprintf("%s.log", timestamp))
-
-	// #nosec G304 -- logDir comes from trusted configuration
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+// NewHandler はlogging設定に従ってアプリケーションログのHandlerを作成します。
+func NewHandler(cfg config.Logging) (*Handler, error) {
+	level := ParseLogLevel(cfg.Level)
+	writer, err := newLogWriter(cfg.Stdout, cfg.AppFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, err
 	}
 
-	opts := &slog.HandlerOptions{
-		Level: level,
-	}
-
-	// 標準出力とファイルの両方に書き込む
-	multiWriter := io.MultiWriter(os.Stdout, file)
-
+	opts := &slog.HandlerOptions{Level: level}
 	return &Handler{
-		handler: slog.NewTextHandler(multiWriter, opts),
-		file:    file,
+		handler: slog.NewTextHandler(writer, opts),
+		writer:  writer,
 	}, nil
 }
 
-// Close はログファイルをクローズします。
-func (h *Handler) Close() error {
-	if h.file != nil {
-		return h.file.Close()
+// Reopen はファイル出力が有効な場合にログファイルを開き直します。
+func (h *Handler) Reopen() error {
+	if h.writer == nil {
+		return nil
 	}
-	return nil
+	return h.writer.Reopen()
+}
+
+// Close はログ出力先を閉じます。
+func (h *Handler) Close() error {
+	if h.writer == nil {
+		return nil
+	}
+	return h.writer.Close()
 }
 
 // Enabled は slog.Handler インターフェースを実装します。
@@ -97,7 +85,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &Handler{
 		handler: h.handler.WithAttrs(attrs),
-		file:    h.file,
+		writer:  h.writer,
 	}
 }
 
@@ -105,6 +93,72 @@ func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (h *Handler) WithGroup(name string) slog.Handler {
 	return &Handler{
 		handler: h.handler.WithGroup(name),
-		file:    h.file,
+		writer:  h.writer,
 	}
+}
+
+// NewAccessLogWriter はEchoアクセスログ用のWriterを作成します。
+func NewAccessLogWriter(cfg config.Logging) (Reopenable, error) {
+	return newLogWriter(cfg.Stdout, cfg.AccessFile)
+}
+
+func newLogWriter(stdout bool, filePath string) (Reopenable, error) {
+	if filePath == "" {
+		if stdout {
+			return noopReopenableWriteCloser{Writer: os.Stdout}, nil
+		}
+		return nil, fmt.Errorf("log output is not configured")
+	}
+
+	fileWriter, err := NewReopenableFileWriter(filePath)
+	if err != nil {
+		return nil, err
+	}
+	if stdout {
+		return &multiReopenableWriteCloser{
+			writer: io.MultiWriter(os.Stdout, fileWriter),
+			file:   fileWriter,
+		}, nil
+	}
+	return fileWriter, nil
+}
+
+type noopReopenableWriteCloser struct {
+	io.Writer
+}
+
+func (w noopReopenableWriteCloser) Close() error {
+	return nil
+}
+
+func (w noopReopenableWriteCloser) Reopen() error {
+	return nil
+}
+
+type multiReopenableWriteCloser struct {
+	writer io.Writer
+	file   Reopenable
+}
+
+func (w *multiReopenableWriteCloser) Write(p []byte) (int, error) {
+	return w.writer.Write(p)
+}
+
+func (w *multiReopenableWriteCloser) Close() error {
+	return w.file.Close()
+}
+
+func (w *multiReopenableWriteCloser) Reopen() error {
+	return w.file.Reopen()
+}
+
+func ensureLogDir(filePath string) error {
+	dir := filepath.Dir(filePath)
+	if dir == "." {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create log directory %s: %w", dir, err)
+	}
+	return nil
 }

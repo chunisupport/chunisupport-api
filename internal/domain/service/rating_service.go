@@ -230,7 +230,7 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 
 	bestAvg := 0.0
 	if bestCount > 0 {
-		bestAvg = truncN(bestSum/float64(bestCount), 2)
+		bestAvg = truncN(bestSum/float64(bestCount), aggregateRatingDecimalPlaces)
 	}
 
 	// 3. 新曲枠: 新曲のみを抽出して上位20曲
@@ -254,7 +254,7 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 
 	newAvg := 0.0
 	if newCount > 0 {
-		newAvg = truncN(newSum/float64(newCount), 2)
+		newAvg = truncN(newSum/float64(newCount), aggregateRatingDecimalPlaces)
 	}
 
 	// 4. プレイヤーレーティング: (ベスト枠合計 + 新曲枠合計) / 50
@@ -263,7 +263,10 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 	// 厳密には、ベスト枠+新曲枠の合計を50で割る
 	totalSum := bestSum + newSum
 	if bestCount+newCount > 0 {
-		playerRating = truncN(totalSum/50.0, 2)
+		playerRating = truncN(
+			totalSum/float64(playerRatingSlotCount),
+			aggregateRatingDecimalPlaces,
+		)
 	}
 
 	return RatingStats{

@@ -48,11 +48,10 @@ const (
 	CodeServiceUnavailable = "service_unavailable"
 
 	// 入力バリデーション詳細エラー
-	CodeUsernameEmpty         = "username_empty"
-	CodeUsernameTooShort      = "username_too_short"
-	CodeUsernameTooLong       = "username_too_long"
-	CodeUsernameInvalidChar   = "username_invalid_char"
-	CodeAppVersionUnsupported = "app_version_unsupported" // 対応していないアプリバージョン
+	CodeUsernameEmpty       = "username_empty"
+	CodeUsernameTooShort    = "username_too_short"
+	CodeUsernameTooLong     = "username_too_long"
+	CodeUsernameInvalidChar = "username_invalid_char"
 
 	// 目標関連エラー
 	CodeGoalNotFound                 = "goal_not_found"
@@ -62,4 +61,10 @@ const (
 	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
 	CodeInvalidGoalInput             = "invalid_goal_input"
+
+	// 保存済みフィルタ関連エラー
+	CodeRecordFilterNotFound      = "record_filter_not_found"
+	CodeRecordFilterLimitExceeded = "record_filter_limit_exceeded"
+	CodeInvalidRecordFilterInput  = "invalid_record_filter_input"
+	CodeInvalidRecordFilterID     = "invalid_record_filter_id"
 )
