@@ -201,31 +201,27 @@ type RatingStats struct {
 
 // CalcRatingStats はレコードリストからプレイヤーレーティング統計を一括計算します。
 func CalcRatingStats(records []RatingRecord) RatingStats {
-	type ratedRecord struct {
-		rating float64
-		isNew  bool
-	}
-
-	// 1. 全レコードの単曲レーティングを計算
-	rated := make([]ratedRecord, 0, len(records))
+	// 1. 単曲レーティングをBEST枠とNEW枠に分けて計算
+	bestRatings := make([]float64, 0, len(records))
+	newRatings := make([]float64, 0, len(records))
 	for _, rec := range records {
 		rating := CalcSingleRating(rec.Score, rec.ChartConst)
-		rated = append(rated, ratedRecord{
-			rating: rating,
-			isNew:  rec.IsNew,
-		})
+		if rec.IsNew {
+			newRatings = append(newRatings, rating)
+			continue
+		}
+		bestRatings = append(bestRatings, rating)
 	}
 
-	// 2. ベスト枠: 全レコードから上位30曲
-	// スコア順にソート（降順）
-	slices.SortFunc(rated, func(a, b ratedRecord) int {
-		return cmp.Compare(b.rating, a.rating)
+	// 2. ベスト枠: BEST系レコードから上位30曲
+	slices.SortFunc(bestRatings, func(a, b float64) int {
+		return cmp.Compare(b, a)
 	})
 
 	bestSum := 0.0
-	bestCount := min(30, len(rated))
+	bestCount := min(30, len(bestRatings))
 	for i := range bestCount {
-		bestSum += rated[i].rating
+		bestSum += bestRatings[i]
 	}
 
 	bestAvg := 0.0
@@ -233,15 +229,7 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 		bestAvg = truncN(bestSum/float64(bestCount), aggregateRatingDecimalPlaces)
 	}
 
-	// 3. 新曲枠: 新曲のみを抽出して上位20曲
-	newRatings := make([]float64, 0, len(rated))
-	for _, r := range rated {
-		if r.isNew {
-			newRatings = append(newRatings, r.rating)
-		}
-	}
-	// 既にソートされているが、抽出後に再度ソートは不要（元の順序が保存されているため）
-	// ただし、念のためソートしておく（安全策）
+	// 3. 新曲枠: NEW系レコードから上位20曲
 	slices.SortFunc(newRatings, func(a, b float64) int {
 		return cmp.Compare(b, a)
 	})
