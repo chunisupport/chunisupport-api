@@ -312,7 +312,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 // DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
-	if err := s.ensureDeleteUserPermission(requester); err != nil {
+	if err := s.ensureAdminPermission(requester); err != nil {
 		return err
 	}
 
@@ -348,7 +348,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 // ChangeUserAccountType はADMIN操作としてユーザー権限を変更します。
 // ハンドラの認可ミドルウェアだけに依存しないよう、ユースケースでもADMIN権限を検証します。
 func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
-	if err := s.ensureDeleteUserPermission(requester); err != nil {
+	if err := s.ensureAdminPermission(requester); err != nil {
 		return nil, err
 	}
 
@@ -381,7 +381,7 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 	return user, nil
 }
 
-func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
+func (s *userUsecase) ensureAdminPermission(requester *entity.User) error {
 	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
 	}
