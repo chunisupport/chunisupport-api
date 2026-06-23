@@ -1,7 +1,6 @@
 package api_internal
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -66,9 +65,6 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 
 	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, userID, req.AccountType)
 	if err != nil {
-		if !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrUserNotFound) && !errors.Is(err, usecase.ErrInvalidAccountType) {
-			return apierror.ErrInternalError.WithInternal(err)
-		}
 		return apierror.FromUsecaseError(err)
 	}
 

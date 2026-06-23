@@ -321,7 +321,13 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return err
 	}
 
-	return r.validateSingleUserUpdate(ctx, exec, userModel.ID, result)
+	if err := r.validateSingleUserUpdate(ctx, exec, userModel.ID, result); err != nil {
+		return err
+	}
+
+	// 保存成功後、OriginalAccountTypeIDを最新の値に更新して次回の保存時の競合検出基準を同期
+	user.OriginalAccountTypeID = userModel.AccountTypeID
+	return nil
 }
 
 // DeleteByID はユーザーを物理削除します。
