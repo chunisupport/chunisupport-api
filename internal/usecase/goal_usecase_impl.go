@@ -154,6 +154,7 @@ type goalAttributeFilter struct {
 	ConstMax      *float64
 	GenreIDs      []int
 	VersionRanges []repository.VersionRange
+	OPTargetOnly  bool
 }
 
 type goalAchievementParam struct {
@@ -203,7 +204,7 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
-	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true}
+	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true, "chart_target": true}
 	for k := range attrs {
 		if !allowed[k] {
 			return nil, nil, ErrInvalidGoalAttributes
@@ -211,6 +212,18 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	}
 
 	result := &goalAttributeFilter{}
+	if v, ok := attrs["chart_target"]; ok {
+		var chartTarget string
+		if err := json.Unmarshal(v, &chartTarget); err != nil || chartTarget != info.GoalChartTargetOP {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		result.OPTargetOnly = true
+	}
+	if result.OPTargetOnly {
+		if _, ok := attrs["diff"]; ok {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+	}
 	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "diff", func(id int) bool {
 		_, exists := masters.DifficultyNamesByID[id]
 		return exists
@@ -502,6 +515,7 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 		VersionRanges: attrs.VersionRanges,
 		ConstMin:      attrs.ConstMin,
 		ConstMax:      attrs.ConstMax,
+		OPTargetOnly:  attrs.OPTargetOnly,
 	}
 	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
 	if err != nil {

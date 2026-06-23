@@ -14,10 +14,11 @@ import (
 )
 
 type stubGoalRepo struct {
-	count     int
-	goal      *entity.Goal
-	updateErr error
-	stats     *repository.GoalTargetStats
+	count      int
+	goal       *entity.Goal
+	updateErr  error
+	stats      *repository.GoalTargetStats
+	lastFilter repository.GoalTargetFilter
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
@@ -56,6 +57,7 @@ func (s *stubGoalRepo) LockUserByID(ctx context.Context, exec repository.Executo
 	return nil
 }
 func (s *stubGoalRepo) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
+	s.lastFilter = filter
 	if s.stats == nil {
 		return &repository.GoalTargetStats{ChartCount: 1000, TotalChartConst: 17000}, nil
 	}
@@ -283,6 +285,59 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			assert.Equal(t, tt.expectedAttributes, out.Attributes)
 		})
 	}
+}
+
+func TestGoalUsecase_CreateAcceptsOPTargetAttribute(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "OP対象",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"total":10.0}`),
+		Attributes:        []byte(`{"chart_target":"OP_TARGET"}`),
+	})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"chart_target": "OP_TARGET"}, out.Attributes)
+	assert.True(t, repo.lastFilter.OPTargetOnly)
+}
+
+func TestGoalUsecase_CreateRejectsOPTargetWithDifficulty(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "OP対象",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"total":10.0}`),
+		Attributes:        []byte(`{"chart_target":"OP_TARGET","diff":[3,4]}`),
+	})
+
+	// Then
+	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+}
+
+func TestGoalUsecase_CreateRejectsUnknownChartTarget(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "OP対象",
+		AchievementType:   "overpower_value",
+		AchievementParams: []byte(`{"total":10.0}`),
+		Attributes:        []byte(`{"chart_target":"MASTER_ULTIMA"}`),
+	})
+
+	// Then
+	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
 
 func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T) {
