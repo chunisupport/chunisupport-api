@@ -313,10 +313,6 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return nil
 	}
 
-	if !constants.IsKnownAccountType(userModel.AccountTypeID) {
-		return repository.ErrUserConflict
-	}
-
 	// 更新。ユーザー集約の状態を保存するため、権限を含む変更可能項目をまとめて更新します。
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
 	originalAccountTypeID := user.OriginalAccountTypeID

@@ -89,39 +89,6 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	assert.True(t, saved.IsSuspicious)
 }
 
-func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) {
-	// Given
-	db := setupUserRepositoryTestDB(t)
-	defer db.Close()
-	ctx := context.Background()
-
-	_, err := db.Exec(`
-		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
-		VALUES (1, 'user01', NULL, 1, 0, 0)
-	`)
-	require.NoError(t, err)
-
-	user := newUserForRepositorySaveTest(t, 1, "user01")
-	user.AccountTypeID = 0
-	user.IsPrivate = true
-	user.UpdatedAt = time.Date(2026, 4, 5, 12, 45, 0, 0, time.UTC)
-
-	repo := &userRepository{db: db}
-
-	// When
-	err = repo.Save(ctx, db, user)
-
-	// Then
-	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
-
-	var saved struct {
-		IsPrivate bool `db:"is_private"`
-	}
-	err = db.Get(&saved, `SELECT is_private FROM users WHERE id = ?`, 1)
-	require.NoError(t, err)
-	assert.False(t, saved.IsPrivate)
-}
-
 func TestUserRepositorySaveBlocksOnlyOneToZeroAdminDemotion(t *testing.T) {
 	tests := []struct {
 		name           string

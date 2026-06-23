@@ -375,9 +375,6 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 	}
 
 	if err := user.ChangeAccountType(accountTypeID); err != nil {
-		if errors.Is(err, entity.ErrInvalidAccountType) {
-			return nil, ErrInvalidAccountType
-		}
 		return nil, err
 	}
 
