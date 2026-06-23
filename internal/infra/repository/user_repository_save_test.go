@@ -89,18 +89,16 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	assert.True(t, saved.IsSuspicious)
 }
 
-func TestUserRepositorySaveBlocksOnlyOneToZeroAdminDemotion(t *testing.T) {
+func TestUserRepositorySaveUpdatesAdminDemotionWithoutLastAdminRule(t *testing.T) {
 	tests := []struct {
 		name           string
 		adminCount     int
-		wantErr        error
 		wantAccountTyp int
 	}{
 		{
-			name:           "ADMINが1人の場合は非ADMINへの更新を拒否する",
+			name:           "ADMINが1人の場合もユースケース層の保証を前提に更新する",
 			adminCount:     1,
-			wantErr:        domainrepo.ErrUserConflict,
-			wantAccountTyp: info.AccountTypeAdmin,
+			wantAccountTyp: info.AccountTypePlayer,
 		},
 		{
 			name:           "ADMINが2人の場合は非ADMINへの更新を許可する",
@@ -138,11 +136,7 @@ func TestUserRepositorySaveBlocksOnlyOneToZeroAdminDemotion(t *testing.T) {
 			err = repo.Save(ctx, db, user)
 
 			// Then
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 			var savedAccountTypeID int
 			err = db.Get(&savedAccountTypeID, `SELECT account_type_id FROM users WHERE id = ?`, 1)
 			require.NoError(t, err)
