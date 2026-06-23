@@ -408,6 +408,9 @@ func (s *userUsecase) ensureNotLastAdminRemoval(ctx context.Context, user *entit
 }
 
 func (s *userUsecase) ensureAdminCountIsNotOne(ctx context.Context) error {
+	// このアプリでは最初のADMINをDB直接編集で付与する運用を許容しており、
+	// 万一ADMINが0人になってもDBから復旧できる規模のため、
+	// TransactionManagerや行ロックまでは導入せず、通常操作での「1人→0人」だけを防ぎます。
 	adminCount, err := s.userRepo.CountByAccountType(ctx, s.db, info.AccountTypeAdmin)
 	if err != nil {
 		slog.Error("failed to count admin users", "error", err)
