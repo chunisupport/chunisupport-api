@@ -29,6 +29,8 @@ type stubUserRepository struct {
 	saveErr         error
 	savedUser       *entity.User
 	deletedUserID   int
+	adminCount      int
+	countErr        error
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -61,6 +63,13 @@ func (s *stubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 		return nil, s.err
 	}
 	return s.usersWithPlayer, nil
+}
+
+func (s *stubUserRepository) CountByAccountType(ctx context.Context, exec repository.Executor, accountTypeID int) (int, error) {
+	if s.countErr != nil {
+		return 0, s.countErr
+	}
+	return s.adminCount, nil
 }
 
 func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
@@ -1086,6 +1095,21 @@ func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	assert.Equal(t, 1, repo.deletedUserID)
 }
 
+func TestUserUsecase_DeleteUser_LastAdminRejected(t *testing.T) {
+	un, err := username.NewUserName("adminuser")
+	require.NoError(t, err)
+	adminRequester := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	repo := &stubUserRepository{
+		user:       &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin},
+		adminCount: 1,
+	}
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	err = service.DeleteUser(context.Background(), adminRequester, "adminuser")
+	require.ErrorIs(t, err, ErrLastAdminRequired)
+	assert.Zero(t, repo.deletedUserID)
+}
+
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: repository.ErrUserNotFound}
@@ -1138,17 +1162,34 @@ func TestUserUsecase_ChangeUserAccountType(t *testing.T) {
 			wantAccountType: info.AccountTypeAdmin,
 		},
 		{
-			name:            "ADMINはADMINをPLAYERに変更できる",
+			name:            "ADMINが2人以上いる場合はADMINをPLAYERに変更できる",
 			requester:       &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
 			accountType:     "PLAYER",
-			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}},
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 2},
 			wantAccountType: info.AccountTypePlayer,
 		},
 		{
-			name:            "ADMINは自分自身をEDITORに変更できる",
+			name:        "ADMINが0人の状態ではPLAYERをADMINに変更できる",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "ADMIN",
+			repo: &stubUserRepository{
+				user:       &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer},
+				adminCount: 0,
+			},
+			wantAccountType: info.AccountTypeAdmin,
+		},
+		{
+			name:        "ADMINが1人の場合はADMINからPLAYERへの変更を拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "PLAYER",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 1},
+			wantErr:     ErrLastAdminRequired,
+		},
+		{
+			name:            "ADMINが2人以上いる場合は自分自身をEDITORに変更できる",
 			requester:       &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin},
 			accountType:     "EDITOR",
-			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}},
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 2},
 			wantAccountType: info.AccountTypeEditor,
 		},
 		{

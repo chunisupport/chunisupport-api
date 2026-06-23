@@ -248,7 +248,7 @@
 
 ### PATCH `/internal/admin/users/:username/account-type`
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
-- **概要**: 指定ユーザーのアカウント種別を変更します。自分自身の変更、ADMINへの昇格、ADMINからの降格、最後のADMINの降格はいずれも許可されます。
+- **概要**: 指定ユーザーのアカウント種別を変更します。自分自身の変更、ADMINへの昇格、ADMINからの降格を許可します。ただし、ADMINが1人だけ存在する状態でそのユーザーを非ADMINへ変更し、ADMINが0人になる操作だけは拒否します。ADMINが0人の状態から最初のADMINを付与する操作は許可します。
 - **パスパラメータ**:
   - `username`: 変更対象ユーザーのユーザー名
 - **リクエストボディ**:
@@ -282,7 +282,8 @@
 | `updated_at` | string | ユーザー更新日時 (ISO8601) |
 
 - **主なエラー**:
-  - 400 Bad Request (`bad_request`): ID形式、JSON、またはアカウント種別が不正
+  - 400 Bad Request (`bad_request`): ユーザー名形式、JSON、またはアカウント種別が不正
+  - 409 Conflict (`conflict`): 最後のADMINを非ADMINへ変更しようとした
   - 401 Unauthorized (`unauthorized` / `missing_token` / `invalid_token`): 認証が必要
   - 403 Forbidden (`forbidden`): ADMIN権限が不足
   - 404 Not Found (`user_not_found`): ユーザーが存在しない

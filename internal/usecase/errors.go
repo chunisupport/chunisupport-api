@@ -12,6 +12,7 @@ var (
 
 	ErrAdminRequired      = errors.New("admin permission required")
 	ErrInvalidAccountType = errors.New("invalid account type")
+	ErrLastAdminRequired  = errors.New("last admin must remain")
 
 	ErrRecordFilterNotFound      = errors.New("record filter not found")
 	ErrRecordFilterLimitExceeded = errors.New("record filter limit exceeded")

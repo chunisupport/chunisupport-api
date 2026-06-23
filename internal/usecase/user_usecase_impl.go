@@ -326,6 +326,10 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		return err
 	}
 
+	if err := s.ensureNotLastAdminRemoval(ctx, user); err != nil {
+		return err
+	}
+
 	firebaseUID := ""
 	if user.FirebaseUID != nil {
 		firebaseUID = *user.FirebaseUID
@@ -366,6 +370,10 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 		return nil, err
 	}
 
+	if err := s.ensureNotLastAdminDemotion(ctx, user, accountTypeID); err != nil {
+		return nil, err
+	}
+
 	if err := user.ChangeAccountType(accountTypeID); err != nil {
 		if errors.Is(err, entity.ErrInvalidAccountType) {
 			return nil, ErrInvalidAccountType
@@ -384,6 +392,32 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 func (s *userUsecase) ensureAdminPermission(requester *entity.User) error {
 	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
+	}
+	return nil
+}
+
+func (s *userUsecase) ensureNotLastAdminDemotion(ctx context.Context, user *entity.User, nextAccountTypeID int) error {
+	if user.AccountTypeID != info.AccountTypeAdmin || nextAccountTypeID == info.AccountTypeAdmin {
+		return nil
+	}
+	return s.ensureAdminCountIsNotOne(ctx)
+}
+
+func (s *userUsecase) ensureNotLastAdminRemoval(ctx context.Context, user *entity.User) error {
+	if user.AccountTypeID != info.AccountTypeAdmin {
+		return nil
+	}
+	return s.ensureAdminCountIsNotOne(ctx)
+}
+
+func (s *userUsecase) ensureAdminCountIsNotOne(ctx context.Context) error {
+	adminCount, err := s.userRepo.CountByAccountType(ctx, s.db, info.AccountTypeAdmin)
+	if err != nil {
+		slog.Error("failed to count admin users", "error", err)
+		return err
+	}
+	if adminCount == 1 {
+		return ErrLastAdminRequired
 	}
 	return nil
 }

@@ -282,6 +282,16 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 	return results, nil
 }
 
+// CountByAccountType は指定したアカウント種別のユーザー数を取得します。
+func (r *userRepository) CountByAccountType(ctx context.Context, exec repository.Executor, accountTypeID int) (int, error) {
+	var count int
+	query := `SELECT COUNT(id) FROM users WHERE account_type_id = ?`
+	if err := exec.GetContext(ctx, &count, query, accountTypeID); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // Save はユーザーを集約単位で保存します。IDが存在する場合は更新、存在しない場合は作成します。
 func (r *userRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	userModel := models.FromUserEntity(user)
@@ -313,9 +323,13 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	if originalAccountTypeID == 0 {
 		return fmt.Errorf("original account type ID is not initialized")
 	}
-	query := "UPDATE users SET player_id = ?, account_type_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
-	args := []any{userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, originalAccountTypeID}
+	query := "UPDATE users SET player_id = ?, account_type_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause + " AND (? != ? OR ? = ? OR (SELECT COUNT(id) FROM users WHERE account_type_id = ?) != 1)"
+	args := []any{
+		userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt,
+		userModel.ID, userModel.Username, originalAccountTypeID,
+	}
 	args = append(args, whereArgs...)
+	args = append(args, originalAccountTypeID, constants.AccountTypeAdmin, userModel.AccountTypeID, constants.AccountTypeAdmin, constants.AccountTypeAdmin)
 
 	result, err := exec.ExecContext(ctx, query, args...)
 	if err != nil {
