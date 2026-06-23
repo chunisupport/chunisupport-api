@@ -1187,7 +1187,7 @@ func TestUserUsecase_ChangeUserAccountType(t *testing.T) {
 			service := NewUserUsecase(nil, tt.repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 			// When
-			got, err := service.ChangeUserAccountType(context.Background(), tt.requester, 1, tt.accountType)
+			got, err := service.ChangeUserAccountType(context.Background(), tt.requester, "testuser", tt.accountType)
 
 			// Then
 			if tt.wantErr != nil {

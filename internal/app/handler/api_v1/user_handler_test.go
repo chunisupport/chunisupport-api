@@ -49,7 +49,7 @@ func (m *mockV1UserUsecase) DeleteUser(ctx context.Context, requester *entity.Us
 	return nil
 }
 
-func (m *mockV1UserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
+func (m *mockV1UserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, username string, accountType string) (*entity.User, error) {
 	return nil, nil
 }
 

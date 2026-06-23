@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -69,8 +71,8 @@ func (m *mockUserUsecase) DeleteUser(ctx context.Context, requester *entity.User
 	return args.Error(0)
 }
 
-func (m *mockUserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
-	args := m.Called(ctx, requester, userID, accountType)
+func (m *mockUserUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, username string, accountType string) (*entity.User, error) {
+	args := m.Called(ctx, requester, username, accountType)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -624,6 +626,44 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[1]["is_private"])
 	assert.Nil(t, body[1]["firebase_uid"])
 	assert.NotContains(t, body[1], "email")
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestAdminUserHandler_UpdateUserAccountTypeUsesUsername(t *testing.T) {
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewAdminUserHandler(mockUsecase)
+	adminUser := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	un, err := username.NewUserName("targetuser")
+	assert.NoError(t, err)
+	updatedAt := time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC)
+
+	// Given
+	mockUsecase.On("ChangeUserAccountType", mock.Anything, adminUser, "targetuser", "ADMIN").Return(&entity.User{
+		ID:            1,
+		Username:      un,
+		AccountTypeID: info.AccountTypeAdmin,
+		UpdatedAt:     updatedAt,
+	}, nil).Once()
+
+	req := httptest.NewRequest(http.MethodPatch, "/internal/admin/users/targetuser/account-type", strings.NewReader(`{"account_type":"ADMIN"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("username")
+	c.SetParamValues("targetuser")
+	c.Set("userEntity", adminUser)
+
+	// When
+	err = h.UpdateUserAccountType(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "targetuser", body["username"])
+	assert.Equal(t, "ADMIN", body["account_type"])
 	mockUsecase.AssertExpectations(t)
 }
 

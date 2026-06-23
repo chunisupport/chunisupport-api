@@ -116,7 +116,7 @@
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
-| `/internal/admin/users/:id/account-type` | PATCH | Firebase Bearer (ADMIN+) | ユーザー権限変更 |
+| `/internal/admin/users/:username/account-type` | PATCH | Firebase Bearer (ADMIN+) | ユーザー権限変更 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -246,11 +246,11 @@
 | `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
 | `go_version` | string | APIバイナリのGoバージョン |
 
-### PATCH `/internal/admin/users/:id/account-type`
+### PATCH `/internal/admin/users/:username/account-type`
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **概要**: 指定ユーザーのアカウント種別を変更します。自分自身の変更、ADMINへの昇格、ADMINからの降格、最後のADMINの降格はいずれも許可されます。
 - **パスパラメータ**:
-  - `id`: 変更対象ユーザーのID
+  - `username`: 変更対象ユーザーのユーザー名
 - **リクエストボディ**:
 
 ```json

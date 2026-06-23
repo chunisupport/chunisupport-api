@@ -347,7 +347,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 
 // ChangeUserAccountType はADMIN操作としてユーザー権限を変更します。
 // ハンドラの認可ミドルウェアだけに依存しないよう、ユースケースでもADMIN権限を検証します。
-func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error) {
+func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, username string, accountType string) (*entity.User, error) {
 	if err := s.ensureAdminPermission(requester); err != nil {
 		return nil, err
 	}
@@ -357,12 +357,12 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 		return nil, ErrInvalidAccountType
 	}
 
-	user, err := s.userRepo.FindByID(ctx, s.db, userID)
+	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, ErrUserNotFound
 		}
-		slog.Error("failed to find user by id for account type change", "user_id", userID, "error", err)
+		slog.Error("failed to find user by username for account type change", "username", username, "error", err)
 		return nil, err
 	}
 
@@ -374,7 +374,7 @@ func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *enti
 	}
 
 	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
-		slog.Error("failed to save user account type", "user_id", userID, "error", err)
+		slog.Error("failed to save user account type", "username", username, "error", err)
 		return nil, err
 	}
 

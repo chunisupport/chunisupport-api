@@ -48,8 +48,8 @@ func (h *AdminUserHandler) GetAllUsers(c echo.Context) error {
 
 // UpdateUserAccountType はADMIN専用で、指定ユーザーの権限を変更します。
 func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
-	userID, err := strconv.Atoi(c.Param("id"))
-	if err != nil || userID <= 0 {
+	username := c.Param("username")
+	if username == "" {
 		return apierror.ErrBadRequest
 	}
 
@@ -63,7 +63,7 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 		return apierror.ErrUnauthorized
 	}
 
-	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, userID, req.AccountType)
+	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, username, req.AccountType)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

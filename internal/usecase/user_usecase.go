@@ -35,6 +35,6 @@ type UserUsecase interface {
 	// DeleteUser はユーザーを物理削除します。
 	DeleteUser(ctx context.Context, requester *entity.User, username string) error
 
-	// ChangeUserAccountType はADMIN操作として対象ユーザーの権限を変更し、更新後のユーザー集約を返します。
-	ChangeUserAccountType(ctx context.Context, requester *entity.User, userID int, accountType string) (*entity.User, error)
+	// ChangeUserAccountType はADMIN操作として対象ユーザー名の権限を変更し、更新後のユーザー集約を返します。
+	ChangeUserAccountType(ctx context.Context, requester *entity.User, username string, accountType string) (*entity.User, error)
 }

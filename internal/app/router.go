@@ -306,7 +306,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	adminGroup.Use(firebaseAuthStrict, requireAdmin)
 	{
 		adminGroup.GET("/build-info", handleAdminBuildInfo)
-		adminGroup.PATCH("/users/:id/account-type", handlers.AdminUser.UpdateUserAccountType)
+		adminGroup.PATCH("/users/:username/account-type", handlers.AdminUser.UpdateUserAccountType)
 	}
 
 	// api.chunisupport.net/internal/honors
