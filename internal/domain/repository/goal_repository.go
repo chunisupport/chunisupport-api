@@ -29,6 +29,7 @@ type GoalTargetFilter struct {
 	VersionRanges []VersionRange
 	ConstMin      *float64
 	ConstMax      *float64
+	OPTargetOnly  bool
 }
 
 type VersionRange struct {

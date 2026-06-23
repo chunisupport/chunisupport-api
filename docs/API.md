@@ -1172,11 +1172,11 @@ curl -X POST \
 
 対象譜面の絞り込み条件です。省略したフィールドは条件なし（全譜面対象）とみなします。空オブジェクト `{}` は全譜面が対象です。
 
-**許可キーは `diff` / `const` / `genre` / `ver` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
+**許可キーは `diff` / `chart_target` / `const` / `genre` / `ver` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
 
 ```json
 {
-  "diff": [3, 4],
+  "chart_target": "OP_TARGET",
   "const": { "min": 14.0, "max": 14.4 },
   "genre": [1, 2],
   "ver": [20, 21]
@@ -1186,6 +1186,7 @@ curl -X POST \
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
 | `diff` | `integer \| integer[]` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。単一値または配列で指定可能。省略時は全難易度対象 |
+| `chart_target` | `"OP_TARGET"` | 任意 | 曲ごとの理論OVER POWER対象譜面のみを対象にする。`diff` との同時指定は不可 |
 | `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 16.0`。省略時は定数条件なし |
 | `genre` | `integer \| integer[]` | 任意 | ジャンルマスタID。単一値または配列で指定可能。省略時は全ジャンル対象 |
 | `ver` | `integer \| integer[]` | 任意 | バージョンマスタID。単一値または配列で指定可能。省略時は全バージョン対象 |
@@ -1204,6 +1205,7 @@ curl -X POST \
 - `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可。存在しないIDは `goal_invalid_attributes` エラー。
 - `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
 - `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
+- `chart_target` は `"OP_TARGET"` のみ許可。`diff` と同時指定した場合は `goal_invalid_attributes` エラー。
 
 **配列入力の正規化**:
 - `diff` / `genre` / `ver` は単一値（例: `"diff": 4`）と配列（例: `"diff": [3, 4]`）の両方を受け付けます。
@@ -1222,7 +1224,7 @@ curl -X POST \
 
 1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数

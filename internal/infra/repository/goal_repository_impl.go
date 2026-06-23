@@ -143,6 +143,14 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 		where = append(where, "c.const <= ?")
 		args = append(args, *filter.ConstMax)
 	}
+	if filter.OPTargetOnly {
+		where = append(where, `NOT EXISTS (
+			SELECT 1
+			FROM charts higher
+			WHERE higher.song_id = c.song_id
+			  AND (higher.const > c.const OR (higher.const = c.const AND higher.difficulty_id > c.difficulty_id))
+		)`)
+	}
 
 	query := `
 		SELECT

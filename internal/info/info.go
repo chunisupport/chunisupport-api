@@ -22,6 +22,7 @@ const (
 	RecordFilterMaxPayloadBytes = 8 * 1024
 	ChartConstMin               = constants.ChartConstMin
 	ChartConstMax               = constants.ChartConstMax
+	GoalChartTargetOP           = "OP_TARGET"
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
