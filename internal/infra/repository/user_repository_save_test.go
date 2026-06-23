@@ -145,7 +145,8 @@ func TestUserRepositorySaveReturnsErrorWhenOriginalAccountTypeIDMissing(t *testi
 	err = repo.Save(ctx, db, user)
 
 	// Then
-	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, domainrepo.ErrUserConflict)
 
 	var saved struct {
 		AccountTypeID int  `db:"account_type_id"`

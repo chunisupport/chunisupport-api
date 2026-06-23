@@ -311,7 +311,7 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
 	originalAccountTypeID := user.OriginalAccountTypeID
 	if originalAccountTypeID == 0 {
-		return repository.ErrUserConflict
+		return fmt.Errorf("original account type ID is not initialized")
 	}
 	query := "UPDATE users SET player_id = ?, account_type_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
 	args := []any{userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, originalAccountTypeID}
