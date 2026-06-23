@@ -122,6 +122,41 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	assert.False(t, saved.IsPrivate)
 }
 
+func TestUserRepositorySaveReturnsErrorWhenOriginalAccountTypeIDMissing(t *testing.T) {
+	// Given
+	db := setupUserRepositoryTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', NULL, 1, 0, 0)
+	`)
+	require.NoError(t, err)
+
+	user := newUserForRepositorySaveTest(t, 1, "user01")
+	user.OriginalAccountTypeID = 0
+	user.AccountTypeID = info.AccountTypeAdmin
+	user.UpdatedAt = time.Date(2026, 4, 5, 13, 30, 0, 0, time.UTC)
+
+	repo := &userRepository{db: db}
+
+	// When
+	err = repo.Save(ctx, db, user)
+
+	// Then
+	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
+
+	var saved struct {
+		AccountTypeID int  `db:"account_type_id"`
+		IsPrivate     bool `db:"is_private"`
+	}
+	err = db.Get(&saved, `SELECT account_type_id, is_private FROM users WHERE id = ?`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, info.AccountTypePlayer, saved.AccountTypeID)
+	assert.False(t, saved.IsPrivate)
+}
+
 func TestUserRepositorySaveReturnsErrUserNotFoundWhenTargetMissing(t *testing.T) {
 	// Given
 	db := setupUserRepositoryTestDB(t)

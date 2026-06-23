@@ -303,11 +303,15 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return nil
 	}
 
+	if !constants.IsKnownAccountType(userModel.AccountTypeID) {
+		return repository.ErrUserConflict
+	}
+
 	// 更新。ユーザー集約の状態を保存するため、権限を含む変更可能項目をまとめて更新します。
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
 	originalAccountTypeID := user.OriginalAccountTypeID
 	if originalAccountTypeID == 0 {
-		originalAccountTypeID = userModel.AccountTypeID
+		return repository.ErrUserConflict
 	}
 	query := "UPDATE users SET player_id = ?, account_type_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
 	args := []any{userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.Username, originalAccountTypeID}
