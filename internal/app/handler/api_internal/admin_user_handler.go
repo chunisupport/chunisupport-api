@@ -64,7 +64,7 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 		return err
 	}
 
-	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, username, req.AccountType)
+	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, usernameParam, req.AccountType)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -72,11 +72,14 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 	return c.JSON(http.StatusOK, newAdminUserAccountTypeResponse(result, req.AccountType))
 }
 
-// bindUpdateUserAccountTypeRequest はBind失敗時のAPIエラー変換をハンドラ本体から分離します。
+// bindUpdateUserAccountTypeRequest はBindと構造体タグ検証をまとめ、境界層で不正な入力を止めます。
 func bindUpdateUserAccountTypeRequest(c echo.Context) (dto_internal.UpdateUserAccountTypeRequest, error) {
 	var req dto_internal.UpdateUserAccountTypeRequest
 	if err := c.Bind(&req); err != nil {
 		return dto_internal.UpdateUserAccountTypeRequest{}, apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return dto_internal.UpdateUserAccountTypeRequest{}, err
 	}
 	return req, nil
 }
