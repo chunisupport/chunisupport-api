@@ -53,14 +53,14 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 		return apierror.ErrBadRequest
 	}
 
-	var req dto_internal.UpdateUserAccountTypeRequest
-	if err := c.Bind(&req); err != nil {
-		return apierror.ErrBadRequest.WithInternal(err)
-	}
-
 	requester, ok := c.Get("userEntity").(*entity.User)
 	if !ok {
 		return apierror.ErrUnauthorized
+	}
+
+	req, err := bindUpdateUserAccountTypeRequest(c)
+	if err != nil {
+		return err
 	}
 
 	result, err := h.userUsecase.ChangeUserAccountType(c.Request().Context(), requester, username, req.AccountType)
@@ -68,10 +68,24 @@ func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, dto_internal.AdminUserAccountTypeResponse{
-		ID:          result.ID,
-		UserName:    result.Username.String(),
-		AccountType: req.AccountType,
-		UpdatedAt:   result.UpdatedAt,
-	})
+	return c.JSON(http.StatusOK, newAdminUserAccountTypeResponse(result, req.AccountType))
+}
+
+// bindUpdateUserAccountTypeRequest はBind失敗時のAPIエラー変換をハンドラ本体から分離します。
+func bindUpdateUserAccountTypeRequest(c echo.Context) (dto_internal.UpdateUserAccountTypeRequest, error) {
+	var req dto_internal.UpdateUserAccountTypeRequest
+	if err := c.Bind(&req); err != nil {
+		return dto_internal.UpdateUserAccountTypeRequest{}, apierror.ErrBadRequest.WithInternal(err)
+	}
+	return req, nil
+}
+
+// newAdminUserAccountTypeResponse はレスポンス生成を集約し、ハンドラ本体をユースケース呼び出しに集中させます。
+func newAdminUserAccountTypeResponse(user *entity.User, accountType string) dto_internal.AdminUserAccountTypeResponse {
+	return dto_internal.AdminUserAccountTypeResponse{
+		ID:          user.ID,
+		UserName:    user.Username.String(),
+		AccountType: accountType,
+		UpdatedAt:   user.UpdatedAt,
+	}
 }
