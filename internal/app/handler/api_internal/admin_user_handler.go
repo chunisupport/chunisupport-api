@@ -48,9 +48,9 @@ func (h *AdminUserHandler) GetAllUsers(c echo.Context) error {
 
 // UpdateUserAccountType はADMIN専用で、指定ユーザーの権限を変更します。
 func (h *AdminUserHandler) UpdateUserAccountType(c echo.Context) error {
-	username := c.Param("username")
-	if username == "" {
-		return apierror.ErrBadRequest
+	usernameParam := c.Param("username")
+	if _, err := vo_username.NewUserName(usernameParam); err != nil {
+		return apierror.FromUsecaseError(err)
 	}
 
 	requester, ok := c.Get("userEntity").(*entity.User)
