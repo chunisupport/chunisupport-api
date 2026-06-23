@@ -27,5 +27,5 @@ type AdminUserAccountTypeResponse struct {
 
 // UpdateUserAccountTypeRequest はユーザー権限変更APIのリクエストです。
 type UpdateUserAccountTypeRequest struct {
-	AccountType string `json:"account_type"`
+	AccountType string "json:\"account_type\" validate:\"required,oneof=PLAYER EDITOR ADMIN\""
 }
