@@ -1513,6 +1513,7 @@ curl -X POST \
     "standard": [
       {
         "is_played": true,
+        "is_op_target": true,
         "updated_at": "2025-11-28T22:23:32+09:00",
         "difficulty": "MASTER",
         "id": "d3b6f3dd66b06bf4",
@@ -1836,6 +1837,7 @@ curl -X POST \
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `is_played` | boolean | プレイ済みかどうか（未プレイ補完データは `false`） |
+| `is_op_target` | boolean | 同一楽曲内でプレイヤーのOVER POWER合計に採用される通常譜面レコードかどうか。判定は全通常プレイ済みレコードを母集団に行い、未プレイ補完データは常に `false` |
 | `updated_at` | string \\| null | 更新日時 (ISO8601)。未プレイ補完データは `null` |
 | `difficulty` | string | 難易度名称 |
 | `id` | string | 楽曲表示用ID |
@@ -3488,6 +3490,7 @@ interface HonorDTO {
 // レコード関連
 interface PlayerRecordDTO {
   is_played: boolean;
+  is_op_target: boolean;
   updated_at: string | null;
   difficulty: string;
   id: string;

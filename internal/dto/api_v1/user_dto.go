@@ -36,6 +36,7 @@ type V1PlayerDTO struct {
 type V1PlayerRecordDTO struct {
 	UpdatedAt        *time.Time                  `json:"updated_at"`
 	IsPlayed         bool                        `json:"is_played"`
+	IsOPTarget       bool                        `json:"is_op_target"`
 	Difficulty       string                      `json:"difficulty"`
 	ID               string                      `json:"id"`
 	Title            string                      `json:"title"`
@@ -134,6 +135,7 @@ func ToV1PlayerRecordDTO(record *dto.PlayerRecordDTO) *V1PlayerRecordDTO {
 	return &V1PlayerRecordDTO{
 		UpdatedAt:        record.UpdatedAt,
 		IsPlayed:         record.IsPlayed,
+		IsOPTarget:       record.IsOPTarget,
 		Difficulty:       record.Difficulty,
 		ID:               record.ID,
 		Title:            record.Title,

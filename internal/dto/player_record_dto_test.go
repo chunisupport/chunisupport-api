@@ -34,6 +34,24 @@ func TestToPlayerRecordDTO_OverpowerPercent(t *testing.T) {
 	assert.Equal(t, service.CalcSingleOverpowerPercent(1009000, 14.0, 3), actual.OverpowerPercent)
 }
 
+func TestToPlayerRecordDTO_IsOPTarget(t *testing.T) {
+	// Given
+	recordScore, err := score.NewScore(1009000)
+	require.NoError(t, err)
+
+	record := &entity.PlayerRecord{
+		Score:      recordScore,
+		IsOPTarget: true,
+	}
+
+	// When
+	actual := ToPlayerRecordDTO(record)
+
+	// Then
+	require.NotNil(t, actual)
+	assert.True(t, actual.IsOPTarget)
+}
+
 func TestToPlayerRecordDTO_JusticeCount(t *testing.T) {
 	tests := []struct {
 		name        string

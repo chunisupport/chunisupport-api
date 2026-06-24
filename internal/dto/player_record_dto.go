@@ -14,6 +14,7 @@ import (
 type PlayerRecordDTO struct {
 	UpdatedAt        *time.Time                  `json:"updated_at"`
 	IsPlayed         bool                        `json:"is_played"`
+	IsOPTarget       bool                        `json:"is_op_target"`
 	Difficulty       string                      `json:"difficulty"`
 	ID               string                      `json:"id"`
 	Title            string                      `json:"title"`
@@ -50,6 +51,7 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 	dto := &PlayerRecordDTO{
 		Const:            chartConst,
 		IsConstUnknown:   isConstUnknown,
+		IsOPTarget:       record.IsOPTarget,
 		Score:            score,
 		JusticeCount:     calcJusticeCount(score, record.ComboLampID, playerRecordNotes(record)),
 		Rating:           service.CalcSingleRating(score, float64(chartConst)),

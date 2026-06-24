@@ -229,6 +229,16 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		}
 		return nil, err
 	}
+	opTargetSourceRecords, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find player records for OP target due to context canceled", "player_id", *user.PlayerID, "error", err)
+		} else {
+			slog.Error("failed to find player records for OP target", "player_id", *user.PlayerID, "error", err)
+		}
+		return nil, err
+	}
+	applyOPTargetFlags(records, calculateOPTargetChartIDs(opTargetSourceRecords))
 
 	slotMap := initializeRatingSlotMap()
 	var latestRecordUpdatedAt time.Time
@@ -421,6 +431,7 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	}
 
 	allRecords := records
+	markOPTargetPlayerRecords(records)
 	if includeNoPlay {
 		allRecords, err = s.completePlayerRecords(ctx, playerID, records)
 		if err != nil {
@@ -447,6 +458,74 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 		slotMap:         slotMap,
 		latestUpdatedAt: latestPlayerRecordUpdatedAt(records),
 	}, nil
+}
+
+type opTargetCandidate struct {
+	record       *entity.PlayerRecord
+	overpower    float64
+	difficultyID int
+}
+
+func markOPTargetPlayerRecords(records []*entity.PlayerRecord) {
+	applyOPTargetFlags(records, calculateOPTargetChartIDs(records))
+}
+
+func applyOPTargetFlags(records []*entity.PlayerRecord, targetChartIDs map[int]struct{}) {
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		chartID := playerRecordChartID(record)
+		_, record.IsOPTarget = targetChartIDs[chartID]
+		if chartID == 0 {
+			record.IsOPTarget = false
+		}
+	}
+}
+
+func calculateOPTargetChartIDs(records []*entity.PlayerRecord) map[int]struct{} {
+	bestBySongID := make(map[int]opTargetCandidate, len(records))
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		if record.UpdatedAt.IsZero() || record.Song == nil || record.Chart == nil {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(uint32(record.Score), float64(record.Chart.Const), record.ComboLampID)
+		candidate := opTargetCandidate{
+			record:       record,
+			overpower:    overpower,
+			difficultyID: record.Chart.DifficultyID,
+		}
+		current, exists := bestBySongID[record.Song.ID]
+		if !exists || candidate.overpower > current.overpower ||
+			(candidate.overpower == current.overpower && candidate.difficultyID > current.difficultyID) {
+			bestBySongID[record.Song.ID] = candidate
+		}
+	}
+
+	targetChartIDs := make(map[int]struct{}, len(bestBySongID))
+	for _, candidate := range bestBySongID {
+		if chartID := playerRecordChartID(candidate.record); chartID != 0 {
+			targetChartIDs[chartID] = struct{}{}
+		}
+	}
+	return targetChartIDs
+}
+
+func playerRecordChartID(record *entity.PlayerRecord) int {
+	if record == nil {
+		return 0
+	}
+	if record.ChartID != 0 {
+		return record.ChartID
+	}
+	if record.Chart != nil {
+		return record.Chart.ID
+	}
+	return 0
 }
 
 func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, records []*entity.PlayerRecord) ([]*entity.PlayerRecord, error) {
