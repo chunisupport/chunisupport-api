@@ -86,6 +86,11 @@ func (m *MockUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 	return args.Get(0).([]entity.UserWithPlayer), args.Error(1)
 }
 
+func (m *MockUserRepository) CountByAccountType(ctx context.Context, exec repository.Executor, accountTypeID int) (int, error) {
+	args := m.Called(ctx, exec, accountTypeID)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *MockUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	args := m.Called(ctx, exec, user)
 	return args.Error(0)

@@ -89,7 +89,63 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	assert.True(t, saved.IsSuspicious)
 }
 
-func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) {
+func TestUserRepositorySaveUpdatesAdminDemotionWithoutLastAdminRule(t *testing.T) {
+	tests := []struct {
+		name           string
+		adminCount     int
+		wantAccountTyp int
+	}{
+		{
+			name:           "ADMINが1人の場合もユースケース層の保証を前提に更新する",
+			adminCount:     1,
+			wantAccountTyp: info.AccountTypePlayer,
+		},
+		{
+			name:           "ADMINが2人の場合は非ADMINへの更新を許可する",
+			adminCount:     2,
+			wantAccountTyp: info.AccountTypePlayer,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupUserRepositoryTestDB(t)
+			defer db.Close()
+			ctx := context.Background()
+
+			_, err := db.Exec(`
+				INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+				VALUES (?, ?, NULL, ?, ?, ?)
+			`, 1, "admin01", info.AccountTypeAdmin, 0, 0)
+			require.NoError(t, err)
+			if tt.adminCount == 2 {
+				_, err = db.Exec(`
+					INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+					VALUES (?, ?, NULL, ?, ?, ?)
+				`, 2, "admin02", info.AccountTypeAdmin, 0, 0)
+				require.NoError(t, err)
+			}
+
+			user := newUserForRepositorySaveTest(t, 1, "admin01")
+			user.OriginalAccountTypeID = info.AccountTypeAdmin
+			user.AccountTypeID = info.AccountTypePlayer
+			repo := &userRepository{db: db}
+
+			// When
+			err = repo.Save(ctx, db, user)
+
+			// Then
+			require.NoError(t, err)
+			var savedAccountTypeID int
+			err = db.Get(&savedAccountTypeID, `SELECT account_type_id FROM users WHERE id = ?`, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAccountTyp, savedAccountTypeID)
+		})
+	}
+}
+
+func TestUserRepositorySaveReturnsErrorWhenOriginalAccountTypeIDMissing(t *testing.T) {
 	// Given
 	db := setupUserRepositoryTestDB(t)
 	defer db.Close()
@@ -102,9 +158,9 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	require.NoError(t, err)
 
 	user := newUserForRepositorySaveTest(t, 1, "user01")
-	user.AccountTypeID = 0
-	user.IsPrivate = true
-	user.UpdatedAt = time.Date(2026, 4, 5, 12, 45, 0, 0, time.UTC)
+	user.OriginalAccountTypeID = 0
+	user.AccountTypeID = info.AccountTypeAdmin
+	user.UpdatedAt = time.Date(2026, 4, 5, 13, 30, 0, 0, time.UTC)
 
 	repo := &userRepository{db: db}
 
@@ -112,13 +168,16 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	err = repo.Save(ctx, db, user)
 
 	// Then
-	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, domainrepo.ErrUserConflict)
 
 	var saved struct {
-		IsPrivate bool `db:"is_private"`
+		AccountTypeID int  `db:"account_type_id"`
+		IsPrivate     bool `db:"is_private"`
 	}
-	err = db.Get(&saved, `SELECT is_private FROM users WHERE id = ?`, 1)
+	err = db.Get(&saved, `SELECT account_type_id, is_private FROM users WHERE id = ?`, 1)
 	require.NoError(t, err)
+	assert.Equal(t, info.AccountTypePlayer, saved.AccountTypeID)
 	assert.False(t, saved.IsPrivate)
 }
 
