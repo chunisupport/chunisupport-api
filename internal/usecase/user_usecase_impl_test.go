@@ -715,7 +715,9 @@ func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 
 	require.Len(t, result.Records.All, 2)
 	assert.True(t, result.Records.All[0].IsPlayed, "expected first record is played")
+	assert.True(t, result.Records.All[0].IsOPTarget, "expected played record is OP target")
 	assert.False(t, result.Records.All[1].IsPlayed, "expected second record is unplayed")
+	assert.False(t, result.Records.All[1].IsOPTarget, "expected unplayed completion record is not OP target")
 	assert.Empty(t, result.Records.Best)
 	assert.Empty(t, result.Records.New)
 	assert.Empty(t, result.Records.NewCandidate)
@@ -729,6 +731,70 @@ func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 
 	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
 	assert.Nil(t, result.Records.All[0].Slot, "expected all record slot nil")
+}
+
+func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
+	now := time.Now()
+	sameOPScore, err := score.NewScore(1009000)
+	require.NoError(t, err)
+	higherOPScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+	zeroOPScore, err := score.NewScore(0)
+	require.NoError(t, err)
+	chartConst, err := chartconstant.NewChartConstant(12.4)
+	require.NoError(t, err)
+
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 1, UpdatedAt: now}
+	records := []*entity.PlayerRecord{
+		{
+			Score:       sameOPScore,
+			ComboLampID: 3,
+			UpdatedAt:   now,
+			Chart:       &entity.Chart{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst},
+			Song:        &entity.Song{ID: 10, DisplayID: "song10", Title: "Song 10"},
+		},
+		{
+			Score:       sameOPScore,
+			ComboLampID: 3,
+			UpdatedAt:   now,
+			Chart:       &entity.Chart{ID: 1002, SongID: 10, DifficultyID: 4, Const: chartConst},
+			Song:        &entity.Song{ID: 10, DisplayID: "song10", Title: "Song 10"},
+		},
+		{
+			Score:       higherOPScore,
+			ComboLampID: 3,
+			UpdatedAt:   now,
+			Chart:       &entity.Chart{ID: 2001, SongID: 20, DifficultyID: 3, Const: chartConst},
+			Song:        &entity.Song{ID: 20, DisplayID: "song20", Title: "Song 20"},
+		},
+		{
+			Score:       zeroOPScore,
+			ComboLampID: 1,
+			UpdatedAt:   now,
+			Chart:       &entity.Chart{ID: 2002, SongID: 20, DifficultyID: 4, Const: chartConst},
+			Song:        &entity.Song{ID: 20, DisplayID: "song20", Title: "Song 20"},
+		},
+	}
+	usecase := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{records: records},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	result, err := usecase.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+
+	require.NoError(t, err)
+	require.Len(t, result.Records.All, 4)
+	assert.False(t, result.Records.All[0].IsOPTarget, "同値の場合は低い難易度を対象にしない")
+	assert.True(t, result.Records.All[1].IsOPTarget, "同値の場合は高い難易度を対象にする")
+	assert.True(t, result.Records.All[2].IsOPTarget, "同一曲内でOPが最大の譜面を対象にする")
+	assert.False(t, result.Records.All[3].IsOPTarget, "同一曲内でOPが低い譜面を対象にしない")
 }
 
 func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
@@ -805,7 +871,7 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	playerUpdatedAt := now.Add(-time.Hour)
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{ratingRecords: records}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records, ratingRecords: records}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -815,6 +881,8 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	assert.Len(t, result.Records.NewCandidate, 1)
 	assert.Empty(t, result.Records.BestCandidate)
 	assert.Empty(t, result.Records.New)
+	assert.True(t, result.Records.Best[0].IsOPTarget)
+	assert.True(t, result.Records.NewCandidate[0].IsOPTarget)
 }
 
 func TestUserUsecase_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {

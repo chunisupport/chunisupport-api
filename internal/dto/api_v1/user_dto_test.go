@@ -64,6 +64,20 @@ func TestToV1PlayerRecordDTO_OverpowerPercent(t *testing.T) {
 	assert.Equal(t, 97.9412, actual.OverpowerPercent)
 }
 
+func TestToV1PlayerRecordDTO_IsOPTarget(t *testing.T) {
+	// Given
+	record := &dto.PlayerRecordDTO{
+		IsOPTarget: true,
+	}
+
+	// When
+	actual := ToV1PlayerRecordDTO(record)
+
+	// Then
+	require.NotNil(t, actual)
+	assert.True(t, actual.IsOPTarget)
+}
+
 func TestToV1PlayerRecordDTO_JusticeCount(t *testing.T) {
 	// Given
 	justiceCount := 1
