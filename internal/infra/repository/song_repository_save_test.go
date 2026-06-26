@@ -63,8 +63,8 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 			defer db.Close()
 
 			_, err := db.Exec(`
-				INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-				VALUES (?, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, ?, 'IDX001', 'original.png', 0, 0)
+				INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+				VALUES (?, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, ?, 'IDX001', 'original.png', 0, 0, 0)
 			`, tt.setupSongID, time.Now().UTC())
 			require.NoError(t, err)
 
@@ -93,10 +93,11 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 					OfficialIdx string  `db:"official_idx"`
 					Jacket      *string `db:"jacket"`
 					IsWorldsend bool    `db:"is_worldsend"`
+					IsNew       bool    `db:"is_new"`
 					IsDeleted   bool    `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, reading, artist, genre_id, bpm, official_idx, jacket, is_worldsend, is_deleted
+					SELECT id, display_id, title, reading, artist, genre_id, bpm, official_idx, jacket, is_worldsend, is_new, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)

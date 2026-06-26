@@ -32,10 +32,10 @@ func TestFindLatestUpdatedAt_ReturnsMaxAcrossSongRelatedTables(t *testing.T) {
 	worldsendChartUpdatedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 
 	_, err = db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, ?),
-			(2, 'WORLD001', 'World Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0, ?)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0, ?),
+			(2, 'WORLD001', 'World Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0, 0, ?)
 	`, songUpdatedAt, songUpdatedAt.Add(-time.Hour))
 	require.NoError(t, err)
 

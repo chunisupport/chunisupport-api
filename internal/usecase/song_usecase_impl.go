@@ -193,6 +193,9 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 		song.BPM = req.BPM
 		song.ReleasedAt = req.ReleasedAt.TimePtr()
 		song.Jacket = req.Jacket
+		if req.IsNew != nil {
+			song.IsNew = *req.IsNew
+		}
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
 		for diffName, chartReq := range req.Charts {
@@ -320,6 +323,7 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.BPM = input.BPM
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
+	song.IsNew = input.IsNew
 	song.Charts = charts
 
 	var created *entity.Song

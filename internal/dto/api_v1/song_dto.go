@@ -76,6 +76,7 @@ type V1SongDTO struct {
 	MaxOP              float64            `json:"maxop"`
 	IsMaxOPUnknown     bool               `json:"is_maxop_unknown"`
 	OpTargetDifficulty *string            `json:"op_target_difficulty"`
+	IsNew              bool               `json:"is_new"`
 	Charts             V1OrderedChartsMap `json:"charts"`
 }
 
@@ -138,6 +139,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 		MaxOP:              maxOP,
 		IsMaxOPUnknown:     song.IsMaxOPUnknown,
 		OpTargetDifficulty: sharedto.OpTargetDifficultyPtr(song.OpTargetDifficultyID),
+		IsNew:              song.IsNew,
 		Charts:             make(V1OrderedChartsMap),
 	}
 }
