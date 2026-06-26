@@ -33,6 +33,7 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 				OfficialIdx: "IDX001-UPDATED",
 				Jacket:      stringPtrForSongSaveTest("updated.png"),
 				IsWorldsend: false,
+				IsNew:       true,
 				IsDeleted:   true,
 				ReleasedAt:  nil,
 			},
@@ -115,6 +116,7 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
 				assert.Equal(t, tt.saveSong.IsWorldsend, saved.IsWorldsend)
+				assert.Equal(t, tt.saveSong.IsNew, saved.IsNew)
 				assert.Equal(t, tt.saveSong.IsDeleted, saved.IsDeleted)
 			}
 		})

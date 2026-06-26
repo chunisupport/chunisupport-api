@@ -35,6 +35,7 @@ func TestToSongDTO(t *testing.T) {
 		Jacket:               &imgURL,
 		IsMaxOPUnknown:       true,
 		OpTargetDifficultyID: 5,
+		IsNew:                true,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -105,6 +106,7 @@ func TestToSongDTO(t *testing.T) {
 
 	require.NotNil(t, dto.OpTargetDifficulty)
 	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
+	assert.True(t, dto.IsNew)
 
 	// Charts は空の map として初期化される
 	if dto.Charts == nil {
@@ -189,6 +191,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		Jacket:             &jacket,
 		MaxOP:              85,
 		OpTargetDifficulty: stringPtr("MASTER"),
+		IsNew:              true,
 		Charts: OrderedChartsMap{
 			"BASIC":    &ChartDTO{Const: chartBasic, IsConstUnknown: false, Notes: nil},
 			"ADVANCED": &ChartDTO{Const: chartAdvanced, IsConstUnknown: false, Notes: nil},
@@ -216,6 +219,10 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 
 	if !strings.Contains(jsonString, `"op_target_difficulty":"MASTER"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain op_target_difficulty field, got: %s", jsonString)
+	}
+
+	if !strings.Contains(jsonString, `"is_new":true`) {
+		assert.Failf(t, "アサーション失敗", "JSON should contain is_new field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
