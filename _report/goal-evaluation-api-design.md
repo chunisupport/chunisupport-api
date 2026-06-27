@@ -178,6 +178,31 @@
 
 `overpower_percent.total` は現行CRUDでも省略不可のため、評価時解決は不要。
 
+### 5.2 `remaining` / `percent` パラメータの評価時解決
+
+CRUDで `remaining` または `percent` が指定された場合、評価時に以下の式で絶対目標値へ解決する。
+
+```
+max := 動的目標値（5.1節の解決値）
+
+if remaining != nil:
+    target = max - remaining
+if percent != nil:
+    target = max * (percent / 100)
+```
+
+`percent` から算出した目標値が小数になる場合、`count` 系と `total_score` は達成割合を下回らないように切り上げて整数化する。
+`overpower_value` は小数値のまま扱う。
+
+各 `achievement_type` での `max`（動的目標値）は以下の通り：
+- `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count`: 対象譜面数
+- `total_score`: 対象譜面数 × 1,010,000
+- `overpower_value`: 対象譜面の理論値OverPower合計
+
+`remaining` と `percent` は `count` / `total` と相互排他であり、いずれか1つのみ指定可能。
+
+`avg_score` と `overpower_percent` は動的最大値の概念がないため、`remaining` / `percent` パラメータをサポートしない。
+
 ---
 
 ## 6. エラー仕様

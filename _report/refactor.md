@@ -1,4 +1,4 @@
-# リファクタリング指摘書 (2026-06-14時点)
+# リファクタリング指摘書 (2026-06-27時点)
 
 本ドキュメントは、現在のコードベースを再確認したうえで、**まだ残っている改善点のみ**を整理したものです。
 解消済み、または根拠が現状と一致しなくなった項目は削除しました。
@@ -25,11 +25,11 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。`internal/dto/worldsend_dto.go` や `internal/infra/models/*record*_model.go` の `G115` は理由付きですが、`Value()` 失敗時の扱いも含めた棚卸しが未完了です。 |
+| **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/usecase/player_data_usecase_impl.go` の `G115` 抑制には変換範囲の根拠がありません。`internal/dto/worldsend_dto.go` と `internal/infra/models/*record*_model.go` の `G115` には範囲保証の説明がありますが、後者は `Value()` のエラーを破棄して型アサーションしており、抑制コメントだけでは変換処理全体の安全性を保証できません。 |
 | **SEC-04** | **Medium** | HTTPサーバーのタイムアウト未設定 | `internal/app/server.go` で `echo.Start` を直接使っており、`ReadHeaderTimeout` / `ReadTimeout` / `WriteTimeout` / `IdleTimeout` が明示されていません。Slowloris 系のリソース枯渇対策として、`http.Server` を明示生成してタイムアウトを設定すべきです。 |
 | **SEC-05** | **Medium** | DB接続のTLS設定がない | `internal/infra/db/connection.go` のMySQL DSNに `tls` 指定がありません。DBが同一ホストまたは信頼できる閉域網に限定されない場合、通信経路上の盗聴・改ざんリスクがあります。本番設定ではTLS必須化を検討すべきです。 |
 | **SEC-06** | **Low** | CORS設定の危険値検証がない | `internal/app/router.go` のCORSは設定値をそのまま反映しています。`allow_credentials=true` と広すぎる `allow_origins` の組み合わせを設定時に拒否するなど、起動時検証を追加すべきです。 |
-| **SEC-07** | **Low** | ログ出力のサニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行除去がありますが、全ログ出力で統一された機微情報・制御文字サニタイズ方針は見当たりません。`router.go` の health check では `slog.Error("Database health check failed: " + err.Error())` のような文字列連結ログも残っています。ログ注入やトークン・UID等の混入を防ぐため、ログ出力ルールを統一すべきです。 |
+| **SEC-07** | **Low** | ログ出力の機微情報・サニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行を除去していますが、全ログ出力で統一された機微情報・制御文字の扱いは定義されていません。`firebase_auth_usecase.go` や `user_credential_usecase.go` では Firebase UID をログ属性に含めています。保存期間や閲覧権限も踏まえ、識別子を記録する必要性、マスキング、制御文字除去の方針を統一すべきです。 |
 
 ### パフォーマンス (PERF)
 
@@ -38,13 +38,14 @@
 | **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | `GetUserProfileWithRecords` と `GetUserProfileRecordView` は `records.all` と `records.worldsend` をまとめて返しており、ページネーションがありません。`view=rating` で軽量化できる経路はありますが、レコード一覧系はユーザーの蓄積データ増加に比例してレスポンスが肥大化します。 |
 | **PERF-004** | **Medium** | レコード表示系の `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | `user_usecase_impl.go` の profile / record 系では通常譜面・WORLD'S ENDともに `FindByPlayerID` で全件取得してからDTO化や未プレイ補完を行っています。`view=rating` では `FindByPlayerIDForRating` に分離済みですが、レコード表示用途は用途別取得への分割余地があります。 |
 | **PERF-005** | **Low** | 楽曲一覧APIが全件返却前提 | `song_handler.go` / `v1/song_handler.go` / `worldsend_handler.go` / `v1_worldsend_handler.go` の楽曲一覧はページネーションなしで全件返却します。マスターデータ的用途として許容する判断もあり得ますが、データ増加時のレスポンス肥大化リスクは `PERF-003` と同様に棚卸しすべきです。 |
+| **PERF-006** | **Medium** | rating view がOP対象判定のため通常レコードを重複取得 | `GetUserProfileRatingView` は `FindByPlayerIDForRating` でレーティング対象を取得した直後、OP対象フラグの算出だけを目的に `FindByPlayerID` で通常レコード全件を再取得しています。rating view の軽量化経路で全件取得が復活しており、同じリクエストで関連情報を含む大きなクエリを2回実行します。OP対象譜面IDだけを返す用途別クエリ、または1回の取得で両方を満たす設計にすべきです。 |
 
 ### 信頼性・運用 (OPS)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
 | **OPS-001** | **Low** | リクエストIDがない | `X-Request-ID` 付与やログへの相関ID埋め込みがなく、障害解析時のトレース性が低い状態です。 |
-| **OPS-002** | **Low** | DBクエリの明示的タイムアウトなし | `context.Context` は伝播されていますが、`context.WithTimeout` 等による通常リクエスト中のDBアクセス上限時間設定が見当たりません。`router.go` の health check も `db.Ping()` を使っており、リクエストContextを使っていません。 |
+| **OPS-002** | **Low** | DBクエリの明示的タイムアウトなし | `context.Context` は伝播されていますが、`context.WithTimeout` 等による通常リクエスト中のDBアクセス上限時間設定が見当たりません。クライアント切断には追従できる一方、接続が維持されたまま長時間化するクエリのアプリケーション側上限はありません。 |
 
 ### 実装品質・保守性 (QUAL)
 
@@ -93,7 +94,7 @@
 
 ## まとめ
 
-- 優先度が高いのは、**Goal更新の非トランザクション**、**Domain層の `sqlx` 依存**、**WORLD'S ENDレコード取得エラーの握りつぶし** です。
-- 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視**, **Context伝播の不徹底** を詰めると、APIの安定性と保守性が上がります。
-- AGENTS.md 準拠の観点では、**`interface{}` 残存**, **本番パッケージの `Must` 系関数**, **厳格JSONデコードの不統一** が追加の棚卸し対象です。
-- `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。
+- 今回の再確認では、一覧にある課題のうち解決済みとして削除できる項目はありませんでした。`SEC-03`、`SEC-07`、`OPS-002` は、既に存在しない根拠を除き、現在のコードに合わせて記述を更新しました。
+- 2026-06-21以降の変更で、rating view がOP対象判定のため通常レコード全件を追加取得する性能退行を確認し、`PERF-006` として追加しました。
+- 優先度 Medium の中では、**Domain層の `sqlx` 依存**、**WORLD'S ENDレコード取得エラーの握りつぶし**、**rating view の重複・全件取得**、**VO変換時のエラー無視**を先に解消する価値があります。
+- 前版のまとめに残っていた **Goal更新の非トランザクション**、**パスパラメータ未検証**、**`interface{}` 残存**は既に解決済みであり、現行の課題一覧にも存在しないため削除しました。

@@ -262,6 +262,7 @@ CREATE TABLE goals (
 - `count` 系の `count`、`total_score.total`、`overpower_value.total` は省略または `null` を許容します。
 - これらを省略または `null` にした場合、保存JSON上も省略または `null` のまま返ります。動的上限チェックでは未指定として扱い、上限超過エラーにはなりません。
 - `overpower_percent.total` は省略不可です。
+- `count` / `total` の代わりに `remaining`（残数）または `percent`（割合）を指定できます。これらは相互排他であり、いずれか1つのみ指定可能です。
 
 ### 7.1 `rank_count`
 
@@ -274,16 +275,19 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `score` が必須、`count` は任意
+- キーは `score` が必須、`count` / `remaining` / `percent` はいずれか1つのみ任意
 - `score` は整数、`0 <= score <= 1010000`
 - `count` は整数または `null`、整数の場合は `count >= 1`
-- キーは `score` / `count` のみ
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `count` / `remaining` / `percent` は相互排他（2つ以上指定不可）
+- キーは `score` / `count` / `remaining` / `percent` のみ
 
 注意:
 
 - 名前は `rank_count` ですが、現行実装では `rank` 文字列ではなく `score` 閾値を受け取ります。
 - つまり「指定スコア以上の譜面数」を数えるための形状です。
-- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
+- `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.2 `score_count`
 
@@ -295,6 +299,8 @@ CREATE TABLE goals (
 ```
 
 条件は `rank_count` と同じです。
+
+- `count` / `remaining` / `percent` はいずれか1つのみ任意
 
 ### 7.3 `avg_score`
 
@@ -320,15 +326,18 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `lamp` が必須、`count` は任意
+- キーは `lamp` が必須、`count` / `remaining` / `percent` はいずれか1つのみ任意
 - `count` は整数または `null`、整数の場合は `count >= 1`
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `count` / `remaining` / `percent` は相互排他（2つ以上指定不可）
 - `lamp` は以下のいずれか
   - `HRD`
   - `BRV`
   - `ABS`
   - `CTS`
-- キーは `lamp` / `count` のみ
-- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
+- キーは `lamp` / `count` / `remaining` / `percent` のみ
+- `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.5 `combolamp_count`
 
@@ -341,13 +350,16 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `lamp` が必須、`count` は任意
+- キーは `lamp` が必須、`count` / `remaining` / `percent` はいずれか1つのみ任意
 - `count` は整数または `null`、整数の場合は `count >= 1`
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `count` / `remaining` / `percent` は相互排他（2つ以上指定不可）
 - `lamp` は以下のいずれか
   - `FC`
   - `AJ`
-- キーは `lamp` / `count` のみ
-- `count` が省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
+- キーは `lamp` / `count` / `remaining` / `percent` のみ
+- `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
 ### 7.6 `total_score`
 
@@ -359,10 +371,13 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `total` のみ。ただし空オブジェクト `{}` も許容されます。
+- キーは `total` / `remaining` / `percent` のいずれか1つのみ。ただし空オブジェクト `{}` も許容されます。
+- `total` / `remaining` / `percent` は相互排他（2つ以上指定不可）
 - `total` は整数または `null`
 - 整数の場合は `total >= 0`
-- `total` が省略または `null` の場合は、対象譜面数 × 1,010,000 を目標値として扱う想定です。
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `total` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数 × 1,010,000 を目標値として扱う想定です。
 
 実装上、Go側では `int64` として受けています。
 
@@ -376,11 +391,14 @@ CREATE TABLE goals (
 
 条件:
 
-- キーは `total` のみ。ただし空オブジェクト `{}` も許容されます。
+- キーは `total` / `remaining` / `percent` のいずれか1つのみ。ただし空オブジェクト `{}` も許容されます。
+- `total` / `remaining` / `percent` は相互排他（2つ以上指定不可）
 - `total` は数値または `null`
 - 数値の場合は `total >= 0`
 - 数値の場合は小数第3位まで許可
-- `total` が省略または `null` の場合は、対象譜面の理論値OverPower合計を目標値として扱う想定です。
+- `remaining` は数値、`remaining >= 0`、小数第3位まで許可
+- `percent` は数値、`0 <= percent <= 100`、小数第3位まで許可
+- `total` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面の理論値OverPower合計を目標値として扱う想定です。
 
 ### 7.8 `overpower_percent`
 
@@ -591,21 +609,27 @@ CREATE TABLE goals (
 条件:
 
 - `count` が整数で指定されている場合のみ `count <= 対象譜面数`
-- `count` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
+- `remaining` が指定されている場合のみ `remaining <= 対象譜面数`
+- `percent` は固定範囲 `0..100` のみで判定され、動的上限はありません
+- `count` / `remaining` / `percent` がいずれも省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.2 `total_score`
 
 条件:
 
 - `total` が整数で指定されている場合のみ `total <= 対象譜面数 * 1010000`
-- `total` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
+- `remaining` が指定されている場合のみ `remaining <= 対象譜面数 * 1010000`
+- `percent` は固定範囲 `0..100` のみで判定され、動的上限はありません
+- `total` / `remaining` / `percent` がいずれも省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.3 `overpower_value`
 
 条件:
 
 - `total` が数値で指定されている場合のみ `total <= ((対象譜面定数合計 + 対象譜面数 * 2.0) * 5.0) + 対象譜面数 * 5.0`
-- `total` が省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
+- `remaining` が指定されている場合のみ `remaining <= ((対象譜面定数合計 + 対象譜面数 * 2.0) * 5.0) + 対象譜面数 * 5.0`
+- `percent` は固定範囲 `0..100` のみで判定され、動的上限はありません
+- `total` / `remaining` / `percent` がいずれも省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
 ### 10.4 `overpower_percent`
 
@@ -682,7 +706,7 @@ CREATE TABLE goals (
 - `diff` / `genre` / `ver` は、入力時に配列でも返却時はスカラーになる場合があります。
 - `created_at` は常に文字列で返り、UNIX時刻ではありません。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
-- `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。受信側は欠落・`null` を許容してください。
+- `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。また `remaining` / `percent` が代わりに指定されている場合もあります。受信側は欠落・`null` を許容してください。
 - `invert` はサーバー側で評価条件に使われていません。保存・返却される表示用フラグです。
 
 ## 14. 実装から見える補足事項

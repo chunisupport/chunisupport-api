@@ -1073,6 +1073,15 @@ curl -X POST \
 
 上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
+`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
+
+- `remaining`: 動的上限から差し引く残数
+- `percent`: 動的上限に対する目標割合（%）
+
+`total_score` / `overpower_value` でも同様に、`total` に代えて `remaining` または `percent` を指定できます。絶対目標値、`remaining`、`percent` の非 `null` 値は相互排他です。`null` は未指定として扱うため、例えば `{"total": null, "remaining": 100}` は有効です。いずれも未指定の場合は動的上限そのものを目標値として扱います。
+
+評価時の絶対目標値は、`remaining` の場合は「動的上限 - remaining」、`percent` の場合は「動的上限 × percent / 100」で算出します。件数系と `total_score` で割合計算結果が小数になる場合は切り上げ、`overpower_value` は小数値のまま扱います。
+
 #### `rank_count` / `score_count`
 
 `rank_count` と `score_count` は同じ構造・同じ判定ロジックです。`rank_count` はUIが「ランク由来の目標」として判別するために分けています。ランク境界はフロントエンドが保持し、バックエンドはスコア閾値のみを扱います。
@@ -1085,6 +1094,8 @@ curl -X POST \
 |---|---|---|---|
 | `score` | `integer` | 0〜1,010,000 | スコア閾値 |
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
 #### `avg_score`
 
@@ -1106,6 +1117,8 @@ curl -X POST \
 |---|---|---|---|
 | `lamp` | `string` | 下表の略称（完全一致） | ハードランプ種別 |
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
 **ハードランプ略称**:
 
@@ -1128,6 +1141,8 @@ curl -X POST \
 |---|---|---|---|
 | `lamp` | `string` | 下表の略称（完全一致） | コンボランプ種別 |
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
 **コンボランプ略称**:
 
@@ -1145,6 +1160,8 @@ curl -X POST \
 | パラメータ | 型 | 範囲 | 説明 |
 |---|---|---|---|
 | `total` | `integer \| null` | null または 0〜対象譜面数 × 1,010,000 | スコア合計目標値。省略/null時は「対象譜面数 × 1,010,000（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象譜面数 × 1,010,000 | 動的上限から差し引く残りスコア |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
 #### `overpower_value`
 
@@ -1155,6 +1172,8 @@ curl -X POST \
 | パラメータ | 型 | 範囲 | 説明 |
 |---|---|---|---|
 | `total` | `number \| null` | null または 0〜対象譜面の理論値OP合計（小数点以下3桁まで） | OverPower合計目標値。省略/null時は「対象譜面の理論値OP合計（動的上限）」として扱います |
+| `remaining` | `number \| null` | null または 0〜対象譜面の理論値OP合計（小数点以下3桁まで） | 動的上限から差し引く残りOverPower値 |
+| `percent` | `number \| null` | null または 0〜100（小数点以下3桁まで） | 動的上限に対する目標割合 |
 
 理論値OP合計はリクエスト時にマスタデータから算出されます。
 
@@ -1228,8 +1247,12 @@ curl -X POST \
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
+   - 同成果種別の `remaining` ≤ 対象譜面数
    - `total_score.total` ≤ 対象譜面数 × 1,010,000
+   - `total_score.remaining` ≤ 対象譜面数 × 1,010,000
    - `overpower_value.total` ≤ 対象譜面の理論値OverPower合計
+   - `overpower_value.remaining` ≤ 対象譜面の理論値OverPower合計
+   - `percent` は 0〜100 の固定範囲
    - `overpower_percent.total` は 0〜100 の固定上限
 
 #### 100件上限の担保
