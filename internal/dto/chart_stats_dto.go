@@ -46,6 +46,7 @@ type ChartComboStatsDTO struct {
 	None int `json:"none"`
 	FC   int `json:"fc"`
 	AJ   int `json:"aj"`
+	AJC  int `json:"ajc"`
 }
 
 // ChartClearStatsDTO はクリアランプ別人数のDTOです。
@@ -102,6 +103,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 					None: stat.Combo.None,
 					FC:   stat.Combo.FC,
 					AJ:   stat.Combo.AJ,
+					AJC:  stat.Combo.AJC,
 				},
 				Clear: ChartClearStatsDTO{
 					Failed:      stat.Clear.Failed,
@@ -162,6 +164,7 @@ func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*r
 				None: stat.Combo.None,
 				FC:   stat.Combo.FC,
 				AJ:   stat.Combo.AJ,
+				AJC:  stat.Combo.AJC,
 			},
 			Clear: ChartClearStatsDTO{
 				Failed:      stat.Clear.Failed,

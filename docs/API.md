@@ -2049,7 +2049,8 @@ curl -X POST \
       "combo": {
         "none": 20,
         "fc": 52,
-        "aj": 28
+        "aj": 25,
+        "ajc": 3
       },
       "clear": {
         "failed": 5,
@@ -2077,7 +2078,8 @@ curl -X POST \
       "combo": {
         "none": 3,
         "fc": 10,
-        "aj": 5
+        "aj": 4,
+        "ajc": 1
       },
       "clear": {
         "failed": 1,
@@ -2100,7 +2102,7 @@ curl -X POST \
 | `stats` | array | レーティング帯別の統計配列。**先頭要素は必ず `rating_band: "ALL"`（全プレイヤー統計）** |
 | `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.6+"） |
 | `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
-| `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj） |
+| `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj, ajc）。`aj` は AJC を除く ALL JUSTICE、`ajc` は ALL JUSTICE かつ 1,010,000 点の人数で、両者は排他的です |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
 | `stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
 | `stats[].player_count` | number | レーティング帯別プレイヤー数 |
