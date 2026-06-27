@@ -564,7 +564,7 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 		} else {
 			slog.Error("failed to find worldsend records", "player_id", playerID, "error", err)
 		}
-		return []*dto.WorldsendRecordDTO{}, nil
+		return nil, err
 	}
 
 	if includeNoPlay {
