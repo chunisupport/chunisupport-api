@@ -63,6 +63,7 @@ func TestConvertToV1SongDTO(t *testing.T) {
 		Jacket:               &imgURL,
 		IsMaxOPUnknown:       true,
 		OpTargetDifficultyID: 4,
+		IsNew:                true,
 	}
 
 	notes1Value := 600
@@ -119,6 +120,8 @@ func TestConvertToV1SongDTO(t *testing.T) {
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "MASTER" {
 		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "MASTER")
 	}
+
+	assert.True(t, dto.IsNew)
 
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {

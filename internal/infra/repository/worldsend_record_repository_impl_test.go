@@ -60,8 +60,8 @@ func TestFindByPlayerID_ScansLevelStarValueObject(t *testing.T) {
 	setupWorldsendRecordDB(t, db)
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0);
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0, 0);
 		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
 		VALUES (101, 1, 4, '狂', 1200);
 		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)
@@ -84,8 +84,8 @@ func TestFindByPlayerID_ScansNilLevelStarAsNil(t *testing.T) {
 	setupWorldsendRecordDB(t, db)
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0);
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0, 0);
 		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
 		VALUES (101, 1, NULL, '狂', 1200);
 		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)

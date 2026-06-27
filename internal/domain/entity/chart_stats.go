@@ -17,6 +17,7 @@ type ChartComboStats struct {
 	None int
 	FC   int
 	AJ   int
+	AJC  int
 }
 
 // ChartClearStats はクリアランプ別の人数統計です。

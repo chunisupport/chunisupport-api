@@ -233,6 +233,7 @@ CREATE TABLE `songs` (
   `official_idx` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `jacket` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_worldsend` tinyint(1) NOT NULL DEFAULT '0',
+  `is_new` tinyint(1) NOT NULL DEFAULT '0',
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

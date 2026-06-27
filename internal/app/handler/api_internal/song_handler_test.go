@@ -68,6 +68,7 @@ func TestConvertToSongDTO(t *testing.T) {
 		BPM:            &bpm,
 		Jacket:         &imgURL,
 		IsMaxOPUnknown: true,
+		IsNew:          true,
 	}
 
 	notes1Value := 500
@@ -125,6 +126,8 @@ func TestConvertToSongDTO(t *testing.T) {
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "EXPERT" {
 		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "EXPERT")
 	}
+
+	assert.True(t, dto.IsNew)
 
 	// Charts マップのキーが存在するか確認
 	if dto.Charts == nil {
@@ -325,6 +328,7 @@ func TestGetSongs(t *testing.T) {
 			Artist:    "テストアーティスト",
 			GenreID:   &genreID,
 			BPM:       &bpm,
+			IsNew:     true,
 			Charts: []*entity.Chart{
 				{
 					DifficultyID:   1,
@@ -379,6 +383,10 @@ func TestGetSongs(t *testing.T) {
 
 	if len(response.Songs) > 0 && response.Songs[0].DisplayID != "test123456789012" {
 		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", response.Songs[0].DisplayID, "test123456789012")
+	}
+
+	if len(response.Songs) > 0 {
+		assert.True(t, response.Songs[0].IsNew)
 	}
 
 	// JSONレスポンスの詳細確認

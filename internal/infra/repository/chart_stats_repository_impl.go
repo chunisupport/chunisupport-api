@@ -41,6 +41,7 @@ type chartStatsRow struct {
 	ComboNone        int      `db:"combo_none"`
 	ComboFC          int      `db:"combo_fc"`
 	ComboAJ          int      `db:"combo_aj"`
+	ComboAJC         int      `db:"combo_ajc"`
 	ClearFailed      int      `db:"clear_failed"`
 	ClearClear       int      `db:"clear_clear"`
 	ClearHard        int      `db:"clear_hard"`
@@ -86,6 +87,7 @@ func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exe
 				None: row.ComboNone,
 				FC:   row.ComboFC,
 				AJ:   row.ComboAJ,
+				AJC:  row.ComboAJC,
 			},
 			Clear: entity.ChartClearStats{
 				Failed:      row.ClearFailed,
@@ -146,6 +148,7 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 			combo_none,
 			combo_fc,
 			combo_aj,
+			combo_ajc,
 			clear_failed,
 			clear_clear,
 			clear_hard,
@@ -177,6 +180,7 @@ func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Con
 			combo_none,
 			combo_fc,
 			combo_aj,
+			combo_ajc,
 			clear_failed,
 			clear_clear,
 			clear_hard,

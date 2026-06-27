@@ -128,6 +128,7 @@ type SongDTO struct {
 	MaxOP              float64          `json:"maxop"`
 	IsMaxOPUnknown     bool             `json:"is_maxop_unknown"`
 	OpTargetDifficulty *string          `json:"op_target_difficulty"`
+	IsNew              bool             `json:"is_new"`
 	Charts             OrderedChartsMap `json:"charts"`
 }
 
@@ -168,6 +169,7 @@ type UpdateSongRequest struct {
 	BPM        *int                           `json:"bpm" validate:"omitempty,gt=0"`
 	ReleasedAt *DateOnly                      `json:"released_at"`
 	Jacket     *string                        `json:"jacket"`
+	IsNew      *bool                          `json:"is_new"`
 	Charts     map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
 }
 
@@ -190,6 +192,7 @@ type CreateSongRequest struct {
 	BPM         *int                  `json:"bpm" validate:"omitempty,gt=0"`
 	ReleasedAt  *DateOnly             `json:"released_at"`
 	Jacket      *string               `json:"jacket" validate:"omitempty,max=20"`
+	IsNew       bool                  `json:"is_new"`
 	Charts      []*CreateChartRequest `json:"charts" validate:"dive"`
 }
 
@@ -270,6 +273,7 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 		MaxOP:              maxOP,
 		IsMaxOPUnknown:     song.IsMaxOPUnknown,
 		OpTargetDifficulty: sharedto.OpTargetDifficultyPtr(song.OpTargetDifficultyID),
+		IsNew:              song.IsNew,
 		Charts:             make(OrderedChartsMap),
 	}
 }

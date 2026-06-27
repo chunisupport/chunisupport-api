@@ -177,6 +177,7 @@ func (h *SongHandler) CreateSong(c echo.Context) error {
 		BPM:         req.BPM,
 		ReleasedAt:  req.ReleasedAt.TimePtr(),
 		Jacket:      req.Jacket,
+		IsNew:       req.IsNew,
 		Charts:      convertToCreateChartInputs(req.Charts),
 	}
 

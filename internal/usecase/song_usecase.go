@@ -27,6 +27,7 @@ type CreateSongInput struct {
 	BPM         *int
 	ReleasedAt  *time.Time
 	Jacket      *string
+	IsNew       bool
 	Charts      []*CreateChartInput
 }
 

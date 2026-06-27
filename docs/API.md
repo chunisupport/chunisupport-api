@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年06月15日
+**最終更新日**: 2026年06月27日
 
 ## ベースURLと環境
 
@@ -1922,6 +1922,7 @@ curl -X POST \
       "maxop": 82.5,
       "is_maxop_unknown": false,
       "op_target_difficulty": "MASTER",
+      "is_new": true,
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -1963,6 +1964,7 @@ curl -X POST \
 | `maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `op_target_difficulty` | string \| null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
+| `is_new` | bool | 新曲枠の対象かどうか |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -2047,7 +2049,8 @@ curl -X POST \
       "combo": {
         "none": 20,
         "fc": 52,
-        "aj": 28
+        "aj": 25,
+        "ajc": 3
       },
       "clear": {
         "failed": 5,
@@ -2075,7 +2078,8 @@ curl -X POST \
       "combo": {
         "none": 3,
         "fc": 10,
-        "aj": 5
+        "aj": 4,
+        "ajc": 1
       },
       "clear": {
         "failed": 1,
@@ -2098,7 +2102,7 @@ curl -X POST \
 | `stats` | array | レーティング帯別の統計配列。**先頭要素は必ず `rating_band: "ALL"`（全プレイヤー統計）** |
 | `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.6+"） |
 | `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
-| `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj） |
+| `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj, ajc）。`aj` は AJC を除く ALL JUSTICE、`ajc` は ALL JUSTICE かつ 1,010,000 点の人数で、両者は排他的です |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
 | `stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
 | `stats[].player_count` | number | レーティング帯別プレイヤー数 |
@@ -2128,6 +2132,7 @@ curl -X POST \
   "bpm": 180,
   "released_at": "2024-01-01",
   "jacket": "ce21ae87308e7599",
+  "is_new": true,
   "charts": [
     {
       "difficulty": "MASTER",
@@ -2150,6 +2155,7 @@ curl -X POST \
 | `bpm` | int | - | BPM（省略可） |
 | `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
 | `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
+| `is_new` | bool | - | 新曲枠の対象かどうか（省略時はfalse） |
 | `charts` | array | - | 譜面情報配列（省略可） |
 | `charts[].difficulty` | string | ✅ | 難易度（`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`） |
 | `charts[].const` | float64 | ✅ | 譜面定数（0以上） |
@@ -2187,6 +2193,7 @@ curl -X POST \
     "bpm": 180,
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
+    "is_new": true,
     "charts": {
       "EXPERT": {
         "const": 14.5,
@@ -2211,6 +2218,7 @@ curl -X POST \
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
+| `is_new` | bool \| null | | 新曲枠の対象かどうか（省略またはnullの場合はfalseとして更新） |
 | `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ |
 
 **UpdateChartRequest**:
@@ -2604,7 +2612,7 @@ curl -X POST \
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -2920,6 +2928,7 @@ curl -X POST \
       "maxop": 86.25,
       "is_maxop_unknown": false,
       "op_target_difficulty": "MASTER",
+      "is_new": true,
       "charts": {
         "MASTER": {
           "const": 14.5,
@@ -2954,6 +2963,7 @@ curl -X POST \
 | `songs[].maxop` | number | その曲の全譜面のうち最も定数が高い譜面で理論値(AJC)を取ったときのOP値 |
 | `songs[].is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `songs[].op_target_difficulty` | string\|null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
+| `songs[].is_new` | boolean | 新曲枠の対象かどうか |
 | `songs[].charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 | `songs[].charts[key].const` | number | 譜面定数（小数点以下1桁表記） |
 | `songs[].charts[key].is_const_unknown` | boolean | 定数が推定値の場合true |

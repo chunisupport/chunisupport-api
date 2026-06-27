@@ -39,6 +39,7 @@ type songRow struct {
 	OfficialIdx string     `db:"official_idx"`
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
+	IsNew       bool       `db:"is_new"`
 	IsDeleted   bool       `db:"is_deleted"`
 	UpdatedAt   *time.Time `db:"updated_at"`
 }
@@ -61,7 +62,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -191,6 +192,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.OfficialIdx = row.OfficialIdx
 	song.Jacket = row.Jacket
 	song.IsWorldsend = row.IsWorldsend
+	song.IsNew = row.IsNew
 	song.IsDeleted = row.IsDeleted
 	song.UpdatedAt = row.UpdatedAt
 	return song
@@ -227,7 +229,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -302,7 +304,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	// 1. 楽曲を取得
 	songQuery := `
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE display_id = ? AND is_worldsend = 0
 	`
@@ -346,7 +348,7 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -362,6 +364,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		song.OfficialIdx,
 		song.Jacket,
 		song.IsWorldsend,
+		song.IsNew,
 		song.IsDeleted,
 		song.ID,
 	)
@@ -462,8 +465,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
-	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
+	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
+	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
 
 	for _, song := range songs {
 		songID := displayIDToSongID[song.DisplayID]
@@ -488,9 +491,12 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
 		jacketArgs = append(jacketArgs, songID, song.Jacket)
+
+		isNewCases = append(isNewCases, "WHEN id = ? THEN ?")
+		isNewArgs = append(isNewArgs, songID, song.IsNew)
 	}
 
-	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→IN句
+	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→is_new→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
 	args = append(args, readingArgs...)
@@ -499,6 +505,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, bpmArgs...)
 	args = append(args, releasedArgs...)
 	args = append(args, jacketArgs...)
+	args = append(args, isNewArgs...)
 
 	// IN句用の引数を追加
 	for _, id := range songIDs {
@@ -518,7 +525,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
 			released_at = CASE %s END,
-			jacket = CASE %s END
+			jacket = CASE %s END,
+			is_new = CASE %s END
 		WHERE id IN (%s)
 		  AND is_worldsend = 0
 	`,
@@ -529,6 +537,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		strings.Join(bpmCases, " "),
 		strings.Join(releasedCases, " "),
 		strings.Join(jacketCases, " "),
+		strings.Join(isNewCases, " "),
 		strings.Join(placeholders, ","),
 	)
 
@@ -633,8 +642,8 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
@@ -645,6 +654,7 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		song.ReleasedAt,
 		song.OfficialIdx,
 		song.Jacket,
+		song.IsNew,
 	)
 	if err != nil {
 		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {

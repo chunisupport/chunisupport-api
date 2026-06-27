@@ -23,6 +23,7 @@ type Song struct {
 	IsMaxOPUnknown       bool
 	OpTargetDifficultyID int
 	IsWorldsend          bool
+	IsNew                bool
 	IsDeleted            bool
 	UpdatedAt            *time.Time
 }
