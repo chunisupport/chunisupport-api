@@ -525,6 +525,174 @@ func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
 	assert.NotNil(t, out)
 }
 
+func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		achievementType string
+		params          []byte
+		stats           *repository.GoalTargetStats
+		wantErr         bool
+	}{
+		{
+			name:            "件数系の整数remainingを受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"remaining":1}`),
+		},
+		{
+			name:            "件数系の小数remainingを拒否する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"remaining":1.5}`),
+			wantErr:         true,
+		},
+		{
+			name:            "合計スコアの整数remainingを受理する",
+			achievementType: "total_score",
+			params:          []byte(`{"remaining":1000000}`),
+		},
+		{
+			name:            "合計スコアの小数remainingを拒否する",
+			achievementType: "total_score",
+			params:          []byte(`{"remaining":1.5}`),
+			wantErr:         true,
+		},
+		{
+			name:            "OP値の小数remainingを受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{"remaining":1.234}`),
+		},
+		{
+			name:            "動的上限を超えるremainingを拒否する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"remaining":3}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20},
+			wantErr:         true,
+		},
+		{
+			name:            "絶対値とremainingの同時指定を拒否する",
+			achievementType: "total_score",
+			params:          []byte(`{"total":1000000,"remaining":100}`),
+			wantErr:         true,
+		},
+		{
+			name:            "nullの件数とremainingの同時指定を受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"count":null,"remaining":1}`),
+		},
+		{
+			name:            "nullの合計値とremainingの同時指定を受理する",
+			achievementType: "total_score",
+			params:          []byte(`{"total":null,"remaining":100}`),
+		},
+		{
+			name:            "nullの合計値とremainingの同時指定を受理する_OP値",
+			achievementType: "overpower_value",
+			params:          []byte(`{"total":null,"remaining":1.234}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{stats: tt.stats}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   tt.achievementType,
+				AchievementParams: tt.params,
+				Attributes:        []byte(`{}`),
+			})
+
+			// Then
+			if tt.wantErr {
+				assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, out)
+		})
+	}
+}
+
+func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		achievementType string
+		params          []byte
+		wantErr         bool
+	}{
+		{
+			name:            "件数系の割合を受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"percent":50.5}`),
+		},
+		{
+			name:            "0パーセントを受理する",
+			achievementType: "total_score",
+			params:          []byte(`{"percent":0}`),
+		},
+		{
+			name:            "100パーセントを受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{"percent":100}`),
+		},
+		{
+			name:            "100を超える割合を拒否する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"percent":100.1}`),
+			wantErr:         true,
+		},
+		{
+			name:            "負の割合を拒否する",
+			achievementType: "total_score",
+			params:          []byte(`{"percent":-0.1}`),
+			wantErr:         true,
+		},
+		{
+			name:            "件数と割合の同時指定を拒否する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"count":1,"percent":50}`),
+			wantErr:         true,
+		},
+		{
+			name:            "OP値の小数第4位の割合を拒否する",
+			achievementType: "overpower_value",
+			params:          []byte(`{"percent":50.1234}`),
+			wantErr:         true,
+		},
+		{
+			name:            "nullの件数と割合の同時指定を受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"count":null,"percent":50}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   tt.achievementType,
+				AchievementParams: tt.params,
+				Attributes:        []byte(`{}`),
+			})
+
+			// Then
+			if tt.wantErr {
+				assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, out)
+		})
+	}
+}
+
 func TestGoalUsecase_Update(t *testing.T) {
 	// Given: 既存の Goal が存在する状態
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}

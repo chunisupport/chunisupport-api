@@ -158,9 +158,12 @@ type goalAttributeFilter struct {
 }
 
 type goalAchievementParam struct {
-	Score *int
-	Count *int
-	Total *float64
+	Score          *int
+	Count          *int
+	Total          *float64
+	RemainingInt   *int64
+	RemainingFloat *float64
+	Percent        *float64
 }
 
 func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*validatedGoalInput, error) {
@@ -417,23 +420,50 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
-		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "score", "count") {
+		if len(m) < 1 || !hasOnlyKeys(m, "score", "count", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		score, ok, err := parseOptional[int](m["score"])
 		if err != nil || !ok || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptional[int](m["count"])
+		result.Score = &score
+
+		count, countOK, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok && count < 1 {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Score = &score
-		if ok {
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(countOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if countOK {
+			if count < 1 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
 			result.Count = &count
+		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
 		}
 	case achievementType == "avg_score":
 		var score int
@@ -443,16 +473,32 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		result.Score = &score
 	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
 		var lamp string
-		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "lamp", "count") || json.Unmarshal(m["lamp"], &lamp) != nil {
+		if len(m) < 1 || !hasOnlyKeys(m, "lamp", "count", "remaining", "percent") || json.Unmarshal(m["lamp"], &lamp) != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptional[int](m["count"])
+
+		count, countOK, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok && count < 1 {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(countOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if countOK && count < 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
 		if achievementType == "hardlamp_count" {
 			if _, ok := info.HardLampAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
@@ -460,37 +506,104 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok {
+
+		if countOK {
 			result.Count = &count
 		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
+		}
 	case achievementType == "total_score":
-		if len(m) > 1 || !hasOnlyKeys(m, "total") {
+		if !hasOnlyKeys(m, "total", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptional[int64](m["total"])
+
+		total, totalOK, err := parseOptional[int64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(totalOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if totalOK {
 			if total < 0 {
 				return nil, nil, ErrInvalidAchievementParam
 			}
 			totalFloat := float64(total)
 			result.Total = &totalFloat
 		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
+		}
 	case achievementType == "overpower_value":
-		if len(m) > 1 || !hasOnlyKeys(m, "total") {
+		if !hasOnlyKeys(m, "total", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptional[float64](m["total"])
+
+		total, totalOK, err := parseOptional[float64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok {
+		remaining, remOK, err := parseOptional[float64](m["remaining"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(totalOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if totalOK {
 			if total < 0 || !isScale(total, 3) {
 				return nil, nil, ErrInvalidAchievementParam
 			}
 			result.Total = &total
+		}
+		if remOK {
+			if remaining < 0 || !isScale(remaining, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingFloat = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 || !isScale(percent, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
 		}
 	case achievementType == "overpower_percent":
 		var total float64
@@ -528,21 +641,33 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
+			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
 	case "total_score":
+		maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 		if params.Total != nil {
-			maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 			if *params.Total > maxTotal {
 				slog.Info("goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
 		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount)*int64(info.TheoreticalScore) {
+			slog.Info("goal validation failed", "reason", "total_score_remaining_over_dynamic_max", "input", *params.RemainingInt, "max", maxTotal)
+			return ErrInvalidAchievementParam
+		}
 	case "overpower_value":
+		maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
 		if params.Total != nil {
-			maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
 			if *params.Total > maxTotal {
 				slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
+		}
+		if params.RemainingFloat != nil && *params.RemainingFloat > maxTotal {
+			slog.Info("goal validation failed", "reason", "overpower_value_remaining_over_dynamic_max", "input", *params.RemainingFloat, "max", maxTotal)
+			return ErrInvalidAchievementParam
 		}
 	case "overpower_percent":
 		// 割合(0-100)で扱うため動的上限は不要
@@ -554,6 +679,13 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 func isScale(v float64, scale int) bool {
 	f := math.Pow10(scale)
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
+}
+
+func countBoolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func parseOptional[T any](raw json.RawMessage) (T, bool, error) {
