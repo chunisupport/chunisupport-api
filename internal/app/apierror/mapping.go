@@ -54,11 +54,17 @@ func FromUsecaseError(err error) *APIError {
 		return ErrNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorConflict):
 		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
+		return ErrConflict.WithInternal(err)
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
 	case errors.Is(err, usecase.ErrChartNotFound):
 		return ErrChartNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrScoreHistoryNotFound):
+		return ErrScoreHistoryNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrScoreHistoryUnsupportedDifficulty):
+		return ErrScoreHistoryUnsupportedDifficulty.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidPlayerName):
 		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidWorldsendInput):

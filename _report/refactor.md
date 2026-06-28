@@ -75,12 +75,6 @@
 | **INFRA-010** | **Low** | 一時プレイヤーデータリポジトリが `context.Context` を無視 | `internal/infra/repository/temporary_player_data_repository_impl.go` の `Create` / `FindByToken` / `ConsumeByToken` / `Delete` は `context.Context` を受け取りながら `_ context.Context` として無視しています。インメモリ実装でも、ロック取得前後や重いペイロード処理前にキャンセルを確認するなど、リポジトリ契約の一貫性を保つべきです。 |
 | **INFRA-016** | **Medium** | スコアVOからの変換でエラー無視 | `internal/infra/models/player_record_model.go` と `player_worldsend_record_model.go` が `Value()` のエラーを `_` で破棄し、`scoreVal.(int64)` の型アサーション前提で変換しています。`#nosec G115` コメントに範囲保証の根拠は記述されましたが、`scoreVal` が `nil` の場合（`Value()` が失敗した場合）にパニックが発生するリスクは残存しています。 |
 
-### ユースケース層 (UC)
-
-| ID | 優先度 | 概要 | 詳細・対応方針 |
-|---|---|---|---|
-| **UC-014** | **Medium** | WORLD'S ENDレコード取得エラーを握りつぶしている | `user_usecase_impl.go` の `getUserProfileWorldsendRecords` は `worldsendRecordRepo.FindByPlayerID` のエラーをログ出力後に空スライス・nil errorとして返します。通常譜面側はエラーを返すため挙動が不一致で、障害時に部分的な欠損レスポンスを正常扱いするリスクがあります。 |
-
 ### ハンドラー / ルーター層 (HDL)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |

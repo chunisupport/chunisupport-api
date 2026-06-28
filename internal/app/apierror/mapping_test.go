@@ -2,11 +2,22 @@ package apierror
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestFromUsecaseError_スコア履歴時刻競合を409へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(repository.ErrScoreHistoryTimestampConflict)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+	assert.Equal(t, CodeConflict, apiErr.Code)
+}
 
 func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *testing.T) {
 	got := FromUsecaseError(usecase.ErrInvalidCredentials)

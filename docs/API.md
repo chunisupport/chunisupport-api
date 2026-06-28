@@ -35,6 +35,7 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1` と `/compat/chunirec/2.0` はどちらも API トークン認証です。
+- `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーの本人確認を行う場合はトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で発行します。
 
 ## レートリミット（現行実装値）
@@ -146,12 +147,14 @@
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs/:displayid/score-history/:difficulty` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
 | `/internal/songs` | POST | Firebase Bearer (ADMIN+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
 | `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
 | `/internal/worldsend-songs` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
 | `/internal/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/worldsend-songs/:displayid/score-history` | GET | Firebase Bearer (任意) | WORLD'S ENDスコア履歴取得 |
 | `/internal/worldsend-songs` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
 | `/internal/worldsend-songs` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
 | `/internal/worldsend-songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
@@ -172,8 +175,10 @@
 | `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
+| `/v1/songs/:displayid/score-history/:difficulty` | GET | APIトークン（任意） | 通常譜面スコア履歴取得 |
 | `/v1/worldsend-songs` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
 | `/v1/worldsend-songs/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
+| `/v1/worldsend-songs/:displayid/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
@@ -2139,6 +2144,21 @@ curl -X POST \
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
+### GET `/internal/songs/:displayid/score-history/:difficulty`
+- **認証**: Firebase Bearer（任意）
+- **概要**: `username` で指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **パスパラメータ**:
+  - `displayid`: 楽曲の表示用ID
+  - `difficulty`: `expert`, `master`, `ultima`
+- **クエリパラメータ**:
+  - `username`（必須）: 対象ユーザー名
+- **レスポンス**: 200 OK。形式は GET `/v1/songs/:displayid/score-history/:difficulty` と同一です。
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 400 Bad Request (`score_history_unsupported_difficulty`): 履歴対象外の難易度
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
 ### POST `/internal/songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
@@ -2387,6 +2407,19 @@ curl -X POST \
 - **主なエラー**:
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/worldsend-songs/:displayid/score-history`
+- **認証**: Firebase Bearer（任意）
+- **概要**: `username` で指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **パスパラメータ**:
+  - `displayid`: WORLD'S END楽曲の表示用ID
+- **クエリパラメータ**:
+  - `username`（必須）: 対象ユーザー名
+- **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:displayid/score-history` と同一です。
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### POST `/internal/worldsend-songs`
 - **認証**: Firebase Bearer 必須
@@ -3187,6 +3220,76 @@ curl -X POST \
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/v1/songs/:displayid/score-history/:difficulty`
+- **認証**: APIトークン（任意）
+- **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人のみ参照できます。
+- **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | 楽曲の表示用ID |
+| `difficulty` | string | 難易度名（小文字）: `expert`, `master`, `ultima` |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `username` | string | ✓ | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "entries": [
+    {
+      "score": 1009000,
+      "clear_lamp": "ABSOLUTE",
+      "combo_lamp": "ALL JUSTICE",
+      "full_chain": "FULL CHAIN GOLD",
+      "updated_at": "2026-04-27T12:34:56Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | array | スコア履歴エントリの配列（新しい順） |
+| `entries[].score` | number | スコア |
+| `entries[].clear_lamp` | string \| null | クリアランプ名称。未設定または解決不能の場合は `null` |
+| `entries[].combo_lamp` | string \| null | コンボランプ名称。未設定または解決不能の場合は `null` |
+| `entries[].full_chain` | string \| null | フルチェイン名称。未設定または解決不能の場合は `null` |
+| `entries[].updated_at` | string | 更新日時（ISO8601） |
+
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 400 Bad Request (`score_history_unsupported_difficulty`): 指定された難易度が `expert`, `master`, `ultima` 以外
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
+### GET `/v1/worldsend-songs/:displayid/score-history`
+- **認証**: APIトークン（任意）
+- **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人のみ参照できます。
+- **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | WORLD'S END楽曲の表示用ID |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `username` | string | ✓ | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK（スキーマは通常譜面のスコア履歴と同一）
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username`
 - **認証**: APIトークン必須

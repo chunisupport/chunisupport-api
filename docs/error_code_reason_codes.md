@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-05-28
+最終更新: 2026-06-28
 
 ## 更新ルール
 
@@ -33,6 +33,8 @@
 | `invalid_genre_id` | ジャンルID不正 |
 | `invalid_difficulty_id` | 難易度ID不正 |
 | `invalid_difficulty` | 難易度指定不正 |
+| `score_history_not_found` | 指定譜面の現行スコア履歴が存在しない |
+| `score_history_unsupported_difficulty` | スコア履歴対象外のBASIC / ADVANCEDを指定 |
 | `validation_failed` | バリデーション失敗 |
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |

@@ -63,26 +63,28 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Login               *api_internal.LoginHandler
-	Signup              *api_internal.SignupHandler
-	Profile             *api_internal.ProfileHandler
-	User                *api_internal.UserHandler
-	AdminUser           *api_internal.AdminUserHandler
-	Song                *api_internal.SongHandler
-	Honor               *api_internal.HonorHandler
-	Worldsend           *api_internal.WorldsendHandler
-	APIToken            *api_internal.APITokenHandler
-	Me                  *api_internal.MeHandler
-	MasterData          *api_internal.MasterDataHandler
-	Goal                *api_internal.GoalHandler
-	RecordFilter        *api_internal.RecordFilterHandler
-	TemporaryPlayerData *api_internal.TemporaryPlayerDataHandler
-	PlayerLockedSong    *api_internal.PlayerLockedSongHandler
+	Login                *api_internal.LoginHandler
+	Signup               *api_internal.SignupHandler
+	Profile              *api_internal.ProfileHandler
+	User                 *api_internal.UserHandler
+	AdminUser            *api_internal.AdminUserHandler
+	Song                 *api_internal.SongHandler
+	Honor                *api_internal.HonorHandler
+	Worldsend            *api_internal.WorldsendHandler
+	APIToken             *api_internal.APITokenHandler
+	Me                   *api_internal.MeHandler
+	MasterData           *api_internal.MasterDataHandler
+	Goal                 *api_internal.GoalHandler
+	RecordFilter         *api_internal.RecordFilterHandler
+	TemporaryPlayerData  *api_internal.TemporaryPlayerDataHandler
+	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
+	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	// 外部API v1 用ハンドラ
-	V1Song      *api_v1.V1SongHandler
-	V1Worldsend *api_v1.V1WorldsendHandler
-	V1User      *api_v1.V1UserHandler
-	V1Version   *api_v1.V1VersionHandler
+	V1Song       *api_v1.V1SongHandler
+	V1Worldsend  *api_v1.V1WorldsendHandler
+	V1User       *api_v1.V1UserHandler
+	V1Version    *api_v1.V1VersionHandler
+	ScoreHistory *api_v1.ScoreHistoryHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 }
@@ -116,6 +118,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	playerRecordRepo := infra.NewPlayerRecordRepository(db)
 	worldsendRecordRepo := infra.NewWorldsendRecordRepository(db)
 	playerDataRepo := infra.NewPlayerDataRepository(db)
+	scoreHistoryRepo := infra.NewScoreHistoryRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
@@ -130,7 +133,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider)
-	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache)
+	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo)
+	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, db, overpowerDenominatorProvider)
@@ -155,26 +159,28 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache)
 	handlers := &Handlers{
-		Login:               api_internal.NewLoginHandler(loginUsecase),
-		Signup:              api_internal.NewSignupHandler(signupUsecase),
-		Profile:             api_internal.NewProfileHandler(userCredentialUsecase),
-		User:                api_internal.NewUserHandler(userUsecase),
-		AdminUser:           api_internal.NewAdminUserHandler(userUsecase),
-		Song:                api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Honor:               api_internal.NewHonorHandler(honorUsecase),
-		Worldsend:           api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
-		APIToken:            api_internal.NewAPITokenHandler(apiTokenUsecase),
-		Me:                  api_internal.NewMeHandler(playerDataUsecase),
-		MasterData:          api_internal.NewMasterDataHandler(masterDataUsecase),
-		Goal:                api_internal.NewGoalHandler(goalUsecase),
-		RecordFilter:        api_internal.NewRecordFilterHandler(recordFilterUsecase),
-		TemporaryPlayerData: api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
-		PlayerLockedSong:    api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
+		Login:                api_internal.NewLoginHandler(loginUsecase),
+		Signup:               api_internal.NewSignupHandler(signupUsecase),
+		Profile:              api_internal.NewProfileHandler(userCredentialUsecase),
+		User:                 api_internal.NewUserHandler(userUsecase),
+		AdminUser:            api_internal.NewAdminUserHandler(userUsecase),
+		Song:                 api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Honor:                api_internal.NewHonorHandler(honorUsecase),
+		Worldsend:            api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
+		APIToken:             api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:                   api_internal.NewMeHandler(playerDataUsecase),
+		MasterData:           api_internal.NewMasterDataHandler(masterDataUsecase),
+		Goal:                 api_internal.NewGoalHandler(goalUsecase),
+		RecordFilter:         api_internal.NewRecordFilterHandler(recordFilterUsecase),
+		TemporaryPlayerData:  api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
+		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
+		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// 外部API v1 用ハンドラ
-		V1Song:      api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		V1Worldsend: api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
-		V1User:      api_v1.NewV1UserHandler(userUsecase),
-		V1Version:   api_v1.NewV1VersionHandler(masterDataUsecase),
+		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		V1Worldsend:  api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
+		V1User:       api_v1.NewV1UserHandler(userUsecase),
+		V1Version:    api_v1.NewV1VersionHandler(masterDataUsecase),
+		ScoreHistory: api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
 	}
@@ -327,6 +333,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
+		publicSongsGroup.GET("/:displayid/score-history/:difficulty", handlers.InternalScoreHistory.GetStandard)
 	}
 
 	// api.chunisupport.net/internal/worldsend-songs
@@ -335,6 +342,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
 		publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
+		publicWorldsendGroup.GET("/:displayid/score-history", handlers.InternalScoreHistory.GetWorldsend)
 	}
 
 	songsGroup := internal.Group("/songs")
@@ -382,6 +390,16 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	// 外部APIルートの登録
 	// api.chunisupport.net/v1
+	scoreHistoryV1 := e.Group("/v1")
+	scoreHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
+	scoreHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
+		info.APIRateLimitRequests,
+		info.APIRateLimitAdminRequests,
+		info.APIRateLimitWindow,
+	))
+	scoreHistoryV1.GET("/songs/:displayid/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
+	scoreHistoryV1.GET("/worldsend-songs/:displayid/score-history", handlers.ScoreHistory.GetWorldsend)
+
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミット: ADMINは15分150,000回、その他は15分150回

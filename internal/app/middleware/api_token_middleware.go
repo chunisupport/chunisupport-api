@@ -26,3 +26,24 @@ func APITokenMiddleware(usecase usecase.APITokenUsecase) echo.MiddlewareFunc {
 		}
 	}
 }
+
+// OptionalAPITokenMiddleware はAPIトークンが指定された場合だけ認証します。
+func OptionalAPITokenMiddleware(usecase usecase.APITokenUsecase) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			rawToken := extractBearerToken(c)
+			if rawToken == "" {
+				return next(c)
+			}
+
+			user, token, err := usecase.Validate(c.Request().Context(), rawToken)
+			if err != nil {
+				return apierror.FromUsecaseError(err)
+			}
+
+			c.Set("userEntity", user)
+			c.Set("apiToken", token)
+			return next(c)
+		}
+	}
+}

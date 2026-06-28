@@ -164,6 +164,19 @@ CREATE TABLE `player_records` (
   CONSTRAINT `player_records_chk_1` CHECK ((`score` between 0 and 1010000)),
   CONSTRAINT `player_records_chk_2` CHECK (((`slot_order` is null) or (`slot_order` between 1 and 255)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_record_histories` (
+  `player_id` mediumint unsigned NOT NULL,
+  `chart_id` mediumint unsigned NOT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `clear_lamp_id` tinyint unsigned NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `full_chain_id` tinyint unsigned NOT NULL,
+  `updated_at` timestamp NOT NULL,
+  PRIMARY KEY (`player_id`,`chart_id`,`updated_at`),
+  CONSTRAINT `fk_player_record_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_record_histories_chart` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_record_histories_score` CHECK ((`score` between 0 and 1010000))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_worldsend_records` (
   `player_id` mediumint unsigned NOT NULL,
   `worldsend_chart_id` mediumint unsigned NOT NULL,
@@ -184,6 +197,19 @@ CREATE TABLE `player_worldsend_records` (
   CONSTRAINT `player_worldsend_records_ibfk_4` FOREIGN KEY (`combo_lamp_id`) REFERENCES `combo_lamp_types` (`id`),
   CONSTRAINT `player_worldsend_records_ibfk_5` FOREIGN KEY (`full_chain_id`) REFERENCES `full_chain_types` (`id`),
   CONSTRAINT `player_worldsend_records_chk_1` CHECK ((`score` between 0 and 1010000))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_worldsend_record_histories` (
+  `player_id` mediumint unsigned NOT NULL,
+  `worldsend_chart_id` mediumint unsigned NOT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `clear_lamp_id` tinyint unsigned NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `full_chain_id` tinyint unsigned NOT NULL,
+  `updated_at` timestamp NOT NULL,
+  PRIMARY KEY (`player_id`,`worldsend_chart_id`,`updated_at`),
+  CONSTRAINT `fk_player_worldsend_record_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_worldsend_record_histories_chart` FOREIGN KEY (`worldsend_chart_id`) REFERENCES `worldsend_charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_worldsend_record_histories_score` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `players` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
