@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockAPITokenUsecase struct {
@@ -143,6 +144,63 @@ func TestAPITokenMiddleware(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+		mockUsecase.AssertExpectations(t)
+	})
+}
+
+func TestOptionalAPITokenMiddleware(t *testing.T) {
+	e := echo.New()
+
+	t.Run("トークンなしでも次のハンドラーを実行する", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate")
+	})
+
+	t.Run("有効なトークンならユーザーを設定する", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		mockUsecase.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer valid")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertExpectations(t)
+	})
+
+	t.Run("不正なトークンは401を返す", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		mockUsecase.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		apiErr, ok := err.(*apierror.APIError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		mockUsecase.AssertExpectations(t)
 	})
 }

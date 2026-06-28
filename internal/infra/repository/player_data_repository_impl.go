@@ -139,6 +139,7 @@ func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Cont
 	if exec == nil {
 		return nil, fmt.Errorf("FindPlayerRecordStatesByChartIDs requires a non-nil executor")
 	}
+	lockClause := r.recordLockClause()
 	rows, err := selectModelsInChunks[int, playerDataRecordRow](ctx, exec, chartIDs, `
 		SELECT
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
@@ -146,7 +147,7 @@ func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Cont
 		FROM player_records
 		WHERE player_id = ?
 		  AND chart_id IN (?)
-	`, "player record states", func(batch []int) []any { return []any{playerID, batch} })
+	`+lockClause, "player record states", func(batch []int) []any { return []any{playerID, batch} })
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +172,7 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 	if exec == nil {
 		return nil, fmt.Errorf("FindWorldsendRecordStatesByChartIDs requires a non-nil executor")
 	}
+	lockClause := r.recordLockClause()
 	rows, err := selectModelsInChunks[int, playerDataWorldsendRecordRow](ctx, exec, worldsendChartIDs, `
 		SELECT
 			player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id,
@@ -178,7 +180,7 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 		FROM player_worldsend_records
 		WHERE player_id = ?
 		  AND worldsend_chart_id IN (?)
-	`, "worldsend record states", func(batch []int) []any { return []any{playerID, batch} })
+	`+lockClause, "worldsend record states", func(batch []int) []any { return []any{playerID, batch} })
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +196,13 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 		}
 	}
 	return states, nil
+}
+
+func (r *playerDataRepository) recordLockClause() string {
+	if r.db.DriverName() == "mysql" {
+		return " FOR UPDATE"
+	}
+	return ""
 }
 
 // GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。

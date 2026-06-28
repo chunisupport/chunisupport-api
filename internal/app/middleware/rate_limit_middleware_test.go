@@ -220,6 +220,45 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
 
+func TestOptionalAPIRateLimitMiddleware(t *testing.T) {
+	e := setupEchoWithErrorHandler(t)
+	middleware := OptionalAPIRateLimitMiddleware(1, 10, time.Minute)
+	handler := middleware(func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	t.Run("未認証ユーザーはIP単位で制限する", func(t *testing.T) {
+		for i, expectedStatus := range []int{http.StatusOK, http.StatusTooManyRequests} {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.RemoteAddr = "192.0.2.1:1234"
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			err := handler(c)
+			if err != nil {
+				e.HTTPErrorHandler(err, c)
+			}
+
+			assert.Equal(t, expectedStatus, rec.Code, "リクエスト回数: %d", i+1)
+		}
+	})
+
+	t.Run("認証済みADMINユーザーにはADMIN上限を適用する", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 999, AccountTypeID: info.AccountTypeAdmin})
+
+		err := handler(c)
+		if err != nil {
+			e.HTTPErrorHandler(err, c)
+		}
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "10", rec.Header().Get("X-RateLimit-Limit"))
+	})
+}
+
 func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	// 異なるユーザーは別々のレートリミットを持つ
 	e := setupEchoWithErrorHandler(t)

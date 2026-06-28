@@ -56,4 +56,7 @@ var (
 
 	// ErrRepositoryOperationFailed はリポジトリ操作が永続化層の事情で失敗した場合に返されるエラーです。
 	ErrRepositoryOperationFailed = errors.New("repository operation failed")
+
+	// ErrScoreHistoryTimestampConflict は同一譜面・同一秒の履歴が既に存在する場合に返されます。
+	ErrScoreHistoryTimestampConflict = errors.New("score history timestamp conflict")
 )

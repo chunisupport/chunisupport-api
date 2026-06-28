@@ -156,6 +156,28 @@ type playerDataUsecase struct {
 	playerDataRepo   repository.PlayerDataRepository
 	lockedRepo       repository.PlayerLockedSongRepository
 	masterCache      repository.PlayerDataMasterProvider
+	scoreHistoryRepo repository.ScoreHistoryRepository
+}
+
+// NewPlayerDataUsecaseWithScoreHistory はスコア履歴保存を有効にした実装を生成します。
+func NewPlayerDataUsecaseWithScoreHistory(
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRepo repository.PlayerRepository,
+	playerRecRepo repository.PlayerRecordRepository,
+	worldsendRecRepo repository.WorldsendRecordRepository,
+	honorRepo repository.HonorRepository,
+	playerDataRepo repository.PlayerDataRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
+	masterCache repository.PlayerDataMasterProvider,
+	scoreHistoryRepo repository.ScoreHistoryRepository,
+) PlayerDataUsecase {
+	us := newPlayerDataUsecase(
+		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
+		honorRepo, playerDataRepo, lockedRepo, masterCache,
+	)
+	us.scoreHistoryRepo = scoreHistoryRepo
+	return us
 }
 
 // NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
@@ -170,6 +192,23 @@ func NewPlayerDataUsecase(
 	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
+	return newPlayerDataUsecase(
+		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
+		honorRepo, playerDataRepo, lockedRepo, masterCache,
+	)
+}
+
+func newPlayerDataUsecase(
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRepo repository.PlayerRepository,
+	playerRecRepo repository.PlayerRecordRepository,
+	worldsendRecRepo repository.WorldsendRecordRepository,
+	honorRepo repository.HonorRepository,
+	playerDataRepo repository.PlayerDataRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
+	masterCache repository.PlayerDataMasterProvider,
+) *playerDataUsecase {
 	if playerRecRepo == nil {
 		panic("player record repository is required")
 	}
@@ -623,11 +662,30 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
 	counts.WorldsendRecordsActuallyChanged = len(worldsendRecordChanges)
 
+	standardHistories, standardHistoryChartIDs := buildStandardHistories(playerID, fullBefore, fullRecordsToUpsert, masters)
+	worldsendHistories, worldsendHistoryChartIDs := buildWorldsendHistories(playerID, worldsendBefore, worldsendRecordsToUpsert)
+	if us.scoreHistoryRepo != nil {
+		if err := us.scoreHistoryRepo.BulkInsertStandard(ctx, tx, standardHistories); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+		if err := us.scoreHistoryRepo.BulkInsertWorldsend(ctx, tx, worldsendHistories); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+	}
+
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
 	}); err != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
+	if us.scoreHistoryRepo != nil {
+		if err := us.scoreHistoryRepo.PruneStandardOverLimit(ctx, tx, playerID, standardHistoryChartIDs); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+		if err := us.scoreHistoryRepo.PruneWorldsendOverLimit(ctx, tx, playerID, worldsendHistoryChartIDs); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
 	}
 
 	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
@@ -657,6 +715,63 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	}
 
 	return counts, skipped, changes, buildPlayerDataStatisticsDiff(beforeStatistics, afterStatistics), overpowerSummary, nil
+}
+
+func buildStandardHistories(
+	playerID int,
+	before map[int]repository.PlayerRecordState,
+	after []repository.PlayerRecordForUpsert,
+	masters *playerDataMaster,
+) ([]repository.PlayerRecordHistory, []int) {
+	rows := make([]repository.PlayerRecordHistory, 0, len(after))
+	chartIDs := make([]int, 0, len(after))
+	seenChartIDs := make(map[int]struct{}, len(after))
+	for _, record := range after {
+		beforeState, exists := before[record.ChartID]
+		if !exists || !playerRecordMeaningfullyChanged(beforeState, record.State) {
+			continue
+		}
+		chart, exists := masters.chartsByID[record.ChartID]
+		if !exists || !entity.SupportsScoreHistory(masters.DifficultyNamesByID[chart.DifficultyID]) {
+			continue
+		}
+		rows = append(rows, repository.PlayerRecordHistory{
+			PlayerID: playerID,
+			ChartID:  record.ChartID,
+			State:    beforeState,
+		})
+		if _, exists := seenChartIDs[record.ChartID]; !exists {
+			seenChartIDs[record.ChartID] = struct{}{}
+			chartIDs = append(chartIDs, record.ChartID)
+		}
+	}
+	return rows, chartIDs
+}
+
+func buildWorldsendHistories(
+	playerID int,
+	before map[int]repository.WorldsendRecordState,
+	after []repository.WorldsendRecordForUpsert,
+) ([]repository.PlayerWorldsendRecordHistory, []int) {
+	rows := make([]repository.PlayerWorldsendRecordHistory, 0, len(after))
+	chartIDs := make([]int, 0, len(after))
+	seenChartIDs := make(map[int]struct{}, len(after))
+	for _, record := range after {
+		beforeState, exists := before[record.ChartID]
+		if !exists || !worldsendRecordMeaningfullyChanged(beforeState, record.State) {
+			continue
+		}
+		rows = append(rows, repository.PlayerWorldsendRecordHistory{
+			PlayerID:         playerID,
+			WorldsendChartID: record.ChartID,
+			State:            beforeState,
+		})
+		if _, exists := seenChartIDs[record.ChartID]; !exists {
+			seenChartIDs[record.ChartID] = struct{}{}
+			chartIDs = append(chartIDs, record.ChartID)
+		}
+	}
+	return rows, chartIDs
 }
 
 func buildPlayerDataStatisticsDiff(before service.PlayerRecordStatisticsSnapshot, after service.PlayerRecordStatisticsSnapshot) api_internal.PlayerDataStatistics {
@@ -838,6 +953,7 @@ func collectFullChartIDs(records []repository.PlayerRecordForUpsert) []int {
 	for _, record := range records {
 		ids = append(ids, record.ChartID)
 	}
+	slices.Sort(ids)
 	return ids
 }
 
@@ -846,6 +962,7 @@ func collectWorldsendChartIDs(records []repository.WorldsendRecordForUpsert) []i
 	for _, record := range records {
 		ids = append(ids, record.ChartID)
 	}
+	slices.Sort(ids)
 	return ids
 }
 
