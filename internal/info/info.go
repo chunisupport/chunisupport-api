@@ -57,9 +57,9 @@ const (
 	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
 	// アカウントタイプ定数
-	AccountTypePlayer = 1 // 一般ユーザー
-	AccountTypeEditor = 2 // 編集者
-	AccountTypeAdmin  = 3 // 管理者
+	AccountTypePlayer = constants.AccountTypePlayer // 一般ユーザー
+	AccountTypeEditor = constants.AccountTypeEditor // 編集者
+	AccountTypeAdmin  = constants.AccountTypeAdmin  // 管理者
 
 	// リクエストボディサイズ上限
 	RequestBodyLimit = "5M"
@@ -79,7 +79,11 @@ var (
 )
 
 var (
-	knownAccountTypes       = make(map[int]struct{})
+	accountTypeNameToID = map[string]int{
+		"PLAYER": AccountTypePlayer,
+		"EDITOR": AccountTypeEditor,
+		"ADMIN":  AccountTypeAdmin,
+	}
 	roleAllowedAccountTypes = map[int]map[int]struct{}{
 		AccountTypePlayer: {
 			AccountTypePlayer: {},
@@ -96,16 +100,16 @@ var (
 	}
 )
 
-func init() {
-	for roleID := range roleAllowedAccountTypes {
-		knownAccountTypes[roleID] = struct{}{}
-	}
-}
-
 // IsKnownAccountType は account_type_id が既知ロールかを判定します。
 func IsKnownAccountType(accountTypeID int) bool {
-	_, ok := knownAccountTypes[accountTypeID]
-	return ok
+	return constants.IsKnownAccountType(accountTypeID)
+}
+
+// AccountTypeIDByName は権限名から account_type_id を取得します。
+// 権限名は将来の小文字ロール追加と衝突しないよう、大文字小文字を厳密に区別します。
+func AccountTypeIDByName(name string) (int, bool) {
+	id, ok := accountTypeNameToID[name]
+	return id, ok
 }
 
 // HasRole は account_type_id が requiredRoleID を満たすかを判定します。

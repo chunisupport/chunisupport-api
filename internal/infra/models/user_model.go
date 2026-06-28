@@ -36,15 +36,16 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 	}
 
 	return &entity.User{
-		ID:            m.ID,
-		Username:      uname,
-		FirebaseUID:   firebaseUID,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
-		PlayerID:      m.PlayerID,
-		AccountTypeID: m.AccountTypeID,
-		IsSuspicious:  m.IsSuspicious,
-		IsPrivate:     m.IsPrivate,
+		ID:                    m.ID,
+		Username:              uname,
+		FirebaseUID:           firebaseUID,
+		CreatedAt:             m.CreatedAt,
+		UpdatedAt:             m.UpdatedAt,
+		PlayerID:              m.PlayerID,
+		AccountTypeID:         m.AccountTypeID,
+		OriginalAccountTypeID: m.AccountTypeID,
+		IsSuspicious:          m.IsSuspicious,
+		IsPrivate:             m.IsPrivate,
 	}, nil
 }
 

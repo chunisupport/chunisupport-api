@@ -29,10 +29,15 @@ type stubUserRepository struct {
 	saveErr         error
 	savedUser       *entity.User
 	deletedUserID   int
+	adminCount      int
+	countErr        error
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
-	return nil, errors.New("not implemented")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.user, nil
 }
 
 func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -58,6 +63,13 @@ func (s *stubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec
 		return nil, s.err
 	}
 	return s.usersWithPlayer, nil
+}
+
+func (s *stubUserRepository) CountByAccountType(ctx context.Context, exec repository.Executor, accountTypeID int) (int, error) {
+	if s.countErr != nil {
+		return 0, s.countErr
+	}
+	return s.adminCount, nil
 }
 
 func (s *stubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
@@ -1151,6 +1163,21 @@ func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	assert.Equal(t, 1, repo.deletedUserID)
 }
 
+func TestUserUsecase_DeleteUser_LastAdminRejected(t *testing.T) {
+	un, err := username.NewUserName("adminuser")
+	require.NoError(t, err)
+	adminRequester := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	repo := &stubUserRepository{
+		user:       &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin},
+		adminCount: 1,
+	}
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	err = service.DeleteUser(context.Background(), adminRequester, "adminuser")
+	require.ErrorIs(t, err, ErrLastAdminRequired)
+	assert.Zero(t, repo.deletedUserID)
+}
+
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: repository.ErrUserNotFound}
@@ -1181,4 +1208,107 @@ func TestUserUsecase_DeleteUser_NilRequester(t *testing.T) {
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
+}
+
+func TestUserUsecase_ChangeUserAccountType(t *testing.T) {
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		requester       *entity.User
+		accountType     string
+		repo            *stubUserRepository
+		wantErr         error
+		wantAccountType int
+	}{
+		{
+			name:            "ADMINはPLAYERをADMINに変更できる",
+			requester:       &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "ADMIN",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantAccountType: info.AccountTypeAdmin,
+		},
+		{
+			name:            "ADMINが2人以上いる場合はADMINをPLAYERに変更できる",
+			requester:       &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "PLAYER",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 2},
+			wantAccountType: info.AccountTypePlayer,
+		},
+		{
+			name:        "ADMINが0人の状態ではPLAYERをADMINに変更できる",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "ADMIN",
+			repo: &stubUserRepository{
+				user:       &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer},
+				adminCount: 0,
+			},
+			wantAccountType: info.AccountTypeAdmin,
+		},
+		{
+			name:        "ADMINが1人の場合はADMINからPLAYERへの変更を拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "PLAYER",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 1},
+			wantErr:     ErrLastAdminRequired,
+		},
+		{
+			name:            "ADMINが2人以上いる場合は自分自身をEDITORに変更できる",
+			requester:       &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin},
+			accountType:     "EDITOR",
+			repo:            &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}, adminCount: 2},
+			wantAccountType: info.AccountTypeEditor,
+		},
+		{
+			name:        "小文字の権限は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "admin",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrInvalidAccountType,
+		},
+		{
+			name:        "存在しない権限は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "SUPER_ADMIN",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrInvalidAccountType,
+		},
+		{
+			name:        "ADMIN以外は拒否する",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeEditor},
+			accountType: "ADMIN",
+			repo:        &stubUserRepository{user: &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypePlayer}},
+			wantErr:     ErrAdminRequired,
+		},
+		{
+			name:        "対象ユーザーが存在しない場合はErrUserNotFound",
+			requester:   &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			accountType: "ADMIN",
+			repo:        &stubUserRepository{err: repository.ErrUserNotFound},
+			wantErr:     ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			service := NewUserUsecase(nil, tt.repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+			// When
+			got, err := service.ChangeUserAccountType(context.Background(), tt.requester, "testuser", tt.accountType)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.NotNil(t, tt.repo.savedUser)
+			assert.Equal(t, tt.wantAccountType, tt.repo.savedUser.AccountTypeID)
+			assert.Equal(t, tt.wantAccountType, got.AccountTypeID)
+		})
+	}
 }

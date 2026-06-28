@@ -96,6 +96,10 @@ func (s *tokenStubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context,
 	return nil, errors.New("not implemented")
 }
 
+func (s *tokenStubUserRepository) CountByAccountType(ctx context.Context, exec repository.Executor, accountTypeID int) (int, error) {
+	return 0, errors.New("not implemented")
+}
+
 func (s *tokenStubUserRepository) Save(ctx context.Context, exec repository.Executor, user *entity.User) error {
 	return errors.New("not implemented")
 }

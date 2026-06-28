@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,4 +25,12 @@ func TestFromUsecaseError_auth_time欠落は詳細を伏せてrecent_sign_in_req
 	assert.Equal(t, CodeRecentSignInRequired, got.Code)
 	assert.Equal(t, ErrRecentSignInRequired.HTTPStatus, got.HTTPStatus)
 	assert.ErrorIs(t, got.Internal, usecase.ErrRecentSignInAuthTimeMissing)
+}
+
+func TestFromUsecaseError_ドメイン由来の不正な権限種別はBadRequestに変換する(t *testing.T) {
+	got := FromUsecaseError(entity.ErrInvalidAccountType)
+
+	assert.Equal(t, CodeBadRequest, got.Code)
+	assert.Equal(t, ErrBadRequest.HTTPStatus, got.HTTPStatus)
+	assert.ErrorIs(t, got.Internal, entity.ErrInvalidAccountType)
 }

@@ -116,6 +116,7 @@
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
 | `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
+| `/internal/admin/users/:username/account-type` | PATCH | Firebase Bearer (ADMIN+) | ユーザー権限変更 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -244,6 +245,48 @@
 | `build_date` | string | ビルド日 |
 | `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
 | `go_version` | string | APIバイナリのGoバージョン |
+
+### PATCH `/internal/admin/users/:username/account-type`
+- **認証**: Firebase Bearer 必須（ADMIN権限必須）
+- **概要**: 指定ユーザーのアカウント種別を変更します。自分自身の変更、ADMINへの昇格、ADMINからの降格を許可します。ただし、ADMINが1人だけ存在する状態でそのユーザーを非ADMINへ変更し、ADMINが0人になる操作だけは拒否します。ADMINが0人の状態から最初のADMINを付与する操作は許可します。
+- **パスパラメータ**:
+  - `username`: 変更対象ユーザーのユーザー名
+- **リクエストボディ**:
+
+```json
+{
+  "account_type": "ADMIN"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `account_type` | string | 変更後のアカウント種別（`PLAYER` / `EDITOR` / `ADMIN`）。大文字小文字を厳密に区別し、小文字は不正値として扱います。 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "id": 1,
+  "username": "user1",
+  "account_type": "ADMIN",
+  "updated_at": "2026-06-22T12:34:56Z"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | number | ユーザーID |
+| `username` | string | ユーザー名 |
+| `account_type` | string | 更新後のアカウント種別 |
+| `updated_at` | string | ユーザー更新日時 (ISO8601) |
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): ユーザー名形式、JSON、またはアカウント種別が不正
+  - 409 Conflict (`conflict`): 最後のADMINを非ADMINへ変更しようとした
+  - 401 Unauthorized (`unauthorized` / `missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN権限が不足
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない
 
 ---
 

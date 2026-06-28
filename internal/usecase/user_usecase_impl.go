@@ -322,7 +322,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 // DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
-	if err := s.ensureDeleteUserPermission(requester); err != nil {
+	if err := s.ensureAdminPermission(requester); err != nil {
 		return err
 	}
 
@@ -333,6 +333,10 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 			return ErrUserNotFound
 		}
 		slog.Error("failed to find user by username", "username", username, "error", err)
+		return err
+	}
+
+	if err := s.ensureNotLastAdminRemoval(ctx, user); err != nil {
 		return err
 	}
 
@@ -355,9 +359,75 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 	return nil
 }
 
-func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
+// ChangeUserAccountType はADMIN操作としてユーザー権限を変更します。
+// ハンドラの認可ミドルウェアだけに依存しないよう、ユースケースでもADMIN権限を検証します。
+func (s *userUsecase) ChangeUserAccountType(ctx context.Context, requester *entity.User, username string, accountType string) (*entity.User, error) {
+	if err := s.ensureAdminPermission(requester); err != nil {
+		return nil, err
+	}
+
+	accountTypeID, ok := info.AccountTypeIDByName(accountType)
+	if !ok {
+		return nil, ErrInvalidAccountType
+	}
+
+	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		slog.Error("failed to find user by username for account type change", "username", username, "error", err)
+		return nil, err
+	}
+
+	if err := s.ensureNotLastAdminDemotion(ctx, user, accountTypeID); err != nil {
+		return nil, err
+	}
+
+	if err := user.ChangeAccountType(accountTypeID); err != nil {
+		return nil, err
+	}
+
+	if err := s.userRepo.Save(ctx, s.db, user); err != nil {
+		slog.Error("failed to save user account type", "username", username, "error", err)
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *userUsecase) ensureAdminPermission(requester *entity.User) error {
 	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
+	}
+	return nil
+}
+
+func (s *userUsecase) ensureNotLastAdminDemotion(ctx context.Context, user *entity.User, nextAccountTypeID int) error {
+	if user.AccountTypeID != info.AccountTypeAdmin || nextAccountTypeID == info.AccountTypeAdmin {
+		return nil
+	}
+	return s.ensureAdminCountIsNotOne(ctx)
+}
+
+func (s *userUsecase) ensureNotLastAdminRemoval(ctx context.Context, user *entity.User) error {
+	if user.AccountTypeID != info.AccountTypeAdmin {
+		return nil
+	}
+	return s.ensureAdminCountIsNotOne(ctx)
+}
+
+func (s *userUsecase) ensureAdminCountIsNotOne(ctx context.Context) error {
+	// このアプリでは最初のADMINをDB直接編集で付与する運用を許容しており、
+	// 万一ADMINが0人になってもDBから復旧できる規模のため、
+	// TransactionManagerや行ロックまでは導入せず、通常操作での「1人→0人」だけを防ぎます。
+	adminCount, err := s.userRepo.CountByAccountType(ctx, s.db, info.AccountTypeAdmin)
+	if err != nil {
+		slog.Error("failed to count admin users", "error", err)
+		return err
+	}
+	if adminCount == 1 {
+		return ErrLastAdminRequired
 	}
 	return nil
 }
