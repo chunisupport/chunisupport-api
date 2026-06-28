@@ -35,7 +35,7 @@
 | --- | --- |
 | 別テーブル | `player_records` は現行どおり 1 譜面 1 行を維持し、履歴は専用テーブルへ分離 |
 | 最新の非重複 | 常に最新 1 件は `player_records`（または `player_worldsend_records`）のみから取得 |
-| 難易度フィルタ | 通常譜面は EXPERT / MASTER / ULTIMA のみ履歴対象 |
+| 難易度による履歴対象の限定（書き込み時） | 通常譜面は EXPERT / MASTER / ULTIMA のみ histories へ書き込む |
 | 件数上限 | 譜面ごとに最大 50 件（初版から適用） |
 | 索引 | `player_id` + 譜面 ID + `updated_at` の複合主キーで参照と prune を効率化 |
 | 読み取り | 1 譜面ずつオンデマンド取得のみ |
@@ -59,6 +59,8 @@ player_record_histories / player_worldsend_record_histories
   → 「過去のベスト」のみ（更新時に退避した before 状態）
 ```
 
+履歴は **譜面（`chart_id` / `worldsend_chart_id`）単位** で独立して保存する。同一楽曲の別難易度譜面とは共有されない（曲単位の履歴ではない）。
+
 最新レコードを histories に重複保存しない。API 表示時は `player_records` を先頭に、histories を時系列で連結する。
 
 ### 3.2 書き込みフロー
@@ -70,7 +72,7 @@ player_record_histories / player_worldsend_record_histories
 1. `player_records`（または `player_worldsend_records`）へ UPSERT
 2. histories には **書き込まない**
 
-> **補足**: 同日に BAS で初プレイした後、EXPERT で初プレイした場合、EXPERT 側の histories は空のまま（EXPERT の `change_type: new` のため）。別難易度の成長は見えないが、BAS / ADV を履歴対象外とする非目的に合致する。
+> **補足**: 初回プレイ（`change_type: new`）では histories に書き込まないため、対象譜面の histories は空のままとなる。同一楽曲の別難易度譜面を同日に登録していても、各譜面は独立した `chart_id` を持つため互いの履歴には影響しない（例: EXPERT を 2 回更新した後に MASTER を初回登録した場合、MASTER 側の histories は空のまま）。BAS / ADVANCED 譜面は 2 回目以降の更新でも histories 対象外（非目的参照）。
 
 #### 2 回目以降の更新（`change_type: updated` かつ意味のある変化あり）
 
@@ -197,7 +199,7 @@ EXPERT+ フィルタ・50 件 cap・最新の非重複・改善時のみ INSERT 
 
 ### 5.1 パス設計方針
 
-譜面統計 API（`GET /api/v1/songs/:displayid/stats/:difficulty`）と同様、**楽曲を主語**とする。`/users/:username/songs/...` のようなユーザー所有の階層は採用しない。
+譜面統計 API（`GET /api/v1/songs/:displayid/stats/:difficulty`）と同様、URL パスでは楽曲 `display_id` を主語とする。ただし `:difficulty` により **1 譜面** を特定する（曲単位の履歴 API ではない）。`/users/:username/songs/...` のようなユーザー所有の階層は採用しない。
 
 ### 5.2 エンドポイント
 
@@ -416,6 +418,7 @@ type PlayerRecordHistoryRepository interface {
 | 変化なしの再登録 | histories 不変 |
 | slot のみ変化 | histories 不変 |
 | BAS / ADV 更新 | player_records は更新、histories 不変 |
+| 同一曲の別難易度譜面（EXPERT+ 同士） | 各 `chart_id` で histories が独立。一方を更新しても他方の histories は不変 |
 | ランプのみ改善 | before が histories に 1 件 |
 | スコア改善後、別の登録でランプのみ改善 | それぞれの before が時系列どおり保存される |
 | 履歴が 49 件の状態で改善 | 50 件になる |
