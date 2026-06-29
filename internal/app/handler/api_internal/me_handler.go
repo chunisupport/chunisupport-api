@@ -14,7 +14,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const (
@@ -33,7 +33,7 @@ func NewMeHandler(playerDataUsecase usecase.PlayerDataUsecase) *MeHandler {
 
 // RegisterData はプレイヤーデータの登録を受け付けます。
 // デフォルトではbase64+gzip圧縮形式を受け入れ、クエリパラメータformat=jsonの場合は生JSONを受け入れます。
-func (h *MeHandler) RegisterData(c echo.Context) error {
+func (h *MeHandler) RegisterData(c *echo.Context) error {
 	user, ok := c.Get("userEntity").(*entity.User)
 	if !ok || user == nil {
 		return apierror.ErrUnauthorized
@@ -129,7 +129,7 @@ func (h *MeHandler) RegisterData(c echo.Context) error {
 }
 
 // DeletePlayerData はプレイヤーデータの削除（連携解除）を扱います。
-func (h *MeHandler) DeletePlayerData(c echo.Context) error {
+func (h *MeHandler) DeletePlayerData(c *echo.Context) error {
 	user, ok := c.Get("userEntity").(*entity.User)
 	if !ok || user == nil {
 		return apierror.ErrUnauthorized

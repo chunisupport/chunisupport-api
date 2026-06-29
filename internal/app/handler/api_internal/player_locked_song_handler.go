@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type PlayerLockedSongHandler struct {
@@ -20,7 +20,7 @@ func NewPlayerLockedSongHandler(u usecase.PlayerLockedSongUsecase) *PlayerLocked
 	return &PlayerLockedSongHandler{usecase: u}
 }
 
-func (h *PlayerLockedSongHandler) List(c echo.Context) error {
+func (h *PlayerLockedSongHandler) List(c *echo.Context) error {
 	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -41,7 +41,7 @@ func (h *PlayerLockedSongHandler) List(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func (h *PlayerLockedSongHandler) Lock(c echo.Context) error {
+func (h *PlayerLockedSongHandler) Lock(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func (h *PlayerLockedSongHandler) Lock(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
+func (h *PlayerLockedSongHandler) Unlock(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (h *PlayerLockedSongHandler) Unlock(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *PlayerLockedSongHandler) Batch(c echo.Context) error {
+func (h *PlayerLockedSongHandler) Batch(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err

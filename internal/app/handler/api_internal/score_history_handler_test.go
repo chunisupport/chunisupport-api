@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,8 +43,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetPath("/internal/songs/:displayid/score-history/:difficulty")
-		c.SetParamNames("displayid", "difficulty")
-		c.SetParamValues("song", "master")
+		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "song"}, {Name: "difficulty", Value: "master"}})
 		c.Set("userEntity", requester)
 
 		err := h.GetStandard(c)
@@ -59,8 +58,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/songs/song/score-history/master", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("displayid", "difficulty")
-		c.SetParamValues("song", "master")
+		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "song"}, {Name: "difficulty", Value: "master"}})
 
 		err := h.GetStandard(c)
 

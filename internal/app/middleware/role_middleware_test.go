@@ -7,7 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func runRequireRoleTestRequest(t *testing.T, e *echo.Echo, handler echo.HandlerF
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 
 	return rec
@@ -52,7 +52,7 @@ func TestRequireRole(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			e := setupEchoWithErrorHandler(t)
-			handler := RequireRole(tt.requiredRoleID)(func(c echo.Context) error {
+			handler := RequireRole(tt.requiredRoleID)(func(c *echo.Context) error {
 				return c.String(http.StatusOK, "OK")
 			})
 

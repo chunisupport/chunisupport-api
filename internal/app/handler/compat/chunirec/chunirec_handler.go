@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // ChunirecHandler はchunirec互換APIのハンドラです
@@ -32,7 +32,7 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.Use
 
 // GetMusicShowAll は全楽曲情報をchunirec互換形式で返します
 // GET /compat/chunirec/2.0/music/showall
-func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
+func (h *ChunirecHandler) GetMusicShowAll(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
@@ -50,7 +50,7 @@ func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 
 // GetMusicShow は指定されたDisplay IDの楽曲情報をchunirec互換形式で返します
 // GET /compat/chunirec/2.0/music/show?id=xxx
-func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
+func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	// クエリパラメータ id を取得
@@ -83,7 +83,7 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 
 // GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
 // GET /compat/chunirec/2.0/users/show
-func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
+func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	// クエリパラメータ user_name を取得

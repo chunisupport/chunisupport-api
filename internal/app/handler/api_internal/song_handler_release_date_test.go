@@ -13,7 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
@@ -23,7 +23,7 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
 
-	newPutSongsContext := func(body string) echo.Context {
+	newPutSongsContext := func(body string) *echo.Context {
 		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -41,7 +41,8 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
 		c := newPutSongsContext(`[{"id":"1234567890123456","title":"test","artist":"artist","released_at":"2024-01-01"}]`)
-		rec := c.Response().Writer.(*httptest.ResponseRecorder)
+		response, _ := echo.UnwrapResponse(c.Response())
+		rec := response.ResponseWriter.(*httptest.ResponseRecorder)
 
 		err := handler.UpdateSongs(c)
 		if err != nil {

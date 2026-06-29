@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // CustomHTTPErrorHandler はカスタムエラーハンドラーです
-func CustomHTTPErrorHandler(err error, c echo.Context) {
+func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	var apiErr *apierror.APIError
 	var httpStatus int
 	var errorCode string
@@ -35,7 +35,7 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	}
 
 	// レスポンスがすでに送信されている場合は何もしない
-	if c.Response().Committed {
+	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
 	}
 
@@ -112,7 +112,7 @@ func httpStatusToErrorCode(status int) string {
 }
 
 // logError はエラーをログに出力します（詳細情報を含む）
-func logError(status int, code string, err error, c echo.Context) {
+func logError(status int, code string, err error, c *echo.Context) {
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ

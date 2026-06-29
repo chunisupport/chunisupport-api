@@ -13,7 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // UserHandler はユーザー関連のHTTPリクエストを処理します。
@@ -27,7 +27,7 @@ func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
 }
 
 // GetUserProfile はユーザー名とプレイヤーデータのみを返す軽量なハンドラです。
-func (h *UserHandler) GetUserProfile(c echo.Context) error {
+func (h *UserHandler) GetUserProfile(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -46,7 +46,7 @@ func (h *UserHandler) GetUserProfile(c echo.Context) error {
 }
 
 // GetUserUpdatedAt はユーザー関連データの updated_at のみを返す軽量なハンドラです。
-func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
+func (h *UserHandler) GetUserUpdatedAt(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -65,7 +65,7 @@ func (h *UserHandler) GetUserUpdatedAt(c echo.Context) error {
 }
 
 // GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
-func (h *UserHandler) GetUserRating(c echo.Context) error {
+func (h *UserHandler) GetUserRating(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -84,7 +84,7 @@ func (h *UserHandler) GetUserRating(c echo.Context) error {
 }
 
 // GetUserRecord はユーザー名をキーにレコード枠のみを返すハンドラです。
-func (h *UserHandler) GetUserRecord(c echo.Context) error {
+func (h *UserHandler) GetUserRecord(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -104,7 +104,7 @@ func (h *UserHandler) GetUserRecord(c echo.Context) error {
 }
 
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
-func (h *UserHandler) GetUserProfileWithRecords(c echo.Context) error {
+func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -214,7 +214,7 @@ func toUserRecordDTO(result *dto_internal.UserProfileRecordViewDTO) *dto_interna
 }
 
 // DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。
-func (h *UserHandler) DeleteUser(c echo.Context) error {
+func (h *UserHandler) DeleteUser(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr

@@ -6,7 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type apiTokenStatusResponse struct {
@@ -25,7 +25,7 @@ func NewAPITokenHandler(usecase usecase.APITokenUsecase) *APITokenHandler {
 }
 
 // GetStatus は自分のAPIトークンの発行状態を返します。
-func (h *APITokenHandler) GetStatus(c echo.Context) error {
+func (h *APITokenHandler) GetStatus(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (h *APITokenHandler) GetStatus(c echo.Context) error {
 }
 
 // Generate はAPIトークンを発行し、プレーントークンを返却します。
-func (h *APITokenHandler) Generate(c echo.Context) error {
+func (h *APITokenHandler) Generate(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (h *APITokenHandler) Generate(c echo.Context) error {
 }
 
 // Delete は自分のAPIトークンを削除します。
-func (h *APITokenHandler) Delete(c echo.Context) error {
+func (h *APITokenHandler) Delete(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err

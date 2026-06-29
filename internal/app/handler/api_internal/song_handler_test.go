@@ -18,7 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -188,7 +188,7 @@ func TestUpdateSongs(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
 
-	newPutSongsContext := func(body string) echo.Context {
+	newPutSongsContext := func(body string) *echo.Context {
 		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -266,7 +266,8 @@ func TestUpdateSongs(t *testing.T) {
 			handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
 			c := newPutSongsContext(tc.body)
-			rec := c.Response().Writer.(*httptest.ResponseRecorder)
+			response, _ := echo.UnwrapResponse(c.Response())
+			rec := response.ResponseWriter.(*httptest.ResponseRecorder)
 
 			err := handler.UpdateSongs(c)
 
@@ -438,8 +439,7 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/0000000000000000", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("displayid")
-		c.SetParamValues("0000000000000000")
+		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "0000000000000000"}})
 
 		// When
 		err := handler.DeleteSong(c)
@@ -465,8 +465,7 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/invalid", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("displayid")
-		c.SetParamValues("invalid")
+		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
 
 		// When
 		err := handler.DeleteSong(c)
@@ -497,8 +496,7 @@ func TestSongHandler_RestoreSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/internal/songs/0000000000000000/restore", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("displayid")
-		c.SetParamValues("0000000000000000")
+		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "0000000000000000"}})
 
 		// When
 		err := handler.RestoreSong(c)

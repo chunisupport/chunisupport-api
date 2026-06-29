@@ -10,7 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,8 +27,7 @@ func TestV1WorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T
 	req := httptest.NewRequest(http.MethodGet, "/v1/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("displayid")
-	c.SetParamValues("invalid")
+	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
 
 	err := handler.GetWorldsendSong(c)
 

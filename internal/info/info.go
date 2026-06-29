@@ -63,7 +63,7 @@ const (
 	AccountTypeAdmin  = 3 // 管理者
 
 	// リクエストボディサイズ上限
-	RequestBodyLimit = "5M"
+	RequestBodyLimit = 5 * 1024 * 1024
 
 	// DBコネクションプールのデフォルト設定
 	DefaultDBMaxOpenConns       = 25

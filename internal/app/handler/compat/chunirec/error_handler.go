@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // ChunirecErrorHandlerMiddleware はchunirec互換API専用のエラーハンドリングミドルウェアです
 // このミドルウェアは、標準のエラーハンドラーをchunirec互換形式でオーバーライドします
 func ChunirecErrorHandlerMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			err := next(c)
 			if err != nil {
 				// エラーをchunirec互換形式で処理
@@ -28,12 +28,12 @@ func ChunirecErrorHandlerMiddleware() echo.MiddlewareFunc {
 }
 
 // handleChunirecError はエラーをchunirec互換形式でレスポンスします
-func handleChunirecError(err error, c echo.Context) {
+func handleChunirecError(err error, c *echo.Context) {
 	var httpStatus int
 	var additionalMessage string
 
 	// レスポンスがすでに送信されている場合は何もしない
-	if c.Response().Committed {
+	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
 	}
 
@@ -84,7 +84,7 @@ func handleChunirecError(err error, c echo.Context) {
 }
 
 // logChunirecError はエラーをログに出力します（詳細情報を含む）
-func logChunirecError(status int, err error, c echo.Context) {
+func logChunirecError(status int, err error, c *echo.Context) {
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ

@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,8 +65,7 @@ func TestPlayerLockedSongHandler_List(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", requester)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		// When
 		err := handler.List(c)
@@ -90,8 +89,7 @@ func TestPlayerLockedSongHandler_List(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/InvalidUser/locked-songs", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("InvalidUser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "InvalidUser"}})
 
 		// When
 		err := handler.List(c)
@@ -167,8 +165,7 @@ func TestPlayerLockedSongHandler_Unlock(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 			c.Set("userEntity", &entity.User{ID: 1})
-			c.SetParamNames("displayid")
-			c.SetParamValues(tt.displayID)
+			c.SetPathValues(echo.PathValues{{Name: "displayid", Value: tt.displayID}})
 
 			err := handler.Unlock(c)
 

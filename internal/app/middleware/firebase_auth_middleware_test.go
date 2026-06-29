@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -55,7 +55,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 		mockAuthenticator.On("Authenticate", mock.Anything, "firebase-token").Return(user, nil).Once()
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			storedUser, ok := c.Get("userEntity").(*entity.User)
 			require.True(t, ok)
@@ -81,7 +81,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -107,7 +107,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("Authenticate", mock.Anything, "invalid-token").Return(nil, usecase.ErrInvalidIDToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -133,7 +133,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("Authenticate", mock.Anything, "revoked-token").Return(nil, usecase.ErrInvalidIDToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -159,7 +159,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("Authenticate", mock.Anything, "disabled-token").Return(nil, usecase.ErrInvalidIDToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -182,7 +182,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -206,7 +206,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("Authenticate", mock.Anything, "valid-token").Return(nil, nil).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -231,7 +231,7 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("Authenticate", mock.Anything, "error-token").Return(nil, errors.New("boom")).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -257,7 +257,7 @@ func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			assert.Nil(t, c.Get("userEntity"))
 			return c.NoContent(http.StatusOK)
@@ -283,7 +283,7 @@ func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
 		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "firebase-token").Return(user, nil).Once()
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			storedUser, ok := c.Get("userEntity").(*entity.User)
 			require.True(t, ok)
@@ -310,7 +310,7 @@ func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
 		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "unregistered-token").Return(nil, nil).Once()
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			assert.Nil(t, c.Get("userEntity"))
 			return c.NoContent(http.StatusOK)
@@ -334,7 +334,7 @@ func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
 
 		mockAuthenticator.On("AuthenticateOptional", mock.Anything, "invalid-token").Return(nil, usecase.ErrInvalidIDToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 

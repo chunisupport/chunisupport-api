@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -64,7 +64,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		mockUsecase.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			return c.String(http.StatusOK, "ok")
 		})
@@ -81,7 +81,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -98,7 +98,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -116,7 +116,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 		mockUsecase.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -136,7 +136,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 		mockUsecase.On("Validate", mock.Anything, "error").Return(nil, nil, errors.New("boom")).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -157,7 +157,7 @@ func TestOptionalAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})(c)
 
@@ -176,7 +176,7 @@ func TestOptionalAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
 			assert.Same(t, user, c.Get("userEntity"))
 			return c.NoContent(http.StatusOK)
 		})(c)
@@ -194,7 +194,7 @@ func TestOptionalAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c echo.Context) error {
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})(c)
 

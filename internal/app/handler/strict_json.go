@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
-// BindStrictJSON は echo.Context からヘッダー/ボディを取り出して厳格なJSONデコードを行います。
-func BindStrictJSON(c echo.Context, out any) error {
+// BindStrictJSON は *echo.Context からヘッダー/ボディを取り出して厳格なJSONデコードを行います。
+func BindStrictJSON(c *echo.Context, out any) error {
 	return DecodeStrictJSON(c.Request().Body, c.Request().Header, out)
 }
 

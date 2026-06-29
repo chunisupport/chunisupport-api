@@ -12,7 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // V1SongHandler は外部API v1 の楽曲関連エンドポイントを処理します。
@@ -34,7 +34,7 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 }
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
-func (h *V1SongHandler) GetSongs(c echo.Context) error {
+func (h *V1SongHandler) GetSongs(c *echo.Context) error {
 	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 }
 
 // GetSong は指定された displayid の楽曲を取得します。
-func (h *V1SongHandler) GetSong(c echo.Context) error {
+func (h *V1SongHandler) GetSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -70,7 +70,7 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 }
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
-func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
+func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -97,7 +97,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 }
 
 // UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
-func (h *V1SongHandler) UpdateSongs(c echo.Context) error {
+func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateSongRequest
 	if err := c.Bind(&requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)

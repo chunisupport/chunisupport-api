@@ -14,6 +14,7 @@ import (
 	dto "github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -47,8 +48,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfile(c)
 
@@ -73,8 +73,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfile(c)
 
@@ -113,8 +112,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 				rec := httptest.NewRecorder()
 				c := e.NewContext(req, rec)
-				c.SetParamNames("username")
-				c.SetParamValues("testuser")
+				c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 				err := h.GetUserProfile(c)
 
@@ -128,8 +126,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/InvalidUser/profile", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("InvalidUser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "InvalidUser"}})
 
 		err := h.GetUserProfile(c)
 

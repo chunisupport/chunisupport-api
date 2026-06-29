@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // V1UserHandler は外部API v1 のユーザー関連エンドポイントを処理します。
@@ -23,7 +23,7 @@ func NewV1UserHandler(userUsecase usecase.UserUsecase) *V1UserHandler {
 }
 
 // GetUser は指定された username のユーザープロファイルを取得します。
-func (h *V1UserHandler) GetUser(c echo.Context) error {
+func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
