@@ -268,10 +268,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	summaryInput := &PlayerDataSummaryInput{
-		Name:           nameVO.String(),
-		Level:          payload.Level,
-		OfficialRating: payload.Rating,
-		LastPlayedAt:   lastPlayedAt,
+		Name:              nameVO.String(),
+		Level:             payload.Level,
+		OfficialRating:    payload.Rating,
+		OfficialOverpower: payload.Overpower.Value,
+		LastPlayedAt:      lastPlayedAt,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -496,6 +497,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		Name:              playerName,
 		Level:             summary.Level,
 		OfficialRating:    summary.OfficialRating,
+		OfficialOverpower: summary.OfficialOverpower,
 		ClassEmblemID:     summary.ClassEmblemID,
 		ClassEmblemBaseID: summary.ClassBaseID,
 		LastPlayedAt:      summary.LastPlayedAt,
