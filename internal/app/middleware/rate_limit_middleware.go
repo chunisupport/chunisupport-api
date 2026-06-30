@@ -9,7 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // RateLimitConfig はレートリミットの設定を保持します
@@ -134,7 +134,7 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// ユーザーエンティティを取得
 			userObj := c.Get("userEntity")
 			if userObj == nil {
@@ -176,7 +176,7 @@ func OptionalAPIRateLimitMiddleware(normalLimit, adminLimit int, window time.Dur
 	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			identifier := "ip:" + c.RealIP()
 			limit := normalLimit
 
@@ -210,7 +210,7 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// IPアドレスを識別子として使用
 			identifier := c.RealIP()
 
@@ -232,7 +232,7 @@ func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			user, ok := c.Get("userEntity").(*entity.User)
 			if !ok || user == nil {
 				return apierror.ErrUnauthorized
@@ -257,7 +257,7 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			userObj := c.Get("userEntity")
 			if userObj != nil {
 				if _, ok := userObj.(*entity.User); !ok {

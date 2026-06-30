@@ -23,7 +23,7 @@ func AggregateSongCharts(charts []*entity.Chart) SongAggregation {
 	isMaxOPUnknown := false
 
 	for _, c := range charts {
-		constVal := float64(c.Const)
+		constVal := c.Const.Float64()
 		if constVal > maxConst || (constVal == maxConst && c.DifficultyID > opTargetDifficultyID) {
 			maxConst = constVal
 			opTargetDifficultyID = c.DifficultyID

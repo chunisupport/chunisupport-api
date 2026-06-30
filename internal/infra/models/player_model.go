@@ -21,6 +21,7 @@ type PlayerModel struct {
 	ClassEmblemBaseID *int       `db:"class_emblem_base_id"`
 	LastPlayedAt      *time.Time `db:"last_played_at"`
 	OverpowerValue    *float64   `db:"overpower_value"`
+	OfficialOverpower float64    `db:"official_overpower"`
 	CreatedAt         time.Time  `db:"created_at"`
 	UpdatedAt         time.Time  `db:"updated_at"`
 }
@@ -44,6 +45,7 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		ClassEmblemBaseID: m.ClassEmblemBaseID,
 		LastPlayedAt:      m.LastPlayedAt,
 		OverpowerValue:    m.OverpowerValue,
+		OfficialOverpower: m.OfficialOverpower,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}, nil
@@ -63,6 +65,7 @@ func FromPlayerEntity(e *entity.Player) *PlayerModel {
 		ClassEmblemBaseID: e.ClassEmblemBaseID,
 		LastPlayedAt:      e.LastPlayedAt,
 		OverpowerValue:    e.OverpowerValue,
+		OfficialOverpower: e.OfficialOverpower,
 		CreatedAt:         e.CreatedAt,
 		UpdatedAt:         e.UpdatedAt,
 	}

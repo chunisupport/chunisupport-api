@@ -753,7 +753,7 @@ curl -X POST \
 | `level` | number | ✓ | プレイヤーレベル |
 | `rating` | number | ✓ | レーティング |
 | `last_played` | string | ✓ | 最終プレイ日時 (`YYYY/MM/DD HH:mm` 形式) |
-| `overpower.value` | number | ✓ | オーバーパワー値（互換入力用。登録時は受け取るが保存値には使わず、通常譜面スコアから楽曲OP合計を再計算） |
+| `overpower.value` | number | ✓ | 公式オーバーパワー値（`players.official_overpower` に保存。通常譜面スコアから再計算する `overpower_value` とは別管理） |
 | `overpower.percentage` | number | ✓ | オーバーパワー割合（互換入力用。登録時は受け取るが保存値には使わず、未解禁設定を除外した通常楽曲の最大OP合計を分母として再計算） |
 | `class_emblem.medal_class` | string | ✓ | クラスエンブレム（0埋め2桁） |
 | `class_emblem.base_class` | string | ✓ | クラスエンブレムベース（0埋め2桁） |

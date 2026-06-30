@@ -172,6 +172,7 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			class_emblem_base_id INTEGER NULL,
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
+			official_overpower REAL NULL,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)`,
@@ -209,9 +210,9 @@ func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, now, now)
+			overpower_value, official_overpower, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, 1234.567, now, now)
 	require.NoError(t, err)
 
 	if !withHonors {
@@ -249,6 +250,7 @@ func TestFindByIDWithHonors_ReturnsPlayerWithSortedHonors(t *testing.T) {
 	require.NotNil(t, result.Player)
 	require.Equal(t, 1, result.Player.ID)
 	require.Equal(t, "テストプレイヤー", result.Player.Name.String())
+	require.Equal(t, 1234.567, result.Player.OfficialOverpower)
 	require.True(t, result.Player.UpdatedAt.Equal(now))
 	require.Len(t, result.Honors, 3)
 	require.Equal(t, 1, result.Honors[0].Slot)

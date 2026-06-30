@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto "github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // ScoreHistoryHandler は外部API v1のスコア履歴を処理します。
@@ -23,7 +23,7 @@ func NewScoreHistoryHandler(scoreHistoryUsecase usecase.ScoreHistoryUsecase) *Sc
 }
 
 // GetStandard は通常譜面のスコア履歴を返します。
-func (h *ScoreHistoryHandler) GetStandard(c echo.Context) error {
+func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 	difficulty, ok := handler.ParseDifficultyPath(c.Param("difficulty"))
 	if !ok || difficulty == "WORLD'S END" {
 		return apierror.ErrInvalidDifficulty
@@ -42,7 +42,7 @@ func (h *ScoreHistoryHandler) GetStandard(c echo.Context) error {
 }
 
 // GetWorldsend はWORLD'S END譜面のスコア履歴を返します。
-func (h *ScoreHistoryHandler) GetWorldsend(c echo.Context) error {
+func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 	username, requester, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
@@ -56,7 +56,7 @@ func (h *ScoreHistoryHandler) GetWorldsend(c echo.Context) error {
 	return c.JSON(http.StatusOK, toScoreHistoryResponse(entries))
 }
 
-func scoreHistoryRequestParams(c echo.Context) (string, *entity.User, *apierror.APIError) {
+func scoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror.APIError) {
 	rawUsername := strings.TrimSpace(c.QueryParam("username"))
 	if rawUsername == "" {
 		return "", nil, apierror.ErrValidationFailedBadRequest

@@ -7,7 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // HonorHandler はADMIN専用の称号関連HTTPリクエストを処理します。
@@ -21,7 +21,7 @@ func NewHonorHandler(honorUsecase usecase.HonorUsecase) *HonorHandler {
 }
 
 // ListHonors は称号一覧を返却します。
-func (h *HonorHandler) ListHonors(c echo.Context) error {
+func (h *HonorHandler) ListHonors(c *echo.Context) error {
 	honors, err := h.honorUsecase.ListHonors(c.Request().Context())
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -32,7 +32,7 @@ func (h *HonorHandler) ListHonors(c echo.Context) error {
 }
 
 // GetHonor は指定IDの称号を返却します。
-func (h *HonorHandler) GetHonor(c echo.Context) error {
+func (h *HonorHandler) GetHonor(c *echo.Context) error {
 	id, err := parseHonorID(c.Param("id"))
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)
@@ -46,7 +46,7 @@ func (h *HonorHandler) GetHonor(c echo.Context) error {
 }
 
 // CreateHonor は称号を作成します。
-func (h *HonorHandler) CreateHonor(c echo.Context) error {
+func (h *HonorHandler) CreateHonor(c *echo.Context) error {
 	var req api_internal.HonorRequest
 	if err := c.Bind(&req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -67,7 +67,7 @@ func (h *HonorHandler) CreateHonor(c echo.Context) error {
 }
 
 // UpdateHonor は称号を更新します。
-func (h *HonorHandler) UpdateHonor(c echo.Context) error {
+func (h *HonorHandler) UpdateHonor(c *echo.Context) error {
 	id, err := parseHonorID(c.Param("id"))
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)
@@ -93,7 +93,7 @@ func (h *HonorHandler) UpdateHonor(c echo.Context) error {
 }
 
 // DeleteHonor は称号を削除します。
-func (h *HonorHandler) DeleteHonor(c echo.Context) error {
+func (h *HonorHandler) DeleteHonor(c *echo.Context) error {
 	id, err := parseHonorID(c.Param("id"))
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)

@@ -7,7 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const reauthTokenHeader = "X-Reauth-Token" // #nosec G101 -- HTTPヘッダー名であり、認証情報（シークレット）ではないため
@@ -25,7 +25,7 @@ func NewProfileHandler(userCredentialUsecase usecase.UserCredentialUsecase) *Pro
 }
 
 // Me は認証済みユーザー自身の情報を取得するリクエストを処理します。
-func (h *ProfileHandler) Me(c echo.Context) error {
+func (h *ProfileHandler) Me(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ type updatePrivacyRequest struct {
 }
 
 // UpdatePrivacy は認証済みユーザーの非公開設定を更新するリクエストを処理します。
-func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
+func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (h *ProfileHandler) UpdatePrivacy(c echo.Context) error {
 }
 
 // DeleteAccount は認証済みユーザーの物理削除を行うリクエストを処理します。
-func (h *ProfileHandler) DeleteAccount(c echo.Context) error {
+func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
 		return err

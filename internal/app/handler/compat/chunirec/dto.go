@@ -103,9 +103,9 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 	// Charts handling
 	for _, c := range s.Charts {
 		chartDTO := &ChartDataDTO{
-			Const:          float64(c.Const),
+			Const:          c.Const.Float64(),
 			IsConstUnknown: c.IsConstUnknown,
-			Level:          calculateLevel(float64(c.Const)),
+			Level:          calculateLevel(c.Const.Float64()),
 		}
 
 		if c.Notes != nil {

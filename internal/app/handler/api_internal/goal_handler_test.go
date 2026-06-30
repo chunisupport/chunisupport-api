@@ -16,7 +16,7 @@ import (
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type goalTestValidator struct {
@@ -185,8 +185,7 @@ func TestGoalHandlerUpdateRejectsUnknownTopLevelKey(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPath("/internal/me/goals/:id")
-	c.SetParamNames("id")
-	c.SetParamValues("1")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 	c.Set("userEntity", &entity.User{ID: 1})
 
 	err := h.Update(c)

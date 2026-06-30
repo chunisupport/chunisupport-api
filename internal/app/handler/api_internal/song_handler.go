@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // SongHandler は曲関連のHTTPリクエストを処理します。
@@ -35,7 +35,7 @@ func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartS
 // GetSongs はWORLD'S END以外の全楽曲を取得します。
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
 // ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
-func (h *SongHandler) GetSongs(c echo.Context) error {
+func (h *SongHandler) GetSongs(c *echo.Context) error {
 	includeDeleted := c.QueryParam("include_deleted") == "true"
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
@@ -55,7 +55,7 @@ func (h *SongHandler) GetSongs(c echo.Context) error {
 }
 
 // GetSongsUpdatedAt は楽曲関連データの updated_at のみを返します。
-func (h *SongHandler) GetSongsUpdatedAt(c echo.Context) error {
+func (h *SongHandler) GetSongsUpdatedAt(c *echo.Context) error {
 	updatedAt, err := h.songUsecase.GetSongsUpdatedAt(c.Request().Context())
 	if err != nil {
 		return apierror.ErrInternalError.WithInternal(err)
@@ -67,7 +67,7 @@ func (h *SongHandler) GetSongsUpdatedAt(c echo.Context) error {
 }
 
 // GetSong は指定されたDisplayIDの楽曲を取得します。
-func (h *SongHandler) GetSong(c echo.Context) error {
+func (h *SongHandler) GetSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -85,7 +85,7 @@ func (h *SongHandler) GetSong(c echo.Context) error {
 }
 
 // GetEditorSongs は編集者向けにWORLD'S END以外の全楽曲を取得します。
-func (h *SongHandler) GetEditorSongs(c echo.Context) error {
+func (h *SongHandler) GetEditorSongs(c *echo.Context) error {
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), true, requesterAccountTypeID)
 	if err != nil {
@@ -98,7 +98,7 @@ func (h *SongHandler) GetEditorSongs(c echo.Context) error {
 }
 
 // GetEditorSong は編集者向けに指定されたDisplayIDの楽曲を取得します。
-func (h *SongHandler) GetEditorSong(c echo.Context) error {
+func (h *SongHandler) GetEditorSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -113,7 +113,7 @@ func (h *SongHandler) GetEditorSong(c echo.Context) error {
 }
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
-func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
+func (h *SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -139,7 +139,7 @@ func (h *SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
-func (h *SongHandler) DeleteSong(c echo.Context) error {
+func (h *SongHandler) DeleteSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -151,7 +151,7 @@ func (h *SongHandler) DeleteSong(c echo.Context) error {
 }
 
 // CreateSong は新規楽曲を追加します。
-func (h *SongHandler) CreateSong(c echo.Context) error {
+func (h *SongHandler) CreateSong(c *echo.Context) error {
 	var req api_internal.CreateSongRequest
 	if err := c.Bind(&req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -207,7 +207,7 @@ func convertToCreateChartInputs(reqs []*api_internal.CreateChartRequest) []*usec
 }
 
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
-func (h *SongHandler) RestoreSong(c echo.Context) error {
+func (h *SongHandler) RestoreSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -219,7 +219,7 @@ func (h *SongHandler) RestoreSong(c echo.Context) error {
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
-func (h *SongHandler) UpdateSongs(c echo.Context) error {
+func (h *SongHandler) UpdateSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateSongRequest
 	if err := c.Bind(&requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)

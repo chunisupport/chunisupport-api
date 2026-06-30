@@ -493,7 +493,7 @@ func calculateOPTargetChartIDs(records []*entity.PlayerRecord) map[int]struct{} 
 			continue
 		}
 
-		overpower := service.CalcSingleOverpower(uint32(record.Score), float64(record.Chart.Const), record.ComboLampID)
+		overpower := service.CalcSingleOverpower(uint32(record.Score), record.Chart.Const.Float64(), record.ComboLampID)
 		candidate := opTargetCandidate{
 			record:       record,
 			overpower:    overpower,

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -268,10 +267,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	summaryInput := &PlayerDataSummaryInput{
-		Name:           nameVO.String(),
-		Level:          payload.Level,
-		OfficialRating: payload.Rating,
-		LastPlayedAt:   lastPlayedAt,
+		Name:              nameVO.String(),
+		Level:             payload.Level,
+		OfficialRating:    payload.Rating,
+		OfficialOverpower: payload.Overpower.Value,
+		LastPlayedAt:      lastPlayedAt,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -496,6 +496,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		Name:              playerName,
 		Level:             summary.Level,
 		OfficialRating:    summary.OfficialRating,
+		OfficialOverpower: summary.OfficialOverpower,
 		ClassEmblemID:     summary.ClassEmblemID,
 		ClassEmblemBaseID: summary.ClassBaseID,
 		LastPlayedAt:      summary.LastPlayedAt,
@@ -1333,11 +1334,6 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
 }
 
-func roundFloat(value float64, scale int) float64 {
-	factor := math.Pow10(scale)
-	return math.Round(value*factor) / factor
-}
-
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {
 	diffCode := strings.ToUpper(strings.TrimSpace(entry.Diff))
 	diffName, ok := difficultyCodeToName[diffCode]
@@ -1483,7 +1479,7 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 		score := uint32(rec.Score) // #nosec G115
 		chartConst := 0.0
 		if rec.Chart != nil {
-			chartConst = float64(rec.Chart.Const)
+			chartConst = rec.Chart.Const.Float64()
 		}
 
 		ratingRecords = append(ratingRecords, service.RatingRecord{

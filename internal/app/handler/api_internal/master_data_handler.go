@@ -6,7 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // itemsToDTOs は []masterdata.Item を []*dto.MasterItemDTO に変換します。
@@ -29,7 +29,7 @@ func NewMasterDataHandler(masterDataUsecase usecase.MasterDataUsecase) *MasterDa
 }
 
 // GetMasterData はフロントエンド向けにマスタデータを返却します。
-func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
+func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 	out := h.masterDataUsecase.GetMasterData(c.Request().Context())
 
 	genres := itemsToDTOs(out.Genres)
@@ -67,14 +67,14 @@ func (h *MasterDataHandler) GetMasterData(c echo.Context) error {
 }
 
 // GetVersions はバージョン一覧を返却します。
-func (h *MasterDataHandler) GetVersions(c echo.Context) error {
+func (h *MasterDataHandler) GetVersions(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &dto.VersionSummariesResponse{
 		Versions: dto.ToVersionSummaryDTOs(h.masterDataUsecase.GetVersions(c.Request().Context())),
 	})
 }
 
 // GetHonorTypes は称号タイプ一覧を返却します。
-func (h *MasterDataHandler) GetHonorTypes(c echo.Context) error {
+func (h *MasterDataHandler) GetHonorTypes(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &dto.HonorTypesResponse{
 		HonorTypes: itemsToDTOs(h.masterDataUsecase.GetHonorTypes(c.Request().Context())),
 	})

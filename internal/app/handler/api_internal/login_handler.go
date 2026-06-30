@@ -6,7 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/httpheader"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type loginRequest struct {
@@ -24,7 +24,7 @@ func NewLoginHandler(loginUsecase usecase.LoginUsecase) *LoginHandler {
 }
 
 // Login はBearerのFirebase IDトークンとTurnstileトークンでログインを検証します。
-func (h *LoginHandler) Login(c echo.Context) error {
+func (h *LoginHandler) Login(c *echo.Context) error {
 	req := new(loginRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)

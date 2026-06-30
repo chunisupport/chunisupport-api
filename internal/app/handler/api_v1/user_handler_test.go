@@ -10,7 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,8 +64,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("privateuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "privateuser"}})
 
 		// When
 		err := handler.GetUser(c)
@@ -92,8 +91,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/users/PrivateUser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("PrivateUser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "PrivateUser"}})
 
 		// When
 		err := handler.GetUser(c)

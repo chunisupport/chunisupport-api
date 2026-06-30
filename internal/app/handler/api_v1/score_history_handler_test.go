@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,13 +56,12 @@ func TestScoreHistoryHandler_GetStandard(t *testing.T) {
 	})
 }
 
-func newScoreHistoryContext(target, displayID, difficulty, username string) echo.Context {
+func newScoreHistoryContext(target, displayID, difficulty, username string) *echo.Context {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("displayid", "difficulty")
-	c.SetParamValues(displayID, difficulty)
+	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: displayID}, {Name: "difficulty", Value: difficulty}})
 	if username != "" {
 		query := req.URL.Query()
 		query.Set("username", username)

@@ -21,6 +21,7 @@ type Player struct {
 	ClassEmblemBaseID *int                  // クラスエンブレムのベースID
 	LastPlayedAt      *time.Time            // 最終プレイ日時
 	OverpowerValue    *float64              // オーバーパワー値
+	OfficialOverpower float64               // 公式オーバーパワー値
 	OverpowerPercent  *float64              // オーバーパワー割合
 	CreatedAt         time.Time             // 作成日時
 	UpdatedAt         time.Time             // 更新日時

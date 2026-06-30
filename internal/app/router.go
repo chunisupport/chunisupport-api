@@ -24,8 +24,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echoMiddleware "github.com/labstack/echo/v5/middleware"
 )
 
 // CustomValidator はリクエストの検証を行うための構造体です。
@@ -101,9 +101,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	// ミドルウェアの設定
 	// Echoのロガーを設定
 	if echoLogWriter != nil {
-		e.Use(echoMiddleware.LoggerWithConfig(echoMiddleware.LoggerConfig{
-			Output: echoLogWriter,
-		}))
+		e.Logger = slog.New(slog.NewTextHandler(echoLogWriter, nil))
+		e.Use(echoMiddleware.RequestLogger())
 	}
 
 	e.Use(echoMiddleware.Recover())
@@ -187,7 +186,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 
 	// ルートの設定
 	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-	e.OPTIONS("/healthz", func(c echo.Context) error {
+	e.OPTIONS("/healthz", func(c *echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
@@ -277,7 +276,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
 	tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-	temporaryPlayerDataGroup.OPTIONS("/temp", func(c echo.Context) error {
+	temporaryPlayerDataGroup.OPTIONS("/temp", func(c *echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}, tempDataCORS)
 	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, tempDataCORS, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
@@ -439,7 +438,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 }
 
 func newDefaultCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
-	return newCORSConfig(cfg.CORS.AllowOrigins, cfg, func(c echo.Context) bool {
+	return newCORSConfig(cfg.CORS.AllowOrigins, cfg, func(c *echo.Context) bool {
 		return isExternalCORSPath(c.Request().URL.Path)
 	})
 }
@@ -486,11 +485,11 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 
 // handleExternalHealth は外部監視向けの軽量な死活チェック結果を返します。
 // 依存サービスの状態を返さないことで、外部公開しても内部構成を推測されにくくします。
-func handleExternalHealth(c echo.Context) error {
+func handleExternalHealth(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func handleRoot(c echo.Context) error {
+func handleRoot(c *echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"app_name":   info.Name,
 		"build_date": info.BuildDate,
@@ -498,7 +497,7 @@ func handleRoot(c echo.Context) error {
 }
 
 // handleAdminBuildInfo は管理者画面向けにAPIのビルド情報を返します。
-func handleAdminBuildInfo(c echo.Context) error {
+func handleAdminBuildInfo(c *echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"app_name":    info.Name,
 		"build_date":  info.BuildDate,
@@ -508,7 +507,7 @@ func handleAdminBuildInfo(c echo.Context) error {
 }
 
 // handleVersion はADMIN向けにAPIのバージョン識別子を返します。
-func handleVersion(c echo.Context) error {
+func handleVersion(c *echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"app_name":    info.Name,
 		"build_date":  info.BuildDate,

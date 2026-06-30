@@ -10,7 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // V1WorldsendHandler は外部 API v1 用の WORLD'S END 楽曲ハンドラです。
@@ -29,7 +29,7 @@ func NewV1WorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCach
 
 // GetWorldsendSongs は全 WORLD'S END 楽曲を取得します（公開 API）。
 // 削除済み楽曲は含まれません。
-func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
+func (h *V1WorldsendHandler) GetWorldsendSongs(c *echo.Context) error {
 	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
 	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), false, nil)
 	if err != nil {
@@ -43,7 +43,7 @@ func (h *V1WorldsendHandler) GetWorldsendSongs(c echo.Context) error {
 }
 
 // GetWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を取得します（公開 API）。
-func (h *V1WorldsendHandler) GetWorldsendSong(c echo.Context) error {
+func (h *V1WorldsendHandler) GetWorldsendSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr

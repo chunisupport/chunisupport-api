@@ -15,6 +15,7 @@ import (
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -83,8 +84,7 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -106,8 +106,7 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -125,8 +124,7 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -182,8 +180,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -212,8 +209,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -235,8 +231,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -278,8 +273,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 				rec := httptest.NewRecorder()
 				c := e.NewContext(req, rec)
-				c.SetParamNames("username")
-				c.SetParamValues("testuser")
+				c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 				err := h.GetUserProfileWithRecords(c)
 
@@ -327,8 +321,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -364,8 +357,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -392,8 +384,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -430,8 +421,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -462,8 +452,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -485,8 +474,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -523,8 +511,7 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record&include_noplay=true", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("username")
-	c.SetParamValues("testuser")
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 	err := h.GetUserProfileWithRecords(c)
 
@@ -631,8 +618,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 		c.Set("userEntity", adminUser)
 
 		err := h.DeleteUser(c)
@@ -648,8 +634,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/nonexistent", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("nonexistent")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "nonexistent"}})
 		c.Set("userEntity", adminUser)
 
 		err := h.DeleteUser(c)
@@ -669,8 +654,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 		c.Set("userEntity", normalUser)
 
 		err := h.DeleteUser(c)

@@ -4,13 +4,14 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
 // ChartConstant は譜面定数の値オブジェクトです。
-// float64を基底型として使用し、精度の問題を回避します。
+// 計算時は Tenths で0.1単位の整数へ変換して使用します。
 type ChartConstant float64
 
 // NewChartConstant は新しい ChartConstant を生成します。
@@ -20,12 +21,23 @@ func NewChartConstant(value float64) (ChartConstant, error) {
 	if value < constants.ChartConstValueMin || value > constants.ChartConstMax {
 		return 0, fmt.Errorf("chart constant must be between %.1f and %.1f", constants.ChartConstValueMin, constants.ChartConstMax)
 	}
-	return ChartConstant(value), nil
+
+	tenths := math.Round(value * 10)
+	if math.Abs(value*10-tenths) > 1e-9 {
+		return 0, fmt.Errorf("chart constant must have at most one decimal place: %v", value)
+	}
+
+	return ChartConstant(tenths / 10), nil
+}
+
+// Float64 はAPI・DB境界で利用する小数表現を返します。
+func (c ChartConstant) Float64() float64 {
+	return float64(c)
 }
 
 // String は ChartConstant の文字列表現を返します。
 func (c ChartConstant) String() string {
-	return fmt.Sprintf("%.1f", c)
+	return fmt.Sprintf("%.1f", c.Float64())
 }
 
 // Value は driver.Valuer インターフェースを実装します。
@@ -68,6 +80,13 @@ func (c *ChartConstant) Scan(value any) error {
 		}
 		*c = chartConst
 		return nil
+	case int64:
+		chartConst, err := NewChartConstant(float64(v))
+		if err != nil {
+			return err
+		}
+		*c = chartConst
+		return nil
 	default:
 		return fmt.Errorf("unsupported type: %T", v)
 	}
@@ -78,7 +97,7 @@ func (c *ChartConstant) Scan(value any) error {
 func (c ChartConstant) MarshalJSON() ([]byte, error) {
 	// 小数点以下1桁の数値としてマーシャルします。
 	// String()メソッドの結果を使用して統一的な表現を保証します。
-	return json.Marshal(float64(c))
+	return json.Marshal(c.Float64())
 }
 
 // UnmarshalJSON は json.Unmarshaler インターフェースを実装します。

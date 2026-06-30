@@ -7,7 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // PlayerHandler はプレイヤー関連のHTTPリクエストを処理します。
@@ -26,7 +26,7 @@ type createPlayerRequest struct {
 }
 
 // CreatePlayer はプレイヤー作成リクエストを処理します。
-func (h *PlayerHandler) CreatePlayer(c echo.Context) error {
+func (h *PlayerHandler) CreatePlayer(c *echo.Context) error {
 	req := new(createPlayerRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)

@@ -6,7 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // FirebaseAuthenticator はFirebase IDトークンからユーザーを解決する最小インターフェースです。
@@ -18,7 +18,7 @@ type FirebaseAuthenticator interface {
 // FirebaseIDTokenMiddleware はBearerのFirebase IDトークン認証を行います。
 func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return apierror.ErrMissingToken
@@ -44,7 +44,7 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 // OptionalFirebaseIDTokenMiddleware はBearerのFirebase IDトークンがある場合のみ認証を行います。
 func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return next(c)

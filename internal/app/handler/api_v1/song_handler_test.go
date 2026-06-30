@@ -14,7 +14,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -178,7 +178,7 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
 
-	newContext := func(body string) echo.Context {
+	newContext := func(body string) *echo.Context {
 		req := httptest.NewRequest(http.MethodPut, "/v1/songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -237,7 +237,8 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
 
 			c := newContext(tt.body)
-			rec := c.Response().Writer.(*httptest.ResponseRecorder)
+			response, _ := echo.UnwrapResponse(c.Response())
+			rec := response.ResponseWriter.(*httptest.ResponseRecorder)
 
 			err := handler.UpdateSongs(c)
 
@@ -267,8 +268,7 @@ func TestV1SongHandler_GetSongRejectsInvalidDisplayID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("displayid")
-	c.SetParamValues("invalid")
+	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
 
 	err := handler.GetSong(c)
 

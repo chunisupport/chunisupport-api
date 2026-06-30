@@ -12,8 +12,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echoMiddleware "github.com/labstack/echo/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +41,7 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 			requestMethod: http.MethodGet,
 			setupRoute: func(e *echo.Echo) {
 				healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-				e.OPTIONS("/healthz", func(c echo.Context) error {
+				e.OPTIONS("/healthz", func(c *echo.Context) error {
 					return c.NoContent(http.StatusNoContent)
 				}, healthzCORS)
 			},
@@ -53,7 +53,7 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 			path:          "/",
 			requestMethod: http.MethodGet,
 			setupRoute: func(e *echo.Echo) {
-				e.OPTIONS("/", func(c echo.Context) error {
+				e.OPTIONS("/", func(c *echo.Context) error {
 					return c.NoContent(http.StatusNoContent)
 				})
 			},
@@ -66,7 +66,7 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 			requestMethod: http.MethodPost,
 			setupRoute: func(e *echo.Echo) {
 				tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-				e.OPTIONS("/internal/player-data/temp", func(c echo.Context) error {
+				e.OPTIONS("/internal/player-data/temp", func(c *echo.Context) error {
 					return c.NoContent(http.StatusNoContent)
 				}, tempDataCORS)
 			},
@@ -78,7 +78,7 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 			path:          "/internal/users/sample",
 			requestMethod: http.MethodPost,
 			setupRoute: func(e *echo.Echo) {
-				e.OPTIONS("/internal/users/:username", func(c echo.Context) error {
+				e.OPTIONS("/internal/users/:username", func(c *echo.Context) error {
 					return c.NoContent(http.StatusNoContent)
 				})
 			},

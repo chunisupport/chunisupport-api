@@ -14,8 +14,7 @@ const (
 )
 
 const (
-	aggregateRatingDecimalPlaces = 4
-	playerRatingSlotCount        = 50
+	playerRatingSlotCount = 50
 )
 
 const (

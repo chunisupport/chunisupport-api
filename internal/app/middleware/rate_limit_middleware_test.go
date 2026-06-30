@@ -10,7 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +38,8 @@ func setupEchoWithErrorHandler(t *testing.T) *echo.Echo {
 	setupFixedWindowStoreCleanup(t)
 
 	e := echo.New()
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		if c.Response().Committed {
+	e.HTTPErrorHandler = func(c *echo.Context, err error) {
+		if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 			return
 		}
 		if apiErr, ok := err.(*apierror.APIError); ok {
@@ -51,7 +51,7 @@ func setupEchoWithErrorHandler(t *testing.T) *echo.Echo {
 			})
 			return
 		}
-		e.DefaultHTTPErrorHandler(err, c)
+		echo.DefaultHTTPErrorHandler(true)(c, err)
 	}
 	return e
 }
@@ -66,7 +66,7 @@ func setupUserRateLimitTest(t *testing.T) (*echo.Echo, echo.HandlerFunc) {
 		Window:   1 * time.Second,
 	}
 	middleware := UserRateLimitMiddleware(config)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 	return e, handler
@@ -85,7 +85,7 @@ func performUserRateLimitRequest(t *testing.T, e *echo.Echo, handler echo.Handle
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	return rec
 }
@@ -102,7 +102,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 		AccountTypeID: info.AccountTypeAdmin,
 	}
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -115,7 +115,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -137,7 +137,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 		AccountTypeID: info.AccountTypePlayer,
 	}
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -150,7 +150,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -168,7 +168,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
@@ -189,7 +189,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 		AccountTypeID: info.AccountTypeEditor,
 	}
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -202,7 +202,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
@@ -215,7 +215,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
@@ -223,7 +223,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 func TestOptionalAPIRateLimitMiddleware(t *testing.T) {
 	e := setupEchoWithErrorHandler(t)
 	middleware := OptionalAPIRateLimitMiddleware(1, 10, time.Minute)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -236,7 +236,7 @@ func TestOptionalAPIRateLimitMiddleware(t *testing.T) {
 
 			err := handler(c)
 			if err != nil {
-				e.HTTPErrorHandler(err, c)
+				e.HTTPErrorHandler(c, err)
 			}
 
 			assert.Equal(t, expectedStatus, rec.Code, "リクエスト回数: %d", i+1)
@@ -251,7 +251,7 @@ func TestOptionalAPIRateLimitMiddleware(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -274,7 +274,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 		AccountTypeID: info.AccountTypePlayer,
 	}
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -287,7 +287,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
@@ -300,7 +300,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
@@ -312,7 +312,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 
 	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
@@ -323,7 +323,7 @@ func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 
 	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -334,7 +334,7 @@ func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
@@ -345,7 +345,7 @@ func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 
 	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
 
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -356,7 +356,7 @@ func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
@@ -421,7 +421,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 		Window:   1 * time.Second,
 	}
 	middleware := IPRateLimitMiddleware(config)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -435,7 +435,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	c := e.NewContext(req, rec)
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -446,7 +446,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	c = e.NewContext(req, rec)
 	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -457,7 +457,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	c = e.NewContext(req, rec)
 	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -468,7 +468,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	c = e.NewContext(req, rec)
 	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 
@@ -479,7 +479,7 @@ func TestIPRateLimitMiddleware(t *testing.T) {
 	c2 := e.NewContext(req2, rec2)
 	err = handler(c2)
 	if err != nil {
-		e.HTTPErrorHandler(err, c2)
+		e.HTTPErrorHandler(c2, err)
 	}
 	assert.Equal(t, http.StatusOK, rec2.Code)
 }
@@ -493,7 +493,7 @@ func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
 		Window:   1 * time.Second,
 	}
 	middleware := IPRateLimitMiddleware(config)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -506,7 +506,7 @@ func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
 	// 1回目: OK
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -517,7 +517,7 @@ func TestIPRateLimitMiddleware_XForwardedFor(t *testing.T) {
 	c = e.NewContext(req, rec)
 	err = handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
@@ -530,7 +530,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 		Window:   1 * time.Minute,
 	}
 	middleware := AnonymousIPRateLimitMiddleware(config)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -543,7 +543,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 		c := e.NewContext(req, rec)
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
@@ -554,7 +554,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 	c := e.NewContext(req, rec)
 	err := handler(c)
 	if err != nil {
-		e.HTTPErrorHandler(err, c)
+		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
@@ -567,7 +567,7 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 		Window:   1 * time.Minute,
 	}
 	middleware := AnonymousIPRateLimitMiddleware(config)
-	handler := middleware(func(c echo.Context) error {
+	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
 
@@ -585,7 +585,7 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 
 		err := handler(c)
 		if err != nil {
-			e.HTTPErrorHandler(err, c)
+			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
