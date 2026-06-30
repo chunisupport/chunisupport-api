@@ -38,7 +38,7 @@ func playerRecordsToOverpowerRecords(records []*entity.PlayerRecord, failOnMissi
 		overpowerRecords = append(overpowerRecords, domainservice.OverpowerRecord{
 			SongID:      record.Song.ID,
 			Score:       uint32(record.Score),
-			ChartConst:  float64(record.Chart.Const),
+			ChartConst:  record.Chart.Const.Float64(),
 			ComboLampID: record.ComboLampID,
 		})
 	}

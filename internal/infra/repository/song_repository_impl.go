@@ -119,7 +119,10 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		if !ok {
 			continue
 		}
-		chart := r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
 		results[idx].Charts = append(results[idx].Charts, chart)
 	}
 
@@ -198,8 +201,11 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	return song
 }
 
-func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
-	constVal, _ := chartconstant.NewChartConstant(row.Const)
+func (r *songRepository) toChartEntity(row *chartRow) (*entity.Chart, error) {
+	constVal, err := chartconstant.NewChartConstant(row.Const)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chart constant for chart %d: %w", row.ID, err)
+	}
 
 	var notesVal *notes.Notes
 	if row.Notes != nil {
@@ -216,7 +222,7 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 		Notes:          notesVal,
 		NotesDesigner:  row.NotesDesigner,
 		UpdatedAt:      row.UpdatedAt,
-	}
+	}, nil
 }
 
 // FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
@@ -287,7 +293,10 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		if !ok {
 			continue
 		}
-		chart := r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
 		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
@@ -332,7 +341,11 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	charts := make([]*entity.Chart, len(chartRows))
 	for i, cr := range chartRows {
-		charts[i] = r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
+		charts[i] = chart
 	}
 
 	song.Charts = charts
@@ -569,7 +582,7 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 			updates = append(updates, chartUpdate{
 				SongID:         songID,
 				DifficultyID:   chart.DifficultyID,
-				Const:          float64(chart.Const),
+				Const:          chart.Const.Float64(),
 				IsConstUnknown: chart.IsConstUnknown,
 				Notes:          notesPtr,
 				NotesDesigner:  chart.NotesDesigner,

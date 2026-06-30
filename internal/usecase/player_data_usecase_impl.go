@@ -1479,7 +1479,7 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 		score := uint32(rec.Score) // #nosec G115
 		chartConst := 0.0
 		if rec.Chart != nil {
-			chartConst = float64(rec.Chart.Const)
+			chartConst = rec.Chart.Const.Float64()
 		}
 
 		ratingRecords = append(ratingRecords, service.RatingRecord{

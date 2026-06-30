@@ -89,7 +89,7 @@ func FromPlayerDataChartEntity(e *entity.PlayerDataChart) *PlayerDataChartModel 
 		ID:             e.ID,
 		SongID:         e.SongID,
 		DifficultyID:   e.DifficultyID,
-		Const:          float64(e.Const),
+		Const:          e.Const.Float64(),
 		IsConstUnknown: e.IsConstUnknown,
 		Notes:          e.Notes,
 	}

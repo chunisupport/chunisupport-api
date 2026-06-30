@@ -1,5 +1,4 @@
 // Package service はドメイン層のサービスを提供します。
-// ここにはエンティティや値オブジェクトに属さない計算ロジックなどが含まれます。
 package service
 
 import (
@@ -10,10 +9,17 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
+const (
+	ratingScale          = int64(100)
+	aggregateRatingScale = int64(10_000)
+	overpowerScale       = int64(1_000)
+	percentScale         = int64(10_000)
+)
+
 // CalcSingleRating は指定されたスコアと譜面定数から単曲レーティングを計算します。
 // スコアが低い場合は0を返し、SSS+（1,009,000点）で譜面定数+2.15が上限となります。
 //
-// 計算式（Wikiより）:
+// 計算式:
 //
 //	SSS+ (1,009,000～): 譜面定数 + 2.15
 //	SSS  (1,007,500～): 譜面定数 + 2.0 + (score - 1,007,500) / 100 * 0.01
@@ -24,242 +30,239 @@ import (
 //	AAA  (950,000～):   譜面定数 - 1.67 + (score - 950,000) / 150 * 0.01
 //	AA   (925,000～):   譜面定数 - 3.34 + (score - 925,000) / 150 * 0.01
 //	A    (900,000～):   譜面定数 - 5.0 + (score - 900,000) / 150 * 0.01
-//	BBB  (800,000～):   (譜面定数 - 5.0) / 2 + (score - 800,000) / (2000 / (譜面定数 - 5)) * 0.01
-//	C    (500,000～):   (score - 500,000) / (6000 / (譜面定数 - 5)) * 0.01
+//	BBB  (800,000～):   (譜面定数 - 5.0) / 2 + (score - 800,000) / (2,000 / (譜面定数 - 5)) * 0.01
+//	C    (500,000～):   (score - 500,000) / (6,000 / (譜面定数 - 5)) * 0.01
 //	D    (～500,000):   0
+//
+// 計算中は0.01単位の整数を使用し、仕様上の切り捨てを整数除算で行います。
 func CalcSingleRating(score uint32, chartConst float64) float64 {
-	var rating float64
+	return float64(calcSingleRatingHundredths(score, chartConst)) / float64(ratingScale)
+}
+
+func calcSingleRatingHundredths(score uint32, chartConst float64) int64 {
+	constTenths := chartConstTenths(chartConst)
+	base := constTenths * 10
+	var rating int64
 
 	switch {
-	case score >= 1009000:
+	case score >= 1_009_000:
 		// SSS+: 譜面定数 + 2.15（上限）
-		rating = chartConst + 2.15
-	case score >= 1007500:
+		rating = base + 215
+	case score >= 1_007_500:
 		// SSS: 譜面定数 + 2.0、100点毎に+0.01
-		rating = chartConst + 2.0 + float64(score-1007500)/100*0.01
-	case score >= 1005000:
+		rating = base + 200 + int64(score-1_007_500)/100
+	case score >= 1_005_000:
 		// SS+: 譜面定数 + 1.5、50点毎に+0.01
-		rating = chartConst + 1.5 + float64(score-1005000)/50*0.01
-	case score >= 1000000:
+		rating = base + 150 + int64(score-1_005_000)/50
+	case score >= 1_000_000:
 		// SS: 譜面定数 + 1.0、100点毎に+0.01
-		rating = chartConst + 1.0 + float64(score-1000000)/100*0.01
-	case score >= 990000:
+		rating = base + 100 + int64(score-1_000_000)/100
+	case score >= 990_000:
 		// S+: 譜面定数 + 0.6、250点毎に+0.01
-		rating = chartConst + 0.6 + float64(score-990000)/250*0.01
-	case score >= 975000:
-		// S: 譜面定数、2500点毎に+0.1（= 250点毎に+0.01）
-		rating = chartConst + float64(score-975000)/2500*0.1
-	case score >= 950000:
+		rating = base + 60 + int64(score-990_000)/250
+	case score >= 975_000:
+		// S: 譜面定数、250点毎に+0.01
+		rating = base + int64(score-975_000)/250
+	case score >= 950_000:
 		// AAA: 譜面定数 - 1.67、150点毎に+0.01
-		rating = chartConst - 1.67 + float64(score-950000)/150*0.01
-	case score >= 925000:
+		rating = base - 167 + int64(score-950_000)/150
+	case score >= 925_000:
 		// AA: 譜面定数 - 3.34、150点毎に+0.01
-		rating = chartConst - 3.34 + float64(score-925000)/150*0.01
-	case score >= 900000:
+		rating = base - 334 + int64(score-925_000)/150
+	case score >= 900_000:
 		// A: 譜面定数 - 5.0、150点毎に+0.01
-		rating = chartConst - 5.0 + float64(score-900000)/150*0.01
-	case score >= 800000:
+		rating = base - 500 + int64(score-900_000)/150
+	case score >= 800_000:
 		// BBB: (譜面定数 - 5.0) / 2 から線形増加
-		if chartConst > 5.0 {
-			rating = (chartConst-5.0)/2 + float64(score-800000)/(2000/(chartConst-5))*0.01
-		} else {
-			rating = 0
+		diff := constTenths - 50
+		if diff > 0 {
+			rating = diff*5 + int64(score-800_000)*diff/20_000
 		}
-	case score >= 500000:
-		// C: 0 から (譜面定数 - 5.0) / 2 まで線形増加
-		if chartConst > 5.0 {
-			rating = float64(score-500000) / (6000 / (chartConst - 5)) * 0.01
-		} else {
-			rating = 0
+	case score >= 500_000:
+		// C: 0から(譜面定数 - 5.0) / 2まで線形増加
+		diff := constTenths - 50
+		if diff > 0 {
+			rating = int64(score-500_000) * diff / 60_000
 		}
-	default:
-		// D: 0
-		rating = 0
 	}
 
-	return truncN(max(rating, 0), 2)
+	return max(rating, 0)
 }
 
-// roundN は数値を小数点以下n桁で四捨五入します。
-func roundN(num float64, n int) float64 {
-	factor := math.Pow(10, float64(n))
-	return math.Round(num*factor) / factor
-}
-
-// truncN は数値を小数点以下n桁で切り捨てます。
-// 浮動小数点の丸め誤差を吸収するため、適切なepsilonを加算します。
-func truncN(num float64, n int) float64 {
-	factor := math.Pow(10, float64(n))
-	// 浮動小数点誤差を吸収（例: 17.149999999999 -> 17.15）
-	// epsilonは切り捨てに影響しない程度に小さく、誤差吸収に十分な値
-	const epsilon = 0.0000001
-	return math.Floor(num*factor+epsilon) / factor
-}
-
-// CalcSingleOverpower は指定されたスコア、譜面定数、コンボランプから単曲 OVER POWER を計算します。
-// コンボランプによる補正:
-//   - comboLampID == 2 (FULL COMBO): +0.5
-//   - comboLampID == 3 (ALL JUSTICE): +1.0
-//   - スコア == 1,010,000 (AJC/理論値): +1.25
+// CalcSingleOverpower は指定されたスコア、譜面定数、コンボランプから単曲OVER POWERを計算します。
 //
 // 計算式:
 //
-//	S以上 (975,000～1,007,500):  レーティング値 × 5 + 補正1
-//	SSS以上 (1,007,501～):       (譜面定数 + 2) × 5 + 補正1 + 補正2
-//	  補正2 = (スコア - 1,007,500) × 0.0015 （最大3.75）
-//	AJC (1,010,000):             (譜面定数 + 3) × 5
+//	SSS以上 (1,007,500～): (譜面定数 + 2) × 5 + (score - 1,007,500) / 2,500 × 3.75
+//	SS+     (1,005,000～): (譜面定数 + 1.5) × 5 + (score - 1,005,000) / 2,500 × 2.5
+//	SS      (1,000,000～): (譜面定数 + 1) × 5 + (score - 1,000,000) / 5,000 × 2.5
+//	S～S+   (975,000～):   譜面定数 × 5 + (score - 975,000) / 25,000 × 5
+//	A～AAA  (900,000～):   (譜面定数 - 5) × 5 + (score - 900,000) / 75,000 × 25
 //
-// 精度:
-//   - S以上: 0.005単位（小数点以下3桁目を切り捨て）
-//   - S未満: 0.05単位（小数点以下2桁目を切り捨て）
+// コンボランプ補正:
+//   - FULL COMBO: +0.5
+//   - ALL JUSTICE: +1.0
+//   - 理論値（1,010,000点）: +1.25
+//
+// 計算中は0.001単位の整数を使用し、S以上は0.005、S未満は0.05単位で切り捨てます。
 func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) float64 {
-	var overPower float64
+	return float64(calcSingleOverpowerThousandths(score, chartConst, comboLampID)) / float64(overpowerScale)
+}
+
+func calcSingleOverpowerThousandths(score uint32, chartConst float64, comboLampID int) int64 {
+	constTenths := chartConstTenths(chartConst)
+	var overpower int64
 
 	switch {
-	case score >= 1007500:
-		// SSS以上: (譜面定数+2)×5 + 補正2
-		overPower = (chartConst+2)*5 + float64(score-1007500)/2500*3.75
-	case score >= 1005000:
-		// SS+
-		overPower = (chartConst+1.5)*5 + float64(score-1005000)/2500*2.5
-	case score >= 1000000:
-		// SS
-		overPower = (chartConst+1)*5 + float64(score-1000000)/5000*2.5
-	case score >= 975000:
-		// S～S+
-		overPower = chartConst*5 + float64(score-975000)/25000*5
-	case score >= 900000:
-		// A～AAA
-		overPower = (chartConst-5)*5 + float64(score-900000)/75000*25
-	case score >= 800000:
-		// BBB
-		overPower = (chartConst-5)/2*5 + float64(score-800000)/100000*(chartConst-5)*5/2
-	case score >= 500000:
-		// C
-		overPower = float64(score-500000) / 300000 * (chartConst - 5) * 5 / 2
-	default:
-		overPower = 0
-	}
-
-	// コンボランプ補正
-	if score == constants.TheoreticalScore {
-		// AJC（理論値）: +1.25
-		overPower += 1.25
-	} else {
-		switch comboLampID {
-		case comboLampAllJustice: // ALL JUSTICE
-			overPower += 1.0
-		case comboLampFullCombo: // FULL COMBO
-			overPower += 0.5
+	case score >= 1_007_500:
+		// SSS以上: (譜面定数 + 2) × 5 + スコア補正
+		overpower = (constTenths+20)*500 + int64(score-1_007_500)*3/2
+	case score >= 1_005_000:
+		// SS+: (譜面定数 + 1.5) × 5 + スコア補正
+		overpower = (constTenths+15)*500 + int64(score-1_005_000)
+	case score >= 1_000_000:
+		// SS: (譜面定数 + 1) × 5 + スコア補正
+		overpower = (constTenths+10)*500 + int64(score-1_000_000)/2
+	case score >= 975_000:
+		// S～S+: 譜面定数 × 5 + スコア補正
+		overpower = constTenths*500 + int64(score-975_000)/5
+	case score >= 900_000:
+		// A～AAA: (譜面定数 - 5) × 5 + スコア補正
+		overpower = (constTenths-50)*500 + int64(score-900_000)/3
+	case score >= 800_000:
+		// BBB: (譜面定数 - 5) / 2 × 5から線形増加
+		diff := constTenths - 50
+		if diff > 0 {
+			overpower = diff*250 + int64(score-800_000)*diff/400
+		}
+	case score >= 500_000:
+		// C: 0から(譜面定数 - 5) / 2 × 5まで線形増加
+		diff := constTenths - 50
+		if diff > 0 {
+			overpower = int64(score-500_000) * diff / 1_200
 		}
 	}
 
-	// 精度調整: S以上は0.005単位、S未満は0.05単位
-	if score >= 975000 {
-		overPower = math.Floor(roundN(overPower*200, 2)) / 200 // 0.005単位
+	if score == constants.TheoreticalScore {
+		// 理論値ではコンボランプ補正の代わりに+1.25する
+		overpower += 1_250
 	} else {
-		overPower = math.Floor(roundN(overPower*20, 3)) / 20 // 0.05単位
+		switch comboLampID {
+		case comboLampAllJustice:
+			// ALL JUSTICE: +1.0
+			overpower += 1_000
+		case comboLampFullCombo:
+			// FULL COMBO: +0.5
+			overpower += 500
+		}
 	}
 
-	return max(overPower, 0)
+	// S以上は0.005単位、S未満は0.05単位で切り捨てる
+	unit := int64(50)
+	if score >= 975_000 {
+		unit = 5
+	}
+	return max(overpower/unit*unit, 0)
 }
 
-// CalcSongMaxOP は楽曲の最大譜面定数から、理論値(AJC)を取った際のOPを返します。
-// maxChartConst はドメインサービスの AggregateSongCharts で算出された値を受け取ります。
+// CalcSongMaxOP は理論値を取った際の楽曲最大OVER POWERを返します。
 func CalcSongMaxOP(maxChartConst float64) float64 {
 	if maxChartConst <= 0 {
 		return 0
 	}
-
 	return CalcSingleOverpower(constants.TheoreticalScore, maxChartConst, comboLampAllJustice)
 }
 
-// CalcSingleOverpowerPercent は譜面別の理論値OVER POWERに対する達成割合を計算します。
+// CalcSingleOverpowerPercent は譜面別理論値に対する達成割合を小数点以下4桁で返します。
 func CalcSingleOverpowerPercent(score uint32, chartConst float64, comboLampID int) float64 {
-	maxOverpower := CalcSongMaxOP(chartConst)
+	if chartConstTenths(chartConst) <= 0 {
+		return 0
+	}
+	maxOverpower := calcSingleOverpowerThousandths(constants.TheoreticalScore, chartConst, comboLampAllJustice)
 	if maxOverpower <= 0 {
 		return 0
 	}
 
-	overpower := CalcSingleOverpower(score, chartConst, comboLampID)
-	return min(max(truncN(overpower/maxOverpower*100, 4), 0.0), 100.0)
+	overpower := calcSingleOverpowerThousandths(score, chartConst, comboLampID)
+	scaledPercent := min(overpower*100*percentScale/maxOverpower, 100*percentScale)
+	return float64(max(scaledPercent, 0)) / float64(percentScale)
 }
 
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。
 type RatingRecord struct {
-	Score      uint32  // スコア
-	ChartConst float64 // 譜面定数
-	IsNew      bool    // 新曲枠に属するか
+	Score      uint32
+	ChartConst float64
+	IsNew      bool
 }
 
 // RatingStats はプレイヤーのレーティング統計情報を保持します。
+// DB・APIとの互換性を維持するため公開値はfloat64ですが、集計は整数で行います。
 type RatingStats struct {
-	PlayerRating float64 // プレイヤーレーティング
-	BestAverage  float64 // ベスト枠平均
-	NewAverage   float64 // 新曲枠平均
+	PlayerRating float64
+	BestAverage  float64
+	NewAverage   float64
 }
 
 // CalcRatingStats はレコードリストからプレイヤーレーティング統計を一括計算します。
 func CalcRatingStats(records []RatingRecord) RatingStats {
-	// 1. 単曲レーティングをBEST枠とNEW枠に分けて計算
-	bestRatings := make([]float64, 0, len(records))
-	newRatings := make([]float64, 0, len(records))
+	// 1. 単曲レーティングをBEST枠とNEW枠に分けて計算する
+	bestRatings := make([]int64, 0, len(records))
+	newRatings := make([]int64, 0, len(records))
 	for _, rec := range records {
-		rating := CalcSingleRating(rec.Score, rec.ChartConst)
+		rating := calcSingleRatingHundredths(rec.Score, rec.ChartConst)
 		if rec.IsNew {
 			newRatings = append(newRatings, rating)
-			continue
+		} else {
+			bestRatings = append(bestRatings, rating)
 		}
-		bestRatings = append(bestRatings, rating)
 	}
 
-	// 2. ベスト枠: BEST系レコードから上位30曲
-	slices.SortFunc(bestRatings, func(a, b float64) int {
-		return cmp.Compare(b, a)
-	})
-
-	bestSum := 0.0
+	// 2. BEST系レコードから単曲レーティング上位30曲を選ぶ
+	slices.SortFunc(bestRatings, func(a, b int64) int { return cmp.Compare(b, a) })
 	bestCount := min(30, len(bestRatings))
-	for i := range bestCount {
-		bestSum += bestRatings[i]
-	}
+	bestSum := sumRatings(bestRatings[:bestCount])
 
-	bestAvg := 0.0
-	if bestCount > 0 {
-		bestAvg = truncN(bestSum/float64(bestCount), aggregateRatingDecimalPlaces)
-	}
-
-	// 3. 新曲枠: NEW系レコードから上位20曲
-	slices.SortFunc(newRatings, func(a, b float64) int {
-		return cmp.Compare(b, a)
-	})
-
-	newSum := 0.0
+	// 3. NEW系レコードから単曲レーティング上位20曲を選ぶ
+	slices.SortFunc(newRatings, func(a, b int64) int { return cmp.Compare(b, a) })
 	newCount := min(20, len(newRatings))
-	for i := range newCount {
-		newSum += newRatings[i]
-	}
+	newSum := sumRatings(newRatings[:newCount])
 
-	newAvg := 0.0
-	if newCount > 0 {
-		newAvg = truncN(newSum/float64(newCount), aggregateRatingDecimalPlaces)
-	}
-
-	// 4. プレイヤーレーティング: (ベスト枠合計 + 新曲枠合計) / 50
-	playerRating := 0.0
-	// 50枠に満たない場合でも、計算式は常に50で割る（CHUNITHMの仕様）
-	// 厳密には、ベスト枠+新曲枠の合計を50で割る
-	totalSum := bestSum + newSum
-	if bestCount+newCount > 0 {
-		playerRating = truncN(
-			totalSum/float64(playerRatingSlotCount),
-			aggregateRatingDecimalPlaces,
-		)
-	}
-
+	// 4. 各平均と、50枠固定のプレイヤーレーティングを小数点以下4桁で切り捨てる
 	return RatingStats{
-		PlayerRating: playerRating,
-		BestAverage:  bestAvg,
-		NewAverage:   newAvg,
+		PlayerRating: scaledAverage(bestSum+newSum, playerRatingSlotCount),
+		BestAverage:  scaledAverage(bestSum, bestCount),
+		NewAverage:   scaledAverage(newSum, newCount),
 	}
+}
+
+func sumRatings(ratings []int64) int64 {
+	var sum int64
+	for _, rating := range ratings {
+		sum += rating
+	}
+	return sum
+}
+
+func scaledAverage(sum int64, count int) float64 {
+	if count == 0 {
+		return 0
+	}
+	scaled := sum * aggregateRatingScale / ratingScale / int64(count)
+	return float64(scaled) / float64(aggregateRatingScale)
+}
+
+func chartConstTenths(value float64) int64 {
+	return int64(math.Round(value * 10))
+}
+
+// roundN は入出力境界で扱う小数を指定桁数に丸めます。
+func roundN(num float64, n int) float64 {
+	factor := math.Pow10(n)
+	return math.Round(num*factor) / factor
+}
+
+// truncN は入出力境界で扱う小数を指定桁数で切り捨てます。
+func truncN(num float64, n int) float64 {
+	factor := math.Pow10(n)
+	return math.Floor(num*factor+1e-7) / factor
 }

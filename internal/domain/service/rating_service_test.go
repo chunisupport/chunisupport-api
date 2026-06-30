@@ -122,6 +122,26 @@ func TestCalcSingleRating(t *testing.T) {
 	}
 }
 
+func TestCalcSingleRatingHundredths_整数単位で境界値を計算する(t *testing.T) {
+	tests := []struct {
+		name       string
+		score      uint32
+		chartConst float64
+		want       int64
+	}{
+		{name: "SSS上限", score: 1_008_999, chartConst: 15.7, want: 1_784},
+		{name: "AAAの150点未満を切り捨てる", score: 950_149, chartConst: 15.7, want: 1_403},
+		{name: "BBBの端数を切り捨てる", score: 800_001, chartConst: 15.7, want: 535},
+		{name: "Cの端数を切り捨てる", score: 500_001, chartConst: 15.7, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, calcSingleRatingHundredths(tt.score, tt.chartConst))
+		})
+	}
+}
+
 func TestCalcRatingStats(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -302,6 +322,26 @@ func TestCalcSingleOverpower(t *testing.T) {
 			if !floatEquals(got, tt.want) {
 				assert.Failf(t, "アサーション失敗", "CalcSingleOverpower(%d, %.1f, %d) = %.6f, want %.6f", tt.score, tt.chartConst, tt.comboLampID, got, tt.want)
 			}
+		})
+	}
+}
+
+func TestCalcSingleOverpowerThousandths_整数単位で精度調整する(t *testing.T) {
+	tests := []struct {
+		name        string
+		score       uint32
+		chartConst  float64
+		comboLampID int
+		want        int64
+	}{
+		{name: "S以上は5単位で切り捨てる", score: 1_007_501, chartConst: 15.4, comboLampID: 1, want: 87_000},
+		{name: "S未満は50単位で切り捨てる", score: 950_000, chartConst: 15.0, comboLampID: 1, want: 66_650},
+		{name: "理論値補正を整数で加算する", score: 1_010_000, chartConst: 15.4, comboLampID: 3, want: 92_000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, calcSingleOverpowerThousandths(tt.score, tt.chartConst, tt.comboLampID))
 		})
 	}
 }
