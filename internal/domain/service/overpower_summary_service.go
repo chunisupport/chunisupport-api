@@ -39,7 +39,7 @@ func CalcOverpowerPercent(overpowerValue float64, maxOverpowerTotal float64) flo
 		return 0.0
 	}
 
-	return min(max(roundToScale(overpowerValue/maxOverpowerTotal*100, 4), 0.0), 100.0)
+	return min(max(truncN(overpowerValue/maxOverpowerTotal*100, 4), 0.0), 100.0)
 }
 
 func roundToScale(value float64, scale int) float64 {

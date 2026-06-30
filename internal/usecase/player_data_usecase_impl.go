@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -1333,11 +1332,6 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
-}
-
-func roundFloat(value float64, scale int) float64 {
-	factor := math.Pow10(scale)
-	return math.Round(value*factor) / factor
 }
 
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {

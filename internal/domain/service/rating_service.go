@@ -182,7 +182,7 @@ func CalcSingleOverpowerPercent(score uint32, chartConst float64, comboLampID in
 	}
 
 	overpower := CalcSingleOverpower(score, chartConst, comboLampID)
-	return min(max(roundToScale(overpower/maxOverpower*100, 4), 0.0), 100.0)
+	return min(max(truncN(overpower/maxOverpower*100, 4), 0.0), 100.0)
 }
 
 // RatingRecord はレーティング計算に必要な単曲の情報を保持します。

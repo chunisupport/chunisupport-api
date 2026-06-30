@@ -365,11 +365,11 @@ func TestCalcSingleOverpowerPercent(t *testing.T) {
 			expected:    100.0,
 		},
 		{
-			name:        "譜面別理論値に対する割合を小数点以下4桁で返す",
+			name:        "譜面別理論値に対する割合を小数点以下4桁で切り捨てる",
 			score:       1009000,
 			chartConst:  14.0,
 			comboLampID: 3,
-			expected:    97.9412,
+			expected:    97.9411,
 		},
 		{
 			name:        "譜面定数が0の場合0%になる",

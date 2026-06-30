@@ -119,7 +119,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
@@ -169,7 +169,7 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
@@ -235,7 +235,7 @@ func TestApplyScores_未解禁曲を除外してOVERPOWERを再計算する(t *t
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 13.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
