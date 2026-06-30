@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -251,6 +252,103 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 				assert.Equal(t, tt.wantErrCode, apiErr.Code)
 			}
 			assert.Equal(t, tt.wantUsecaseCall, usecaseCalled)
+		})
+	}
+}
+
+func TestV1SongHandler_UpdateChartConstant(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	var got usecase.UpdateChartConstantInput
+	updatedSong := &entity.Song{
+		DisplayID:   "display-id",
+		OfficialIdx: "123",
+		Title:       "更新対象楽曲",
+		Artist:      "アーティスト",
+		Charts:      []*entity.Chart{},
+	}
+	h := NewV1SongHandler(&testutil.MockSongUsecase{
+		UpdateChartConstantFunc: func(_ context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
+			got = input
+			return updatedSong, nil
+		},
+	}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(
+		`{"official_idx":"123","difficulty":"MAS","const":14.7}`,
+	))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := h.UpdateChartConstant(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{
+		"id":"display-id",
+		"title":"更新対象楽曲",
+		"reading":null,
+		"artist":"アーティスト",
+		"genre":null,
+		"bpm":null,
+		"release":null,
+		"jacket":null,
+		"official_idx":"123",
+		"maxop":90,
+		"is_maxop_unknown":false,
+		"op_target_difficulty":null,
+		"is_new":false,
+		"charts":{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}
+	}`, rec.Body.String())
+	assert.Equal(t, usecase.UpdateChartConstantInput{
+		OfficialIdx: "123",
+		Difficulty:  "MAS",
+		Const:       14.7,
+	}, got)
+}
+
+func TestV1SongHandler_UpdateChartConstant_const未指定を拒否する(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "constがない",
+			body: `{"official_idx":"123","difficulty":"MAS"}`,
+		},
+		{
+			name: "constがnull",
+			body: `{"official_idx":"123","difficulty":"MAS","const":null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			called := false
+			h := NewV1SongHandler(&testutil.MockSongUsecase{
+				UpdateChartConstantFunc: func(_ context.Context, _ usecase.UpdateChartConstantInput) (*entity.Song, error) {
+					called = true
+					return nil, nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			req := httptest.NewRequest(http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			c := e.NewContext(req, httptest.NewRecorder())
+
+			// When
+			err := h.UpdateChartConstant(c)
+
+			// Then
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.False(t, called)
 		})
 	}
 }

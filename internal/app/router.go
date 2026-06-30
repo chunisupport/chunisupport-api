@@ -410,6 +410,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
 		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
+		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireEditor)
 		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
 		apiV1.GET("/songs/:displayid/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)

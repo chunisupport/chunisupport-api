@@ -8,10 +8,55 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func TestUpdateChartConstant_公式IDと難易度接頭辞で譜面定数を更新する(t *testing.T) {
+	// Given
+	original, err := chartconstant.NewChartConstant(14.5)
+	assert.NoError(t, err)
+	song := &entity.Song{
+		ID:          1,
+		DisplayID:   "display-id",
+		OfficialIdx: "123",
+		Charts: []*entity.Chart{{
+			ID:             10,
+			SongID:         1,
+			DifficultyID:   4,
+			Const:          original,
+			IsConstUnknown: true,
+		}},
+	}
+	mockRepo := new(MockSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	mockMasterCache.On("SongMasters").Return(&masterdata.SongMasters{
+		Difficulties: map[string]master.ChartDifficulty{
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	})
+	mockRepo.On("FindByOfficialIdx", mock.Anything, mockExec, "123").Return(song, nil)
+	mockRepo.On("Save", mock.Anything, mockExec, song).Return(nil)
+	uc := NewSongUsecase(mockRepo, mockMasterCache, &passthroughTransactionManager{tx: mockExec}, mockExec)
+
+	// When
+	updatedSong, err := uc.UpdateChartConstant(context.Background(), UpdateChartConstantInput{
+		OfficialIdx: "123",
+		Difficulty:  "mas",
+		Const:       14.7,
+	})
+
+	// Then
+	assert.NoError(t, err)
+	assert.Same(t, song, updatedSong)
+	assert.Equal(t, 14.7, song.Charts[0].Const.Float64())
+	assert.False(t, song.Charts[0].IsConstUnknown)
+	mockRepo.AssertExpectations(t)
+}
 
 // MockSongRepository は SongRepository のモックです。
 type MockSongRepository struct {
@@ -28,6 +73,14 @@ func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec
 
 func (m *MockSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	args := m.Called(ctx, exec, displayID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
+func (m *MockSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	args := m.Called(ctx, exec, officialIdx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

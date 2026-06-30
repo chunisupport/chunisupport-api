@@ -311,14 +311,29 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 // FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 // 削除済み楽曲も取得します。
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	return r.findByIdentifier(ctx, exec, "display_id", displayID)
+}
+
+// FindByOfficialIdx は指定された公式IDの通常楽曲を取得します。
+// 削除済み楽曲も取得します。
+func (r *songRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return r.findByIdentifier(ctx, exec, "official_idx", officialIdx)
+}
+
+// findByIdentifier は許可済みの識別カラムで通常楽曲集約を取得します。
+func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.Executor, column, value string) (*entity.Song, error) {
+	if column != "display_id" && column != "official_idx" {
+		return nil, fmt.Errorf("unsupported song identifier column: %s", column)
+	}
+
 	// 1. 楽曲を取得
-	songQuery := `
+	songQuery := fmt.Sprintf(`
 		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
-		WHERE display_id = ? AND is_worldsend = 0
-	`
+		WHERE %s = ? AND is_worldsend = 0
+	`, column)
 	var songRow songRow
-	if err := exec.GetContext(ctx, &songRow, songQuery, displayID); err != nil {
+	if err := exec.GetContext(ctx, &songRow, songQuery, value); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -356,7 +371,8 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	return song, nil
 }
 
-// Save は楽曲エンティティの現在の状態を永続化します。
+// Save は楽曲集約（楽曲本体と既存譜面）の現在の状態を永続化します。
+// 譜面の追加・削除は行いません。
 // 対象が存在しない場合は ErrSongNotFound を返します。
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
@@ -390,10 +406,18 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		return err
 	}
 	if rowsAffected == 0 {
-		return repository.ErrSongNotFound
+		var exists bool
+		if err := exec.GetContext(ctx, &exists, `SELECT EXISTS(SELECT 1 FROM songs WHERE id = ?)`, song.ID); err != nil {
+			return err
+		}
+		if !exists {
+			return repository.ErrSongNotFound
+		}
 	}
 
-	return nil
+	return r.bulkUpdateCharts(ctx, exec, []*entity.Song{song}, map[string]int{
+		song.DisplayID: song.ID,
+	})
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。

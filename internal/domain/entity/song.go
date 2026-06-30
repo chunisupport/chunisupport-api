@@ -1,8 +1,13 @@
 package entity
 
 import (
+	"errors"
 	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
+
+var ErrChartNotFound = errors.New("chart not found")
 
 // Song は楽曲エンティティ（集約ルート）を表します。
 // Charts フィールドは常に初期化された状態（最低でも空スライス）でなければなりません。
@@ -48,6 +53,18 @@ func (s *Song) HasDifficultyChart(difficultyID int) bool {
 		}
 	}
 	return false
+}
+
+// ChangeChartConstant は指定難易度の既存譜面の定数を変更します。
+// 譜面の追加は行わず、対象譜面がない場合は ErrChartNotFound を返します。
+func (s *Song) ChangeChartConstant(difficultyID int, constant chartconstant.ChartConstant) error {
+	for _, chart := range s.Charts {
+		if chart.DifficultyID == difficultyID {
+			chart.ChangeConstant(constant)
+			return nil
+		}
+	}
+	return ErrChartNotFound
 }
 
 // Delete は楽曲を論理削除します。

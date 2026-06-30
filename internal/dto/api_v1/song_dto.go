@@ -85,6 +85,13 @@ type V1SongsResponse struct {
 	Songs []*V1SongDTO `json:"songs"`
 }
 
+// UpdateChartConstantRequest は外部APIから譜面定数だけを更新するリクエストです。
+type UpdateChartConstantRequest struct {
+	OfficialIdx string   `json:"official_idx" validate:"required,max=10"`
+	Difficulty  string   `json:"difficulty" validate:"required,len=3"`
+	Const       *float64 `json:"const" validate:"required"`
+}
+
 // ToV1ChartDTO はChartエンティティから V1ChartDTO へ変換します。
 func ToV1ChartDTO(chart *entity.Chart) *V1ChartDTO {
 	if chart == nil {
