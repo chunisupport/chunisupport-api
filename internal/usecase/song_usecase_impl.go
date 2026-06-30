@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -156,6 +157,61 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	}
 	s.invalidateOverpowerDenominator(ctx)
 	return nil
+}
+
+// UpdateChartConstant は公式IDと難易度の先頭3文字を使って既存譜面の定数を更新します。
+func (s *songUsecaseImpl) UpdateChartConstant(ctx context.Context, input UpdateChartConstantInput) (*entity.Song, error) {
+	masters := s.masterCache.SongMasters()
+	if masters == nil {
+		return nil, fmt.Errorf("master cache is not initialized")
+	}
+
+	difficultyPrefix := strings.ToUpper(input.Difficulty)
+	if len(difficultyPrefix) != 3 {
+		return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+	}
+
+	difficultyID := 0
+	for name, difficulty := range masters.Difficulties {
+		if strings.HasPrefix(name, difficultyPrefix) {
+			if difficultyID != 0 {
+				return nil, fmt.Errorf("%w: ambiguous difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+			}
+			difficultyID = difficulty.ID
+		}
+	}
+	if difficultyID == 0 {
+		return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+	}
+
+	constant, err := chartconstant.NewChartConstant(input.Const)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidDifficulty, err)
+	}
+
+	var updatedSong *entity.Song
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		song, err := s.songRepo.FindByOfficialIdx(ctx, tx, input.OfficialIdx)
+		if err != nil {
+			return err
+		}
+		if err := song.ChangeChartConstant(difficultyID, constant); err != nil {
+			if errors.Is(err, entity.ErrChartNotFound) {
+				return fmt.Errorf("%w: difficulty=%s", ErrChartNotFound, difficultyPrefix)
+			}
+			return err
+		}
+		if err := s.songRepo.Save(ctx, tx, song); err != nil {
+			return err
+		}
+		updatedSong = song
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	s.invalidateOverpowerDenominator(ctx)
+	return updatedSong, nil
 }
 
 // CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。

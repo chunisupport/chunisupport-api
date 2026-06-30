@@ -127,6 +127,28 @@ func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// UpdateChartConstant は公式IDと難易度の先頭3文字を使って譜面定数を更新します。
+func (h *V1SongHandler) UpdateChartConstant(c *echo.Context) error {
+	var request api_v1.UpdateChartConstantRequest
+	if err := handler.BindStrictJSON(c, &request); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&request); err != nil {
+		return apierror.ErrValidationFailedBadRequest.WithInternal(err)
+	}
+
+	song, err := h.songUsecase.UpdateChartConstant(c.Request().Context(), usecase.UpdateChartConstantInput{
+		OfficialIdx: request.OfficialIdx,
+		Difficulty:  request.Difficulty,
+		Const:       *request.Const,
+	})
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToV1SongDTO(song))
+}
+
 // convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。
 func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1SongDTO {
 	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songs))

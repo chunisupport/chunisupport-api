@@ -173,6 +173,7 @@
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
+| `/v1/songs/chart-constant` | PATCH | APIトークン (EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
 | `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
 | `/v1/songs/:displayid/score-history/:difficulty` | GET | APIトークン（任意） | 通常譜面スコア履歴取得 |
@@ -3068,6 +3069,36 @@ curl -X POST \
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
+
+### PATCH `/v1/songs/chart-constant`
+- **認証**: APIトークン必須
+- **権限**: EDITOR または ADMIN 権限が必要
+- **概要**: 通常楽曲の既存譜面について、公式ID、難易度名の先頭3文字、譜面定数だけを指定して更新します。更新後は `is_const_unknown` が `false` になります。
+
+```json
+{
+  "official_idx": "1234567890",
+  "difficulty": "MAS",
+  "const": 14.7
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `official_idx` | string | ✅ | 公式ID（最大10文字） |
+| `difficulty` | string | ✅ | 難易度名の先頭3文字。`BAS` / `ADV` / `EXP` / `MAS` / `ULT`（大文字・小文字を区別しない） |
+| `const` | number | ✅ | 譜面定数（0.0～16.0、小数第1位まで） |
+
+- **レスポンス**: 200 OK（成功時）。更新後の楽曲オブジェクトを返します。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON形式またはContent-Typeが不正
+  - 400 Bad Request (`validation_failed`): 必須項目、文字数などが不正
+  - 400 Bad Request (`invalid_difficulty`): 難易度または譜面定数が不正
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 403 Forbidden (`forbidden`): 権限不足
+  - 404 Not Found (`song_not_found`): 公式IDに対応する通常楽曲が存在しない
+  - 404 Not Found (`chart_not_found`): 対象難易度の譜面が存在しない
 
 ### GET `/v1/worldsend-songs`
 - **認証**: APIトークン必須

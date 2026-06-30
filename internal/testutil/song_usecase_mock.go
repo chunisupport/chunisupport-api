@@ -17,6 +17,7 @@ type MockSongUsecase struct {
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
 	UpdateSongsFunc                   func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
+	UpdateChartConstantFunc           func(ctx context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error)
 	CalcSongMaxOPFunc                 func(song *entity.Song) float64
 	CreateSongFunc                    func(ctx context.Context, input *usecase.CreateSongInput) (*entity.Song, error)
 }
@@ -61,6 +62,13 @@ func (m *MockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_inter
 		return m.UpdateSongsFunc(ctx, requests)
 	}
 	return nil
+}
+
+func (m *MockSongUsecase) UpdateChartConstant(ctx context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
+	if m.UpdateChartConstantFunc != nil {
+		return m.UpdateChartConstantFunc(ctx, input)
+	}
+	return nil, nil
 }
 
 func (m *MockSongUsecase) CalcSongMaxOP(song *entity.Song) float64 {

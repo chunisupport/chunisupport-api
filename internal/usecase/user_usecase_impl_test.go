@@ -227,6 +227,10 @@ func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repositor
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *stubSongRepository) FindByDisplayIDs(ctx context.Context, exec repository.Executor, displayIDs []string) ([]*entity.Song, error) {
 	return nil, errors.New("not implemented")
 }

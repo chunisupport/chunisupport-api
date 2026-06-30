@@ -21,6 +21,10 @@ type SongRepository interface {
 	// 各楽曲には関連する譜面情報が含まれます。
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
 
+	// FindByOfficialIdx は指定された公式IDの通常楽曲を譜面情報付きで取得します。
+	// 削除済み楽曲も取得します。
+	FindByOfficialIdx(ctx context.Context, exec Executor, officialIdx string) (*entity.Song, error)
+
 	// FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
 	// 存在しないDisplayIDがある場合でもエラーにはせず、存在する楽曲のみを返します。
 	// 各楽曲には関連する譜面情報が含まれます。
@@ -30,7 +34,8 @@ type SongRepository interface {
 	// 対象データが存在しない場合は nil を返します。
 	FindLatestUpdatedAt(ctx context.Context, exec Executor) (*time.Time, error)
 
-	// Save は楽曲エンティティの現在の状態を永続化します。
+	// Save は楽曲集約（楽曲本体と既存譜面）の現在の状態を永続化します。
+	// 譜面の追加・削除は行いません。
 	// 対象が存在しない場合は ErrSongNotFound を返します。
 	Save(ctx context.Context, exec Executor, song *entity.Song) error
 
