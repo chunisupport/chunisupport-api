@@ -13,21 +13,19 @@ import (
 
 // CustomHTTPErrorHandler はカスタムエラーハンドラーです
 func CustomHTTPErrorHandler(c *echo.Context, err error) {
-	var apiErr *apierror.APIError
 	var httpStatus int
 	var errorCode string
 	errorMessage := ""
 	var errorDetails []apierror.ValidationErrorDetail
 
 	// APIErrorの場合
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok {
 		httpStatus = apiErr.HTTPStatus
 		errorCode = apiErr.Code
 		errorMessage, errorDetails = buildClientErrorInfo(apiErr)
-	} else if he, ok := err.(*echo.HTTPError); ok {
-		// echo.HTTPErrorの場合（フォールバック）
-		httpStatus = he.Code
-		errorCode = httpStatusToErrorCode(he.Code)
+	} else if httpStatus = echo.StatusCode(err); httpStatus != 0 {
+		// EchoネイティブのHTTPエラー（*httpError / *HTTPError 両対応）
+		errorCode = httpStatusToErrorCode(httpStatus)
 	} else {
 		// その他のエラー
 		httpStatus = http.StatusInternalServerError
