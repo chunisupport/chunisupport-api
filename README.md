@@ -87,5 +87,25 @@
 
 5. 起動する。
    ```bash
-   APP_ENV=develop go run main.go
+   APP_ENV=develop go run ./cmd/api
    ```
+
+## プロジェクト構成
+
+```
+cmd/
+├── api/          # APIサーバー用エントリポイント
+│   └── main.go
+└── batch/        # バッチジョブ用エントリポイント
+    └── main.go
+internal/         # 共通のドメインロジック・ユースケース・インフラ
+└── ...
+```
+
+APIサーバーとバッチジョブは `internal/` 配下のドメイン層・ユースケース層を共有するマルチバイナリ構成です。
+各バイナリは独立してビルド・実行できます。
+
+| バイナリ | ビルドコマンド | 実行コマンド |
+|---|---|---|
+| APIサーバー | `go build -o _chunisupport-api ./cmd/api` | `go run ./cmd/api` |
+| バッチジョブ | `go build -o _chunisupport-batch ./cmd/batch` | `go run ./cmd/batch` |
