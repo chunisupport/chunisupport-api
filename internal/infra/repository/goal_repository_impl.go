@@ -10,6 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -155,10 +156,24 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 	query := `
 		SELECT
 			COUNT(*) AS chart_count,
+			COUNT(DISTINCT rainbow.song_id) AS song_count,
 			COALESCE(SUM(c.const), 0) AS total_chart_const
 		FROM charts c
 		INNER JOIN songs s ON s.id = c.song_id
+		LEFT JOIN (
+			SELECT song_id
+			FROM charts
+			WHERE difficulty_id BETWEEN %d AND %d
+			GROUP BY song_id
+			HAVING COUNT(DISTINCT difficulty_id) = %d
+		) rainbow ON rainbow.song_id = s.id
 		WHERE ` + strings.Join(where, " AND ")
+	query = fmt.Sprintf(
+		query,
+		info.RainbowRequiredDifficultyMinID,
+		info.RainbowRequiredDifficultyMaxID,
+		info.RainbowRequiredDifficultyCount,
+	)
 	query, args, err := sqlx.In(query, args...)
 	if err != nil {
 		return nil, err
@@ -167,11 +182,16 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 
 	var row struct {
 		ChartCount      int     `db:"chart_count"`
+		SongCount       int     `db:"song_count"`
 		TotalChartConst float64 `db:"total_chart_const"`
 	}
 	if err := exec.GetContext(ctx, &row, query, args...); err != nil {
 		return nil, err
 	}
 
-	return &repository.GoalTargetStats{ChartCount: row.ChartCount, TotalChartConst: row.TotalChartConst}, nil
+	return &repository.GoalTargetStats{
+		ChartCount:      row.ChartCount,
+		SongCount:       row.SongCount,
+		TotalChartConst: row.TotalChartConst,
+	}, nil
 }

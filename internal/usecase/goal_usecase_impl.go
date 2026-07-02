@@ -183,7 +183,11 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 	if !ok {
 		return nil, ErrInvalidAchievementType
 	}
-	attrsRaw, attrsFilter, err := validateAttributes(input.Attributes, masters)
+	attrsRaw, attrsFilter, err := validateAttributes(
+		input.Attributes,
+		masters,
+		input.AchievementType,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +203,11 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 	return &validatedGoalInput{Title: title, AchievementTypeID: item.ID, AchievementParams: paramsRaw, Attributes: attrsRaw, Invert: input.Invert}, nil
 }
 
-func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]byte, *goalAttributeFilter, error) {
+func validateAttributes(
+	raw []byte,
+	masters *domainmasterdata.GoalMasters,
+	achievementType string,
+) ([]byte, *goalAttributeFilter, error) {
 	var attrs map[string]json.RawMessage
 	if len(raw) == 0 {
 		return []byte("{}"), &goalAttributeFilter{}, nil
@@ -211,6 +219,13 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	for k := range attrs {
 		if !allowed[k] {
 			return nil, nil, ErrInvalidGoalAttributes
+		}
+	}
+	if achievementType == "rainbow_count" {
+		for _, key := range []string{"diff", "const", "chart_target"} {
+			if _, ok := attrs[key]; ok {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
 		}
 	}
 
@@ -471,9 +486,16 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
-	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
+	case achievementType == "hardlamp_count" || achievementType == "combolamp_count" || achievementType == "rainbow_count":
+		if !hasOnlyKeys(m, "lamp", "count", "remaining", "percent") {
+			return nil, nil, ErrInvalidAchievementParam
+		}
 		var lamp string
-		if len(m) < 1 || !hasOnlyKeys(m, "lamp", "count", "remaining", "percent") || json.Unmarshal(m["lamp"], &lamp) != nil {
+		if achievementType != "rainbow_count" {
+			if len(m) < 1 || json.Unmarshal(m["lamp"], &lamp) != nil {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+		} else if _, ok := m["lamp"]; ok {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 
@@ -503,8 +525,10 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			if _, ok := info.HardLampAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
 			}
-		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
-			return nil, nil, ErrInvalidAchievementParam
+		} else if achievementType == "combolamp_count" {
+			if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
+				return nil, nil, ErrInvalidAchievementParam
+			}
 		}
 
 		if countOK {
@@ -643,6 +667,15 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 		}
 		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
 			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
+	case "rainbow_count":
+		if params.Count != nil && *params.Count > stats.SongCount {
+			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.SongCount)
+			return ErrInvalidAchievementParam
+		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.SongCount) {
+			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.SongCount)
 			return ErrInvalidAchievementParam
 		}
 	case "total_score":

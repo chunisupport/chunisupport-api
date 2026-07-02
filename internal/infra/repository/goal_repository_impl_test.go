@@ -40,6 +40,9 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 			(2, 10, '2024-01-01', 0),
 			(3, 10, '2024-01-01', 1)`,
 		`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES
+			(97, 1, 1, 3.0),
+			(98, 1, 2, 6.0),
+			(99, 1, 3, 10.0),
 			(101, 1, 4, 14.0),
 			(102, 1, 5, 15.0),
 			(201, 2, 4, 14.5),
@@ -67,6 +70,7 @@ func TestGoalRepository_GetTargetStatsOPTargetOnly(t *testing.T) {
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, 2, stats.ChartCount)
+	assert.Equal(t, 1, stats.SongCount)
 	assert.InDelta(t, 29.5, stats.TotalChartConst, 0.0001)
 }
 
@@ -85,5 +89,6 @@ func TestGoalRepository_GetTargetStatsOPTargetOnlyWithConstFilter(t *testing.T) 
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, 1, stats.ChartCount)
+	assert.Equal(t, 0, stats.SongCount)
 	assert.InDelta(t, 14.5, stats.TotalChartConst, 0.0001)
 }

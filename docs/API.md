@@ -1062,6 +1062,7 @@ curl -X POST \
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
+| `rainbow_count` | BASIC〜MASTERと、存在する場合はULTIMAがすべてALL JUSTICEの楽曲数 |
 | `total_score` | 全譜面のスコア合計 |
 | `overpower_value` | 全譜面のOverPower値合計 |
 | `overpower_percent` | 全譜面に対するOverPower達成割合（%） |
@@ -1074,12 +1075,13 @@ curl -X POST \
 |---|---|---|
 | `rank_count` / `score_count` | `count` | 対象譜面数（動的上限） |
 | `hardlamp_count` / `combolamp_count` | `count` | 対象譜面数（動的上限） |
+| `rainbow_count` | `count` | 対象楽曲数（動的上限） |
 | `total_score` | `total` | 対象譜面数 × 1,010,000（動的上限） |
 | `overpower_value` | `total` | 対象譜面の理論値OP合計（動的上限） |
 
 上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
-`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
+`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
 
 - `remaining`: 動的上限から差し引く残数
 - `percent`: 動的上限に対する目標割合（%）
@@ -1156,6 +1158,22 @@ curl -X POST \
 |---|---|
 | `FC` | `FULL COMBO` |
 | `AJ` | `ALL JUSTICE` |
+
+#### `rainbow_count`
+
+```json
+{ "count": 100 }
+```
+
+BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象にします。ULTIMAが存在する楽曲ではULTIMAも判定対象に加え、必要な全譜面のコンボランプが`ALL JUSTICE`なら達成楽曲として数えます。未プレイ譜面は未達成として扱います。
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `count` | `integer \| null` | null または 1〜対象楽曲数 | 目標楽曲数。省略/null時は「対象楽曲数（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象楽曲数 | 動的上限から差し引く残り楽曲数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+`attributes`は`genre`と`ver`のみ指定できます。`diff`、`const`、`chart_target`は指定できません。削除済み楽曲とBASIC〜MASTERのいずれかが存在しない楽曲は、対象楽曲数から除外します。固定`count`で保存済みの目標は、後から対象楽曲数が減少しても自動補正しません。
 
 #### `total_score`
 
@@ -1253,7 +1271,9 @@ curl -X POST \
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
-   - 同成果種別の `remaining` ≤ 対象譜面数
+   - `rainbow_count.count` ≤ 対象楽曲数
+   - 譜面件数系成果種別の `remaining` ≤ 対象譜面数
+   - `rainbow_count.remaining` ≤ 対象楽曲数
    - `total_score.total` ≤ 対象譜面数 × 1,010,000
    - `total_score.remaining` ≤ 対象譜面数 × 1,010,000
    - `overpower_value.total` ≤ 対象譜面の理論値OverPower合計

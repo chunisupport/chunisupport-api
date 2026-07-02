@@ -24,6 +24,9 @@ const (
 	ChartConstMin                  = constants.ChartConstMin
 	ChartConstMax                  = constants.ChartConstMax
 	GoalChartTargetOP              = "OP_TARGET"
+	RainbowRequiredDifficultyMinID = 1
+	RainbowRequiredDifficultyMaxID = 4
+	RainbowRequiredDifficultyCount = 4
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

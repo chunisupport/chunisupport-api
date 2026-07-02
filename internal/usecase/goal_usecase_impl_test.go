@@ -96,11 +96,12 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 		AchievementTypesByCode: map[string]domainmasterdata.Item{
 			"score_count":       {ID: 2, Name: "score_count"},
 			"rank_count":        {ID: 1, Name: "rank_count"},
+			"rainbow_count":     {ID: 9, Name: "rainbow_count"},
 			"total_score":       {ID: 6, Name: "total_score"},
 			"overpower_value":   {ID: 7, Name: "overpower_value"},
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
-		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent"},
+		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count"},
 		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
 		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
 		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
@@ -411,6 +412,70 @@ func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
 		Attributes:        []byte(`{}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateRejectsRainbowCountOverSongUpperBound(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 10, SongCount: 2}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "虹枠",
+		AchievementType:   "rainbow_count",
+		AchievementParams: []byte(`{"count":3}`),
+		Attributes:        []byte(`{"genre":1,"ver":20}`),
+	})
+
+	// Then
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateRejectsRainbowRemainingOverSongUpperBound(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 10, SongCount: 2}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "虹枠",
+		AchievementType:   "rainbow_count",
+		AchievementParams: []byte(`{"remaining":3}`),
+		Attributes:        []byte(`{}`),
+	})
+
+	// Then
+	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateRejectsChartAttributesForRainbowCount(t *testing.T) {
+	tests := []struct {
+		name       string
+		attributes []byte
+	}{
+		{name: "難易度を拒否する", attributes: []byte(`{"diff":4}`)},
+		{name: "譜面定数を拒否する", attributes: []byte(`{"const":{"min":1.0,"max":16.0}}`)},
+		{name: "OP対象を拒否する", attributes: []byte(`{"chart_target":"OP_TARGET"}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+			// When
+			_, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "虹枠",
+				AchievementType:   "rainbow_count",
+				AchievementParams: []byte(`{}`),
+				Attributes:        tt.attributes,
+			})
+
+			// Then
+			assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+		})
+	}
 }
 
 func TestGoalUsecase_CreateRejectsTotalScoreOverDynamicUpperBound(t *testing.T) {
