@@ -283,6 +283,47 @@ func TestApplyScores_統計用の関連情報欠損時はエラーを返す(t *t
 	assert.Contains(t, err.Error(), "missing statistics relation")
 }
 
+func TestApplyScores_0点スコアを保存できる(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 4, 27, 12, 34, 56, 0, time.UTC)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
+	}
+	uc := &playerDataUsecase{
+		playerDataRepo: repo,
+		playerRecRepo:  &stubPlayerRecordRepositoryForApplyScoresTest{},
+	}
+	payload := PlayerDataScorePayload{
+		Standard: []PlayerDataScoreEntry{
+			{Idx: "full-song", Diff: "MAS", Score: 0},
+		},
+		Worldsend: []PlayerDataScoreEntry{
+			{Idx: "world-song", Score: 0},
+		},
+	}
+
+	// When
+	counts, skipped, changes, statistics, _, err := uc.applyScores(
+		context.Background(), nil, 99, payload, newApplyScoresTestMasters(), updatedAt, service.PlayerRecordStatisticsSnapshot{},
+	)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, api_internal.PlayerDataCounts{
+		FullRecordsUpserted:             1,
+		WorldsendRecordsUpserted:        1,
+		FullRecordsActuallyChanged:      1,
+		WorldsendRecordsActuallyChanged: 1,
+	}, counts)
+	assert.Empty(t, skipped)
+	assert.Len(t, changes, 2)
+	assert.Equal(t, int64(0), statistics.Overall.TotalHighScore.After)
+	require.Len(t, repo.savedInput.FullRecords, 1)
+	assert.Equal(t, 0, repo.savedInput.FullRecords[0].State.Score)
+	require.Len(t, repo.savedInput.WorldsendRecords, 1)
+	assert.Equal(t, 0, repo.savedInput.WorldsendRecords[0].State.Score)
+}
+
 func TestApplyScores_不正レコードをスキップして理由を保持する(t *testing.T) {
 	tests := []struct {
 		name              string

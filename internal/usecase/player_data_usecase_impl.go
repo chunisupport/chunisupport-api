@@ -22,7 +22,7 @@ import (
 const (
 	maxPlayerDataChangeDetails = 100
 	maxScoreValue              = 1010000
-	minScoreValue              = 1
+	minScoreValue              = 0
 	tokyoLayout                = "2006/01/02 15:04"
 	defaultSlotName            = "none"
 )
