@@ -502,6 +502,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		LastPlayedAt:      summary.LastPlayedAt,
 		OverpowerValue:    summary.OverpowerValue,
 		OverpowerPercent:  summary.OverpowerPercent,
+		DataCollectedAt:   &updatedAt,
 		UpdatedAt:         updatedAt,
 	}
 

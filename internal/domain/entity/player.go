@@ -23,6 +23,7 @@ type Player struct {
 	OverpowerValue    *float64              // オーバーパワー値
 	OfficialOverpower float64               // 公式オーバーパワー値
 	OverpowerPercent  *float64              // オーバーパワー割合
+	DataCollectedAt   *time.Time            // CHUNITHM-NETからのデータ取得完了日時
 	CreatedAt         time.Time             // 作成日時
 	UpdatedAt         time.Time             // 更新日時
 }

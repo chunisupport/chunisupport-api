@@ -113,6 +113,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
 | OverpowerPercent | *float64 | - | オーバーパワー割合（%） |
+| DataCollectedAt | *time.Time | - | CHUNITHM-NETからのデータ取得完了日時 |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
 | Users | *User | - | 紐づくユーザー（関連エンティティ） |

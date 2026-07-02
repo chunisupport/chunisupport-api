@@ -105,6 +105,8 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.Before(before))
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.After(after))
 			assert.True(t, playerRepo.savedPlayer.UpdatedAt.Equal(updatedAt))
+			require.NotNil(t, playerRepo.savedPlayer.DataCollectedAt)
+			assert.True(t, playerRepo.savedPlayer.DataCollectedAt.Equal(updatedAt))
 			userRepo.AssertExpectations(t)
 		})
 	}
