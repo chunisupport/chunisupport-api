@@ -161,6 +161,23 @@ func (r *honorRepository) DeletePlayerHonors(ctx context.Context, exec repositor
 	return err
 }
 
+// DeletePlayerHonorsExceptSlots は指定スロットを保持して称号割り当てを削除します。
+func (r *honorRepository) DeletePlayerHonorsExceptSlots(ctx context.Context, exec repository.Executor, playerID int, preservedSlots []int) error {
+	if len(preservedSlots) == 0 {
+		return r.DeletePlayerHonors(ctx, exec, playerID)
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(preservedSlots)), ", ")
+	query := `DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (` + placeholders + `)`
+	args := make([]any, 0, len(preservedSlots)+1)
+	args = append(args, playerID)
+	for _, slot := range preservedSlots {
+		args = append(args, slot)
+	}
+	_, err := exec.ExecContext(ctx, query, args...)
+	return err
+}
+
 // BulkAssignHonors はプレイヤーに称号を一括で割り当てます。
 // 大量の割り当てはチャンク分割して実行されます。
 func (r *honorRepository) BulkAssignHonors(ctx context.Context, exec repository.Executor, assignments []repository.HonorAssignment) error {

@@ -57,6 +57,20 @@ func TestEnsureHonor_画像URLがnilの場合は空文字でUpsertする(t *test
 	assert.Equal(t, []any{"称号A", 2, ""}, exec.args)
 }
 
+func TestDeletePlayerHonorsExceptSlots_指定スロットを削除対象から除外する(t *testing.T) {
+	// Given
+	exec := &honorEnsureExec{}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.DeletePlayerHonorsExceptSlots(context.Background(), exec, 100, []int{1, 3})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, "DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (?, ?)", exec.query)
+	assert.Equal(t, []any{100, 1, 3}, exec.args)
+}
+
 type honorExecResultExecutor struct {
 	baseExecutor
 	result sql.Result

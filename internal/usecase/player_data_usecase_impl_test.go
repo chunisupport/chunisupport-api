@@ -263,6 +263,25 @@ func TestApplyHonors_通常称号はタイトルと空画像URLで登録する(t
 	assert.Nil(t, honorRepo.ensureCalls[0].imageURL)
 }
 
+func TestApplyHonors_お気に入りからランダムのスロットは更新しない(t *testing.T) {
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Title: "お気に入りからランダム", Class: "normal"},
+		"2": {Title: "更新する称号", Class: "normal"},
+	}, masters)
+
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	assert.Equal(t, []int{1}, honorRepo.preservedSlots)
+	require.Len(t, honorRepo.ensureCalls, 1)
+	assert.Equal(t, "更新する称号", honorRepo.ensureCalls[0].title)
+	require.Len(t, honorRepo.assignments, 1)
+	assert.Equal(t, 2, honorRepo.assignments[0].Slot)
+}
+
 func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
 	assert.PanicsWithValue(t, "player record repository is required", func() {
 		NewPlayerDataUsecase(nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -276,10 +295,11 @@ type honorEnsureCallForApplyHonorsTest struct {
 }
 
 type stubHonorRepositoryForApplyHonorsTest struct {
-	deleteCount int
-	ensureCalls []honorEnsureCallForApplyHonorsTest
-	assignments []repository.HonorAssignment
-	nextHonorID int
+	deleteCount    int
+	preservedSlots []int
+	ensureCalls    []honorEnsureCallForApplyHonorsTest
+	assignments    []repository.HonorAssignment
+	nextHonorID    int
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) FindAll(_ context.Context, _ repository.Executor) ([]*entity.Honor, error) {
@@ -314,6 +334,12 @@ func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _
 
 func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonors(_ context.Context, _ repository.Executor, _ int) error {
 	s.deleteCount++
+	return nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonorsExceptSlots(_ context.Context, _ repository.Executor, _ int, preservedSlots []int) error {
+	s.deleteCount++
+	s.preservedSlots = append(s.preservedSlots, preservedSlots...)
 	return nil
 }
 

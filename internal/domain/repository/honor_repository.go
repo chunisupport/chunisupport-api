@@ -38,6 +38,9 @@ type HonorRepository interface {
 	// DeletePlayerHonors はプレイヤーの称号割り当てを全て削除します。
 	DeletePlayerHonors(ctx context.Context, exec Executor, playerID int) error
 
+	// DeletePlayerHonorsExceptSlots は指定スロットを保持して称号割り当てを削除します。
+	DeletePlayerHonorsExceptSlots(ctx context.Context, exec Executor, playerID int, preservedSlots []int) error
+
 	// BulkAssignHonors はプレイヤーに称号を一括で割り当てます。
 	BulkAssignHonors(ctx context.Context, exec Executor, assignments []HonorAssignment) error
 }

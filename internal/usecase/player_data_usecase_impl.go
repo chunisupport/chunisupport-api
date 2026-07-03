@@ -542,7 +542,8 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 	if honors == nil {
 		return skipped, nil
 	}
-	if err := us.honorRepo.DeletePlayerHonors(ctx, tx, playerID); err != nil {
+	preservedSlots := randomFavoriteHonorSlots(honors)
+	if err := us.honorRepo.DeletePlayerHonorsExceptSlots(ctx, tx, playerID, preservedSlots); err != nil {
 		return skipped, err
 	}
 
@@ -569,6 +570,9 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 				Reason:     fmt.Sprintf("slot out of range: %d", slot),
 				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
 			})
+			continue
+		}
+		if honor.Title == info.RandomFavoriteHonorTitle {
 			continue
 		}
 
@@ -629,6 +633,22 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 	}
 
 	return skipped, nil
+}
+
+// randomFavoriteHonorSlots はCHUNITHM-NET側で毎回ランダム選択される称号のスロットを返します。
+// この表示用テキストを称号として保存せず、現在の割り当てを維持するために使用します。
+func randomFavoriteHonorSlots(honors map[string]PlayerDataHonorPayload) []int {
+	slots := make([]int, 0, 3)
+	for slotKey, honor := range honors {
+		if honor.Title != info.RandomFavoriteHonorTitle {
+			continue
+		}
+		slot, err := strconv.Atoi(strings.TrimSpace(slotKey))
+		if err == nil && slot >= 1 && slot <= 3 {
+			slots = append(slots, slot)
+		}
+	}
+	return slots
 }
 
 // applyScores はプレイヤーのスコア情報を更新します。

@@ -112,6 +112,10 @@ func (m *honorRepositoryMock) DeletePlayerHonors(context.Context, repository.Exe
 	return nil
 }
 
+func (m *honorRepositoryMock) DeletePlayerHonorsExceptSlots(context.Context, repository.Executor, int, []int) error {
+	return nil
+}
+
 func (m *honorRepositoryMock) BulkAssignHonors(context.Context, repository.Executor, []repository.HonorAssignment) error {
 	return nil
 }

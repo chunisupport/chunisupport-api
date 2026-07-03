@@ -27,6 +27,7 @@ const (
 	RainbowRequiredDifficultyMinID = 1
 	RainbowRequiredDifficultyMaxID = 4
 	RainbowRequiredDifficultyCount = 4
+	RandomFavoriteHonorTitle       = "お気に入りからランダム"
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
