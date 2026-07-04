@@ -125,6 +125,8 @@
 | `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
 | `/internal/me/locked-songs/batch` | POST | Firebase Bearer | 自分の未解禁曲をまとめて登録・解除 |
 | `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
+| `/internal/me/favorite-songs` | POST | Firebase Bearer | 自分のお気に入り楽曲を登録 |
+| `/internal/me/favorite-songs/:displayid` | DELETE | Firebase Bearer | 自分のお気に入り楽曲を解除 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -141,6 +143,7 @@
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username/locked-songs` | GET | Firebase Bearer (任意) | ユーザーの未解禁曲一覧を取得 |
+| `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
@@ -438,6 +441,127 @@
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### GET `/internal/users/:username/favorite-songs`
+
+対象ユーザーのお気に入り楽曲一覧を取得します。本人または非公開ユーザー以外の閲覧はできません。
+
+#### 認証
+
+Firebase Bearer Token（任意）
+- トークンあり: 非公開ユーザーでも本人が取得可能
+- トークンなし: 公開ユーザーのみ取得可能
+
+#### リクエスト
+
+| パラメータ | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `username` | パス | 必須 | 対象ユーザー名（半角英数字4〜16文字） |
+
+#### レスポンス（200 OK）
+
+```json
+{
+  "items": [
+    {
+      "display_id": "0000000000000123",
+      "title": "楽曲名",
+      "jacket": "example.jpg",
+      "favorited_at": "2026-07-05T12:34:56Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `items` | array | お気に入り楽曲リスト。空の場合は `{"items":[]}` |
+| `.display_id` | string | 楽曲識別子 |
+| `.title` | string | 楽曲タイトル |
+| `.jacket` | string or null | ジャケット画像ファイル名 |
+| `.favorited_at` | string (ISO 8601) | お気に入り登録日時 |
+
+#### エラー
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `user_not_found` | 404 | 対象ユーザーが存在しない、または非公開ユーザーを本人以外が取得 |
+| `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
+
+削除済み楽曲やWORLD'S END楽曲はレスポンスに含まれません。
+
+### POST `/internal/me/favorite-songs`
+
+認証済みユーザーのお気に入りに楽曲を登録します。
+
+#### 認証
+
+Firebase Bearer Token（必須）
+
+#### リクエスト
+
+```json
+{
+  "display_id": "0000000000000123"
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `display_id` | string | 必須 | 楽曲識別子（16桁16進数） |
+
+未知のトップレベルキーは拒否されます。
+
+#### レスポンス（204 No Content）
+
+成功時はレスポンスボディなし。
+
+#### エラー
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `unauthorized` | 401 | 認証情報がない |
+| `bad_request` | 400 | JSONデコード失敗 |
+| `validation_failed` | 422 | `display_id` の形式不正 |
+| `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
+| `song_not_found` | 404 | 楽曲が存在しない、論理削除済み、またはWORLD'S END |
+| `favorite_song_limit_exceeded` | 400 | お気に入りが100件に達している（再登録時は発生しない） |
+
+#### 備考
+
+- 登録済み楽曲の再登録は成功し、登録日時を変更しません（冪等）
+- お気に入りはプレイヤー単位で保持され、最大100件です
+
+### DELETE `/internal/me/favorite-songs/:displayid`
+
+認証済みユーザーのお気に入りから楽曲を解除します。
+
+#### 認証
+
+Firebase Bearer Token（必須）
+
+#### リクエスト
+
+| パラメータ | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `displayid` | パス | 必須 | 楽曲識別子（16桁16進数） |
+
+#### レスポンス（204 No Content）
+
+成功時はレスポンスボディなし。
+
+#### エラー
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `unauthorized` | 401 | 認証情報がない |
+| `validation_failed` | 422 | `display_id` の形式不正 |
+| `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
+
+#### 備考
+
+- 未登録楽曲の解除も成功します（冪等）
+- 論理削除済み、物理削除済み楽曲の解除も成功します
 
 ### GET `/internal/users/:username/locked-songs`
 - **認証**: Firebase Bearer 任意

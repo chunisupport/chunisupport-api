@@ -76,6 +76,9 @@ const (
 	DefaultDBConnMaxIdleTimeSec = 60
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
+
+	// プレイヤーお気に入り楽曲
+	PlayerFavoriteSongMaxCount = 100
 )
 
 var (

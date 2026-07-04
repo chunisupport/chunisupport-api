@@ -117,6 +117,8 @@ var (
 	ErrRecordFilterLimitExceeded = New(CodeRecordFilterLimitExceeded, http.StatusBadRequest)
 	ErrInvalidRecordFilterInput  = New(CodeInvalidRecordFilterInput, http.StatusBadRequest)
 	ErrInvalidRecordFilterID     = New(CodeInvalidRecordFilterID, http.StatusBadRequest)
+
+	ErrFavoriteSongLimitExceeded = New(CodeFavoriteSongLimitExceeded, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

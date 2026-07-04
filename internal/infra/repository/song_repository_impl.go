@@ -320,6 +320,52 @@ func (r *songRepository) FindByOfficialIdx(ctx context.Context, exec repository.
 	return r.findByIdentifier(ctx, exec, "official_idx", officialIdx)
 }
 
+// FindByDisplayIDForUpdate は指定されたDisplayIDの通常楽曲をFOR UPDATEロック付きで取得します。
+func (r *songRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	// 1. 楽曲をFOR UPDATEで取得
+	songQuery := `
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		FROM songs
+		WHERE display_id = ? AND is_worldsend = 0
+		FOR UPDATE
+	`
+	var songRow songRow
+	if err := exec.GetContext(ctx, &songRow, songQuery, displayID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+
+	song := r.toSongEntity(&songRow)
+
+	// 2. 譜面を取得（FOR UPDATE不要）
+	chartsQuery := `
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
+		FROM charts
+		WHERE song_id = ?
+		ORDER BY difficulty_id
+	`
+	var chartRows []chartRow
+	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, songRow.ID); err != nil {
+		return nil, err
+	}
+
+	charts := make([]*entity.Chart, len(chartRows))
+	for i, cr := range chartRows {
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
+		charts[i] = chart
+	}
+
+	song.Charts = charts
+	service.ApplyAggregation(song)
+
+	return song, nil
+}
+
 // findByIdentifier は許可済みの識別カラムで通常楽曲集約を取得します。
 func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.Executor, column, value string) (*entity.Song, error) {
 	if column != "display_id" && column != "official_idx" {

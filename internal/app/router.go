@@ -78,6 +78,7 @@ type Handlers struct {
 	RecordFilter         *api_internal.RecordFilterHandler
 	TemporaryPlayerData  *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
+	PlayerFavoriteSong   *api_internal.PlayerFavoriteSongHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	// 外部API v1 用ハンドラ
 	V1Song       *api_v1.V1SongHandler
@@ -126,6 +127,9 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	recordFilterRepo := infra.NewRecordFilterRepository(smallDataDB)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
+	playerFavoriteSongRepo := infra.NewPlayerFavoriteSongRepository()
+	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
+	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	tm := transaction.NewTransactionManager(db)
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
@@ -136,7 +140,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
-	songUsecase := usecase.NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, db, overpowerDenominatorProvider)
+	songUsecase := usecase.NewSongUsecaseWithFavoriteIntegration(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
@@ -148,6 +152,10 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create player locked song usecase: %v", err))
+	}
+	playerFavoriteSongUsecase, err := usecase.NewPlayerFavoriteSongUsecase(db, tm, userRepo, playerRepo, songRepo, playerFavoriteSongRepo, playerFavoriteSongQueryService, playerFavoriteSongLocker, playerSongIDResolver)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create player favorite song usecase: %v", err))
 	}
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
@@ -173,6 +181,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		RecordFilter:         api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		TemporaryPlayerData:  api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
+		PlayerFavoriteSong:   api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -272,6 +281,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
+		meGroup.POST("/favorite-songs", handlers.PlayerFavoriteSong.Add)
+		meGroup.DELETE("/favorite-songs/:displayid", handlers.PlayerFavoriteSong.Remove)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
@@ -297,6 +308,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
+		publicUsersGroup.GET("/:username/favorite-songs", handlers.PlayerFavoriteSong.List)
 		publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
 	}
 

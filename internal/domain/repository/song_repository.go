@@ -44,6 +44,12 @@ type SongRepository interface {
 	// 存在しない楽曲・譜面がある場合はエラーを返します。
 	UpdateSongs(ctx context.Context, exec Executor, songs []*entity.Song) error
 
+	// FindByDisplayIDForUpdate は指定されたDisplayIDの通常楽曲をFOR UPDATEロック付きで取得します。
+	// 論理削除済みの楽曲も含めて取得します。
+	// 各楽曲には関連する譜面情報が含まれます。
+	// 対象が存在しない場合は ErrSongNotFound を返します。
+	FindByDisplayIDForUpdate(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
+
 	// Create は新規楽曲を songs および charts テーブルに追加します。
 	// display_id 重複時は ErrDuplicateDisplayID を、official_idx 重複時は ErrDuplicateOfficialIdx を返します。
 	Create(ctx context.Context, exec Executor, song *entity.Song) (*entity.Song, error)

@@ -79,6 +79,14 @@ func (m *MockSongRepository) FindByDisplayID(ctx context.Context, exec repositor
 	return args.Get(0).(*entity.Song), args.Error(1)
 }
 
+func (m *MockSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	args := m.Called(ctx, exec, displayID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
 func (m *MockSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
 	args := m.Called(ctx, exec, officialIdx)
 	if args.Get(0) == nil {
@@ -110,6 +118,35 @@ func (m *MockSongRepository) Save(ctx context.Context, exec repository.Executor,
 
 func (m *MockSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
 	args := m.Called(ctx, exec, songs)
+	return args.Error(0)
+}
+
+type MockPlayerFavoriteSongRepository struct {
+	mock.Mock
+}
+
+func (m *MockPlayerFavoriteSongRepository) CountByPlayerID(ctx context.Context, exec repository.Executor, playerID int) (int, error) {
+	args := m.Called(ctx, exec, playerID)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Exists(ctx context.Context, exec repository.Executor, playerID int, songID int) (bool, error) {
+	args := m.Called(ctx, exec, playerID, songID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Save(ctx context.Context, exec repository.Executor, favorite *entity.PlayerFavoriteSong) error {
+	args := m.Called(ctx, exec, favorite)
+	return args.Error(0)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int) error {
+	args := m.Called(ctx, exec, playerID, songID)
+	return args.Error(0)
+}
+
+func (m *MockPlayerFavoriteSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	args := m.Called(ctx, exec, songID)
 	return args.Error(0)
 }
 
@@ -332,6 +369,35 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 	}
 }
 
+func TestDeleteSong_DeletesFavoritesWhenFavoriteRepoIsSet(t *testing.T) {
+	mockRepo := new(MockSongRepository)
+	mockFavoriteRepo := new(MockPlayerFavoriteSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewSongUsecaseWithFavoriteIntegration(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo)
+	ctx := context.Background()
+
+	song := &entity.Song{
+		ID:        10,
+		DisplayID: "S010",
+		IsDeleted: false,
+		Charts:    []*entity.Chart{},
+	}
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
+		return saved == song && saved.IsDeleted
+	})).Return(nil).Once()
+	mockFavoriteRepo.On("DeleteBySongID", ctx, mockExec, 10).Return(nil).Once()
+
+	err := uc.DeleteSong(ctx, "S010")
+
+	assert.NoError(t, err)
+	assert.True(t, song.IsDeleted)
+	mockRepo.AssertExpectations(t)
+	mockFavoriteRepo.AssertExpectations(t)
+}
+
 func TestDeleteSong_SavesDeletedState(t *testing.T) {
 	// Given
 	mockRepo := new(MockSongRepository)
@@ -347,7 +413,7 @@ func TestDeleteSong_SavesDeletedState(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayID", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()

@@ -16,4 +16,6 @@ var (
 	ErrRecordFilterLimitExceeded = errors.New("record filter limit exceeded")
 	ErrInvalidRecordFilterInput  = errors.New("invalid record filter input")
 	ErrInvalidRecordFilterID     = errors.New("invalid record filter id")
+
+	ErrPlayerFavoriteSongLimitExceeded = errors.New("player favorite song limit exceeded")
 )

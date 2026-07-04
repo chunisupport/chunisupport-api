@@ -102,6 +102,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidRecordFilterInput.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidRecordFilterID):
 		return ErrInvalidRecordFilterID.WithInternal(err)
+	case errors.Is(err, usecase.ErrPlayerFavoriteSongLimitExceeded):
+		return ErrFavoriteSongLimitExceeded.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

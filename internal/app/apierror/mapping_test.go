@@ -27,6 +27,14 @@ func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *te
 	assert.Equal(t, usecase.ErrInvalidCredentials, got.Internal)
 }
 
+func TestFromUsecaseError_お気に入り上限エラーを400に変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrPlayerFavoriteSongLimitExceeded)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeFavoriteSongLimitExceeded, apiErr.Code)
+}
+
 func TestFromUsecaseError_auth_time欠落は詳細を伏せてrecent_sign_in_requiredに丸める(t *testing.T) {
 	err := errors.Join(usecase.ErrRecentSignInAuthTimeMissing, errors.New("firebase token auth_time is empty"))
 

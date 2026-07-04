@@ -69,4 +69,7 @@ const (
 	CodeRecordFilterLimitExceeded = "record_filter_limit_exceeded"
 	CodeInvalidRecordFilterInput  = "invalid_record_filter_input"
 	CodeInvalidRecordFilterID     = "invalid_record_filter_id"
+
+	// お気に入り楽曲関連エラー
+	CodeFavoriteSongLimitExceeded = "favorite_song_limit_exceeded"
 )

@@ -26,6 +26,7 @@ type songUsecaseImpl struct {
 	tm                           TransactionManager
 	defaultExecutor              repository.Executor
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
+	favoriteRepo                 repository.PlayerFavoriteSongRepository
 }
 
 // NewSongUsecase は新しい SongUsecase を生成します。
@@ -57,6 +58,24 @@ func NewSongUsecaseWithOverpowerDenominator(
 		panic("NewSongUsecaseWithOverpowerDenominator: NewSongUsecase returned unexpected type, expected *songUsecaseImpl")
 	}
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	return impl
+}
+
+// NewSongUsecaseWithFavoriteIntegration はお気に入り楽曲削除連携付きで SongUsecase を生成します。
+func NewSongUsecaseWithFavoriteIntegration(
+	songRepo repository.SongRepository,
+	masterCache repository.SongMasterProvider,
+	tm TransactionManager,
+	defaultExecutor repository.Executor,
+	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
+	favoriteRepo repository.PlayerFavoriteSongRepository,
+) SongUsecase {
+	usecase := NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, defaultExecutor, overpowerDenominatorProvider)
+	impl, ok := usecase.(*songUsecaseImpl)
+	if !ok {
+		panic("NewSongUsecaseWithFavoriteIntegration: NewSongUsecaseWithOverpowerDenominator returned unexpected type, expected *songUsecaseImpl")
+	}
+	impl.favoriteRepo = favoriteRepo
 	return impl
 }
 
@@ -100,13 +119,19 @@ func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, er
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) error {
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayIDForUpdate(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
 
 		song.Delete()
-		return s.songRepo.Save(ctx, tx, song)
+		if err := s.songRepo.Save(ctx, tx, song); err != nil {
+			return err
+		}
+		if s.favoriteRepo != nil {
+			return s.favoriteRepo.DeleteBySongID(ctx, tx, song.ID)
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
