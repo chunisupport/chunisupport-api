@@ -1335,21 +1335,24 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 		}
 		lockedSet[lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)] = struct{}{}
 	}
-	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, func(record *entity.PlayerRecord) bool {
+	overpowerRecords, skippedRecords, err := playerRecordsToOverpowerRecordsWithSkipped(records, false, func(record *entity.PlayerRecord) (bool, string) {
 		if len(lockedSet) == 0 {
-			return true
+			return true, ""
 		}
 		if record.ChartDifficulty == nil {
-			return false
+			return false, "chart_difficulty_nil"
 		}
 		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
-		return !exists
+		if exists {
+			return false, "locked_song"
+		}
+		return true, ""
 	})
 	if err != nil {
 		return calculatedOverpowerSummary{}, err
 	}
-	if len(overpowerRecords) != len(records) {
-		slog.Warn("skipped player records with missing related data during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords))
+	if len(skippedRecords) > 0 {
+		slog.Warn("skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", skippedRecords)
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
