@@ -7,7 +7,9 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,11 +33,12 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 最小限のペイロードを作成（スコアは空）
+			rating := 0.0
 			payload := &PlayerDataPayload{
 				AppVersion: tt.appVersion,
 				Name:       "テストプレイヤー",
 				Level:      1,
-				Rating:     new(0.0),
+				Rating:     &rating,
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
 					Value:      0.0,
@@ -163,8 +166,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "06",
 				BaseClass:  "06",
 			},
-			wantClassID: new(6),
-			wantBaseID:  new(6),
+			wantClassID: intPtrForApplyScoresTest(6),
+			wantBaseID:  intPtrForApplyScoresTest(6),
 		},
 		{
 			name: "infの直接指定も従来通り解決できる",
@@ -172,8 +175,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "INF",
 				BaseClass:  "inf",
 			},
-			wantClassID: new(6),
-			wantBaseID:  new(6),
+			wantClassID: intPtrForApplyScoresTest(6),
+			wantBaseID:  intPtrForApplyScoresTest(6),
 		},
 		{
 			name: "未定義値はnil扱いになる",
@@ -377,4 +380,240 @@ func newApplyHonorsTestMasters() *playerDataMaster {
 			},
 		},
 	}
+}
+
+func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
+	t.Run("ChartDifficultyがnilのレコードをスキップしWARNログを出力する", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ChartDifficultyがnilのレコード（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "テスト曲1"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				// ChartDifficulty: nil
+			},
+			// 正常なレコード（集計される）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 101, Title: "テスト曲2"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 200, IsUltima: false},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// WARNログが出力されていることを確認
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "level=WARN")
+		assert.Contains(t, logOutput, "skipped player records during overpower recalculation")
+		assert.Contains(t, logOutput, "chart_difficulty_nil")
+	})
+
+	t.Run("ロック楽曲のレコードをスキップしWARNログを出力する", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ロックされている楽曲（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ロック曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+			// 正常なレコード（集計される）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 101, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: false},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// WARNログが出力されていることを確認
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "level=WARN")
+		assert.Contains(t, logOutput, "skipped player records during overpower recalculation")
+		assert.Contains(t, logOutput, "locked_song")
+	})
+
+	t.Run("ULTIMAのロック楽曲も正しくスキップする", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ULTIMAでロックされている楽曲（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ULTIMA曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   5,
+					Name: "ULTIMA",
+				},
+			},
+			// 同じ曲の別の難易度（スキップされない）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ULTIMA曲"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: true},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// WARNログが出力されていることを確認
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "level=WARN")
+		assert.Contains(t, logOutput, "skipped player records during overpower recalculation")
+		assert.Contains(t, logOutput, "locked_song")
+	})
+
+	t.Run("ロック楽曲がない場合はスキップ処理をバイパスする", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				// ChartDifficultyがnilでもロック楽曲が空ならスキップチェックはバイパスされる
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// ロック楽曲がないのでWARNログは出力されない（または別の理由でスキップされた場合のみ出力される）
+		logOutput := logBuffer.String()
+		// この場合はChartDifficultyがnilでもスキップロジックがバイパスされるため、WARNログは出ない
+		assert.NotContains(t, logOutput, "chart_difficulty_nil")
+		assert.NotContains(t, logOutput, "locked_song")
+	})
+
+	t.Run("スキップレコードが空の場合はWARNログを出力しない", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 200, IsUltima: false}, // 別の曲をロック
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// スキップレコードがないのでWARNログは出力されない
+		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
+	})
 }
