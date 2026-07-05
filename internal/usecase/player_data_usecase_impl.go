@@ -1351,8 +1351,14 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 	if err != nil {
 		return calculatedOverpowerSummary{}, err
 	}
-	if len(skippedRecords) > 0 {
-		slog.Warn("skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", skippedRecords)
+	unexpectedSkippedRecords := make([]skippedOverpowerRecord, 0, len(skippedRecords))
+	for _, skippedRecord := range skippedRecords {
+		if skippedRecord.Reason != "locked_song" {
+			unexpectedSkippedRecords = append(unexpectedSkippedRecords, skippedRecord)
+		}
+	}
+	if len(unexpectedSkippedRecords) > 0 {
+		slog.Warn("skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", unexpectedSkippedRecords)
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
