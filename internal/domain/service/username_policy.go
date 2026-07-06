@@ -3,13 +3,10 @@ package service
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
-
-var forbiddenWordPattern = regexp.MustCompile(`^[a-z0-9]+$`)
 
 var (
 	// ErrUsernameForbidden はユーザー名が登録禁止語に該当する場合に返されます。
@@ -65,8 +62,8 @@ func (p *forbiddenUsernamePolicy) Validate(userName username.UserName) error {
 func validatedForbiddenWords(words []string) (map[string]struct{}, error) {
 	result := make(map[string]struct{}, len(words))
 	for _, word := range words {
-		if !forbiddenWordPattern.MatchString(word) {
-			return nil, fmt.Errorf("forbidden word must contain only lowercase letters and numbers: %q", word)
+		if word == "" {
+			return nil, errors.New("forbidden word must not be empty")
 		}
 		result[word] = struct{}{}
 	}

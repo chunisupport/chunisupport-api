@@ -61,15 +61,14 @@ func TestForbiddenUsernamePolicy_Validate(t *testing.T) {
 	}
 }
 
-func TestNewForbiddenUsernamePolicy_不正な禁止語を拒否する(t *testing.T) {
+func TestNewForbiddenUsernamePolicy_空の禁止語を拒否する(t *testing.T) {
 	tests := []struct {
 		name     string
 		exact    []string
 		contains []string
 	}{
 		{name: "空文字", exact: []string{""}},
-		{name: "大文字", exact: []string{"Admin"}},
-		{name: "記号", contains: []string{"admin-"}},
+		{name: "部分一致の空文字", contains: []string{""}},
 	}
 
 	for _, tt := range tests {
@@ -79,4 +78,13 @@ func TestNewForbiddenUsernamePolicy_不正な禁止語を拒否する(t *testing
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestNewForbiddenUsernamePolicy_任意の非空文字列を許可する(t *testing.T) {
+	_, err := NewForbiddenUsernamePolicy(
+		[]string{"Admin", "運営"},
+		[]string{"admin-", "管理者"},
+	)
+
+	assert.NoError(t, err)
 }

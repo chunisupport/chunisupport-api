@@ -50,9 +50,13 @@ func TestLoadUsernamePolicy(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "大文字を含む禁止語を拒否する",
-			content: `{"exact":["Admin"]}`,
-			wantErr: true,
+			name:      "大文字や記号を含む禁止語を読み込む",
+			content:   `{"exact":["Admin"],"contains":["運営","admin-"]}`,
+			wantExact: []string{"Admin"},
+			wantContain: []string{
+				"運営",
+				"admin-",
+			},
 		},
 	}
 
