@@ -108,6 +108,9 @@ type stubPlayerRecordRepositoryForLockedSong struct {
 func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
 	return s.records, nil
 }
+func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error) {
+	return s.records, nil
+}
 func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDForRating(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
 	return nil, nil
 }

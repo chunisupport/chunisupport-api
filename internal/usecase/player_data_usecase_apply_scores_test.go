@@ -599,6 +599,10 @@ func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerID(_ context.
 	return s.records, nil
 }
 
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error) {
+	return s.FindByPlayerID(ctx, exec, playerID)
+}
+
 func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDForRating(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerRecord, error) {
 	return nil, nil
 }

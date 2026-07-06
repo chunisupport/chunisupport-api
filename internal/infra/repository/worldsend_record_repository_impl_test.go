@@ -100,3 +100,31 @@ func TestFindByPlayerID_ScansNilLevelStarAsNil(t *testing.T) {
 	require.NotNil(t, records[0].WorldsendChart)
 	assert.Nil(t, records[0].WorldsendChart.LevelStar)
 }
+
+func TestWorldsendRecordRepository_FindByPlayerIDAndSongDisplayID_指定楽曲だけを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupWorldsendRecordDB(t, db)
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, is_worldsend)
+		VALUES
+			(1, 'WE001', '曲1', 'artist', 1, 'WEIDX001', 1),
+			(2, 'WE002', '曲2', 'artist', 1, 'WEIDX002', 1);
+		INSERT INTO worldsend_charts (id, song_id) VALUES (101, 1), (102, 2);
+		INSERT INTO player_worldsend_records
+			(player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)
+		VALUES
+			(10, 101, 900000, 1, 1, 1, CURRENT_TIMESTAMP),
+			(10, 102, 950000, 1, 1, 1, CURRENT_TIMESTAMP);
+	`)
+	require.NoError(t, err)
+
+	// When
+	records, err := (&worldsendRecordRepository{db: db}).FindByPlayerIDAndSongDisplayID(context.Background(), db, 10, "WE001")
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "WE001", records[0].Song.DisplayID)
+}

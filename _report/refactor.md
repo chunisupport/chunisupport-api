@@ -35,8 +35,8 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | `GetUserProfileWithRecords` と `GetUserProfileRecordView` は `records.all` と `records.worldsend` をまとめて返しており、ページネーションがありません。`view=rating` で軽量化できる経路はありますが、レコード一覧系はユーザーの蓄積データ増加に比例してレスポンスが肥大化します。 |
-| **PERF-004** | **Medium** | レコード表示系の `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | `user_usecase_impl.go` の profile / record 系では通常譜面・WORLD'S ENDともに `FindByPlayerID` で全件取得してからDTO化や未プレイ補完を行っています。`view=rating` では `FindByPlayerIDForRating` に分離済みですが、レコード表示用途は用途別取得への分割余地があります。 |
+| **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | 楽曲詳細用途には楽曲単位APIを追加済みです。既存の一覧用途では `GetUserProfileWithRecords` と `GetUserProfileRecordView` が全件を返すため、ページネーションは引き続き検討対象です。 |
+| **PERF-004** | **Medium** | レコード表示系の `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | 楽曲単位APIでは `FindByPlayerIDAndSongDisplayID` により対象曲だけを取得するよう対応済みです。既存の全件表示APIは用途上全件取得を維持しています。 |
 | **PERF-005** | **Low** | 楽曲一覧APIが全件返却前提 | `song_handler.go` / `v1/song_handler.go` / `worldsend_handler.go` / `v1_worldsend_handler.go` の楽曲一覧はページネーションなしで全件返却します。マスターデータ的用途として許容する判断もあり得ますが、データ増加時のレスポンス肥大化リスクは `PERF-003` と同様に棚卸しすべきです。 |
 | **PERF-006** | **Medium** | rating view がOP対象判定のため通常レコードを重複取得 | `GetUserProfileRatingView` は `FindByPlayerIDForRating` でレーティング対象を取得した直後、OP対象フラグの算出だけを目的に `FindByPlayerID` で通常レコード全件を再取得しています。rating view の軽量化経路で全件取得が復活しており、同じリクエストで関連情報を含む大きなクエリを2回実行します。OP対象譜面IDだけを返す用途別クエリ、または1回の取得で両方を満たす設計にすべきです。 |
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -417,6 +418,142 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		},
 		UpdatedAt: &player.UpdatedAt,
 	}, nil
+}
+
+// GetUserSongRecord は指定した通常楽曲に属するレコードだけを返します。
+func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*api_internal.UserSongRecordDTO, error) {
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	song, err := s.songRepo.FindByDisplayID(ctx, s.db, displayID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSongNotFound) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+	if song == nil || song.IsDeleted || song.IsWorldsend {
+		return nil, repository.ErrSongNotFound
+	}
+
+	difficultyID, err := s.resolveSongDifficulty(song, difficulty)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &api_internal.UserSongRecordDTO{
+		Standard: []*dto.PlayerRecordDTO{},
+		Meta:     &api_internal.UserSongRecordMetaDTO{},
+	}
+	if !user.HasLinkedPlayer() {
+		return response, nil
+	}
+
+	records, err := s.playerRecordRepo.FindByPlayerIDAndSongDisplayID(ctx, s.db, *user.PlayerID, displayID)
+	if err != nil {
+		return nil, err
+	}
+	markOPTargetPlayerRecords(records)
+
+	allRecords := records
+	if includeNoPlay {
+		difficultyNames, difficultySortOrders := s.songDifficultyMasters()
+		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, []*entity.Song{song}, difficultyNames, difficultySortOrders)
+	}
+	if difficultyID != nil {
+		allRecords = filterPlayerRecordsByDifficultyID(allRecords, *difficultyID)
+	}
+
+	response.Standard = make([]*dto.PlayerRecordDTO, 0, len(allRecords))
+	for _, record := range allRecords {
+		response.Standard = append(response.Standard, dto.ToPlayerRecordDTO(record))
+	}
+	if latest := latestPlayerRecordUpdatedAt(allRecords); !latest.IsZero() {
+		response.Meta.UpdatedAt = &latest
+	}
+	return response, nil
+}
+
+// GetUserWorldsendSongRecord は指定した WORLD'S END 楽曲のレコードを返します。
+func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*api_internal.UserWorldsendSongRecordDTO, error) {
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	songChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.db, displayID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSongNotFound) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+	if songChart == nil || songChart.Song == nil || songChart.Chart == nil ||
+		songChart.Song.IsDeleted || !songChart.Song.IsWorldsend {
+		return nil, repository.ErrSongNotFound
+	}
+
+	response := &api_internal.UserWorldsendSongRecordDTO{
+		Meta: &api_internal.UserSongRecordMetaDTO{},
+	}
+	if !user.HasLinkedPlayer() {
+		return response, nil
+	}
+
+	records, err := s.worldsendRecordRepo.FindByPlayerIDAndSongDisplayID(ctx, s.db, *user.PlayerID, displayID)
+	if err != nil {
+		return nil, err
+	}
+	if includeNoPlay {
+		records = s.recordCompletionSvc.CompleteWorldsendRecords(records, []*entity.WorldsendSongWithChart{songChart})
+	}
+	if len(records) == 0 {
+		return response, nil
+	}
+
+	response.Worldsend = dto.ToWorldsendRecordDTO(records[0])
+	response.Meta.UpdatedAt = response.Worldsend.UpdatedAt
+	return response, nil
+}
+
+func (s *userUsecase) resolveSongDifficulty(song *entity.Song, difficulty string) (*int, error) {
+	if difficulty == "" {
+		return nil, nil
+	}
+	normalized := strings.ToUpper(difficulty)
+	switch normalized {
+	case "BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA":
+	default:
+		return nil, ErrInvalidDifficulty
+	}
+
+	names, _ := s.songDifficultyMasters()
+	for difficultyID, name := range names {
+		if strings.ToUpper(name) == normalized && song.HasDifficultyChart(difficultyID) {
+			return &difficultyID, nil
+		}
+	}
+	return nil, ErrInvalidDifficulty
+}
+
+func (s *userUsecase) songDifficultyMasters() (map[int]string, map[int]int) {
+	if s.masterProvider == nil || s.masterProvider.SongMasters() == nil {
+		return nil, nil
+	}
+	masters := s.masterProvider.SongMasters()
+	return masters.DifficultyNamesByID, masters.DifficultySortOrderByID()
+}
+
+func filterPlayerRecordsByDifficultyID(records []*entity.PlayerRecord, difficultyID int) []*entity.PlayerRecord {
+	filtered := make([]*entity.PlayerRecord, 0, 1)
+	for _, record := range records {
+		if record != nil && record.Chart != nil && record.Chart.DifficultyID == difficultyID {
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered
 }
 
 func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int, includeNoPlay bool) (*userProfilePlayerRecords, error) {

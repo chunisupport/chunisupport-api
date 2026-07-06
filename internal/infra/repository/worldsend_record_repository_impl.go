@@ -88,10 +88,40 @@ WHERE pwr.player_id = ? AND s.is_deleted = 0
 ORDER BY pwr.updated_at DESC
 `
 
+const worldsendRecordBySongQuery = `
+SELECT
+    pwr.player_id, pwr.worldsend_chart_id, pwr.score, pwr.clear_lamp_id,
+    pwr.combo_lamp_id, pwr.full_chain_id, pwr.updated_at,
+    wc.song_id AS chart_song_id, wc.level_star AS chart_level_star,
+    wc.attribute AS chart_attribute, wc.notes AS chart_notes,
+    s.id AS song_id, s.display_id AS song_display_id, s.title AS song_title,
+    s.artist AS song_artist, s.genre_id AS song_genre_id, s.bpm AS song_bpm,
+    s.released_at AS song_released_at, s.official_idx AS song_official_idx,
+    s.jacket AS song_jacket, s.is_deleted AS song_is_deleted,
+    cl.name AS clear_lamp_name, co.name AS combo_lamp_name, fc.name AS full_chain_name
+FROM player_worldsend_records pwr
+INNER JOIN worldsend_charts wc ON pwr.worldsend_chart_id = wc.id
+INNER JOIN songs s ON wc.song_id = s.id
+INNER JOIN clear_lamp_types cl ON pwr.clear_lamp_id = cl.id
+INNER JOIN combo_lamp_types co ON pwr.combo_lamp_id = co.id
+INNER JOIN full_chain_types fc ON pwr.full_chain_id = fc.id
+WHERE pwr.player_id = ? AND s.display_id = ? AND s.is_deleted = 0
+ORDER BY pwr.updated_at DESC
+`
+
 // FindByPlayerID はプレイヤーID で WORLD'S END レコードを検索し、関連する譜面・楽曲・ランプ情報を含むエンティティを返します。
 func (r *worldsendRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerWorldsendRecord, error) {
+	return r.find(ctx, exec, worldsendRecordQuery, playerID)
+}
+
+// FindByPlayerIDAndSongDisplayID は指定楽曲の WORLD'S END レコードだけを取得します。
+func (r *worldsendRecordRepository) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerWorldsendRecord, error) {
+	return r.find(ctx, exec, worldsendRecordBySongQuery, playerID, displayID)
+}
+
+func (r *worldsendRecordRepository) find(ctx context.Context, exec repository.Executor, query string, args ...any) ([]*entity.PlayerWorldsendRecord, error) {
 	var rows []worldsendRecordRow
-	if err := exec.SelectContext(ctx, &rows, worldsendRecordQuery, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -101,6 +102,53 @@ func (h *UserHandler) GetUserRecord(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, toUserRecordDTO(result))
+}
+
+// GetUserSongRecord は通常楽曲1曲分のユーザーレコードを返します。
+func (h *UserHandler) GetUserSongRecord(c *echo.Context) error {
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+	difficulty := strings.ToUpper(c.QueryParam("difficulty"))
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserSongRecord(c.Request().Context(), username, requester, displayID, includeNoPlay, difficulty)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, result)
+}
+
+// GetUserWorldsendSongRecord は WORLD'S END 楽曲1曲分のユーザーレコードを返します。
+func (h *UserHandler) GetUserWorldsendSongRecord(c *echo.Context) error {
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserWorldsendSongRecord(c.Request().Context(), username, requester, displayID, includeNoPlay)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, result)
 }
 
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。

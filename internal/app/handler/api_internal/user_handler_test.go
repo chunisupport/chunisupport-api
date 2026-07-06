@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -57,6 +58,22 @@ func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username
 	return args.Get(0).(*dto_internal.UserProfileRecordViewDTO), args.Error(1)
 }
 
+func (m *mockUserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*dto_internal.UserSongRecordDTO, error) {
+	args := m.Called(ctx, username, requester, displayID, includeNoPlay, difficulty)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto_internal.UserSongRecordDTO), args.Error(1)
+}
+
+func (m *mockUserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*dto_internal.UserWorldsendSongRecordDTO, error) {
+	args := m.Called(ctx, username, requester, displayID, includeNoPlay)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto_internal.UserWorldsendSongRecordDTO), args.Error(1)
+}
+
 func (m *mockUserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
 	args := m.Called(ctx, page, limit, name)
 	if args.Get(0) == nil {
@@ -68,6 +85,72 @@ func (m *mockUserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, lim
 func (m *mockUserUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	args := m.Called(ctx, requester, username)
 	return args.Error(0)
+}
+
+func TestUserHandler_GetUserSongRecord(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
+	expected := &dto_internal.UserSongRecordDTO{
+		Standard: []*dto.PlayerRecordDTO{},
+		Meta:     &dto_internal.UserSongRecordMetaDTO{},
+	}
+	mockUsecase.On(
+		"GetUserSongRecord",
+		mock.Anything,
+		"testuser",
+		(*entity.User)(nil),
+		"0000000000000001",
+		true,
+		"MASTER",
+	).Return(expected, nil).Once()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/0000000000000001?include_noplay=true&difficulty=master", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{
+		{Name: "username", Value: "testuser"},
+		{Name: "displayid", Value: "0000000000000001"},
+	})
+
+	// When
+	err := h.GetUserSongRecord(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestUserHandler_GetUserWorldsendSongRecord_楽曲不存在(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
+	mockUsecase.On(
+		"GetUserWorldsendSongRecord",
+		mock.Anything,
+		"testuser",
+		(*entity.User)(nil),
+		"0000000000000002",
+		false,
+	).Return((*dto_internal.UserWorldsendSongRecordDTO)(nil), repository.ErrSongNotFound).Once()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/0000000000000002", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{
+		{Name: "username", Value: "testuser"},
+		{Name: "displayid", Value: "0000000000000002"},
+	})
+
+	// When
+	err := h.GetUserWorldsendSongRecord(c)
+
+	// Then
+	apiErr, ok := err.(*apierror.APIError)
+	assert.True(t, ok)
+	assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+	mockUsecase.AssertExpectations(t)
 }
 
 func TestUserHandler_GetUserUpdatedAt(t *testing.T) {

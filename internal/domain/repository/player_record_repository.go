@@ -30,6 +30,9 @@ type PlayerRecordRepository interface {
 	// FindByPlayerID はプレイヤーIDをキーにレコード一覧を取得します。
 	FindByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
 
+	// FindByPlayerIDAndSongDisplayID はプレイヤーと楽曲の表示IDをキーにレコード一覧を取得します。
+	FindByPlayerIDAndSongDisplayID(ctx context.Context, exec Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error)
+
 	// FindByPlayerIDForRating はレーティング対象のレコードのみを取得します。
 	FindByPlayerIDForRating(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
 

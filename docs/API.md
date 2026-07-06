@@ -142,6 +142,8 @@
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
+| `/internal/users/:username/record/songs/:displayid` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
+| `/internal/users/:username/record/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲1曲分のレコード取得 |
 | `/internal/users/:username/locked-songs` | GET | Firebase Bearer (任意) | ユーザーの未解禁曲一覧を取得 |
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
@@ -1974,6 +1976,53 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   }
 }
 ```
+
+### GET `/internal/users/:username/record/songs/:displayid`
+
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: 指定した通常楽曲に属するユーザーレコードだけを返します。
+- **クエリパラメータ**:
+  - `include_noplay` (任意): `true` の場合は未プレイ譜面も補完します。
+  - `difficulty` (任意): `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`。大文字小文字は区別しません。指定した難易度の譜面が曲に存在しない場合は `400 invalid_difficulty` を返します。
+- **レスポンス**: `standard` は最大5件です。`meta.updated_at` は返却したプレイ済みレコードの最終更新日時で、該当レコードがなければ `null` です。
+
+```json
+{
+  "standard": [
+    {
+      "is_played": true,
+      "difficulty": "MASTER",
+      "id": "0000000000000001",
+      "score": 1009500,
+      "updated_at": "2026-06-20T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "updated_at": "2026-06-20T10:00:00Z"
+  }
+}
+```
+
+### GET `/internal/users/:username/record/worldsend-songs/:displayid`
+
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: 指定した WORLD'S END 楽曲のユーザーレコードを返します。
+- **クエリパラメータ**:
+  - `include_noplay` (任意): `true` の場合は未プレイレコードを補完します。
+- **レスポンス**: レコードがなければ `worldsend` は `null` です。`include_noplay=true` の場合は未プレイオブジェクトを返します。
+
+```json
+{
+  "worldsend": null,
+  "meta": {
+    "updated_at": null
+  }
+}
+```
+
+両APIともユーザー不存在・非公開ユーザー・楽曲不存在・パスと楽曲種別の不一致は `404` を返します。`username` または `displayid` の形式不正は `400 validation_failed` です。
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)

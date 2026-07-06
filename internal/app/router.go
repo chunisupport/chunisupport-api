@@ -311,6 +311,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
+		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
+		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 		publicUsersGroup.GET("/:username/favorite-songs", handlers.PlayerFavoriteSong.List)

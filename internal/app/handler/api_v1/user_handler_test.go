@@ -41,6 +41,14 @@ func (m *mockV1UserUsecase) GetUserProfileRecordView(ctx context.Context, userna
 	return nil, nil
 }
 
+func (m *mockV1UserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*dto_internal.UserSongRecordDTO, error) {
+	return nil, nil
+}
+
+func (m *mockV1UserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*dto_internal.UserWorldsendSongRecordDTO, error) {
+	return nil, nil
+}
+
 func (m *mockV1UserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
 	return nil, nil
 }

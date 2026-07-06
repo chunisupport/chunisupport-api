@@ -98,6 +98,10 @@ func (s *stubPlayerRecordRepository) FindByPlayerID(ctx context.Context, exec re
 	return s.records, nil
 }
 
+func (s *stubPlayerRecordRepository) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error) {
+	return s.FindByPlayerID(ctx, exec, playerID)
+}
+
 func (s *stubPlayerRecordRepository) FindByPlayerIDForRating(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
 	if s.err != nil {
 		return nil, s.err
@@ -211,8 +215,13 @@ func (s *stubWorldsendRecordRepository) FindByPlayerID(ctx context.Context, exec
 	return s.records, nil
 }
 
+func (s *stubWorldsendRecordRepository) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerWorldsendRecord, error) {
+	return s.FindByPlayerID(ctx, exec, playerID)
+}
+
 type stubSongRepository struct {
 	songs []*entity.Song
+	song  *entity.Song
 	err   error
 }
 
@@ -224,7 +233,10 @@ func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec
 }
 
 func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
-	return nil, errors.New("not implemented")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.song, nil
 }
 
 func (s *stubSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
@@ -278,6 +290,7 @@ func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
 
 type stubWorldsendChartRepository struct {
 	records []*entity.WorldsendSongWithChart
+	record  *entity.WorldsendSongWithChart
 	err     error
 }
 
@@ -289,7 +302,10 @@ func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec reposit
 }
 
 func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
-	return nil, errors.New("not implemented")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.record, nil
 }
 
 func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
@@ -1142,6 +1158,121 @@ func intPointer(v int) *int {
 
 func timePointer(v time.Time) *time.Time {
 	return &v
+}
+
+func TestUserUsecase_GetUserSongRecord_指定難易度を未プレイ補完して返す(t *testing.T) {
+	// Given
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	user := &entity.User{ID: 1, Username: userName, PlayerID: &playerID}
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Title:     "テスト曲",
+		Charts: []*entity.Chart{
+			{ID: 101, SongID: 20, DifficultyID: 1},
+			{ID: 104, SongID: 20, DifficultyID: 4},
+		},
+	}
+	masters := &masterdata.SongMasters{
+		CommonMasters: masterdata.CommonMasters{
+			DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
+		},
+		Difficulties: map[string]master.ChartDifficulty{
+			"BASIC":  {ID: 1, Name: "BASIC", SortOrder: 1},
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	}
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		&stubSongMasterProvider{masters: masters},
+	)
+
+	// When
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", true, "MASTER")
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, result.Standard, 1)
+	assert.Equal(t, "MASTER", result.Standard[0].Difficulty)
+	assert.False(t, result.Standard[0].IsPlayed)
+	assert.Nil(t, result.Meta.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserSongRecord_曲に存在しない難易度はエラー(t *testing.T) {
+	// Given
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Charts:    []*entity.Chart{{ID: 101, SongID: 20, DifficultyID: 1}},
+	}
+	masters := &masterdata.SongMasters{
+		CommonMasters: masterdata.CommonMasters{
+			DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
+		},
+	}
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		&stubSongMasterProvider{masters: masters},
+	)
+
+	// When
+	_, err = service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", false, "MASTER")
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidDifficulty)
+}
+
+func TestUserUsecase_GetUserWorldsendSongRecord_未プレイ補完を返す(t *testing.T) {
+	// Given
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	songChart := &entity.WorldsendSongWithChart{
+		Song: &entity.Song{
+			ID:          20,
+			DisplayID:   "WE001",
+			Title:       "WE曲",
+			Charts:      []*entity.Chart{},
+			IsWorldsend: true,
+		},
+		Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
+	}
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		&stubWorldsendRecordRepository{},
+		nil,
+		&stubWorldsendChartRepository{record: songChart},
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001", true)
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, result.Worldsend)
+	assert.Equal(t, "WE001", result.Worldsend.ID)
+	assert.False(t, result.Worldsend.IsPlayed)
+	assert.Nil(t, result.Meta.UpdatedAt)
 }
 
 func TestUserUsecase_DeleteUser_Success(t *testing.T) {

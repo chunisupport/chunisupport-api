@@ -28,4 +28,7 @@ type WorldsendRecordRepository interface {
 	// FindByPlayerID はプレイヤーIDをキーに WORLD'S END レコードを詳細情報付きで取得します。
 	// 楽曲、譜面、マスターデータを含む完全な PlayerWorldsendRecord エンティティを返します。
 	FindByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerWorldsendRecord, error)
+
+	// FindByPlayerIDAndSongDisplayID はプレイヤーと楽曲の表示IDをキーに WORLD'S END レコードを取得します。
+	FindByPlayerIDAndSongDisplayID(ctx context.Context, exec Executor, playerID int, displayID string) ([]*entity.PlayerWorldsendRecord, error)
 }
