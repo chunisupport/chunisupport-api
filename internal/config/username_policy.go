@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,8 +25,13 @@ func loadUsernamePolicy(path string) (UsernamePolicy, error) {
 	}
 	defer file.Close()
 
+	reader := bufio.NewReader(file)
+	if prefix, _ := reader.Peek(3); bytes.Equal(prefix, []byte{0xEF, 0xBB, 0xBF}) {
+		_, _ = reader.Discard(3)
+	}
+
 	var policy UsernamePolicy
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(reader)
 	decoder.DisallowUnknownFields()
 	var rawPolicy *UsernamePolicy
 	if err := decoder.Decode(&rawPolicy); err != nil {

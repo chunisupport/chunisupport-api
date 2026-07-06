@@ -24,6 +24,12 @@ func TestLoadUsernamePolicy(t *testing.T) {
 			wantContain: []string{"word"},
 		},
 		{
+			name:        "UTF-8 BOM付きJSONを読み込む",
+			content:     "\uFEFF" + `{"exact":["admin"],"contains":["word"]}`,
+			wantExact:   []string{"admin"},
+			wantContain: []string{"word"},
+		},
+		{
 			name:    "壊れたJSONを拒否する",
 			content: `{"exact":`,
 			wantErr: true,
