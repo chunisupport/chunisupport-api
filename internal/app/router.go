@@ -132,11 +132,12 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
+	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	tm := transaction.NewTransactionManager(db)
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
@@ -305,11 +306,14 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	}))
 
 	// api.chunisupport.net/internal/users
+	userUpdatedAtGroup := internal.Group("/users")
+	userUpdatedAtGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	userUpdatedAtGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
+
 	publicUsersGroup := internal.Group("/users")
 	publicUsersGroup.Use(optionalFirebaseAuthStrict, anonymousRateLimit)
 	{
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
-		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)

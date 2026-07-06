@@ -119,6 +119,15 @@ func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exe
 	return s.lastScoreUpdate, nil
 }
 
+type stubUserUpdatedAtQueryService struct {
+	result *repository.UserUpdatedAtQueryResult
+	err    error
+}
+
+func (s *stubUserUpdatedAtQueryService) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*repository.UserUpdatedAtQueryResult, error) {
+	return s.result, s.err
+}
+
 type stubPlayerRepository struct {
 	playerWithHonors *repository.PlayerWithHonors
 	err              error
@@ -449,6 +458,95 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Nil(t, result.UpdatedAt)
 	})
+}
+
+func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.T) {
+	now := time.Now()
+	playerUpdatedAt := now
+	recordsUpdatedAt := now.Add(time.Hour)
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+		result: &repository.UserUpdatedAtQueryResult{
+			User:             &entity.User{ID: 1, PlayerID: intPointer(10)},
+			PlayerUpdatedAt:  &playerUpdatedAt,
+			RecordsUpdatedAt: &recordsUpdatedAt,
+		},
+	}
+
+	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.UpdatedAt)
+	assert.Equal(t, recordsUpdatedAt, *result.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検証する(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+		result: &repository.UserUpdatedAtQueryResult{
+			User: &entity.User{ID: 1, PlayerID: intPointer(10), IsPrivate: true},
+		},
+	}
+
+	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, ErrUserPrivate)
+}
+
+func TestUserUsecase_GetUserUpdatedAt_専用クエリでプレイヤー未連携の場合は更新日時がnil(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+		result: &repository.UserUpdatedAtQueryResult{
+			User: &entity.User{ID: 1},
+		},
+	}
+
+	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserUpdatedAt_専用クエリで存在しないユーザーはエラー(t *testing.T) {
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{err: repository.ErrUserNotFound}
+
+	result, err := service.GetUserUpdatedAt(context.Background(), "missing", nil)
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, ErrUserNotFound)
+}
+
+func TestUserUsecase_GetUserUpdatedAt_専用クエリで非公開ユーザー本人は取得できる(t *testing.T) {
+	playerUpdatedAt := time.Now()
+	user := &entity.User{ID: 1, PlayerID: intPointer(10), IsPrivate: true}
+	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	impl, ok := service.(*userUsecase)
+	require.True(t, ok)
+	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+		result: &repository.UserUpdatedAtQueryResult{
+			User:            user,
+			PlayerUpdatedAt: &playerUpdatedAt,
+		},
+	}
+
+	result, err := service.GetUserUpdatedAt(context.Background(), "tester", user)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.UpdatedAt)
+	assert.Equal(t, playerUpdatedAt, *result.UpdatedAt)
 }
 
 func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {

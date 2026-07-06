@@ -77,8 +77,9 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 ### 3.1 read 最適化経路
 
-現状、read 最適化経路は `/internal/songs` の公開 GET 群に適用されています。
+現状、read 最適化経路はキャッシュ確認用途を含む以下の公開 GET に適用されています。
 
+- `GET /internal/users/:username/updated-at`
 - `GET /internal/songs/updated-at`
 - `GET /internal/songs`
 - `GET /internal/songs/:displayid`
@@ -90,10 +91,9 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 ### 3.2 strict 任意認証
 
-現状、`/internal/users` の公開 GET 群は strict 任意認証です。read 最適化経路ではありません。
+現状、`/internal/users` のうち更新日時取得以外の公開 GET 群は strict 任意認証です。
 
 - `GET /internal/users/:username/profile`
-- `GET /internal/users/:username/updated-at`
 - `GET /internal/users/:username/rating`
 - `GET /internal/users/:username/record`
 - `GET /internal/users/:username/locked-songs`

@@ -26,6 +26,7 @@ type userUsecase struct {
 	worldsendChartRepo           repository.WorldsendChartRepository
 	playerLockedSongRepo         repository.PlayerLockedSongRepository
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
+	userUpdatedAtQuery           repository.UserUpdatedAtQueryService
 	recordCompletionSvc          *service.RecordCompletionService
 	masterProvider               userMasterProvider
 	firebaseDeleter              FirebaseUserDeleter
@@ -84,7 +85,7 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 }
 
 // NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
 	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, firebaseDeleter)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
@@ -92,6 +93,7 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Exec
 	}
 	impl.playerLockedSongRepo = playerLockedSongRepo
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	impl.userUpdatedAtQuery = userUpdatedAtQuery
 	return impl
 }
 
@@ -114,15 +116,26 @@ func (s *userUsecase) GetUserProfile(ctx context.Context, username string, reque
 
 // GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方を返します。
 func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error) {
+	if s.userUpdatedAtQuery != nil {
+		return s.getUserUpdatedAtByQuery(ctx, username, requester)
+	}
+
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
 	}
-	player, err := s.getOptionalPlayer(ctx, user)
+	if user.PlayerID == nil {
+		return &api_internal.UserUpdatedAtDTO{UpdatedAt: nil}, nil
+	}
+
+	player, err := s.playerRepo.FindByID(ctx, s.db, *user.PlayerID)
 	if err != nil {
+		if errors.Is(err, repository.ErrPlayerNotFound) {
+			return &api_internal.UserUpdatedAtDTO{UpdatedAt: nil}, nil
+		}
 		return nil, err
 	}
-	if player == nil || user.PlayerID == nil {
+	if player == nil {
 		return &api_internal.UserUpdatedAtDTO{
 			UpdatedAt: nil,
 		}, nil
@@ -146,6 +159,32 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 	return &api_internal.UserUpdatedAtDTO{
 		UpdatedAt: &latestUpdatedAt,
 	}, nil
+}
+
+func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error) {
+	result, err := s.userUpdatedAtQuery.FindByUsername(ctx, s.db, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	if result == nil || result.User == nil {
+		return nil, ErrUserNotFound
+	}
+	if result.User.IsPrivate && (requester == nil || requester.ID != result.User.ID) {
+		return nil, ErrUserPrivate
+	}
+	if result.PlayerUpdatedAt == nil {
+		return &api_internal.UserUpdatedAtDTO{UpdatedAt: nil}, nil
+	}
+
+	latestUpdatedAt := *result.PlayerUpdatedAt
+	if result.RecordsUpdatedAt != nil && result.RecordsUpdatedAt.After(latestUpdatedAt) {
+		latestUpdatedAt = *result.RecordsUpdatedAt
+	}
+
+	return &api_internal.UserUpdatedAtDTO{UpdatedAt: &latestUpdatedAt}, nil
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
