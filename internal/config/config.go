@@ -70,12 +70,13 @@ type Config struct {
 	// SmallDataDBPath は小規模なユーザー補助データ用SQLiteのファイルパスです。
 	SmallDataDBPath string `json:"smalldata_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int       `json:"shutdown_timeout_seconds"`
-	CORS                   CORS      `json:"cors"`
-	TempData               TempData  `json:"temp_data"`
-	Firebase               Firebase  // 環境変数から読み込み
-	Turnstile              Turnstile // 環境変数から読み込み
-	Database               Database  // 環境変数から読み込み
+	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
+	CORS                   CORS           `json:"cors"`
+	TempData               TempData       `json:"temp_data"`
+	UsernamePolicy         UsernamePolicy `json:"-"`
+	Firebase               Firebase       // 環境変数から読み込み
+	Turnstile              Turnstile      // 環境変数から読み込み
+	Database               Database       // 環境変数から読み込み
 	loggingSet             bool
 }
 
@@ -168,6 +169,12 @@ func LoadConfig() (Config, error) {
 
 	if err := json.NewDecoder(configFile).Decode(&config); err != nil {
 		return config, fmt.Errorf("failed to decode config file: %w", err)
+	}
+
+	usernamePolicyPath := filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile)
+	config.UsernamePolicy, err = loadUsernamePolicy(usernamePolicyPath)
+	if err != nil {
+		return config, err
 	}
 
 	var errors []string

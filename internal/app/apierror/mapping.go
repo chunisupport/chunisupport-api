@@ -18,6 +18,8 @@ func FromUsecaseError(err error) *APIError {
 	switch {
 	case errors.Is(err, usecase.ErrUsernameTaken):
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
+	case errors.Is(err, usecase.ErrUsernameForbidden):
+		return ErrRegistrationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidCredentials):
 		return ErrInvalidCredentials.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecentSignInAuthTimeMissing):

@@ -306,7 +306,7 @@
 
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
-| `username` | string | ✓ | 5〜50文字、小文字英数字のみ |
+| `username` | string | ✓ | 5〜50文字、小文字英数字のみ。設定された禁止語に該当しないこと |
 | `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
 
 - **レスポンス**: 201 Created。`UserDTO` を返します。

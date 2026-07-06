@@ -9,6 +9,7 @@ import (
 const (
 	Name                           = "chunisupport-api"
 	ConfigDir                      = ".config/"
+	UsernameForbiddenWordsFile     = "username_forbidden_words.json"
 	ResourceDir                    = ".resources/"
 	MigrationDir                   = "migration/mysql/"
 	StaticDBFilename               = "static.db"

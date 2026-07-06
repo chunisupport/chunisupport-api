@@ -7,6 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -24,6 +25,7 @@ type signupUsecase struct {
 	tokenVerifier       TokenVerifier
 	turnstileVerifier   TurnstileVerifier
 	accountTypeProvider AccountTypeProvider
+	usernamePolicy      service.UsernamePolicy
 }
 
 // NewSignupUsecase は signup 用ユースケースを生成します。
@@ -33,6 +35,7 @@ func NewSignupUsecase(
 	tokenVerifier TokenVerifier,
 	turnstileVerifier TurnstileVerifier,
 	accountTypeProvider AccountTypeProvider,
+	usernamePolicy service.UsernamePolicy,
 ) SignupUsecase {
 	if tm == nil {
 		panic("signupUsecase: TransactionManager is nil")
@@ -49,6 +52,9 @@ func NewSignupUsecase(
 	if accountTypeProvider == nil {
 		panic("signupUsecase: AccountTypeProvider is nil")
 	}
+	if usernamePolicy == nil {
+		panic("signupUsecase: UsernamePolicy is nil")
+	}
 
 	return &signupUsecase{
 		tm:                  tm,
@@ -56,6 +62,7 @@ func NewSignupUsecase(
 		tokenVerifier:       tokenVerifier,
 		turnstileVerifier:   turnstileVerifier,
 		accountTypeProvider: accountTypeProvider,
+		usernamePolicy:      usernamePolicy,
 	}
 }
 
@@ -88,6 +95,12 @@ func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr 
 	un, err := username.NewUserName(usernameStr)
 	if err != nil {
 		return nil, convertUsernameError(err)
+	}
+	if err := u.usernamePolicy.Validate(un); err != nil {
+		if errors.Is(err, service.ErrUsernameForbidden) {
+			return nil, ErrUsernameForbidden
+		}
+		return nil, errors.Join(ErrInternalError, err)
 	}
 
 	var newUser *entity.User

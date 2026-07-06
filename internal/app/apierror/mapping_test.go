@@ -27,6 +27,13 @@ func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *te
 	assert.Equal(t, usecase.ErrInvalidCredentials, got.Internal)
 }
 
+func TestFromUsecaseError_禁止ユーザー名は登録失敗に丸める(t *testing.T) {
+	got := FromUsecaseError(usecase.ErrUsernameForbidden)
+
+	assert.Equal(t, CodeRegistrationFailed, got.Code)
+	assert.Equal(t, http.StatusBadRequest, got.HTTPStatus)
+}
+
 func TestFromUsecaseError_お気に入り上限エラーを400に変換する(t *testing.T) {
 	apiErr := FromUsecaseError(usecase.ErrPlayerFavoriteSongLimitExceeded)
 
