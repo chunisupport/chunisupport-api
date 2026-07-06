@@ -45,6 +45,7 @@ jobs:
           ARCH="${{ matrix.goarch }}"
           echo "goarch=${ARCH}" >> $GITHUB_OUTPUT
           echo "binary_name=chunisupport-api-linux-${ARCH}" >> $GITHUB_OUTPUT
+          echo "batch_binary_name=chunisupport-recalculate-player-stats-linux-${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Build binary
         id: build-binary
@@ -58,12 +59,16 @@ jobs:
           go build -trimpath \
             -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
             -o "${{ steps.target.outputs.binary_name }}" ./cmd/api
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+            -o "${{ steps.target.outputs.batch_binary_name }}" ./cmd/recalculate-player-stats
 
       - name: Package (binary + migration, flat structure)
         id: package
         run: |
           tar -czf ${{ steps.target.outputs.binary_name }}.tar.gz \
-            ${{ steps.target.outputs.binary_name }} migration/
+            ${{ steps.target.outputs.binary_name }} \
+            ${{ steps.target.outputs.batch_binary_name }} migration/
 
       - name: Upload artifact
         id: upload-artifact

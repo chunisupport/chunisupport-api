@@ -96,7 +96,7 @@
 cmd/
 ├── api/          # APIサーバー用エントリポイント
 │   └── main.go
-└── batch/        # バッチジョブ用エントリポイント
+└── recalculate-player-stats/ # プレイヤー統計再計算バッチ
     └── main.go
 internal/         # 共通のドメインロジック・ユースケース・インフラ
 └── ...
@@ -108,4 +108,8 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | バイナリ | ビルドコマンド | 実行コマンド |
 |---|---|---|
 | APIサーバー | `go build -o _chunisupport-api ./cmd/api` | `go run ./cmd/api` |
-| バッチジョブ | `go build -o _chunisupport-batch ./cmd/batch` | `go run ./cmd/batch` |
+| プレイヤー統計再計算バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-recalculate-player-stats-linux-amd64 ./cmd/recalculate-player-stats` | `go run ./cmd/recalculate-player-stats` |
+
+## プレイヤー統計再計算バッチ
+
+`go run ./cmd/recalculate-player-stats` は最新マスタに基づいて全プレイヤーのRatingとOVER POWERを再計算します。MySQLアドバイザリロックで多重起動を防ぎ、プレイヤー単位のトランザクションで処理します。運用では07:00前後を避け、cronまたはsystemd timerから1日1回起動してください。

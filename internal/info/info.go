@@ -29,6 +29,7 @@ const (
 	RainbowRequiredDifficultyMaxID = 4
 	RainbowRequiredDifficultyCount = 4
 	RandomFavoriteHonorTitle       = "お気に入りからランダム"
+	PlayerStatsBatchLockName       = "chunisupport:recalculate-player-stats"
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

@@ -1495,32 +1495,22 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 		return service.RatingStats{}, fmt.Errorf("failed to fetch player records: %w", err)
 	}
 
-	// レーティング計算用のレコードに変換
-	ratingRecords := make([]service.RatingRecord, 0, len(records))
+	bestRecords := make([]service.RatingSlotRecord, 0, 30)
+	newRecords := make([]service.RatingSlotRecord, 0, 20)
 	for _, rec := range records {
-		// スロット名が"new"または"new_candidate"の場合は新曲として扱う
-		isNew := false
-		if rec.Slot != nil {
-			slotName := strings.ToLower(rec.Slot.Name)
-			isNew = slotName == "new" || slotName == "new_candidate"
+		if rec.Chart == nil || rec.Slot == nil {
+			return service.RatingStats{}, fmt.Errorf("rating record relation is missing: chart_id=%d", rec.ChartID)
 		}
-
-		// スコアと譜面定数を取得
-		score := uint32(rec.Score) // #nosec G115
-		chartConst := 0.0
-		if rec.Chart != nil {
-			chartConst = rec.Chart.Const.Float64()
+		ratingRecord := service.RatingSlotRecord{ChartID: rec.ChartID, Score: uint32(rec.Score), ChartConst: rec.Chart.Const.Float64()} // #nosec G115
+		switch rec.Slot.Name {
+		case "best":
+			bestRecords = append(bestRecords, ratingRecord)
+		case "new":
+			newRecords = append(newRecords, ratingRecord)
 		}
-
-		ratingRecords = append(ratingRecords, service.RatingRecord{
-			Score:      score,
-			ChartConst: chartConst,
-			IsNew:      isNew,
-		})
 	}
 
-	// レーティング計算
-	stats := service.CalcRatingStats(ratingRecords)
+	stats := service.AggregateOfficialRating(bestRecords, newRecords)
 
 	// データベースに保存
 	if err := us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage); err != nil {

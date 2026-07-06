@@ -164,7 +164,7 @@ INNER JOIN full_chain_types fc ON pr.full_chain_id = fc.id
 INNER JOIN slots sl ON pr.slot_id = sl.id
 INNER JOIN difficulties diff ON c.difficulty_id = diff.id
 WHERE pr.player_id = ? AND s.is_deleted = 0
-  AND sl.name IN ('best', 'best_candidate', 'new', 'new_candidate')
+  AND sl.name IN ('best', 'new')
 ORDER BY sl.id, pr.slot_order IS NULL, pr.slot_order, pr.updated_at DESC
 `
 

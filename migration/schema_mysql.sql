@@ -118,6 +118,15 @@ CREATE TABLE `honors` (
   KEY `honor_type_id` (`honor_type_id`),
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_favorite_songs` (
+  `player_id` mediumint unsigned NOT NULL,
+  `song_id` int unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`player_id`,`song_id`),
+  KEY `fk_player_favorite_songs_song_id` (`song_id`),
+  CONSTRAINT `fk_player_favorite_songs_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_favorite_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_honors` (
   `player_id` mediumint unsigned NOT NULL,
   `honor_id` int unsigned NOT NULL,
@@ -137,15 +146,6 @@ CREATE TABLE `player_locked_songs` (
   KEY `fk_player_locked_songs_song_id` (`song_id`),
   CONSTRAINT `fk_player_locked_songs_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_player_locked_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `player_favorite_songs` (
-  `player_id` mediumint unsigned NOT NULL,
-  `song_id` int unsigned NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`player_id`,`song_id`),
-  KEY `fk_player_favorite_songs_song_id` (`song_id`),
-  CONSTRAINT `fk_player_favorite_songs_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_player_favorite_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_record_histories` (
   `player_id` mediumint unsigned NOT NULL,
@@ -235,7 +235,8 @@ CREATE TABLE `players` (
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
-  `official_overpower` decimal(8,2) NOT NULL DEFAULT 0.00,
+  `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
+  `data_collected_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
