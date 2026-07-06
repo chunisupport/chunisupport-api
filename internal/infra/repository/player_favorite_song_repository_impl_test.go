@@ -68,12 +68,6 @@ func TestPlayerFavoriteSongRepositoryWrapsPersistenceErrors(t *testing.T) {
 	}
 }
 
-type favoriteSongRowForTest struct {
-	PlayerID  int    `db:"player_id"`
-	SongID    int    `db:"song_id"`
-	CreatedAt string `db:"created_at"`
-}
-
 func setupFavoriteSongTestDB(t *testing.T) *sqlx.DB {
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
