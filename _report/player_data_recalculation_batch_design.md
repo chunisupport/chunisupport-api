@@ -511,7 +511,7 @@ SQLや `*sql.Tx`、`*sql.Conn` をDomainまたはUsecaseインターフェース
 
 ### 15.3 Usecase Layer
 
-`PlayerStatsRecalculationBatchUsecase` は次を担当する。
+`PlayerDataRecalculationBatchUsecase` は次を担当する。
 
 - runスナップショット作成
 - マスタ事前検証
@@ -565,7 +565,7 @@ cmd/batch/
 専用エントリーポイントを追加する。
 
 ```text
-cmd/recalculate-player-stats/main.go
+cmd/recalculate-player-data/main.go
 ```
 
 今後別のバッチを追加するときも、汎用バッチへサブコマンドを詰め込まず、責務ごとに `cmd/<batch-name>` とバイナリを分ける。
@@ -573,15 +573,15 @@ cmd/recalculate-player-stats/main.go
 配布成果物名には既存APIバイナリと同様にOSとアーキテクチャを含める。
 
 ```text
-chunisupport-recalculate-player-stats-linux-amd64
-chunisupport-recalculate-player-stats-linux-arm64
+chunisupport-recalculate-player-data-linux-amd64
+chunisupport-recalculate-player-data-linux-arm64
 ```
 
 ローカルTaskfileで先頭にアンダースコアを付ける既存規約を維持する場合も、少なくとも次の形式とする。
 
 ```text
-_chunisupport-recalculate-player-stats-linux-amd64
-_chunisupport-recalculate-player-stats-linux-arm64
+_chunisupport-recalculate-player-data-linux-amd64
+_chunisupport-recalculate-player-data-linux-arm64
 ```
 
 OS・アーキテクチャを省略した単一名をビルド成果物として使ってはいけない。
@@ -611,7 +611,7 @@ API成果物とバッチ成果物が名前衝突しないようにする。
 例:
 
 ```text
-run-recalculate-player-stats
+run-recalculate-player-data
 ```
 
 ### 18.3 README・仕様書
@@ -694,7 +694,7 @@ run-recalculate-player-stats
 JSTのcron例:
 
 ```cron
-30 3 * * * /opt/chunisupport/bin/chunisupport-recalculate-player-stats-linux-amd64
+30 3 * * * /opt/chunisupport/bin/chunisupport-recalculate-player-data-linux-amd64
 ```
 
 サーバーのcronタイムゾーンがUTCの場合はJSTへ換算するか、crontabでタイムゾーンを明示する。
@@ -823,7 +823,7 @@ JSTのcron例:
 ```text
 cmd/
   batch/                                  削除
-  recalculate-player-stats/               追加
+  recalculate-player-data/               追加
 
 internal/domain/service/
   rating_service.go                       低水準計算共有
@@ -833,17 +833,17 @@ internal/domain/service/
 internal/domain/repository/
   player_repository.go                    port拡張
   player_record_repository.go             port拡張
-  player_stats_batch_repository.go        追加候補
+  player_data_batch_repository.go        追加候補
   batch_lock.go                           追加候補
 
 internal/usecase/
-  player_stats_recalculation_batch.go      追加候補
-  player_stats_recalculation_batch_test.go 追加候補
+  player_data_recalculation_batch.go      追加候補
+  player_data_recalculation_batch_test.go 追加候補
   player_data_usecase_impl.go              登録時Rating集計修正
 
 internal/infra/repository/
-  player_stats_batch_repository_impl.go    追加候補
-  player_stats_batch_repository_impl_test.go
+  player_data_batch_repository_impl.go    追加候補
+  player_data_batch_repository_impl_test.go
 
 internal/infra/db/
   advisory_lock.go                         追加候補

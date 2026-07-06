@@ -12,16 +12,16 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type playerStatsBatchRepository struct {
+type playerDataBatchRepository struct {
 	db *sqlx.DB
 }
 
-func NewPlayerStatsBatchRepository(db *sqlx.DB) domainrepo.PlayerStatsBatchRepository {
-	return &playerStatsBatchRepository{db: db}
+func NewPlayerDataBatchRepository(db *sqlx.DB) domainrepo.PlayerDataBatchRepository {
+	return &playerDataBatchRepository{db: db}
 }
 
-func (r *playerStatsBatchRepository) LoadSnapshot(ctx context.Context, operationalDate time.Time) (domainrepo.PlayerStatsMasterSnapshot, error) {
-	var snapshot domainrepo.PlayerStatsMasterSnapshot
+func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationalDate time.Time) (domainrepo.PlayerDataMasterSnapshot, error) {
+	var snapshot domainrepo.PlayerDataMasterSnapshot
 	var version batchVersionRow
 	if err := r.db.GetContext(ctx, &version, `
 		SELECT id, name, released_at
@@ -69,7 +69,7 @@ func (r *playerStatsBatchRepository) LoadSnapshot(ctx context.Context, operation
 	return snapshot, nil
 }
 
-func (r *playerStatsBatchRepository) ListPlayerKeys(ctx context.Context, afterID, upperBound, limit int) ([]domainrepo.PlayerBatchKey, error) {
+func (r *playerDataBatchRepository) ListPlayerKeys(ctx context.Context, afterID, upperBound, limit int) ([]domainrepo.PlayerBatchKey, error) {
 	var rows []playerBatchKeyRow
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, data_collected_at
@@ -84,7 +84,7 @@ func (r *playerStatsBatchRepository) ListPlayerKeys(ctx context.Context, afterID
 	return keys, err
 }
 
-func (r *playerStatsBatchRepository) ProcessPlayer(ctx context.Context, key domainrepo.PlayerBatchKey, buildUpdate func(domainrepo.PlayerBatchData) (domainrepo.PlayerBatchUpdate, error)) (status domainrepo.PlayerBatchProcessStatus, err error) {
+func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domainrepo.PlayerBatchKey, buildUpdate func(domainrepo.PlayerBatchData) (domainrepo.PlayerBatchUpdate, error)) (status domainrepo.PlayerBatchProcessStatus, err error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return status, err

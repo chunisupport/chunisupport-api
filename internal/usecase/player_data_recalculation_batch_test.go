@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPlayerStatsRecalculationBatchUsecase_運用日を07時境界で固定する(t *testing.T) {
+func TestPlayerDataRecalculationBatchUsecase_運用日を07時境界で固定する(t *testing.T) {
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	tests := []struct {
 		name     string
@@ -23,7 +23,7 @@ func TestPlayerStatsRecalculationBatchUsecase_運用日を07時境界で固定�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &batchRepositoryStub{snapshot: validBatchSnapshot()}
-			usecase := NewPlayerStatsRecalculationBatchUsecase(repo)
+			usecase := NewPlayerDataRecalculationBatchUsecase(repo)
 			usecase.now = func() time.Time { return tt.now }
 
 			_, err := usecase.Execute(context.Background())
@@ -88,19 +88,19 @@ func TestPrepareBatchSnapshot_officialIdxを数値へ変換する(t *testing.T) 
 	assert.Equal(t, uint64(2), prepared.officialIndex[2])
 }
 
-func validBatchSnapshot() repository.PlayerStatsMasterSnapshot {
-	return repository.PlayerStatsMasterSnapshot{
+func validBatchSnapshot() repository.PlayerDataMasterSnapshot {
+	return repository.PlayerDataMasterSnapshot{
 		Version: repository.BatchVersion{ID: 1, Name: "VERSE", ReleasedAt: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)},
 		SlotIDs: map[string]int{"none": 1, "best": 2, "best_candidate": 3, "new": 4, "new_candidate": 5},
 	}
 }
 
 type batchRepositoryStub struct {
-	snapshot        repository.PlayerStatsMasterSnapshot
+	snapshot        repository.PlayerDataMasterSnapshot
 	operationalDate time.Time
 }
 
-func (s *batchRepositoryStub) LoadSnapshot(_ context.Context, operationalDate time.Time) (repository.PlayerStatsMasterSnapshot, error) {
+func (s *batchRepositoryStub) LoadSnapshot(_ context.Context, operationalDate time.Time) (repository.PlayerDataMasterSnapshot, error) {
 	s.operationalDate = operationalDate
 	return s.snapshot, nil
 }

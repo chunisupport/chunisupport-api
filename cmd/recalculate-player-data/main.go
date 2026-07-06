@@ -41,7 +41,7 @@ func run() int {
 		return 1
 	}
 	defer database.Close()
-	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.PlayerStatsBatchLockName)
+	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.PlayerDataBatchLockName)
 	if err != nil {
 		slog.Error("バッチロックの取得に失敗しました", "error", err)
 		return 1
@@ -57,7 +57,7 @@ func run() int {
 			slog.Error("バッチロックの解放に失敗しました", "error", err)
 		}
 	}()
-	batchUsecase := usecase.NewPlayerStatsRecalculationBatchUsecase(infrarepo.NewPlayerStatsBatchRepository(database))
+	batchUsecase := usecase.NewPlayerDataRecalculationBatchUsecase(infrarepo.NewPlayerDataBatchRepository(database))
 	start := time.Now()
 	result, executeErr := batchUsecase.Execute(ctx)
 	slog.Info("プレイヤーデータ再計算バッチを終了しました",

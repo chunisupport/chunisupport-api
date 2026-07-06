@@ -11,8 +11,8 @@ type PlayerBatchKey struct {
 	DataCollectedAt *time.Time
 }
 
-// PlayerStatsMasterSnapshot はrun全体で固定するマスタ情報です。
-type PlayerStatsMasterSnapshot struct {
+// PlayerDataMasterSnapshot はrun全体で固定するマスタ情報です。
+type PlayerDataMasterSnapshot struct {
 	Version    BatchVersion
 	Songs      []BatchSong
 	Charts     []BatchChart
@@ -87,9 +87,9 @@ const (
 	PlayerBatchConflict
 )
 
-// PlayerStatsBatchRepository は再計算バッチ固有の投影と原子的更新を提供します。
-type PlayerStatsBatchRepository interface {
-	LoadSnapshot(ctx context.Context, operationalDate time.Time) (PlayerStatsMasterSnapshot, error)
+// PlayerDataBatchRepository は再計算バッチ固有の投影と原子的更新を提供します。
+type PlayerDataBatchRepository interface {
+	LoadSnapshot(ctx context.Context, operationalDate time.Time) (PlayerDataMasterSnapshot, error)
 	ListPlayerKeys(ctx context.Context, afterID, upperBound, limit int) ([]PlayerBatchKey, error)
 	ProcessPlayer(ctx context.Context, key PlayerBatchKey, buildUpdate func(PlayerBatchData) (PlayerBatchUpdate, error)) (PlayerBatchProcessStatus, error)
 }

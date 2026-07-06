@@ -13,9 +13,9 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
-const playerStatsBatchPageSize = 100
+const playerDataBatchPageSize = 100
 
-type PlayerStatsBatchResult struct {
+type PlayerDataBatchResult struct {
 	StartedAt          time.Time
 	OperationalDate    time.Time
 	CurrentVersion     string
@@ -30,29 +30,29 @@ type PlayerStatsBatchResult struct {
 	LastPlayerID       int
 }
 
-type PlayerStatsRecalculationBatchUsecase struct {
-	repository repository.PlayerStatsBatchRepository
+type PlayerDataRecalculationBatchUsecase struct {
+	repository repository.PlayerDataBatchRepository
 	now        func() time.Time
 }
 
-func NewPlayerStatsRecalculationBatchUsecase(batchRepository repository.PlayerStatsBatchRepository) *PlayerStatsRecalculationBatchUsecase {
-	return &PlayerStatsRecalculationBatchUsecase{repository: batchRepository, now: time.Now}
+func NewPlayerDataRecalculationBatchUsecase(batchRepository repository.PlayerDataBatchRepository) *PlayerDataRecalculationBatchUsecase {
+	return &PlayerDataRecalculationBatchUsecase{repository: batchRepository, now: time.Now}
 }
 
-func (u *PlayerStatsRecalculationBatchUsecase) Execute(ctx context.Context) (PlayerStatsBatchResult, error) {
+func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (PlayerDataBatchResult, error) {
 	startedAt := u.now()
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	operationalTime := startedAt.In(jst).Add(-7 * time.Hour)
 	operationalDate := time.Date(operationalTime.Year(), operationalTime.Month(), operationalTime.Day(), 0, 0, 0, 0, jst)
 	snapshot, err := u.repository.LoadSnapshot(ctx, operationalDate)
 	if err != nil {
-		return PlayerStatsBatchResult{}, fmt.Errorf("マスタスナップショットの取得に失敗しました: %w", err)
+		return PlayerDataBatchResult{}, fmt.Errorf("マスタスナップショットの取得に失敗しました: %w", err)
 	}
 	prepared, err := prepareBatchSnapshot(snapshot, operationalDate, jst)
 	if err != nil {
-		return PlayerStatsBatchResult{}, err
+		return PlayerDataBatchResult{}, err
 	}
-	result := PlayerStatsBatchResult{
+	result := PlayerDataBatchResult{
 		StartedAt:          startedAt,
 		OperationalDate:    operationalDate,
 		CurrentVersion:     snapshot.Version.Name,
@@ -63,7 +63,7 @@ func (u *PlayerStatsRecalculationBatchUsecase) Execute(ctx context.Context) (Pla
 		if err := ctx.Err(); err != nil {
 			return result, nil
 		}
-		keys, err := u.repository.ListPlayerKeys(ctx, afterID, snapshot.UpperBound, playerStatsBatchPageSize)
+		keys, err := u.repository.ListPlayerKeys(ctx, afterID, snapshot.UpperBound, playerDataBatchPageSize)
 		if err != nil {
 			return result, err
 		}
@@ -114,7 +114,7 @@ func (u *PlayerStatsRecalculationBatchUsecase) Execute(ctx context.Context) (Pla
 }
 
 type preparedBatchSnapshot struct {
-	snapshot         repository.PlayerStatsMasterSnapshot
+	snapshot         repository.PlayerDataMasterSnapshot
 	versionStartedAt time.Time
 	songsByID        map[int]repository.BatchSong
 	chartsByID       map[int]repository.BatchChart
@@ -122,7 +122,7 @@ type preparedBatchSnapshot struct {
 	operationalDate  time.Time
 }
 
-func prepareBatchSnapshot(snapshot repository.PlayerStatsMasterSnapshot, operationalDate time.Time, jst *time.Location) (preparedBatchSnapshot, error) {
+func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operationalDate time.Time, jst *time.Location) (preparedBatchSnapshot, error) {
 	requiredSlots := []string{"none", "best", "best_candidate", "new", "new_candidate"}
 	for _, name := range requiredSlots {
 		if snapshot.SlotIDs[name] == 0 {
