@@ -27,6 +27,7 @@ type songUsecaseImpl struct {
 	defaultExecutor              repository.Executor
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
 	favoriteRepo                 repository.PlayerFavoriteSongRepository
+	lockedRepo                   repository.PlayerLockedSongRepository
 }
 
 // NewSongUsecase は新しい SongUsecase を生成します。
@@ -61,21 +62,23 @@ func NewSongUsecaseWithOverpowerDenominator(
 	return impl
 }
 
-// NewSongUsecaseWithFavoriteIntegration はお気に入り楽曲削除連携付きで SongUsecase を生成します。
-func NewSongUsecaseWithFavoriteIntegration(
+// NewSongUsecaseWithCascadeDelete はお気に入り・未解禁設定の楽曲削除カスケード連携付きで SongUsecase を生成します。
+func NewSongUsecaseWithCascadeDelete(
 	songRepo repository.SongRepository,
 	masterCache repository.SongMasterProvider,
 	tm TransactionManager,
 	defaultExecutor repository.Executor,
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
 	favoriteRepo repository.PlayerFavoriteSongRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
 ) SongUsecase {
 	usecase := NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, defaultExecutor, overpowerDenominatorProvider)
 	impl, ok := usecase.(*songUsecaseImpl)
 	if !ok {
-		panic("NewSongUsecaseWithFavoriteIntegration: NewSongUsecaseWithOverpowerDenominator returned unexpected type, expected *songUsecaseImpl")
+		panic("NewSongUsecaseWithCascadeDelete: NewSongUsecaseWithOverpowerDenominator returned unexpected type, expected *songUsecaseImpl")
 	}
 	impl.favoriteRepo = favoriteRepo
+	impl.lockedRepo = lockedRepo
 	return impl
 }
 
@@ -129,7 +132,14 @@ func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) erro
 			return err
 		}
 		if s.favoriteRepo != nil {
-			return s.favoriteRepo.DeleteBySongID(ctx, tx, song.ID)
+			if err := s.favoriteRepo.DeleteBySongID(ctx, tx, song.ID); err != nil {
+				return err
+			}
+		}
+		if s.lockedRepo != nil {
+			if err := s.lockedRepo.DeleteBySongID(ctx, tx, song.ID); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); err != nil {

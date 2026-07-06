@@ -75,6 +75,12 @@ func (r *PlayerLockedSongRepository) Delete(ctx context.Context, exec domainrepo
 	return wrapPlayerLockedSongRepositoryError("delete", err)
 }
 
+func (r *PlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec domainrepo.Executor, songID int) error {
+	const q = `DELETE FROM player_locked_songs WHERE song_id = ?`
+	_, err := exec.ExecContext(ctx, q, songID)
+	return wrapPlayerLockedSongRepositoryError("delete by song id", err)
+}
+
 func (r *PlayerLockedSongRepository) BulkCreate(ctx context.Context, exec domainrepo.Executor, lockedSongs []*entity.PlayerLockedSong) error {
 	if len(lockedSongs) == 0 {
 		return nil

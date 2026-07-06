@@ -161,6 +161,10 @@ func (s *stubPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec re
 	return errors.New("not implemented")
 }
 
+func (s *stubPlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	return errors.New("not implemented")
+}
+
 type stubOverpowerDenominatorProvider struct {
 	snapshot *repository.OverpowerDenominatorSnapshot
 	err      error

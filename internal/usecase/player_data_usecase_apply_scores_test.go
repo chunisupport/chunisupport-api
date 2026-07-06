@@ -542,6 +542,10 @@ func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) BulkDelete(_ context.
 	return nil
 }
 
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) DeleteBySongID(_ context.Context, _ repository.Executor, _ int) error {
+	return nil
+}
+
 func newApplyScoresTestMasters() *playerDataMaster {
 	return &playerDataMaster{
 		PlayerDataMasters: &domainmasterdata.PlayerDataMasters{

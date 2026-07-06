@@ -82,6 +82,10 @@ func (s *spyPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec rep
 	return nil
 }
 
+func (s *spyPlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	return nil
+}
+
 type stubPlayerSongIDResolver struct {
 	songID *int
 }
