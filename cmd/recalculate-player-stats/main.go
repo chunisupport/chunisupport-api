@@ -47,7 +47,7 @@ func run() int {
 		return 1
 	}
 	if !acquired {
-		slog.Info("別の再計算バッチが実行中のためスキップします")
+		slog.Info("別のプレイヤーデータ再計算バッチが実行中のためスキップします")
 		return 0
 	}
 	defer func() {
@@ -60,7 +60,7 @@ func run() int {
 	batchUsecase := usecase.NewPlayerStatsRecalculationBatchUsecase(infrarepo.NewPlayerStatsBatchRepository(database))
 	start := time.Now()
 	result, executeErr := batchUsecase.Execute(ctx)
-	slog.Info("プレイヤー統計再計算バッチを終了しました",
+	slog.Info("プレイヤーデータ再計算バッチを終了しました",
 		"started_at", result.StartedAt, "operational_date", result.OperationalDate.Format(time.DateOnly),
 		"current_version", result.CurrentVersion, "upper_bound_player_id", result.UpperBoundPlayerID,
 		"processed", result.Processed, "success", result.Success, "current_preserved", result.CurrentPreserved,
@@ -71,7 +71,7 @@ func run() int {
 		return 0
 	}
 	if executeErr != nil {
-		slog.Error("プレイヤー統計再計算バッチに失敗しました", "error", executeErr)
+		slog.Error("プレイヤーデータ再計算バッチに失敗しました", "error", executeErr)
 		return 1
 	}
 	return 0

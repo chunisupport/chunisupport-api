@@ -84,7 +84,7 @@ func (u *PlayerStatsRecalculationBatchUsecase) Execute(ctx context.Context) (Pla
 				return prepared.buildUpdate(data, isCurrent)
 			})
 			if processErr != nil {
-				slog.ErrorContext(ctx, "プレイヤー統計の再計算に失敗しました",
+				slog.ErrorContext(ctx, "プレイヤーデータの再計算に失敗しました",
 					"player_id", key.ID,
 					"rebuild_reason", playerRebuildReason(isCurrent, lastPlayedAt),
 					"error", processErr)
