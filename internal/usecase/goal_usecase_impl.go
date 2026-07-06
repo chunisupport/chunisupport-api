@@ -521,11 +521,12 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			return nil, nil, ErrInvalidAchievementParam
 		}
 
-		if achievementType == "hardlamp_count" {
+		switch achievementType {
+		case "hardlamp_count":
 			if _, ok := info.HardLampAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
 			}
-		} else if achievementType == "combolamp_count" {
+		case "combolamp_count":
 			if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
 			}
