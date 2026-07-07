@@ -115,6 +115,72 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 	}
 }
 
+func TestCORSAllowOrigins_ワイルドカード入りオリジンを許可する(t *testing.T) {
+	cfg := config.Config{
+		CORS: config.CORS{
+			AllowOrigins: []string{
+				"https://chunisupport.example.com",
+				"https://*.chunisupport.pages.dev",
+			},
+			AllowCredentials: true,
+			MaxAge:           600,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		origin    string
+		wantAllow string
+	}{
+		{
+			name:      "完全一致のオリジンを許可する",
+			origin:    "https://chunisupport.example.com",
+			wantAllow: "https://chunisupport.example.com",
+		},
+		{
+			name:      "Pagesのプレビューサブドメインを許可する",
+			origin:    "https://feature-branch.chunisupport.pages.dev",
+			wantAllow: "https://feature-branch.chunisupport.pages.dev",
+		},
+		{
+			name:   "Pagesのルートドメインは許可しない",
+			origin: "https://chunisupport.pages.dev",
+		},
+		{
+			name:   "別スキームは許可しない",
+			origin: "http://feature-branch.chunisupport.pages.dev",
+		},
+		{
+			name:   "別ドメインは許可しない",
+			origin: "https://feature-branch.example.pages.dev",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+			e.OPTIONS("/internal/me", func(c *echo.Context) error {
+				return c.NoContent(http.StatusNoContent)
+			})
+
+			req := httptest.NewRequest(http.MethodOptions, "/internal/me", nil)
+			req.Header.Set(echo.HeaderOrigin, tt.origin)
+			req.Header.Set(echo.HeaderAccessControlRequestMethod, http.MethodGet)
+			rec := httptest.NewRecorder()
+
+			e.ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.wantAllow, rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+			if tt.wantAllow == "" {
+				assert.Empty(t, rec.Header().Get(echo.HeaderAccessControlAllowCredentials))
+				return
+			}
+			assert.Equal(t, "true", rec.Header().Get(echo.HeaderAccessControlAllowCredentials))
+		})
+	}
+}
+
 func TestHandleExternalHealth_外部監視向けに204NoContentを返す(t *testing.T) {
 	// Given
 	e := echo.New()

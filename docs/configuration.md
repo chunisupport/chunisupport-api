@@ -144,6 +144,8 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 ```
 
 `cors.allow_origins` は全体の基本設定です。
+オリジンには `https://*.example.pages.dev` のような `*` / `?` を含むパターンを指定できます。
+この場合、許可された実際のリクエスト元オリジンが `Access-Control-Allow-Origin` に返されます。
 ただし `/` の `GET` と `OPTIONS`、および `/internal/player-data/temp` の `POST` と `OPTIONS` に限っては、固定で `https://new.chunithm-net.com` も追加許可されます。
 
 ## Firebase 認証
