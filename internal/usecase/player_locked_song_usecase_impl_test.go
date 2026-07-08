@@ -164,6 +164,7 @@ func TestPlayerLockedSongList(t *testing.T) {
 		targetUser  *entity.User
 		player      *entity.Player
 		requester   *entity.User
+		friend      bool
 		wantErr     error
 		wantRowsHit bool
 	}{
@@ -192,6 +193,14 @@ func TestPlayerLockedSongList(t *testing.T) {
 			wantErr:    ErrUserPrivate,
 		},
 		{
+			name:        "非公開ユーザーを承認済みフレンドが取得できる",
+			targetUser:  &entity.User{ID: 100, IsPrivate: true},
+			player:      &entity.Player{ID: 10},
+			requester:   &entity.User{ID: 200},
+			friend:      true,
+			wantRowsHit: true,
+		},
+		{
 			name:    "存在しないユーザーは見つからないエラー",
 			wantErr: ErrUserNotFound,
 		},
@@ -212,10 +221,15 @@ func TestPlayerLockedSongList(t *testing.T) {
 				},
 			}
 			playerRepo := &stubPlayerLockedSongPlayerRepository{player: tt.player}
+			friendshipRepo := newStubFriendshipRepo()
+			if tt.friend {
+				friendshipRepo.exists[[2]int{tt.requester.ID, tt.targetUser.ID}] = true
+			}
 			u := &playerLockedSongUsecase{
-				userRepo:     userRepo,
-				playerRepo:   playerRepo,
-				queryService: queryService,
+				userRepo:       userRepo,
+				playerRepo:     playerRepo,
+				friendshipRepo: friendshipRepo,
+				queryService:   queryService,
 			}
 
 			// When

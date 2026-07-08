@@ -17,15 +17,21 @@ var (
 )
 
 type playerFavoriteSongUsecase struct {
-	db           repository.Executor
-	tm           TransactionManager
-	userRepo     repository.UserRepository
-	playerRepo   repository.PlayerRepository
-	songRepo     repository.SongRepository
-	favoriteRepo repository.PlayerFavoriteSongRepository
-	queryService PlayerFavoriteSongQueryService
-	locker       PlayerFavoriteSongLocker
-	resolver     PlayerSongIDResolver
+	db             repository.Executor
+	tm             TransactionManager
+	userRepo       repository.UserRepository
+	playerRepo     repository.PlayerRepository
+	songRepo       repository.SongRepository
+	favoriteRepo   repository.PlayerFavoriteSongRepository
+	friendshipRepo repository.FriendshipRepository
+	queryService   PlayerFavoriteSongQueryService
+	locker         PlayerFavoriteSongLocker
+	resolver       PlayerSongIDResolver
+}
+
+// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
+func (u *playerFavoriteSongUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
+	u.friendshipRepo = friendshipRepo
 }
 
 func NewPlayerFavoriteSongUsecase(
@@ -70,7 +76,11 @@ func (u *playerFavoriteSongUsecase) List(ctx context.Context, username string, r
 	if user == nil {
 		return nil, ErrUserNotFound
 	}
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+	accessible, err := canAccessPrivateUser(ctx, u.db, u.friendshipRepo, user, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, user.ID)

@@ -35,7 +35,13 @@ type scoreHistoryUsecase struct {
 	songRepo       repository.SongRepository
 	worldsendRepo  repository.WorldsendChartRepository
 	historyRepo    repository.ScoreHistoryRepository
+	friendshipRepo repository.FriendshipRepository
 	masterProvider repository.PlayerDataMasterProvider
+}
+
+// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
+func (us *scoreHistoryUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
+	us.friendshipRepo = friendshipRepo
 }
 
 // NewScoreHistoryUsecase はスコア履歴取得ユースケースを生成します。
@@ -114,7 +120,11 @@ func (us *scoreHistoryUsecase) findVisibleUser(ctx context.Context, username str
 		}
 		return nil, err
 	}
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+	accessible, err := canAccessPrivateUser(ctx, us.exec, us.friendshipRepo, user, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 	if user.PlayerID == nil {

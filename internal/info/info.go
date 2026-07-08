@@ -81,6 +81,9 @@ const (
 
 	// プレイヤーお気に入り楽曲
 	PlayerFavoriteSongMaxCount = 100
+
+	// フレンド機能
+	FriendshipMaxOutgoingActive = 100
 )
 
 var (

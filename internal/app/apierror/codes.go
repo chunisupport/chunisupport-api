@@ -72,4 +72,9 @@ const (
 
 	// お気に入り楽曲関連エラー
 	CodeFavoriteSongLimitExceeded = "favorite_song_limit_exceeded"
+
+	// フレンド関連エラー
+	CodeFriendshipLimitExceeded = "friendship_limit_exceeded"
+	CodeFriendshipConflict      = "friendship_conflict"
+	CodeFriendRequestNotFound   = "friend_request_not_found"
 )

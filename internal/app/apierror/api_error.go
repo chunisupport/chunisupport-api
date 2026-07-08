@@ -119,6 +119,10 @@ var (
 	ErrInvalidRecordFilterID     = New(CodeInvalidRecordFilterID, http.StatusBadRequest)
 
 	ErrFavoriteSongLimitExceeded = New(CodeFavoriteSongLimitExceeded, http.StatusBadRequest)
+
+	ErrFriendshipLimitExceeded = New(CodeFriendshipLimitExceeded, http.StatusBadRequest)
+	ErrFriendshipConflict      = New(CodeFriendshipConflict, http.StatusConflict)
+	ErrFriendRequestNotFound   = New(CodeFriendRequestNotFound, http.StatusNotFound)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

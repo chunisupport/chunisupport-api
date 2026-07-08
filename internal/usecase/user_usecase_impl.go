@@ -25,6 +25,7 @@ type userUsecase struct {
 	songRepo                     repository.SongRepository
 	worldsendChartRepo           repository.WorldsendChartRepository
 	playerLockedSongRepo         repository.PlayerLockedSongRepository
+	friendshipRepo               repository.FriendshipRepository
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
 	userUpdatedAtQuery           repository.UserUpdatedAtQueryService
 	recordCompletionSvc          *service.RecordCompletionService
@@ -71,6 +72,11 @@ func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo rep
 	return impl
 }
 
+// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
+func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
+	s.friendshipRepo = friendshipRepo
+}
+
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
 func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
 	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
@@ -98,7 +104,7 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Exec
 }
 
 // GetUserProfile はユーザー名をキーにプロファイル（username + player）を軽量に取得します。
-// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
+// 対象ユーザーが非公開設定の場合は、本人または承認済みフレンド以外は ErrUserPrivate を返します。
 func (s *userUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
@@ -172,7 +178,11 @@ func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username stri
 	if result == nil || result.User == nil {
 		return nil, ErrUserNotFound
 	}
-	if result.User.IsPrivate && (requester == nil || requester.ID != result.User.ID) {
+	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, result.User, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 	if result.PlayerUpdatedAt == nil {
@@ -188,7 +198,7 @@ func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username stri
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
-// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
+// 対象ユーザーが非公開設定の場合は、本人または承認済みフレンド以外は ErrUserPrivate を返します。
 func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
@@ -856,7 +866,11 @@ func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, re
 		return nil, ErrUserNotFound
 	}
 
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, user, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 

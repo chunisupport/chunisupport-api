@@ -10,23 +10,23 @@ import (
 // UserUsecase はユーザー関連のユースケースを定義します。
 type UserUsecase interface {
 	// GetUserProfile はユーザー名をキーにプロファイル（username + player）のみを軽量に取得します。
-	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error)
 
 	// GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方を取得します。
-	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error)
 
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
-	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error)
 
 	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
-	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error)
 
 	// GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
-	// 対象ユーザーが非公開設定の場合、閲覧者が本人でなければ ErrUserPrivate を返します。
+	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileRecordViewDTO, error)
 
 	// GetUserSongRecord は通常楽曲1曲分のユーザーレコードを取得します。

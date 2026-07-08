@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年06月27日
+**最終更新日**: 2026年07月08日
 
 ## ベースURLと環境
 
@@ -99,6 +99,9 @@
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
 | `internal_error` | 予期しないサーバーエラー |
+| `friendship_limit_exceeded` | フレンド枠の上限超過 |
+| `friendship_conflict` | 既に申請中またはフレンド成立済み |
+| `friend_request_not_found` | 対象のフレンド申請が見つからない |
 
 ## マスターデータ概要
 
@@ -127,6 +130,13 @@
 | `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
 | `/internal/me/favorite-songs` | POST | Firebase Bearer | 自分のお気に入り楽曲を登録 |
 | `/internal/me/favorite-songs/:displayid` | DELETE | Firebase Bearer | 自分のお気に入り楽曲を解除 |
+| `/internal/friends` | GET | Firebase Bearer | フレンド一覧取得 |
+| `/internal/friends/:user_id` | DELETE | Firebase Bearer | フレンド解除 |
+| `/internal/friends/requests` | POST | Firebase Bearer | username完全一致でフレンド申請 |
+| `/internal/friends/requests/received` | GET | Firebase Bearer | 自分宛てのフレンド申請一覧取得 |
+| `/internal/friends/requests/sent` | GET | Firebase Bearer | 自分が送ったフレンド申請一覧取得 |
+| `/internal/friends/requests/:user_id/accept` | POST | Firebase Bearer | フレンド申請承認 |
+| `/internal/friends/requests/:user_id/reject` | POST | Firebase Bearer | フレンド申請拒否 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -446,12 +456,12 @@
 
 ### GET `/internal/users/:username/favorite-songs`
 
-対象ユーザーのお気に入り楽曲一覧を取得します。本人または非公開ユーザー以外の閲覧はできません。
+対象ユーザーのお気に入り楽曲一覧を取得します。対象ユーザーが非公開の場合は、本人または承認済みフレンドのみ閲覧できます。
 
 #### 認証
 
 Firebase Bearer Token（任意）
-- トークンあり: 非公開ユーザーでも本人が取得可能
+- トークンあり: 非公開ユーザーでも本人または承認済みフレンドが取得可能
 - トークンなし: 公開ユーザーのみ取得可能
 
 #### リクエスト
@@ -487,7 +497,7 @@ Firebase Bearer Token（任意）
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `user_not_found` | 404 | 対象ユーザーが存在しない、または非公開ユーザーを本人以外が取得 |
+| `user_not_found` | 404 | 対象ユーザーが存在しない、または非公開ユーザーを本人・承認済みフレンド以外が取得 |
 | `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
 
 削除済み楽曲やWORLD'S END楽曲はレスポンスに含まれません。
@@ -565,9 +575,93 @@ Firebase Bearer Token（必須）
 - 未登録楽曲の解除も成功します（冪等）
 - 論理削除済み、物理削除済み楽曲の解除も成功します
 
+## `/internal/friends` グループ
+
+フレンド関係は片方向レコード2件で管理します。申請中は `pending` の片方向レコード、承認後は双方向 `accepted` レコードです。拒否は申請レコード削除で表現し、`rejected` 状態は持ちません。`blocked` はDB上の予約ステータスですが、現時点のAPIでは作成・更新しません。
+
+フレンド枠の上限は、自分から外向きの `pending` / `accepted` 合計100件です。`blocked` は将来仕様を検討するため、上限カウント対象外です。
+
+非公開ユーザーのプロフィール、レーティング、レコード、スコア履歴、未解禁曲、お気に入り楽曲は、承認済みフレンドからは公開ユーザーと同じように閲覧できます。未認証または非フレンドからの参照では、ユーザー列挙を避けるため従来通り `user_not_found` 相当になります。
+
+一覧で返す相手ユーザー概要は以下です。
+
+```json
+{
+  "user_id": 2,
+  "username": "frienduser",
+  "player_level": 42,
+  "player_name": "PLAYER",
+  "rating": 15.25,
+  "requested_at": "2026-07-08T12:00:00Z",
+  "accepted_at": "2026-07-08T12:05:00Z"
+}
+```
+
+### GET `/internal/friends`
+
+承認済みフレンド一覧を、成立日時降順で取得します。
+
+### POST `/internal/friends/requests`
+
+`username` の完全一致でフレンド申請します。相手から申請中の場合は、即時に双方向承認します。
+
+```json
+{
+  "username": "targetuser"
+}
+```
+
+成功時は `204 No Content` です。
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `validation_failed` | 400 | 自分自身への申請、または不正な `username` |
+| `user_not_found` | 404 | 対象ユーザーが存在しない |
+| `friendship_limit_exceeded` | 400 | 自分の外向き `pending` / `accepted` が100件に達している |
+| `friendship_conflict` | 409 | 既に申請中、承認済み、または相手から承認済み関係がある |
+
+### GET `/internal/friends/requests/received`
+
+自分宛ての申請一覧を申請日時降順で取得します。
+
+### GET `/internal/friends/requests/sent`
+
+自分が送った申請一覧を申請日時降順で取得します。
+
+### POST `/internal/friends/requests/:user_id/accept`
+
+指定ユーザーからの申請を承認し、双方向の `accepted` レコードを作成します。承認時に自分の外向き `pending` / `accepted` が100件に達している場合は失敗します。
+
+成功時は `204 No Content` です。
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `user_not_found` | 404 | ロック対象ユーザーが存在しない |
+| `friend_request_not_found` | 404 | 指定ユーザーからの `pending` 申請が存在しない |
+| `friendship_limit_exceeded` | 400 | 自分の外向き `pending` / `accepted` が100件に達している |
+
+### POST `/internal/friends/requests/:user_id/reject`
+
+指定ユーザーからの `pending` 申請を削除します。成功時は `204 No Content` です。
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `user_not_found` | 404 | ロック対象ユーザーが存在しない |
+| `friend_request_not_found` | 404 | 指定ユーザーからの `pending` 申請が存在しない |
+
+### DELETE `/internal/friends/:user_id`
+
+指定ユーザーとの双方向フレンド関係を削除します。成功時は `204 No Content` です。
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+
 ### GET `/internal/users/:username/locked-songs`
 - **認証**: Firebase Bearer 任意
-- **概要**: 指定ユーザーのプレイヤーに紐づく未解禁曲一覧を取得します。通常未解禁とULTIMA未解禁は `is_ultima` で区別されます。対象ユーザーが非公開設定の場合、本人以外にはユーザー未発見として扱われます。
+- **概要**: 指定ユーザーのプレイヤーに紐づく未解禁曲一覧を取得します。通常未解禁とULTIMA未解禁は `is_ultima` で区別されます。対象ユーザーが非公開設定の場合、本人または承認済みフレンド以外にはユーザー未発見として扱われます。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
@@ -1652,7 +1746,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend` のみを返します。
     - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
-- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
 
@@ -1737,7 +1831,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` が `null` になります。
+- **レスポンス**: ユーザー名とプレイヤー情報のみを返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` が `null` になります。
 
 #### レスポンス例
 
@@ -1787,7 +1881,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
+- **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
 
 #### レスポンス例
 
@@ -1815,7 +1909,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: レーティング枠のみを返します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は各配列が空、`meta.updated_at` が `null` になります。
+- **レスポンス**: レーティング枠のみを返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は各配列が空、`meta.updated_at` が `null` になります。
 
 #### レスポンス例
 
@@ -1893,7 +1987,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/users/:username/record`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `standard` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
+- **概要**: 指定されたユーザーのレコード枠のみを取得します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `standard` / `worldsend` が空配列、`meta.updated_at` が `null` になります。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |

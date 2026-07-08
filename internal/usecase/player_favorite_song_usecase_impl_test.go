@@ -28,7 +28,10 @@ func (s *stubUserRepoForFav) FindByID(ctx context.Context, exec repository.Execu
 }
 
 func (s *stubUserRepoForFav) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
-	return nil, errors.New("not implemented")
+	if s.user != nil && s.user.ID == id {
+		return s.user, s.err
+	}
+	return s.user, s.err
 }
 
 func (s *stubUserRepoForFav) FindAllWithPlayer(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
@@ -227,6 +230,24 @@ func TestPlayerFavoriteSongUsecase_List(t *testing.T) {
 		}
 
 		got, err := u.List(context.Background(), "private", &entity.User{ID: 1})
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+	})
+
+	t.Run("非公開ユーザーを承認済みフレンドが取得できる", func(t *testing.T) {
+		repo := newStubFriendshipRepo()
+		repo.exists[[2]int{2, 1}] = true
+		u := &playerFavoriteSongUsecase{
+			db:             &MockExecutor{},
+			userRepo:       &stubUserRepoForFav{user: &entity.User{ID: 1, IsPrivate: true}},
+			playerRepo:     &stubPlayerRepoForFav{player: &entity.Player{ID: 10, UserID: 1}},
+			friendshipRepo: repo,
+			queryService: &stubFavoriteQueryService{models: []*PlayerFavoriteSongReadModel{
+				{DisplayID: "0000000000000001", Title: "楽曲A"},
+			}},
+		}
+
+		got, err := u.List(context.Background(), "private", &entity.User{ID: 2})
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 	})

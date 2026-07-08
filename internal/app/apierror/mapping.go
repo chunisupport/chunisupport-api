@@ -106,6 +106,14 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidRecordFilterID.WithInternal(err)
 	case errors.Is(err, usecase.ErrPlayerFavoriteSongLimitExceeded):
 		return ErrFavoriteSongLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendshipLimitExceeded):
+		return ErrFriendshipLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendshipAlreadyExists):
+		return ErrFriendshipConflict.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendRequestNotFound):
+		return ErrFriendRequestNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidFriendRequest):
+		return ErrValidationFailedBadRequest.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

@@ -18,6 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -83,6 +84,7 @@ type Handlers struct {
 	TemporaryPlayerData  *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
 	PlayerFavoriteSong   *api_internal.PlayerFavoriteSongHandler
+	Friendship           *api_internal.FriendshipHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	// 外部API v1 用ハンドラ
 	V1Song       *api_v1.V1SongHandler
@@ -134,6 +136,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	playerFavoriteSongRepo := infra.NewPlayerFavoriteSongRepository()
 	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
+	friendshipRepo := infra.NewFriendshipRepository()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	tm := transaction.NewTransactionManager(db)
@@ -141,8 +144,18 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
+	if configurable, ok := userUsecase.(interface {
+		SetFriendshipRepository(repository.FriendshipRepository)
+	}); ok {
+		configurable.SetFriendshipRepository(friendshipRepo)
+	}
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
+	if configurable, ok := scoreHistoryUsecase.(interface {
+		SetFriendshipRepository(repository.FriendshipRepository)
+	}); ok {
+		configurable.SetFriendshipRepository(friendshipRepo)
+	}
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
@@ -158,9 +171,23 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	if err != nil {
 		panic(fmt.Sprintf("failed to create player locked song usecase: %v", err))
 	}
+	if configurable, ok := playerLockedSongUsecase.(interface {
+		SetFriendshipRepository(repository.FriendshipRepository)
+	}); ok {
+		configurable.SetFriendshipRepository(friendshipRepo)
+	}
 	playerFavoriteSongUsecase, err := usecase.NewPlayerFavoriteSongUsecase(db, tm, userRepo, playerRepo, songRepo, playerFavoriteSongRepo, playerFavoriteSongQueryService, playerFavoriteSongLocker, playerSongIDResolver)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create player favorite song usecase: %v", err))
+	}
+	if configurable, ok := playerFavoriteSongUsecase.(interface {
+		SetFriendshipRepository(repository.FriendshipRepository)
+	}); ok {
+		configurable.SetFriendshipRepository(friendshipRepo)
+	}
+	friendshipUsecase, err := usecase.NewFriendshipUsecase(db, tm, userRepo, friendshipRepo)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create friendship usecase: %v", err))
 	}
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
@@ -191,6 +218,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		TemporaryPlayerData:  api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:   api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
+		Friendship:           api_internal.NewFriendshipHandler(friendshipUsecase),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -292,6 +320,18 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
 		meGroup.POST("/favorite-songs", handlers.PlayerFavoriteSong.Add)
 		meGroup.DELETE("/favorite-songs/:displayid", handlers.PlayerFavoriteSong.Remove)
+	}
+
+	friendshipGroup := internal.Group("/friends")
+	friendshipGroup.Use(firebaseAuthStrict)
+	{
+		friendshipGroup.GET("", handlers.Friendship.ListFriends)
+		friendshipGroup.POST("/requests", handlers.Friendship.SendRequest)
+		friendshipGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
+		friendshipGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
+		friendshipGroup.POST("/requests/:user_id/accept", handlers.Friendship.AcceptRequest)
+		friendshipGroup.POST("/requests/:user_id/reject", handlers.Friendship.RejectRequest)
+		friendshipGroup.DELETE("/:user_id", handlers.Friendship.Remove)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
