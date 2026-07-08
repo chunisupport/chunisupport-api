@@ -143,7 +143,9 @@
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username/record/songs/:displayid` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
+| `/internal/users/:username/record/songs/:displayid/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
 | `/internal/users/:username/record/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲1曲分のレコード取得 |
+| `/internal/users/:username/record/worldsend-songs/:displayid/history` | GET | Firebase Bearer (任意) | WORLD'S ENDスコア履歴取得 |
 | `/internal/users/:username/locked-songs` | GET | Firebase Bearer (任意) | ユーザーの未解禁曲一覧を取得 |
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
@@ -152,14 +154,12 @@
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
-| `/internal/songs/:displayid/score-history/:difficulty` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
 | `/internal/songs` | POST | Firebase Bearer (ADMIN+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
 | `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
 | `/internal/worldsend-songs` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
 | `/internal/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
-| `/internal/worldsend-songs/:displayid/score-history` | GET | Firebase Bearer (任意) | WORLD'S ENDスコア履歴取得 |
 | `/internal/worldsend-songs` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
 | `/internal/worldsend-songs` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
 | `/internal/worldsend-songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
@@ -2337,17 +2337,18 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/:displayid/score-history/:difficulty`
+### GET `/internal/users/:username/record/songs/:displayid/:difficulty/history`
 - **認証**: Firebase Bearer（任意）
-- **概要**: `username` で指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **レート制限**: 認証なしの場合 1分間60回/IP
+- **概要**: パスで指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
 - **パスパラメータ**:
+  - `username`: 対象ユーザー名
   - `displayid`: 楽曲の表示用ID
   - `difficulty`: `expert`, `master`, `ultima`
-- **クエリパラメータ**:
-  - `username`（必須）: 対象ユーザー名
 - **レスポンス**: 200 OK。形式は GET `/v1/songs/:displayid/score-history/:difficulty` と同一です。
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 400 Bad Request (`validation_failed`): `username` が不正
+  - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 400 Bad Request (`score_history_unsupported_difficulty`): 履歴対象外の難易度
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
@@ -2601,16 +2602,16 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/worldsend-songs/:displayid/score-history`
+### GET `/internal/users/:username/record/worldsend-songs/:displayid/history`
 - **認証**: Firebase Bearer（任意）
-- **概要**: `username` で指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **レート制限**: 認証なしの場合 1分間60回/IP
+- **概要**: パスで指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
 - **パスパラメータ**:
+  - `username`: 対象ユーザー名
   - `displayid`: WORLD'S END楽曲の表示用ID
-- **クエリパラメータ**:
-  - `username`（必須）: 対象ユーザー名
 - **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:displayid/score-history` と同一です。
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 400 Bad Request (`validation_failed`): `username` が不正
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 

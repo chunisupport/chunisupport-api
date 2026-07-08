@@ -2,7 +2,6 @@ package api_internal
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -57,11 +56,7 @@ func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 }
 
 func internalScoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror.APIError) {
-	rawUsername := strings.TrimSpace(c.QueryParam("username"))
-	if rawUsername == "" {
-		return "", nil, apierror.ErrValidationFailedBadRequest
-	}
-	username, apiErr := apphandler.ValidateUsername(rawUsername)
+	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return "", nil, apiErr
 	}

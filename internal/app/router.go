@@ -319,7 +319,9 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
+		publicUsersGroup.GET("/:username/record/songs/:displayid/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
+		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid/history", handlers.InternalScoreHistory.GetWorldsend)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 		publicUsersGroup.GET("/:username/favorite-songs", handlers.PlayerFavoriteSong.List)
@@ -358,7 +360,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
-		publicSongsGroup.GET("/:displayid/score-history/:difficulty", handlers.InternalScoreHistory.GetStandard)
 	}
 
 	// api.chunisupport.net/internal/worldsend-songs
@@ -367,7 +368,6 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
 		publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
-		publicWorldsendGroup.GET("/:displayid/score-history", handlers.InternalScoreHistory.GetWorldsend)
 	}
 
 	songsGroup := internal.Group("/songs")
