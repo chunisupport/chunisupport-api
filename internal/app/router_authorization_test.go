@@ -11,6 +11,7 @@ import (
 	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -351,5 +352,6 @@ func newAuthorizationTestHandlers() *Handlers {
 		V1User:              new(api_v1.V1UserHandler),
 		V1Version:           new(api_v1.V1VersionHandler),
 		Chunirec:            new(chunirec.ChunirecHandler),
+		Reiwa:               new(reiwa.ReiwaHandler),
 	}
 }

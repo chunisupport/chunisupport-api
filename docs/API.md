@@ -1,8 +1,8 @@
 # chunisupport-api API仕様書
 
-このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)の仕様をまとめたものです。
+このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)、reiwa互換API(`/compat/reiwa/1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年07月08日
+**最終更新日**: 2026年07月09日
 
 ## ベースURLと環境
 
@@ -16,6 +16,7 @@
 - 内部向けAPI: `http://localhost:<app_port>/internal`
 - 公開API (APIトークン認証): `http://localhost:<app_port>/v1`
 - chunirec互換API (APIトークン認証): `http://localhost:<app_port>/compat/chunirec/2.0`
+- reiwa互換API (APIトークン認証): `http://localhost:<app_port>/compat/reiwa/1`
 
 ## CORS
 
@@ -31,10 +32,10 @@
 - Bearer 任意のエンドポイントでは、未認証時にレートリミットが適用されます。
 - `token` Cookie や独自セッションは使用しません。
 
-### 公開API (`/v1`, `/compat/chunirec/2.0`)
+### 公開API (`/v1`, `/compat/chunirec/2.0`, `/compat/reiwa/1`)
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
-- `/v1` と `/compat/chunirec/2.0` はどちらも API トークン認証です。
+- `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
 - `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーの本人確認を行う場合はトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で発行します。
 
@@ -49,6 +50,7 @@
 - `/internal/users/*`、`/internal/songs/*` および `/internal/worldsend-songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
 - `/v1/*`: **15分あたり150回（一般ユーザー） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
+- `/compat/reiwa/1/*`: **`/v1` と同一**
 
 実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
 
@@ -200,6 +202,7 @@
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
 | `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
+| `/compat/reiwa/1/chunithm_record/original` | GET | APIトークン | reiwa互換：通常譜面全楽曲一覧取得 |
 
 ---
 
@@ -3860,6 +3863,61 @@ chunirec互換APIはchunirecとの互換性を持つエンドポイントです�
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー・プレイヤー未紐付けを含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+---
+
+## reiwa互換API `/compat/reiwa/1`
+
+reiwa互換APIは外部ツールとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
+
+### GET `/compat/reiwa/1/chunithm_record/original`
+
+- **認証**: APIトークン必須
+- **概要**: WORLD'S END以外の全楽曲の通常譜面情報を、譜面単位のフラットな配列で取得します（削除済み楽曲は除外）。
+- **レスポンス**: 200 OK
+
+```json
+[
+  {
+    "title": "B.B.K.K.B.K.K.",
+    "artist": "nora2r",
+    "img": "d739ba44da6798a0",
+    "genre": "VARIETY",
+    "const": 4,
+    "level": 4,
+    "diff": "BAS",
+    "notes": 333,
+    "unknown": 0,
+    "chunirec_id": "6a88218b1a936bd3",
+    "idx": "3",
+    "bpm": 170,
+    "release": 14370588,
+    "version": ""
+  }
+]
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `title` | string | 楽曲タイトル |
+| `artist` | string | アーティスト名 |
+| `img` | string | ジャケット画像識別子 |
+| `genre` | string | ジャンル名（"POPS&ANIME"は"POPS & ANIME"に変換） |
+| `const` | number | 譜面定数 |
+| `level` | number | 表記レベル（.5区切り、例: 13+ → 13.5） |
+| `diff` | string | 難易度（"BAS", "ADV", "EXP", "MAS", "ULT"） |
+| `notes` | number | ノーツ数 |
+| `unknown` | number | 譜面定数不明フラグ（0: 既知, 1: 不明） |
+| `chunirec_id` | string | 楽曲の内部ID |
+| `idx` | string | 公式インデックス |
+| `bpm` | number | BPM |
+| `release` | number | リリース日のJST0時Unixタイムスタンプ÷100 |
+| `version` | string | バージョン名から"CHUNITHM "を除去した名称（初代CHUNITHMは空文字） |
+
+- **ソート順**: `idx` を数値として昇順 → 難易度順（BAS → ADV → EXP → MAS → ULT）
+- **主なエラー**:
+  - 401 Unauthorized: APIトークン未指定または無効
+  - 500 Internal Server Error: サーバー内部エラー
 
 ---
 

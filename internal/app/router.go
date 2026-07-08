@@ -16,6 +16,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -94,6 +95,8 @@ type Handlers struct {
 	ScoreHistory *api_v1.ScoreHistoryHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
+	// reiwa互換APIハンドラ
+	Reiwa *reiwa.ReiwaHandler
 }
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
@@ -228,6 +231,8 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		ScoreHistory: api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
+		// reiwa互換APIハンドラ
+		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterCache),
 	}
 
 	// ルートの設定
@@ -501,6 +506,19 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
 		chunirecGroup.GET("/music/show", handlers.Chunirec.GetMusicShow)
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
+	}
+
+	// reiwa互換APIルートの登録
+	reiwaGroup := e.Group("/compat/reiwa/1")
+	reiwaGroup.Use(reiwa.ReiwaErrorHandlerMiddleware())
+	reiwaGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
+	reiwaGroup.Use(middleware.APIRateLimitMiddleware(
+		info.APIRateLimitRequests,
+		info.APIRateLimitAdminRequests,
+		info.APIRateLimitWindow,
+	))
+	{
+		reiwaGroup.GET("/chunithm_record/original", handlers.Reiwa.GetChunithmRecordOriginal)
 	}
 }
 
