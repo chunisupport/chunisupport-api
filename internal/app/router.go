@@ -86,6 +86,7 @@ type Handlers struct {
 	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
 	PlayerFavoriteSong   *api_internal.PlayerFavoriteSongHandler
 	Friendship           *api_internal.FriendshipHandler
+	FriendChartRanking   *api_internal.FriendChartRankingHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	// 外部API v1 用ハンドラ
 	V1Song       *api_v1.V1SongHandler
@@ -140,6 +141,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
+	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	tm := transaction.NewTransactionManager(db)
@@ -192,6 +194,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	if err != nil {
 		panic(fmt.Sprintf("failed to create friendship usecase: %v", err))
 	}
+	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
@@ -222,6 +225,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:   api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
 		Friendship:           api_internal.NewFriendshipHandler(friendshipUsecase),
+		FriendChartRanking:   api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -338,6 +342,12 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		friendshipGroup.POST("/requests/:user_id/reject", handlers.Friendship.RejectRequest)
 		friendshipGroup.DELETE("/requests/:user_id", handlers.Friendship.CancelRequest)
 		friendshipGroup.DELETE("/:user_id", handlers.Friendship.Remove)
+	}
+
+	friendRankingGroup := internal.Group("/friend-rankings")
+	friendRankingGroup.Use(firebaseAuthStrict)
+	{
+		friendRankingGroup.GET("/songs/:displayid/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")

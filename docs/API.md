@@ -140,6 +140,7 @@
 | `/internal/friends/requests/:user_id/accept` | POST | Firebase Bearer | フレンド申請承認 |
 | `/internal/friends/requests/:user_id/reject` | POST | Firebase Bearer | フレンド申請拒否 |
 | `/internal/friends/requests/:user_id` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
+| `/internal/friend-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -673,6 +674,71 @@ Firebase Bearer Token（必須）
 | コード | HTTP | 条件 |
 | --- | --- | --- |
 | `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+
+## `/internal/friend-rankings` グループ
+
+フレンドランキングは、自分と双方向 `accepted` のフレンドのうち、対象譜面をプレイ済みのユーザーだけを返します。未プレイユーザーは返しません。
+
+### GET `/internal/friend-rankings/songs/:displayid/charts/:difficulty`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: 通常譜面1つについて、自分と承認済みフレンド内の現在スコアランキングを取得します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | 楽曲の表示用ID |
+| `difficulty` | string | 難易度（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`。短縮形は既存のパス難易度変換に従う） |
+
+- **ソート・順位**:
+  - `score` 降順
+  - 同点内の表示順は `updated_at` 降順、`user_id` 昇順
+  - 同点は同順位とし、次順位は件数分進めます（例: `1, 1, 3`）
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "song": {
+    "id": "0000000000000001",
+    "title": "楽曲名",
+    "artist": "アーティスト名"
+  },
+  "chart": {
+    "difficulty": "MASTER",
+    "const": 14.5,
+    "is_const_unknown": false
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "user_id": 2,
+      "username": "frienduser",
+      "player_name": "PLAYER",
+      "score": 1009500,
+      "rating": 16.65,
+      "overpower": 87.123,
+      "overpower_percent": 98.7654,
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "ALL JUSTICE",
+      "full_chain": null,
+      "updated_at": "2026-07-09T12:00:00Z",
+      "is_self": false
+    }
+  ],
+  "my_rank": null,
+  "total": 1
+}
+```
+
+`my_rank` は自分が対象譜面を未プレイの場合 `null` です。`combo_lamp` と `full_chain` はマスタ値が `NONE` の場合 `null` です。
+
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `displayid` の形式不正
+  - 400 Bad Request (`invalid_difficulty`): 難易度が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/users/:username/locked-songs`
 - **認証**: Firebase Bearer 任意
