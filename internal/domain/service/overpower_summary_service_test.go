@@ -17,7 +17,7 @@ func TestCalcOverpowerSummary_楽曲ごとの最大値を合計する(t *testing
 	value, percent := CalcOverpowerSummary(records, maxTotal)
 
 	wantValue := CalcSingleOverpower(1008000, 15.0, 3) + CalcSingleOverpower(1009000, 14.0, 3)
-	wantPercent := truncN(wantValue/maxTotal*100, 4)
+	wantPercent := truncN(wantValue/maxTotal*100, 5)
 	assert.InDelta(t, wantValue, value, 0.0001)
 	assert.InDelta(t, wantPercent, percent, 0.0001)
 }
@@ -42,10 +42,10 @@ func TestCalcOverpowerPercent(t *testing.T) {
 			expected:          0,
 		},
 		{
-			name:              "小数点以下4桁で切り捨てる",
+			name:              "小数点以下5桁で切り捨てる",
 			overpowerValue:    2,
 			maxOverpowerTotal: 3,
-			expected:          66.6666,
+			expected:          66.66666,
 		},
 		{
 			name:              "100を超える場合は100に丸める",

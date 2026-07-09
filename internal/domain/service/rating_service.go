@@ -13,7 +13,7 @@ const (
 	ratingScale          = int64(100)
 	aggregateRatingScale = int64(10_000)
 	overpowerScale       = int64(1_000)
-	percentScale         = int64(10_000)
+	percentScale         = int64(100_000)
 )
 
 // CalcSingleRating は指定されたスコアと譜面定数から単曲レーティングを計算します。
@@ -173,7 +173,7 @@ func CalcSongMaxOP(maxChartConst float64) float64 {
 	return CalcSingleOverpower(constants.TheoreticalScore, maxChartConst, comboLampAllJustice)
 }
 
-// CalcSingleOverpowerPercent は譜面別理論値に対する達成割合を小数点以下4桁で返します。
+// CalcSingleOverpowerPercent は譜面別理論値に対する達成割合を小数点以下5桁で返します。
 func CalcSingleOverpowerPercent(score uint32, chartConst float64, comboLampID int) float64 {
 	if chartConstTenths(chartConst) <= 0 {
 		return 0

@@ -505,6 +505,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	{
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
 		chunirecGroup.GET("/music/show", handlers.Chunirec.GetMusicShow)
+		chunirecGroup.GET("/records/showall", handlers.Chunirec.GetRecordsShowAll)
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
 	}
 

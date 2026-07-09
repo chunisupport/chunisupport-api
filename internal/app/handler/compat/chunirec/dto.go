@@ -3,9 +3,11 @@ package chunirec
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
@@ -46,6 +48,30 @@ type ChartDataDTO struct {
 	IsConstUnknown bool    `json:"is_const_unknown"`
 }
 
+// RecordsShowAllResponse は通常譜面のプレイヤーレコード一覧レスポンスを表します。
+type RecordsShowAllResponse struct {
+	Records []*RecordItemDTO `json:"records"`
+}
+
+// RecordItemDTO はchunirec互換の譜面別プレイヤーレコードを表します。
+type RecordItemDTO struct {
+	ID             string  `json:"id"`
+	Diff           string  `json:"diff"`
+	Level          float64 `json:"level"`
+	Title          string  `json:"title"`
+	Const          float64 `json:"const"`
+	Score          uint32  `json:"score"`
+	Rating         float64 `json:"rating"`
+	IsConstUnknown bool    `json:"is_const_unknown"`
+	IsClear        bool    `json:"is_clear"`
+	IsFullCombo    bool    `json:"is_fullcombo"`
+	IsAllJustice   bool    `json:"is_alljustice"`
+	IsFullChain    bool    `json:"is_fullchain"`
+	Genre          string  `json:"genre"`
+	UpdatedAt      string  `json:"updated_at"`
+	IsPlayed       bool    `json:"is_played"`
+}
+
 // ToMusicShowAllResponse はドメインエンティティのリストをDTOに変換します
 func ToMusicShowAllResponse(songs []*entity.Song, masters *domainmasterdata.SongMasters) MusicShowAllResponse {
 	response := make(MusicShowAllResponse, 0, len(songs))
@@ -70,6 +96,67 @@ func ToMusicShowResponse(song *entity.Song, masters *domainmasterdata.SongMaster
 	}
 
 	return toMusicItemDTO(song, genres)
+}
+
+// ToRecordsShowAllResponse は通常譜面のプレイヤーレコードをchunirec互換形式に変換します。
+func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map[string]string) *RecordsShowAllResponse {
+	response := &RecordsShowAllResponse{
+		Records: make([]*RecordItemDTO, 0, len(records)),
+	}
+
+	for _, record := range records {
+		if record == nil || !record.IsPlayed || record.UpdatedAt == nil {
+			continue
+		}
+
+		response.Records = append(response.Records, &RecordItemDTO{
+			ID:             record.ID,
+			Diff:           toChunirecDifficulty(record.Difficulty),
+			Level:          calculateLevel(record.Const.Float64()),
+			Title:          record.Title,
+			Const:          record.Const.Float64(),
+			Score:          record.Score,
+			Rating:         record.Rating,
+			IsConstUnknown: record.IsConstUnknown,
+			IsClear:        record.ClearLamp != nil,
+			IsFullCombo:    isFullCombo(record.ComboLamp),
+			IsAllJustice:   isAllJustice(record.ComboLamp),
+			IsFullChain:    record.FullChain != nil,
+			Genre:          genresBySongID[record.ID],
+			UpdatedAt:      record.UpdatedAt.Format("2006-01-02T15:04:05-0700"),
+			IsPlayed:       true,
+		})
+	}
+
+	return response
+}
+
+func toChunirecDifficulty(difficulty string) string {
+	switch strings.ToUpper(difficulty) {
+	case "BASIC", "BAS":
+		return "BAS"
+	case "ADVANCED", "ADV":
+		return "ADV"
+	case "EXPERT", "EXP":
+		return "EXP"
+	case "MASTER", "MAS":
+		return "MAS"
+	case "ULTIMA", "ULT":
+		return "ULT"
+	default:
+		return ""
+	}
+}
+
+func isFullCombo(comboLamp *string) bool {
+	if comboLamp == nil {
+		return false
+	}
+	return *comboLamp == "FULL COMBO" || *comboLamp == "ALL JUSTICE"
+}
+
+func isAllJustice(comboLamp *string) bool {
+	return comboLamp != nil && *comboLamp == "ALL JUSTICE"
 }
 
 // toMusicItemDTO は1曲のSongをMusicItemDTOに変換する内部ヘルパー関数です

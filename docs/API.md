@@ -201,6 +201,7 @@
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
+| `/compat/chunirec/2.0/records/showall` | GET | APIトークン | chunirec互換：通常譜面全レコード取得 |
 | `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
 | `/compat/reiwa/1/chunithm_record/original` | GET | APIトークン | reiwa互換：通常譜面全楽曲一覧取得 |
 
@@ -3819,6 +3820,62 @@ chunirec互換APIはchunirecとの互換性を持つエンドポイントです�
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found: 指定されたDisplay IDの楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/compat/chunirec/2.0/records/showall`
+- **認証**: APIトークン必須
+- **概要**: 指定されたユーザーの通常譜面の全レコードをchunirec互換形式で取得します。未プレイ譜面とWORLD'S ENDは返しません。
+- **クエリパラメータ**:
+  - `user_name` (string, optional): 取得対象のユーザー名。未指定の場合はAPIトークン所有者のレコードを返します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "records": [
+    {
+      "id": "6a88218b1a936bd3",
+      "diff": "EXP",
+      "level": 10,
+      "title": "B.B.K.K.B.K.K.",
+      "const": 10,
+      "score": 1003215,
+      "rating": 11.32,
+      "is_const_unknown": true,
+      "is_clear": true,
+      "is_fullcombo": false,
+      "is_alljustice": false,
+      "is_fullchain": false,
+      "genre": "VARIETY",
+      "updated_at": "1970-01-01T09:00:00+0900",
+      "is_played": true
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `records` | array | 通常譜面のプレイ済みレコード一覧 |
+| `records[].id` | string | 楽曲の識別ID（16桁） |
+| `records[].diff` | string | 難易度（`BAS`, `ADV`, `EXP`, `MAS`, `ULT`） |
+| `records[].level` | number | 表記レベル（.0または.5） |
+| `records[].title` | string | 楽曲名 |
+| `records[].const` | number | 譜面定数 |
+| `records[].score` | number | スコア |
+| `records[].rating` | number | 単曲レーティング |
+| `records[].is_const_unknown` | boolean | 定数が推定値の場合true |
+| `records[].is_clear` | boolean | クリアランプが付いている場合true |
+| `records[].is_fullcombo` | boolean | コンボランプがFULL COMBOまたはALL JUSTICEの場合true |
+| `records[].is_alljustice` | boolean | コンボランプがALL JUSTICEの場合true |
+| `records[].is_fullchain` | boolean | フルチェインランプが付いている場合true |
+| `records[].genre` | string | ジャンル名 |
+| `records[].updated_at` | string | レコード更新日時（`YYYY-MM-DDTHH:mm:ss+0900`形式） |
+| `records[].is_played` | boolean | 常にtrue |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/compat/chunirec/2.0/users/show`
