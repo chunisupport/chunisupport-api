@@ -32,6 +32,34 @@ func TestFriendChartRankingQueryService_ListRecords_自分と相互承認済み�
 	assert.Equal(t, []uint32{1_009_500, 1_009_500, 1_009_000}, []uint32{records[0].Score, records[1].Score, records[2].Score})
 }
 
+func TestFriendChartRankingQueryService_ListWorldsendRecords_自分と相互承認済みフレンドのプレイ済みだけを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupFriendChartRankingDB(t, db)
+	insertFriendChartRankingFixtures(t, db)
+	insertFriendWorldsendRankingFixtures(t, db)
+
+	query := NewFriendChartRankingQueryService()
+	chart, err := query.FindWorldsendChart(context.Background(), db, "0000000000000002")
+	require.NoError(t, err)
+	require.NotNil(t, chart)
+	require.NotNil(t, chart.LevelStar)
+	require.NotNil(t, chart.Attribute)
+	assert.Equal(t, 5, *chart.LevelStar)
+	assert.Equal(t, "狂", *chart.Attribute)
+
+	// When
+	records, err := query.ListWorldsendRecords(context.Background(), db, 1, chart.ChartID)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, records, 3)
+	assert.Equal(t, []int{2, 3, 1}, []int{records[0].UserID, records[1].UserID, records[2].UserID})
+	assert.Equal(t, []uint32{1_009_700, 1_009_700, 1_009_100}, []uint32{records[0].Score, records[1].Score, records[2].Score})
+	assert.Equal(t, "ALL JUSTICE", records[0].ComboLamp)
+}
+
 func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 	t.Helper()
 	_, err := db.Exec(`
@@ -62,10 +90,47 @@ func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 		CREATE TABLE clear_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 		CREATE TABLE combo_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 		CREATE TABLE full_chain_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+		CREATE TABLE worldsend_charts (
+			id INTEGER PRIMARY KEY,
+			song_id INTEGER NOT NULL,
+			level_star INTEGER,
+			attribute TEXT,
+			notes INTEGER,
+			notes_designer TEXT,
+			updated_at DATETIME
+		);
+		CREATE TABLE player_worldsend_records (
+			player_id INTEGER NOT NULL,
+			worldsend_chart_id INTEGER NOT NULL,
+			score INTEGER NOT NULL,
+			clear_lamp_id INTEGER NOT NULL,
+			combo_lamp_id INTEGER NOT NULL,
+			full_chain_id INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL
+		);
 		INSERT INTO clear_lamp_types (id, name) VALUES (1, 'CLEAR');
 		INSERT INTO combo_lamp_types (id, name) VALUES (1, 'NONE'), (2, 'FULL COMBO'), (3, 'ALL JUSTICE');
 		INSERT INTO full_chain_types (id, name) VALUES (1, 'NONE');
 	`)
+	require.NoError(t, err)
+}
+
+func insertFriendWorldsendRankingFixtures(t *testing.T, db *sqlx.DB) {
+	t.Helper()
+	updatedAt := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
+		VALUES (2, '0000000000000002', 'WE楽曲名', 'WE artist', 1, '2', 1, 0);
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES (20, 2, 5, '狂', 2000);
+		INSERT INTO player_worldsend_records (
+			player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at
+		) VALUES
+			(101, 20, 1009100, 1, 1, 1, ?),
+			(102, 20, 1009700, 1, 3, 1, ?),
+			(103, 20, 1009700, 1, 2, 1, ?),
+			(104, 20, 1010000, 1, 3, 1, ?)
+	`, updatedAt, updatedAt.Add(time.Minute), updatedAt, updatedAt.Add(2*time.Minute))
 	require.NoError(t, err)
 }
 

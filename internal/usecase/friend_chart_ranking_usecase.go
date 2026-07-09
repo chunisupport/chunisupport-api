@@ -27,6 +27,9 @@ type FriendChartRankingChart struct {
 	Difficulty     string
 	Const          chartconstant.ChartConstant
 	IsConstUnknown bool
+	LevelStar      *int
+	Attribute      *string
+	IsWorldsend    bool
 }
 
 // FriendChartRankingEntry は譜面単位フレンドランキングの1件です。
@@ -58,6 +61,7 @@ type FriendChartRankingResult struct {
 // FriendChartRankingUsecase は譜面単位フレンドランキング取得を提供します。
 type FriendChartRankingUsecase interface {
 	GetStandard(ctx context.Context, userID int, displayID string, difficulty string) (*FriendChartRankingResult, error)
+	GetWorldsend(ctx context.Context, userID int, displayID string) (*FriendChartRankingResult, error)
 }
 
 type friendChartRankingUsecase struct {
@@ -83,6 +87,27 @@ func (u *friendChartRankingUsecase) GetStandard(ctx context.Context, userID int,
 		return nil, err
 	}
 
+	return buildFriendChartRankingResult(userID, chart, rows), nil
+}
+
+func (u *friendChartRankingUsecase) GetWorldsend(ctx context.Context, userID int, displayID string) (*FriendChartRankingResult, error) {
+	chart, err := u.rankingRepo.FindWorldsendChart(ctx, u.exec, displayID)
+	if err != nil {
+		return nil, err
+	}
+	if chart == nil {
+		return nil, ErrChartNotFound
+	}
+
+	rows, err := u.rankingRepo.ListWorldsendRecords(ctx, u.exec, userID, chart.ChartID)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildFriendChartRankingResult(userID, chart, rows), nil
+}
+
+func buildFriendChartRankingResult(userID int, chart *repository.FriendChartRankingChart, rows []*repository.FriendChartRankingRecord) *FriendChartRankingResult {
 	result := &FriendChartRankingResult{
 		Song: FriendChartRankingSong{
 			ID:     chart.SongDisplayID,
@@ -93,6 +118,9 @@ func (u *friendChartRankingUsecase) GetStandard(ctx context.Context, userID int,
 			Difficulty:     chart.Difficulty,
 			Const:          chart.Const,
 			IsConstUnknown: chart.IsConstUnknown,
+			LevelStar:      chart.LevelStar,
+			Attribute:      chart.Attribute,
+			IsWorldsend:    chart.IsWorldsend,
 		},
 		Ranking: make([]FriendChartRankingEntry, 0, len(rows)),
 		Total:   len(rows),
@@ -110,15 +138,23 @@ func (u *friendChartRankingUsecase) GetStandard(ctx context.Context, userID int,
 			rank := currentRank
 			result.MyRank = &rank
 		}
+		rating := 0.0
+		overpower := 0.0
+		overpowerPercent := 0.0
+		if !chart.IsWorldsend {
+			rating = service.CalcSingleRating(row.Score, chart.Const.Float64())
+			overpower = service.CalcSingleOverpower(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))
+			overpowerPercent = service.CalcSingleOverpowerPercent(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))
+		}
 		result.Ranking = append(result.Ranking, FriendChartRankingEntry{
 			Rank:             currentRank,
 			UserID:           row.UserID,
 			Username:         row.Username,
 			PlayerName:       row.PlayerName,
 			Score:            row.Score,
-			Rating:           service.CalcSingleRating(row.Score, chart.Const.Float64()),
-			Overpower:        service.CalcSingleOverpower(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp)),
-			OverpowerPercent: service.CalcSingleOverpowerPercent(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp)),
+			Rating:           rating,
+			Overpower:        overpower,
+			OverpowerPercent: overpowerPercent,
 			ClearLamp:        rankingLampNamePtr(row.ClearLamp),
 			ComboLamp:        rankingLampNamePtr(row.ComboLamp),
 			FullChain:        rankingLampNamePtr(row.FullChain),
@@ -127,7 +163,7 @@ func (u *friendChartRankingUsecase) GetStandard(ctx context.Context, userID int,
 		})
 	}
 
-	return result, nil
+	return result
 }
 
 func rankingLampNamePtr(name string) *string {

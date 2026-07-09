@@ -7,7 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
-// FriendChartRankingChart はフレンドランキング対象の通常譜面情報です。
+// FriendChartRankingChart はフレンドランキング対象の譜面情報です（通常 / WORLD'S END）。
 type FriendChartRankingChart struct {
 	SongDisplayID   string
 	SongTitle       string
@@ -15,8 +15,11 @@ type FriendChartRankingChart struct {
 	Difficulty      string
 	Const           chartconstant.ChartConstant
 	IsConstUnknown  bool
+	LevelStar       *int
+	Attribute       *string
 	ChartID         int
 	ChartDifficulty int
+	IsWorldsend     bool
 }
 
 // FriendChartRankingRecord は譜面単位フレンドランキングの1件です。
@@ -37,5 +40,7 @@ type FriendChartRankingRecord struct {
 // FriendChartRankingQueryService は譜面単位フレンドランキングの読み取りを扱います。
 type FriendChartRankingQueryService interface {
 	FindChart(ctx context.Context, exec Executor, displayID string, difficulty string) (*FriendChartRankingChart, error)
+	FindWorldsendChart(ctx context.Context, exec Executor, displayID string) (*FriendChartRankingChart, error)
 	ListRecords(ctx context.Context, exec Executor, userID int, chartID int) ([]*FriendChartRankingRecord, error)
+	ListWorldsendRecords(ctx context.Context, exec Executor, userID int, worldsendChartID int) ([]*FriendChartRankingRecord, error)
 }

@@ -40,6 +40,23 @@ func (h *FriendChartRankingHandler) GetStandard(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toFriendChartRankingResponse(result))
 }
 
+func (h *FriendChartRankingHandler) GetWorldsend(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+
+	result, err := h.usecase.GetWorldsend(c.Request().Context(), user.ID, displayID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, toFriendChartRankingResponse(result))
+}
+
 func toFriendChartRankingResponse(result *usecase.FriendChartRankingResult) *internaldto.FriendChartRankingResponse {
 	if result == nil {
 		return nil
@@ -51,30 +68,41 @@ func toFriendChartRankingResponse(result *usecase.FriendChartRankingResult) *int
 			Artist: result.Song.Artist,
 		},
 		Chart: internaldto.FriendChartRankingChartDTO{
-			Difficulty:     result.Chart.Difficulty,
-			Const:          result.Chart.Const,
-			IsConstUnknown: result.Chart.IsConstUnknown,
+			Difficulty:  result.Chart.Difficulty,
+			LevelStar:   result.Chart.LevelStar,
+			Attribute:   result.Chart.Attribute,
+			IsWorldsend: result.Chart.IsWorldsend,
 		},
 		Ranking: make([]internaldto.FriendChartRankingEntryDTO, 0, len(result.Ranking)),
 		MyRank:  result.MyRank,
 		Total:   result.Total,
 	}
+	if !result.Chart.IsWorldsend {
+		res.Chart.Const = &result.Chart.Const
+		res.Chart.IsConstUnknown = &result.Chart.IsConstUnknown
+	}
 	for _, entry := range result.Ranking {
-		res.Ranking = append(res.Ranking, internaldto.FriendChartRankingEntryDTO{
-			Rank:             entry.Rank,
-			UserID:           entry.UserID,
-			Username:         entry.Username,
-			PlayerName:       entry.PlayerName,
-			Score:            entry.Score,
-			Rating:           entry.Rating,
-			Overpower:        entry.Overpower,
-			OverpowerPercent: entry.OverpowerPercent,
-			ClearLamp:        entry.ClearLamp,
-			ComboLamp:        entry.ComboLamp,
-			FullChain:        entry.FullChain,
-			UpdatedAt:        entry.UpdatedAt,
-			IsSelf:           entry.IsSelf,
-		})
+		item := internaldto.FriendChartRankingEntryDTO{
+			Rank:       entry.Rank,
+			UserID:     entry.UserID,
+			Username:   entry.Username,
+			PlayerName: entry.PlayerName,
+			Score:      entry.Score,
+			ClearLamp:  entry.ClearLamp,
+			ComboLamp:  entry.ComboLamp,
+			FullChain:  entry.FullChain,
+			UpdatedAt:  entry.UpdatedAt,
+			IsSelf:     entry.IsSelf,
+		}
+		if !result.Chart.IsWorldsend {
+			rating := entry.Rating
+			overpower := entry.Overpower
+			overpowerPercent := entry.OverpowerPercent
+			item.Rating = &rating
+			item.Overpower = &overpower
+			item.OverpowerPercent = &overpowerPercent
+		}
+		res.Ranking = append(res.Ranking, item)
 	}
 	return res
 }

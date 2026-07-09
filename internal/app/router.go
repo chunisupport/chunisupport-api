@@ -348,6 +348,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	friendRankingGroup.Use(firebaseAuthStrict)
 	{
 		friendRankingGroup.GET("/songs/:displayid/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
+		friendRankingGroup.GET("/worldsend-songs/:displayid", handlers.FriendChartRanking.GetWorldsend)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")

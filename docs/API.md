@@ -141,6 +141,7 @@
 | `/internal/friends/requests/:user_id/reject` | POST | Firebase Bearer | フレンド申請拒否 |
 | `/internal/friends/requests/:user_id` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/friend-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
+| `/internal/friend-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -707,7 +708,8 @@ Firebase Bearer Token（必須）
   "chart": {
     "difficulty": "MASTER",
     "const": 14.5,
-    "is_const_unknown": false
+    "is_const_unknown": false,
+    "is_worldsend": false
   },
   "ranking": [
     {
@@ -738,6 +740,62 @@ Firebase Bearer Token（必須）
   - 400 Bad Request (`invalid_difficulty`): 難易度が不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
+
+### GET `/internal/friend-rankings/worldsend-songs/:displayid`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: WORLD'S END譜面1つについて、自分と承認済みフレンド内の現在スコアランキングを取得します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | WORLD'S END楽曲の表示用ID |
+
+- **ソート・順位**:
+  - `score` 降順
+  - 同点内の表示順は `updated_at` 降順、`user_id` 昇順
+  - 同点は同順位とし、次順位は件数分進めます（例: `1, 1, 3`）
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "song": {
+    "id": "0000000000000002",
+    "title": "WORLD'S END楽曲名",
+    "artist": "アーティスト名"
+  },
+  "chart": {
+    "difficulty": "WORLD'S END",
+    "level_star": 5,
+    "attribute": "狂",
+    "is_worldsend": true
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "user_id": 2,
+      "username": "frienduser",
+      "player_name": "PLAYER",
+      "score": 1009500,
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "ALL JUSTICE",
+      "full_chain": null,
+      "updated_at": "2026-07-09T12:00:00Z",
+      "is_self": false
+    }
+  ],
+  "my_rank": null,
+  "total": 1
+}
+```
+
+WORLD'S END はレーティング・OVER POWER計算の対象外のため、通常譜面で返す `const` / `is_const_unknown` / `rating` / `overpower` / `overpower_percent` は返しません。ランキング表示に必要なスコアとランプは `ranking` の各要素に含まれます。
+
+- **主なエラー**:
+  - 400 Bad Request (`validation_failed`): `displayid` の形式不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/users/:username/locked-songs`

@@ -15,9 +15,12 @@ type FriendChartRankingSongDTO struct {
 
 // FriendChartRankingChartDTO はフレンドランキング対象譜面の概要です。
 type FriendChartRankingChartDTO struct {
-	Difficulty     string                      `json:"difficulty"`
-	Const          chartconstant.ChartConstant `json:"const"`
-	IsConstUnknown bool                        `json:"is_const_unknown"`
+	Difficulty     string                       `json:"difficulty"`
+	Const          *chartconstant.ChartConstant `json:"const,omitempty"`
+	IsConstUnknown *bool                        `json:"is_const_unknown,omitempty"`
+	LevelStar      *int                         `json:"level_star,omitempty"`
+	Attribute      *string                      `json:"attribute,omitempty"`
+	IsWorldsend    bool                         `json:"is_worldsend"`
 }
 
 // FriendChartRankingEntryDTO は譜面単位フレンドランキングの1件です。
@@ -27,9 +30,9 @@ type FriendChartRankingEntryDTO struct {
 	Username         string    `json:"username"`
 	PlayerName       string    `json:"player_name"`
 	Score            uint32    `json:"score"`
-	Rating           float64   `json:"rating"`
-	Overpower        float64   `json:"overpower"`
-	OverpowerPercent float64   `json:"overpower_percent"`
+	Rating           *float64  `json:"rating,omitempty"`
+	Overpower        *float64  `json:"overpower,omitempty"`
+	OverpowerPercent *float64  `json:"overpower_percent,omitempty"`
 	ClearLamp        *string   `json:"clear_lamp"`
 	ComboLamp        *string   `json:"combo_lamp"`
 	FullChain        *string   `json:"full_chain"`
