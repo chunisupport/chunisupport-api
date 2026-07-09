@@ -3704,7 +3704,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ## chunirec互換API `/compat/chunirec/2.0`
 
-chunirec互換APIはchunirecとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
+chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法は`/v1`と同様です。  
+なお、こちらのAPIで表示されるIDはあくまでChuniSupportのIDであり、chunirecのIDとは異なります。他のchunirec互換APIと同時に利用していただく想定です。
 
 ### GET `/compat/chunirec/2.0/music/showall`
 - **認証**: APIトークン必須
