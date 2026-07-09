@@ -13,6 +13,7 @@ type FriendshipUsecase interface {
 	ListSentRequests(ctx context.Context, userID int) ([]*FriendshipUserOutput, error)
 	AcceptRequest(ctx context.Context, userID int, requesterID int) error
 	RejectRequest(ctx context.Context, userID int, requesterID int) error
+	CancelRequest(ctx context.Context, userID int, targetUserID int) error
 	Remove(ctx context.Context, userID int, friendUserID int) error
 }
 

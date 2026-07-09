@@ -182,6 +182,27 @@ func (u *friendshipUsecase) RejectRequest(ctx context.Context, userID int, reque
 	})
 }
 
+func (u *friendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUserID int) error {
+	if userID == targetUserID {
+		return ErrInvalidFriendRequest
+	}
+
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.lockUsers(ctx, tx, userID, targetUserID); err != nil {
+			return err
+		}
+
+		outgoing, err := u.friendshipRepo.Find(ctx, tx, userID, targetUserID)
+		if err != nil {
+			return err
+		}
+		if outgoing == nil || !outgoing.IsPending() {
+			return ErrFriendRequestNotFound
+		}
+		return u.friendshipRepo.DeletePending(ctx, tx, userID, targetUserID)
+	})
+}
+
 func (u *friendshipUsecase) Remove(ctx context.Context, userID int, friendUserID int) error {
 	if userID == friendUserID {
 		return ErrInvalidFriendRequest

@@ -104,6 +104,7 @@ A が B に申請済みの状態で B が A に申請した場合、新しい `p
 | GET | `/internal/friends/requests/sent` | 自分が送った申請一覧 |
 | POST | `/internal/friends/requests/:user_id/accept` | 申請承認 |
 | POST | `/internal/friends/requests/:user_id/reject` | 申請拒否 |
+| DELETE | `/internal/friends/requests/:user_id` | 自分が送った申請の取り消し |
 | DELETE | `/internal/friends/:user_id` | フレンド解除 |
 
 申請作成だけは、ユーザーが入力する表向きIDとして `username` を使用します。

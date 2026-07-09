@@ -139,6 +139,7 @@
 | `/internal/friends/requests/sent` | GET | Firebase Bearer | 自分が送ったフレンド申請一覧取得 |
 | `/internal/friends/requests/:user_id/accept` | POST | Firebase Bearer | フレンド申請承認 |
 | `/internal/friends/requests/:user_id/reject` | POST | Firebase Bearer | フレンド申請拒否 |
+| `/internal/friends/requests/:user_id` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -654,6 +655,16 @@ Firebase Bearer Token（必須）
 | `validation_failed` | 400 | 自分自身の `user_id` を指定 |
 | `user_not_found` | 404 | ロック対象ユーザーが存在しない |
 | `friend_request_not_found` | 404 | 指定ユーザーからの `pending` 申請が存在しない |
+
+### DELETE `/internal/friends/requests/:user_id`
+
+指定ユーザーへの自分からの `pending` 申請を取り消します。成功時は `204 No Content` です。
+
+| コード | HTTP | 条件 |
+| --- | --- | --- |
+| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `user_not_found` | 404 | ロック対象ユーザーが存在しない |
+| `friend_request_not_found` | 404 | 指定ユーザーへの自分からの `pending` 申請が存在しない |
 
 ### DELETE `/internal/friends/:user_id`
 

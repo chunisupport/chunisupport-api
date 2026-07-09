@@ -23,6 +23,7 @@ type mockFriendshipUsecase struct {
 	listFriendsFunc  func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 	acceptFunc       func(ctx context.Context, userID int, requesterID int) error
 	rejectFunc       func(ctx context.Context, userID int, requesterID int) error
+	cancelFunc       func(ctx context.Context, userID int, targetUserID int) error
 	removeFunc       func(ctx context.Context, userID int, friendUserID int) error
 	listReceivedFunc func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 	listSentFunc     func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
@@ -66,6 +67,13 @@ func (m *mockFriendshipUsecase) AcceptRequest(ctx context.Context, userID int, r
 func (m *mockFriendshipUsecase) RejectRequest(ctx context.Context, userID int, requesterID int) error {
 	if m.rejectFunc != nil {
 		return m.rejectFunc(ctx, userID, requesterID)
+	}
+	return nil
+}
+
+func (m *mockFriendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUserID int) error {
+	if m.cancelFunc != nil {
+		return m.cancelFunc(ctx, userID, targetUserID)
 	}
 	return nil
 }
@@ -229,6 +237,33 @@ func TestFriendshipHandler_AcceptRejectRemove(t *testing.T) {
 
 		// When
 		err := handler.RejectRequest(c)
+
+		// Then
+		require.NoError(t, err)
+		assert.True(t, called)
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+	})
+
+	t.Run("取り消しはpathのuser_idを送信先として渡す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		called := false
+		handler := NewFriendshipHandler(&mockFriendshipUsecase{
+			cancelFunc: func(ctx context.Context, userID int, targetUserID int) error {
+				called = true
+				assert.Equal(t, 1, userID)
+				assert.Equal(t, 2, targetUserID)
+				return nil
+			},
+		})
+		req := httptest.NewRequest(http.MethodDelete, "/internal/friends/requests/2", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
+		c.SetPathValues(echo.PathValues{{Name: "user_id", Value: "2"}})
+
+		// When
+		err := handler.CancelRequest(c)
 
 		// Then
 		require.NoError(t, err)

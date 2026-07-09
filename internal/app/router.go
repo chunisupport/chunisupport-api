@@ -336,6 +336,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		friendshipGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
 		friendshipGroup.POST("/requests/:user_id/accept", handlers.Friendship.AcceptRequest)
 		friendshipGroup.POST("/requests/:user_id/reject", handlers.Friendship.RejectRequest)
+		friendshipGroup.DELETE("/requests/:user_id", handlers.Friendship.CancelRequest)
 		friendshipGroup.DELETE("/:user_id", handlers.Friendship.Remove)
 	}
 

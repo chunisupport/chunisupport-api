@@ -329,6 +329,45 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		assert.Nil(t, repo.relations[[2]int{2, 1}])
 		assert.Contains(t, repo.deleted, [2]int{2, 1})
 	})
+
+	t.Run("送信済み申請を取り消すと自分から相手へのpendingを削除する", func(t *testing.T) {
+		// Given
+		repo := newStubFriendshipRepo()
+		outgoing, err := entity.NewFriendRequest(1, 2, now.Add(-time.Hour))
+		require.NoError(t, err)
+		repo.relations[[2]int{1, 2}] = outgoing
+		u := &friendshipUsecase{
+			db:             &MockExecutor{},
+			tm:             &spyTransactionManager{executor: &MockExecutor{}},
+			userRepo:       &stubUserRepoForFriendship{},
+			friendshipRepo: repo,
+		}
+
+		// When
+		err = u.CancelRequest(context.Background(), 1, 2)
+
+		// Then
+		require.NoError(t, err)
+		assert.Nil(t, repo.relations[[2]int{1, 2}])
+		assert.Contains(t, repo.deleted, [2]int{1, 2})
+	})
+
+	t.Run("送信済み申請がない場合はnot foundを返す", func(t *testing.T) {
+		// Given
+		repo := newStubFriendshipRepo()
+		u := &friendshipUsecase{
+			db:             &MockExecutor{},
+			tm:             &spyTransactionManager{executor: &MockExecutor{}},
+			userRepo:       &stubUserRepoForFriendship{},
+			friendshipRepo: repo,
+		}
+
+		// When
+		err := u.CancelRequest(context.Background(), 1, 2)
+
+		// Then
+		require.ErrorIs(t, err, ErrFriendRequestNotFound)
+	})
 }
 
 func TestUserUsecase_PrivateUserAccessibleByFriend(t *testing.T) {

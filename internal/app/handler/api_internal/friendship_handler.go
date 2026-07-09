@@ -96,6 +96,17 @@ func (h *FriendshipHandler) RejectRequest(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *FriendshipHandler) CancelRequest(c *echo.Context) error {
+	user, targetUserID, err := h.authenticatedUserAndPathUserID(c)
+	if err != nil {
+		return err
+	}
+	if err := h.usecase.CancelRequest(c.Request().Context(), user.ID, targetUserID); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *FriendshipHandler) Remove(c *echo.Context) error {
 	user, friendUserID, err := h.authenticatedUserAndPathUserID(c)
 	if err != nil {
