@@ -38,8 +38,7 @@ func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 		CREATE TABLE users (
 			id INTEGER PRIMARY KEY,
 			username TEXT NOT NULL,
-			player_id INTEGER,
-			is_deleted INTEGER NOT NULL DEFAULT 0
+			player_id INTEGER
 		);
 		CREATE TABLE players (
 			id INTEGER PRIMARY KEY,
@@ -78,12 +77,12 @@ func insertFriendChartRankingFixtures(t *testing.T, db *sqlx.DB) {
 		VALUES (1, '0000000000000001', '楽曲名', 'artist', 1, '1', 0, 0);
 		INSERT INTO charts (id, song_id, difficulty_id, const, is_const_unknown)
 		VALUES (10, 1, 4, 14.5, 0);
-		INSERT INTO users (id, username, player_id, is_deleted) VALUES
-			(1, 'me', 101, 0),
-			(2, 'friend1', 102, 0),
-			(3, 'friend2', 103, 0),
-			(4, 'oneway', 104, 0),
-			(5, 'unplayed', 105, 0);
+		INSERT INTO users (id, username, player_id) VALUES
+			(1, 'me', 101),
+			(2, 'friend1', 102),
+			(3, 'friend2', 103),
+			(4, 'oneway', 104),
+			(5, 'unplayed', 105);
 		INSERT INTO players (id, user_id, player_name) VALUES
 			(101, 1, 'ME'),
 			(102, 2, 'FRIEND1'),

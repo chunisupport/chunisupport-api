@@ -100,7 +100,6 @@ func (q *FriendChartRankingQueryService) ListRecords(ctx context.Context, exec d
 		INNER JOIN combo_lamp_types co ON co.id = pr.combo_lamp_id
 		INNER JOIN full_chain_types fc ON fc.id = pr.full_chain_id
 		WHERE pr.chart_id = ?
-		  AND u.is_deleted = 0
 		  AND (
 			u.id = ?
 			OR EXISTS (
