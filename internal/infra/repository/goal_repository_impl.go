@@ -26,7 +26,7 @@ func NewGoalRepository(db *sqlx.DB) repository.GoalRepository {
 
 func (r *goalRepository) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
 	var goalModels []*models.GoalModel
-	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, created_at FROM goals WHERE user_id = ? ORDER BY created_at ASC, id ASC`
+	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at FROM goals WHERE user_id = ? ORDER BY sort_order ASC, id ASC`
 	if err := exec.SelectContext(ctx, &goalModels, query, userID); err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (r *goalRepository) ListByUserID(ctx context.Context, exec repository.Execu
 
 func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
 	var m models.GoalModel
-	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, created_at FROM goals WHERE id = ? AND user_id = ?`
+	query := `SELECT id, user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at FROM goals WHERE id = ? AND user_id = ?`
 	if err := exec.GetContext(ctx, &m, query, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.Join(repository.ErrGoalNotFound, err)
@@ -50,8 +50,8 @@ func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.
 }
 
 func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
-	query := `INSERT INTO goals (user_id, title, achievement_type_id, achievement_params, attributes, invert) VALUES (?, ?, ?, ?, ?, ?)`
-	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert)
+	query := `INSERT INTO goals (user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert, goal.SortOrder)
 	if err != nil {
 		return err
 	}
@@ -66,9 +66,9 @@ func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, g
 	return nil
 }
 
-func (r *goalRepository) Update(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
-	query := `UPDATE goals SET title = ?, achievement_type_id = ?, achievement_params = ?, attributes = ?, invert = ? WHERE id = ? AND user_id = ?`
-	res, err := exec.ExecContext(ctx, query, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert, goal.ID, goal.UserID)
+func (r *goalRepository) Save(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
+	query := `UPDATE goals SET title = ?, achievement_type_id = ?, achievement_params = ?, attributes = ?, invert = ?, sort_order = ? WHERE id = ? AND user_id = ?`
+	res, err := exec.ExecContext(ctx, query, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert, goal.SortOrder, goal.ID, goal.UserID)
 	if err != nil {
 		return err
 	}
@@ -94,6 +94,73 @@ func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repositor
 	}
 	if affected == 0 {
 		return repository.ErrGoalNotFound
+	}
+	return nil
+}
+
+// SaveGoalOrder は固定オフセットへ退避せず、表示順集約の全状態を単一UPDATEで保存します。
+func (r *goalRepository) SaveGoalOrder(ctx context.Context, exec repository.Executor, order *entity.GoalOrder) error {
+	goals := order.Goals()
+	if err := validateGoalOrderPersistence(ctx, exec, order.UserID(), goals); err != nil {
+		return err
+	}
+	if len(goals) == 0 {
+		return nil
+	}
+
+	var query strings.Builder
+	query.WriteString(`UPDATE goals SET sort_order = CASE id`)
+	args := make([]any, 0, len(goals)*2+1)
+	for _, goal := range goals {
+		query.WriteString(` WHEN ? THEN ?`)
+		args = append(args, goal.ID, goal.SortOrder)
+	}
+	query.WriteString(` ELSE sort_order END WHERE user_id = ? AND id IN (`)
+	args = append(args, order.UserID())
+	for i, goal := range goals {
+		if i > 0 {
+			query.WriteString(`, `)
+		}
+		query.WriteString(`?`)
+		args = append(args, goal.ID)
+	}
+	query.WriteString(`)`)
+
+	_, err := exec.ExecContext(ctx, query.String(), args...)
+	return err
+}
+
+func validateGoalOrderPersistence(ctx context.Context, exec repository.Executor, userID int, goals []*entity.Goal) error {
+	var total int
+	if err := exec.GetContext(ctx, &total, `SELECT COUNT(*) FROM goals WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if total != len(goals) {
+		return repository.ErrGoalOrderInconsistent
+	}
+	if len(goals) == 0 {
+		return nil
+	}
+
+	var query strings.Builder
+	query.WriteString(`SELECT COUNT(*) FROM goals WHERE user_id = ? AND id IN (`)
+	args := make([]any, 0, len(goals)+1)
+	args = append(args, userID)
+	for i, goal := range goals {
+		if i > 0 {
+			query.WriteString(`, `)
+		}
+		query.WriteString(`?`)
+		args = append(args, goal.ID)
+	}
+	query.WriteString(`)`)
+
+	var matched int
+	if err := exec.GetContext(ctx, &matched, query.String(), args...); err != nil {
+		return err
+	}
+	if matched != len(goals) {
+		return repository.ErrGoalOrderInconsistent
 	}
 	return nil
 }

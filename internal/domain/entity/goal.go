@@ -12,5 +12,6 @@ type Goal struct {
 	AchievementParams []byte
 	Attributes        []byte
 	Invert            bool
+	SortOrder         uint16
 	CreatedAt         time.Time
 }

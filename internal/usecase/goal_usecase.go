@@ -8,6 +8,7 @@ type GoalUsecase interface {
 	Create(ctx context.Context, userID int, input *GoalInput) (*GoalOutput, error)
 	Update(ctx context.Context, userID int, id uint32, input *GoalInput) (*GoalOutput, error)
 	Delete(ctx context.Context, userID int, id uint32) error
+	Reorder(ctx context.Context, userID int, orderedGoalIDs []uint32) error
 }
 
 // GoalInput は目標の作成・更新入力です。
@@ -27,5 +28,6 @@ type GoalOutput struct {
 	AchievementParams map[string]any
 	Attributes        map[string]any
 	Invert            bool
+	SortOrder         uint16
 	CreatedAt         string
 }

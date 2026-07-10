@@ -104,6 +104,25 @@ func (h *GoalHandler) Delete(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// Reorder はフロントエンドが指定した目標IDの順序を保存します。
+func (h *GoalHandler) Reorder(c *echo.Context) error {
+	user, err := getUser(c)
+	if err != nil {
+		return err
+	}
+	var req internaldto.GoalOrderRequest
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if req.GoalIDs == nil {
+		return apierror.ErrBadRequest
+	}
+	if err := h.goalUsecase.Reorder(c.Request().Context(), user.ID, req.GoalIDs); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 	params, err := json.Marshal(req.AchievementParams)
 	if err != nil {
@@ -135,6 +154,7 @@ func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
 		AchievementParams: goal.AchievementParams,
 		Attributes:        goal.Attributes,
 		Invert:            goal.Invert,
+		SortOrder:         goal.SortOrder,
 		CreatedAt:         goal.CreatedAt,
 	}
 }

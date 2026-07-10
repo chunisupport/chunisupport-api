@@ -72,6 +72,30 @@ CREATE TABLE `difficulties` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `friendship_statuses` (
+  `id` tinyint unsigned NOT NULL,
+  `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `friendships` (
+  `user_id` int unsigned NOT NULL,
+  `friend_user_id` int unsigned NOT NULL,
+  `status_id` tinyint unsigned NOT NULL,
+  `requested_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `accepted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`,`friend_user_id`),
+  KEY `idx_friendships_friend_user_status` (`friend_user_id`,`status_id`,`requested_at`),
+  KEY `idx_friendships_user_status` (`user_id`,`status_id`,`accepted_at`),
+  KEY `fk_friendships_status_id` (`status_id`),
+  CONSTRAINT `fk_friendships_friend_user_id` FOREIGN KEY (`friend_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_friendships_status_id` FOREIGN KEY (`status_id`) REFERENCES `friendship_statuses` (`id`),
+  CONSTRAINT `fk_friendships_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_friendships_accepted_at` CHECK ((((`status_id` = 2) and (`accepted_at` is not null)) or ((`status_id` <> 2) and (`accepted_at` is null)))),
+  CONSTRAINT `chk_friendships_not_self` CHECK ((`user_id` <> `friend_user_id`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `full_chain_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -94,10 +118,11 @@ CREATE TABLE `goals` (
   `achievement_params` json NOT NULL,
   `attributes` json NOT NULL,
   `invert` tinyint(1) NOT NULL DEFAULT '0',
+  `sort_order` smallint unsigned NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `fk_goals_achievement_type_id` (`achievement_type_id`),
-  KEY `idx_goals_user_created_id` (`user_id`,`created_at`,`id`),
+  KEY `idx_goals_user_sort_order_id` (`user_id`,`sort_order`,`id`),
   CONSTRAINT `fk_goals_achievement_type_id` FOREIGN KEY (`achievement_type_id`) REFERENCES `achievement_types` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_goals_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -301,29 +326,6 @@ CREATE TABLE `users` (
   KEY `idx_users_private` (`is_private`,`player_id`),
   CONSTRAINT `fk_users_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`account_type_id`) REFERENCES `account_types` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `friendship_statuses` (
-  `id` tinyint unsigned NOT NULL,
-  `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `friendships` (
-  `user_id` int unsigned NOT NULL,
-  `friend_user_id` int unsigned NOT NULL,
-  `status_id` tinyint unsigned NOT NULL,
-  `requested_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `accepted_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`user_id`,`friend_user_id`),
-  KEY `idx_friendships_friend_user_status` (`friend_user_id`,`status_id`,`requested_at`),
-  KEY `idx_friendships_user_status` (`user_id`,`status_id`,`accepted_at`),
-  CONSTRAINT `fk_friendships_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_friendships_friend_user_id` FOREIGN KEY (`friend_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_friendships_status_id` FOREIGN KEY (`status_id`) REFERENCES `friendship_statuses` (`id`),
-  CONSTRAINT `chk_friendships_not_self` CHECK ((`user_id` <> `friend_user_id`)),
-  CONSTRAINT `chk_friendships_accepted_at` CHECK (((`status_id` = 2) and (`accepted_at` is not null)) or ((`status_id` <> 2) and (`accepted_at` is null)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `versions` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,

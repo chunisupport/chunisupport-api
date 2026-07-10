@@ -13,10 +13,12 @@ type GoalRepository interface {
 	// FindByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	FindByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) (*entity.Goal, error)
 	Create(ctx context.Context, exec Executor, goal *entity.Goal) error
-	// Update は対象が存在しない場合に ErrGoalNotFound を返します。
-	Update(ctx context.Context, exec Executor, goal *entity.Goal) error
+	// Save は集約の現在状態を保存し、対象が存在しない場合に ErrGoalNotFound を返します。
+	Save(ctx context.Context, exec Executor, goal *entity.Goal) error
 	// DeleteByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	DeleteByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) error
+	// SaveGoalOrder はユーザーの目標表示順集約を保存します。
+	SaveGoalOrder(ctx context.Context, exec Executor, order *entity.GoalOrder) error
 	CountByUserID(ctx context.Context, exec Executor, userID int) (int, error)
 	LockUserByID(ctx context.Context, exec Executor, userID int) error
 	GetTargetStats(ctx context.Context, exec Executor, filter GoalTargetFilter) (*GoalTargetStats, error)

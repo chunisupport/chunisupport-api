@@ -173,3 +173,48 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000018**: `players.overpower_percentage` カラムを削除。OVER POWER割合は保存値ではなく、レスポンス時点の最新マスタと未解禁設定から随時計算する。
 - **000019**: バージョンマスタに「CHUNITHM Mate」（2026年7月2日稼働）を追加。
 - **000024**: `players` テーブルにCHUNITHM-NETからのデータ取得完了日時を保持する `data_collected_at` カラムを追加。
+- **000028**: `goals` テーブルにユーザー内の表示順を保持する `sort_order` カラムを追加。既存データは作成順で採番し、一覧用インデックスを `(user_id, sort_order, id)` へ変更。MySQLのDDLは暗黙コミットされるため、適用開始から完了までGoalの作成・更新・削除・並び替えを停止する。
+
+#### 000028の失敗時復旧
+
+`000028` は列追加、既存行への採番、`NOT NULL`化、インデックス置換を別々に実行します。失敗時に`migrate force 28`を実行する前に、必ず以下を確認します。
+
+```sql
+SHOW COLUMNS FROM goals LIKE 'sort_order';
+SELECT COUNT(*) AS null_sort_order_count FROM goals WHERE sort_order IS NULL;
+SHOW INDEX FROM goals WHERE Key_name IN (
+  'idx_goals_user_created_id',
+  'idx_goals_user_sort_order_id'
+);
+```
+
+- `sort_order`列が存在しない場合は、`migrate force 27`でdirty状態を戻してから、修正済みの`000028`を再実行する。
+- `sort_order`がNULL許容、またはNULL値が1件でもある場合は、書き込み停止を維持したまま次を実行する。
+
+```sql
+UPDATE goals g
+INNER JOIN (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY created_at ASC, id ASC
+        ) AS sort_order
+    FROM goals
+) ranked ON ranked.id = g.id
+SET g.sort_order = ranked.sort_order;
+
+ALTER TABLE goals
+    MODIFY COLUMN sort_order SMALLINT UNSIGNED NOT NULL;
+```
+
+- 新インデックスが存在しない場合は、先に作成する。旧インデックスは新インデックスの存在を確認してから削除する。
+
+```sql
+CREATE INDEX idx_goals_user_sort_order_id
+    ON goals(user_id, sort_order, id);
+
+DROP INDEX idx_goals_user_created_id ON goals;
+```
+
+最後に`sort_order`が`NOT NULL`で、NULL件数が0件、新インデックスのみが存在することを確認してから`migrate force 28`でdirty状態を解消する。すでに新インデックスが存在する場合は、重複作成せず旧インデックスの削除から再開する。

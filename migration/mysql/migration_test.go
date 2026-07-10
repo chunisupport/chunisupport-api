@@ -52,3 +52,35 @@ func TestAddExtDevRoleDown_EXTDEVユーザーをPLAYERへ移行してからロ�
 	assert.Less(t, updateIndex, deleteIndex)
 	assert.NotContains(t, downSQL, "ALTER TABLE account_types")
 }
+
+func TestAddSortOrderToGoalsUp_既存の作成順を連番へ移行する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000028_add_sort_order_to_goals.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ADD COLUMN sort_order SMALLINT UNSIGNED NULL")
+	assert.Contains(t, upSQL, "ROW_NUMBER() OVER ( PARTITION BY user_id ORDER BY created_at ASC, id ASC )")
+	assert.Contains(t, upSQL, "MODIFY COLUMN sort_order SMALLINT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "CREATE INDEX idx_goals_user_sort_order_id ON goals(user_id, sort_order, id)")
+	assert.NotContains(t, upSQL, "UNIQUE")
+	assert.Less(
+		t,
+		strings.Index(upSQL, "CREATE INDEX idx_goals_user_sort_order_id"),
+		strings.Index(upSQL, "DROP INDEX idx_goals_user_created_id"),
+	)
+}
+
+func TestAddSortOrderToGoalsDown_従来の一覧インデックスへ戻す(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000028_add_sort_order_to_goals.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP INDEX idx_goals_user_sort_order_id ON goals")
+	assert.Contains(t, downSQL, "CREATE INDEX idx_goals_user_created_id ON goals(user_id, created_at, id)")
+	assert.Contains(t, downSQL, "DROP COLUMN sort_order")
+	assert.Less(
+		t,
+		strings.Index(downSQL, "CREATE INDEX idx_goals_user_created_id"),
+		strings.Index(downSQL, "DROP INDEX idx_goals_user_sort_order_id"),
+	)
+}

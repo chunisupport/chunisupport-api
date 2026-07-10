@@ -146,6 +146,7 @@
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
 | `/internal/me/goals` | POST | Firebase Bearer | 目標を作成 |
+| `/internal/me/goals/order` | PUT | Firebase Bearer | 目標を並び替え |
 | `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
 | `/internal/me/record-filters` | GET | Firebase Bearer | 保存済みレコードフィルタ一覧を取得 |
@@ -1390,6 +1391,7 @@ curl -X POST \
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
   "invert": false,
+  "sort_order": 1,
   "created_at": "2026-01-01T09:00:00+09:00"
 }
 ```
@@ -1402,6 +1404,7 @@ curl -X POST \
 | `achievement_params` | `object` | 双方向 | 成果種別ごとの可変パラメータ（詳細は後述） |
 | `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
 | `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
+| `sort_order` | `integer` | レスポンスのみ | ユーザー内での表示順。1から始まる連番 |
 | `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
 
 **作成・更新リクエストでの省略可否**:
@@ -1409,7 +1412,7 @@ curl -X POST \
 - `title` / `achievement_type` / `achievement_params` は必須です。
 - `attributes` は省略可能です。省略時は絞り込み条件なしとして扱います。明示する場合は空オブジェクト `{}` を推奨します。
 - `invert` は省略可能です。省略時は `false` として扱います。
-- `id` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
+- `id` / `sort_order` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
 
 ### `achievement_type` 一覧
 
@@ -1641,11 +1644,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 #### 100件上限の担保
 
-作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。これにより同一ユーザーの並列リクエストがシリアライズされ、レースコンディションを防止します。
+作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。作成・削除・並び替えは同じユーザー行ロックを使用するため、件数と表示順を変更する同一ユーザーのリクエストは直列化されます。
 
 ### GET `/internal/me/goals`
 
-自分が作成した目標を全件返します。ソート順は `created_at` 昇順（作成順）です。
+自分が作成した目標を全件返します。ソート順は `sort_order` 昇順です。同順位が存在する不整合時のみ `id` 昇順を使用します。
 
 **レスポンス**: 200 OK
 
@@ -1659,6 +1662,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "achievement_params": { "score": 1007500, "count": 100 },
       "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
       "invert": false,
+      "sort_order": 1,
       "created_at": "2026-01-01T09:00:00+09:00"
     }
   ]
@@ -1669,7 +1673,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
 
-**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
+新しい目標は現在の末尾へ追加され、レスポンスにはサーバーが採番した `sort_order` が含まれます。
+
+**リクエストボディ**: Goal オブジェクト（`id` / `sort_order` / `created_at` 除く）
 
 ```json
 {
@@ -1687,13 +1693,29 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 指定IDの目標を完全上書き更新します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
 
-**リクエストボディ**: Goal オブジェクト（`id` / `created_at` 除く）
+**リクエストボディ**: Goal オブジェクト（`id` / `sort_order` / `created_at` 除く）
 
 **レスポンス**: 200 OK（更新後の Goal オブジェクト）
 
+### PUT `/internal/me/goals/order`
+
+自分の目標を並び替えます。現在所有するすべての目標IDを、希望する表示順で1回ずつ指定します。フロントエンドは順序を決定し、バックエンドは配列順に `sort_order` を1から採番します。
+
+```json
+{
+  "goal_ids": [12, 5, 9]
+}
+```
+
+`goal_ids` に重複、欠落、存在しないID、または他ユーザー所有のIDが含まれる場合は `goal_invalid_order` を返し、並び順は変更しません。処理はユーザー行ロックを取得した単一トランザクションで実行されます。
+
+`goal_ids` の欠落または `null` はリクエスト形式不正として `bad_request` を返します。
+
+**レスポンス**: 204 No Content
+
 ### DELETE `/internal/me/goals/:id`
 
-指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
+指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。削除後、残った目標の `sort_order` は1からの連番へ詰め直されます。
 
 **レスポンス**: 204 No Content
 
@@ -1707,6 +1729,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
+| `goal_invalid_order` | 400 | `goal_ids` が現在所有する目標IDの集合と一致しない、または重複している |
 | `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
 
 ---

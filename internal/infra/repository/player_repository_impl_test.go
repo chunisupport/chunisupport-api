@@ -133,11 +133,11 @@ func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testin
 	require.Nil(t, goal)
 }
 
-func TestGoalUpdate_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
+func TestGoalSave_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
 	repo := &goalRepository{}
 	exec := &execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
 
-	err := repo.Update(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
+	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
 	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
 }
 

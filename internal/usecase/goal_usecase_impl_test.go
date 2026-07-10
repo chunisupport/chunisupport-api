@@ -16,12 +16,21 @@ import (
 type stubGoalRepo struct {
 	count      int
 	goal       *entity.Goal
+	goals      []*entity.Goal
 	updateErr  error
 	stats      *repository.GoalTargetStats
 	lastFilter repository.GoalTargetFilter
+	savedOrder []uint32
+	savedSorts []uint16
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
+	if s.goals != nil {
+		return s.goals, nil
+	}
+	if s.goal == nil {
+		return []*entity.Goal{}, nil
+	}
 	return []*entity.Goal{s.goal}, nil
 }
 func (s *stubGoalRepo) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
@@ -36,7 +45,7 @@ func (s *stubGoalRepo) Create(ctx context.Context, exec repository.Executor, goa
 	s.goal = goal
 	return nil
 }
-func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
+func (s *stubGoalRepo) Save(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
 	if s.updateErr != nil {
 		return s.updateErr
 	}
@@ -44,10 +53,29 @@ func (s *stubGoalRepo) Update(ctx context.Context, exec repository.Executor, goa
 	return nil
 }
 func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
+	if s.goals != nil {
+		for i, goal := range s.goals {
+			if goal.ID == id {
+				s.goals = append(s.goals[:i], s.goals[i+1:]...)
+				return nil
+			}
+		}
+		return repository.ErrGoalNotFound
+	}
 	if s.goal == nil || s.goal.ID != id {
 		return repository.ErrGoalNotFound
 	}
 	s.goal = nil
+	return nil
+}
+func (s *stubGoalRepo) SaveGoalOrder(ctx context.Context, exec repository.Executor, order *entity.GoalOrder) error {
+	goals := order.Goals()
+	s.savedOrder = make([]uint32, 0, len(goals))
+	s.savedSorts = make([]uint16, 0, len(goals))
+	for _, goal := range goals {
+		s.savedOrder = append(s.savedOrder, goal.ID)
+		s.savedSorts = append(s.savedSorts, goal.SortOrder)
+	}
 	return nil
 }
 func (s *stubGoalRepo) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {
@@ -124,6 +152,25 @@ func TestGoalUsecase_Create(t *testing.T) {
 	assert.Equal(t, "score_count", out.AchievementType)
 }
 
+func TestGoalUsecase_CreateAssignsLastSortOrder(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{count: 2}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	out, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, uint16(3), repo.goal.SortOrder)
+	assert.Equal(t, uint16(3), out.SortOrder)
+}
+
 func TestGoalUsecase_CreateRejectsTitleOver30Runes(t *testing.T) {
 	repo := &stubGoalRepo{}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
@@ -156,11 +203,14 @@ func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 }
 
 func TestGoalUsecase_Delete(t *testing.T) {
-	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, SortOrder: 1}}
+	tm := &trackingTM{}
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
 	err := u.Delete(context.Background(), 1, 1)
 	require.NoError(t, err)
 	assert.Nil(t, repo.goal)
+	assert.Empty(t, repo.savedOrder)
+	assert.True(t, tm.called)
 }
 
 func TestGoalUsecase_DeleteNotFound(t *testing.T) {
@@ -168,6 +218,73 @@ func TestGoalUsecase_DeleteNotFound(t *testing.T) {
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
 	err := u.Delete(context.Background(), 1, 999)
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
+}
+
+func TestGoalUsecase_DeleteRenumbersRemainingGoals(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{goals: []*entity.Goal{
+		{ID: 10, UserID: 1, SortOrder: 1},
+		{ID: 20, UserID: 1, SortOrder: 2},
+		{ID: 30, UserID: 1, SortOrder: 3},
+	}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+	// When
+	err := u.Delete(context.Background(), 1, 20)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, []uint32{10, 30}, repo.savedOrder)
+	assert.Equal(t, []uint16{1, 2}, repo.savedSorts)
+}
+
+func TestGoalUsecase_Reorder(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{goals: []*entity.Goal{
+		{ID: 10, UserID: 1, SortOrder: 1},
+		{ID: 20, UserID: 1, SortOrder: 2},
+		{ID: 30, UserID: 1, SortOrder: 3},
+	}}
+	tm := &trackingTM{}
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
+
+	// When
+	err := u.Reorder(context.Background(), 1, []uint32{30, 10, 20})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, []uint32{30, 10, 20}, repo.savedOrder)
+	assert.Equal(t, []uint16{1, 2, 3}, repo.savedSorts)
+	assert.True(t, tm.called)
+}
+
+func TestGoalUsecase_ReorderRejectsInvalidGoalSet(t *testing.T) {
+	tests := []struct {
+		name       string
+		orderedIDs []uint32
+	}{
+		{name: "IDが不足している", orderedIDs: []uint32{10}},
+		{name: "IDが重複している", orderedIDs: []uint32{10, 10}},
+		{name: "所有していないIDが含まれる", orderedIDs: []uint32{10, 99}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{goals: []*entity.Goal{
+				{ID: 10, UserID: 1, SortOrder: 1},
+				{ID: 20, UserID: 1, SortOrder: 2},
+			}}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+
+			// When
+			err := u.Reorder(context.Background(), 1, tt.orderedIDs)
+
+			// Then
+			assert.ErrorIs(t, err, ErrInvalidGoalOrder)
+			assert.Nil(t, repo.savedOrder)
+		})
+	}
 }
 
 func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {

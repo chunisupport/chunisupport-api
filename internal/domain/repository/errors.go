@@ -20,6 +20,9 @@ var (
 	// ErrGoalNotFound は目標が見つからなかった場合に返されるエラーです。
 	ErrGoalNotFound = errors.New("goal not found")
 
+	// ErrGoalOrderInconsistent は保存対象の目標順集約と永続化済み目標の集合が一致しない場合に返されます。
+	ErrGoalOrderInconsistent = errors.New("goal order is inconsistent")
+
 	// ErrRecordFilterNotFound は譜面フィルタが見つからなかった場合に返されるエラーです。
 	ErrRecordFilterNotFound = errors.New("record filter not found")
 

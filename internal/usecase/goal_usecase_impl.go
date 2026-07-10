@@ -26,6 +26,7 @@ var (
 	ErrInvalidAchievementType  = errors.New("invalid achievement type")
 	ErrInvalidAchievementParam = errors.New("invalid achievement params")
 	ErrInvalidGoalAttributes   = errors.New("invalid goal attributes")
+	ErrInvalidGoalOrder        = errors.New("invalid goal order")
 )
 
 type goalUsecase struct {
@@ -72,6 +73,7 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 			AchievementParams: validated.AchievementParams,
 			Attributes:        validated.Attributes,
 			Invert:            validated.Invert,
+			SortOrder:         uint16(count + 1),
 		}
 		if err := u.goalRepo.Create(ctx, tx, goal); err != nil {
 			return err
@@ -113,7 +115,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 		g.AchievementParams = validated.AchievementParams
 		g.Attributes = validated.Attributes
 		g.Invert = validated.Invert
-		if err := u.goalRepo.Update(ctx, tx, g); err != nil {
+		if err := u.goalRepo.Save(ctx, tx, g); err != nil {
 			if errors.Is(err, repository.ErrGoalNotFound) {
 				return ErrGoalNotFound
 			}
@@ -133,11 +135,52 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 }
 
 func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
-	err := u.goalRepo.DeleteByIDAndUserID(ctx, u.db, id, userID)
-	if errors.Is(err, repository.ErrGoalNotFound) {
-		return ErrGoalNotFound
-	}
-	return err
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
+			return err
+		}
+		goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		order, err := entity.NewGoalOrder(userID, goals)
+		if err != nil {
+			return ErrInternalError
+		}
+		if err := order.Remove(id); errors.Is(err, entity.ErrGoalOrderMissing) {
+			return ErrGoalNotFound
+		} else if err != nil {
+			return ErrInternalError
+		}
+		if err := u.goalRepo.DeleteByIDAndUserID(ctx, tx, id, userID); err != nil {
+			if errors.Is(err, repository.ErrGoalNotFound) {
+				return ErrGoalNotFound
+			}
+			return err
+		}
+		return u.goalRepo.SaveGoalOrder(ctx, tx, order)
+	})
+}
+
+// Reorder は所有目標の完全なID集合だけを受け付け、欠落や他ユーザーIDの混入を防ぎます。
+func (u *goalUsecase) Reorder(ctx context.Context, userID int, orderedGoalIDs []uint32) error {
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
+			return err
+		}
+		goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		order, err := entity.NewGoalOrder(userID, goals)
+		if err != nil {
+			return ErrInternalError
+		}
+		if err := order.Reorder(orderedGoalIDs); err != nil {
+			return ErrInvalidGoalOrder
+		}
+		return u.goalRepo.SaveGoalOrder(ctx, tx, order)
+	})
 }
 
 type validatedGoalInput struct {
@@ -763,7 +806,7 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 		if err := json.Unmarshal(g.Attributes, &a); err != nil {
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
-		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00")})
+		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00")})
 	}
 	return outs, nil
 }

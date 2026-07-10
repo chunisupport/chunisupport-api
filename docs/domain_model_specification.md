@@ -317,11 +317,13 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
 | Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
 | Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
+| SortOrder | uint16 | ✓ | ユーザー内での表示順（1から始まる連番） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 
 #### 振る舞い（メソッド）
 
-現在、振る舞いメソッドなし。将来的に型安全な `AchievementParams` / `Attributes` 構造体への段階移行を予定。
+- `GoalOrder.Reorder(orderedGoalIDs)`: 所有するすべての目標IDを指定順へ並び替え、1からの連番を割り当てる
+- `GoalOrder.Remove(id)`: 目標を表示順集約から取り除き、残りを1からの連番へ詰め直す
 
 #### 不変条件
 
@@ -329,6 +331,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
 - `AchievementParams` は `AchievementType` に対応する構造のJSON
 - `Attributes` は許可キー（`diff`, `chart_target`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- 同一ユーザーの `SortOrder` は1から目標件数までの連番。作成・削除・並び替え時にユーザー行ロック下で更新する
 - 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
 
 #### `AchievementParams` の型整合ルール
@@ -352,7 +355,23 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `achievement_params` / `attributes` はDB上ではJSON型で保存されます
 - DB保存時はコンパクトJSON（インデントなし）で、バリデーション済み構造体から再エンコードしたJSONを保存します（入力原文をそのまま保持しません）
 - `updated_at` / 達成日時カラムは持ちません（楽曲追加により達成状態が揺らぐ可能性があるため）
-- `created_at` はソート基準として使用されます
+- 一覧のソート基準には `sort_order` を使用し、`created_at` は作成日時としてのみ保持します
+- `sort_order` に一意制約は付与しない。重複禁止だけでは連番不変条件を保証できないため、作成・削除・並び替えをユーザー行ロック下で直列化し、`GoalOrder`集約を単一更新で保存する
+
+---
+
+### GoalOrder（目標表示順集約）
+
+#### 概要
+
+1ユーザーが所有する全Goalの表示順を管理する集約です。`Goal`一覧を表示順で受け取り、並び替え・削除後に`SortOrder`を1からの連番へ正規化します。
+
+#### 不変条件
+
+- 内包するすべてのGoalは同一ユーザーに属する
+- Goal IDは集約内で重複しない
+- `Reorder`は現在内包するGoal IDをすべて1回ずつ指定した場合のみ成功する
+- 既存の`SortOrder`に不整合があっても、一覧取得順を正として次回の削除または並び替え保存時に正規化する
 
 ---
 

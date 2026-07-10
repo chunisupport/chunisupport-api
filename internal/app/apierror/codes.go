@@ -63,6 +63,7 @@ const (
 	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
 	CodeInvalidGoalInput             = "invalid_goal_input"
+	CodeGoalInvalidOrder             = "goal_invalid_order"
 
 	// 保存済みフィルタ関連エラー
 	CodeRecordFilterNotFound      = "record_filter_not_found"

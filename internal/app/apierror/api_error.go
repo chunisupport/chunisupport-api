@@ -112,6 +112,7 @@ var (
 	ErrGoalInvalidAchievementParams = New(CodeGoalInvalidAchievementParams, http.StatusBadRequest)
 	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
 	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
+	ErrGoalInvalidOrder             = New(CodeGoalInvalidOrder, http.StatusBadRequest)
 
 	ErrRecordFilterNotFound      = New(CodeRecordFilterNotFound, http.StatusNotFound)
 	ErrRecordFilterLimitExceeded = New(CodeRecordFilterLimitExceeded, http.StatusBadRequest)

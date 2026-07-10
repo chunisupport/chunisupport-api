@@ -318,6 +318,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
 		meGroup.GET("/goals", handlers.Goal.List)
 		meGroup.POST("/goals", handlers.Goal.Create)
+		meGroup.PUT("/goals/order", handlers.Goal.Reorder)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
 		meGroup.GET("/record-filters", handlers.RecordFilter.List)

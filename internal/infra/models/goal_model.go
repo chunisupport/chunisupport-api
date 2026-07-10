@@ -15,6 +15,7 @@ type GoalModel struct {
 	AchievementParams []byte    `db:"achievement_params"`
 	Attributes        []byte    `db:"attributes"`
 	Invert            bool      `db:"invert"`
+	SortOrder         uint16    `db:"sort_order"`
 	CreatedAt         time.Time `db:"created_at"`
 }
 
@@ -27,6 +28,7 @@ func (m *GoalModel) ToEntity() *entity.Goal {
 		AchievementParams: m.AchievementParams,
 		Attributes:        m.Attributes,
 		Invert:            m.Invert,
+		SortOrder:         m.SortOrder,
 		CreatedAt:         m.CreatedAt,
 	}
 }
@@ -40,6 +42,7 @@ func FromGoalEntity(e *entity.Goal) *GoalModel {
 		AchievementParams: e.AchievementParams,
 		Attributes:        e.Attributes,
 		Invert:            e.Invert,
+		SortOrder:         e.SortOrder,
 		CreatedAt:         e.CreatedAt,
 	}
 }

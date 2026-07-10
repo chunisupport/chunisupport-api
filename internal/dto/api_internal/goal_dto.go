@@ -17,7 +17,13 @@ type GoalResponse struct {
 	AchievementParams map[string]any `json:"achievement_params"`
 	Attributes        map[string]any `json:"attributes"`
 	Invert            bool           `json:"invert"`
+	SortOrder         uint16         `json:"sort_order"`
 	CreatedAt         string         `json:"created_at"`
+}
+
+// GoalOrderRequest は目標の並び順更新リクエストです。
+type GoalOrderRequest struct {
+	GoalIDs []uint32 `json:"goal_ids"`
 }
 
 // GoalsResponse は目標一覧レスポンスです。

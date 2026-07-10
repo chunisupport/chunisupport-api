@@ -55,6 +55,7 @@
 | `goal_invalid_achievement_type` | goal達成種別不正 |
 | `goal_invalid_achievement_params` | goal達成条件不正 |
 | `goal_invalid_attributes` | goal属性不正 |
+| `goal_invalid_order` | goal並び順不正 |
 | `invalid_goal_input` | goal入力不正 |
 | `favorite_song_limit_exceeded` | お気に入り楽曲上限超過（最大100件） |
 
