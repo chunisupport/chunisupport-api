@@ -21,7 +21,7 @@
 ## CORS
 
 すべてのエンドポイントでCORSが有効です。基本設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
-ただし `GET /`、`OPTIONS /`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
+ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 ## 認証
 
@@ -36,7 +36,7 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーの本人確認を行う場合はトークンを送信します。
+- `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で発行します。
 
 ## レートリミット（現行実装値）
@@ -622,7 +622,7 @@ Firebase Bearer Token（必須）
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 400 | 自分自身への申請、または不正な `username` |
+| `validation_failed` | 422 | 自分自身への申請、または不正な `username` |
 | `user_not_found` | 404 | 対象ユーザーが存在しない |
 | `friendship_limit_exceeded` | 400 | 自分の外向き `pending` / `accepted` が100件に達している |
 | `friendship_conflict` | 409 | 既に申請中、承認済み、または相手から承認済み関係がある |
@@ -736,7 +736,7 @@ Firebase Bearer Token（必須）
 `my_rank` は自分が対象譜面を未プレイの場合 `null` です。`combo_lamp` と `full_chain` はマスタ値が `NONE` の場合 `null` です。
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
   - 400 Bad Request (`invalid_difficulty`): 難易度が不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
@@ -793,7 +793,7 @@ Firebase Bearer Token（必須）
 WORLD'S END はレーティング・OVER POWER計算の対象外のため、通常譜面で返す `const` / `is_const_unknown` / `rating` / `overpower` / `overpower_percent` は返しません。ランキング表示に必要なスコアとランプは `ranking` の各要素に含まれます。
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
@@ -2573,7 +2573,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/users/:username/record/songs/:displayid/:difficulty/history`
 - **認証**: Firebase Bearer（任意）
 - **レート制限**: 認証なしの場合 1分間60回/IP
-- **概要**: パスで指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **概要**: パスで指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
   - `username`: 対象ユーザー名
   - `displayid`: 楽曲の表示用ID
@@ -2838,7 +2838,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/users/:username/record/worldsend-songs/:displayid/history`
 - **認証**: Firebase Bearer（任意）
 - **レート制限**: 認証なしの場合 1分間60回/IP
-- **概要**: パスで指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人だけが参照できます。
+- **概要**: パスで指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
   - `username`: 対象ユーザー名
   - `displayid`: WORLD'S END楽曲の表示用ID
@@ -3681,7 +3681,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/songs/:displayid/score-history/:difficulty`
 - **認証**: APIトークン（任意）
-- **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人のみ参照できます。
+- **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
 - **パスパラメータ**:
 
@@ -3729,7 +3729,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/worldsend-songs/:displayid/score-history`
 - **認証**: APIトークン（任意）
-- **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人のみ参照できます。
+- **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
 - **パスパラメータ**:
 
@@ -4055,8 +4055,10 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー・プレイヤー未紐付けを含む）
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
 
 ---
 
@@ -4136,7 +4138,6 @@ interface AdminUserListResponse {
   is_suspicious: boolean;
   is_private: boolean;
   firebase_uid: string | null;
-  is_deleted: boolean;
 }
 
 // プロファイル＋レコード統合レスポンス

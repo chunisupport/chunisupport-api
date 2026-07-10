@@ -108,14 +108,6 @@
 | **HDL-014** | **Medium** | スコア履歴APIがDisplay IDと削除済み楽曲を検証しない | internal/v1の両ScoreHistoryHandlerは `displayid` を `ValidateDisplayID` に通さずUsecaseへ渡します。Usecaseは削除済みも返す `SongRepository.FindByDisplayID` / WORLD'S END queryを使いながら `IsDeleted` を確認しないため、他の公開レコードAPIでは隠れる削除済み楽曲の履歴を取得できます。境界で形式検証し、Usecaseで楽曲種別と公開状態を404へ正規化すべきです。 |
 | **HDL-015** | **Medium** | chunirec互換の `is_clear` がFAILEDでもtrue | `internal/app/handler/compat/chunirec/dto.go:121` は `record.ClearLamp != nil` だけでクリア判定します。`FAILED` は有効な非nilマスタ値なので、FAILEDレコードも `is_clear: true` になります。ランプ名またはドメインのクリア判定メソッドを使い、FAILEDケースのテストを追加すべきです。 |
 
-### ドキュメント (DOC)
-
-| ID | 優先度 | 概要 | 詳細・対応方針 |
-|---|---|---|---|
-| **DOC-001** | **Medium** | `docs/API.md` に現行実装との不整合が複数残存 | 主な不一致は、(1) CORS追加許可対象を `/` と記載するが実装は `/healthz`、(2) 管理者ユーザーDTO例に削除済みの `is_deleted` が残る、(3) friend requestのusernameとrankingのdisplayidについて形式制約違反を400と記載するが実装は422、(4) score history等で非公開ユーザーは本人のみと記載するが承認済みフレンドも許可、(5) chunirec `/users/show` のPlayer未連携を404と記載するが実装は200 `null`、です。仕様と実装のどちらを正とするか決め、HTTP contract testと同時に更新すべきです。 |
-
----
-
 ## まとめ
 
 - 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**古いプレイヤーデータによる巻き戻し (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**、**UsecaseからAPI DTOへの依存 (`ARCH-003`)**です。

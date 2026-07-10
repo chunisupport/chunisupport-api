@@ -9,6 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,6 +226,17 @@ func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
 			assert.Equal(t, tt.wantAllJustice, result.Records[0].IsAllJustice)
 		})
 	}
+}
+
+func TestToChunirecUserDTO_プレイヤー未連携ではnullへ変換する(t *testing.T) {
+	// Given
+	profile := &api_internal.UserProfileWithRecordsDTO{}
+
+	// When
+	result := ToChunirecUserDTO(profile, nil)
+
+	// Then
+	assert.Nil(t, result)
 }
 
 func stringPtr(value string) *string {

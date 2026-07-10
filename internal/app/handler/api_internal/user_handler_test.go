@@ -674,6 +674,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
 	assert.Equal(t, uid, body[0]["firebase_uid"])
+	assert.NotContains(t, body[0], "is_deleted")
 	assert.NotContains(t, body[0], "email")
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])

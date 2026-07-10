@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -27,6 +28,27 @@ type mockFriendshipUsecase struct {
 	removeFunc       func(ctx context.Context, userID int, friendUserID int) error
 	listReceivedFunc func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 	listSentFunc     func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
+}
+
+func TestFriendshipHandler_SendRequest_不正なUsernameはHTTP422を返す(t *testing.T) {
+	// Given
+	e := newFriendshipTestEcho(t)
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	handler := NewFriendshipHandler(&mockFriendshipUsecase{})
+	e.POST("/internal/friends/requests", func(c *echo.Context) error {
+		c.Set("userEntity", &entity.User{ID: 1})
+		return handler.SendRequest(c)
+	})
+	req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests", strings.NewReader(`{"username":"InvalidUser"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	assert.JSONEq(t, `{"error":{"status":422,"code":"validation_failed","message":"入力値の形式を確認してください。"}}`, rec.Body.String())
 }
 
 func (m *mockFriendshipUsecase) SendRequest(ctx context.Context, userID int, username string) error {
@@ -130,6 +152,7 @@ func TestFriendshipHandler_SendRequest(t *testing.T) {
 		var apiErr *apierror.APIError
 		if assert.ErrorAs(t, err, &apiErr) {
 			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
 		}
 	})
 }
