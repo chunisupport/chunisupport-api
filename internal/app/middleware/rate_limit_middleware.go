@@ -24,7 +24,7 @@ type RateLimitConfig struct {
 type rateLimitEntry struct {
 	Count       int       // 現在のウィンドウ内でのリクエスト数
 	WindowStart time.Time // 現在のウィンドウの開始時刻
-	Limit       int       // このエントリの制限数（ADMINは150000、その他は150）
+	Limit       int       // このエントリの制限数（ADMIN: 150000, EDITOR/EXTDEV: 3000, その他: 150）
 }
 
 // FixedWindowStore はFixed Window方式のレートリミットストアです
@@ -127,10 +127,10 @@ func (s *FixedWindowStore) Cleanup() {
 }
 
 // APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
-// ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
+// ADMINアカウントはadminLimit、EDITOR/EXTDEVアカウントはeditorLimit、それ以外はnormalLimitが適用されます。
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
 // このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
-func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
+func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -148,10 +148,13 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 			// ユーザーIDを識別子として使用
 			identifier := strconv.Itoa(user.ID)
 
-			// ADMINかどうかで制限数を変更
+			// アカウントタイプに応じて制限数を変更
 			limit := normalLimit
-			if user.AccountTypeID == info.AccountTypeAdmin {
+			switch user.AccountTypeID {
+			case info.AccountTypeAdmin:
 				limit = adminLimit
+			case info.AccountTypeEditor, info.AccountTypeExtDev:
+				limit = editorLimit
 			}
 
 			// レートリミットチェック
@@ -172,7 +175,7 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 }
 
 // OptionalAPIRateLimitMiddleware は未認証ユーザーをIP、認証済みユーザーをユーザーIDで識別します。
-func OptionalAPIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
+func OptionalAPIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -186,8 +189,11 @@ func OptionalAPIRateLimitMiddleware(normalLimit, adminLimit int, window time.Dur
 					return apierror.ErrUnauthorized
 				}
 				identifier = "user:" + strconv.Itoa(user.ID)
-				if user.AccountTypeID == info.AccountTypeAdmin {
+				switch user.AccountTypeID {
+				case info.AccountTypeAdmin:
 					limit = adminLimit
+				case info.AccountTypeEditor, info.AccountTypeExtDev:
+					limit = editorLimit
 				}
 			}
 

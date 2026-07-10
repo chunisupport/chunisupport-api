@@ -95,7 +95,7 @@ func TestAPIRateLimitMiddleware_AdminUnlimited(t *testing.T) {
 	e := setupEchoWithErrorHandler(t)
 
 	// normalLimit=2, adminLimit=10000
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(2, 50, 10000, 1*time.Minute)
 
 	adminUser := &entity.User{
 		ID:            1,
@@ -130,7 +130,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	// ADMIN以外のユーザーはレートリミットを受ける
 	e := setupEchoWithErrorHandler(t)
 
-	middleware := APIRateLimitMiddleware(3, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(3, 50, 10000, 1*time.Minute)
 
 	playerUser := &entity.User{
 		ID:            100, // 他のテストと衝突しないIDを使用
@@ -178,14 +178,15 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	assert.NotEmpty(t, rec.Header().Get("X-RateLimit-Reset"))
 }
 
-func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
-	// EDITORユーザーもレートリミットを受ける
+func TestAPIRateLimitMiddleware_EditorHasSeparateLimit(t *testing.T) {
+	// EDITORユーザーはeditorLimitが適用され、超過時に429を返す
 	e := setupEchoWithErrorHandler(t)
 
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	// normalLimit=2, editorLimit=3, adminLimit=10000
+	middleware := APIRateLimitMiddleware(2, 3, 10000, 1*time.Minute)
 
 	editorUser := &entity.User{
-		ID:            200, // 他のテストと衝突しないIDを使用
+		ID:            200,
 		AccountTypeID: info.AccountTypeEditor,
 	}
 
@@ -193,8 +194,8 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	// 制限回数までは成功
-	for i := 0; i < 2; i++ {
+	// 通常の制限（2回）を超えてもeditorLimit（3回）までは成功
+	for i := 0; i < 3; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -207,7 +208,7 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
 
-	// 制限を超えると429エラー
+	// editorLimit（3回）を超えると429エラー
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -218,11 +219,55 @@ func TestAPIRateLimitMiddleware_EditorLimited(t *testing.T) {
 		e.HTTPErrorHandler(c, err)
 	}
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Equal(t, "3", rec.Header().Get("X-RateLimit-Limit"))
+	assert.Equal(t, "0", rec.Header().Get("X-RateLimit-Remaining"))
+}
+
+func TestAPIRateLimitMiddleware_ExtDevHasEditorLimit(t *testing.T) {
+	// EXTDEVユーザーもeditorLimitが適用され、超過時に429を返す
+	e := setupEchoWithErrorHandler(t)
+
+	middleware := APIRateLimitMiddleware(2, 3, 10000, 1*time.Minute)
+
+	extDevUser := &entity.User{
+		ID:            210,
+		AccountTypeID: info.AccountTypeExtDev,
+	}
+
+	handler := middleware(func(c *echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", extDevUser)
+
+		err := handler(c)
+		if err != nil {
+			e.HTTPErrorHandler(c, err)
+		}
+		assert.Equal(t, http.StatusOK, rec.Code)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", extDevUser)
+
+	err := handler(c)
+	if err != nil {
+		e.HTTPErrorHandler(c, err)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Equal(t, "3", rec.Header().Get("X-RateLimit-Limit"))
+	assert.Equal(t, "0", rec.Header().Get("X-RateLimit-Remaining"))
 }
 
 func TestOptionalAPIRateLimitMiddleware(t *testing.T) {
 	e := setupEchoWithErrorHandler(t)
-	middleware := OptionalAPIRateLimitMiddleware(1, 10, time.Minute)
+	middleware := OptionalAPIRateLimitMiddleware(1, 50, 10, time.Minute)
 	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
 	})
@@ -263,7 +308,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	// 異なるユーザーは別々のレートリミットを持つ
 	e := setupEchoWithErrorHandler(t)
 
-	middleware := APIRateLimitMiddleware(2, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(2, 50, 10000, 1*time.Minute)
 
 	user1 := &entity.User{
 		ID:            300, // 他のテストと衝突しないIDを使用
@@ -321,7 +366,7 @@ func TestAPIRateLimitMiddleware_NoUserEntity(t *testing.T) {
 	// ユーザー情報がない場合は認証エラー
 	e := setupEchoWithErrorHandler(t)
 
-	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(10, 50, 10000, 1*time.Minute)
 
 	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")
@@ -343,7 +388,7 @@ func TestAPIRateLimitMiddleware_InvalidUserEntity(t *testing.T) {
 	// ユーザー情報が不正な型の場合は認証エラー
 	e := setupEchoWithErrorHandler(t)
 
-	middleware := APIRateLimitMiddleware(10, 10000, 1*time.Minute)
+	middleware := APIRateLimitMiddleware(10, 50, 10000, 1*time.Minute)
 
 	handler := middleware(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "OK")

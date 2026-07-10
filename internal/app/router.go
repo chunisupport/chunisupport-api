@@ -476,6 +476,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	scoreHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
 	scoreHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
 		info.APIRateLimitRequests,
+		info.APIRateLimitEditorRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))
@@ -484,9 +485,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
-	// レートリミット: ADMINは15分150,000回、その他は15分150回
+	// レートリミット: ADMINは15分150,000回、EDITOR/EXTDEVは15分3,000回、その他は15分150回
 	apiV1.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
+		info.APIRateLimitEditorRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))
@@ -511,6 +513,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	// レートリミットはv1と同じ設定を適用
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
+		info.APIRateLimitEditorRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))
@@ -527,6 +530,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	reiwaGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	reiwaGroup.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
+		info.APIRateLimitEditorRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))

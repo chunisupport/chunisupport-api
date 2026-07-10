@@ -134,7 +134,7 @@ func TestGetSongStatsByDisplayID_DeletedSongPermissionBranch(t *testing.T) {
 		{
 			name: "未知ロールの場合は削除済み楽曲が取得できない",
 			accountTypeID: func() *int {
-				unknown := 4
+				unknown := 5
 				return &unknown
 			}(),
 			setupMocks: func(ctx context.Context, songRepo *MockSongRepository, _ *MockChartStatsRepository, _ *MockSongMasterProvider, exec *MockExecutor) {
@@ -228,7 +228,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.
 		{
 			name: "未知ロールの場合は削除済み楽曲が取得できない",
 			accountTypeID: func() *int {
-				unknown := 4
+				unknown := 5
 				return &unknown
 			}(),
 			expectedErrChecker: func(t assert.TestingT, err error, _ ...any) bool {

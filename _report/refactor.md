@@ -59,7 +59,6 @@
 | **DATA-002** | **High** | 譜面定数PATCHが未ロックの集約全体を上書き | `internal/usecase/song_usecase_impl.go:228-242` は非ロックの `FindByOfficialIdx` 後に、`internal/infra/repository/song_repository_impl.go:423-466` の全列・全譜面 `Save` を実行します。読み取り後に削除や別編集がcommitされると、古い `IsDeleted`・タイトル・他譜面で再上書きできます。また `Song.ChangeChartConstant` は `MaxChartConst` / `IsMaxOPUnknown` / `OpTargetDifficultyID` を再集約しないため、直後の200レスポンスも変更譜面とトップレベル値が矛盾します。集約を `FOR UPDATE` で復元し、変更メソッド内で派生値まで再計算してから保存すべきです。 |
 | **DATA-003** | **High** | 未解禁曲更新が古いPlayer集約を保存して並行更新を失う | `internal/usecase/player_locked_song_usecase_impl.go` の `Lock` / `Unlock` / `Batch` はPlayerをトランザクション外で読み、子行変更とOP再計算後にその古いPlayerを `Save` します。`PlayerRepository.Save` はOPだけでなく名前・レベル・公式値・`data_collected_at` 等も更新するため、並行するデータ登録を巻き戻せます。複数のLock/Unlock同士でも、各トランザクションが片側変更しか見ないOP値を後勝ち保存する可能性があります。トランザクション冒頭でPlayer行をロック・再読込し、全経路のロック順をPlayer→子行へ統一すべきです。 |
 | **DATA-004** | **Medium** | 再計算バッチのマスタ「スナップショット」が原子的でない | `internal/infra/repository/player_data_batch_repository_impl.go:23-69` はversion、songs、charts、slots、Player上限を5本のautocommit SELECTで取得します。途中で編集がcommitされると、旧楽曲属性と新譜面定数が混在したrun全体スナップショットになります。`REPEATABLE READ` または明示的なconsistent snapshotを使うread-only transactionでまとめて取得し、そのトランザクションから構築した値だけをrun中に使用すべきです。 |
-| **DATA-005** | **Medium** | EXTDEV追加マイグレーションを利用開始後にrollbackできない | `migration/mysql/000027_add_extdev_role.down.sql` は `account_types.id=4` を先に削除します。`users.account_type_id` には外部キーがあるため、EXTDEVへ変更されたユーザーが1人でもいるとDELETEが失敗し、down migrationを適用できません。rollback時の移行先ロールを決めて参照行を先に更新するか、必要な運用前提と手順を明示すべきです。 |
 
 ### 信頼性・運用 (OPS)
 

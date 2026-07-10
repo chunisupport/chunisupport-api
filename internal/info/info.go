@@ -38,9 +38,10 @@ const (
 	TheoreticalOverpowerBonus   = 5.0
 
 	// レートリミット設定: 外部API v1
-	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）
-	APIRateLimitAdminRequests = 150000           // ADMINユーザーのリクエスト制限（15分間）
-	APIRateLimitWindow        = 15 * time.Minute // レートリミットのウィンドウ期間
+	APIRateLimitRequests       = 150              // 一般ユーザーのリクエスト制限（15分間）
+	APIRateLimitEditorRequests = 3000             // EDITOR/EXTDEV共用のリクエスト制限（15分間）
+	APIRateLimitAdminRequests  = 150000           // ADMINユーザーのリクエスト制限（15分間）
+	APIRateLimitWindow         = 15 * time.Minute // レートリミットのウィンドウ期間
 
 	// レートリミット設定: 認証エンドポイント（IPベース）
 	LoginRateLimitRequests          = 10              // ログインエンドポイントのリクエスト制限（1分間）
@@ -67,6 +68,7 @@ const (
 	AccountTypePlayer = 1 // 一般ユーザー
 	AccountTypeEditor = 2 // 編集者
 	AccountTypeAdmin  = 3 // 管理者
+	AccountTypeExtDev = 4 // 外部API開発者
 
 	// リクエストボディサイズ上限
 	RequestBodyLimit = 5 * 1024 * 1024
@@ -98,6 +100,7 @@ var (
 			AccountTypePlayer: {},
 			AccountTypeEditor: {},
 			AccountTypeAdmin:  {},
+			AccountTypeExtDev: {},
 		},
 		AccountTypeEditor: {
 			AccountTypeEditor: {},
@@ -105,6 +108,10 @@ var (
 		},
 		AccountTypeAdmin: {
 			AccountTypeAdmin: {},
+		},
+		// EXTDEVはPLAYERの操作を利用できる一方、専用ゲートではEXTDEV自身だけを許可する。
+		AccountTypeExtDev: {
+			AccountTypeExtDev: {},
 		},
 	}
 )

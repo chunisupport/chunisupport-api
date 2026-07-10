@@ -25,7 +25,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `id`: ユーザーのユニークID。
     - `username`: アプリ内で一意なユーザー名（ユニーク制約）。
     - `firebase_uid`: Firebase Authentication の UID（ユニーク制約、NULL可）。
-    - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN）。
+    - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN/EXTDEV）。
     - `player_id`: `players`テーブルへの外部キー（ユニーク制約、NULL可）。
     - `is_private`: プライバシー設定（0=公開, 1=非公開）。
     - `is_suspicious`: 不審アカウントフラグ（0=正常, 1=不審）。
@@ -139,7 +139,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - `genres` / `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
-- `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
+- `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN、EXTDEV）。
 - `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。
 
 #### ゲームコンテンツマスタ

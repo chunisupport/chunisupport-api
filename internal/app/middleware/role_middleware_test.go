@@ -39,12 +39,15 @@ func TestRequireRole(t *testing.T) {
 		{name: "AdminRequired/PLAYERは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
 		{name: "AdminRequired/EDITORは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusForbidden},
 		{name: "AdminRequired/ADMINは許可", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
-		{name: "AdminRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
+		{name: "AdminRequired/EXTDEVは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 4, AccountTypeID: info.AccountTypeExtDev}, wantStatus: http.StatusForbidden},
+		{name: "AdminRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeAdmin, user: &entity.User{ID: 5, AccountTypeID: 5}, wantStatus: http.StatusForbidden},
 		{name: "AdminRequired/未認証は拒否", requiredRoleID: info.AccountTypeAdmin, user: nil, wantStatus: http.StatusUnauthorized},
 		{name: "EditorRequired/PLAYERは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 1, AccountTypeID: info.AccountTypePlayer}, wantStatus: http.StatusForbidden},
 		{name: "EditorRequired/EDITORは許可", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 2, AccountTypeID: info.AccountTypeEditor}, wantStatus: http.StatusOK},
 		{name: "EditorRequired/ADMINは許可", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 3, AccountTypeID: info.AccountTypeAdmin}, wantStatus: http.StatusOK},
-		{name: "EditorRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 4, AccountTypeID: 4}, wantStatus: http.StatusForbidden},
+		{name: "EditorRequired/EXTDEVは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 4, AccountTypeID: info.AccountTypeExtDev}, wantStatus: http.StatusForbidden},
+		{name: "EditorRequired/未知ロールは拒否", requiredRoleID: info.AccountTypeEditor, user: &entity.User{ID: 5, AccountTypeID: 5}, wantStatus: http.StatusForbidden},
+		{name: "PlayerRequired/EXTDEVは許可", requiredRoleID: info.AccountTypePlayer, user: &entity.User{ID: 4, AccountTypeID: info.AccountTypeExtDev}, wantStatus: http.StatusOK},
 		{name: "EditorRequired/未認証は拒否", requiredRoleID: info.AccountTypeEditor, user: nil, wantStatus: http.StatusUnauthorized},
 	}
 

@@ -48,7 +48,7 @@
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
 - `/internal/users/*`、`/internal/songs/*` および `/internal/worldsend-songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
-- `/v1/*`: **15分あたり150回（一般ユーザー） / 150,000回（ADMIN）**
+- `/v1/*`: **15分あたり150回（PLAYER） / 3,000回（EDITOR/EXTDEV） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 - `/compat/reiwa/1/*`: **`/v1` と同一**
 
@@ -409,7 +409,7 @@
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
-| `account_type` | string | アカウントタイプ (PLAYER, EDITOR, ADMIN) |
+| `account_type` | string | アカウントタイプ (PLAYER, EDITOR, ADMIN, EXTDEV) |
 | `is_private` | bool | 非公開設定 (true: 非公開, false: 公開) |
 | `last_score_update` | string \| null | プレイヤースコアの最終更新日時 (ISO8601)。プレイヤーが紐付いていない場合やレコードが存在しない場合は null |
 
@@ -1866,7 +1866,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
-| `account_type` | string | アカウント種別（`PLAYER` / `EDITOR` / `ADMIN`） |
+| `account_type` | string | アカウント種別（`PLAYER` / `EDITOR` / `ADMIN` / `EXTDEV`） |
 | `created_at` | string | ユーザー作成日時 (ISO8601) |
 | `updated_at` | string | ユーザー更新日時 (ISO8601) |
 | `player_name` | string \| null | プレイヤー名（未連携の場合は `null`） |
@@ -3213,7 +3213,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "account_types": [
     { "id": 1, "name": "PLAYER" },
     { "id": 2, "name": "EDITOR" },
-    { "id": 3, "name": "ADMIN" }
+    { "id": 3, "name": "ADMIN" },
+    { "id": 4, "name": "EXTDEV" }
   ],
   "versions": [
     { "id": 1, "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },

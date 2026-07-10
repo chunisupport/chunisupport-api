@@ -1410,7 +1410,7 @@ func TestUserUsecase_DeleteUser_AdminRequired(t *testing.T) {
 }
 
 func TestUserUsecase_DeleteUser_UnknownRoleRejected(t *testing.T) {
-	unknownRoleUser := &entity.User{ID: 1, AccountTypeID: 4}
+	unknownRoleUser := &entity.User{ID: 1, AccountTypeID: 5}
 	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), unknownRoleUser, "testuser")
