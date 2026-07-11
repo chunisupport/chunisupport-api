@@ -26,6 +26,7 @@ type ChartStatsByRatingBandDTO struct {
 	Combo        ChartComboStatsDTO `json:"combo"`
 	Clear        ChartClearStatsDTO `json:"clear"`
 	AverageScore *float64           `json:"average_score"`
+	MedianScore  *float64           `json:"median_score"`
 	PlayerCount  int                `json:"player_count"`
 }
 
@@ -114,6 +115,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 					Catastrophy: stat.Clear.Catastrophy,
 				},
 				AverageScore: stat.AverageScore,
+				MedianScore:  stat.MedianScore,
 				PlayerCount:  stat.PlayerCount,
 			})
 		}
@@ -175,6 +177,7 @@ func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*r
 				Catastrophy: stat.Clear.Catastrophy,
 			},
 			AverageScore: stat.AverageScore,
+			MedianScore:  stat.MedianScore,
 			PlayerCount:  stat.PlayerCount,
 		})
 	}

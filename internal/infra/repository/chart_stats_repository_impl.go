@@ -49,6 +49,7 @@ type chartStatsRow struct {
 	ClearAbsolute    int      `db:"clear_absolute"`
 	ClearCatastrophy int      `db:"clear_catastrophy"`
 	AverageScore     *float64 `db:"average_score"`
+	MedianScore      *float64 `db:"median_score"`
 	PlayerCount      int      `db:"player_count"`
 }
 
@@ -98,6 +99,7 @@ func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exe
 				Catastrophy: row.ClearCatastrophy,
 			},
 			AverageScore: row.AverageScore,
+			MedianScore:  row.MedianScore,
 			PlayerCount:  row.PlayerCount,
 		})
 	}
@@ -156,6 +158,7 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 			clear_absolute,
 			clear_catastrophy,
 			average_score,
+			median_score,
 			player_count
 		FROM chart_stats_by_rating_band
 		WHERE chart_id IN (?)
@@ -188,6 +191,7 @@ func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Con
 			clear_absolute,
 			clear_catastrophy,
 			average_score,
+			median_score,
 			player_count
 		FROM worldsend_chart_stats_by_rating_band
 		WHERE worldsend_chart_id IN (?)

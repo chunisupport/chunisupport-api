@@ -38,6 +38,7 @@ type ChartStatsByRatingBand struct {
 	Combo        ChartComboStats
 	Clear        ChartClearStats
 	AverageScore *float64 // レート帯別平均スコア（レコードが0件の場合はnil）
+	MedianScore  *float64 // レート帯別中央スコア（レコードが0件の場合はnil）
 	PlayerCount  int      // レート帯別プレイヤー数
 }
 

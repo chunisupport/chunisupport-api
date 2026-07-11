@@ -37,6 +37,7 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			clear_absolute INTEGER NOT NULL,
 			clear_catastrophy INTEGER NOT NULL,
 			average_score REAL,
+			median_score REAL,
 			player_count INTEGER NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS worldsend_chart_stats_by_rating_band (
@@ -61,6 +62,7 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			clear_absolute INTEGER NOT NULL,
 			clear_catastrophy INTEGER NOT NULL,
 			average_score REAL,
+			median_score REAL,
 			player_count INTEGER NOT NULL
 		);
 	`)
@@ -77,20 +79,20 @@ func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
 		INSERT INTO chart_stats_by_rating_band (
 			chart_id, rating_band_id, rank_aaal, rank_s, rank_sp, rank_ss, rank_ssp, rank_sss, rank_sssp, rank_max,
 			combo_none, combo_fc, combo_aj, combo_ajc, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
-			average_score, player_count
+			average_score, median_score, player_count
 		) VALUES (
 			100, 1, 10, 11, 12, 13, 14, 15, 16, 17,
 			18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-			900000, 27
+			900000, NULL, 27
 		);
 		INSERT INTO worldsend_chart_stats_by_rating_band (
 			worldsend_chart_id, rating_band_id, rank_aaal, rank_s, rank_sp, rank_ss, rank_ssp, rank_sss, rank_sssp, rank_max,
 			combo_none, combo_fc, combo_aj, combo_ajc, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
-			average_score, player_count
+			average_score, median_score, player_count
 		) VALUES (
 			100, 1, 1, 2, 3, 4, 5, 6, 7, 8,
 			9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-			950000, 18
+			950000, 960000, 18
 		);
 	`)
 	require.NoError(t, err)
@@ -102,6 +104,7 @@ func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
 	require.Len(t, chartStats, 1)
 	assert.Equal(t, 20, chartStats[0].Combo.AJ)
 	assert.Equal(t, 21, chartStats[0].Combo.AJC)
+	assert.Nil(t, chartStats[0].MedianScore)
 
 	stats, err := repo.FindWorldsendChartStatsByChartIDs(context.Background(), db, []int{100})
 	require.NoError(t, err)
@@ -116,6 +119,9 @@ func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
 	assert.Equal(t, 13, stats[0].Clear.Failed)
 	if assert.NotNil(t, stats[0].AverageScore) {
 		assert.InDelta(t, 950000, *stats[0].AverageScore, 0.001)
+	}
+	if assert.NotNil(t, stats[0].MedianScore) {
+		assert.InDelta(t, 960000, *stats[0].MedianScore, 0.001)
 	}
 	assert.Equal(t, 18, stats[0].PlayerCount)
 }

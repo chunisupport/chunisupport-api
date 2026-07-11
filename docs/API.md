@@ -2538,6 +2538,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
         "catastrophy": 2
       },
       "average_score": 1006234.8,
+      "median_score": 1007000,
       "player_count": 100
     },
     {
@@ -2567,6 +2568,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
         "catastrophy": 0
       },
       "average_score": 1007500.5,
+      "median_score": 1008000,
       "player_count": 18
     }
   ]
@@ -2582,6 +2584,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj, ajc）。`aj` は AJC を除く ALL JUSTICE、`ajc` は ALL JUSTICE かつ 1,010,000 点の人数で、両者は排他的です |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
 | `stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
+| `stats[].median_score` | number\|null | レーティング帯別中央スコア（レコード数が0件の場合はnull） |
 | `stats[].player_count` | number | レーティング帯別プレイヤー数 |
 
 **難易度パラメータについて**:
