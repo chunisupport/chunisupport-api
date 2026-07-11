@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -49,12 +50,12 @@ func NewServer(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 
 // Start はサーバーを開始します
 func (s *Server) Start() error {
-	port := ":" + strconv.Itoa(s.cfg.AppPort)
-	slog.Info("Starting server on port " + port)
+	address := serverAddress(s.cfg.AppPort)
+	slog.Info("Starting server", "address", address)
 
 	defer close(s.startDone)
 	startConfig := echo.StartConfig{
-		Address:         port,
+		Address:         address,
 		GracefulTimeout: time.Duration(s.cfg.ShutdownTimeoutSeconds) * time.Second,
 	}
 	if err := startConfig.Start(s.startCtx, s.echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -63,6 +64,11 @@ func (s *Server) Start() error {
 	}
 
 	return nil
+}
+
+// serverAddress はNginxからのプロキシ接続だけを受け付けるループバック待受アドレスを返します。
+func serverAddress(port int) string {
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 }
 
 // Shutdown はサーバーを正常に終了します
