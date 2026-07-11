@@ -240,21 +240,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, errors.New("invalid player data")
 	}
 
-	loc, err := time.LoadLocation("Asia/Tokyo")
-	if err != nil {
-		loc = time.FixedZone("Asia/Tokyo", 9*60*60)
-	}
-
-	var lastPlayedAt *time.Time
-	if strings.TrimSpace(payload.LastPlayed) != "" {
-		parsed, parseErr := time.ParseInLocation(tokyoLayout, payload.LastPlayed, loc)
-		if parseErr != nil {
-			return nil, errors.New("invalid player data")
-		}
-		lastPlayedAt = &parsed
-	}
-
-	updatedAt, err := time.Parse(time.RFC3339, payload.UpdatedAt)
+	lastPlayedAt, updatedAt, err := parsePlayerDataTimes(payload.LastPlayed, payload.UpdatedAt)
 	if err != nil {
 		return nil, errors.New("invalid player data")
 	}
@@ -370,6 +356,32 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
+}
+
+// parsePlayerDataTimes はゲーム由来の時刻をUTCへ正規化します。
+// lastPlayed はCHUNITHM-NETが日本時間の壁時計として出力する仕様であり、API出力用timezoneとは独立しています。
+func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Time, error) {
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		loc = time.FixedZone("Asia/Tokyo", 9*60*60)
+	}
+
+	var lastPlayedAt *time.Time
+	if strings.TrimSpace(lastPlayed) != "" {
+		parsed, err := time.ParseInLocation(tokyoLayout, lastPlayed, loc)
+		if err != nil {
+			return nil, time.Time{}, err
+		}
+		utc := parsed.UTC()
+		lastPlayedAt = &utc
+	}
+
+	updatedAt, err := time.Parse(time.RFC3339, updatedAtRaw)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+
+	return lastPlayedAt, updatedAt.UTC(), nil
 }
 
 // loadMasterData はプレイヤーデータ登録に必要なマスターデータをキャッシュおよびDBから読み込みます。
@@ -515,7 +527,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		player.NewAverageRating = existingPlayer.NewAverageRating
 		player.BestAverageRating = existingPlayer.BestAverageRating
 	} else {
-		player.CreatedAt = time.Now()
+		player.CreatedAt = time.Now().UTC()
 	}
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）

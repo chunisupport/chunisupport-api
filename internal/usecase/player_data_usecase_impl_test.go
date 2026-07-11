@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -13,6 +14,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParsePlayerDataTimes_UTCへ正規化する(t *testing.T) {
+	lastPlayedAt, updatedAt, err := parsePlayerDataTimes("2024/01/01 00:00", "2024-01-01T00:00:00+09:00")
+
+	require.NoError(t, err)
+	require.NotNil(t, lastPlayedAt)
+	assert.Equal(t, time.UTC, lastPlayedAt.Location())
+	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), *lastPlayedAt)
+	assert.Equal(t, time.UTC, updatedAt.Location())
+	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), updatedAt)
+}
 
 // TestValidatePlayerDataPayload_AppVersion は、app_verに関係なく登録できることをテストします。
 func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {

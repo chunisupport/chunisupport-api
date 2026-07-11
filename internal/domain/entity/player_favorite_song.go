@@ -17,7 +17,7 @@ func NewPlayerFavoriteSong(playerID int, songID int) (*PlayerFavoriteSong, error
 	p := &PlayerFavoriteSong{
 		PlayerID:  playerID,
 		SongID:    songID,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
 	}
 	if err := p.Validate(); err != nil {
 		return nil, err

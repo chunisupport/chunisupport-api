@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
@@ -46,7 +47,7 @@ var _ usecase.UserUsecase = stubChunirecUserUsecase{}
 func TestChunirecHandler_GetUserShow_プレイヤー未連携ではHTTP200とnullを返す(t *testing.T) {
 	// Given
 	e := echo.New()
-	handler := NewChunirecHandler(nil, stubChunirecUserUsecase{}, nil)
+	handler := NewChunirecHandler(nil, stubChunirecUserUsecase{}, nil, time.UTC)
 	e.GET("/compat/chunirec/2.0/users/show", handler.GetUserShow)
 	req := httptest.NewRequest(http.MethodGet, "/compat/chunirec/2.0/users/show?user_name=testuser", nil)
 	rec := httptest.NewRecorder()

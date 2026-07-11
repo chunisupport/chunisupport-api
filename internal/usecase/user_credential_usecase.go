@@ -28,7 +28,7 @@ type clock interface {
 type systemClock struct{}
 
 func (systemClock) Now() time.Time {
-	return time.Now()
+	return time.Now().UTC()
 }
 
 type userCredentialUsecaseImpl struct {

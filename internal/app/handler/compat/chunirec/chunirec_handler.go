@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -20,14 +21,19 @@ type ChunirecHandler struct {
 	songUsecase usecase.SongUsecase
 	userUsecase usecase.UserUsecase
 	masterCache *masterdata.Cache
+	location    *time.Location
 }
 
 // NewChunirecHandler はChunirecHandlerの新しいインスタンスを返します
-func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache) *ChunirecHandler {
+func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache, location *time.Location) *ChunirecHandler {
+	if location == nil {
+		location = time.UTC
+	}
 	return &ChunirecHandler{
 		songUsecase: songUsecase,
 		userUsecase: userUsecase,
 		masterCache: masterCache,
+		location:    location,
 	}
 }
 
@@ -120,7 +126,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 	if result != nil && result.Records != nil {
 		records = result.Records.All
 	}
-	response := ToRecordsShowAllResponse(records, h.genresBySongID(songs))
+	response := ToRecordsShowAllResponse(records, h.genresBySongID(songs), h.location)
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -157,7 +163,7 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	}
 
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, h.masterCache)
+	response := ToChunirecUserDTO(result, h.masterCache, h.location)
 
 	return c.JSON(http.StatusOK, response)
 }

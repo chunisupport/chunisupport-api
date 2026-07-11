@@ -1,6 +1,9 @@
 package usecase
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // GoalUsecase は目標機能のユースケースです。
 type GoalUsecase interface {
@@ -29,5 +32,5 @@ type GoalOutput struct {
 	Attributes        map[string]any
 	Invert            bool
 	SortOrder         uint16
-	CreatedAt         string
+	CreatedAt         time.Time
 }

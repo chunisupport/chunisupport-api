@@ -68,6 +68,6 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, response.Versions, 1)
 	assert.Equal(t, "LUMINOUS", response.Versions[0].Name)
-	assert.Equal(t, "2026-02-05T00:00:00Z", response.Versions[0].ReleasedAt)
+	assert.Equal(t, "2026-02-05", response.Versions[0].ReleasedAt)
 	usecaseMock.AssertExpectations(t)
 }

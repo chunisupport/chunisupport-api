@@ -45,8 +45,8 @@ type RecordFilterOutput struct {
 	FilterType    string
 	SchemaVersion int
 	Filter        json.RawMessage
-	CreatedAt     string
-	UpdatedAt     string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type recordFilterUsecase struct {
@@ -295,8 +295,8 @@ func toRecordFilterOutput(filter *entity.RecordFilter) (*RecordFilterOutput, err
 		FilterType:    recordFilterTypeFromWorldsend(filter.IsWorldsend()),
 		SchemaVersion: payload.SchemaVersion,
 		Filter:        payload.Filter,
-		CreatedAt:     formatRecordFilterTime(filter.CreatedAt()),
-		UpdatedAt:     formatRecordFilterTime(filter.UpdatedAt()),
+		CreatedAt:     filter.CreatedAt(),
+		UpdatedAt:     filter.UpdatedAt(),
 	}, nil
 }
 
@@ -327,13 +327,6 @@ func gunzipBytes(value []byte, maxBytes int) ([]byte, error) {
 		return nil, ErrInvalidRecordFilterInput
 	}
 	return raw, nil
-}
-
-func formatRecordFilterTime(value time.Time) string {
-	if value.IsZero() {
-		return ""
-	}
-	return value.Format(time.RFC3339)
 }
 
 func hasControlCharacterForRecordFilter(value string) bool {

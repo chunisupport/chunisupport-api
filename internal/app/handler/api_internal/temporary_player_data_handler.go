@@ -30,8 +30,8 @@ func NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase usecase.TemporaryP
 }
 
 type createTemporaryPlayerDataResponse struct {
-	UploadToken string `json:"uploadToken"`
-	ExpiresAt   string `json:"expiresAt"`
+	UploadToken string    `json:"uploadToken"`
+	ExpiresAt   time.Time `json:"expiresAt"`
 }
 
 type commitTemporaryPlayerDataRequest struct {
@@ -91,7 +91,7 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 
 	return c.JSON(http.StatusCreated, createTemporaryPlayerDataResponse{
 		UploadToken: result.UploadToken,
-		ExpiresAt:   result.ExpiresAt.Format(time.RFC3339),
+		ExpiresAt:   result.ExpiresAt,
 	})
 }
 

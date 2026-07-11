@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -99,7 +100,7 @@ func ToMusicShowResponse(song *entity.Song, masters *domainmasterdata.SongMaster
 }
 
 // ToRecordsShowAllResponse は通常譜面のプレイヤーレコードをchunirec互換形式に変換します。
-func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map[string]string) *RecordsShowAllResponse {
+func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map[string]string, location *time.Location) *RecordsShowAllResponse {
 	response := &RecordsShowAllResponse{
 		Records: make([]*RecordItemDTO, 0, len(records)),
 	}
@@ -123,7 +124,7 @@ func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map
 			IsAllJustice:   isAllJustice(record.ComboLamp),
 			IsFullChain:    record.FullChain != nil,
 			Genre:          genresBySongID[record.ID],
-			UpdatedAt:      record.UpdatedAt.Format("2006-01-02T15:04:05-0700"),
+			UpdatedAt:      record.UpdatedAt.In(location).Format("2006-01-02T15:04:05-0700"),
 			IsPlayed:       true,
 		})
 	}
@@ -246,7 +247,7 @@ type ChunirecUserDTO struct {
 }
 
 // ToChunirecUserDTO は内部APIのUserProfileWithRecordsDTOをchunirec互換形式に変換します
-func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCache *masterdata.Cache) *ChunirecUserDTO {
+func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCache *masterdata.Cache, location *time.Location) *ChunirecUserDTO {
 	if profile == nil || profile.Player == nil {
 		return nil
 	}
@@ -256,7 +257,7 @@ func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCa
 		PlayerName:   profile.Player.Name,
 		Level:        profile.Player.Level,
 		IsJoinedTeam: nil, // ChuniSupportでは保持しないデータ
-		UpdatedAt:    profile.Player.UpdatedAt.Format("2006-01-02T15:04:05-07:00"),
+		UpdatedAt:    profile.Player.UpdatedAt.In(location).Format("2006-01-02T15:04:05-07:00"),
 	}
 
 	// Rating を文字列化（nullならnullのまま）

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/joho/godotenv"
@@ -63,8 +64,11 @@ type TempData struct {
 }
 
 type Config struct {
-	AppPort int     `json:"app_port"`
-	Logging Logging `json:"logging"`
+	AppPort  int     `json:"app_port"`
+	Logging  Logging `json:"logging"`
+	Timezone string  `json:"timezone"`
+	// Location は検証済みのAPI出力用タイムゾーンです。
+	Location *time.Location `json:"-"`
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
 	// SmallDataDBPath は小規模なユーザー補助データ用SQLiteのファイルパスです。
@@ -84,6 +88,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		AppPort                int      `json:"app_port"`
 		Logging                *Logging `json:"logging"`
+		Timezone               string   `json:"timezone"`
 		StaticDBPath           string   `json:"static_db_path"`
 		SmallDataDBPath        string   `json:"smalldata_db_path"`
 		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
@@ -96,6 +101,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 
 	c.AppPort = raw.AppPort
+	c.Timezone = raw.Timezone
 	if raw.Logging != nil {
 		c.Logging = *raw.Logging
 		c.loggingSet = true
@@ -189,6 +195,9 @@ func LoadConfig() (Config, error) {
 	}
 	if strings.TrimSpace(config.SmallDataDBPath) == "" {
 		errors = append(errors, "smalldata_db_path is required")
+	}
+	if err := normalizeAndValidateTimezone(&config); err != nil {
+		errors = append(errors, err.Error())
 	}
 
 	if err := normalizeAndValidateLoggingConfig(&config.Logging, config.loggingSet); err != nil {
@@ -295,6 +304,21 @@ func LoadConfig() (Config, error) {
 	}
 
 	return config, nil
+}
+
+// normalizeAndValidateTimezone はAPI出力用のIANAタイムゾーンを起動時に解決します。
+func normalizeAndValidateTimezone(config *Config) error {
+	config.Timezone = strings.TrimSpace(config.Timezone)
+	if config.Timezone == "" {
+		return fmt.Errorf("timezone is required")
+	}
+
+	location, err := time.LoadLocation(config.Timezone)
+	if err != nil {
+		return fmt.Errorf("timezone must be a valid IANA time zone: %w", err)
+	}
+	config.Location = location
+	return nil
 }
 
 func normalizeAndValidateLoggingConfig(logging *Logging, loggingSet bool) error {

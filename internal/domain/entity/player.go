@@ -30,7 +30,7 @@ type Player struct {
 
 // NewPlayer は新規プレイヤーを生成し、永続化に必要な初期状態を設定します。
 func NewPlayer(userID int, name playername.PlayerName) *Player {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	return &Player{
 		UserID:    userID,

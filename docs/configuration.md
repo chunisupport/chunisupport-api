@@ -24,6 +24,7 @@
 最低限、以下のキーを持つJSONを用意してください。
 
 - `app_port`
+- `timezone` (APIレスポンスに使用するIANAタイムゾーン。例: `Asia/Tokyo`)
 - `logging.level` (`debug`, `info`, `warn`, `error`)
 - `logging.stdout`
 - `logging.app_file`（任意。空文字ならアプリログのファイル出力なし）
@@ -47,6 +48,8 @@
 
 `database.startup.*` は起動時のMySQL接続待機設定です。
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
+
+MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
 
 `logging` は必須です。旧 `log_level` / `log_paths` 形式にはフォールバックしません。
 `logging.stdout=false` の場合は `logging.app_file` と `logging.access_file` の両方が必須です。
@@ -113,6 +116,7 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 ```json
 {
   "app_port": 3002,
+  "timezone": "Asia/Tokyo",
   "logging": {
     "level": "debug",
     "app_file": ".log/app.log",

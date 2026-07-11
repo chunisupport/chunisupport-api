@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -31,8 +32,8 @@ func (m *mockRecordFilterUsecase) List(ctx context.Context, userID int, filterTy
 			FilterType:    usecase.RecordFilterTypeStandard,
 			SchemaVersion: 3,
 			Filter:        []byte(`{"title":"","difficulties":["MASTER"]}`),
-			CreatedAt:     "2026-06-15T12:00:00Z",
-			UpdatedAt:     "2026-06-15T12:00:00Z",
+			CreatedAt:     time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+			UpdatedAt:     time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
 		},
 	}, nil
 }
@@ -45,8 +46,8 @@ func (m *mockRecordFilterUsecase) Create(ctx context.Context, userID int, input 
 		FilterType:    input.FilterType,
 		SchemaVersion: input.SchemaVersion,
 		Filter:        input.Filter,
-		CreatedAt:     "2026-06-15T12:00:00Z",
-		UpdatedAt:     "2026-06-15T12:00:00Z",
+		CreatedAt:     time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+		UpdatedAt:     time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
 	}, nil
 }
 

@@ -22,7 +22,7 @@ type User struct {
 
 // NewUser は必須項目が設定された新規ユーザーを生成します。
 func NewUser(userName username.UserName, accountTypeID int) *User {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	return &User{
 		Username:      userName,
@@ -34,7 +34,7 @@ func NewUser(userName username.UserName, accountTypeID int) *User {
 
 // NewFirebaseUser はFirebase UID紐付け済みの新規ユーザーを生成します。
 func NewFirebaseUser(userName username.UserName, uid string, accountTypeID int) *User {
-	now := time.Now()
+	now := time.Now().UTC()
 	normalizedUID := strings.TrimSpace(uid)
 
 	return &User{
@@ -64,7 +64,7 @@ func (u *User) HasLinkedFirebase() bool {
 // ChangePrivacy はユーザーの公開/非公開設定を変更します。
 func (u *User) ChangePrivacy(isPrivate bool) {
 	u.IsPrivate = isPrivate
-	u.UpdatedAt = time.Now()
+	u.UpdatedAt = time.Now().UTC()
 }
 
 // LinkFirebaseUID はユーザーに Firebase UID を紐付けます。
@@ -75,17 +75,17 @@ func (u *User) LinkFirebaseUID(uid string) {
 	} else {
 		u.FirebaseUID = &normalizedUID
 	}
-	u.UpdatedAt = time.Now()
+	u.UpdatedAt = time.Now().UTC()
 }
 
 // LinkPlayer はユーザーにプレイヤーを紐付けます。
 func (u *User) LinkPlayer(playerID int) {
 	u.PlayerID = &playerID
-	u.UpdatedAt = time.Now()
+	u.UpdatedAt = time.Now().UTC()
 }
 
 // UnlinkPlayer はユーザーからプレイヤーとの紐付けを解除します。
 func (u *User) UnlinkPlayer() {
 	u.PlayerID = nil
-	u.UpdatedAt = time.Now()
+	u.UpdatedAt = time.Now().UTC()
 }

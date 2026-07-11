@@ -1,5 +1,7 @@
 package api_internal
 
+import "time"
+
 // GoalRequest は目標作成・更新リクエストです。
 type GoalRequest struct {
 	Title             string         `json:"title" validate:"required"`
@@ -18,7 +20,7 @@ type GoalResponse struct {
 	Attributes        map[string]any `json:"attributes"`
 	Invert            bool           `json:"invert"`
 	SortOrder         uint16         `json:"sort_order"`
-	CreatedAt         string         `json:"created_at"`
+	CreatedAt         time.Time      `json:"created_at"`
 }
 
 // GoalOrderRequest は目標の並び順更新リクエストです。

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,40 @@ func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 
 	if err := normalizeAndValidateDatabasePoolConfig(&pool); err != nil {
 		require.Failf(t, "前提条件失敗", "unexpected error: %v", err)
+	}
+}
+
+func TestNormalizeAndValidateTimezone(t *testing.T) {
+	tests := []struct {
+		name       string
+		timezone   string
+		wantName   string
+		wantOffset int
+		wantErr    bool
+	}{
+		{name: "IANAタイムゾーンを読み込める", timezone: " Asia/Tokyo ", wantName: "Asia/Tokyo", wantOffset: 9 * 60 * 60},
+		{name: "UTCを読み込める", timezone: "UTC", wantName: "UTC", wantOffset: 0},
+		{name: "未指定はエラー", timezone: "", wantErr: true},
+		{name: "不正なタイムゾーンはエラー", timezone: "JST", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{Timezone: tt.timezone}
+
+			err := normalizeAndValidateTimezone(&cfg)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, cfg.Location)
+			assert.Equal(t, tt.wantName, cfg.Timezone)
+			assert.Equal(t, tt.wantName, cfg.Location.String())
+			_, offset := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).In(cfg.Location).Zone()
+			assert.Equal(t, tt.wantOffset, offset)
+		})
 	}
 }
 

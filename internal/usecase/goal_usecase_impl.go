@@ -806,7 +806,7 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 		if err := json.Unmarshal(g.Attributes, &a); err != nil {
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
-		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00")})
+		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt})
 	}
 	return outs, nil
 }

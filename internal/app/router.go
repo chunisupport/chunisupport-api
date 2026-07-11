@@ -105,6 +105,7 @@ type Handlers struct {
 func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
+	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
 
 	// カスタムエラーハンドラーの設定
 	e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
@@ -234,7 +235,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		V1Version:    api_v1.NewV1VersionHandler(masterDataUsecase),
 		ScoreHistory: api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
 		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache),
+		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache, cfg.Location),
 		// reiwa互換APIハンドラ
 		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterCache),
 	}

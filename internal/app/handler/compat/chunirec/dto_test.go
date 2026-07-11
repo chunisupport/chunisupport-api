@@ -150,7 +150,7 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 	// When
 	result := ToRecordsShowAllResponse(records, map[string]string{
 		"6a88218b1a936bd3": "VARIETY",
-	})
+	}, jst)
 
 	// Then
 	require.NotNil(t, result)
@@ -218,7 +218,7 @@ func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
 			}
 
 			// When
-			result := ToRecordsShowAllResponse(records, nil)
+			result := ToRecordsShowAllResponse(records, nil, time.UTC)
 
 			// Then
 			require.Len(t, result.Records, 1)
@@ -233,7 +233,7 @@ func TestToChunirecUserDTO_プレイヤー未連携ではnullへ変換する(t *
 	profile := &api_internal.UserProfileWithRecordsDTO{}
 
 	// When
-	result := ToChunirecUserDTO(profile, nil)
+	result := ToChunirecUserDTO(profile, nil, time.UTC)
 
 	// Then
 	assert.Nil(t, result)

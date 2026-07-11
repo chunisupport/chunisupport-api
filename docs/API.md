@@ -6,7 +6,7 @@
 
 ## ベースURLと環境
 
-アプリケーションは `.config/<APP_ENV>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。
+アプリケーションは `.config/<APP_ENV>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。APIレスポンスの日時は同設定の `timezone` で指定したIANAタイムゾーンへ変換され、内部処理とDB保存ではUTCを使用します。日時はRFC3339で返され、UTC固定の`Z`ではなく設定に応じたオフセット（例: `+09:00`）になります。
 
 ローカル開発の例: `.config/<APP_ENV>.settings.json` で `app_port: 3002` を指定している場合、`http://localhost:3002`
 
