@@ -52,6 +52,12 @@ func FromUsecaseError(err error) *APIError {
 		return ErrSongNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrDuplicateOfficialIdx):
 		return ErrDuplicateOfficialIdx.WithInternal(err)
+	case errors.Is(err, usecase.ErrCourseNotFound), errors.Is(err, repository.ErrCourseNotFound):
+		return ErrNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrCourseClassNotFound):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidCourseInput):
+		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorNotFound):
 		return ErrNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorConflict):

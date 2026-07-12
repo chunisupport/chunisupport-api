@@ -189,6 +189,15 @@
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
+| `/internal/courses/:idx` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
+| `/internal/courses/:idx` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
+| `/internal/courses/:idx` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
+| `/internal/courses/:idx/restore` | POST | Firebase Bearer (EDITOR+) | コース復元 |
+| `/internal/editor/courses` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース一覧取得 |
+| `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
+| `/internal/users/:username/record/courses/:idx` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
@@ -202,6 +211,9 @@
 | `/v1/worldsend-songs/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/worldsend-songs/:displayid/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
+| `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
+| `/v1/courses/:idx` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
@@ -1098,6 +1110,14 @@ curl -X POST \
         "cmb_lv": 1,
         "fch_lv": 1
       }
+    ],
+    "course": [
+      {
+        "score": 3023238,
+        "is_clear": true,
+        "cmb_lv": 1,
+        "idx": "50020"
+      }
     ]
   },
   "updated_at": "2025-11-27T10:30:03+09:00"
@@ -1122,6 +1142,7 @@ curl -X POST \
 | `honors` | object | | 称号情報（キー: スロット番号 "1"〜"3"） |
 | `scores.standard` | array | ✓ | 通常譜面スコア配列 |
 | `scores.worldsend` | array | ✓ | WORLD'S END スコア配列 |
+| `scores.course` | array | | コーススコア配列。省略時は空配列として扱う |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
 **スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
@@ -1136,6 +1157,15 @@ curl -X POST \
 | `fch_lv` | number \| null | | フルチェイン（後方互換のため **1=NONE, 2=PLATINUM, 3=GOLD** として解釈） |
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
+
+**コースエントリスキーマ (`scores.course` の各要素)**:
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `idx` | string | ✓ | コースの公式インデックス |
+| `score` | number | ✓ | 3曲合計スコア (0〜3,030,000) |
+| `is_clear` | boolean | ✓ | コースクリア状態。コンボランプとは独立して保存する |
+| `cmb_lv` | number | ✓ | 1=NONE、2=FULL COMBO、3=ALL JUSTICE |
 
 - **レスポンス**: 200 OK。登録結果 `PlayerDataResult` を返します。
   - `profile.rating` と `summary.rating` は保存済み全スコアから再計算した `calculated_player_rating` です。入力データの公式RATINGではありません。
@@ -1274,14 +1304,15 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `record_type` | string | `standard` または `worldsend` |
+| `record_type` | string | `standard`、`worldsend`、または`course` |
 | `change_type` | string | 未登録レコードは `new`、保存済みレコードの比較対象カラムが変化した場合は `updated` |
 | `idx` | string | 楽曲の公式インデックス |
-| `diff` | string | 通常譜面は大文字難易度名、WORLD'S END は入力値にかかわらず `WE` |
+| `diff` | string | 通常譜面は大文字難易度名、WORLD'S ENDは`WE`。コースでは省略 |
+| `course_class` | string | コースの場合のみコースクラス |
 | `before` | object \| null | 更新前状態。`change_type=new` では `null` |
 | `after` | object | 登録後状態 |
 
-`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。ランプ名はマスタの `Name` を返し、`none` 相当・未設定は `null` です。`slot` / `order` は保存されますが、差分判定および `changes` には含まれません。同一payload内で同じ譜面キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。`changes` は `idx` を数値として昇順に並べ、同一 `idx` の場合は `record_type`、`diff` の順で並びます。`idx` を数値として解釈できない値は末尾に並びます。`counts.*_actually_changed` は実際に変化した全件数で、`changes` はレスポンスサイズ抑制のため最大100件です。
+通常譜面とWORLD'S ENDの`before` / `after` は常に `score`, `clear_lamp`, `combo_lamp`, `full_chain` を含みます。コースではこれに`is_clear`を追加し、`course_class`でクラスを返します。ランプ名はマスタの `Name` を返し、`none`相当・未設定は`null`です。`slot` / `order`は保存されますが、差分判定および`changes`には含めません。同一payload内で同じ対象キーが複数回現れた場合は、最後の1件を保存・差分表示の対象にします。`changes`は`idx`を数値として昇順に並べ、同一`idx`の場合は`record_type`、`diff`の順で並びます。`idx`を数値として解釈できない値は末尾に並びます。`counts.*_actually_changed`は実際に変化した全件数で、`changes`はレスポンスサイズ抑制のため最大100件です。
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request` / `resource_not_found`): JSON構文不備・楽曲マスタ未登録など
@@ -4342,13 +4373,17 @@ interface PlayerDataCounts {
   honors_skipped: number;
   standard_records_actually_changed: number;
   worldsend_records_actually_changed: number;
+  course_records_upserted: number;
+  course_records_skipped: number;
+  course_records_actually_changed: number;
 }
 
 interface PlayerDataRecordChange {
-  record_type: 'standard' | 'worldsend';
+  record_type: 'standard' | 'worldsend' | 'course';
   change_type: 'new' | 'updated';
   idx: string;
-  diff: string;
+  diff?: string;
+  course_class?: string;
   before: PlayerDataRecordState | null;
   after: PlayerDataRecordState;
 }
@@ -4358,10 +4393,11 @@ interface PlayerDataRecordState {
   clear_lamp: string | null;
   combo_lamp: string | null;
   full_chain: string | null;
+  is_clear?: boolean;
 }
 
 interface SkippedRecord {
-  record_type: 'standard' | 'worldsend' | 'honor';
+  record_type: 'standard' | 'worldsend' | 'course' | 'honor';
   reason: string;
   details: string;
 }

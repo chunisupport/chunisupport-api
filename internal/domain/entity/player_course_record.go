@@ -8,12 +8,12 @@ import (
 
 // PlayerCourseRecord はプレイヤーのコース記録です。
 type PlayerCourseRecord struct {
-	PlayerID   int
-	CourseID   int
-	Score      coursescore.CourseScore
-	IsClear    bool
+	PlayerID    int
+	CourseID    int
+	Score       coursescore.CourseScore
+	IsClear     bool
 	ComboLampID int
-	UpdatedAt  time.Time
-	Course     *Course
-	ComboLamp  *ComboLampType
+	UpdatedAt   time.Time
+	Course      *Course
+	ComboLamp   *ComboLampType
 }

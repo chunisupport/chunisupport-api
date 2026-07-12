@@ -75,9 +75,9 @@ type PlayerDataCounts struct {
 	HonorsSkipped                   int `json:"honors_skipped"`
 	FullRecordsActuallyChanged      int `json:"standard_records_actually_changed"`
 	WorldsendRecordsActuallyChanged int `json:"worldsend_records_actually_changed"`
-	CourseRecordsUpserted            int `json:"course_records_upserted"`
-	CourseRecordsSkipped             int `json:"course_records_skipped"`
-	CourseRecordsActuallyChanged     int `json:"course_records_actually_changed"`
+	CourseRecordsUpserted           int `json:"course_records_upserted"`
+	CourseRecordsSkipped            int `json:"course_records_skipped"`
+	CourseRecordsActuallyChanged    int `json:"course_records_actually_changed"`
 }
 
 // SkippedRecord はスキップされたレコードの情報です。
@@ -99,13 +99,13 @@ type PlayerDataRecordState struct {
 
 // PlayerDataRecordChange は登録前後で実際に変化したレコードの差分です。
 type PlayerDataRecordChange struct {
-	RecordType string                 `json:"record_type"`
-	ChangeType string                 `json:"change_type"`
-	Idx        string                 `json:"idx"`
-	Diff       string                 `json:"diff"`
-	CourseClass string                `json:"course_class,omitempty"`
-	Before     *PlayerDataRecordState `json:"before"`
-	After      PlayerDataRecordState  `json:"after"`
+	RecordType  string                 `json:"record_type"`
+	ChangeType  string                 `json:"change_type"`
+	Idx         string                 `json:"idx"`
+	Diff        string                 `json:"diff,omitempty"`
+	CourseClass string                 `json:"course_class,omitempty"`
+	Before      *PlayerDataRecordState `json:"before"`
+	After       PlayerDataRecordState  `json:"after"`
 }
 
 // PlayerDataResult は登録APIのレスポンス全体です。

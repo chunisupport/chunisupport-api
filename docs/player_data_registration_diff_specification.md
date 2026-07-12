@@ -9,7 +9,7 @@
 - `POST /internal/me/register-data`
 - `POST /internal/player-data/commit`
 
-`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
+`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、コース、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
 
 リクエスト形式、認証、バリデーション、エラー仕様を含むAPI全体の仕様は [API.md](./API.md) を参照する。
 
@@ -37,7 +37,7 @@
 
 ### 3.1 差分の判定対象
 
-入力から解決でき、保存対象になった通常譜面とWORLD'S ENDについて、保存直前のDB状態とupsert予定値を譜面ID単位で比較する。
+入力から解決でき、保存対象になった通常譜面、WORLD'S END、コースについて、保存直前のDB状態とupsert予定値を対象ID単位で比較する。コースはスコア、クリア状態、コンボランプIDを比較する。
 
 次の4項目のいずれかが異なる場合だけ、実際に変化したレコードとして扱う。
 
@@ -75,14 +75,15 @@
 
 | フィールド | 型 | 仕様 |
 | --- | --- | --- |
-| `record_type` | string | 通常譜面は `standard`、WORLD'S ENDは `worldsend` |
+| `record_type` | string | 通常譜面は `standard`、WORLD'S ENDは `worldsend`、コースは `course` |
 | `change_type` | string | 新規レコードは `new`、既存レコードの更新は `updated` |
 | `idx` | string | 楽曲の公式インデックス。マスタから解決できない内部不整合時は楽曲IDまたは譜面IDの文字列 |
-| `diff` | string | 通常譜面はマスタ上の大文字難易度名、WORLD'S ENDは常に `WE` |
+| `diff` | string | 通常譜面はマスタ上の大文字難易度名、WORLD'S ENDは常に `WE`。コースでは省略 |
+| `course_class` | string | コースの場合のみコースクラスを返す |
 | `before` | object \| null | 更新前状態。`new` の場合は `null` |
 | `after` | object | upsert予定の登録後状態 |
 
-`before` と `after` は `score`、`clear_lamp`、`combo_lamp`、`full_chain` を常に含む。ランプはマスタの `Name` をそのまま返す。マスタ名が `none`（大文字・小文字を区別しない）、未設定、またはマスタから解決できない場合は `null` を返す。
+通常譜面とWORLD'S ENDの`before`と`after`は`score`、`clear_lamp`、`combo_lamp`、`full_chain`を含む。コースは`score`、`is_clear`、`combo_lamp`を使用する。ランプはマスタの`Name`を返し、`none`相当、未設定、またはマスタから解決できない場合は`null`を返す。
 
 ### 3.3 並び順と件数上限
 
@@ -183,7 +184,7 @@
 
 ## 6. スキップ情報 (`skipped_records`)
 
-保存対象にできなかった通常譜面、WORLD'S END、称号は次の形式で返す。
+保存対象にできなかった通常譜面、WORLD'S END、コース、称号は次の形式で返す。
 
 ```json
 {
@@ -193,7 +194,7 @@
 }
 ```
 
-`record_type` は `standard`、`worldsend`、または `honor` である。`reason` と `details` は失敗箇所が生成する診断用文字列であり、固定のエラーコードではない。スキップされた要素は `changes` と `statistics.after` に含まれない。
+`record_type` は `standard`、`worldsend`、`course`、または `honor` である。`reason` と `details` は失敗箇所が生成する診断用文字列であり、固定のエラーコードではない。スキップされた要素は `changes` と `statistics.after` に含まれない。
 
 ## 7. 計算と保存の順序
 
@@ -203,9 +204,9 @@
 2. 保存済み通常譜面全件を取得し、`statistics.before` を計算する。
 3. payloadのスコアをマスタIDへ変換し、保存できない要素をスキップする。
 4. 同一譜面の重複を最後の1件へ正規化する。
-5. 保存対象譜面だけの保存前状態を通常譜面・WORLD'S ENDごとに一括取得する。
+5. 保存対象だけの保存前状態を通常譜面・WORLD'S END・コースごとに一括取得する。
 6. 保存前状態とupsert予定値を比較し、`changes` と `*_actually_changed` を作る。
-7. 通常譜面とWORLD'S ENDをbulk upsertする。
+7. 通常譜面、WORLD'S END、コースをbulk upsertする。
 8. 保存済み通常譜面全件を再取得し、`statistics.after` とOVER POWERを計算する。
 9. 保存済み全スコアからレーティングを再計算し、レスポンスを組み立てる。
 

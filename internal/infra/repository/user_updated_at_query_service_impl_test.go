@@ -143,10 +143,16 @@ func setupUserUpdatedAtQueryServiceDB(t *testing.T) *sqlx.DB {
 			player_id INTEGER NOT NULL,
 			updated_at DATETIME NOT NULL
 		);
+		CREATE TABLE player_course_records (
+			player_id INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL
+		);
 		CREATE INDEX idx_player_records_player_updated_at
 			ON player_records(player_id, updated_at DESC);
 		CREATE INDEX idx_player_worldsend_records_player_updated_at
 			ON player_worldsend_records(player_id, updated_at DESC);
+		CREATE INDEX idx_player_course_records_player_updated_at
+			ON player_course_records(player_id, updated_at DESC);
 
 		INSERT INTO users (
 			id, username, firebase_uid, created_at, updated_at, player_id,

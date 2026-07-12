@@ -142,4 +142,5 @@ type UserRecordResponseDTO struct {
 	NewCandidate  []*PlayerRecordDTO    `json:"new_candidate"`
 	All           []*PlayerRecordDTO    `json:"standard"`
 	WorldsEnd     []*WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
+	Courses       []*CourseRecordDTO    `json:"course"`
 }

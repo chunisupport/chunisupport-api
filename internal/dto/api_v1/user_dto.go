@@ -82,6 +82,7 @@ type V1UserRecordResponseDTO struct {
 	NewCandidate  []*V1PlayerRecordDTO    `json:"new_candidate"`
 	All           []*V1PlayerRecordDTO    `json:"standard"`
 	WorldsEnd     []*V1WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
+	Courses       []*dto.CourseRecordDTO  `json:"course"`
 }
 
 // V1UserProfileDTO は外部API v1 用のユーザープロファイルDTOです。
@@ -208,6 +209,7 @@ func ToV1UserRecordResponseDTO(records *dto.UserRecordResponseDTO) *V1UserRecord
 		NewCandidate:  convertSlice(records.NewCandidate),
 		All:           convertSlice(records.All),
 		WorldsEnd:     convertWorldsendSlice(records.WorldsEnd),
+		Courses:       records.Courses,
 	}
 }
 

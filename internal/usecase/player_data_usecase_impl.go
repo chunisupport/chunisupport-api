@@ -91,8 +91,13 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		}
 	}
 	for i, entry := range payload.Scores.Course {
-		if errorCount >= maxErrorsToReport { break }
-		if err := validateCourseScoreEntry(entry, i); err != nil { errorCount++; errorMessages = append(errorMessages, err.Error()) }
+		if errorCount >= maxErrorsToReport {
+			break
+		}
+		if err := validateCourseScoreEntry(entry, i); err != nil {
+			errorCount++
+			errorMessages = append(errorMessages, err.Error())
+		}
 	}
 
 	if errorCount > 0 {
@@ -110,12 +115,24 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 }
 
 func validateCourseScoreEntry(entry PlayerDataCourseEntry, index int) error {
-	if strings.TrimSpace(entry.Idx) == "" { return fmt.Errorf("course[%d]: idx is required", index) }
-	if entry.Score < 0 || entry.Score > 3030000 { return fmt.Errorf("course[%d]: score must be between 0 and 3030000 (idx=%s)", index, entry.Idx) }
-	if entry.ComboLv < 1 || entry.ComboLv > 3 { return fmt.Errorf("course[%d]: unknown combo level: %d (idx=%s)", index, entry.ComboLv, entry.Idx) }
-	if entry.Score == 3030000 && entry.ComboLv != 3 { return fmt.Errorf("course[%d]: score=3030000 without AJ (cmb_lv=3, idx=%s)", index, entry.Idx) }
-	if entry.ComboLv == 3 && entry.Score < 3000000 { return fmt.Errorf("course[%d]: AJ requires score>=3000000 (idx=%s)", index, entry.Idx) }
-	if entry.IsClear && entry.Score == 0 { return fmt.Errorf("course[%d]: cleared course cannot have score=0 (idx=%s)", index, entry.Idx) }
+	if strings.TrimSpace(entry.Idx) == "" {
+		return fmt.Errorf("course[%d]: idx is required", index)
+	}
+	if entry.Score < 0 || entry.Score > 3030000 {
+		return fmt.Errorf("course[%d]: score must be between 0 and 3030000 (idx=%s)", index, entry.Idx)
+	}
+	if entry.ComboLv < 1 || entry.ComboLv > 3 {
+		return fmt.Errorf("course[%d]: unknown combo level: %d (idx=%s)", index, entry.ComboLv, entry.Idx)
+	}
+	if entry.Score == 3030000 && entry.ComboLv != 3 {
+		return fmt.Errorf("course[%d]: score=3030000 without AJ (cmb_lv=3, idx=%s)", index, entry.Idx)
+	}
+	if entry.ComboLv == 3 && entry.Score < 3000000 {
+		return fmt.Errorf("course[%d]: AJ requires score>=3000000 (idx=%s)", index, entry.Idx)
+	}
+	if entry.IsClear && entry.Score == 0 {
+		return fmt.Errorf("course[%d]: cleared course cannot have score=0 (idx=%s)", index, entry.Idx)
+	}
 	return nil
 }
 
@@ -153,7 +170,7 @@ type playerDataMaster struct {
 	chartsByKey       map[string]entity.PlayerDataChart
 	chartsByID        map[int]entity.PlayerDataChart
 	worldsendBySongID map[int]entity.PlayerDataWorldsendChart
-	courses            map[string]*entity.Course
+	courses           map[string]*entity.Course
 }
 
 type calculatedOverpowerSummary struct {
@@ -195,7 +212,9 @@ func NewPlayerDataUsecaseWithScoreHistory(
 		honorRepo, playerDataRepo, lockedRepo, masterCache,
 	)
 	us.scoreHistoryRepo = scoreHistoryRepo
-	if len(courseRepos) > 0 { us.courseRepo = courseRepos[0] }
+	if len(courseRepos) > 0 {
+		us.courseRepo = courseRepos[0]
+	}
 	return us
 }
 
@@ -216,7 +235,9 @@ func NewPlayerDataUsecase(
 		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
 		honorRepo, playerDataRepo, lockedRepo, masterCache,
 	)
-	if len(courseRepos) > 0 { us.courseRepo = courseRepos[0] }
+	if len(courseRepos) > 0 {
+		us.courseRepo = courseRepos[0]
+	}
 	return us
 }
 
@@ -424,7 +445,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 		chartsByKey:       make(map[string]entity.PlayerDataChart),
 		chartsByID:        make(map[int]entity.PlayerDataChart),
 		worldsendBySongID: make(map[int]entity.PlayerDataWorldsendChart),
-		courses:            make(map[string]*entity.Course),
+		courses:           make(map[string]*entity.Course),
 	}
 
 	idxSet := make(map[string]struct{})
@@ -441,11 +462,25 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 		}
 	}
 	courseIdxSet := make(map[string]struct{}, len(payload.Scores.Course))
-	for _, entry := range payload.Scores.Course { if idx := strings.TrimSpace(entry.Idx); idx != "" { courseIdxSet[idx] = struct{}{} } }
+	for _, entry := range payload.Scores.Course {
+		if idx := strings.TrimSpace(entry.Idx); idx != "" {
+			courseIdxSet[idx] = struct{}{}
+		}
+	}
 	if len(courseIdxSet) > 0 {
-		if us.courseRepo == nil { return nil, errors.New("course repository is not initialized") }
-		courseIdxList := make([]string, 0, len(courseIdxSet)); for idx := range courseIdxSet { courseIdxList = append(courseIdxList, idx) }; slices.Sort(courseIdxList)
-		courses, err := us.courseRepo.FindByOfficialIdxList(ctx, nil, courseIdxList); if err != nil { return nil, err }; masters.courses = courses
+		if us.courseRepo == nil {
+			return nil, errors.New("course repository is not initialized")
+		}
+		courseIdxList := make([]string, 0, len(courseIdxSet))
+		for idx := range courseIdxSet {
+			courseIdxList = append(courseIdxList, idx)
+		}
+		slices.Sort(courseIdxList)
+		courses, err := us.courseRepo.FindByOfficialIdxList(ctx, nil, courseIdxList)
+		if err != nil {
+			return nil, err
+		}
+		masters.courses = courses
 	}
 	if len(idxSet) == 0 {
 		return masters, nil
@@ -734,9 +769,13 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	}
 	courseBefore := make(map[int]repository.CourseRecordState)
 	if len(courseRecordsToUpsert) > 0 {
-		if us.courseRepo == nil { return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, errors.New("course repository is not initialized") }
+		if us.courseRepo == nil {
+			return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, errors.New("course repository is not initialized")
+		}
 		courseBefore, err = us.courseRepo.FindRecordStatesByCourseIDs(ctx, tx, playerID, collectCourseIDs(courseRecordsToUpsert))
-		if err != nil { return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err }
+		if err != nil {
+			return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
 	}
 
 	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
@@ -771,7 +810,11 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	}); err != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
-	if len(courseRecordsToUpsert) > 0 { if err := us.courseRepo.UpsertRecords(ctx, tx, courseRecordsToUpsert); err != nil { return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err } }
+	if len(courseRecordsToUpsert) > 0 {
+		if err := us.courseRepo.UpsertRecords(ctx, tx, courseRecordsToUpsert); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+	}
 	if us.scoreHistoryRepo != nil {
 		if err := us.scoreHistoryRepo.PruneStandardOverLimit(ctx, tx, playerID, standardHistoryChartIDs); err != nil {
 			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
@@ -820,32 +863,75 @@ func applyCourseScores(playerID int, entries []PlayerDataCourseEntry, masters *p
 		course, ok := masters.courses[idx]
 		if !ok {
 			counts.CourseRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{RecordType:"course", Reason:"failed to resolve course", Details:"idx="+idx})
+			skipped = append(skipped, api_internal.SkippedRecord{RecordType: "course", Reason: "failed to resolve course", Details: "idx=" + idx})
 			continue
 		}
 		combo := entry.ComboLv
 		comboID, err := resolveComboLampID(&combo, masters)
 		if err != nil {
 			counts.CourseRecordsSkipped++
-			skipped = append(skipped, api_internal.SkippedRecord{RecordType:"course", Reason:"failed to resolve combo_lamp", Details:fmt.Sprintf("idx=%s, combo_lv=%d, error=%s",idx,combo,err)})
+			skipped = append(skipped, api_internal.SkippedRecord{RecordType: "course", Reason: "failed to resolve combo_lamp", Details: fmt.Sprintf("idx=%s, combo_lv=%d, error=%s", idx, combo, err)})
 			continue
 		}
-		records = append(records, repository.CourseRecordForUpsert{PlayerID:playerID, CourseID:course.ID, State:repository.CourseRecordState{Score:entry.Score,IsClear:entry.IsClear,ComboLampID:comboID,UpdatedAt:updatedAt}})
+		records = append(records, repository.CourseRecordForUpsert{PlayerID: playerID, CourseID: course.ID, State: repository.CourseRecordState{Score: entry.Score, IsClear: entry.IsClear, ComboLampID: comboID, UpdatedAt: updatedAt}})
 	}
 	return counts, skipped, records
 }
 
 func normalizeCourseRecordsForUpsert(records []repository.CourseRecordForUpsert) []repository.CourseRecordForUpsert {
-	last := make(map[int]repository.CourseRecordForUpsert, len(records)); order := make([]int,0,len(records))
-	for _, record := range records { if _,ok:=last[record.CourseID];!ok{order=append(order,record.CourseID)}; last[record.CourseID]=record }
-	result:=make([]repository.CourseRecordForUpsert,0,len(last)); for _,id:=range order{result=append(result,last[id])}; return result
+	last := make(map[int]repository.CourseRecordForUpsert, len(records))
+	order := make([]int, 0, len(records))
+	for _, record := range records {
+		if _, ok := last[record.CourseID]; !ok {
+			order = append(order, record.CourseID)
+		}
+		last[record.CourseID] = record
+	}
+	result := make([]repository.CourseRecordForUpsert, 0, len(last))
+	for _, id := range order {
+		result = append(result, last[id])
+	}
+	return result
 }
 
-func collectCourseIDs(records []repository.CourseRecordForUpsert) []int { result:=make([]int,0,len(records));for _,r:=range records{result=append(result,r.CourseID)};return result }
+func collectCourseIDs(records []repository.CourseRecordForUpsert) []int {
+	result := make([]int, 0, len(records))
+	for _, r := range records {
+		result = append(result, r.CourseID)
+	}
+	return result
+}
 
 func computeCourseRecordChanges(before map[int]repository.CourseRecordState, after []repository.CourseRecordForUpsert, masters *playerDataMaster, lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
-	byID:=make(map[int]*entity.Course,len(masters.courses));for _,course:=range masters.courses{byID[course.ID]=course}
-	result:=make([]api_internal.PlayerDataRecordChange,0,len(after));for _,record:=range after{old,exists:=before[record.CourseID];if exists&&old.Score==record.State.Score&&old.IsClear==record.State.IsClear&&old.ComboLampID==record.State.ComboLampID{continue}; course:=byID[record.CourseID]; idx:=fmt.Sprint(record.CourseID);class:="";if course!=nil{idx=course.OfficialIdx;if course.CourseClass!=nil{class=course.CourseClass.Name}}; clearAfter:=record.State.IsClear; change:=api_internal.PlayerDataRecordChange{RecordType:"course",ChangeType:"new",Idx:idx,CourseClass:class,After:api_internal.PlayerDataRecordState{Score:record.State.Score,ComboLamp:lookup.comboLampName(record.State.ComboLampID),IsClear:&clearAfter}};if exists{clearBefore:=old.IsClear;change.ChangeType="updated";change.Before=&api_internal.PlayerDataRecordState{Score:old.Score,ComboLamp:lookup.comboLampName(old.ComboLampID),IsClear:&clearBefore}};result=append(result,change)};return result
+	byID := make(map[int]*entity.Course, len(masters.courses))
+	for _, course := range masters.courses {
+		byID[course.ID] = course
+	}
+	result := make([]api_internal.PlayerDataRecordChange, 0, len(after))
+	for _, record := range after {
+		old, exists := before[record.CourseID]
+		if exists && old.Score == record.State.Score && old.IsClear == record.State.IsClear && old.ComboLampID == record.State.ComboLampID {
+			continue
+		}
+		course := byID[record.CourseID]
+		idx := fmt.Sprint(record.CourseID)
+		class := ""
+		if course != nil {
+			idx = course.OfficialIdx
+			if course.CourseClass != nil {
+				class = course.CourseClass.Name
+			}
+		}
+		clearAfter := record.State.IsClear
+		change := api_internal.PlayerDataRecordChange{RecordType: "course", ChangeType: "new", Idx: idx, CourseClass: class, After: api_internal.PlayerDataRecordState{Score: record.State.Score, ComboLamp: lookup.comboLampName(record.State.ComboLampID), IsClear: &clearAfter}}
+		if exists {
+			clearBefore := old.IsClear
+			change.ChangeType = "updated"
+			change.Before = &api_internal.PlayerDataRecordState{Score: old.Score, ComboLamp: lookup.comboLampName(old.ComboLampID), IsClear: &clearBefore}
+		}
+		result = append(result, change)
+	}
+	return result
 }
 
 func buildStandardHistories(

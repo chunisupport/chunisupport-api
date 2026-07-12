@@ -43,6 +43,14 @@ latest_record_updates AS (
 		ORDER BY updated_at DESC
 		LIMIT 1
 	) AS updated_at
+	UNION ALL
+	SELECT (
+		SELECT updated_at
+		FROM player_course_records
+		WHERE player_id = (SELECT player_id FROM target_user)
+		ORDER BY updated_at DESC
+		LIMIT 1
+	) AS updated_at
 )
 SELECT
 	u.id, u.username, u.firebase_uid, u.created_at, u.updated_at, u.player_id,

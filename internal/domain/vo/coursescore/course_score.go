@@ -38,18 +38,26 @@ func (s *CourseScore) Scan(value any) error {
 		n = v
 	case []byte:
 		parsed, err := strconv.ParseInt(string(v), 10, 64)
-		if err != nil { return fmt.Errorf("failed to parse course score: %w", err) }
+		if err != nil {
+			return fmt.Errorf("failed to parse course score: %w", err)
+		}
 		n = parsed
 	case string:
 		parsed, err := strconv.ParseInt(v, 10, 64)
-		if err != nil { return fmt.Errorf("failed to parse course score: %w", err) }
+		if err != nil {
+			return fmt.Errorf("failed to parse course score: %w", err)
+		}
 		n = parsed
 	default:
 		return fmt.Errorf("unsupported course score type %T", value)
 	}
-	if n < 0 { return errors.New("course score cannot be negative") }
+	if n < 0 {
+		return errors.New("course score cannot be negative")
+	}
 	parsed, err := New(uint32(n))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	*s = parsed
 	return nil
 }

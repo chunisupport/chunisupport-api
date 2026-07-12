@@ -112,3 +112,30 @@ func TestStoreOnlySPHonorImageURLsDown_NULLを空文字へ戻す(t *testing.T) {
 	assert.Contains(t, downSQL, "DROP INDEX unique_honor_name_type")
 	assert.Contains(t, downSQL, "MODIFY COLUMN image_url VARCHAR(255) NOT NULL DEFAULT ''")
 }
+
+func TestCreateCoursesUp_コースマスタとレコードを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000030_create_courses.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE course_classes")
+	assert.Contains(t, upSQL, "('extra', 6)")
+	assert.Contains(t, upSQL, "CREATE TABLE courses")
+	assert.Contains(t, upSQL, "name VARCHAR(255) NOT NULL")
+	assert.Contains(t, upSQL, "is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
+	assert.Contains(t, upSQL, "CREATE TABLE player_course_records")
+	assert.Contains(t, upSQL, "CHECK (score BETWEEN 0 AND 3030000)")
+	assert.Contains(t, upSQL, "PRIMARY KEY (player_id, course_id)")
+}
+
+func TestCreateCoursesDown_参照順の逆順で削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000030_create_courses.down.sql")
+
+	// Then
+	recordsIndex := strings.Index(downSQL, "DROP TABLE IF EXISTS player_course_records")
+	coursesIndex := strings.Index(downSQL, "DROP TABLE IF EXISTS courses")
+	classesIndex := strings.Index(downSQL, "DROP TABLE IF EXISTS course_classes")
+	assert.Less(t, recordsIndex, coursesIndex)
+	assert.Less(t, coursesIndex, classesIndex)
+}

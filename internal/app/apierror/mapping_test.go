@@ -59,3 +59,18 @@ func TestFromUsecaseError_auth_time欠落は詳細を伏せてrecent_sign_in_req
 	assert.Equal(t, ErrRecentSignInRequired.HTTPStatus, got.HTTPStatus)
 	assert.ErrorIs(t, got.Internal, usecase.ErrRecentSignInAuthTimeMissing)
 }
+
+func TestFromUsecaseError_不正なコース入力をバリデーションエラーへ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrInvalidCourseInput)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, CodeValidationFailed, apiErr.Code)
+}
+
+func TestFromUsecaseError_コース未検出を404へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrCourseNotFound)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+}

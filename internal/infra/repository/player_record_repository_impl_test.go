@@ -36,6 +36,12 @@ func setupPlayerRecordRepositoryDB(t *testing.T, db *sqlx.DB) {
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY (player_id, worldsend_chart_id)
 		);
+		CREATE TABLE IF NOT EXISTS player_course_records (
+			player_id INTEGER NOT NULL,
+			course_id INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (player_id, course_id)
+		);
 	`)
 	require.NoError(t, err)
 }

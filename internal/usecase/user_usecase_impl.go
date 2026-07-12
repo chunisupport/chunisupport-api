@@ -22,6 +22,7 @@ type userUsecase struct {
 	playerRepo                   repository.PlayerRepository
 	playerRecordRepo             repository.PlayerRecordRepository
 	worldsendRecordRepo          repository.WorldsendRecordRepository
+	courseRepo                   repository.CourseRepository
 	songRepo                     repository.SongRepository
 	worldsendChartRepo           repository.WorldsendChartRepository
 	playerLockedSongRepo         repository.PlayerLockedSongRepository
@@ -75,6 +76,11 @@ func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo rep
 // SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
 func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
 	s.friendshipRepo = friendshipRepo
+}
+
+// SetCourseRepository はユーザーレコードレスポンスへコースを統合します。
+func (s *userUsecase) SetCourseRepository(courseRepo repository.CourseRepository) {
+	s.courseRepo = courseRepo
 }
 
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
@@ -227,8 +233,12 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 	if err != nil {
 		return nil, err
 	}
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
+	}
 
-	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords), courseUpdatedAt)
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
@@ -240,6 +250,7 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		NewCandidate:  playerRecords.slotMap["new_candidate"],
 		All:           playerRecords.all,
 		WorldsEnd:     worldsendRecords,
+		Courses:       courseRecords,
 	}
 
 	return &api_internal.UserProfileWithRecordsDTO{
@@ -451,8 +462,12 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 	if err != nil {
 		return nil, err
 	}
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
+	}
 
-	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords), courseUpdatedAt)
 	if recordsUpdatedAt.IsZero() {
 		recordsUpdatedAt = player.UpdatedAt
 	}
@@ -464,6 +479,7 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 			UpdatedAt: recordsUpdatedAt,
 			All:       playerRecords.all,
 			Worldsend: worldsendRecords,
+			Courses:   courseRecords,
 		},
 		UpdatedAt: &player.UpdatedAt,
 	}, nil
@@ -804,11 +820,33 @@ func latestWorldsendRecordUpdatedAt(records []*dto.WorldsendRecordDTO) time.Time
 	return latest
 }
 
-func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecordsUpdatedAt time.Time) time.Time {
-	if worldsendRecordsUpdatedAt.After(playerRecordsUpdatedAt) {
-		return worldsendRecordsUpdatedAt
+func latestUserRecordUpdatedAt(values ...time.Time) time.Time {
+	var latest time.Time
+	for _, value := range values {
+		if value.After(latest) {
+			latest = value
+		}
 	}
-	return playerRecordsUpdatedAt
+	return latest
+}
+
+func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.CourseRecordDTO, time.Time, error) {
+	if s.courseRepo == nil {
+		return []*dto.CourseRecordDTO{}, time.Time{}, nil
+	}
+	records, err := s.courseRepo.FindRecordsByPlayerID(ctx, s.db, playerID, false, includeNoPlay)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	result := make([]*dto.CourseRecordDTO, 0, len(records))
+	var latest time.Time
+	for _, record := range records {
+		result = append(result, dto.ToCourseRecordDTO(record))
+		if record.UpdatedAt.After(latest) {
+			latest = record.UpdatedAt
+		}
+	}
+	return result, latest, nil
 }
 
 func buildPlayerDTO(playerWithHonors *repository.PlayerWithHonors) *dto.PlayerDTO {

@@ -216,11 +216,19 @@ SELECT MAX(last_update) AS last_update FROM (
         ORDER BY updated_at DESC
         LIMIT 1
     ) AS last_update
+	UNION ALL
+	SELECT (
+		SELECT updated_at
+		FROM player_course_records
+		WHERE player_id = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	) AS last_update
 ) AS combined
 `
 
 	var rawLastUpdate any
-	if err := exec.GetContext(ctx, &rawLastUpdate, query, playerID, playerID); err != nil {
+	if err := exec.GetContext(ctx, &rawLastUpdate, query, playerID, playerID, playerID); err != nil {
 		return nil, err
 	}
 

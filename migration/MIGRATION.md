@@ -218,3 +218,7 @@ DROP INDEX idx_goals_user_created_id ON goals;
 ```
 
 最後に`sort_order`が`NOT NULL`で、NULL件数が0件、新インデックスのみが存在することを確認してから`migrate force 28`でdirty状態を解消する。すでに新インデックスが存在する場合は、重複作成せず旧インデックスの削除から再開する。
+
+### 000030 コースレコード
+
+`course_classes`、`courses`、`player_course_records`を追加する。コースクラスは`1`～`5`、`inf`、`extra`の固定値であり、コースは論理削除に対応する。コーススコアは0～3,030,000点を保持する。

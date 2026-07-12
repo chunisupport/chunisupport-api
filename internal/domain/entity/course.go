@@ -27,12 +27,17 @@ type Course struct {
 
 // Validate はコースが常に有効な識別子と名称を持つことを保証します。
 func (c *Course) Validate() error {
-	if strings.TrimSpace(c.OfficialIdx) == "" { return errors.New("official_idxは必須です") }
-	if strings.TrimSpace(c.Name) == "" { return errors.New("nameは必須です") }
-	if c.CourseClassID <= 0 { return errors.New("course_class_idは正の整数である必要があります") }
+	if strings.TrimSpace(c.OfficialIdx) == "" {
+		return errors.New("official_idxは必須です")
+	}
+	if strings.TrimSpace(c.Name) == "" {
+		return errors.New("nameは必須です")
+	}
+	if c.CourseClassID <= 0 {
+		return errors.New("course_class_idは正の整数である必要があります")
+	}
 	return nil
 }
 
-func (c *Course) Delete() { c.IsDeleted = true }
+func (c *Course) Delete()  { c.IsDeleted = true }
 func (c *Course) Restore() { c.IsDeleted = false }
-

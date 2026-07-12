@@ -65,6 +65,27 @@ CREATE TABLE `combo_lamp_types` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_classes` (
+  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_course_classes_name` (`name`),
+  UNIQUE KEY `uq_course_classes_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `courses` (
+  `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `official_idx` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `course_class_id` tinyint unsigned NOT NULL,
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_courses_official_idx` (`official_idx`),
+  KEY `idx_courses_class_deleted_idx` (`course_class_id`,`is_deleted`,`official_idx`),
+  CONSTRAINT `fk_courses_course_class` FOREIGN KEY (`course_class_id`) REFERENCES `course_classes` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `difficulties` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -142,6 +163,22 @@ CREATE TABLE `honors` (
   UNIQUE KEY `unique_honor_name_type` (`name`,`honor_type_id`),
   KEY `honor_type_id` (`honor_type_id`),
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_course_records` (
+  `player_id` mediumint unsigned NOT NULL,
+  `course_id` mediumint unsigned NOT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `is_clear` tinyint(1) NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`player_id`,`course_id`),
+  KEY `idx_player_course_records_course_id` (`course_id`),
+  KEY `idx_player_course_records_player_updated_at` (`player_id`,`updated_at` DESC),
+  KEY `fk_player_course_records_combo_lamp` (`combo_lamp_id`),
+  CONSTRAINT `fk_player_course_records_combo_lamp` FOREIGN KEY (`combo_lamp_id`) REFERENCES `combo_lamp_types` (`id`),
+  CONSTRAINT `fk_player_course_records_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`),
+  CONSTRAINT `fk_player_course_records_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_course_records_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_favorite_songs` (
   `player_id` mediumint unsigned NOT NULL,

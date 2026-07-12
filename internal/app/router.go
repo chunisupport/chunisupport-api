@@ -88,12 +88,14 @@ type Handlers struct {
 	Friendship           *api_internal.FriendshipHandler
 	FriendChartRanking   *api_internal.FriendChartRankingHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
+	Course               *api_internal.CourseHandler
 	// 外部API v1 用ハンドラ
 	V1Song       *api_v1.V1SongHandler
 	V1Worldsend  *api_v1.V1WorldsendHandler
 	V1User       *api_v1.V1UserHandler
 	V1Version    *api_v1.V1VersionHandler
 	ScoreHistory *api_v1.ScoreHistoryHandler
+	V1Course     *api_v1.V1CourseHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 	// reiwa互換APIハンドラ
@@ -145,6 +147,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
+	courseRepo := infra.NewCourseRepository(db)
 	tm := transaction.NewTransactionManager(db)
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
@@ -155,7 +158,13 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	}); ok {
 		configurable.SetFriendshipRepository(friendshipRepo)
 	}
-	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo)
+	if configurable, ok := userUsecase.(interface {
+		SetCourseRepository(repository.CourseRepository)
+	}); ok {
+		configurable.SetCourseRepository(courseRepo)
+	}
+	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
+	courseUsecase := usecase.NewCourseUsecase(db, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
 	if configurable, ok := scoreHistoryUsecase.(interface {
 		SetFriendshipRepository(repository.FriendshipRepository)
@@ -228,12 +237,14 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 		Friendship:           api_internal.NewFriendshipHandler(friendshipUsecase),
 		FriendChartRanking:   api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
+		Course:               api_internal.NewCourseHandler(courseUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend:  api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
 		V1User:       api_v1.NewV1UserHandler(userUsecase),
 		V1Version:    api_v1.NewV1VersionHandler(masterDataUsecase),
 		ScoreHistory: api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
+		V1Course:     api_v1.NewV1CourseHandler(courseUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache, cfg.Location),
 		// reiwa互換APIハンドラ
@@ -380,6 +391,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
 		publicUsersGroup.GET("/:username/record/songs/:displayid/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
+		publicUsersGroup.GET("/:username/record/courses", handlers.Course.GetUserRecords)
+		publicUsersGroup.GET("/:username/record/courses/:idx", handlers.Course.GetUserRecord)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid/history", handlers.InternalScoreHistory.GetWorldsend)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
@@ -461,6 +474,27 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		editorWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
 	}
 
+	publicCoursesGroup := internal.Group("/courses")
+	publicCoursesGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	{
+		publicCoursesGroup.GET("", handlers.Course.List)
+		publicCoursesGroup.GET("/:idx", handlers.Course.Get)
+	}
+	coursesGroup := internal.Group("/courses")
+	coursesGroup.Use(firebaseAuthStrict)
+	{
+		coursesGroup.POST("", handlers.Course.Create, requireAdmin)
+		coursesGroup.PUT("/:idx", handlers.Course.Update, requireEditor)
+		coursesGroup.DELETE("/:idx", handlers.Course.Delete, requireAdmin)
+		coursesGroup.POST("/:idx/restore", handlers.Course.Restore, requireEditor)
+	}
+	editorCoursesGroup := internal.Group("/editor/courses")
+	editorCoursesGroup.Use(firebaseAuthStrict, requireEditor)
+	{
+		editorCoursesGroup.GET("", handlers.Course.ListEditor)
+		editorCoursesGroup.GET("/:idx", handlers.Course.GetEditor)
+	}
+
 	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
 	{
@@ -503,6 +537,9 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/worldsend-songs/:displayid", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
+		apiV1.GET("/users/:username/records/courses", handlers.V1Course.GetUserRecords)
+		apiV1.GET("/courses", handlers.V1Course.List)
+		apiV1.GET("/courses/:idx", handlers.V1Course.Get)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 
