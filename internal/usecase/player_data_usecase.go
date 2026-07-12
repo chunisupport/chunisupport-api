@@ -52,6 +52,15 @@ type PlayerDataHonorPayload struct {
 type PlayerDataScorePayload struct {
 	Standard  []PlayerDataScoreEntry `json:"standard"`
 	Worldsend []PlayerDataScoreEntry `json:"worldsend"`
+	Course    []PlayerDataCourseEntry `json:"course"`
+}
+
+// PlayerDataCourseEntry は1件のコースレコード入力です。
+type PlayerDataCourseEntry struct {
+	Score   int    `json:"score"`
+	IsClear bool   `json:"is_clear"`
+	ComboLv int    `json:"cmb_lv"`
+	Idx     string `json:"idx"`
 }
 
 // PlayerDataScoreEntry は1件のスコア情報です。

@@ -75,6 +75,9 @@ type PlayerDataCounts struct {
 	HonorsSkipped                   int `json:"honors_skipped"`
 	FullRecordsActuallyChanged      int `json:"standard_records_actually_changed"`
 	WorldsendRecordsActuallyChanged int `json:"worldsend_records_actually_changed"`
+	CourseRecordsUpserted            int `json:"course_records_upserted"`
+	CourseRecordsSkipped             int `json:"course_records_skipped"`
+	CourseRecordsActuallyChanged     int `json:"course_records_actually_changed"`
 }
 
 // SkippedRecord はスキップされたレコードの情報です。
@@ -91,6 +94,7 @@ type PlayerDataRecordState struct {
 	ClearLamp *string `json:"clear_lamp"`
 	ComboLamp *string `json:"combo_lamp"`
 	FullChain *string `json:"full_chain"`
+	IsClear   *bool   `json:"is_clear,omitempty"`
 }
 
 // PlayerDataRecordChange は登録前後で実際に変化したレコードの差分です。
@@ -99,6 +103,7 @@ type PlayerDataRecordChange struct {
 	ChangeType string                 `json:"change_type"`
 	Idx        string                 `json:"idx"`
 	Diff       string                 `json:"diff"`
+	CourseClass string                `json:"course_class,omitempty"`
 	Before     *PlayerDataRecordState `json:"before"`
 	After      PlayerDataRecordState  `json:"after"`
 }
