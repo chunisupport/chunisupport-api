@@ -84,3 +84,31 @@ func TestAddSortOrderToGoalsDown_従来の一覧インデックスへ戻す(t *t
 		strings.Index(downSQL, "DROP INDEX idx_goals_user_sort_order_id"),
 	)
 }
+
+func TestStoreOnlySPHonorImageURLsUp_通常称号をNULL化して重複を統合する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000029_store_only_sp_honor_image_urls.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "MODIFY COLUMN image_url VARCHAR(255) NULL")
+	assert.Contains(t, upSQL, "SET h.image_url = NULL WHERE ht.name <> 'sp'")
+	assert.Contains(t, upSQL, "SET h.name = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(h.image_url, '#', 1), '?', 1), '/', -1)")
+	assert.Contains(t, upSQL, "UPDATE player_honors AS ph")
+	assert.Contains(t, upSQL, "SET ph.honor_id = duplicated_group.keep_id")
+	assert.Contains(t, upSQL, "DELETE duplicated FROM honors AS duplicated")
+	assert.Contains(t, upSQL, "ADD UNIQUE KEY unique_honor_name_type (name, honor_type_id)")
+	assert.Less(t,
+		strings.Index(upSQL, "MODIFY COLUMN image_url VARCHAR(255) NULL"),
+		strings.Index(upSQL, "SET h.image_url = NULL"),
+	)
+}
+
+func TestStoreOnlySPHonorImageURLsDown_NULLを空文字へ戻す(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000029_store_only_sp_honor_image_urls.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "UPDATE honors SET image_url = '' WHERE image_url IS NULL")
+	assert.Contains(t, downSQL, "DROP INDEX unique_honor_name_type")
+	assert.Contains(t, downSQL, "MODIFY COLUMN image_url VARCHAR(255) NOT NULL DEFAULT ''")
+}

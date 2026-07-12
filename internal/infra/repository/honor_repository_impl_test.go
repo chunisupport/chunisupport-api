@@ -43,7 +43,7 @@ func TestEnsureHonor_称号の一意キー単位でUpsertする(t *testing.T) {
 	assert.Equal(t, []any{"称号A", 2, "https://example.com/honor.png"}, exec.args)
 }
 
-func TestEnsureHonor_画像URLがnilの場合は空文字でUpsertする(t *testing.T) {
+func TestEnsureHonor_画像URLがnilの場合はNULLでUpsertする(t *testing.T) {
 	// Given
 	exec := &honorEnsureExec{}
 	repo := &honorRepository{}
@@ -54,7 +54,7 @@ func TestEnsureHonor_画像URLがnilの場合は空文字でUpsertする(t *test
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, 10, id)
-	assert.Equal(t, []any{"称号A", 2, ""}, exec.args)
+	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
 }
 
 func TestDeletePlayerHonorsExceptSlots_指定スロットを削除対象から除外する(t *testing.T) {

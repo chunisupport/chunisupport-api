@@ -36,7 +36,7 @@ func NewHonorRepository(db *sqlx.DB) repository.HonorRepository {
 func (r *honorRepository) FindAll(ctx context.Context, exec repository.Executor) ([]*entity.Honor, error) {
 	rows := []honorRow{}
 	if err := exec.SelectContext(ctx, &rows, `
-		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, h.image_url, h.created_at
+		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
 		FROM honors h
 		INNER JOIN honor_types ht ON h.honor_type_id = ht.id
 		ORDER BY h.id
@@ -55,7 +55,7 @@ func (r *honorRepository) FindAll(ctx context.Context, exec repository.Executor)
 func (r *honorRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Honor, error) {
 	var row honorRow
 	if err := exec.GetContext(ctx, &row, `
-		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, h.image_url, h.created_at
+		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
 		FROM honors h
 		INNER JOIN honor_types ht ON h.honor_type_id = ht.id
 		WHERE h.id = ?
@@ -138,7 +138,7 @@ func toHonorEntity(row *honorRow) *entity.Honor {
 // 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
 func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
 	storedTitle := strings.TrimSpace(title)
-	storedImageURL := ""
+	var storedImageURL any
 	if imageURL != nil {
 		storedImageURL = strings.TrimSpace(*imageURL)
 	}

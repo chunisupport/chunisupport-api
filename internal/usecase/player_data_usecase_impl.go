@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -609,11 +611,15 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 		}
 
 		honorTitle := honor.Title
+		imageURL := honor.Img
 		if honorTypeKey == "sp" {
-			honorTitle = ""
+			honorTitle = honorImageFilename(*imageURL)
+		} else {
+			// 通常称号の画像は既知の対応表で解決できるため、未判明のSP称号だけを保存する。
+			imageURL = nil
 		}
 
-		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, honor.Img)
+		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, imageURL)
 		if err != nil {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
@@ -645,6 +651,15 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 	}
 
 	return skipped, nil
+}
+
+// honorImageFilename はSP称号を一意に識別するため、画像URLからファイル名を取り出します。
+func honorImageFilename(imageURL string) string {
+	parsedURL, err := url.Parse(strings.TrimSpace(imageURL))
+	if err != nil {
+		return strings.TrimSpace(imageURL)
+	}
+	return path.Base(parsedURL.EscapedPath())
 }
 
 // randomFavoriteHonorSlots はCHUNITHM-NET側で毎回ランダム選択される称号のスロットを返します。

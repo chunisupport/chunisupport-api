@@ -225,8 +225,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 	}
 }
 
-func TestApplyHonors_SP称号はタイトル空文字と画像URLで登録する(t *testing.T) {
-	img1 := "https://example.com/sp-1.png"
+func TestApplyHonors_SP称号は画像ファイル名と画像URLで登録する(t *testing.T) {
+	img1 := "https://example.com/sp-%E3%83%86%E3%82%B9%E3%83%88.png?version=1#fragment"
 	img2 := "https://example.com/sp-2.png"
 	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
 	uc := &playerDataUsecase{honorRepo: honorRepo}
@@ -242,7 +242,7 @@ func TestApplyHonors_SP称号はタイトル空文字と画像URLで登録する
 	assert.Equal(t, 1, honorRepo.deleteCount)
 	require.Len(t, honorRepo.ensureCalls, 2)
 	assert.ElementsMatch(t, []string{img1, img2}, honorRepo.ensureImageURLs())
-	assert.ElementsMatch(t, []string{"", ""}, honorRepo.ensureTitles())
+	assert.ElementsMatch(t, []string{"sp-%E3%83%86%E3%82%B9%E3%83%88.png", "sp-2.png"}, honorRepo.ensureTitles())
 	assert.Len(t, honorRepo.assignments, 2)
 }
 
@@ -262,13 +262,14 @@ func TestApplyHonors_SP称号で画像URLがない場合はスキップする(t 
 	assert.Empty(t, honorRepo.assignments)
 }
 
-func TestApplyHonors_通常称号はタイトルと空画像URLで登録する(t *testing.T) {
+func TestApplyHonors_通常称号は入力画像URLを保存せずNULLで登録する(t *testing.T) {
+	imageURL := "https://example.com/honor_bg_123.png"
 	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
 	uc := &playerDataUsecase{honorRepo: honorRepo}
 	masters := newApplyHonorsTestMasters()
 
 	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
-		"1": {Title: "通常称号", Class: "normal"},
+		"1": {Title: "通常称号", Class: "normal", Img: &imageURL},
 	}, masters)
 
 	require.NoError(t, err)
