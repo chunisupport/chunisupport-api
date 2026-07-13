@@ -15,15 +15,15 @@ func setupCourseRepositoryDB(t *testing.T) *courseRepository {
 	_, err := db.Exec(`
 		CREATE TABLE course_classes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL);
 		CREATE TABLE courses (id INTEGER PRIMARY KEY, official_idx TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
-			course_class_id INTEGER NOT NULL, is_deleted INTEGER NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL);
+			course_class_id INTEGER NOT NULL, is_deleted INTEGER NOT NULL, updated_at DATETIME NOT NULL);
 		CREATE TABLE combo_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 		CREATE TABLE player_course_records (player_id INTEGER NOT NULL, course_id INTEGER NOT NULL, score INTEGER NOT NULL,
 			is_clear INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY(player_id, course_id));
 		INSERT INTO course_classes VALUES (1, '1', 0), (7, 'extra', 6);
 		INSERT INTO combo_lamp_types VALUES (1, 'NONE'), (3, 'ALL JUSTICE');
 		INSERT INTO courses VALUES
-			(10, '50020', '通常コース', 1, 0, '2026-07-01 00:00:00', '2026-07-01 00:00:00'),
-			(11, '50029', '削除コース', 7, 1, '2026-07-01 00:00:00', '2026-07-01 00:00:00');
+			(10, '50020', '通常コース', 1, 0, '2026-07-01 00:00:00'),
+			(11, '50029', '削除コース', 7, 1, '2026-07-01 00:00:00');
 		INSERT INTO player_course_records VALUES (100, 10, 3023238, 1, 1, '2026-07-12 10:00:00');
 	`)
 	require.NoError(t, err)

@@ -79,7 +79,6 @@ CREATE TABLE `courses` (
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `course_class_id` tinyint unsigned NOT NULL,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_courses_official_idx` (`official_idx`),

@@ -244,7 +244,7 @@ func (h *SongHandler) UpdateSongs(c *echo.Context) error {
 	}
 
 	// ユースケース層での更新処理
-	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
+	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(requests)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 

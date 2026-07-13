@@ -15,7 +15,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -167,7 +166,7 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
-func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSongInput) error {
 	if len(requests) == 0 {
 		return nil
 	}
@@ -259,9 +258,9 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	return service.CalcSongMaxOP(song.MaxChartConst)
 }
 
-// convertRequestsToEntities はDTOリストからエンティティリストに変換します。
+// convertRequestsToEntities はユースケース入力からエンティティリストに変換します。
 // IDフィールドは既存データの参照に使用されないため、0のままです。
-func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
+func (s *songUsecaseImpl) convertRequestsToEntities(requests []*UpdateSongInput, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
 	result := make([]*entity.Song, 0, len(requests))
 
 	for _, req := range requests {
@@ -282,7 +281,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 		song.Artist = req.Artist
 		song.GenreID = genreID
 		song.BPM = req.BPM
-		song.ReleasedAt = req.ReleasedAt.TimePtr()
+		song.ReleasedAt = req.ReleasedAt
 		song.Jacket = req.Jacket
 		if req.IsNew != nil {
 			song.IsNew = *req.IsNew

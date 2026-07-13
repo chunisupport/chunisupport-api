@@ -5,79 +5,79 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 )
 
 // PlayerDataPayload はCHUNITHMプレイヤーデータインポートの入力構造です。
 type PlayerDataPayload struct {
-	AppVersion  string                            `json:"app_ver"`
-	Name        string                            `json:"name"`
-	Level       int                               `json:"level"`
-	Rating      *float64                          `json:"rating"`
-	LastPlayed  string                            `json:"last_played"`
-	Overpower   PlayerDataOverpowerPayload        `json:"overpower"`
-	ClassEmblem PlayerDataClassPayload            `json:"class_emblem"`
-	Team        PlayerDataTeamPayload             `json:"team"`
-	Honors      map[string]PlayerDataHonorPayload `json:"honors"`
-	Scores      PlayerDataScorePayload            `json:"scores"`
-	UpdatedAt   string                            `json:"updated_at"`
+	AppVersion  string
+	Name        string
+	Level       int
+	Rating      *float64
+	LastPlayed  string
+	Overpower   PlayerDataOverpowerPayload
+	ClassEmblem PlayerDataClassPayload
+	Team        PlayerDataTeamPayload
+	Honors      map[string]PlayerDataHonorPayload
+	Scores      PlayerDataScorePayload
+	UpdatedAt   string
 }
 
 // PlayerDataOverpowerPayload はオーバーパワー情報です。
 type PlayerDataOverpowerPayload struct {
-	Value      float64 `json:"value"`
-	Percentage float64 `json:"percentage"`
+	Value      float64
+	Percentage float64
 }
 
 // PlayerDataClassPayload はクラスエンブレム情報です。
 type PlayerDataClassPayload struct {
-	MedalClass string `json:"medal_class"`
-	BaseClass  string `json:"base_class"`
+	MedalClass string
+	BaseClass  string
 }
 
 // PlayerDataTeamPayload はチーム情報です。
 type PlayerDataTeamPayload struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	Name  string
+	Color string
 }
 
 // PlayerDataHonorPayload は称号スロットの情報です。
 type PlayerDataHonorPayload struct {
-	Title string  `json:"title"`
-	Class string  `json:"class"`
-	Img   *string `json:"img_url"`
+	Title string
+	Class string
+	Img   *string
 }
 
 // PlayerDataScorePayload はスコア配列を保持します。
 type PlayerDataScorePayload struct {
-	Standard  []PlayerDataScoreEntry  `json:"standard"`
-	Worldsend []PlayerDataScoreEntry  `json:"worldsend"`
-	Course    []PlayerDataCourseEntry `json:"course"`
+	Standard  []PlayerDataScoreEntry
+	Worldsend []PlayerDataScoreEntry
+	Course    []PlayerDataCourseEntry
 }
 
 // PlayerDataCourseEntry は1件のコースレコード入力です。
 type PlayerDataCourseEntry struct {
-	Score   int    `json:"score"`
-	IsClear bool   `json:"is_clear"`
-	ComboLv int    `json:"cmb_lv"`
-	Idx     string `json:"idx"`
+	Score   int
+	IsClear bool
+	ComboLv int
+	Idx     string
 }
 
 // PlayerDataScoreEntry は1件のスコア情報です。
 type PlayerDataScoreEntry struct {
-	Diff      string  `json:"diff"`
-	Idx       string  `json:"idx"`
-	Score     int     `json:"score"`
-	ClearLamp *string `json:"clear_lamp"`
-	ComboLv   *int    `json:"cmb_lv"`
-	FullChain *int    `json:"fch_lv"`
-	Slot      *string `json:"slot"`
-	Order     *int    `json:"order"`
+	Diff      string
+	Idx       string
+	Score     int
+	ClearLamp *string
+	ComboLv   *int
+	FullChain *int
+	Slot      *string
+	Order     *int
 }
 
 // PlayerDataUsecase はCHUNITHMプレイヤーデータの登録ユースケースを表します。
 type PlayerDataUsecase interface {
-	Register(ctx context.Context, user *entity.User, payload *PlayerDataPayload, bodyHash string) (*api_internal.PlayerDataResult, error)
+	Register(ctx context.Context, user *entity.User, payload *PlayerDataPayload, bodyHash string) (*playerdataresult.Result, error)
 	// Delete はユーザーに紐づくプレイヤーと関連データを削除し、連携を解除します。
 	Delete(ctx context.Context, user *entity.User) error
 }

@@ -115,17 +115,18 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 	}
 
 	// 正式な構造体にデコード（未知フィールドは無視される）
-	var payload usecase.PlayerDataPayload
-	if err := json.Unmarshal(jsonData, &payload); err != nil {
+	var request playerDataRequest
+	if err := json.Unmarshal(jsonData, &request); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
+	payload := request.toUsecase()
 
 	result, err := h.playerDataUsecase.Register(c.Request().Context(), user, &payload, hashText)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toPlayerDataResponse(result))
 }
 
 // DeletePlayerData はプレイヤーデータの削除（連携解除）を扱います。

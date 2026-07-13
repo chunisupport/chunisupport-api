@@ -20,7 +20,6 @@ type Course struct {
 	Name          string
 	CourseClassID int
 	IsDeleted     bool
-	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	CourseClass   *CourseClass
 }

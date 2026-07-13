@@ -13,7 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -725,7 +725,7 @@ func TestFullRecordDisplayKeys_難易度マスタ欠損時は難易度IDをDiff�
 	assert.Equal(t, "99", diff)
 }
 
-func TestPlayerDataRecordState_JSON_none相当はnullで返す(t *testing.T) {
+func TestPlayerDataRecordState_ランプ未設定をnilで保持する(t *testing.T) {
 	// Given
 	dto := playerRecordStateDTO(repository.PlayerRecordState{
 		Score:       1000000,
@@ -739,10 +739,10 @@ func TestPlayerDataRecordState_JSON_none相当はnullで返す(t *testing.T) {
 
 	// Then
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"score":1000000,"clear_lamp":"FAILED","combo_lamp":null,"full_chain":null}`, string(encoded))
+	assert.JSONEq(t, `{"Score":1000000,"ClearLamp":"FAILED","ComboLamp":null,"FullChain":null,"IsClear":null}`, string(encoded))
 }
 
-func TestPlayerDataRecordChange_JSON_newではbeforeがnullになる(t *testing.T) {
+func TestPlayerDataRecordChange_newではBeforeがnilになる(t *testing.T) {
 	// Given
 	change := api_internal.PlayerDataRecordChange{
 		RecordType: "standard",
@@ -760,8 +760,8 @@ func TestPlayerDataRecordChange_JSON_newではbeforeがnullになる(t *testing.
 
 	// Then
 	require.NoError(t, err)
-	assert.Contains(t, string(encoded), `"before":null`)
-	assert.Contains(t, string(encoded), `"combo_lamp":null`)
+	assert.Contains(t, string(encoded), `"Before":null`)
+	assert.Contains(t, string(encoded), `"ComboLamp":null`)
 }
 
 func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *testing.T) {
@@ -791,7 +791,7 @@ func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *t
 	assert.Len(t, statistics.ByDifficulty, 5)
 }
 
-func TestPlayerDataResult_JSON_changesとskippedRecordsは空配列で返す(t *testing.T) {
+func TestPlayerDataResult_changesとskippedRecordsは空スライスで返す(t *testing.T) {
 	// Given
 	result := api_internal.PlayerDataResult{
 		PlayerID:       42,
@@ -806,11 +806,11 @@ func TestPlayerDataResult_JSON_changesとskippedRecordsは空配列で返す(t *
 
 	// Then
 	require.NoError(t, err)
-	assert.Contains(t, string(encoded), `"changes":[]`)
-	assert.Contains(t, string(encoded), `"skipped_records":[]`)
+	assert.Contains(t, string(encoded), `"Changes":[]`)
+	assert.Contains(t, string(encoded), `"SkippedRecords":[]`)
 }
 
-func TestPlayerDataStatistics_JSON固定5難易度と全差分フィールドを返す(t *testing.T) {
+func TestPlayerDataStatistics_固定5難易度と全差分フィールドを保持する(t *testing.T) {
 	// Given
 	statistics := buildPlayerDataStatisticsDiff(
 		service.PlayerRecordStatisticsSnapshot{},
@@ -825,11 +825,11 @@ func TestPlayerDataStatistics_JSON固定5難易度と全差分フィールドを
 	for _, difficulty := range service.PlayerRecordDifficultyNames() {
 		assert.Contains(t, string(encoded), `"`+difficulty+`"`)
 	}
-	assert.Contains(t, string(encoded), `"total_high_score":{"before":0,"after":0,"delta":0}`)
-	assert.Contains(t, string(encoded), `"record_statistics":{"aj":`)
-	assert.Contains(t, string(encoded), `"s_plus":{"before":0,"after":0,"delta":0}`)
-	assert.Contains(t, string(encoded), `"s":{"before":0,"after":0,"delta":0}`)
-	assert.NotContains(t, string(encoded), `"lamp_counts"`)
+	assert.Contains(t, string(encoded), `"TotalHighScore":{"Before":0,"After":0,"Delta":0}`)
+	assert.Contains(t, string(encoded), `"RecordStatistics":{"AJ":`)
+	assert.Contains(t, string(encoded), `"SPlus":{"Before":0,"After":0,"Delta":0}`)
+	assert.Contains(t, string(encoded), `"S":{"Before":0,"After":0,"Delta":0}`)
+	assert.NotContains(t, string(encoded), `"LampCounts"`)
 }
 
 func TestPlayerRecordStateDTO_マスタ欠損時はランプ名をnullで返す(t *testing.T) {

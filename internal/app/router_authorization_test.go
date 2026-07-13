@@ -15,7 +15,6 @@ import (
 	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
@@ -149,7 +148,7 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 			called := false
 			handlers := newAuthorizationTestHandlers()
 			handlers.V1Song = api_v1.NewV1SongHandler(&testutil.MockSongUsecase{
-				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 					called = true
 					require.Len(t, requests, 1)
 					assert.Equal(t, "1234567890abcdef", requests[0].DisplayID)

@@ -9,7 +9,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func TestProfileHandler_Me(t *testing.T) {
 	t.Run("正常系: 自分のユーザー情報を取得できる", func(t *testing.T) {
 		// Given
 		user := &entity.User{ID: 1}
-		expected := &dto_internal.UserDTO{Username: "tester", IsPrivate: true}
+		expected := &usecase.UserOutput{Username: "tester", IsPrivate: true}
 		userCredentialMock.On("GetUser", mock.Anything, 1).Return(expected, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/internal/me", nil)

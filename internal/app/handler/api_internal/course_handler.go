@@ -7,6 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -23,28 +24,28 @@ func (h *CourseHandler) List(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: items})
+	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: toCourseDTOs(items)})
 }
 func (h *CourseHandler) ListEditor(c *echo.Context) error {
 	items, err := h.usecase.List(c.Request().Context(), true)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: items})
+	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: toCourseDTOs(items)})
 }
 func (h *CourseHandler) Get(c *echo.Context) error {
 	item, err := h.usecase.Get(c.Request().Context(), c.Param("idx"), false)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, item)
+	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) GetEditor(c *echo.Context) error {
 	item, err := h.usecase.Get(c.Request().Context(), c.Param("idx"), true)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, item)
+	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) Create(c *echo.Context) error {
 	var req internaldto.CreateCourseRequest
@@ -58,7 +59,7 @@ func (h *CourseHandler) Create(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusCreated, item)
+	return c.JSON(http.StatusCreated, toCourseDTO(item))
 }
 func (h *CourseHandler) Update(c *echo.Context) error {
 	var req internaldto.UpdateCourseRequest
@@ -72,7 +73,7 @@ func (h *CourseHandler) Update(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, item)
+	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) Delete(c *echo.Context) error {
 	if err := h.usecase.Delete(c.Request().Context(), c.Param("idx")); err != nil {
@@ -96,7 +97,7 @@ func (h *CourseHandler) GetUserRecords(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, &internaldto.CourseRecordListResponse{Courses: result.Records, Meta: &internaldto.UserRecordMetaDTO{UpdatedAt: result.UpdatedAt}})
+	return c.JSON(http.StatusOK, &internaldto.CourseRecordListResponse{Courses: toCourseRecordDTOs(result.Records), Meta: &internaldto.UserRecordMetaDTO{UpdatedAt: result.UpdatedAt}})
 }
 
 func (h *CourseHandler) GetUserRecord(c *echo.Context) error {
@@ -108,5 +109,32 @@ func (h *CourseHandler) GetUserRecord(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toCourseRecordDTO(result))
+}
+
+func toCourseDTO(value *usecase.CourseOutput) *dto.CourseDTO {
+	if value == nil {
+		return nil
+	}
+	return &dto.CourseDTO{ID: value.ID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
+}
+func toCourseDTOs(values []*usecase.CourseOutput) []*dto.CourseDTO {
+	result := make([]*dto.CourseDTO, 0, len(values))
+	for _, value := range values {
+		result = append(result, toCourseDTO(value))
+	}
+	return result
+}
+func toCourseRecordDTO(value *usecase.CourseRecordOutput) *dto.CourseRecordDTO {
+	if value == nil {
+		return nil
+	}
+	return &dto.CourseRecordDTO{Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt}
+}
+func toCourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRecordDTO {
+	result := make([]*dto.CourseRecordDTO, 0, len(values))
+	for _, value := range values {
+		result = append(result, toCourseRecordDTO(value))
+	}
+	return result
 }

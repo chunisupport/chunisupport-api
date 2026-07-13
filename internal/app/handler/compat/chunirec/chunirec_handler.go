@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
+	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
@@ -124,7 +125,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 
 	var records []*dto.PlayerRecordDTO
 	if result != nil && result.Records != nil {
-		records = result.Records.All
+		records = internalhandler.ToPlayerRecordDTOs(result.Records.All)
 	}
 	response := ToRecordsShowAllResponse(records, h.genresBySongID(songs), h.location)
 
@@ -163,7 +164,7 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	}
 
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, h.masterCache, h.location)
+	response := ToChunirecUserDTO(internalhandler.ToUserProfileWithRecordsDTO(result), h.masterCache, h.location)
 
 	return c.JSON(http.StatusOK, response)
 }

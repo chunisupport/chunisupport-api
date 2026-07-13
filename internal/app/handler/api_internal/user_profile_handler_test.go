@@ -11,7 +11,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	dto "github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -19,12 +18,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func (m *mockUserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileDTO, error) {
+func (m *mockUserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileOutput, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserProfileDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserProfileOutput), args.Error(1)
 }
 
 func TestUserHandler_GetUserProfile(t *testing.T) {
@@ -34,14 +33,9 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
 
 	t.Run("正常系: username と player を返す", func(t *testing.T) {
-		result := &dto_internal.UserProfileDTO{
+		result := &usecase.UserProfileOutput{
 			Username: "testuser",
-			Player: &dto.PlayerDTO{
-				Name:      "テストプレイヤー",
-				Level:     100,
-				UpdatedAt: now,
-				Honors:    []*dto.HonorDTO{},
-			},
+			Player:   testUserPlayerOutput(t, "テストプレイヤー", 100, now),
 		}
 		mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
 
@@ -64,7 +58,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 	})
 
 	t.Run("正常系: プレイヤー未連携なら player は null を返す", func(t *testing.T) {
-		result := &dto_internal.UserProfileDTO{
+		result := &usecase.UserProfileOutput{
 			Username: "testuser",
 			Player:   nil,
 		}
@@ -107,7 +101,7 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
-				mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileDTO)(nil), testCase.usecaseError).Once()
+				mockUsecase.On("GetUserProfile", mock.Anything, "testuser", (*entity.User)(nil)).Return((*usecase.UserProfileOutput)(nil), testCase.usecaseError).Once()
 
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser/profile", nil)
 				rec := httptest.NewRecorder()

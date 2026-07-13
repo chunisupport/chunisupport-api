@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -41,5 +42,9 @@ func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 		return apierror.ErrInternalError
 	}
 
-	return c.JSON(http.StatusOK, users)
+	result := make([]internaldto.AdminUserListResponse, 0, len(users))
+	for _, user := range users {
+		result = append(result, internaldto.AdminUserListResponse{UserName: user.UserName, AccountType: user.AccountType, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt, PlayerName: user.PlayerName, Rating: user.Rating, OverPowerValue: user.OverPowerValue, IsSuspicious: user.IsSuspicious, IsPrivate: user.IsPrivate, FirebaseUID: user.FirebaseUID})
+	}
+	return c.JSON(http.StatusOK, result)
 }

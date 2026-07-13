@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 )
@@ -36,7 +37,7 @@ func (h *ProfileHandler) Me(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, userDTO)
+	return c.JSON(http.StatusOK, dto_internal.UserDTO{Username: userDTO.Username, AccountType: userDTO.AccountType, IsPrivate: userDTO.IsPrivate, LastScoreUpdate: userDTO.LastScoreUpdate})
 }
 
 type updatePrivacyRequest struct {

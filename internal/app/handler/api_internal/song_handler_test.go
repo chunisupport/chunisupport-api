@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,9 +16,11 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testValidator struct {
@@ -200,14 +201,14 @@ func TestUpdateSongs(t *testing.T) {
 		expectedStatus   int
 		expectedErrCode  string
 		expectUsecaseHit bool
-		assertUsecaseReq func(t *testing.T, requests []*api_internal.UpdateSongRequest)
+		assertUsecaseReq func(t *testing.T, requests []*usecase.UpdateSongInput)
 	}{
 		{
 			name:             "正常な配列で204が返る",
 			body:             `[{"id":"1234567890123456","title":"テスト楽曲","artist":"テストアーティスト","charts":{"BASIC":{"const":10.5,"notes_designer":"譜面作者A"}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
-			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
+			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateSongInput) {
 				t.Helper()
 				if len(requests) != 1 {
 					require.Failf(t, "前提条件失敗", "requests len = %d, want 1", len(requests))
@@ -255,7 +256,7 @@ func TestUpdateSongs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			called := false
 			mockUsecase := &testutil.MockSongUsecase{
-				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 					called = true
 					if tc.assertUsecaseReq != nil {
 						tc.assertUsecaseReq(t, requests)

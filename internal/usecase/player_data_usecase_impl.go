@@ -17,8 +17,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 )
 
 const (

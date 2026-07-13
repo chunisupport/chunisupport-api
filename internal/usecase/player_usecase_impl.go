@@ -7,7 +7,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
 )
 
 // playerUsecase は PlayerUsecase の実装です。
@@ -24,8 +23,8 @@ func NewPlayerUsecase(db repository.Executor, playerRepo repository.PlayerReposi
 	}
 }
 
-// CreatePlayer は新しいプレイヤーを作成し、永続化後のDTOを返します。
-func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
+// CreatePlayer は新しいプレイヤーを作成し、永続化後のエンティティを返します。
+func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*entity.Player, error) {
 	// 値オブジェクトを生成
 	playerNameVO, err := playername.NewPlayerName(name)
 	if err != nil {
@@ -40,5 +39,5 @@ func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name stri
 		return nil, err
 	}
 
-	return dto.ToPlayerDTO(player), nil
+	return player, nil
 }

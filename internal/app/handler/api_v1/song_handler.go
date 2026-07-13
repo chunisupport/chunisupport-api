@@ -120,7 +120,7 @@ func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 		}
 	}
 
-	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
+	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(requests)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 

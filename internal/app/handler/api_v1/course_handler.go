@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -23,7 +24,7 @@ func (h *V1CourseHandler) List(c *echo.Context) error {
 	}
 	result := make([]*api_v1.V1CourseDTO, 0, len(items))
 	for _, item := range items {
-		result = append(result, api_v1.ToV1CourseDTO(item))
+		result = append(result, toV1CourseDTO(item))
 	}
 	return c.JSON(http.StatusOK, &api_v1.V1CourseListResponse{Courses: result})
 }
@@ -32,7 +33,7 @@ func (h *V1CourseHandler) Get(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, api_v1.ToV1CourseDTO(item))
+	return c.JSON(http.StatusOK, toV1CourseDTO(item))
 }
 func (h *V1CourseHandler) GetUserRecords(c *echo.Context) error {
 	var requester *entity.User
@@ -44,5 +45,23 @@ func (h *V1CourseHandler) GetUserRecords(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, &api_v1.V1CourseRecordListResponse{UpdatedAt: result.UpdatedAt, Courses: result.Records})
+	return c.JSON(http.StatusOK, &api_v1.V1CourseRecordListResponse{UpdatedAt: result.UpdatedAt, Courses: toV1CourseRecordDTOs(result.Records)})
+}
+
+func toV1CourseDTO(value *usecase.CourseOutput) *api_v1.V1CourseDTO {
+	if value == nil {
+		return nil
+	}
+	return &api_v1.V1CourseDTO{Idx: value.Idx, Name: value.Name, Class: value.Class}
+}
+func toV1CourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRecordDTO {
+	result := make([]*dto.CourseRecordDTO, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			result = append(result, nil)
+			continue
+		}
+		result = append(result, &dto.CourseRecordDTO{Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt})
+	}
+	return result
 }

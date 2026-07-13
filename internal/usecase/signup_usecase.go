@@ -9,14 +9,13 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // SignupUsecase はFirebase Bearerトークンを用いた初回ユーザー作成を扱います。
 type SignupUsecase interface {
 	// Signup はFirebase IDトークンとユーザー名でアプリ内ユーザーを作成します。
-	Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error)
+	Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*UserOutput, error)
 }
 
 type signupUsecase struct {
@@ -66,7 +65,7 @@ func NewSignupUsecase(
 	}
 }
 
-func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*UserOutput, error) {
 	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP); err != nil {
 		return nil, err
 	}
@@ -122,7 +121,7 @@ func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr 
 	}
 
 	accountTypeName := u.accountTypeProvider.GetAccountTypeNameByID(newUser.AccountTypeID)
-	return dto_internal.ToUserDTO(newUser, accountTypeName, newUser.IsPrivate, nil), nil
+	return &UserOutput{Username: newUser.Username.String(), AccountType: accountTypeName, IsPrivate: newUser.IsPrivate}, nil
 }
 
 var _ SignupUsecase = (*signupUsecase)(nil)

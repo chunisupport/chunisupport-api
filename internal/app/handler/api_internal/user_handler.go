@@ -43,7 +43,7 @@ func (h *UserHandler) GetUserProfile(c *echo.Context) error {
 		return h.handleUserProfileError(err, username, "user profile")
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toUserProfileDTO(result))
 }
 
 // GetUserUpdatedAt はユーザー関連データの updated_at のみを返す軽量なハンドラです。
@@ -62,7 +62,7 @@ func (h *UserHandler) GetUserUpdatedAt(c *echo.Context) error {
 		return h.handleUserProfileError(err, username, "user updated at")
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, &dto_internal.UserUpdatedAtDTO{UpdatedAt: result.UpdatedAt})
 }
 
 // GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
@@ -125,7 +125,7 @@ func (h *UserHandler) GetUserSongRecord(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toUserSongRecordDTO(result))
 }
 
 // GetUserWorldsendSongRecord は WORLD'S END 楽曲1曲分のユーザーレコードを返します。
@@ -148,7 +148,7 @@ func (h *UserHandler) GetUserWorldsendSongRecord(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toUserWorldsendSongRecordDTO(result))
 }
 
 // GetUserProfileWithRecords はユーザープロファイルとレコードを一括取得するハンドラです。
@@ -167,7 +167,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 		if err != nil {
 			return h.handleUserProfileError(err, username, "user profile rating view")
 		}
-		return c.JSON(http.StatusOK, result)
+		return c.JSON(http.StatusOK, toUserProfileRatingViewDTO(result))
 	}
 
 	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
@@ -176,7 +176,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 		if err != nil {
 			return h.handleUserProfileError(err, username, "user profile record view")
 		}
-		return c.JSON(http.StatusOK, result)
+		return c.JSON(http.StatusOK, toUserProfileRecordViewDTO(result))
 	}
 
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
@@ -184,7 +184,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 		return h.handleUserProfileError(err, username, "user profile with records")
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, ToUserProfileWithRecordsDTO(result))
 }
 
 func (h *UserHandler) handleUserProfileError(err error, username string, contextDescription string) error {
@@ -204,7 +204,7 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 	}
 }
 
-func toUserRatingDTO(result *dto_internal.UserProfileRatingViewDTO) *dto_internal.UserRatingDTO {
+func toUserRatingDTO(result *usecase.UserProfileRatingViewOutput) *dto_internal.UserRatingDTO {
 	if result == nil {
 		return nil
 	}
@@ -218,26 +218,26 @@ func toUserRatingDTO(result *dto_internal.UserProfileRatingViewDTO) *dto_interna
 			UpdatedAt: result.UpdatedAt,
 		},
 	}
-	if result.Player != nil {
-		ratingDTO.Rating = result.Player.CalculatedRating
-		ratingDTO.BestAverage = result.Player.BestAverageRating
-		ratingDTO.NewAverage = result.Player.NewAverageRating
+	if result.Player != nil && result.Player.Player != nil {
+		ratingDTO.Rating = result.Player.Player.CalculatedRating
+		ratingDTO.BestAverage = result.Player.Player.BestAverageRating
+		ratingDTO.NewAverage = result.Player.Player.NewAverageRating
 	}
 
 	if result.Records == nil {
 		return ratingDTO
 	}
 
-	ratingDTO.Best = result.Records.Best
-	ratingDTO.BestCandidate = result.Records.BestCandidate
-	ratingDTO.New = result.Records.New
-	ratingDTO.NewCandidate = result.Records.NewCandidate
+	ratingDTO.Best = ToPlayerRecordDTOs(result.Records.Best)
+	ratingDTO.BestCandidate = ToPlayerRecordDTOs(result.Records.BestCandidate)
+	ratingDTO.New = ToPlayerRecordDTOs(result.Records.New)
+	ratingDTO.NewCandidate = ToPlayerRecordDTOs(result.Records.NewCandidate)
 	ratingDTO.Meta.UpdatedAt = &result.Records.UpdatedAt
 
 	return ratingDTO
 }
 
-func toUserRecordDTO(result *dto_internal.UserProfileRecordViewDTO) *dto_internal.UserRecordDTO {
+func toUserRecordDTO(result *usecase.UserProfileRecordViewOutput) *dto_internal.UserRecordDTO {
 	if result == nil {
 		return nil
 	}
@@ -254,11 +254,105 @@ func toUserRecordDTO(result *dto_internal.UserProfileRecordViewDTO) *dto_interna
 		return recordDTO
 	}
 
-	recordDTO.All = result.Records.All
-	recordDTO.Worldsend = result.Records.Worldsend
+	recordDTO.All = ToPlayerRecordDTOs(result.Records.All)
+	recordDTO.Worldsend = toWorldsendRecordDTOs(result.Records.Worldsend)
+	recordDTO.Courses = toCourseRecordDTOs(result.Records.Courses)
 	recordDTO.Meta.UpdatedAt = &result.Records.UpdatedAt
 
 	return recordDTO
+}
+
+func ToPlayerRecordDTOs(values []*usecase.PlayerRecordOutput) []*dto.PlayerRecordDTO {
+	result := make([]*dto.PlayerRecordDTO, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			result = append(result, nil)
+		} else {
+			result = append(result, dto.ToPlayerRecordDTO(value.PlayerRecord))
+		}
+	}
+	return result
+}
+func toWorldsendRecordDTOs(values []*usecase.WorldsendRecordOutput) []*dto.WorldsendRecordDTO {
+	result := make([]*dto.WorldsendRecordDTO, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			result = append(result, nil)
+		} else {
+			result = append(result, dto.ToWorldsendRecordDTO(value.PlayerWorldsendRecord))
+		}
+	}
+	return result
+}
+func toUserPlayerDTO(value *usecase.UserPlayerOutput) *dto.PlayerDTO {
+	if value == nil || value.Player == nil {
+		return nil
+	}
+	result := dto.ToPlayerDTO(value.Player)
+	result.Honors = make([]*dto.HonorDTO, 0, len(value.Honors))
+	for _, honor := range value.Honors {
+		if honor == nil {
+			continue
+		}
+		imageURL := ""
+		if honor.ImageURL != nil {
+			imageURL = *honor.ImageURL
+		}
+		result.Honors = append(result.Honors, &dto.HonorDTO{Slot: honor.Slot, Name: honor.Name, TypeName: honor.TypeName, ImageURL: imageURL})
+	}
+	return result
+}
+func toUserProfileDTO(value *usecase.UserProfileOutput) *dto_internal.UserProfileDTO {
+	if value == nil {
+		return nil
+	}
+	return &dto_internal.UserProfileDTO{Username: value.Username, Player: toUserPlayerDTO(value.Player)}
+}
+func ToUserProfileWithRecordsDTO(value *usecase.UserProfileWithRecordsOutput) *dto_internal.UserProfileWithRecordsDTO {
+	if value == nil {
+		return nil
+	}
+	result := &dto_internal.UserProfileWithRecordsDTO{UserID: value.UserID, Username: value.Username, Player: toUserPlayerDTO(value.Player), UpdatedAt: value.UpdatedAt}
+	if value.Records != nil {
+		result.Records = &dto.UserRecordResponseDTO{UpdatedAt: value.Records.UpdatedAt, Best: ToPlayerRecordDTOs(value.Records.Best), BestCandidate: ToPlayerRecordDTOs(value.Records.BestCandidate), New: ToPlayerRecordDTOs(value.Records.New), NewCandidate: ToPlayerRecordDTOs(value.Records.NewCandidate), All: ToPlayerRecordDTOs(value.Records.All), WorldsEnd: toWorldsendRecordDTOs(value.Records.WorldsEnd), Courses: toCourseRecordDTOs(value.Records.Courses)}
+	}
+	return result
+}
+func toUserProfileRatingViewDTO(value *usecase.UserProfileRatingViewOutput) *dto_internal.UserProfileRatingViewDTO {
+	if value == nil {
+		return nil
+	}
+	result := &dto_internal.UserProfileRatingViewDTO{Username: value.Username, Player: toUserPlayerDTO(value.Player), UpdatedAt: value.UpdatedAt}
+	if value.Records != nil {
+		result.Records = &dto_internal.UserRatingRecordResponseDTO{UpdatedAt: value.Records.UpdatedAt, Best: ToPlayerRecordDTOs(value.Records.Best), BestCandidate: ToPlayerRecordDTOs(value.Records.BestCandidate), New: ToPlayerRecordDTOs(value.Records.New), NewCandidate: ToPlayerRecordDTOs(value.Records.NewCandidate)}
+	}
+	return result
+}
+func toUserProfileRecordViewDTO(value *usecase.UserProfileRecordViewOutput) *dto_internal.UserProfileRecordViewDTO {
+	if value == nil {
+		return nil
+	}
+	result := &dto_internal.UserProfileRecordViewDTO{Username: value.Username, Player: toUserPlayerDTO(value.Player), UpdatedAt: value.UpdatedAt}
+	if value.Records != nil {
+		result.Records = &dto_internal.UserRecordViewResponseDTO{UpdatedAt: value.Records.UpdatedAt, All: ToPlayerRecordDTOs(value.Records.All), Worldsend: toWorldsendRecordDTOs(value.Records.Worldsend), Courses: toCourseRecordDTOs(value.Records.Courses)}
+	}
+	return result
+}
+func toUserSongRecordDTO(value *usecase.UserSongRecordOutput) *dto_internal.UserSongRecordDTO {
+	if value == nil {
+		return nil
+	}
+	return &dto_internal.UserSongRecordDTO{Standard: ToPlayerRecordDTOs(value.Standard), Meta: &dto_internal.UserSongRecordMetaDTO{UpdatedAt: value.UpdatedAt}}
+}
+func toUserWorldsendSongRecordDTO(value *usecase.UserWorldsendSongRecordOutput) *dto_internal.UserWorldsendSongRecordDTO {
+	if value == nil {
+		return nil
+	}
+	var record *dto.WorldsendRecordDTO
+	if value.Worldsend != nil {
+		record = dto.ToWorldsendRecordDTO(value.Worldsend.PlayerWorldsendRecord)
+	}
+	return &dto_internal.UserWorldsendSongRecordDTO{Worldsend: record, Meta: &dto_internal.UserSongRecordMetaDTO{UpdatedAt: value.UpdatedAt}}
 }
 
 // DeleteUser はユーザーを物理削除するハンドラです（ADMIN権限必須）。

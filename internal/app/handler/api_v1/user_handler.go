@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
+	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -39,5 +40,5 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	}
 
 	// 既存DTOから V1DTO へ変換
-	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(result))
+	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(internalhandler.ToUserProfileWithRecordsDTO(result)))
 }

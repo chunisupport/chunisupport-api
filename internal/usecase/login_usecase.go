@@ -3,14 +3,12 @@ package usecase
 import (
 	"context"
 	"errors"
-
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // LoginUsecase はTurnstile検証後のFirebaseログインを扱います。
 type LoginUsecase interface {
 	// Login はTurnstileとFirebase IDトークンを検証し、紐づくユーザーを返します。
-	Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error)
+	Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*UserOutput, error)
 }
 
 type loginUsecase struct {
@@ -42,7 +40,7 @@ func NewLoginUsecase(
 	}
 }
 
-func (u *loginUsecase) Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+func (u *loginUsecase) Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*UserOutput, error) {
 	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP); err != nil {
 		return nil, err
 	}
@@ -56,7 +54,7 @@ func (u *loginUsecase) Login(ctx context.Context, idToken string, turnstileToken
 	}
 
 	accountTypeName := u.accountTypeProvider.GetAccountTypeNameByID(user.AccountTypeID)
-	return dto_internal.ToUserDTO(user, accountTypeName, user.IsPrivate, nil), nil
+	return &UserOutput{Username: user.Username.String(), AccountType: accountTypeName, IsPrivate: user.IsPrivate}, nil
 }
 
 var _ LoginUsecase = (*loginUsecase)(nil)

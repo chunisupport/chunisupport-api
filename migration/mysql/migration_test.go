@@ -139,3 +139,13 @@ func TestCreateCoursesDown_参照順の逆順で削除する(t *testing.T) {
 	assert.Less(t, recordsIndex, coursesIndex)
 	assert.Less(t, coursesIndex, classesIndex)
 }
+
+func TestRemoveCreatedAtFromCourses_コースマスタの作成日時を削除する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000031_remove_created_at_from_courses.up.sql")
+	downSQL := readNormalizedMigrationSQL(t, "000031_remove_created_at_from_courses.down.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ALTER TABLE courses DROP COLUMN created_at")
+	assert.Contains(t, downSQL, "ALTER TABLE courses ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER is_deleted")
+}

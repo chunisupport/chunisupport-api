@@ -18,6 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,12 +29,12 @@ type mockPlayerDataUsecase struct {
 	mock.Mock
 }
 
-func (m *mockPlayerDataUsecase) Register(ctx context.Context, user *entity.User, payload *usecase.PlayerDataPayload, hash string) (*dto_internal.PlayerDataResult, error) {
+func (m *mockPlayerDataUsecase) Register(ctx context.Context, user *entity.User, payload *usecase.PlayerDataPayload, hash string) (*playerdataresult.Result, error) {
 	args := m.Called(ctx, user, payload, hash)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.PlayerDataResult), args.Error(1)
+	return args.Get(0).(*playerdataresult.Result), args.Error(1)
 }
 
 func (m *mockPlayerDataUsecase) Delete(ctx context.Context, user *entity.User) error {
@@ -68,7 +69,7 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		Level:      100,
 	}
 
-	expectedResult := &dto_internal.PlayerDataResult{
+	expectedResult := &playerdataresult.Result{
 		PlayerID:   1,
 		AppVersion: "1.0.0",
 	}

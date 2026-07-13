@@ -10,7 +10,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -22,13 +21,13 @@ type mockSignupUsecase struct {
 	mock.Mock
 }
 
-func (m *mockSignupUsecase) Signup(ctx context.Context, idToken string, username string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+func (m *mockSignupUsecase) Signup(ctx context.Context, idToken string, username string, turnstileToken string, remoteIP string) (*usecase.UserOutput, error) {
 	args := m.Called(ctx, idToken, username, turnstileToken, remoteIP)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*dto_internal.UserDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserOutput), args.Error(1)
 }
 
 func TestSignupHandler_Signup(t *testing.T) {
@@ -38,7 +37,7 @@ func TestSignupHandler_Signup(t *testing.T) {
 	t.Run("正常系: Bearerトークンで初回登録できる", func(t *testing.T) {
 		signupUsecase := new(mockSignupUsecase)
 		h := api_internal.NewSignupHandler(signupUsecase)
-		signupUsecase.On("Signup", mock.Anything, "firebase-id-token", "newuser", "turnstile-token", "192.0.2.1").Return(&dto_internal.UserDTO{
+		signupUsecase.On("Signup", mock.Anything, "firebase-id-token", "newuser", "turnstile-token", "192.0.2.1").Return(&usecase.UserOutput{
 			Username:    "newuser",
 			AccountType: "PLAYER",
 		}, nil).Once()

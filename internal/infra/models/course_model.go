@@ -13,7 +13,6 @@ type CourseModel struct {
 	Name            string    `db:"name"`
 	CourseClassID   int       `db:"course_class_id"`
 	IsDeleted       bool      `db:"is_deleted"`
-	CreatedAt       time.Time `db:"created_at"`
 	UpdatedAt       time.Time `db:"updated_at"`
 	CourseClassName string    `db:"course_class_name"`
 	ClassSortOrder  int       `db:"course_class_sort_order"`
@@ -21,7 +20,7 @@ type CourseModel struct {
 
 func (m CourseModel) ToEntity() *entity.Course {
 	return &entity.Course{ID: m.ID, OfficialIdx: m.OfficialIdx, Name: m.Name, CourseClassID: m.CourseClassID,
-		IsDeleted: m.IsDeleted, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
+		IsDeleted: m.IsDeleted, UpdatedAt: m.UpdatedAt,
 		CourseClass: &entity.CourseClass{ID: m.CourseClassID, Name: m.CourseClassName, SortOrder: m.ClassSortOrder}}
 }
 

@@ -13,7 +13,6 @@ type CourseDTO struct {
 	Name      string     `json:"name"`
 	Class     string     `json:"class"`
 	IsDeleted bool       `json:"is_deleted,omitempty"`
-	CreatedAt *time.Time `json:"created_at,omitempty"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
@@ -40,7 +39,6 @@ func ToCourseDTO(course *entity.Course, editor bool) *CourseDTO {
 	if editor {
 		result.ID = course.ID
 		result.IsDeleted = course.IsDeleted
-		result.CreatedAt = &course.CreatedAt
 		result.UpdatedAt = &course.UpdatedAt
 	}
 	return result

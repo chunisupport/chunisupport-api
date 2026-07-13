@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -16,28 +15,28 @@ import (
 
 type stubChunirecUserUsecase struct{}
 
-func (stubChunirecUserUsecase) GetUserProfile(context.Context, string, *entity.User) (*internaldto.UserProfileDTO, error) {
+func (stubChunirecUserUsecase) GetUserProfile(context.Context, string, *entity.User) (*usecase.UserProfileOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserUpdatedAt(context.Context, string, *entity.User) (*internaldto.UserUpdatedAtDTO, error) {
+func (stubChunirecUserUsecase) GetUserUpdatedAt(context.Context, string, *entity.User) (*usecase.UserUpdatedAtOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserProfileWithRecords(context.Context, string, *entity.User, bool) (*internaldto.UserProfileWithRecordsDTO, error) {
-	return &internaldto.UserProfileWithRecordsDTO{}, nil
+func (stubChunirecUserUsecase) GetUserProfileWithRecords(context.Context, string, *entity.User, bool) (*usecase.UserProfileWithRecordsOutput, error) {
+	return &usecase.UserProfileWithRecordsOutput{}, nil
 }
-func (stubChunirecUserUsecase) GetUserProfileRatingView(context.Context, string, *entity.User) (*internaldto.UserProfileRatingViewDTO, error) {
+func (stubChunirecUserUsecase) GetUserProfileRatingView(context.Context, string, *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserProfileRecordView(context.Context, string, *entity.User, bool) (*internaldto.UserProfileRecordViewDTO, error) {
+func (stubChunirecUserUsecase) GetUserProfileRecordView(context.Context, string, *entity.User, bool) (*usecase.UserProfileRecordViewOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserSongRecord(context.Context, string, *entity.User, string, bool, string) (*internaldto.UserSongRecordDTO, error) {
+func (stubChunirecUserUsecase) GetUserSongRecord(context.Context, string, *entity.User, string, bool, string) (*usecase.UserSongRecordOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserWorldsendSongRecord(context.Context, string, *entity.User, string, bool) (*internaldto.UserWorldsendSongRecordDTO, error) {
+func (stubChunirecUserUsecase) GetUserWorldsendSongRecord(context.Context, string, *entity.User, string, bool) (*usecase.UserWorldsendSongRecordOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetAllUsersForAdmin(context.Context, int, int, string) ([]internaldto.AdminUserListResponse, error) {
+func (stubChunirecUserUsecase) GetAllUsersForAdmin(context.Context, int, int, string) ([]usecase.AdminUserOutput, error) {
 	return nil, nil
 }
 func (stubChunirecUserUsecase) DeleteUser(context.Context, *entity.User, string) error { return nil }

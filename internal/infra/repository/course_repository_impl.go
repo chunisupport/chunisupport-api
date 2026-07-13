@@ -18,7 +18,7 @@ type courseRepository struct{ db *sqlx.DB }
 
 func NewCourseRepository(db *sqlx.DB) domainrepo.CourseRepository { return &courseRepository{db: db} }
 
-const courseColumns = `c.id, c.official_idx, c.name, c.course_class_id, c.is_deleted, c.created_at, c.updated_at,
+const courseColumns = `c.id, c.official_idx, c.name, c.course_class_id, c.is_deleted, c.updated_at,
 cc.name AS course_class_name, cc.sort_order AS course_class_sort_order`
 
 func (r *courseRepository) FindAll(ctx context.Context, exec domainrepo.Executor, includeDeleted bool) ([]*entity.Course, error) {

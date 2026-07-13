@@ -79,8 +79,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **ARCH-002** | **Low** | 未使用DTOに `db:` タグが残存 | `internal/dto/official_dto.go` の `OfficialSongWithGenreDTO` はDBタグを持ち、定義以外の参照がありません。DTO層への永続化都合の漏出と死コードを同時に解消するため、利用予定がなければ削除すべきです。 |
-| **ARCH-003** | **High** | Usecase層がAPI DTOへ依存 | `internal/usecase/login_usecase.go:7`、`player_data_usecase.go:8`、`song_usecase.go:8`、`user_usecase_impl.go:13-14` など、本番13ファイルが `internal/dto` または `dto/api_internal` をimportしています。「UsecaseはDomainのみに依存」という依存規則に反し、API形式変更がユースケースへ波及します。直近のFriendship/ランキングUsecaseと同様に、Usecase固有のinput/output型を定義し、HandlerでAPI DTOへ変換すべきです。 |
 | **ARCH-004** | **Medium** | フレンド認可依存を匿名interfaceで後注入 | User、ScoreHistory、LockedSong、FavoriteSongの各Usecaseはコンストラクタで `FriendshipRepository` を受け取らず、`internal/app/router.go:151-192` が匿名interfaceへの型アサーションで `SetFriendshipRepository` を呼びます。アサーション失敗時も起動を継続し、非公開フレンド閲覧だけが静かに404へ退行します。認可に必要な依存はコンストラクタ契約へ明示し、欠落時は生成エラーにすべきです。 |
 | **ARCH-005** | **Medium** | Player集約の永続化経路が部分更新と直接SQLへ分裂 | `internal/domain/repository/player_repository.go:25` に禁止方針と逆行する `UpdateCalculatedRatings` が残り、通常登録の `Save`、未解禁曲更新の `Save`、再計算バッチの直接UPDATEと更新経路が分散しています。並行更新時の所有列とロック規約が揃わない根因になっているため、Playerの変更メソッドとロック済み集約の `Save` へ統一し、バッチ固有の競合条件も同じ規約上で定義すべきです。 |
 | **DOM-006** | **Medium** | GoalのJSON表現がDomainからAPIまで型安全でない | `internal/domain/entity/goal.go` は `AchievementParams` / `Attributes` を `[]byte` で保持し、`internal/dto/api_internal/goal_dto.go` は対応値を `map[string]any` で公開します。インフラ表現がDomainへ入り、コンパイル時にスキーマを保証できません。achievement typeごとの値オブジェクトまたは明示的なunion型へ移し、永続化モデルだけでJSONへ変換すべきです。旧 `DTO-001` は本項目へ統合しました。 |
@@ -110,7 +108,7 @@
 
 ## まとめ
 
-- 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**古いプレイヤーデータによる巻き戻し (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**、**UsecaseからAPI DTOへの依存 (`ARCH-003`)**です。
+- 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**古いプレイヤーデータによる巻き戻し (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
 - 直近追加の互換APIでは、不要な全件取得、401/422/500の503化、FAILEDのクリア誤判定が見つかりました。機能単位の正常系テストだけでなく、認証・入力不正・非公開・削除済み・並行更新を含む境界テストが必要です。
 - 旧 `SEC-03` と `INFRA-016` は、`score.Score` が `uint32` 基底で `Value()` も常に `int64, nil` を返すため、記載されていたpanic・範囲逸脱リスクが成立せず削除しました。
 - 旧 `SEC-06` の「CORS危険値検証なし」は、Echo v5と独自ワイルドカード検証が不正Originおよび `* + credentials` を起動時に拒否するため削除しました。

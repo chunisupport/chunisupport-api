@@ -222,3 +222,7 @@ DROP INDEX idx_goals_user_created_id ON goals;
 ### 000030 コースレコード
 
 `course_classes`、`courses`、`player_course_records`を追加する。コースクラスは`1`～`5`、`inf`、`extra`の固定値であり、コースは論理削除に対応する。コーススコアは0～3,030,000点を保持する。
+
+### 000031 コース作成日時の削除
+
+`courses` テーブルの `created_at` カラムを削除する。コースマスタでは作成日時を利用しないため、更新日時のみを保持する。

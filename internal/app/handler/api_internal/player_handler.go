@@ -6,6 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 )
@@ -45,5 +46,5 @@ func (h *PlayerHandler) CreatePlayer(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusCreated, player)
+	return c.JSON(http.StatusCreated, dto.ToPlayerDTO(player))
 }

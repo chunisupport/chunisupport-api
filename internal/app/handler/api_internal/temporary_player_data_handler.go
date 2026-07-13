@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -73,9 +74,18 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 	}
 
 	hash := sha256.Sum256(jsonBody)
+	var request playerDataRequest
+	if err := json.Unmarshal(jsonBody, &request); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	payload := request.toUsecase()
+	internalPayload, err := json.Marshal(payload)
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
 	result, err := h.temporaryPlayerDataUsecase.Create(c.Request().Context(), usecase.CreateTemporaryPlayerDataInput{
 		IPAddress: c.RealIP(),
-		Payload:   jsonBody,
+		Payload:   internalPayload,
 		BodyHash:  hex.EncodeToString(hash[:]),
 	})
 	if err != nil {
@@ -141,5 +151,5 @@ func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c *echo.Context) error 
 		}
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toPlayerDataResponse(result))
 }

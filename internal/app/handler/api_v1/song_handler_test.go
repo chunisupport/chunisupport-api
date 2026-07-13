@@ -10,7 +10,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -192,14 +191,14 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 		wantStatus       int
 		wantErrCode      string
 		wantUsecaseCall  bool
-		assertUsecaseReq func(t *testing.T, requests []*api_internal.UpdateSongRequest)
+		assertUsecaseReq func(t *testing.T, requests []*usecase.UpdateSongInput)
 	}{
 		{
 			name:            "正常な配列で204を返す",
 			body:            `[{"id":"1234567890abcdef","title":"テスト楽曲","artist":"テストアーティスト","charts":{"MASTER":{"const":14.5,"is_const_unknown":false,"notes":1234,"notes_designer":"譜面作者A"}}}]`,
 			wantStatus:      http.StatusNoContent,
 			wantUsecaseCall: true,
-			assertUsecaseReq: func(t *testing.T, requests []*api_internal.UpdateSongRequest) {
+			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateSongInput) {
 				t.Helper()
 				require.Len(t, requests, 1)
 				assert.Equal(t, "1234567890abcdef", requests[0].DisplayID)
@@ -228,7 +227,7 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			usecaseCalled := false
 			handler := NewV1SongHandler(&testutil.MockSongUsecase{
-				UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+				UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 					usecaseCalled = true
 					if tt.assertUsecaseReq != nil {
 						tt.assertUsecaseReq(t, requests)
