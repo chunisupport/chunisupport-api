@@ -160,6 +160,7 @@ CREATE TABLE `honors` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_honor_name_type` (`name`,`honor_type_id`),
+  UNIQUE KEY `unique_honor_image_url` (`image_url`),
   KEY `honor_type_id` (`honor_type_id`),
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

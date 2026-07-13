@@ -149,3 +149,38 @@ func TestRemoveCreatedAtFromCourses_コースマスタの作成日時を削除�
 	assert.Contains(t, upSQL, "ALTER TABLE courses DROP COLUMN created_at")
 	assert.Contains(t, downSQL, "ALTER TABLE courses ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER is_deleted")
 }
+
+func TestIdentifySPHonorsByImageURLUp_手動で変更した名称を優先して重複を統合する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000032_identify_sp_honors_by_image_url.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "SET image_url = TRIM(image_url) WHERE image_url IS NOT NULL")
+	assert.Contains(t, upSQL, "PARTITION BY image_url")
+	assert.Contains(t, upSQL, ") AS honor_rank")
+	assert.Contains(t, upSQL, "WHERE ranked.honor_rank = 1")
+	assert.NotContains(t, upSQL, "AS row_number")
+	assert.Contains(t, upSQL, "CASE WHEN name = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(image_url, '#', 1), '?', 1), '/', -1) THEN 1 ELSE 0 END")
+	assert.Contains(t, upSQL, "UPDATE player_honors AS ph")
+	assert.Contains(t, upSQL, "SET ph.honor_id = keepers.keep_id")
+	assert.Contains(t, upSQL, "DELETE duplicated FROM honors AS duplicated")
+	assert.Contains(t, upSQL, "ADD UNIQUE KEY unique_honor_image_url (image_url)")
+	assert.Less(
+		t,
+		strings.Index(upSQL, "SET image_url = TRIM(image_url)"),
+		strings.Index(upSQL, "PARTITION BY image_url"),
+	)
+	assert.Less(
+		t,
+		strings.Index(upSQL, "DELETE duplicated FROM honors AS duplicated"),
+		strings.Index(upSQL, "ADD UNIQUE KEY unique_honor_image_url (image_url)"),
+	)
+}
+
+func TestIdentifySPHonorsByImageURLDown_imageURLの一意制約を削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000032_identify_sp_honors_by_image_url.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP INDEX unique_honor_image_url")
+}

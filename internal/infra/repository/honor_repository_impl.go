@@ -73,7 +73,7 @@ func (r *honorRepository) Create(ctx context.Context, exec repository.Executor, 
 	result, err := exec.ExecContext(ctx, `
 		INSERT INTO honors (name, honor_type_id, image_url)
 		VALUES (?, ?, ?)
-	`, strings.TrimSpace(honor.Name), honor.HonorTypeID, strings.TrimSpace(honor.ImageURL))
+	`, strings.TrimSpace(honor.Name), honor.HonorTypeID, nullableHonorImageURL(honor.ImageURL))
 	if err != nil {
 		return nil, wrapHonorDuplicateError(err)
 	}
@@ -91,7 +91,7 @@ func (r *honorRepository) Save(ctx context.Context, exec repository.Executor, ho
 		UPDATE honors
 		SET name = ?, honor_type_id = ?, image_url = ?
 		WHERE id = ?
-	`, strings.TrimSpace(honor.Name), honor.HonorTypeID, strings.TrimSpace(honor.ImageURL), honor.ID)
+	`, strings.TrimSpace(honor.Name), honor.HonorTypeID, nullableHonorImageURL(honor.ImageURL), honor.ID)
 	if err != nil {
 		return wrapHonorDuplicateError(err)
 	}
@@ -140,18 +140,51 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 	storedTitle := strings.TrimSpace(title)
 	var storedImageURL any
 	if imageURL != nil {
-		storedImageURL = strings.TrimSpace(*imageURL)
+		storedImageURL = nullableHonorImageURL(*imageURL)
 	}
-	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`
+	if storedImageURL != nil {
+		var existingID int
+		err := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+		if err == nil {
+			return existingID, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
+	}
+	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
+	if storedImageURL == nil {
+		query += ` ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`
+	}
 	result, err := exec.ExecContext(ctx, query, storedTitle, honorTypeID, storedImageURL)
 	if err != nil {
-		return 0, err
+		if storedImageURL != nil && (isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") ||
+			isMySQLDuplicateEntryForKey(err, "unique_honor_name_type")) {
+			var existingID int
+			findErr := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+			if findErr == nil {
+				return existingID, nil
+			}
+			if !errors.Is(findErr, sql.ErrNoRows) {
+				return 0, findErr
+			}
+		}
+		return 0, wrapHonorDuplicateError(err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
 		return 0, err
 	}
 	return int(id), nil
+}
+
+// nullableHonorImageURL は画像URL未設定の称号を、一意制約で複数保持できるSQL NULLに変換します。
+func nullableHonorImageURL(imageURL string) any {
+	trimmed := strings.TrimSpace(imageURL)
+	if trimmed == "" {
+		return nil
+	}
+	return trimmed
 }
 
 // DeletePlayerHonors はプレイヤーの称号割り当てを全て削除します。

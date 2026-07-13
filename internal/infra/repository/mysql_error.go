@@ -37,7 +37,8 @@ func wrapOfficialIdxDuplicateError(err error) error {
 }
 
 func wrapHonorDuplicateError(err error) error {
-	if !isMySQLDuplicateEntryForKey(err, "unique_honor_name_type_image_url") {
+	if !isMySQLDuplicateEntryForKey(err, "unique_honor_name_type") &&
+		!isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") {
 		return err
 	}
 
