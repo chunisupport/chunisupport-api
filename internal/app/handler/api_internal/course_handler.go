@@ -34,14 +34,22 @@ func (h *CourseHandler) ListEditor(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: toCourseDTOs(items)})
 }
 func (h *CourseHandler) Get(c *echo.Context) error {
-	item, err := h.usecase.Get(c.Request().Context(), c.Param("idx"), false)
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	item, err := h.usecase.Get(c.Request().Context(), displayID, false)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) GetEditor(c *echo.Context) error {
-	item, err := h.usecase.Get(c.Request().Context(), c.Param("idx"), true)
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	item, err := h.usecase.Get(c.Request().Context(), displayID, true)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -62,6 +70,10 @@ func (h *CourseHandler) Create(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, toCourseDTO(item))
 }
 func (h *CourseHandler) Update(c *echo.Context) error {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var req internaldto.UpdateCourseRequest
 	if err := handler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -69,20 +81,28 @@ func (h *CourseHandler) Update(c *echo.Context) error {
 	if err := c.Validate(&req); err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
-	item, err := h.usecase.Update(c.Request().Context(), c.Param("idx"), usecase.UpdateCourseInput{Name: req.Name, Class: req.Class})
+	item, err := h.usecase.Update(c.Request().Context(), displayID, usecase.UpdateCourseInput{Name: req.Name, Class: req.Class})
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) Delete(c *echo.Context) error {
-	if err := h.usecase.Delete(c.Request().Context(), c.Param("idx")); err != nil {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	if err := h.usecase.Delete(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 func (h *CourseHandler) Restore(c *echo.Context) error {
-	if err := h.usecase.Restore(c.Request().Context(), c.Param("idx")); err != nil {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	if err := h.usecase.Restore(c.Request().Context(), displayID); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -101,11 +121,15 @@ func (h *CourseHandler) GetUserRecords(c *echo.Context) error {
 }
 
 func (h *CourseHandler) GetUserRecord(c *echo.Context) error {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if value, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = value
 	}
-	result, err := h.usecase.GetUserRecord(c.Request().Context(), c.Param("username"), requester, c.Param("idx"))
+	result, err := h.usecase.GetUserRecord(c.Request().Context(), c.Param("username"), requester, displayID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -116,7 +140,7 @@ func toCourseDTO(value *usecase.CourseOutput) *dto.CourseDTO {
 	if value == nil {
 		return nil
 	}
-	return &dto.CourseDTO{ID: value.ID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
+	return &dto.CourseDTO{ID: value.ID, DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
 }
 func toCourseDTOs(values []*usecase.CourseOutput) []*dto.CourseDTO {
 	result := make([]*dto.CourseDTO, 0, len(values))
@@ -129,7 +153,7 @@ func toCourseRecordDTO(value *usecase.CourseRecordOutput) *dto.CourseRecordDTO {
 	if value == nil {
 		return nil
 	}
-	return &dto.CourseRecordDTO{Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt}
+	return &dto.CourseRecordDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt}
 }
 func toCourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRecordDTO {
 	result := make([]*dto.CourseRecordDTO, 0, len(values))

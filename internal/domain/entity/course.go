@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 // CourseClass はコース固有のクラスマスタです。
@@ -16,6 +18,7 @@ type CourseClass struct {
 // Course はコースマスタを表します。
 type Course struct {
 	ID            int
+	DisplayID     displayid.DisplayID
 	OfficialIdx   string
 	Name          string
 	CourseClassID int
@@ -26,6 +29,9 @@ type Course struct {
 
 // Validate はコースが常に有効な識別子と名称を持つことを保証します。
 func (c *Course) Validate() error {
+	if !c.DisplayID.IsValid() {
+		return errors.New("display_idは16文字の小文字16進数である必要があります")
+	}
 	if strings.TrimSpace(c.OfficialIdx) == "" {
 		return errors.New("official_idxは必須です")
 	}

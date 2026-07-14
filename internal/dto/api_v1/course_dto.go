@@ -7,9 +7,10 @@ import (
 )
 
 type V1CourseDTO struct {
-	Idx   string `json:"idx"`
-	Name  string `json:"name"`
-	Class string `json:"class"`
+	DisplayID string `json:"display_id"`
+	Idx       string `json:"idx"`
+	Name      string `json:"name"`
+	Class     string `json:"class"`
 }
 type V1CourseListResponse struct {
 	Courses []*V1CourseDTO `json:"courses"`
@@ -23,5 +24,5 @@ func ToV1CourseDTO(course *dto.CourseDTO) *V1CourseDTO {
 	if course == nil {
 		return nil
 	}
-	return &V1CourseDTO{Idx: course.Idx, Name: course.Name, Class: course.Class}
+	return &V1CourseDTO{DisplayID: course.DisplayID, Idx: course.Idx, Name: course.Name, Class: course.Class}
 }

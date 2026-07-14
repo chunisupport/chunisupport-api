@@ -392,7 +392,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicUsersGroup.GET("/:username/record/songs/:displayid/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
 		publicUsersGroup.GET("/:username/record/courses", handlers.Course.GetUserRecords)
-		publicUsersGroup.GET("/:username/record/courses/:idx", handlers.Course.GetUserRecord)
+		publicUsersGroup.GET("/:username/record/courses/:displayid", handlers.Course.GetUserRecord)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid/history", handlers.InternalScoreHistory.GetWorldsend)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
@@ -478,21 +478,21 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	publicCoursesGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
 		publicCoursesGroup.GET("", handlers.Course.List)
-		publicCoursesGroup.GET("/:idx", handlers.Course.Get)
+		publicCoursesGroup.GET("/:displayid", handlers.Course.Get)
 	}
 	coursesGroup := internal.Group("/courses")
 	coursesGroup.Use(firebaseAuthStrict)
 	{
 		coursesGroup.POST("", handlers.Course.Create, requireAdmin)
-		coursesGroup.PUT("/:idx", handlers.Course.Update, requireEditor)
-		coursesGroup.DELETE("/:idx", handlers.Course.Delete, requireAdmin)
-		coursesGroup.POST("/:idx/restore", handlers.Course.Restore, requireEditor)
+		coursesGroup.PUT("/:displayid", handlers.Course.Update, requireEditor)
+		coursesGroup.DELETE("/:displayid", handlers.Course.Delete, requireAdmin)
+		coursesGroup.POST("/:displayid/restore", handlers.Course.Restore, requireEditor)
 	}
 	editorCoursesGroup := internal.Group("/editor/courses")
 	editorCoursesGroup.Use(firebaseAuthStrict, requireEditor)
 	{
 		editorCoursesGroup.GET("", handlers.Course.ListEditor)
-		editorCoursesGroup.GET("/:idx", handlers.Course.GetEditor)
+		editorCoursesGroup.GET("/:displayid", handlers.Course.GetEditor)
 	}
 
 	// api.chunisupport.net/internal/master
@@ -539,7 +539,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
 		apiV1.GET("/users/:username/records/courses", handlers.V1Course.GetUserRecords)
 		apiV1.GET("/courses", handlers.V1Course.List)
-		apiV1.GET("/courses/:idx", handlers.V1Course.Get)
+		apiV1.GET("/courses/:displayid", handlers.V1Course.Get)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 

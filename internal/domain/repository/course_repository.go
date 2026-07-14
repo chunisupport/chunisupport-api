@@ -23,6 +23,7 @@ type CourseRecordForUpsert struct {
 // CourseRepository はコース集約とプレイヤーのコース記録を永続化します。
 type CourseRepository interface {
 	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Course, error)
+	FindByDisplayID(ctx context.Context, exec Executor, displayID string, includeDeleted bool) (*entity.Course, error)
 	FindByOfficialIdx(ctx context.Context, exec Executor, officialIdx string, includeDeleted bool) (*entity.Course, error)
 	FindByOfficialIdxList(ctx context.Context, exec Executor, officialIdxList []string) (map[string]*entity.Course, error)
 	FindClassByName(ctx context.Context, exec Executor, name string) (*entity.CourseClass, error)

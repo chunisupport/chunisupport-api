@@ -9,6 +9,7 @@ import (
 
 type CourseDTO struct {
 	ID        int        `json:"id,omitempty"`
+	DisplayID string     `json:"display_id"`
 	Idx       string     `json:"idx"`
 	Name      string     `json:"name"`
 	Class     string     `json:"class"`
@@ -17,6 +18,7 @@ type CourseDTO struct {
 }
 
 type CourseRecordDTO struct {
+	DisplayID string     `json:"display_id"`
 	Idx       string     `json:"idx"`
 	Name      string     `json:"name"`
 	Class     string     `json:"class"`
@@ -35,7 +37,7 @@ func ToCourseDTO(course *entity.Course, editor bool) *CourseDTO {
 	if course.CourseClass != nil {
 		class = course.CourseClass.Name
 	}
-	result := &CourseDTO{Idx: course.OfficialIdx, Name: course.Name, Class: class}
+	result := &CourseDTO{DisplayID: course.DisplayID.String(), Idx: course.OfficialIdx, Name: course.Name, Class: class}
 	if editor {
 		result.ID = course.ID
 		result.IsDeleted = course.IsDeleted
@@ -63,5 +65,5 @@ func ToCourseRecordDTO(record *entity.PlayerCourseRecord) *CourseRecordDTO {
 		value := record.ComboLamp.Name
 		lamp = &value
 	}
-	return &CourseRecordDTO{Idx: record.Course.OfficialIdx, Name: record.Course.Name, Class: class, IsPlayed: played, Score: record.Score.Uint32(), IsClear: record.IsClear, ComboLamp: lamp, UpdatedAt: updated}
+	return &CourseRecordDTO{DisplayID: record.Course.DisplayID.String(), Idx: record.Course.OfficialIdx, Name: record.Course.Name, Class: class, IsPlayed: played, Score: record.Score.Uint32(), IsClear: record.IsClear, ComboLamp: lamp, UpdatedAt: updated}
 }

@@ -190,14 +190,15 @@
 | `/internal/editor/worldsend-songs` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
-| `/internal/courses/:idx` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses/:displayid` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
-| `/internal/courses/:idx` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
-| `/internal/courses/:idx` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
-| `/internal/courses/:idx/restore` | POST | Firebase Bearer (EDITOR+) | コース復元 |
+| `/internal/courses/:displayid` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
+| `/internal/courses/:displayid` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
+| `/internal/courses/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | コース復元 |
 | `/internal/editor/courses` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース一覧取得 |
+| `/internal/editor/courses/:displayid` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース詳細取得 |
 | `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
-| `/internal/users/:username/record/courses/:idx` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
+| `/internal/users/:username/record/courses/:displayid` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
@@ -212,7 +213,7 @@
 | `/v1/worldsend-songs/:displayid/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
-| `/v1/courses/:idx` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/courses/:displayid` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |

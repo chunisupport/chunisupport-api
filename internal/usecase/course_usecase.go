@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 var (
@@ -19,11 +20,13 @@ type CreateCourseInput struct{ Idx, Name, Class string }
 type UpdateCourseInput struct{ Name, Class string }
 type CourseOutput struct {
 	ID               int
+	DisplayID        string
 	Idx, Name, Class string
 	IsDeleted        bool
 	UpdatedAt        *time.Time
 }
 type CourseRecordOutput struct {
+	DisplayID        string
 	Idx, Name, Class string
 	IsPlayed         bool
 	Score            uint32
@@ -38,13 +41,13 @@ type CourseRecordResult struct {
 
 type CourseUsecase interface {
 	List(ctx context.Context, includeDeleted bool) ([]*CourseOutput, error)
-	Get(ctx context.Context, idx string, includeDeleted bool) (*CourseOutput, error)
+	Get(ctx context.Context, displayID string, includeDeleted bool) (*CourseOutput, error)
 	Create(ctx context.Context, input CreateCourseInput) (*CourseOutput, error)
-	Update(ctx context.Context, idx string, input UpdateCourseInput) (*CourseOutput, error)
-	Delete(ctx context.Context, idx string) error
-	Restore(ctx context.Context, idx string) error
+	Update(ctx context.Context, displayID string, input UpdateCourseInput) (*CourseOutput, error)
+	Delete(ctx context.Context, displayID string) error
+	Restore(ctx context.Context, displayID string) error
 	GetUserRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*CourseRecordResult, error)
-	GetUserRecord(ctx context.Context, username string, requester *entity.User, idx string) (*CourseRecordOutput, error)
+	GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error)
 }
 
 type courseUsecase struct {
@@ -69,8 +72,8 @@ func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*Cours
 	}
 	return result, nil
 }
-func (u *courseUsecase) Get(ctx context.Context, idx string, includeDeleted bool) (*CourseOutput, error) {
-	item, err := u.repo.FindByOfficialIdx(ctx, u.db, strings.TrimSpace(idx), includeDeleted)
+func (u *courseUsecase) Get(ctx context.Context, displayID string, includeDeleted bool) (*CourseOutput, error) {
+	item, err := u.repo.FindByDisplayID(ctx, u.db, displayID, includeDeleted)
 	if errors.Is(err, repository.ErrCourseNotFound) {
 		return nil, ErrCourseNotFound
 	}
@@ -94,7 +97,15 @@ func (u *courseUsecase) Create(ctx context.Context, input CreateCourseInput) (*C
 	if err != nil {
 		return nil, err
 	}
-	course := &entity.Course{OfficialIdx: idx, Name: name, CourseClassID: class.ID, CourseClass: class}
+	displayIDValue, err := generateDisplayID()
+	if err != nil {
+		return nil, err
+	}
+	displayID, err := displayid.NewDisplayID(displayIDValue)
+	if err != nil {
+		return nil, errors.Join(ErrInvalidCourseInput, err)
+	}
+	course := &entity.Course{DisplayID: displayID, OfficialIdx: idx, Name: name, CourseClassID: class.ID, CourseClass: class}
 	if err := course.Validate(); err != nil {
 		return nil, errors.Join(ErrInvalidCourseInput, err)
 	}
@@ -107,11 +118,11 @@ func (u *courseUsecase) Create(ctx context.Context, input CreateCourseInput) (*C
 	}
 	return toCourseOutput(created, true), nil
 }
-func (u *courseUsecase) Update(ctx context.Context, idx string, input UpdateCourseInput) (*CourseOutput, error) {
+func (u *courseUsecase) Update(ctx context.Context, displayID string, input UpdateCourseInput) (*CourseOutput, error) {
 	if strings.TrimSpace(input.Name) == "" {
 		return nil, ErrInvalidCourseInput
 	}
-	course, err := u.repo.FindByOfficialIdx(ctx, u.db, strings.TrimSpace(idx), true)
+	course, err := u.repo.FindByDisplayID(ctx, u.db, displayID, true)
 	if errors.Is(err, repository.ErrCourseNotFound) {
 		return nil, ErrCourseNotFound
 	}
@@ -137,14 +148,14 @@ func (u *courseUsecase) Update(ctx context.Context, idx string, input UpdateCour
 	}
 	return toCourseOutput(updated, true), nil
 }
-func (u *courseUsecase) Delete(ctx context.Context, idx string) error {
-	return u.setDeleted(ctx, idx, true)
+func (u *courseUsecase) Delete(ctx context.Context, displayID string) error {
+	return u.setDeleted(ctx, displayID, true)
 }
-func (u *courseUsecase) Restore(ctx context.Context, idx string) error {
-	return u.setDeleted(ctx, idx, false)
+func (u *courseUsecase) Restore(ctx context.Context, displayID string) error {
+	return u.setDeleted(ctx, displayID, false)
 }
-func (u *courseUsecase) setDeleted(ctx context.Context, idx string, deleted bool) error {
-	course, err := u.repo.FindByOfficialIdx(ctx, u.db, strings.TrimSpace(idx), true)
+func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, deleted bool) error {
+	course, err := u.repo.FindByDisplayID(ctx, u.db, displayID, true)
 	if errors.Is(err, repository.ErrCourseNotFound) {
 		return ErrCourseNotFound
 	}
@@ -187,14 +198,13 @@ func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, req
 	return result, nil
 }
 
-func (u *courseUsecase) GetUserRecord(ctx context.Context, username string, requester *entity.User, idx string) (*CourseRecordOutput, error) {
+func (u *courseUsecase) GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error) {
 	result, err := u.GetUserRecords(ctx, username, requester, true)
 	if err != nil {
 		return nil, err
 	}
-	idx = strings.TrimSpace(idx)
 	for _, record := range result.Records {
-		if record.Idx == idx {
+		if record.DisplayID == displayID {
 			return record, nil
 		}
 	}
@@ -209,7 +219,7 @@ func toCourseOutput(course *entity.Course, editor bool) *CourseOutput {
 	if course.CourseClass != nil {
 		class = course.CourseClass.Name
 	}
-	result := &CourseOutput{Idx: course.OfficialIdx, Name: course.Name, Class: class}
+	result := &CourseOutput{DisplayID: course.DisplayID.String(), Idx: course.OfficialIdx, Name: course.Name, Class: class}
 	if editor {
 		result.ID, result.IsDeleted = course.ID, course.IsDeleted
 		result.UpdatedAt = &course.UpdatedAt
@@ -236,7 +246,7 @@ func toCourseRecordOutput(record *entity.PlayerCourseRecord) *CourseRecordOutput
 		value := record.ComboLamp.Name
 		lamp = &value
 	}
-	return &CourseRecordOutput{Idx: record.Course.OfficialIdx, Name: record.Course.Name, Class: class, IsPlayed: played, Score: record.Score.Uint32(), IsClear: record.IsClear, ComboLamp: lamp, UpdatedAt: updated}
+	return &CourseRecordOutput{DisplayID: record.Course.DisplayID.String(), Idx: record.Course.OfficialIdx, Name: record.Course.Name, Class: class, IsPlayed: played, Score: record.Score.Uint32(), IsClear: record.IsClear, ComboLamp: lamp, UpdatedAt: updated}
 }
 func normalizeCourseClass(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))

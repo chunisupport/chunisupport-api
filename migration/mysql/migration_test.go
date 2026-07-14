@@ -184,3 +184,24 @@ func TestIdentifySPHonorsByImageURLDown_imageURLの一意制約を削除する(t
 	// Then
 	assert.Contains(t, downSQL, "DROP INDEX unique_honor_image_url")
 }
+
+func TestAddDisplayIDToCoursesUp_既存コースへ一意な表示用IDを採番する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000033_add_display_id_to_courses.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ADD COLUMN display_id CHAR(16) NULL AFTER id")
+	assert.Contains(t, upSQL, "LOWER(HEX(RANDOM_BYTES(8)))")
+	assert.Contains(t, upSQL, "MODIFY COLUMN display_id CHAR(16) NOT NULL")
+	assert.Contains(t, upSQL, "ADD UNIQUE KEY uq_courses_display_id (display_id)")
+	assert.Less(t, strings.Index(upSQL, "LOWER(HEX(RANDOM_BYTES(8)))"), strings.Index(upSQL, "MODIFY COLUMN display_id"))
+}
+
+func TestAddDisplayIDToCoursesDown_表示用IDを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000033_add_display_id_to_courses.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP INDEX uq_courses_display_id")
+	assert.Contains(t, downSQL, "DROP COLUMN display_id")
+}

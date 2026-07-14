@@ -75,6 +75,7 @@ CREATE TABLE `course_classes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `courses` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `official_idx` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `course_class_id` tinyint unsigned NOT NULL,
@@ -82,6 +83,7 @@ CREATE TABLE `courses` (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_courses_official_idx` (`official_idx`),
+  UNIQUE KEY `uq_courses_display_id` (`display_id`),
   KEY `idx_courses_class_deleted_idx` (`course_class_id`,`is_deleted`,`official_idx`),
   CONSTRAINT `fk_courses_course_class` FOREIGN KEY (`course_class_id`) REFERENCES `course_classes` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

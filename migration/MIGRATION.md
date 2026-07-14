@@ -226,3 +226,7 @@ DROP INDEX idx_goals_user_created_id ON goals;
 ### 000031 コース作成日時の削除
 
 `courses` テーブルの `created_at` カラムを削除する。コースマスタでは作成日時を利用しないため、更新日時のみを保持する。
+
+### 000033 コース表示用ID
+
+`courses` テーブルに16文字の小文字16進数で表す一意な `display_id` を追加する。既存コースにはマイグレーションで暗号学的乱数を採番し、以後の個別コースAPIでは `official_idx` ではなく `display_id` を外部識別子として利用する。

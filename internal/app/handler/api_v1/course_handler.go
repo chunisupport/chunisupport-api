@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
@@ -29,7 +30,11 @@ func (h *V1CourseHandler) List(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &api_v1.V1CourseListResponse{Courses: result})
 }
 func (h *V1CourseHandler) Get(c *echo.Context) error {
-	item, err := h.usecase.Get(c.Request().Context(), c.Param("idx"), false)
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
+	item, err := h.usecase.Get(c.Request().Context(), displayID, false)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -52,7 +57,7 @@ func toV1CourseDTO(value *usecase.CourseOutput) *api_v1.V1CourseDTO {
 	if value == nil {
 		return nil
 	}
-	return &api_v1.V1CourseDTO{Idx: value.Idx, Name: value.Name, Class: value.Class}
+	return &api_v1.V1CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class}
 }
 func toV1CourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRecordDTO {
 	result := make([]*dto.CourseRecordDTO, 0, len(values))
@@ -61,7 +66,7 @@ func toV1CourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRec
 			result = append(result, nil)
 			continue
 		}
-		result = append(result, &dto.CourseRecordDTO{Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt})
+		result = append(result, &dto.CourseRecordDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt})
 	}
 	return result
 }
