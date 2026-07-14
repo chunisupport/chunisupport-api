@@ -42,6 +42,8 @@ type CourseRecordResult struct {
 type CourseUsecase interface {
 	List(ctx context.Context, includeDeleted bool) ([]*CourseOutput, error)
 	Get(ctx context.Context, displayID string, includeDeleted bool) (*CourseOutput, error)
+	// GetCoursesUpdatedAt はコースマスタの updated_at の最大値を取得します。
+	GetCoursesUpdatedAt(ctx context.Context) (*time.Time, error)
 	Create(ctx context.Context, input CreateCourseInput) (*CourseOutput, error)
 	Update(ctx context.Context, displayID string, input UpdateCourseInput) (*CourseOutput, error)
 	Delete(ctx context.Context, displayID string) error
@@ -72,6 +74,11 @@ func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*Cours
 	}
 	return result, nil
 }
+// GetCoursesUpdatedAt はコースマスタの updated_at の最大値を取得します。
+func (u *courseUsecase) GetCoursesUpdatedAt(ctx context.Context) (*time.Time, error) {
+	return u.repo.FindLatestUpdatedAt(ctx, u.db)
+}
+
 func (u *courseUsecase) Get(ctx context.Context, displayID string, includeDeleted bool) (*CourseOutput, error) {
 	item, err := u.repo.FindByDisplayID(ctx, u.db, displayID, includeDeleted)
 	if errors.Is(err, repository.ErrCourseNotFound) {

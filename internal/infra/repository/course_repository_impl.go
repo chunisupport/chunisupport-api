@@ -21,6 +21,26 @@ func NewCourseRepository(db *sqlx.DB) domainrepo.CourseRepository { return &cour
 const courseColumns = `c.id, c.display_id, c.official_idx, c.name, c.course_class_id, c.is_deleted, c.updated_at,
 cc.name AS course_class_name, cc.sort_order AS course_class_sort_order`
 
+// FindLatestUpdatedAt は courses.updated_at の最大値を返します。
+// 削除済みを含む全コースを対象とし、コースが0件の場合は nil を返します。
+func (r *courseRepository) FindLatestUpdatedAt(ctx context.Context, exec domainrepo.Executor) (*time.Time, error) {
+	if exec == nil {
+		exec = r.db
+	}
+	var updatedAtRaw sql.NullString
+	if err := exec.GetContext(ctx, &updatedAtRaw, `SELECT MAX(updated_at) FROM courses`); err != nil {
+		return nil, fmt.Errorf("failed to find latest course updated_at: %w", err)
+	}
+	if !updatedAtRaw.Valid || updatedAtRaw.String == "" {
+		return nil, nil
+	}
+	parsedUpdatedAt, err := parseLatestUpdatedAt(updatedAtRaw.String)
+	if err != nil {
+		return nil, err
+	}
+	return &parsedUpdatedAt, nil
+}
+
 func (r *courseRepository) FindAll(ctx context.Context, exec domainrepo.Executor, includeDeleted bool) ([]*entity.Course, error) {
 	if exec == nil {
 		exec = r.db

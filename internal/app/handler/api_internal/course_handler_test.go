@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
+	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +19,9 @@ import (
 )
 
 type courseUsecaseStub struct {
-	get func(context.Context, string, bool) (*usecase.CourseOutput, error)
+	get               func(context.Context, string, bool) (*usecase.CourseOutput, error)
+	coursesUpdatedAt  *time.Time
+	coursesUpdatedErr error
 }
 
 func (s *courseUsecaseStub) List(context.Context, bool) ([]*usecase.CourseOutput, error) {
@@ -25,6 +29,12 @@ func (s *courseUsecaseStub) List(context.Context, bool) ([]*usecase.CourseOutput
 }
 func (s *courseUsecaseStub) Get(ctx context.Context, displayID string, includeDeleted bool) (*usecase.CourseOutput, error) {
 	return s.get(ctx, displayID, includeDeleted)
+}
+func (s *courseUsecaseStub) GetCoursesUpdatedAt(context.Context) (*time.Time, error) {
+	if s.coursesUpdatedErr != nil {
+		return nil, s.coursesUpdatedErr
+	}
+	return s.coursesUpdatedAt, nil
 }
 func (s *courseUsecaseStub) Create(context.Context, usecase.CreateCourseInput) (*usecase.CourseOutput, error) {
 	return nil, nil
@@ -82,4 +92,44 @@ func TestCourseHandler_Get_不正なDisplayIDを拒否する(t *testing.T) {
 		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	}
 	assert.False(t, called)
+}
+
+func TestCourseHandler_GetCoursesUpdatedAt_更新日時を返す(t *testing.T) {
+	// Given
+	expected := time.Date(2026, 7, 14, 12, 34, 56, 0, time.UTC)
+	handler := NewCourseHandler(&courseUsecaseStub{coursesUpdatedAt: &expected})
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/courses/updated-at", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handler.GetCoursesUpdatedAt(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var response internaldto.CourseUpdatedAtDTO
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.NotNil(t, response.UpdatedAt)
+	assert.True(t, expected.Equal(*response.UpdatedAt))
+}
+
+func TestCourseHandler_GetCoursesUpdatedAt_コースが無い場合はnull(t *testing.T) {
+	// Given
+	handler := NewCourseHandler(&courseUsecaseStub{})
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/courses/updated-at", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handler.GetCoursesUpdatedAt(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var response internaldto.CourseUpdatedAtDTO
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Nil(t, response.UpdatedAt)
 }

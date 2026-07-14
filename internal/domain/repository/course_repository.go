@@ -27,6 +27,9 @@ type CourseRepository interface {
 	FindByOfficialIdx(ctx context.Context, exec Executor, officialIdx string, includeDeleted bool) (*entity.Course, error)
 	FindByOfficialIdxList(ctx context.Context, exec Executor, officialIdxList []string) (map[string]*entity.Course, error)
 	FindClassByName(ctx context.Context, exec Executor, name string) (*entity.CourseClass, error)
+	// FindLatestUpdatedAt は courses.updated_at の最大値を返します。
+	// コースが0件の場合は nil を返します。
+	FindLatestUpdatedAt(ctx context.Context, exec Executor) (*time.Time, error)
 	Create(ctx context.Context, exec Executor, course *entity.Course) error
 	Save(ctx context.Context, exec Executor, course *entity.Course) error
 	FindRecordsByPlayerID(ctx context.Context, exec Executor, playerID int, includeDeleted, includeNoPlay bool) ([]*entity.PlayerCourseRecord, error)

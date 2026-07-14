@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/stretchr/testify/assert"
@@ -73,4 +74,46 @@ func TestCourseRepository_FindRecordsByPlayerID_未プレイを補完する(t *t
 	require.Len(t, records, 1)
 	assert.Equal(t, uint32(3023238), records[0].Score.Uint32())
 	assert.True(t, records[0].IsClear)
+}
+
+func TestCourseRepository_FindLatestUpdatedAt_最大値を返す(t *testing.T) {
+	// Given
+	repo := setupCourseRepositoryDB(t)
+	latest := time.Date(2026, 7, 14, 15, 0, 0, 0, time.UTC)
+	_, err := repo.db.Exec(`UPDATE courses SET updated_at = ? WHERE id = 11`, latest)
+	require.NoError(t, err)
+
+	// When
+	result, err := repo.FindLatestUpdatedAt(context.Background(), repo.db)
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, latest.Equal(*result))
+}
+
+func TestCourseRepository_FindLatestUpdatedAt_コースが無い場合はnil(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err := db.Exec(`
+		CREATE TABLE courses (
+			id INTEGER PRIMARY KEY,
+			display_id TEXT NOT NULL UNIQUE,
+			official_idx TEXT NOT NULL UNIQUE,
+			name TEXT NOT NULL,
+			course_class_id INTEGER NOT NULL,
+			is_deleted INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL
+		)
+	`)
+	require.NoError(t, err)
+	repo := &courseRepository{db: db}
+
+	// When
+	result, err := repo.FindLatestUpdatedAt(context.Background(), db)
+
+	// Then
+	require.NoError(t, err)
+	assert.Nil(t, result)
 }

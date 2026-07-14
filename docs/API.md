@@ -189,6 +189,7 @@
 | `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/courses/updated-at` | GET | Firebase Bearer (任意) | コースマスタキャッシュ用の最終更新日時のみ取得 |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
 | `/internal/courses/:displayid` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
@@ -2329,6 +2330,25 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `updated_at` | string \| null | `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null` |
+
+### GET `/internal/courses/updated-at`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **レスポンス**: `courses.updated_at` の最大値のみを返します。コースマスタキャッシュの更新判定に使用できます。削除済みコースも含みます。
+
+#### レスポンス例
+
+```json
+{
+  "updated_at": "2026-07-14T12:34:56Z"
+}
+```
+
+#### CourseUpdatedAtDTO スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `updated_at` | string \| null | `courses.updated_at` の最大値 (ISO8601)。コースが0件の場合は `null` |
 
 #### UserRecordResponseDTO スキーマ
 

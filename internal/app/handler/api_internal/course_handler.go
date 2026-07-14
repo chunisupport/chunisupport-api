@@ -26,6 +26,15 @@ func (h *CourseHandler) List(c *echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: toCourseDTOs(items)})
 }
+
+// GetCoursesUpdatedAt はコースマスタの updated_at のみを返します。
+func (h *CourseHandler) GetCoursesUpdatedAt(c *echo.Context) error {
+	updatedAt, err := h.usecase.GetCoursesUpdatedAt(c.Request().Context())
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+	return c.JSON(http.StatusOK, &internaldto.CourseUpdatedAtDTO{UpdatedAt: updatedAt})
+}
 func (h *CourseHandler) ListEditor(c *echo.Context) error {
 	items, err := h.usecase.List(c.Request().Context(), true)
 	if err != nil {

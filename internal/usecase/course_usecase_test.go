@@ -18,6 +18,7 @@ type courseRepositoryStub struct {
 	searchedDisplayID string
 	saved             *entity.Course
 	records           []*entity.PlayerCourseRecord
+	latestUpdatedAt   *time.Time
 }
 
 func (s *courseRepositoryStub) FindAll(context.Context, repository.Executor, bool) ([]*entity.Course, error) {
@@ -92,6 +93,9 @@ func (s *courseRepositoryStub) FindRecordStatesByCourseIDs(context.Context, repo
 }
 func (s *courseRepositoryStub) UpsertRecords(context.Context, repository.Executor, []repository.CourseRecordForUpsert) error {
 	return nil
+}
+func (s *courseRepositoryStub) FindLatestUpdatedAt(context.Context, repository.Executor) (*time.Time, error) {
+	return s.latestUpdatedAt, nil
 }
 
 func TestCourseUsecase_Create_DisplayIDを生成して返す(t *testing.T) {
@@ -180,4 +184,32 @@ func TestCourseUsecase_GetUserRecord_DisplayIDで対象レコードを選ぶ(t *
 	require.NoError(t, err)
 	assert.Equal(t, displayID.String(), output.DisplayID)
 	assert.Equal(t, "対象コース", output.Name)
+}
+
+func TestCourseUsecase_GetCoursesUpdatedAt_リポジトリの値を返す(t *testing.T) {
+	// Given
+	expected := time.Date(2026, 7, 14, 12, 34, 56, 0, time.UTC)
+	repo := &courseRepositoryStub{latestUpdatedAt: &expected}
+	uc := NewCourseUsecase(nil, repo, nil, nil)
+
+	// When
+	result, err := uc.GetCoursesUpdatedAt(context.Background())
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, expected.Equal(*result))
+}
+
+func TestCourseUsecase_GetCoursesUpdatedAt_コースが無い場合はnil(t *testing.T) {
+	// Given
+	repo := &courseRepositoryStub{}
+	uc := NewCourseUsecase(nil, repo, nil, nil)
+
+	// When
+	result, err := uc.GetCoursesUpdatedAt(context.Background())
+
+	// Then
+	require.NoError(t, err)
+	assert.Nil(t, result)
 }

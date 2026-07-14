@@ -477,6 +477,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	publicCoursesGroup := internal.Group("/courses")
 	publicCoursesGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
+		publicCoursesGroup.GET("/updated-at", handlers.Course.GetCoursesUpdatedAt)
 		publicCoursesGroup.GET("", handlers.Course.List)
 		publicCoursesGroup.GET("/:displayid", handlers.Course.Get)
 	}

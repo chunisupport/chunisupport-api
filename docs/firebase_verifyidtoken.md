@@ -81,6 +81,7 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 - `GET /internal/users/:username/updated-at`
 - `GET /internal/songs/updated-at`
+- `GET /internal/courses/updated-at`
 - `GET /internal/songs`
 - `GET /internal/songs/:displayid`
 - `GET /internal/songs/:displayid/stats/:difficulty`
