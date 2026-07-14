@@ -186,6 +186,119 @@ func TestCourseUsecase_GetUserRecord_DisplayIDで対象レコードを選ぶ(t *
 	assert.Equal(t, "対象コース", output.Name)
 }
 
+func TestCourseUsecase_GetUserRecords_metaUpdatedAtがマスタとレコードの新しい方になる(t *testing.T) {
+	displayID, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	playerID := 10
+	masterAt := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	recordAt := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	sameAt := time.Date(2026, 7, 12, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name            string
+		playerID        *int
+		masterUpdatedAt *time.Time
+		recordUpdatedAt *time.Time
+		wantUpdatedAt   *time.Time
+	}{
+		{
+			name:            "マスタのみ新しい",
+			playerID:        &playerID,
+			masterUpdatedAt: &masterAt,
+			recordUpdatedAt: &recordAt,
+			wantUpdatedAt:   &masterAt,
+		},
+		{
+			name:            "レコードのみ新しい",
+			playerID:        &playerID,
+			masterUpdatedAt: &recordAt,
+			recordUpdatedAt: &masterAt,
+			wantUpdatedAt:   &masterAt,
+		},
+		{
+			name:            "両方が同じ",
+			playerID:        &playerID,
+			masterUpdatedAt: &sameAt,
+			recordUpdatedAt: &sameAt,
+			wantUpdatedAt:   &sameAt,
+		},
+		{
+			name:            "レコードのみ存在する",
+			playerID:        &playerID,
+			masterUpdatedAt: nil,
+			recordUpdatedAt: &recordAt,
+			wantUpdatedAt:   &recordAt,
+		},
+		{
+			name:            "マスタのみ存在する_未プレイ",
+			playerID:        &playerID,
+			masterUpdatedAt: &masterAt,
+			recordUpdatedAt: nil,
+			wantUpdatedAt:   &masterAt,
+		},
+		{
+			name:            "マスタのみ存在する_未連携",
+			playerID:        nil,
+			masterUpdatedAt: &masterAt,
+			recordUpdatedAt: nil,
+			wantUpdatedAt:   &masterAt,
+		},
+		{
+			name:            "どちらも無い",
+			playerID:        &playerID,
+			masterUpdatedAt: nil,
+			recordUpdatedAt: nil,
+			wantUpdatedAt:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			var records []*entity.PlayerCourseRecord
+			if tt.playerID != nil {
+				record := &entity.PlayerCourseRecord{
+					Course: &entity.Course{DisplayID: displayID, OfficialIdx: "50020", Name: "対象コース", CourseClassID: 1},
+				}
+				if tt.recordUpdatedAt != nil {
+					record.UpdatedAt = *tt.recordUpdatedAt
+				}
+				records = []*entity.PlayerCourseRecord{record}
+			}
+			repo := &courseRepositoryStub{
+				records:         records,
+				latestUpdatedAt: tt.masterUpdatedAt,
+			}
+			userRepo := &courseUserRepositoryStub{user: &entity.User{PlayerID: tt.playerID}}
+			uc := NewCourseUsecase(nil, repo, userRepo, nil)
+
+			// When
+			result, err := uc.GetUserRecords(context.Background(), "player", nil, true)
+
+			// Then
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			if tt.wantUpdatedAt == nil {
+				assert.Nil(t, result.UpdatedAt)
+			} else {
+				require.NotNil(t, result.UpdatedAt)
+				assert.True(t, tt.wantUpdatedAt.Equal(*result.UpdatedAt))
+			}
+			if tt.playerID != nil {
+				require.Len(t, result.Records, 1)
+				if tt.recordUpdatedAt == nil {
+					assert.Nil(t, result.Records[0].UpdatedAt)
+				} else {
+					require.NotNil(t, result.Records[0].UpdatedAt)
+					assert.True(t, tt.recordUpdatedAt.Equal(*result.Records[0].UpdatedAt))
+				}
+			} else {
+				assert.Empty(t, result.Records)
+			}
+		})
+	}
+}
+
 func TestCourseUsecase_GetCoursesUpdatedAt_リポジトリの値を返す(t *testing.T) {
 	// Given
 	expected := time.Date(2026, 7, 14, 12, 34, 56, 0, time.UTC)

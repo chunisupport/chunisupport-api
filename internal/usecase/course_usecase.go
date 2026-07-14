@@ -172,6 +172,10 @@ func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, delete
 	course.IsDeleted = deleted
 	return u.repo.Save(ctx, u.db, course)
 }
+// GetUserRecords はユーザーのコースレコード一覧を返す。
+// meta.updated_at 相当の UpdatedAt は、コースマスタの最大更新日時と
+// 対象プレイヤーのコースレコード最大更新日時のうち新しい方とする。
+// 一覧レスポンスが名称・クラス・未プレイ補完などマスタ情報にも依存するため。
 func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*CourseRecordResult, error) {
 	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -187,22 +191,47 @@ func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, req
 	if !ok {
 		return nil, ErrUserPrivate
 	}
-	if user.PlayerID == nil {
-		return &CourseRecordResult{Records: []*CourseRecordOutput{}}, nil
+
+	// マスタ最大更新はプレイヤー連携有無に依存しない。
+	masterUpdatedAt, err := u.repo.FindLatestUpdatedAt(ctx, u.db)
+	if err != nil {
+		return nil, err
 	}
+
+	if user.PlayerID == nil {
+		return &CourseRecordResult{Records: []*CourseRecordOutput{}, UpdatedAt: masterUpdatedAt}, nil
+	}
+
 	records, err := u.repo.FindRecordsByPlayerID(ctx, u.db, *user.PlayerID, false, includeNoPlay)
 	if err != nil {
 		return nil, err
 	}
 	result := &CourseRecordResult{Records: make([]*CourseRecordOutput, 0, len(records))}
+	var recordUpdatedAt *time.Time
 	for _, record := range records {
 		item := toCourseRecordOutput(record)
 		result.Records = append(result.Records, item)
-		if item.UpdatedAt != nil && (result.UpdatedAt == nil || item.UpdatedAt.After(*result.UpdatedAt)) {
-			result.UpdatedAt = item.UpdatedAt
+		if item.UpdatedAt != nil && (recordUpdatedAt == nil || item.UpdatedAt.After(*recordUpdatedAt)) {
+			recordUpdatedAt = item.UpdatedAt
 		}
 	}
+	result.UpdatedAt = newerTimePtr(masterUpdatedAt, recordUpdatedAt)
 	return result, nil
+}
+
+// newerTimePtr は2つの時刻ポインタのうち新しい方を返す。
+// 片方のみ存在する場合はその値、どちらも無い場合は nil。
+func newerTimePtr(a, b *time.Time) *time.Time {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	if b.After(*a) {
+		return b
+	}
+	return a
 }
 
 func (u *courseUsecase) GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error) {

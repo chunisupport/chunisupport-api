@@ -2350,6 +2350,49 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `updated_at` | string \| null | `courses.updated_at` の最大値 (ISO8601)。コースが0件の場合は `null` |
 
+### GET `/internal/users/:username/record/courses`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
+- **レスポンス**: 対象ユーザーのコースレコード一覧を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `courses` が空配列です。
+
+#### レスポンス例
+
+```json
+{
+  "courses": [
+    {
+      "display_id": "0123456789abcdef",
+      "idx": "50020",
+      "name": "CLASS I COURSE",
+      "class": "1",
+      "is_played": true,
+      "score": 3029000,
+      "is_clear": true,
+      "combo_lamp": "FULL COMBO",
+      "updated_at": "2026-07-10T08:00:00Z"
+    }
+  ],
+  "meta": {
+    "updated_at": "2026-07-14T10:00:00Z"
+  }
+}
+```
+
+#### CourseRecordListResponse スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `courses` | CourseRecordDTO[] | コースレコード配列 |
+| `meta` | UserRecordMetaDTO | メタ情報 |
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `meta.updated_at` | string \| null | COURSE マスタ更新日時（`courses.updated_at` 最大値）と、対象プレイヤーの COURSE レコード更新日時（`player_course_records.updated_at` 最大値）のうち新しい方。どちらもなければ `null`。プレイヤー未連携でもマスタ側のみ存在すればその値を返す |
+
+各要素の `courses[i].updated_at` は当該プレイ済みレコードの更新日時であり、`meta.updated_at` とは独立する。未プレイ補完データでは `null`。
+
 #### UserRecordResponseDTO スキーマ
 
 | フィールド | 型 | 説明 |
