@@ -838,13 +838,6 @@ func buildPlayerOutput(playerWithHonors *repository.PlayerWithHonors) *UserPlaye
 	return &UserPlayerOutput{Player: playerWithHonors.Player, Honors: playerWithHonors.Honors}
 }
 
-func derefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
 func initializeSlotMap() map[string][]*entity.PlayerRecord {
 	slots := []string{"best", "best_candidate", "new", "new_candidate"}
