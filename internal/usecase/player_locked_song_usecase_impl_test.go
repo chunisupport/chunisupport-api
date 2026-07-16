@@ -148,6 +148,14 @@ func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStatsWithExecu
 	return s.GetOverpowerTargetStats(ctx, filter)
 }
 
+func (s *stubPlayerDataRepositoryForLockedSong) SaveLatestUpdate(_ context.Context, _ repository.Executor, _ *entity.PlayerLatestUpdate) error {
+	return nil
+}
+
+func (s *stubPlayerDataRepositoryForLockedSong) FindLatestUpdateByPlayerID(_ context.Context, _ int) (*entity.PlayerLatestUpdate, error) {
+	return nil, repository.ErrPlayerLatestUpdateNotFound
+}
+
 type stubPlayerLockedSongQueryService struct {
 	gotPlayerID int
 	rows        []*PlayerLockedSongReadModel

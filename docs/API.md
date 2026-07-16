@@ -126,6 +126,7 @@
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
+| `/internal/me/player-data/latest-update` | GET | Firebase Bearer | 自分の最新プレイヤーデータ登録結果を取得 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
 | `/internal/me/locked-songs/batch` | POST | Firebase Bearer | 自分の未解禁曲をまとめて登録・解除 |
@@ -1324,6 +1325,36 @@ curl -X POST \
   - 409 Conflict (`conflict`): 別ユーザーのプレイヤーデータと競合
   - 413 Request Entity Too Large (`payload_too_large`): ボディサイズ5MB超過
   - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー（スコア範囲外など）
+
+---
+
+### GET `/internal/me/player-data/latest-update`
+
+認証済みユーザーに紐づくプレイヤーの最新データ登録結果を返します。
+
+- **認証**: Firebase Bearer必須
+- **成功レスポンス**: `200 OK`
+- **レスポンス形式**: `POST /internal/me/register-data` の成功レスポンスから `skipped_records` を除き、保存形式の `schema_version` を追加したJSON
+- `counts` 内の各スキップ件数はそのまま含みます
+- 保存済みの結果がない場合は `204 No Content` を返します。既存プレイヤーが本機能の導入後にまだデータ登録していない場合などが該当します
+
+```json
+{
+  "schema_version": 1,
+  "player_id": 42,
+  "app_ver": "0.1.0",
+  "imported_at": "2026-07-16T12:00:00+09:00",
+  "profile": {},
+  "summary": {},
+  "statistics": {},
+  "counts": {},
+  "changes": []
+}
+```
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
+  - 404 Not Found (`player_not_linked`): プレイヤー未連携
 
 ---
 

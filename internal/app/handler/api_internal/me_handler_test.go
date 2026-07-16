@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -42,6 +43,14 @@ func (m *mockPlayerDataUsecase) Delete(ctx context.Context, user *entity.User) e
 	return args.Error(0)
 }
 
+func (m *mockPlayerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.User) (json.RawMessage, error) {
+	args := m.Called(ctx, user)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(json.RawMessage), args.Error(1)
+}
+
 // compressAndEncodeGzipBase64 はJSONデータをgzip圧縮してbase64エンコードします。
 func compressAndEncodeGzipBase64(data []byte) (string, error) {
 	var buf bytes.Buffer
@@ -53,6 +62,96 @@ func compressAndEncodeGzipBase64(data []byte) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
+	testUser := &entity.User{ID: 1, Username: username.MustNewUserName("testuser")}
+
+	t.Run("保存済みの最新登録結果を返す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		e.JSONSerializer = app.NewTimezoneJSONSerializer(time.FixedZone("Asia/Tokyo", 9*60*60))
+		mockUsecase := new(mockPlayerDataUsecase)
+		raw := json.RawMessage(`{"schema_version":1,"player_id":12,"app_ver":"1.2.3","imported_at":"2026-07-16T02:03:04Z","profile":{"player_id":12,"name":"TEST","level":99,"rating":null,"class_emblem_id":null,"class_emblem_base_id":null,"last_played_at":"2026-07-16T01:00:00Z","overpower_value":null,"overpower_percent":null},"summary":{"name":"TEST","level":99,"rating":null,"last_played_at":"2026-07-16T01:00:00Z","overpower_value":null,"overpower_percentage":null},"statistics":{"overall":{"total_high_score":{"before":0,"after":0,"delta":0},"record_statistics":{}},"by_difficulty":{}},"counts":{},"changes":[]}`)
+		mockUsecase.On("GetLatestUpdate", mock.Anything, testUser).Return(raw, nil).Once()
+		h := api_internal.NewMeHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/latest-update", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", testUser)
+
+		// When
+		err := h.GetLatestPlayerUpdate(c)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var response map[string]any
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+		assert.Equal(t, float64(1), response["schema_version"])
+		assert.Equal(t, "1.2.3", response["app_ver"])
+		assert.Equal(t, "2026-07-16T11:03:04+09:00", response["imported_at"])
+		profile := response["profile"].(map[string]any)
+		assert.Equal(t, "2026-07-16T10:00:00+09:00", profile["last_played_at"])
+		assert.NotContains(t, response, "skipped_records")
+		mockUsecase.AssertExpectations(t)
+	})
+
+	t.Run("連携済みだが最新結果がない場合は204", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		mockUsecase := new(mockPlayerDataUsecase)
+		mockUsecase.On("GetLatestUpdate", mock.Anything, testUser).Return(nil, usecase.ErrPlayerLatestUpdateNotFound).Once()
+		h := api_internal.NewMeHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/latest-update", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", testUser)
+
+		// When
+		err := h.GetLatestPlayerUpdate(c)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		assert.Empty(t, rec.Body.String())
+	})
+
+	t.Run("プレイヤー未連携は404", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		mockUsecase := new(mockPlayerDataUsecase)
+		mockUsecase.On("GetLatestUpdate", mock.Anything, testUser).Return(nil, usecase.ErrPlayerNotLinked).Once()
+		h := api_internal.NewMeHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/latest-update", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", testUser)
+
+		// When
+		err := h.GetLatestPlayerUpdate(c)
+
+		// Then
+		apiErr, ok := err.(*apierror.APIError)
+		assert.True(t, ok)
+		assert.Equal(t, apierror.ErrPlayerNotLinked.Code, apiErr.Code)
+		assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	})
+
+	t.Run("認証ユーザーがなければ401", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		h := api_internal.NewMeHandler(new(mockPlayerDataUsecase))
+		req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/latest-update", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		// When
+		err := h.GetLatestPlayerUpdate(c)
+
+		// Then
+		assert.Equal(t, apierror.ErrUnauthorized, err)
+	})
 }
 
 func TestMeHandler_RegisterData(t *testing.T) {

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -132,6 +134,82 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	}
 
 	return nil
+}
+
+// SaveLatestUpdate は収集日時が新しいプレイヤーデータ登録結果だけを保存します。
+func (r *playerDataRepository) SaveLatestUpdate(ctx context.Context, exec repository.Executor, update *entity.PlayerLatestUpdate) error {
+	if exec == nil {
+		return fmt.Errorf("SaveLatestUpdate requires a non-nil executor: must be called within a transaction")
+	}
+	if update == nil {
+		return fmt.Errorf("SaveLatestUpdate requires a non-nil update")
+	}
+
+	model := models.FromPlayerLatestUpdateEntity(update)
+	insertQuery := `
+		INSERT INTO player_latest_updates (
+			player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+		) VALUES (
+			:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
+		)
+		ON DUPLICATE KEY UPDATE player_id = player_id
+	`
+	if r.db.DriverName() == "sqlite" {
+		insertQuery = `
+			INSERT INTO player_latest_updates (
+				player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+			) VALUES (
+				:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
+			)
+			ON CONFLICT(player_id) DO NOTHING
+		`
+	}
+	if _, err := exec.NamedExecContext(ctx, insertQuery, model); err != nil {
+		return fmt.Errorf("failed to save player latest update: %w", err)
+	}
+
+	updateQuery := `
+		UPDATE player_latest_updates
+		SET schema_version = :schema_version,
+			result_gzip = :result_gzip,
+			source_updated_at = :source_updated_at,
+			imported_at = :imported_at,
+			body_hash = :body_hash
+		WHERE player_id = :player_id
+		  AND (
+			source_updated_at < :source_updated_at
+			OR (
+				source_updated_at = :source_updated_at
+				AND body_hash <> :body_hash
+				AND imported_at < :imported_at
+			)
+		  )
+	`
+	if _, err := exec.NamedExecContext(ctx, updateQuery, model); err != nil {
+		return fmt.Errorf("failed to update player latest update: %w", err)
+	}
+	return nil
+}
+
+// FindLatestUpdateByPlayerID はプレイヤーIDに対応する最新データ登録結果を取得します。
+func (r *playerDataRepository) FindLatestUpdateByPlayerID(ctx context.Context, playerID int) (*entity.PlayerLatestUpdate, error) {
+	var model models.PlayerLatestUpdateModel
+	query := `
+		SELECT player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+		FROM player_latest_updates
+		WHERE player_id = ?
+	`
+	if err := r.db.GetContext(ctx, &model, query, playerID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrPlayerLatestUpdateNotFound
+		}
+		return nil, fmt.Errorf("failed to find player latest update: %w", err)
+	}
+	update, err := model.ToEntity()
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore player latest update: %w", err)
+	}
+	return update, nil
 }
 
 // FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。

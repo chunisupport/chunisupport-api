@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -75,6 +76,10 @@ func (s *stubPlayerDataUsecase) Register(ctx context.Context, user *entity.User,
 		return s.registerFn(ctx, user, payload, hash)
 	}
 	return &api_internal.PlayerDataResult{PlayerID: 1}, nil
+}
+
+func (s *stubPlayerDataUsecase) GetLatestUpdate(_ context.Context, _ *entity.User) (json.RawMessage, error) {
+	return nil, ErrPlayerLatestUpdateNotFound
 }
 
 func (s *stubPlayerDataUsecase) Delete(_ context.Context, _ *entity.User) error { return nil }

@@ -392,6 +392,14 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.Statistics = statistics
 		result.SkippedRecords = skippedRecords
 
+		latestUpdate, latestUpdateErr := buildPlayerLatestUpdate(result, updatedAt, bodyHash)
+		if latestUpdateErr != nil {
+			return latestUpdateErr
+		}
+		if latestUpdateErr = us.playerDataRepo.SaveLatestUpdate(ctx, tx, latestUpdate); latestUpdateErr != nil {
+			return latestUpdateErr
+		}
+
 		return nil
 	})
 	if err != nil {

@@ -202,6 +202,16 @@ CREATE TABLE `player_honors` (
   CONSTRAINT `player_honors_ibfk_2` FOREIGN KEY (`honor_id`) REFERENCES `honors` (`id`),
   CONSTRAINT `player_honors_chk_1` CHECK ((`slot` between 1 and 3))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_latest_updates` (
+  `player_id` mediumint unsigned NOT NULL,
+  `schema_version` int unsigned NOT NULL,
+  `result_gzip` mediumblob NOT NULL,
+  `source_updated_at` datetime(6) NOT NULL,
+  `imported_at` datetime(6) NOT NULL,
+  `body_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`player_id`),
+  CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_locked_songs` (
   `player_id` mediumint unsigned NOT NULL,
   `song_id` int unsigned NOT NULL,

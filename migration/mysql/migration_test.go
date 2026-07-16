@@ -243,3 +243,38 @@ func TestSchemaMySQL_保存済みフィルタテーブルを含む(t *testing.T)
 	assert.Contains(t, schemaSQL, "KEY `idx_record_filters_user_updated_id` (`user_id`,`updated_at` DESC,`id`)")
 	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_record_filters_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE")
 }
+
+func TestCreatePlayerLatestUpdatesUp_プレイヤーごとの最新登録結果テーブルを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000035_create_player_latest_updates.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE player_latest_updates")
+	assert.Contains(t, upSQL, "player_id MEDIUMINT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "schema_version INT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "result_gzip MEDIUMBLOB NOT NULL")
+	assert.Contains(t, upSQL, "source_updated_at DATETIME(6) NOT NULL")
+	assert.Contains(t, upSQL, "imported_at DATETIME(6) NOT NULL")
+	assert.Contains(t, upSQL, "body_hash CHAR(64) NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (player_id)")
+	assert.Contains(t, upSQL, "FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE")
+}
+
+func TestCreatePlayerLatestUpdatesDown_最新登録結果テーブルを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000035_create_player_latest_updates.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP TABLE IF EXISTS player_latest_updates")
+}
+
+func TestSchemaMySQL_プレイヤー最新登録結果テーブルを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "CREATE TABLE `player_latest_updates`")
+	assert.Contains(t, schemaSQL, "`result_gzip` mediumblob NOT NULL")
+	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE")
+}

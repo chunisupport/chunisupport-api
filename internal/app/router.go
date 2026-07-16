@@ -331,6 +331,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
+		meGroup.GET("/player-data/latest-update", handlers.Me.GetLatestPlayerUpdate)
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
 		meGroup.GET("/goals", handlers.Goal.List)
 		meGroup.POST("/goals", handlers.Goal.Create)

@@ -96,3 +96,16 @@ type PlayerDataResult struct {
 	Changes        []PlayerDataRecordChange `json:"changes"`
 	SkippedRecords []SkippedRecord          `json:"skipped_records"`
 }
+
+// PlayerLatestUpdateResult は保存済みの最新プレイヤーデータ登録結果です。
+type PlayerLatestUpdateResult struct {
+	SchemaVersion int                      `json:"schema_version"`
+	PlayerID      int                      `json:"player_id"`
+	AppVersion    string                   `json:"app_ver"`
+	ImportedAt    time.Time                `json:"imported_at"`
+	Profile       PlayerDataProfile        `json:"profile"`
+	Summary       PlayerDataSummary        `json:"summary"`
+	Statistics    PlayerDataStatistics     `json:"statistics"`
+	Counts        PlayerDataCounts         `json:"counts"`
+	Changes       []PlayerDataRecordChange `json:"changes"`
+}

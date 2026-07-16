@@ -7,12 +7,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 )
@@ -24,6 +26,28 @@ const (
 // MeHandler は認証済みユーザー向けエンドポイントを扱います。
 type MeHandler struct {
 	playerDataUsecase usecase.PlayerDataUsecase
+}
+
+// GetLatestPlayerUpdate は認証済みユーザーの最新プレイヤーデータ登録結果を返します。
+func (h *MeHandler) GetLatestPlayerUpdate(c *echo.Context) error {
+	user, ok := c.Get("userEntity").(*entity.User)
+	if !ok || user == nil {
+		return apierror.ErrUnauthorized
+	}
+
+	raw, err := h.playerDataUsecase.GetLatestUpdate(c.Request().Context(), user)
+	if errors.Is(err, usecase.ErrPlayerLatestUpdateNotFound) {
+		return c.NoContent(http.StatusNoContent)
+	}
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	var response dto_internal.PlayerLatestUpdateResult
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+	return c.JSON(http.StatusOK, &response)
 }
 
 // NewMeHandler は MeHandler のインスタンスを生成します。

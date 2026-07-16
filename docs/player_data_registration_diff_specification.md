@@ -209,6 +209,7 @@
 7. 通常譜面、WORLD'S END、コースをbulk upsertする。
 8. 保存済み通常譜面全件を再取得し、`statistics.after` とOVER POWERを計算する。
 9. 保存済み全スコアからレーティングを再計算し、レスポンスを組み立てる。
+10. 最新登録結果をJSON化してgzip圧縮し、スコア更新と同じトランザクションで保存する。
 
 保存前状態の取得は譜面ごとの個別問い合わせではなく一括取得する。集計も登録前後に通常譜面全件を1回ずつ取得して行うため、譜面数に比例したN+1問い合わせは発生しない。
 
@@ -218,10 +219,22 @@
 
 差分は「保存前状態の取得」と「upsert予定値」の比較で作る。同一プレイヤーに対する複数の登録リクエストを同時実行した場合、別リクエストが取得後に状態を変更すると、返却した差分が最終的なDB更新内容と一致しない可能性がある。現行実装は同一プレイヤーの登録が同時実行されない通常利用を前提とし、排他制御による差分の直列化は行わない。
 
-## 9. 実装上の参照先
+## 9. 最新登録結果の保存
+
+登録成功時の結果は `player_latest_updates` にプレイヤーごとに1件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
+
+JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` をUTCへ正規化した値を `source_updated_at`、サーバーの登録受付日時を `imported_at`、入力本文のSHA-256を `body_hash` として別カラムにも保存する。
+
+既存行より `source_updated_at` が新しい場合だけ最新結果を更新する。同じ `source_updated_at` で本文ハッシュが異なる場合は `imported_at` が新しい結果を採用し、本文ハッシュも同じ場合は更新しない。日時はマイクロ秒精度で保存する。保存はスコア更新と同じトランザクション内で行うため、最新登録結果の保存に失敗した場合はプレイヤーデータ登録全体をロールバックする。
+
+保存済みの最新登録結果は、Firebase認証が必要な `GET /internal/me/player-data/latest-update` で本人だけが参照できる。プレイヤー連携済みで保存済み結果がない場合は `204 No Content`、プレイヤー未連携の場合は `404 player_not_linked` を返す。
+
+## 10. 実装上の参照先
 
 - レスポンスDTO: `internal/dto/api_internal/player_data_dto.go`
 - 登録・差分計算: `internal/usecase/player_data_usecase_impl.go`
 - 集計条件: `internal/domain/service/player_record_statistics.go`
 - DB upsert条件: `internal/infra/repository/player_data_repository_impl.go`
+- 最新登録結果の変換: `internal/usecase/player_latest_update.go`
+- 最新登録結果テーブル: `migration/mysql/000035_create_player_latest_updates.up.sql`
 - HTTPエンドポイント: `internal/app/handler/api_internal/me_handler.go`、`internal/app/handler/api_internal/temporary_player_data_handler.go`

@@ -20,4 +20,5 @@ var (
 	ErrInvalidRecordFilterID     = errors.New("invalid record filter id")
 
 	ErrPlayerFavoriteSongLimitExceeded = errors.New("player favorite song limit exceeded")
+	ErrPlayerLatestUpdateNotFound      = errors.New("player latest update not found")
 )

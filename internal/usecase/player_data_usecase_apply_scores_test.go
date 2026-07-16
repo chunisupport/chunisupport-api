@@ -469,6 +469,8 @@ type stubPlayerDataRepositoryForApplyScoresTest struct {
 	overpowerErr    error
 	fullBefore      map[int]repository.PlayerRecordState
 	worldsendBefore map[int]repository.WorldsendRecordState
+	latestUpdate    *entity.PlayerLatestUpdate
+	latestUpdateErr error
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
@@ -513,6 +515,14 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStats(_ c
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec repository.Executor, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
 	return s.GetOverpowerTargetStats(ctx, filter)
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) SaveLatestUpdate(_ context.Context, _ repository.Executor, _ *entity.PlayerLatestUpdate) error {
+	return nil
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerID(_ context.Context, _ int) (*entity.PlayerLatestUpdate, error) {
+	return s.latestUpdate, s.latestUpdateErr
 }
 
 type stubPlayerLockedSongRepositoryForApplyScoresTest struct {
