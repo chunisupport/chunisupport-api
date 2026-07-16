@@ -137,7 +137,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
-	recordFilterRepo := infra.NewRecordFilterRepository(smallDataDB)
+	recordFilterRepo := infra.NewRecordFilterRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	playerFavoriteSongRepo := infra.NewPlayerFavoriteSongRepository()

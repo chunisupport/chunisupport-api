@@ -205,3 +205,30 @@ func TestAddDisplayIDToCoursesDown_表示用IDを削除する(t *testing.T) {
 	assert.Contains(t, downSQL, "DROP INDEX uq_courses_display_id")
 	assert.Contains(t, downSQL, "DROP COLUMN display_id")
 }
+
+func TestCreateRecordFiltersUp_保存済みフィルタテーブルを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000034_create_record_filters.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE record_filters")
+	assert.Contains(t, upSQL, "id BINARY(16) NOT NULL")
+	assert.Contains(t, upSQL, "user_id INT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "name VARCHAR(30) NOT NULL")
+	assert.Contains(t, upSQL, "filter_value_gzip BLOB NOT NULL")
+	assert.Contains(t, upSQL, "is_worldsend BOOLEAN NOT NULL DEFAULT FALSE")
+	assert.Contains(t, upSQL, "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
+	assert.Contains(t, upSQL, "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+	assert.Contains(t, upSQL, "PRIMARY KEY (id)")
+	assert.Contains(t, upSQL, "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE")
+	assert.Contains(t, upSQL, "INDEX idx_record_filters_user_updated_id (user_id, updated_at DESC, id ASC)")
+	assert.NotContains(t, upSQL, "UNIQUE KEY")
+}
+
+func TestCreateRecordFiltersDown_保存済みフィルタテーブルを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000034_create_record_filters.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP TABLE IF EXISTS record_filters")
+}
