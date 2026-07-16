@@ -313,6 +313,18 @@ CREATE TABLE `players` (
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `record_filters` (
+  `id` binary(16) NOT NULL,
+  `user_id` int unsigned NOT NULL,
+  `name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `filter_value_gzip` blob NOT NULL,
+  `is_worldsend` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_record_filters_user_updated_id` (`user_id`,`updated_at` DESC,`id`),
+  CONSTRAINT `fk_record_filters_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `schema_migrations` (
   `version` bigint NOT NULL,
   `dirty` tinyint(1) NOT NULL,

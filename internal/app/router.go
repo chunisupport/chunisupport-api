@@ -104,7 +104,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, smallDataDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)

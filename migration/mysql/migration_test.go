@@ -232,3 +232,14 @@ func TestCreateRecordFiltersDown_保存済みフィルタテーブルを削除�
 	// Then
 	assert.Contains(t, downSQL, "DROP TABLE IF EXISTS record_filters")
 }
+
+func TestSchemaMySQL_保存済みフィルタテーブルを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "CREATE TABLE `record_filters`")
+	assert.Contains(t, schemaSQL, "`id` binary(16) NOT NULL")
+	assert.Contains(t, schemaSQL, "KEY `idx_record_filters_user_updated_id` (`user_id`,`updated_at` DESC,`id`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_record_filters_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE")
+}

@@ -71,8 +71,6 @@ type Config struct {
 	Location *time.Location `json:"-"`
 	// StaticDBPath は静的データ用SQLiteのファイルパスです
 	StaticDBPath string `json:"static_db_path"`
-	// SmallDataDBPath は小規模なユーザー補助データ用SQLiteのファイルパスです。
-	SmallDataDBPath string `json:"smalldata_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
 	CORS                   CORS           `json:"cors"`
@@ -90,7 +88,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		Logging                *Logging `json:"logging"`
 		Timezone               string   `json:"timezone"`
 		StaticDBPath           string   `json:"static_db_path"`
-		SmallDataDBPath        string   `json:"smalldata_db_path"`
 		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
 		CORS                   CORS     `json:"cors"`
 		TempData               TempData `json:"temp_data"`
@@ -107,7 +104,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		c.loggingSet = true
 	}
 	c.StaticDBPath = raw.StaticDBPath
-	c.SmallDataDBPath = raw.SmallDataDBPath
 	c.ShutdownTimeoutSeconds = raw.ShutdownTimeoutSeconds
 	c.CORS = raw.CORS
 	c.TempData = raw.TempData
@@ -192,9 +188,6 @@ func LoadConfig() (Config, error) {
 
 	if strings.TrimSpace(config.StaticDBPath) == "" {
 		errors = append(errors, "static_db_path is required")
-	}
-	if strings.TrimSpace(config.SmallDataDBPath) == "" {
-		errors = append(errors, "smalldata_db_path is required")
 	}
 	if err := normalizeAndValidateTimezone(&config); err != nil {
 		errors = append(errors, err.Error())
