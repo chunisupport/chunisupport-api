@@ -339,6 +339,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		User:                new(internalhandler.UserHandler),
 		AdminUser:           new(internalhandler.AdminUserHandler),
 		Song:                new(internalhandler.SongHandler),
+		BestSlotStats:       new(internalhandler.BestSlotStatsHandler),
 		Honor:               new(internalhandler.HonorHandler),
 		Worldsend:           new(internalhandler.WorldsendHandler),
 		APIToken:            new(internalhandler.APITokenHandler),

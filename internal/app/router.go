@@ -87,6 +87,7 @@ type Handlers struct {
 	PlayerFavoriteSong   *api_internal.PlayerFavoriteSongHandler
 	Friendship           *api_internal.FriendshipHandler
 	FriendChartRanking   *api_internal.FriendChartRankingHandler
+	BestSlotStats        *api_internal.BestSlotStatsHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	Course               *api_internal.CourseHandler
 	// 外部API v1 用ハンドラ
@@ -145,6 +146,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
+	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db, staticDB)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	courseRepo := infra.NewCourseRepository(db)
@@ -205,6 +207,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		panic(fmt.Sprintf("failed to create friendship usecase: %v", err))
 	}
 	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
+	bestSlotRankingUsecase := usecase.NewBestSlotRankingUsecase(bestSlotRankingQueryService, chartStatsMasterProvider)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 
 	// DI - Handlers
@@ -236,6 +239,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 		PlayerFavoriteSong:   api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
 		Friendship:           api_internal.NewFriendshipHandler(friendshipUsecase),
 		FriendChartRanking:   api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
+		BestSlotStats:        api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		Course:               api_internal.NewCourseHandler(courseUsecase),
 		// 外部API v1 用ハンドラ
@@ -432,6 +436,13 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
 		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
 		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
+		publicSongsGroup.GET("/:displayid/best-slot-stats/:difficulty", handlers.BestSlotStats.GetChartStats)
+	}
+
+	bestSlotRankingGroup := internal.Group("/best-slot-rankings")
+	bestSlotRankingGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
+	{
+		bestSlotRankingGroup.GET("", handlers.BestSlotStats.GetRanking)
 	}
 
 	// api.chunisupport.net/internal/worldsend-songs

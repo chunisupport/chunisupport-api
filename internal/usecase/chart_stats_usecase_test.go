@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type MockChartStatsRepository struct {
@@ -35,6 +36,42 @@ func (m *MockChartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*entity.ChartStatsByRatingBand), args.Error(1)
+}
+
+func (m *MockChartStatsRepository) FindChartBestSlotStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartBestSlotStatsByRatingBand, error) {
+	args := m.Called(ctx, exec, chartIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*entity.ChartBestSlotStatsByRatingBand), args.Error(1)
+}
+
+func TestGetChartBestSlotStatsByDisplayIDAndDifficulty_レート帯順で取得する(t *testing.T) {
+	// Given
+	ctx := context.Background()
+	mockSongRepo := new(MockSongRepository)
+	mockWorldsendRepo := new(MockWorldsendChartRepository)
+	mockStatsRepo := new(MockChartStatsRepository)
+	mockSongMasterProvider := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	provider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 2}, {ID: 20, SortOrder: 1}}}
+	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, provider, mockExec, mockExec)
+	song := &entity.Song{DisplayID: "0000000000000001", Charts: []*entity.Chart{{ID: 101, DifficultyID: 4}}}
+	mockSongRepo.On("FindByDisplayID", ctx, mockExec, song.DisplayID).Return(song, nil).Once()
+	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
+	mockStatsRepo.On("FindChartBestSlotStatsByChartIDs", ctx, mockExec, []int{101}).Return([]*entity.ChartBestSlotStatsByRatingBand{
+		{ChartID: 101, RatingBandID: 10},
+		{ChartID: 101, RatingBandID: 20},
+	}, nil).Once()
+
+	// When
+	result, err := u.GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx, song.DisplayID, "MASTER", nil)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, result.Stats, 2)
+	assert.Equal(t, 20, result.Stats[0].RatingBandID)
+	mockStatsRepo.AssertExpectations(t)
 }
 
 type StubChartStatsMasterProvider struct {

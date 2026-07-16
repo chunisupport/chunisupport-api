@@ -17,6 +17,8 @@ const (
 	BulkSelectChunkSize            = 1000 // IN句のプレースホルダ上限を避けるための分割数
 	DefaultUserListLimit           = 100
 	DefaultSongListLimit           = 100
+	DefaultBestSlotRankingLimit    = 50
+	MaxBestSlotRankingLimit        = 100
 	GoalMaxPerUser                 = 100
 	RecordFilterMaxPerUser         = 100
 	RecordFilterNameMaxLength      = 30

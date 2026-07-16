@@ -65,10 +65,42 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			median_score REAL,
 			player_count INTEGER NOT NULL
 		);
+		CREATE TABLE IF NOT EXISTS chart_best_slot_stats_by_rating_band (
+			chart_id INTEGER NOT NULL,
+			rating_band_id INTEGER NOT NULL,
+			best_player_count INTEGER NOT NULL,
+			eligible_player_count INTEGER NOT NULL,
+			best_player_percentage REAL
+		);
 	`)
 	require.NoError(t, err)
 
 	return db
+}
+
+func TestFindChartBestSlotStatsByChartIDs_対象譜面を一括取得する(t *testing.T) {
+	// Given
+	db := setupChartStatsDB(t)
+	defer db.Close()
+	_, err := db.Exec(`
+		INSERT INTO chart_best_slot_stats_by_rating_band
+			(chart_id, rating_band_id, best_player_count, eligible_player_count, best_player_percentage)
+		VALUES (100, 0, 10, 40, 25.0), (100, 22, 4, 8, 50.0), (200, 22, 1, 8, 12.5)
+	`)
+	require.NoError(t, err)
+	repo := &chartStatsRepository{db: db}
+
+	// When
+	stats, err := repo.FindChartBestSlotStatsByChartIDs(context.Background(), db, []int{100})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, stats, 2)
+	assert.Equal(t, 0, stats[0].RatingBandID)
+	assert.Equal(t, 22, stats[1].RatingBandID)
+	assert.Equal(t, 4, stats[1].BestPlayerCount)
+	require.NotNil(t, stats[1].BestPlayerPercentage)
+	assert.InDelta(t, 50.0, *stats[1].BestPlayerPercentage, 0.0001)
 }
 
 func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {

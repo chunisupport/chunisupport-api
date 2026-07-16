@@ -5,10 +5,12 @@ import "errors"
 var (
 	ErrInvalidPlayerName = errors.New("invalid player name")
 
-	ErrInvalidDifficulty     = errors.New("invalid difficulty")
-	ErrChartNotFound         = errors.New("chart not found")
-	ErrInvalidWorldsendInput = errors.New("invalid worldsend input")
-	ErrInvalidHonorInput     = errors.New("invalid honor input")
+	ErrInvalidDifficulty            = errors.New("invalid difficulty")
+	ErrInvalidRatingBand            = errors.New("invalid rating band")
+	ErrInvalidBestSlotRankingCursor = errors.New("invalid best-slot ranking cursor")
+	ErrChartNotFound                = errors.New("chart not found")
+	ErrInvalidWorldsendInput        = errors.New("invalid worldsend input")
+	ErrInvalidHonorInput            = errors.New("invalid honor input")
 
 	ErrAdminRequired = errors.New("admin permission required")
 

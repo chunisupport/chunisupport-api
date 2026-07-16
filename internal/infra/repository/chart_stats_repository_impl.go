@@ -166,6 +166,48 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 	`, chartIDs)
 }
 
+// FindChartBestSlotStatsByChartIDs は通常譜面のベスト枠採用統計を一括取得します。
+func (r *chartStatsRepository) FindChartBestSlotStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartBestSlotStatsByRatingBand, error) {
+	if len(chartIDs) == 0 {
+		return []*entity.ChartBestSlotStatsByRatingBand{}, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT chart_id, rating_band_id, best_player_count, eligible_player_count, best_player_percentage
+		FROM chart_best_slot_stats_by_rating_band
+		WHERE chart_id IN (?)
+		ORDER BY chart_id, rating_band_id
+	`, chartIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = exec.Rebind(query)
+
+	type row struct {
+		ChartID              int      `db:"chart_id"`
+		RatingBandID         int      `db:"rating_band_id"`
+		BestPlayerCount      int      `db:"best_player_count"`
+		EligiblePlayerCount  int      `db:"eligible_player_count"`
+		BestPlayerPercentage *float64 `db:"best_player_percentage"`
+	}
+	var rows []row
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+
+	results := make([]*entity.ChartBestSlotStatsByRatingBand, 0, len(rows))
+	for _, item := range rows {
+		results = append(results, &entity.ChartBestSlotStatsByRatingBand{
+			ChartID:              item.ChartID,
+			RatingBandID:         item.RatingBandID,
+			BestPlayerCount:      item.BestPlayerCount,
+			EligiblePlayerCount:  item.EligiblePlayerCount,
+			BestPlayerPercentage: item.BestPlayerPercentage,
+		})
+	}
+	return results, nil
+}
+
 // FindWorldsendChartStatsByChartIDs はWORLD'S END譜面ID一覧に対する統計を返します。
 func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
 	return r.findChartStatsByChartIDs(ctx, exec, `

@@ -23,6 +23,44 @@ type ChartStatsUsecase interface {
 	// または "WORLD'S END" である必要があります。
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error)
+
+	// GetChartBestSlotStatsByDisplayIDAndDifficulty は指定譜面のベスト枠採用統計を取得します。
+	GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartBestSlotStats, error)
+}
+
+// GetChartBestSlotStatsByDisplayIDAndDifficulty は通常譜面のレート帯別ベスト枠採用統計を返します。
+func (u *chartStatsUsecaseImpl) GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartBestSlotStats, error) {
+	if difficultyName == info.StatsDifficultyWorldsend {
+		return nil, ErrInvalidDifficulty
+	}
+
+	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	if err != nil {
+		return nil, err
+	}
+	if !song.IsActive() && (requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor)) {
+		return nil, repository.ErrSongNotFound
+	}
+
+	entry, err := u.findChartEntryByDifficulty(song, difficultyName)
+	if err != nil {
+		return nil, err
+	}
+	stats, err := u.statsRepo.FindChartBestSlotStatsByChartIDs(ctx, u.statsExecutor, []int{entry.id})
+	if err != nil {
+		return nil, err
+	}
+
+	ratingBands := u.masterProvider.RatingBands()
+	bandOrder := make(map[int]int, len(ratingBands))
+	for _, band := range ratingBands {
+		bandOrder[band.ID] = band.SortOrder
+	}
+	slices.SortFunc(stats, func(a, b *entity.ChartBestSlotStatsByRatingBand) int {
+		return cmp.Compare(bandOrder[a.RatingBandID], bandOrder[b.RatingBandID])
+	})
+
+	return &entity.SingleChartBestSlotStats{SongID: song.DisplayID, Difficulty: entry.key, Stats: stats}, nil
 }
 
 type chartStatsUsecaseImpl struct {

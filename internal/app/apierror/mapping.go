@@ -67,6 +67,10 @@ func FromUsecaseError(err error) *APIError {
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRatingBand):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidBestSlotRankingCursor):
+		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrChartNotFound):
 		return ErrChartNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrScoreHistoryNotFound):

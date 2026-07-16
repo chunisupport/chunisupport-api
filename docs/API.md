@@ -170,6 +170,8 @@
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
 | `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs/:displayid/best-slot-stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別ベスト枠採用統計取得 |
+| `/internal/best-slot-rankings` | GET | Firebase Bearer (任意) | ベスト枠平均レート帯別の譜面採用率ランキング取得 |
 | `/internal/songs` | POST | Firebase Bearer (ADMIN+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
@@ -2687,6 +2689,106 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/best-slot-rankings`
+
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしは1分60回/IP
+- **概要**: 指定したベスト枠平均レート帯について、各譜面がベスト枠に採用されているプレイヤーの割合を降順で取得します。削除済み楽曲、WORLD'S END譜面、採用人数0人の譜面は返しません。
+- **クエリパラメータ**:
+  - `rating_band` (必須): `/internal/master` の `rating_bands[].label`（例: `17.0`, `17.6+`）。`17.6+` を直接URLへ記述する場合、`+` は `%2B` にエンコードしてください。
+  - `limit` (任意): 1～100。デフォルト50
+  - `cursor` (任意): 前回レスポンスの `next_cursor`
+- **ソート順**: `best_player_percentage` 降順 → `best_player_count` 降順 → 楽曲識別ID昇順 → 難易度名昇順
+- **レスポンス**: 200 OK
+
+```json
+{
+  "rating_band": "17.0",
+  "eligible_player_count": 40,
+  "ranking": [
+    {
+      "rank": 1,
+      "song": {
+        "id": "0000000000000001",
+        "title": "楽曲名"
+      },
+      "chart": {
+        "difficulty": "MASTER",
+        "const": 14.8,
+        "is_const_unknown": false
+      },
+      "best_player_count": 10,
+      "best_player_percentage": 25.0
+    }
+  ],
+  "next_cursor": "opaque-cursor"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `rating_band` | string | 集計に使用したベスト枠平均レート帯のラベル |
+| `eligible_player_count` | number | 指定レート帯の集計対象プレイヤー数 |
+| `ranking` | array | ベスト枠採用率順の譜面一覧 |
+| `ranking[].rank` | number | ランキング順位 |
+| `ranking[].song.id` | string | 楽曲の識別ID（16桁） |
+| `ranking[].song.title` | string | 楽曲名 |
+| `ranking[].chart.difficulty` | string | 難易度（大文字） |
+| `ranking[].chart.const` | number | 譜面定数 |
+| `ranking[].chart.is_const_unknown` | boolean | 譜面定数が推定値の場合true |
+| `ranking[].best_player_count` | number | 指定レート帯でこの譜面をベスト枠に持つプレイヤー数 |
+| `ranking[].best_player_percentage` | number | `best_player_count / eligible_player_count * 100`（小数点以下4桁まで） |
+| `next_cursor` | string\|null | 次ページがある場合の不透明カーソル |
+
+- **主なエラー**:
+  - 422 Unprocessable Entity (`validation_failed`): `rating_band`、`limit`、`cursor` が不正
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/songs/:displayid/best-slot-stats/:difficulty`
+
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしは1分60回/IP
+- **概要**: 指定した通常譜面について、ベスト枠平均レート帯別の採用人数、集計対象人数、採用率を取得します。WORLD'S ENDは対象外です。
+- **パスパラメータ**:
+  - `displayid`: 楽曲の表示用ID
+  - `difficulty`: `basic`, `advanced`, `expert`, `master`, `ultima`
+- **レスポンス**: 200 OK
+
+```json
+{
+  "song_id": "0000000000000001",
+  "stats": [
+    {
+      "rating_band": "ALL",
+      "best_player_count": 520,
+      "eligible_player_count": 1640,
+      "best_player_percentage": 31.7073
+    },
+    {
+      "rating_band": "17.0",
+      "best_player_count": 10,
+      "eligible_player_count": 40,
+      "best_player_percentage": 25.0
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `song_id` | string | 楽曲の識別ID（16桁） |
+| `stats` | array | レート帯の表示順に並んだ統計。先頭は `ALL` |
+| `stats[].rating_band` | string | ベスト枠平均レート帯のラベル |
+| `stats[].best_player_count` | number | この譜面をベスト枠に持つプレイヤー数 |
+| `stats[].eligible_player_count` | number | レート帯の集計対象プレイヤー数 |
+| `stats[].best_player_percentage` | number\|null | ベスト枠採用率。集計対象が0人の場合はnull |
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_difficulty`): 無効な難易度またはWORLD'S END
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
