@@ -106,7 +106,7 @@ down側:
 DROP TABLE IF EXISTS player_locked_songs;
 ```
 
-SQLiteマイグレーションは持たない。本プロジェクトのSQLiteは統計と小規模データ用途であり、アプリケーション本体の未解禁曲管理テーブルはMySQLのみを対象にする。RepositoryテストもMySQLを前提にし、SQLite用のDDLやテストスキーマは持たない。
+未解禁曲管理テーブルはMySQLのみを対象にする。RepositoryテストもMySQLを前提にし、SQLite用のDDLやテストスキーマは持たない。
 
 ---
 

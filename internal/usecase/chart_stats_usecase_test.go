@@ -55,7 +55,7 @@ func TestGetChartBestSlotStatsByDisplayIDAndDifficulty_レート帯順で取得�
 	mockSongMasterProvider := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	provider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 2}, {ID: 20, SortOrder: 1}}}
-	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, provider, mockExec, mockExec)
+	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, provider, mockExec)
 	song := &entity.Song{DisplayID: "0000000000000001", Charts: []*entity.Chart{{ID: 101, DifficultyID: 4}}}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, song.DisplayID).Return(song, nil).Once()
 	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
@@ -91,7 +91,7 @@ func TestGetSongStatsByDisplayID_SortByRatingBandOrder(t *testing.T) {
 	mockExec := new(MockExecutor)
 	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 2}, {ID: 20, SortOrder: 1}}}
 
-	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 	song := &entity.Song{DisplayID: "S001", Charts: []*entity.Chart{{ID: 101, DifficultyID: 3}}}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S001").Return(song, nil)
@@ -113,7 +113,7 @@ func TestGetSongStatsByDisplayID_WorldsendUsesDedicatedStatsRepository(t *testin
 	mockExec := new(MockExecutor)
 	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 1, SortOrder: 2}, {ID: 2, SortOrder: 1}}}
 
-	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 	song := &entity.Song{DisplayID: "WE001", IsWorldsend: true}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(song, nil)
@@ -199,7 +199,7 @@ func TestGetSongStatsByDisplayID_DeletedSongPermissionBranch(t *testing.T) {
 
 			tt.setupMocks(ctx, mockSongRepo, mockStatsRepo, mockSongMasterProvider, mockExec)
 
-			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 			result, err := u.GetSongStatsByDisplayID(ctx, "S002", tt.accountTypeID)
 
@@ -218,7 +218,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendBranch(t *testing.T) {
 	mockExec := new(MockExecutor)
 	stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 1, SortOrder: 2}, {ID: 2, SortOrder: 1}}}
 
-	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 	worldsendSong := &entity.Song{DisplayID: "WE001", IsWorldsend: true}
 	mockWorldsendRepo.On("FindByDisplayID", ctx, mockExec, "WE001").Return(&entity.WorldsendSongWithChart{Song: worldsendSong, Chart: &entity.WorldsendChart{ID: 301}}, nil)
@@ -295,7 +295,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.
 				mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{201}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
 			}
 
-			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 			result, err := u.GetChartStatsByDisplayIDAndDifficulty(ctx, "S002", "MASTER", tt.accountTypeID)
 
@@ -358,7 +358,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendDeletedSongPermission(t 
 				mockStatsRepo.On("FindWorldsendChartStatsByChartIDs", ctx, mockExec, []int{401}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
 			}
 
-			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec, mockExec)
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
 
 			result, err := u.GetChartStatsByDisplayIDAndDifficulty(ctx, "WE002", info.StatsDifficultyWorldsend, tt.accountTypeID)
 

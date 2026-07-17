@@ -1,0 +1,4 @@
+DROP TABLE chart_best_slot_stats_by_rating_band;
+DROP TABLE worldsend_chart_stats_by_rating_band;
+DROP TABLE chart_stats_by_rating_band;
+DROP TABLE rating_bands;

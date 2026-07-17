@@ -29,7 +29,6 @@
 - `logging.stdout`
 - `logging.app_file`（任意。空文字ならアプリログのファイル出力なし）
 - `logging.access_file`（任意。空文字ならアクセスログのファイル出力なし）
-- `static_db_path` (統計データ用SQLiteデータベースのパス)
 - `shutdown_timeout_seconds` (1以上)
 - `cors.allow_origins`
 - `cors.allow_credentials`
@@ -123,7 +122,6 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
     "access_file": ".log/access.log",
     "stdout": true
   },
-  "static_db_path": "./static.db",
   "shutdown_timeout_seconds": 20,
   "cors": {
     "allow_origins": [

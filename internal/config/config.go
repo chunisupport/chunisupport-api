@@ -69,8 +69,6 @@ type Config struct {
 	Timezone string  `json:"timezone"`
 	// Location は検証済みのAPI出力用タイムゾーンです。
 	Location *time.Location `json:"-"`
-	// StaticDBPath は静的データ用SQLiteのファイルパスです
-	StaticDBPath string `json:"static_db_path"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
 	CORS                   CORS           `json:"cors"`
@@ -87,7 +85,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		AppPort                int      `json:"app_port"`
 		Logging                *Logging `json:"logging"`
 		Timezone               string   `json:"timezone"`
-		StaticDBPath           string   `json:"static_db_path"`
 		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
 		CORS                   CORS     `json:"cors"`
 		TempData               TempData `json:"temp_data"`
@@ -103,7 +100,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		c.Logging = *raw.Logging
 		c.loggingSet = true
 	}
-	c.StaticDBPath = raw.StaticDBPath
 	c.ShutdownTimeoutSeconds = raw.ShutdownTimeoutSeconds
 	c.CORS = raw.CORS
 	c.TempData = raw.TempData
@@ -186,9 +182,6 @@ func LoadConfig() (Config, error) {
 		errors = append(errors, "shutdown_timeout_seconds must be greater than 0")
 	}
 
-	if strings.TrimSpace(config.StaticDBPath) == "" {
-		errors = append(errors, "static_db_path is required")
-	}
 	if err := normalizeAndValidateTimezone(&config); err != nil {
 		errors = append(errors, err.Error())
 	}

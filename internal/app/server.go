@@ -24,22 +24,20 @@ type Server struct {
 	cancelStart       context.CancelFunc
 	startDone         chan struct{}
 	db                *sqlx.DB
-	staticDB          *sqlx.DB
 	cfg               config.Config
 	masterCache       *masterdata.Cache
 	staticMasterCache *masterdata.StaticCache
 }
 
 // NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *Server {
+func NewServer(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *Server {
 	startCtx, cancelStart := context.WithCancel(context.Background())
 	return &Server{
-		echo:              NewRouter(db, staticDB, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
+		echo:              NewRouter(db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
 		startCtx:          startCtx,
 		cancelStart:       cancelStart,
 		startDone:         make(chan struct{}),
 		db:                db,
-		staticDB:          staticDB,
 		cfg:               cfg,
 		masterCache:       masterCache,
 		staticMasterCache: staticMasterCache,
@@ -86,13 +84,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			slog.Error("Failed to close database connection", "error", err)
-			shutdownErrs = append(shutdownErrs, err)
-		}
-	}
-
-	if s.staticDB != nil {
-		if err := s.staticDB.Close(); err != nil {
-			slog.Error("Failed to close static database connection", "error", err)
 			shutdownErrs = append(shutdownErrs, err)
 		}
 	}

@@ -113,6 +113,38 @@ func TestStoreOnlySPHonorImageURLsDown_NULLを空文字へ戻す(t *testing.T) {
 	assert.Contains(t, downSQL, "MODIFY COLUMN image_url VARCHAR(255) NOT NULL DEFAULT ''")
 }
 
+func TestCreateChartStatisticsUp_MySQLへ統計テーブルを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000036_create_chart_statistics.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE rating_bands")
+	assert.Contains(t, upSQL, "CREATE TABLE chart_stats_by_rating_band")
+	assert.Contains(t, upSQL, "CREATE TABLE worldsend_chart_stats_by_rating_band")
+	assert.Contains(t, upSQL, "CREATE TABLE chart_best_slot_stats_by_rating_band")
+	assert.Contains(t, upSQL, "FOREIGN KEY (chart_id) REFERENCES charts(id) ON DELETE CASCADE")
+	assert.Contains(t, upSQL, "FOREIGN KEY (worldsend_chart_id) REFERENCES worldsend_charts(id) ON DELETE CASCADE")
+	assert.Contains(t, upSQL, "(0, 'ALL', NULL, NULL, 0)")
+}
+
+func TestCreateChartStatisticsDown_依存順に統計テーブルを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000036_create_chart_statistics.down.sql")
+
+	// Then
+	bestSlotIndex := strings.Index(downSQL, "DROP TABLE chart_best_slot_stats_by_rating_band")
+	chartIndex := strings.Index(downSQL, "DROP TABLE chart_stats_by_rating_band")
+	worldsendIndex := strings.Index(downSQL, "DROP TABLE worldsend_chart_stats_by_rating_band")
+	ratingBandIndex := strings.Index(downSQL, "DROP TABLE rating_bands")
+	require.NotEqual(t, -1, bestSlotIndex)
+	require.NotEqual(t, -1, chartIndex)
+	require.NotEqual(t, -1, worldsendIndex)
+	require.NotEqual(t, -1, ratingBandIndex)
+	assert.Less(t, bestSlotIndex, ratingBandIndex)
+	assert.Less(t, chartIndex, ratingBandIndex)
+	assert.Less(t, worldsendIndex, ratingBandIndex)
+}
+
 func TestCreateCoursesUp_コースマスタとレコードを作成する(t *testing.T) {
 	// Given
 	upSQL := readNormalizedMigrationSQL(t, "000030_create_courses.up.sql")
