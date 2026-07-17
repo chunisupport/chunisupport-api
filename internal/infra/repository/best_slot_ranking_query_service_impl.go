@@ -17,13 +17,12 @@ var _ domainrepo.BestSlotRankingQueryService = (*BestSlotRankingQueryService)(ni
 
 // BestSlotRankingQueryService は統計行と通常譜面マスターを一括結合します。
 type BestSlotRankingQueryService struct {
-	defaultDB *sqlx.DB
-	statsDB   *sqlx.DB
+	db *sqlx.DB
 }
 
 // NewBestSlotRankingQueryService はランキング読み取りサービスを生成します。
-func NewBestSlotRankingQueryService(defaultDB, statsDB *sqlx.DB) *BestSlotRankingQueryService {
-	return &BestSlotRankingQueryService{defaultDB: defaultDB, statsDB: statsDB}
+func NewBestSlotRankingQueryService(db *sqlx.DB) *BestSlotRankingQueryService {
+	return &BestSlotRankingQueryService{db: db}
 }
 
 type bestSlotRankingStatsRow struct {
@@ -42,17 +41,17 @@ type bestSlotRankingChartRow struct {
 }
 
 func (q *BestSlotRankingQueryService) List(ctx context.Context, ratingBandID int, cursor *domainrepo.BestSlotRankingCursor, limit int) (*domainrepo.BestSlotRankingPage, error) {
-	eligibleCount, err := findEligiblePlayerCount(ctx, q.statsDB, ratingBandID)
+	eligibleCount, err := findEligiblePlayerCount(ctx, q.db, ratingBandID)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := findBestSlotRankingRows(ctx, q.statsDB, ratingBandID)
+	rows, err := findBestSlotRankingRows(ctx, q.db, ratingBandID)
 	if err != nil {
 		return nil, err
 	}
 
-	charts, err := findBestSlotRankingCharts(ctx, q.defaultDB)
+	charts, err := findBestSlotRankingCharts(ctx, q.db)
 	if err != nil {
 		return nil, err
 	}

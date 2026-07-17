@@ -6,7 +6,6 @@
     "access_file": ".log/access.log",
     "stdout": true
   },
-  "static_db_path": "./static.db",
   "shutdown_timeout_seconds": 20,
   "cors": {
     "allow_origins": [

@@ -13,14 +13,11 @@ import (
 
 func TestBestSlotRankingQueryService_List_割合順で楽曲情報を一括結合する(t *testing.T) {
 	// Given
-	defaultDB, err := sqlx.Open("sqlite", ":memory:")
+	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
-	defer defaultDB.Close()
-	staticDB, err := sqlx.Open("sqlite", ":memory:")
-	require.NoError(t, err)
-	defer staticDB.Close()
+	defer db.Close()
 
-	_, err = defaultDB.Exec(`
+	_, err = db.Exec(`
 		CREATE TABLE songs (id INTEGER PRIMARY KEY, display_id TEXT, title TEXT, is_worldsend INTEGER, is_deleted INTEGER);
 		CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT);
 		CREATE TABLE charts (id INTEGER PRIMARY KEY, song_id INTEGER, difficulty_id INTEGER, const REAL, is_const_unknown INTEGER);
@@ -36,7 +33,7 @@ func TestBestSlotRankingQueryService_List_割合順で楽曲情報を一括結�
 			(104, 4, 4, 15.0, 0), (105, 5, 4, 15.0, 0);
 	`)
 	require.NoError(t, err)
-	_, err = staticDB.Exec(`
+	_, err = db.Exec(`
 		CREATE TABLE chart_best_slot_stats_by_rating_band (
 			chart_id INTEGER, rating_band_id INTEGER, best_player_count INTEGER,
 			eligible_player_count INTEGER, best_player_percentage REAL
@@ -50,7 +47,7 @@ func TestBestSlotRankingQueryService_List_割合順で楽曲情報を一括結�
 	`)
 	require.NoError(t, err)
 
-	service := NewBestSlotRankingQueryService(defaultDB, staticDB)
+	service := NewBestSlotRankingQueryService(db)
 
 	// When
 	page, err := service.List(context.Background(), 22, nil, 2)

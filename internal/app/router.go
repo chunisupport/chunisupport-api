@@ -105,7 +105,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
-func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
@@ -134,7 +134,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	scoreHistoryRepo := infra.NewScoreHistoryRepository(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
-	chartStatsRepo := infra.NewChartStatsRepository(staticDB)
+	chartStatsRepo := infra.NewChartStatsRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
@@ -146,7 +146,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
-	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db, staticDB)
+	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	courseRepo := infra.NewCourseRepository(db)
@@ -178,7 +178,7 @@ func NewRouter(db *sqlx.DB, staticDB *sqlx.DB, cfg config.Config, masterCache *m
 	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
-	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db, staticDB)
+	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
 	recordFilterUsecase := usecase.NewRecordFilterUsecase(recordFilterRepo)

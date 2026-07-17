@@ -90,14 +90,6 @@ func run() int {
 
 	slog.Info("Connected to the database")
 
-	staticDatabase, err := db.ConnectStatic(cfg.StaticDBPath)
-	if err != nil {
-		slog.Error("Failed to connect to static database", "error", err)
-		return 1
-	}
-
-	slog.Info("Connected to the static database")
-
 	// 必須データの存在チェック
 	// if err := db.ValidateRequiredData(database); err != nil {
 	// 	slog.Error("Required data validation failed", "error", err)
@@ -115,7 +107,7 @@ func run() int {
 
 	slog.Info("Master data preloaded")
 
-	staticMasterCache, err := masterdata.PreloadStatic(ctx, staticDatabase)
+	staticMasterCache, err := masterdata.PreloadStatic(ctx, database)
 	if err != nil {
 		slog.Error("Failed to preload static master data", "error", err)
 		return 1
@@ -135,15 +127,11 @@ func run() int {
 			slog.Error("Failed to close database after startup cancellation", "error", closeErr)
 			return 1
 		}
-		if closeErr := staticDatabase.Close(); closeErr != nil {
-			slog.Error("Failed to close static database after startup cancellation", "error", closeErr)
-			return 1
-		}
 		slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
 		return 0
 	}
 
-	server := app.NewServer(database, staticDatabase, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
+	server := app.NewServer(database, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
 
 	serverErrCh := make(chan error, 1)
 	go func() {

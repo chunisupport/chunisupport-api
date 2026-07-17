@@ -8,16 +8,16 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// StaticCache は統計DB（SQLite）から起動時にプリロードされるマスタのセットです。
+// StaticCache は統計用マスタから起動時にプリロードされる値のセットです。
 type StaticCache struct {
 	RatingBands        []*ratingband.RatingBand
 	RatingBandsByID    map[int]*ratingband.RatingBand
 	RatingBandsByLabel map[string]*ratingband.RatingBand
 }
 
-// PreloadStatic は統計DBから固定値が INSERT されているマスタを読み込み、キャッシュを構築します。
-func PreloadStatic(ctx context.Context, staticDB *sqlx.DB) (*StaticCache, error) {
-	ratingBands, err := loadRatingBands(ctx, staticDB)
+// PreloadStatic はMySQLから統計用マスタを読み込み、キャッシュを構築します。
+func PreloadStatic(ctx context.Context, db *sqlx.DB) (*StaticCache, error) {
+	ratingBands, err := loadRatingBands(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload rating_bands: %w", err)
 	}

@@ -5,12 +5,12 @@
 このプロジェクトでは、データベースのスキーマ管理とマイグレーションのために [**golang-migrate**](https://github.com/golang-migrate/migrate) を使用しています。インストールにはバイナリのダウンロードではなく、以下のコマンドを利用してください。
 
 ```plaintext
-go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ``` 
 
 マイグレーションファイルは `migration/mysql` ディレクトリに格納されており、`*.up.sql` ファイルがスキーマの追加・変更、`*.down.sql` ファイルが変更のロールバックを定義します。
 
-静的データ用のSQLiteスキーマは `migration/sqlite` ディレクトリに配置しています。
+`migration/sqlite`はMySQL統計移行前の履歴として残しており、新規環境では適用しません。
 
 ## 主要テーブルの概要
 
@@ -173,6 +173,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000019**: バージョンマスタに「CHUNITHM Mate」（2026年7月2日稼働）を追加。
 - **000024**: `players` テーブルにCHUNITHM-NETからのデータ取得完了日時を保持する `data_collected_at` カラムを追加。
 - **000028**: `goals` テーブルにユーザー内の表示順を保持する `sort_order` カラムを追加。既存データは作成順で採番し、一覧用インデックスを `(user_id, sort_order, id)` へ変更。MySQLのDDLは暗黙コミットされるため、適用開始から完了までGoalの作成・更新・削除・並び替えを停止する。
+- **000036**: レーティング帯マスタと譜面統計3表をMySQLへ追加。統計は別リポジトリのバッチが実行ごとに全削除して再生成する。
 
 #### 000028の失敗時復旧
 
