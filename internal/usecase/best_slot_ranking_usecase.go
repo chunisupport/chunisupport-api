@@ -18,6 +18,7 @@ type BestSlotRankingEntry struct {
 	IsConstUnknown       bool
 	BestPlayerCount      int
 	BestPlayerPercentage float64
+	AverageScore         *float64
 }
 
 // BestSlotRankingResult は指定レート帯のベスト枠採用率ランキングです。
@@ -86,6 +87,7 @@ func (u *bestSlotRankingUsecase) Get(ctx context.Context, ratingBand string, cur
 			IsConstUnknown:       item.IsConstUnknown,
 			BestPlayerCount:      item.BestPlayerCount,
 			BestPlayerPercentage: item.BestPlayerPercentage,
+			AverageScore:         item.AverageScore,
 		})
 	}
 	return result, nil

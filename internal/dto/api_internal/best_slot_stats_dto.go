@@ -24,6 +24,7 @@ type BestSlotRankingEntryDTO struct {
 	Chart                BestSlotRankingChartDTO `json:"chart"`
 	BestPlayerCount      int                     `json:"best_player_count"`
 	BestPlayerPercentage float64                 `json:"best_player_percentage"`
+	AverageScore         *float64                `json:"average_score"`
 }
 
 // BestSlotRankingSongDTO はランキング表示に必要な楽曲情報です。
@@ -68,6 +69,7 @@ func ToBestSlotRankingResponse(result *usecase.BestSlotRankingResult, nextCursor
 			Song:            BestSlotRankingSongDTO{ID: entry.SongID, Title: entry.Title},
 			Chart:           BestSlotRankingChartDTO{Difficulty: entry.Difficulty, Const: entry.ChartConst.Float64(), IsConstUnknown: entry.IsConstUnknown},
 			BestPlayerCount: entry.BestPlayerCount, BestPlayerPercentage: roundBestSlotPercentage(entry.BestPlayerPercentage),
+			AverageScore: entry.AverageScore,
 		})
 	}
 	return response

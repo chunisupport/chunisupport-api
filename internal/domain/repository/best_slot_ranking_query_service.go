@@ -25,6 +25,7 @@ type BestSlotRankingItem struct {
 	IsConstUnknown       bool
 	BestPlayerCount      int
 	BestPlayerPercentage float64
+	AverageScore         *float64
 }
 
 // BestSlotRankingPage はランキング1ページ分の読み取り結果です。

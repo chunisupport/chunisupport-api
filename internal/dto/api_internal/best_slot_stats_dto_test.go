@@ -58,3 +58,26 @@ func TestBestSlotStatsResponse_採用率を小数点以下4桁へ丸める(t *te
 	assert.Equal(t, 25.1235, *singleResponse.Stats[0].BestPlayerPercentage)
 	assert.Equal(t, 25.1235, rankingResponse.Ranking[0].BestPlayerPercentage)
 }
+
+func TestToBestSlotRankingResponse_平均スコアをJSONへ変換する(t *testing.T) {
+	// Given
+	averageScore := 1007500.5
+	ranking := &usecase.BestSlotRankingResult{
+		Ranking: []usecase.BestSlotRankingEntry{
+			{AverageScore: &averageScore},
+			{AverageScore: nil},
+		},
+	}
+
+	// When
+	response := ToBestSlotRankingResponse(ranking, nil)
+	encoded, err := json.Marshal(response.Ranking)
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, response.Ranking[0].AverageScore)
+	assert.Equal(t, averageScore, *response.Ranking[0].AverageScore)
+	assert.Nil(t, response.Ranking[1].AverageScore)
+	assert.Contains(t, string(encoded), `"average_score":1007500.5`)
+	assert.Contains(t, string(encoded), `"average_score":null`)
+}

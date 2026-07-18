@@ -26,9 +26,10 @@ func NewBestSlotRankingQueryService(db *sqlx.DB) *BestSlotRankingQueryService {
 }
 
 type bestSlotRankingStatsRow struct {
-	ChartID              int     `db:"chart_id"`
-	BestPlayerCount      int     `db:"best_player_count"`
-	BestPlayerPercentage float64 `db:"best_player_percentage"`
+	ChartID              int      `db:"chart_id"`
+	BestPlayerCount      int      `db:"best_player_count"`
+	BestPlayerPercentage float64  `db:"best_player_percentage"`
+	AverageScore         *float64 `db:"average_score"`
 }
 
 type bestSlotRankingChartRow struct {
@@ -74,6 +75,7 @@ func (q *BestSlotRankingQueryService) List(ctx context.Context, ratingBandID int
 			IsConstUnknown:       chart.IsUnknown,
 			BestPlayerCount:      row.BestPlayerCount,
 			BestPlayerPercentage: row.BestPlayerPercentage,
+			AverageScore:         row.AverageScore,
 		})
 	}
 	slices.SortFunc(items, compareBestSlotRankingItems)
@@ -123,11 +125,18 @@ func findEligiblePlayerCount(ctx context.Context, exec domainrepo.Executor, rati
 
 func findBestSlotRankingRows(ctx context.Context, exec domainrepo.Executor, ratingBandID int) ([]bestSlotRankingStatsRow, error) {
 	const query = `
-		SELECT chart_id, best_player_count, best_player_percentage
-		FROM chart_best_slot_stats_by_rating_band
-		WHERE rating_band_id = ?
-		  AND best_player_percentage IS NOT NULL
-		  AND best_player_count > 0
+		SELECT
+			best.chart_id,
+			best.best_player_count,
+			best.best_player_percentage,
+			stats.average_score
+		FROM chart_best_slot_stats_by_rating_band best
+		LEFT JOIN chart_stats_by_rating_band stats
+		  ON stats.chart_id = best.chart_id
+		 AND stats.rating_band_id = best.rating_band_id
+		WHERE best.rating_band_id = ?
+		  AND best.best_player_percentage IS NOT NULL
+		  AND best.best_player_count > 0
 	`
 	var rows []bestSlotRankingStatsRow
 	if err := exec.SelectContext(ctx, &rows, query, ratingBandID); err != nil {
