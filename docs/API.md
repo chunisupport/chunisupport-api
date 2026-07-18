@@ -2753,7 +2753,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
         "is_const_unknown": false
       },
       "best_player_count": 10,
-      "best_player_percentage": 25.0
+      "best_player_percentage": 25.0,
+      "average_score": 1007500.5
     }
   ],
   "next_cursor": "opaque-cursor"
@@ -2773,6 +2774,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `ranking[].chart.is_const_unknown` | boolean | 譜面定数が推定値の場合true |
 | `ranking[].best_player_count` | number | 指定レート帯でこの譜面をベスト枠に持つプレイヤー数 |
 | `ranking[].best_player_percentage` | number | `best_player_count / eligible_player_count * 100`（小数点以下4桁まで） |
+| `ranking[].average_score` | number\|null | 指定レート帯でこの譜面をプレイした全プレイヤーの平均スコア（レコード数が0件の場合はnull） |
 | `next_cursor` | string\|null | 次ページがある場合の不透明カーソル |
 
 - **主なエラー**:

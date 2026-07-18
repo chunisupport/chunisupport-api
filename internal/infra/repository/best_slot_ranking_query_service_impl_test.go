@@ -38,12 +38,19 @@ func TestBestSlotRankingQueryService_List_割合順で楽曲情報を一括結�
 			chart_id INTEGER, rating_band_id INTEGER, best_player_count INTEGER,
 			eligible_player_count INTEGER, best_player_percentage REAL
 		);
+		CREATE TABLE chart_stats_by_rating_band (
+			chart_id INTEGER, rating_band_id INTEGER, average_score REAL
+		);
 		INSERT INTO chart_best_slot_stats_by_rating_band VALUES
 			(104, 22, 20, 40, 50.0),
 			(105, 22, 20, 40, 50.0),
 			(101, 22, 10, 40, 25.0),
 			(103, 22, 10, 40, 25.0),
 			(102, 22, 8, 40, 20.0);
+		INSERT INTO chart_stats_by_rating_band VALUES
+			(101, 22, 1007500.5),
+			(103, 21, 999999.0),
+			(102, 22, 1005000.0);
 	`)
 	require.NoError(t, err)
 
@@ -59,8 +66,11 @@ func TestBestSlotRankingQueryService_List_割合順で楽曲情報を一括結�
 	assert.Equal(t, "0000000000000001", page.Items[0].SongDisplayID)
 	assert.Equal(t, "楽曲A", page.Items[0].SongTitle)
 	assert.Equal(t, 1, page.Items[0].Rank)
+	require.NotNil(t, page.Items[0].AverageScore)
+	assert.Equal(t, 1007500.5, *page.Items[0].AverageScore)
 	assert.Equal(t, "0000000000000003", page.Items[1].SongDisplayID)
 	assert.Equal(t, 2, page.Items[1].Rank)
+	assert.Nil(t, page.Items[1].AverageScore)
 	require.NotNil(t, page.NextCursor)
 	assert.Equal(t, "0000000000000003", page.NextCursor.SongDisplayID)
 	assert.Equal(t, "MASTER", page.NextCursor.Difficulty)

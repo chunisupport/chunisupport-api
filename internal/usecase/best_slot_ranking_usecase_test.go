@@ -30,6 +30,7 @@ func (m *bestSlotRankingQueryServiceMock) List(_ context.Context, ratingBandID i
 func TestBestSlotRankingUsecase_Get_レート帯ラベルを内部IDへ解決する(t *testing.T) {
 	// Given
 	percentage := 25.0
+	averageScore := 1007500.5
 	query := &bestSlotRankingQueryServiceMock{result: &repository.BestSlotRankingPage{
 		EligiblePlayerCount: 40,
 		Items: []repository.BestSlotRankingItem{{
@@ -40,6 +41,7 @@ func TestBestSlotRankingUsecase_Get_レート帯ラベルを内部IDへ解決す
 			ChartConst:           chartconstant.ChartConstant(14.8),
 			BestPlayerCount:      10,
 			BestPlayerPercentage: percentage,
+			AverageScore:         &averageScore,
 		}},
 	}}
 	provider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 22, Label: "17.0"}}}
@@ -55,6 +57,8 @@ func TestBestSlotRankingUsecase_Get_レート帯ラベルを内部IDへ解決す
 	require.Len(t, result.Ranking, 1)
 	assert.Equal(t, "0000000000000001", result.Ranking[0].SongID)
 	assert.Equal(t, "楽曲名", result.Ranking[0].Title)
+	require.NotNil(t, result.Ranking[0].AverageScore)
+	assert.Equal(t, averageScore, *result.Ranking[0].AverageScore)
 	assert.Equal(t, 22, query.ratingBandID)
 	assert.Equal(t, 50, query.limit)
 }
