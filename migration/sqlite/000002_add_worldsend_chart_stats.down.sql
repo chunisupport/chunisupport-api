@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS worldsend_chart_stats_by_rating_band;

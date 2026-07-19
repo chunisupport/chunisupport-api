@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS chart_best_slot_stats_by_rating_band;
