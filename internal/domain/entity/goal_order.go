@@ -7,19 +7,20 @@ var (
 	ErrGoalOrderMissing = errors.New("goal is not included in goal order")
 )
 
-// GoalOrder はユーザーが所有する目標全体の表示順を表す集約です。
+// GoalOrder は同一ユーザー・同一グループ内の目標表示順を表す集約です。groupIDがnilの場合は未分類を表します。
 type GoalOrder struct {
-	userID int
-	goals  []*Goal
+	userID  int
+	groupID *uint32
+	goals   []*Goal
 }
 
 // NewGoalOrder は同一ユーザーの目標から表示順集約を生成します。
 // 呼び出し元が一覧取得順で渡した目標を正規の表示順として採用し、既存のSortOrder値は連番へ正規化します。
-func NewGoalOrder(userID int, goals []*Goal) (*GoalOrder, error) {
+func NewGoalOrder(userID int, groupID *uint32, goals []*Goal) (*GoalOrder, error) {
 	ordered := append([]*Goal(nil), goals...)
 	seenIDs := make(map[uint32]struct{}, len(ordered))
 	for _, goal := range ordered {
-		if goal == nil || goal.UserID != userID {
+		if goal == nil || goal.UserID != userID || !sameOptionalID(goal.GroupID, groupID) {
 			return nil, ErrInvalidGoalOrder
 		}
 		if _, exists := seenIDs[goal.ID]; exists {
@@ -27,10 +28,13 @@ func NewGoalOrder(userID int, goals []*Goal) (*GoalOrder, error) {
 		}
 		seenIDs[goal.ID] = struct{}{}
 	}
-	order := &GoalOrder{userID: userID, goals: ordered}
+	order := &GoalOrder{userID: userID, groupID: cloneOptionalID(groupID), goals: ordered}
 	order.assignSortOrders()
 	return order, nil
 }
+
+// GroupID は表示順の対象グループIDを返します。nilは未分類を表します。
+func (o *GoalOrder) GroupID() *uint32 { return cloneOptionalID(o.groupID) }
 
 // UserID は表示順を所有するユーザーIDを返します。
 func (o *GoalOrder) UserID() int {
@@ -91,4 +95,16 @@ func (o *GoalOrder) assignSortOrders() {
 	for i, goal := range o.goals {
 		goal.SortOrder = uint16(i + 1)
 	}
+}
+
+func sameOptionalID(a, b *uint32) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
+
+func cloneOptionalID(id *uint32) *uint32 {
+	if id == nil {
+		return nil
+	}
+	cloned := *id
+	return &cloned
 }

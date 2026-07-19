@@ -23,6 +23,10 @@ var (
 	// ErrGoalOrderInconsistent は保存対象の目標順集約と永続化済み目標の集合が一致しない場合に返されます。
 	ErrGoalOrderInconsistent = errors.New("goal order is inconsistent")
 
+	ErrGoalGroupNotFound          = errors.New("goal group not found")
+	ErrGoalGroupConflict          = errors.New("goal group conflict")
+	ErrGoalGroupOrderInconsistent = errors.New("goal group order is inconsistent")
+
 	// ErrRecordFilterNotFound は譜面フィルタが見つからなかった場合に返されるエラーです。
 	ErrRecordFilterNotFound = errors.New("record filter not found")
 

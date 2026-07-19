@@ -4,6 +4,7 @@ import "time"
 
 // GoalRequest は目標作成・更新リクエストです。
 type GoalRequest struct {
+	GroupID           *uint32        `json:"group_id"`
 	Title             string         `json:"title" validate:"required"`
 	AchievementType   string         `json:"achievement_type" validate:"required"`
 	AchievementParams map[string]any `json:"achievement_params" validate:"required"`
@@ -14,6 +15,7 @@ type GoalRequest struct {
 // GoalResponse は目標レスポンスです。
 type GoalResponse struct {
 	ID                uint32         `json:"id"`
+	GroupID           *uint32        `json:"group_id"`
 	Title             string         `json:"title"`
 	AchievementType   string         `json:"achievement_type"`
 	AchievementParams map[string]any `json:"achievement_params"`
@@ -25,6 +27,7 @@ type GoalResponse struct {
 
 // GoalOrderRequest は目標の並び順更新リクエストです。
 type GoalOrderRequest struct {
+	GroupID *uint32  `json:"group_id"`
 	GoalIDs []uint32 `json:"goal_ids"`
 }
 

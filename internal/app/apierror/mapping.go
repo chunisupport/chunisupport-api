@@ -108,6 +108,16 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalInvalidAttributes.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalOrder):
 		return ErrGoalInvalidOrder.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupNotFound):
+		return ErrGoalGroupNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupLimitExceeded):
+		return ErrGoalGroupLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalGroupName):
+		return ErrGoalGroupInvalidName.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupConflict):
+		return ErrGoalGroupConflict.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalGroupOrder):
+		return ErrGoalGroupInvalidOrder.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecordFilterNotFound):
 		return ErrRecordFilterNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecordFilterLimitExceeded):

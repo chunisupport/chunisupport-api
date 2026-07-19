@@ -19,6 +19,7 @@ const (
 	DefaultBestSlotRankingLimit       = 50
 	MaxBestSlotRankingLimit           = 100
 	GoalMaxPerUser                    = 100
+	GoalGroupMaxPerUser               = 20
 	RecordFilterMaxPerUser            = 100
 	RecordFilterNameMaxLength         = 30
 	RecordFilterMaxPayloadBytes       = 8 * 1024

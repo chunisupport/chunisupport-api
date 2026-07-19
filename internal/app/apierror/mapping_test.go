@@ -50,6 +50,14 @@ func TestFromUsecaseError_目標並び順不正を400に変換する(t *testing.
 	assert.Equal(t, CodeGoalInvalidOrder, apiErr.Code)
 }
 
+func TestFromUsecaseError_目標グループ名重複を409に変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrGoalGroupConflict)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+	assert.Equal(t, CodeGoalGroupConflict, apiErr.Code)
+}
+
 func TestFromUsecaseError_auth_time欠落は詳細を伏せてrecent_sign_in_requiredに丸める(t *testing.T) {
 	err := errors.Join(usecase.ErrRecentSignInAuthTimeMissing, errors.New("firebase token auth_time is empty"))
 

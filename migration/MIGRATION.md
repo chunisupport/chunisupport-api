@@ -174,6 +174,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000024**: `players` テーブルにCHUNITHM-NETからのデータ取得完了日時を保持する `data_collected_at` カラムを追加。
 - **000028**: `goals` テーブルにユーザー内の表示順を保持する `sort_order` カラムを追加。既存データは作成順で採番し、一覧用インデックスを `(user_id, sort_order, id)` へ変更。MySQLのDDLは暗黙コミットされるため、適用開始から完了までGoalの作成・更新・削除・並び替えを停止する。
 - **000036**: レーティング帯マスタと譜面統計3表をMySQLへ追加。統計は別リポジトリのバッチが実行ごとに全削除して再生成する。
+- **000037**: ユーザー所有の `goal_groups` を追加し、`goals.group_id` とグループ内 `sort_order` による目標分類・並び替えへ変更。既存目標は未分類のまま従来順を保持する。
 
 #### 000028の失敗時復旧
 
@@ -222,6 +223,10 @@ DROP INDEX idx_goals_user_created_id ON goals;
 ### 000030 コースレコード
 
 `course_classes`、`courses`、`player_course_records`を追加する。コースクラスは`1`～`5`、`inf`、`extra`の固定値であり、コースは論理削除に対応する。コーススコアは0～3,030,000点を保持する。
+
+### 000037 目標グループ
+
+適用中はGoalとGoalGroupの書き込みを停止する。MySQLのDDLは暗黙コミットされるため、失敗時は `goal_groups`、`goals.group_id`、`idx_goals_user_group_sort_order_id`、`fk_goals_group_user` の有無を確認し、up SQLの順序どおり不足分だけを適用してからバージョンを修復する。既存Goalは `group_id = NULL` の未分類となり、従来の `sort_order` を維持する。downでは現在のグループ順・グループ内順・未分類末尾の表示順をユーザー全体の連番へ変換してから `group_id` を削除する。
 
 ### 000031 コース作成日時の削除
 

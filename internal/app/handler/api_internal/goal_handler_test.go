@@ -29,12 +29,13 @@ func (tv *goalTestValidator) Validate(i any) error {
 }
 
 type mockGoalUsecase struct {
-	createCalled  bool
-	updateCalled  bool
-	reorderCalled bool
-	reorderedIDs  []uint32
-	createErr     error
-	updateErr     error
+	createCalled     bool
+	updateCalled     bool
+	reorderCalled    bool
+	reorderedIDs     []uint32
+	reorderedGroupID *uint32
+	createErr        error
+	updateErr        error
 }
 
 func (m *mockGoalUsecase) List(ctx context.Context, userID int) ([]*usecase.GoalOutput, error) {
@@ -61,8 +62,9 @@ func (m *mockGoalUsecase) Delete(ctx context.Context, userID int, id uint32) err
 	return nil
 }
 
-func (m *mockGoalUsecase) Reorder(ctx context.Context, userID int, orderedGoalIDs []uint32) error {
+func (m *mockGoalUsecase) Reorder(ctx context.Context, userID int, groupID *uint32, orderedGoalIDs []uint32) error {
 	m.reorderCalled = true
+	m.reorderedGroupID = groupID
 	m.reorderedIDs = append([]uint32(nil), orderedGoalIDs...)
 	return nil
 }

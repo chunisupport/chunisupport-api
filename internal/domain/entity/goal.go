@@ -6,6 +6,7 @@ import "time"
 type Goal struct {
 	ID                uint32
 	UserID            int
+	GroupID           *uint32
 	Title             string
 	AchievementTypeID int
 	AchievementType   string

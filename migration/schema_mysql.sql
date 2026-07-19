@@ -132,9 +132,22 @@ CREATE TABLE `genres` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `goal_groups` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` smallint unsigned NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_goal_groups_user_name` (`user_id`,`name`),
+  UNIQUE KEY `uq_goal_groups_user_id` (`user_id`,`id`),
+  KEY `idx_goal_groups_user_sort_order_id` (`user_id`,`sort_order`,`id`),
+  CONSTRAINT `fk_goal_groups_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `goals` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
+  `group_id` int unsigned DEFAULT NULL,
   `title` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
   `achievement_type_id` tinyint unsigned NOT NULL,
   `achievement_params` json NOT NULL,
@@ -144,9 +157,10 @@ CREATE TABLE `goals` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `fk_goals_achievement_type_id` (`achievement_type_id`),
-  KEY `idx_goals_user_sort_order_id` (`user_id`,`sort_order`,`id`),
+  KEY `idx_goals_user_group_sort_order_id` (`user_id`,`group_id`,`sort_order`,`id`),
   CONSTRAINT `fk_goals_achievement_type_id` FOREIGN KEY (`achievement_type_id`) REFERENCES `achievement_types` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_goals_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_goals_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_goals_group_user` FOREIGN KEY (`user_id`,`group_id`) REFERENCES `goal_groups` (`user_id`,`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `honor_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,

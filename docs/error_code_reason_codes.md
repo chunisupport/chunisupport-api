@@ -57,6 +57,11 @@
 | `goal_invalid_attributes` | goal属性不正 |
 | `goal_invalid_order` | goal並び順不正 |
 | `invalid_goal_input` | goal入力不正 |
+| `goal_group_not_found` | 目標グループ未検出 |
+| `goal_group_limit_exceeded` | 目標グループ上限超過（最大20件） |
+| `goal_group_invalid_name` | 目標グループ名不正 |
+| `goal_group_conflict` | 目標グループ名重複 |
+| `goal_group_invalid_order` | 目標グループ並び順不正 |
 | `favorite_song_limit_exceeded` | お気に入り楽曲上限超過（最大100件） |
 
 ## 内部理由コード一覧（運用・調査用）

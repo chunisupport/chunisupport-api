@@ -17,9 +17,10 @@ type GoalRepository interface {
 	Save(ctx context.Context, exec Executor, goal *entity.Goal) error
 	// DeleteByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	DeleteByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) error
-	// SaveGoalOrder はユーザーの目標表示順集約を保存します。
-	SaveGoalOrder(ctx context.Context, exec Executor, order *entity.GoalOrder) error
+	// SaveGoalArrangement はユーザーの全目標についてグループ所属とグループ内表示順を保存します。
+	SaveGoalArrangement(ctx context.Context, exec Executor, arrangement *entity.GoalArrangement) error
 	CountByUserID(ctx context.Context, exec Executor, userID int) (int, error)
+	CountByUserIDAndGroupID(ctx context.Context, exec Executor, userID int, groupID *uint32) (int, error)
 	LockUserByID(ctx context.Context, exec Executor, userID int) error
 	GetTargetStats(ctx context.Context, exec Executor, filter GoalTargetFilter) (*GoalTargetStats, error)
 }

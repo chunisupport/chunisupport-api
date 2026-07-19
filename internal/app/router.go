@@ -81,6 +81,7 @@ type Handlers struct {
 	Me                   *api_internal.MeHandler
 	MasterData           *api_internal.MasterDataHandler
 	Goal                 *api_internal.GoalHandler
+	GoalGroup            *api_internal.GoalGroupHandler
 	RecordFilter         *api_internal.RecordFilterHandler
 	TemporaryPlayerData  *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
@@ -138,6 +139,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 	apiTokenRepo := infra.NewAPITokenRepository(db)
 	songRepo := infra.NewSongRepository(db)
 	goalRepo := infra.NewGoalRepository(db)
+	goalGroupRepo := infra.NewGoalGroupRepository()
 	recordFilterRepo := infra.NewRecordFilterRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
@@ -180,7 +182,8 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
-	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache)
+	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache, goalGroupRepo)
+	goalGroupUsecase := usecase.NewGoalGroupUsecase(db, tm, goalGroupRepo, goalRepo)
 	recordFilterUsecase := usecase.NewRecordFilterUsecase(recordFilterRepo)
 	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
 	playerSongIDResolver := infra.NewPlayerSongIDResolver()
@@ -233,6 +236,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 		Me:                   api_internal.NewMeHandler(playerDataUsecase),
 		MasterData:           api_internal.NewMasterDataHandler(masterDataUsecase),
 		Goal:                 api_internal.NewGoalHandler(goalUsecase),
+		GoalGroup:            api_internal.NewGoalGroupHandler(goalGroupUsecase),
 		RecordFilter:         api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		TemporaryPlayerData:  api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
@@ -338,6 +342,11 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 		meGroup.PUT("/goals/order", handlers.Goal.Reorder)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
+		meGroup.GET("/goal-groups", handlers.GoalGroup.List)
+		meGroup.POST("/goal-groups", handlers.GoalGroup.Create)
+		meGroup.PUT("/goal-groups/order", handlers.GoalGroup.Reorder)
+		meGroup.PUT("/goal-groups/:id", handlers.GoalGroup.Update)
+		meGroup.DELETE("/goal-groups/:id", handlers.GoalGroup.Delete)
 		meGroup.GET("/record-filters", handlers.RecordFilter.List)
 		meGroup.POST("/record-filters", handlers.RecordFilter.Create)
 		meGroup.PUT("/record-filters/:id", handlers.RecordFilter.Update)

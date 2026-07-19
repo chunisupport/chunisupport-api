@@ -117,7 +117,7 @@ func (h *GoalHandler) Reorder(c *echo.Context) error {
 	if req.GoalIDs == nil {
 		return apierror.ErrBadRequest
 	}
-	if err := h.goalUsecase.Reorder(c.Request().Context(), user.ID, req.GoalIDs); err != nil {
+	if err := h.goalUsecase.Reorder(c.Request().Context(), user.ID, req.GroupID, req.GoalIDs); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -135,7 +135,7 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 			return nil, err
 		}
 	}
-	return &usecase.GoalInput{Title: req.Title, AchievementType: req.AchievementType, AchievementParams: params, Attributes: attrs, Invert: req.Invert}, nil
+	return &usecase.GoalInput{GroupID: req.GroupID, Title: req.Title, AchievementType: req.AchievementType, AchievementParams: params, Attributes: attrs, Invert: req.Invert}, nil
 }
 
 func getUser(c *echo.Context) (*entity.User, error) {
@@ -149,6 +149,7 @@ func getUser(c *echo.Context) (*entity.User, error) {
 func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
 	return &internaldto.GoalResponse{
 		ID:                goal.ID,
+		GroupID:           goal.GroupID,
 		Title:             goal.Title,
 		AchievementType:   goal.AchievementType,
 		AchievementParams: goal.AchievementParams,

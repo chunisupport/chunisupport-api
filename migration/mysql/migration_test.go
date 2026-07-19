@@ -85,6 +85,50 @@ func TestAddSortOrderToGoalsDown_従来の一覧インデックスへ戻す(t *t
 	)
 }
 
+func TestAddGoalGroupsUp_グループとグループ内順序を追加する(t *testing.T) {
+	// When
+	upSQL := readNormalizedMigrationSQL(t, "000037_add_goal_groups.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE goal_groups")
+	assert.Contains(t, upSQL, "UNIQUE KEY uq_goal_groups_user_name (user_id, name)")
+	assert.Contains(t, upSQL, "ADD COLUMN group_id INT UNSIGNED NULL AFTER user_id")
+	assert.Contains(t, upSQL, "FOREIGN KEY (user_id, group_id) REFERENCES goal_groups (user_id, id) ON DELETE RESTRICT")
+	assert.Contains(t, upSQL, "CREATE INDEX idx_goals_user_group_sort_order_id ON goals(user_id, group_id, sort_order, id)")
+	assert.Less(t,
+		strings.Index(upSQL, "CREATE INDEX idx_goals_user_group_sort_order_id"),
+		strings.Index(upSQL, "ADD CONSTRAINT fk_goals_group_user"),
+	)
+	assert.Less(t,
+		strings.Index(upSQL, "ADD CONSTRAINT fk_goals_group_user"),
+		strings.Index(upSQL, "DROP INDEX idx_goals_user_sort_order_id"),
+	)
+}
+
+func TestAddGoalGroupsDown_従来の目標順へ戻す(t *testing.T) {
+	// When
+	downSQL := readNormalizedMigrationSQL(t, "000037_add_goal_groups.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "CREATE INDEX idx_goals_user_sort_order_id ON goals(user_id, sort_order, id)")
+	assert.Contains(t, downSQL, "ROW_NUMBER() OVER ( PARTITION BY current_order.user_id")
+	assert.Contains(t, downSQL, "(current_order.group_id IS NULL) ASC")
+	assert.Contains(t, downSQL, "current_order.group_sort_order ASC")
+	assert.Contains(t, downSQL, "current_order.goal_sort_order ASC")
+	assert.Contains(t, downSQL, "SET g.sort_order = reordered.new_sort_order")
+	assert.Contains(t, downSQL, "DROP FOREIGN KEY fk_goals_group_user")
+	assert.Contains(t, downSQL, "DROP COLUMN group_id")
+	assert.Contains(t, downSQL, "DROP TABLE goal_groups")
+	assert.Less(t,
+		strings.Index(downSQL, "SET g.sort_order = reordered.new_sort_order"),
+		strings.Index(downSQL, "DROP FOREIGN KEY fk_goals_group_user"),
+	)
+	assert.Less(t,
+		strings.Index(downSQL, "DROP FOREIGN KEY fk_goals_group_user"),
+		strings.Index(downSQL, "DROP INDEX idx_goals_user_group_sort_order_id"),
+	)
+}
+
 func TestStoreOnlySPHonorImageURLsUp_通常称号をNULL化して重複を統合する(t *testing.T) {
 	// Given
 	upSQL := readNormalizedMigrationSQL(t, "000029_store_only_sp_honor_image_urls.up.sql")

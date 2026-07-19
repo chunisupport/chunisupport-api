@@ -33,11 +33,14 @@ type goalUsecase struct {
 	db             repository.Executor
 	tm             TransactionManager
 	goalRepo       repository.GoalRepository
+	groupRepo      repository.GoalGroupRepository
 	masterProvider repository.GoalMasterProvider
 }
 
-func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider) GoalUsecase {
-	return &goalUsecase{db: db, tm: tm, goalRepo: goalRepo, masterProvider: masterProvider}
+// NewGoalUsecase は目標ユースケースを生成します。
+// グループ所有権の検証漏れを配線時に検出できるよう、関連リポジトリはすべて必須依存とします。
+func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider, groupRepo repository.GoalGroupRepository) GoalUsecase {
+	return &goalUsecase{db: db, tm: tm, goalRepo: goalRepo, groupRepo: groupRepo, masterProvider: masterProvider}
 }
 
 func (u *goalUsecase) List(ctx context.Context, userID int) ([]*GoalOutput, error) {
@@ -66,14 +69,22 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 		if count >= info.GoalMaxPerUser {
 			return ErrGoalLimitExceeded
 		}
+		if err := u.validateGroupOwnership(ctx, tx, userID, input.GroupID); err != nil {
+			return err
+		}
+		groupCount, err := u.goalRepo.CountByUserIDAndGroupID(ctx, tx, userID, input.GroupID)
+		if err != nil {
+			return err
+		}
 		goal := &entity.Goal{
 			UserID:            userID,
+			GroupID:           cloneUint32Pointer(input.GroupID),
 			Title:             validated.Title,
 			AchievementTypeID: validated.AchievementTypeID,
 			AchievementParams: validated.AchievementParams,
 			Attributes:        validated.Attributes,
 			Invert:            validated.Invert,
-			SortOrder:         uint16(count + 1),
+			SortOrder:         uint16(groupCount + 1),
 		}
 		if err := u.goalRepo.Create(ctx, tx, goal); err != nil {
 			return err
@@ -110,6 +121,32 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 			}
 			return err
 		}
+		if err := u.validateGroupOwnership(ctx, tx, userID, input.GroupID); err != nil {
+			return err
+		}
+		if !equalUint32Pointers(g.GroupID, input.GroupID) {
+			goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+			if err != nil {
+				return err
+			}
+			arrangement, err := entity.NewGoalArrangement(userID, goals)
+			if err != nil {
+				return ErrInternalError
+			}
+			if err := arrangement.Move(g.ID, input.GroupID); err != nil {
+				return ErrInternalError
+			}
+			if err := u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement); err != nil {
+				return err
+			}
+			g.GroupID = cloneUint32Pointer(input.GroupID)
+			for _, arrangedGoal := range arrangement.Goals() {
+				if arrangedGoal.ID == g.ID {
+					g.SortOrder = arrangedGoal.SortOrder
+					break
+				}
+			}
+		}
 		g.Title = validated.Title
 		g.AchievementTypeID = validated.AchievementTypeID
 		g.AchievementParams = validated.AchievementParams
@@ -143,11 +180,11 @@ func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
 		if err != nil {
 			return err
 		}
-		order, err := entity.NewGoalOrder(userID, goals)
+		arrangement, err := entity.NewGoalArrangement(userID, goals)
 		if err != nil {
 			return ErrInternalError
 		}
-		if err := order.Remove(id); errors.Is(err, entity.ErrGoalOrderMissing) {
+		if err := arrangement.Remove(id); errors.Is(err, entity.ErrGoalArrangementMissing) {
 			return ErrGoalNotFound
 		} else if err != nil {
 			return ErrInternalError
@@ -158,12 +195,12 @@ func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
 			}
 			return err
 		}
-		return u.goalRepo.SaveGoalOrder(ctx, tx, order)
+		return u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement)
 	})
 }
 
 // Reorder は所有目標の完全なID集合だけを受け付け、欠落や他ユーザーIDの混入を防ぎます。
-func (u *goalUsecase) Reorder(ctx context.Context, userID int, orderedGoalIDs []uint32) error {
+func (u *goalUsecase) Reorder(ctx context.Context, userID int, groupID *uint32, orderedGoalIDs []uint32) error {
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
 		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
 			return err
@@ -172,15 +209,43 @@ func (u *goalUsecase) Reorder(ctx context.Context, userID int, orderedGoalIDs []
 		if err != nil {
 			return err
 		}
-		order, err := entity.NewGoalOrder(userID, goals)
+		if err := u.validateGroupOwnership(ctx, tx, userID, groupID); err != nil {
+			return err
+		}
+		arrangement, err := entity.NewGoalArrangement(userID, goals)
 		if err != nil {
 			return ErrInternalError
 		}
-		if err := order.Reorder(orderedGoalIDs); err != nil {
+		if err := arrangement.Reorder(groupID, orderedGoalIDs); err != nil {
 			return ErrInvalidGoalOrder
 		}
-		return u.goalRepo.SaveGoalOrder(ctx, tx, order)
+		return u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement)
 	})
+}
+
+func (u *goalUsecase) validateGroupOwnership(ctx context.Context, exec repository.Executor, userID int, groupID *uint32) error {
+	if groupID == nil {
+		return nil
+	}
+	if _, err := u.groupRepo.FindByIDAndUserID(ctx, exec, *groupID, userID); err != nil {
+		if errors.Is(err, repository.ErrGoalGroupNotFound) {
+			return ErrGoalGroupNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func equalUint32Pointers(a, b *uint32) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
+
+func cloneUint32Pointer(value *uint32) *uint32 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 type validatedGoalInput struct {
@@ -806,7 +871,7 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 		if err := json.Unmarshal(g.Attributes, &a); err != nil {
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
-		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt})
+		outs = append(outs, &GoalOutput{ID: g.ID, GroupID: cloneUint32Pointer(g.GroupID), Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt})
 	}
 	return outs, nil
 }

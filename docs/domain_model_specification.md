@@ -311,19 +311,22 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 |------------|-----|-----|------|
 | ID | uint32 | ✓ | 目標ID（主キー、自動採番） |
 | UserID | int | ✓ | 所属ユーザーID（外部キー） |
+| GroupID | *uint32 | - | 所属目標グループID。nilは未分類 |
 | Title | string | ✓ | 目標タイトル（trim後30文字以内、空文字不可、制御文字不可） |
 | AchievementTypeID | int | ✓ | 成果種別ID（`achievement_types.id` への外部キー） |
 | AchievementType | string | - | 成果種別コード（DBには永続化されない。マスタ逆引きで出力時に解決） |
 | AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
 | Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
 | Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
-| SortOrder | uint16 | ✓ | ユーザー内での表示順（1から始まる連番） |
+| SortOrder | uint16 | ✓ | 同一グループ内での表示順（1から始まる連番） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 
 #### 振る舞い（メソッド）
 
-- `GoalOrder.Reorder(orderedGoalIDs)`: 所有するすべての目標IDを指定順へ並び替え、1からの連番を割り当てる
-- `GoalOrder.Remove(id)`: 目標を表示順集約から取り除き、残りを1からの連番へ詰め直す
+- `GoalArrangement.Reorder(groupID, orderedGoalIDs)`: 指定グループ内の全目標を並び替える
+- `GoalArrangement.Move(id, destinationGroupID)`: 移動元を詰め、移動先末尾へ目標を移動する
+- `GoalArrangement.Remove(id)`: 目標を取り除き、同じグループの順番を詰める
+- `GoalArrangement.RemoveGroup(groupID)`: 削除対象グループの目標を未分類末尾へ移動する
 
 #### 不変条件
 
@@ -331,7 +334,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
 - `AchievementParams` は `AchievementType` に対応する構造のJSON
 - `Attributes` は許可キー（`diff`, `chart_target`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
-- 同一ユーザーの `SortOrder` は1から目標件数までの連番。作成・削除・並び替え時にユーザー行ロック下で更新する
+- 同一ユーザー・同一グループ（未分類を含む）の `SortOrder` は1から所属目標件数までの連番。作成・削除・移動・並び替え時にユーザー行ロック下で更新する
 - 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
 
 #### `AchievementParams` の型整合ルール
@@ -355,23 +358,32 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `achievement_params` / `attributes` はDB上ではJSON型で保存されます
 - DB保存時はコンパクトJSON（インデントなし）で、バリデーション済み構造体から再エンコードしたJSONを保存します（入力原文をそのまま保持しません）
 - `updated_at` / 達成日時カラムは持ちません（楽曲追加により達成状態が揺らぐ可能性があるため）
-- 一覧のソート基準には `sort_order` を使用し、`created_at` は作成日時としてのみ保持します
-- `sort_order` に一意制約は付与しない。重複禁止だけでは連番不変条件を保証できないため、作成・削除・並び替えをユーザー行ロック下で直列化し、`GoalOrder`集約を単一更新で保存する
+- 一覧はグループ順、グループ内の `sort_order` 順、未分類の順で返し、`created_at` は作成日時としてのみ保持します
+- `sort_order` に一意制約は付与しない。連番不変条件はユーザー行ロック下で直列化し、`GoalArrangement`集約を単一更新で保存する
 
 ---
 
-### GoalOrder（目標表示順集約）
+### GoalGroup（目標グループエンティティ）
+
+ユーザーが作成する目標の分類です。空グループを保持でき、1ユーザー最大20件です。名称は `GoalGroupName` 値オブジェクトとしてtrim後1〜30文字・制御文字禁止を保証し、同一ユーザー内で重複できません。`SortOrder` はユーザー内で1からの連番です。未分類はGoalGroupとして永続化せず、`Goal.GroupID == nil` で表し、常に表示上の末尾に配置します。
+
+グループ削除時は所属目標を削除せず、並び順を保って未分類末尾へ移動します。`goals(user_id, group_id)` から `goal_groups(user_id, id)` への複合外部キーにより、別ユーザーのグループを参照できません。
+
+---
+
+### GoalArrangement（目標配置集約）
 
 #### 概要
 
-1ユーザーが所有する全Goalの表示順を管理する集約です。`Goal`一覧を表示順で受け取り、並び替え・削除後に`SortOrder`を1からの連番へ正規化します。
+1ユーザーが所有する全Goalのグループ所属とグループ内表示順を管理する集約です。
 
 #### 不変条件
 
 - 内包するすべてのGoalは同一ユーザーに属する
 - Goal IDは集約内で重複しない
-- `Reorder`は現在内包するGoal IDをすべて1回ずつ指定した場合のみ成功する
-- 既存の`SortOrder`に不整合があっても、一覧取得順を正として次回の削除または並び替え保存時に正規化する
+- グループ内のGoal IDは重複せず、`Reorder`は指定グループの全IDを1回ずつ指定した場合のみ成功する
+- 移動先グループへの追加位置は常に末尾
+- 既存の`SortOrder`に不整合があっても、一覧取得順を正として次回の変更時にグループ単位で正規化する
 
 ---
 

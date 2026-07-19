@@ -11,11 +11,12 @@ type GoalUsecase interface {
 	Create(ctx context.Context, userID int, input *GoalInput) (*GoalOutput, error)
 	Update(ctx context.Context, userID int, id uint32, input *GoalInput) (*GoalOutput, error)
 	Delete(ctx context.Context, userID int, id uint32) error
-	Reorder(ctx context.Context, userID int, orderedGoalIDs []uint32) error
+	Reorder(ctx context.Context, userID int, groupID *uint32, orderedGoalIDs []uint32) error
 }
 
 // GoalInput は目標の作成・更新入力です。
 type GoalInput struct {
+	GroupID           *uint32
 	Title             string
 	AchievementType   string
 	AchievementParams []byte
@@ -26,6 +27,7 @@ type GoalInput struct {
 // GoalOutput は目標API向けの出力です。
 type GoalOutput struct {
 	ID                uint32
+	GroupID           *uint32
 	Title             string
 	AchievementType   string
 	AchievementParams map[string]any

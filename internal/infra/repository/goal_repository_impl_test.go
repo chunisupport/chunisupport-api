@@ -24,9 +24,18 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 	})
 
 	schema := []string{
+		`CREATE TABLE goal_groups (
+			id INTEGER PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			sort_order INTEGER NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE (user_id, name)
+		)`,
 		`CREATE TABLE goals (
 			id INTEGER PRIMARY KEY,
 			user_id INTEGER NOT NULL,
+			group_id INTEGER NULL,
 			title TEXT NOT NULL,
 			achievement_type_id INTEGER NOT NULL,
 			achievement_params TEXT NOT NULL,
@@ -69,6 +78,31 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 	return db
 }
 
+func TestGoalRepository_ListByUserIDOrdersByGroupAndPutsUnclassifiedLast(t *testing.T) {
+	// Given
+	db := setupGoalRepositorySQLite(t)
+	_, err := db.Exec(`INSERT INTO goal_groups (id, user_id, name, sort_order, created_at) VALUES
+		(10, 1, 'second group', 2, '2026-01-01'),
+		(20, 1, 'first group', 1, '2026-01-01')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO goals
+		(id, user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at)
+		VALUES
+		(1, 1, NULL, 'unclassified', 1, '{}', '{}', 0, 1, '2026-01-01'),
+		(2, 1, 10, 'group second', 1, '{}', '{}', 0, 1, '2026-01-01'),
+		(3, 1, 20, 'within second', 1, '{}', '{}', 0, 2, '2026-01-01'),
+		(4, 1, 20, 'within first', 1, '{}', '{}', 0, 1, '2026-01-01')`)
+	require.NoError(t, err)
+	repo := &goalRepository{db: db}
+
+	// When
+	goals, err := repo.ListByUserID(context.Background(), db, 1)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, []uint32{4, 3, 2, 1}, []uint32{goals[0].ID, goals[1].ID, goals[2].ID, goals[3].ID})
+}
+
 func TestGoalRepository_ListByUserIDReturnsSortOrder(t *testing.T) {
 	// Given
 	db := setupGoalRepositorySQLite(t)
@@ -106,13 +140,13 @@ func TestGoalRepository_SaveGoalOrderAssignsDenseSortOrders(t *testing.T) {
 	repo := &goalRepository{db: db}
 
 	// When
-	order, err := entity.NewGoalOrder(1, []*entity.Goal{
+	arrangement, err := entity.NewGoalArrangement(1, []*entity.Goal{
 		{ID: 30, UserID: 1, SortOrder: 1},
 		{ID: 10, UserID: 1, SortOrder: 2},
 		{ID: 20, UserID: 1, SortOrder: 3},
 	})
 	require.NoError(t, err)
-	err = repo.SaveGoalOrder(context.Background(), db, order)
+	err = repo.SaveGoalArrangement(context.Background(), db, arrangement)
 
 	// Then
 	require.NoError(t, err)
@@ -133,11 +167,11 @@ func TestGoalRepository_SaveGoalOrderRejectsMismatchedGoalSet(t *testing.T) {
 		VALUES (10, 1, 'first', 1, '{}', '{}', 0, 1, '2026-01-01')`)
 	require.NoError(t, err)
 	repo := &goalRepository{db: db}
-	order, err := entity.NewGoalOrder(1, []*entity.Goal{{ID: 99, UserID: 1}})
+	arrangement, err := entity.NewGoalArrangement(1, []*entity.Goal{{ID: 99, UserID: 1}})
 	require.NoError(t, err)
 
 	// When
-	err = repo.SaveGoalOrder(context.Background(), db, order)
+	err = repo.SaveGoalArrangement(context.Background(), db, arrangement)
 
 	// Then
 	assert.ErrorIs(t, err, domainrepo.ErrGoalOrderInconsistent)

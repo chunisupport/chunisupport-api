@@ -64,6 +64,11 @@ const (
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
 	CodeInvalidGoalInput             = "invalid_goal_input"
 	CodeGoalInvalidOrder             = "goal_invalid_order"
+	CodeGoalGroupNotFound            = "goal_group_not_found"
+	CodeGoalGroupLimitExceeded       = "goal_group_limit_exceeded"
+	CodeGoalGroupInvalidName         = "goal_group_invalid_name"
+	CodeGoalGroupConflict            = "goal_group_conflict"
+	CodeGoalGroupInvalidOrder        = "goal_group_invalid_order"
 
 	// 保存済みフィルタ関連エラー
 	CodeRecordFilterNotFound      = "record_filter_not_found"

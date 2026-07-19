@@ -88,6 +88,20 @@ func (e *execResultExecutor) ExecContext(ctx context.Context, query string, args
 
 var _ domainrepo.Executor = (*execResultExecutor)(nil)
 
+type goalSaveExecutor struct {
+	execResultExecutor
+	exists int
+}
+
+func (e *goalSaveExecutor) GetContext(ctx context.Context, dest any, query string, args ...any) error {
+	count, ok := dest.(*int)
+	if !ok {
+		return errors.New("unexpected destination type")
+	}
+	*count = e.exists
+	return nil
+}
+
 func TestFindByUserID_ReturnsNilWhenWrappedNoRows(t *testing.T) {
 	repo := &playerRepository{}
 	exec := &noRowsWrappedExecutor{}
@@ -135,10 +149,21 @@ func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testin
 
 func TestGoalSave_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
 	repo := &goalRepository{}
-	exec := &execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+	exec := &goalSaveExecutor{execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}}
 
 	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
 	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
+}
+
+func TestGoalSave_AllowsIdempotentUpdate(t *testing.T) {
+	repo := &goalRepository{}
+	exec := &goalSaveExecutor{
+		execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}},
+		exists:             1,
+	}
+
+	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
+	require.NoError(t, err)
 }
 
 func TestGoalDelete_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {

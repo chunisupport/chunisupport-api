@@ -9,7 +9,12 @@ import (
 
 func TestGoalOrder_ReorderAssignsDenseSortOrders(t *testing.T) {
 	// Given
-	order, err := NewGoalOrder(1, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 1}, {ID: 30, UserID: 1}})
+	groupID := uint32(5)
+	order, err := NewGoalOrder(1, &groupID, []*Goal{
+		{ID: 10, UserID: 1, GroupID: &groupID},
+		{ID: 20, UserID: 1, GroupID: &groupID},
+		{ID: 30, UserID: 1, GroupID: &groupID},
+	})
 	require.NoError(t, err)
 
 	// When
@@ -24,7 +29,7 @@ func TestGoalOrder_ReorderAssignsDenseSortOrders(t *testing.T) {
 
 func TestGoalOrder_ReorderRejectsDifferentGoalSet(t *testing.T) {
 	// Given
-	order, err := NewGoalOrder(1, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 1}})
+	order, err := NewGoalOrder(1, nil, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 1}})
 	require.NoError(t, err)
 
 	// When
@@ -36,7 +41,7 @@ func TestGoalOrder_ReorderRejectsDifferentGoalSet(t *testing.T) {
 
 func TestNewGoalOrder_RejectsAnotherUsersGoal(t *testing.T) {
 	// When
-	order, err := NewGoalOrder(1, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 2}})
+	order, err := NewGoalOrder(1, nil, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 2}})
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidGoalOrder)
@@ -45,7 +50,7 @@ func TestNewGoalOrder_RejectsAnotherUsersGoal(t *testing.T) {
 
 func TestNewGoalOrder_RejectsDuplicateGoalID(t *testing.T) {
 	// When
-	order, err := NewGoalOrder(1, []*Goal{{ID: 10, UserID: 1}, {ID: 10, UserID: 1}})
+	order, err := NewGoalOrder(1, nil, []*Goal{{ID: 10, UserID: 1}, {ID: 10, UserID: 1}})
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidGoalOrder)
@@ -54,7 +59,7 @@ func TestNewGoalOrder_RejectsDuplicateGoalID(t *testing.T) {
 
 func TestGoalOrder_RemoveRenumbersRemainingGoals(t *testing.T) {
 	// Given
-	order, err := NewGoalOrder(1, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 1}, {ID: 30, UserID: 1}})
+	order, err := NewGoalOrder(1, nil, []*Goal{{ID: 10, UserID: 1}, {ID: 20, UserID: 1}, {ID: 30, UserID: 1}})
 	require.NoError(t, err)
 
 	// When
@@ -65,4 +70,17 @@ func TestGoalOrder_RemoveRenumbersRemainingGoals(t *testing.T) {
 	goals := order.Goals()
 	assert.Equal(t, []uint32{10, 30}, []uint32{goals[0].ID, goals[1].ID})
 	assert.Equal(t, []uint16{1, 2}, []uint16{goals[0].SortOrder, goals[1].SortOrder})
+}
+
+func TestNewGoalOrder_RejectsGoalFromAnotherGroup(t *testing.T) {
+	// Given
+	groupID := uint32(5)
+	otherGroupID := uint32(6)
+
+	// When
+	order, err := NewGoalOrder(1, &groupID, []*Goal{{ID: 10, UserID: 1, GroupID: &otherGroupID}})
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidGoalOrder)
+	assert.Nil(t, order)
 }

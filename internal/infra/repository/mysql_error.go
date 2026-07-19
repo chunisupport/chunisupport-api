@@ -54,6 +54,13 @@ func wrapHonorReferencedError(err error) error {
 	return fmt.Errorf("%w: %v", domainrepo.ErrHonorConflict, err)
 }
 
+func wrapGoalGroupDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "uq_goal_groups_user_name") {
+		return err
+	}
+	return fmt.Errorf("%w: %v", domainrepo.ErrGoalGroupConflict, err)
+}
+
 func isMySQLDuplicateEntryForKey(err error, key string) bool {
 	var mysqlErr *mysql.MySQLError
 	if !errors.As(err, &mysqlErr) {

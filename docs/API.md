@@ -150,6 +150,11 @@
 | `/internal/me/goals/order` | PUT | Firebase Bearer | 目標を並び替え |
 | `/internal/me/goals/:id` | PUT | Firebase Bearer | 目標を更新 |
 | `/internal/me/goals/:id` | DELETE | Firebase Bearer | 目標を削除 |
+| `/internal/me/goal-groups` | GET | Firebase Bearer | 目標グループ一覧を取得 |
+| `/internal/me/goal-groups` | POST | Firebase Bearer | 目標グループを作成 |
+| `/internal/me/goal-groups/order` | PUT | Firebase Bearer | 目標グループを並び替え |
+| `/internal/me/goal-groups/:id` | PUT | Firebase Bearer | 目標グループ名を更新 |
+| `/internal/me/goal-groups/:id` | DELETE | Firebase Bearer | 目標グループを削除 |
 | `/internal/me/record-filters` | GET | Firebase Bearer | 保存済みレコードフィルタ一覧を取得 |
 | `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
 | `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
@@ -1444,14 +1449,32 @@ curl -X POST \
 目標はユーザー個人のデータであり、認証済みユーザーの個人データ操作が集約されている `/internal/me` 配下に配置されます。他ユーザーへの公開は現時点では行いません。
 
 - 1ユーザーあたり目標上限は **100件** です。
+- 1ユーザーあたり目標グループ上限は **20件** です。空グループも保持されます。
 - 目標は「属性（`attributes`）」と「成果（`achievement`）」を持ちます。
 - 外部API（`/v1`）には公開しません。
+
+### GoalGroup オブジェクト
+
+```json
+{
+  "id": 3,
+  "name": "攻略中",
+  "sort_order": 1,
+  "created_at": "2026-01-01T09:00:00+09:00"
+}
+```
+
+- `name` はtrim後1〜30文字で、制御文字を許可しません。
+- 同一ユーザー内の名前は大文字小文字を区別せず重複不可です。
+- `sort_order` はユーザー内で1から始まる連番です。
+- 未分類はグループレコードを持たず、Goalの `group_id: null` で表します。表示上は常にグループの末尾です。
 
 ### Goal オブジェクト
 
 ```json
 {
   "id": 1,
+  "group_id": 3,
   "title": "マスター14+ 100枚",
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
@@ -1465,18 +1488,20 @@ curl -X POST \
 | フィールド | 型 | 方向 | 説明 |
 |---|---|---|---|
 | `id` | `integer` | レスポンスのみ | 目標ID（自動採番） |
+| `group_id` | `integer \| null` | 双方向 | 所属グループID。`null` または省略時は未分類 |
 | `title` | `string` | 双方向 | 目標タイトル。trim後30文字以内、空文字不可、制御文字不可 |
 | `achievement_type` | `string` | 双方向 | 成果種別コード（`achievement_types.code` と完全一致。大文字小文字の混在不可） |
 | `achievement_params` | `object` | 双方向 | 成果種別ごとの可変パラメータ（詳細は後述） |
 | `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
 | `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
-| `sort_order` | `integer` | レスポンスのみ | ユーザー内での表示順。1から始まる連番 |
+| `sort_order` | `integer` | レスポンスのみ | 同一グループ内での表示順。1から始まる連番 |
 | `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
 
 **作成・更新リクエストでの省略可否**:
 
 - `title` / `achievement_type` / `achievement_params` は必須です。
 - `attributes` は省略可能です。省略時は絞り込み条件なしとして扱います。明示する場合は空オブジェクト `{}` を推奨します。
+- `group_id` は省略可能です。省略または `null` の場合は未分類として扱います。
 - `invert` は省略可能です。省略時は `false` として扱います。
 - `id` / `sort_order` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
 
@@ -1688,7 +1713,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 #### 境界（Handler/DTO）での検査
 
-- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
+- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
 
 #### Usecase層での業務ルール検査
 
@@ -1714,7 +1739,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/internal/me/goals`
 
-自分が作成した目標を全件返します。ソート順は `sort_order` 昇順です。同順位が存在する不整合時のみ `id` 昇順を使用します。
+自分が作成した目標を全件返します。グループは `goal_groups.sort_order` 昇順、未分類は末尾、その中でGoalの `sort_order` 昇順です。同順位が存在する不整合時のみ `id` 昇順を使用します。
 
 **レスポンス**: 200 OK
 
@@ -1723,6 +1748,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "goals": [
     {
       "id": 1,
+      "group_id": 3,
       "title": "マスター14+ 100枚",
       "achievement_type": "score_count",
       "achievement_params": { "score": 1007500, "count": 100 },
@@ -1739,12 +1765,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
 
-新しい目標は現在の末尾へ追加され、レスポンスにはサーバーが採番した `sort_order` が含まれます。
+新しい目標は指定グループ（未指定時は未分類）の末尾へ追加され、レスポンスにはサーバーが採番した `sort_order` が含まれます。
 
 **リクエストボディ**: Goal オブジェクト（`id` / `sort_order` / `created_at` 除く）
 
 ```json
 {
+  "group_id": 3,
   "title": "マスター14+ 100枚",
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
@@ -1757,7 +1784,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/internal/me/goals/:id`
 
-指定IDの目標を完全上書き更新します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。
+指定IDの目標を完全上書き更新します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。`group_id` を変更した場合、移動元の順番を詰めて移動先の末尾へ追加します。
 
 **リクエストボディ**: Goal オブジェクト（`id` / `sort_order` / `created_at` 除く）
 
@@ -1765,10 +1792,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/internal/me/goals/order`
 
-自分の目標を並び替えます。現在所有するすべての目標IDを、希望する表示順で1回ずつ指定します。フロントエンドは順序を決定し、バックエンドは配列順に `sort_order` を1から採番します。
+指定グループ内の目標を並び替えます。そのグループに現在所属するすべての目標IDを、希望する表示順で1回ずつ指定します。`group_id: null` または省略時は未分類を対象にします。
 
 ```json
 {
+  "group_id": 3,
   "goal_ids": [12, 5, 9]
 }
 ```
@@ -1781,9 +1809,19 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### DELETE `/internal/me/goals/:id`
 
-指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。削除後、残った目標の `sort_order` は1からの連番へ詰め直されます。
+指定IDの目標を削除します。他ユーザーの目標を指定した場合は `goal_not_found` を返します。削除後、同じグループに残った目標の `sort_order` は1からの連番へ詰め直されます。
 
 **レスポンス**: 204 No Content
+
+### GoalGroup API
+
+- `GET /internal/me/goal-groups`: 空グループを含む全グループを `sort_order` 順で返します。
+- `POST /internal/me/goal-groups`: `{"name":"攻略中"}` で末尾に作成します。
+- `PUT /internal/me/goal-groups/:id`: 同じ形式で名前を完全上書き更新します。
+- `PUT /internal/me/goal-groups/order`: `{"group_ids":[3,1,2]}` のように所有する全グループIDを1回ずつ指定します。
+- `DELETE /internal/me/goal-groups/:id`: 所属目標を現在の未分類末尾へ順序を保って移動し、グループを削除します。
+
+作成・更新・削除・並び替えはユーザー行ロック下の単一トランザクションで実行します。
 
 ### Goal API エラーコード
 
@@ -1795,8 +1833,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
-| `goal_invalid_order` | 400 | `goal_ids` が現在所有する目標IDの集合と一致しない、または重複している |
+| `goal_invalid_order` | 400 | `goal_ids` が指定グループ（`group_id` の省略・`null` は未分類）に現在所属する目標IDの集合と一致しない、または重複している |
 | `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
+| `goal_group_not_found` | 404 | グループが存在しない、または他ユーザー所有 |
+| `goal_group_limit_exceeded` | 400 | 20件上限を超えてグループを作成しようとした |
+| `goal_group_invalid_name` | 400 | グループ名が空、30文字超、または制御文字を含む |
+| `goal_group_conflict` | 409 | 同一ユーザー内でグループ名が重複している |
+| `goal_group_invalid_order` | 400 | `group_ids` が現在所有するグループIDの集合と一致しない、または重複している |
 
 ---
 

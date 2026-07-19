@@ -113,6 +113,11 @@ var (
 	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
 	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
 	ErrGoalInvalidOrder             = New(CodeGoalInvalidOrder, http.StatusBadRequest)
+	ErrGoalGroupNotFound            = New(CodeGoalGroupNotFound, http.StatusNotFound)
+	ErrGoalGroupLimitExceeded       = New(CodeGoalGroupLimitExceeded, http.StatusBadRequest)
+	ErrGoalGroupInvalidName         = New(CodeGoalGroupInvalidName, http.StatusBadRequest)
+	ErrGoalGroupConflict            = New(CodeGoalGroupConflict, http.StatusConflict)
+	ErrGoalGroupInvalidOrder        = New(CodeGoalGroupInvalidOrder, http.StatusBadRequest)
 
 	ErrRecordFilterNotFound      = New(CodeRecordFilterNotFound, http.StatusNotFound)
 	ErrRecordFilterLimitExceeded = New(CodeRecordFilterLimitExceeded, http.StatusBadRequest)

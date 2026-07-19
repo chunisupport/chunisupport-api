@@ -68,8 +68,8 @@ func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.
 	s.goal = nil
 	return nil
 }
-func (s *stubGoalRepo) SaveGoalOrder(ctx context.Context, exec repository.Executor, order *entity.GoalOrder) error {
-	goals := order.Goals()
+func (s *stubGoalRepo) SaveGoalArrangement(ctx context.Context, exec repository.Executor, arrangement *entity.GoalArrangement) error {
+	goals := arrangement.Goals()
 	s.savedOrder = make([]uint32, 0, len(goals))
 	s.savedSorts = make([]uint16, 0, len(goals))
 	for _, goal := range goals {
@@ -80,6 +80,19 @@ func (s *stubGoalRepo) SaveGoalOrder(ctx context.Context, exec repository.Execut
 }
 func (s *stubGoalRepo) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {
 	return s.count, nil
+}
+
+func (s *stubGoalRepo) CountByUserIDAndGroupID(ctx context.Context, exec repository.Executor, userID int, groupID *uint32) (int, error) {
+	count := 0
+	for _, goal := range s.goals {
+		if goal.GroupID == nil && groupID == nil || goal.GroupID != nil && groupID != nil && *goal.GroupID == *groupID {
+			count++
+		}
+	}
+	if s.goals == nil {
+		return s.count, nil
+	}
+	return count, nil
 }
 func (s *stubGoalRepo) LockUserByID(ctx context.Context, exec repository.Executor, userID int) error {
 	return nil
@@ -144,7 +157,7 @@ func (s *stubMissingTypeMasterProvider) GoalMasters() *domainmasterdata.GoalMast
 
 func TestGoalUsecase_Create(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	in := &GoalInput{Title: "  test  ", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"diff":4,"genre":1,"ver":20}`)}
 	out, err := u.Create(context.Background(), 1, in)
 	require.NoError(t, err)
@@ -155,7 +168,7 @@ func TestGoalUsecase_Create(t *testing.T) {
 func TestGoalUsecase_CreateAssignsLastSortOrder(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{count: 2}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	out, err := u.Create(context.Background(), 1, &GoalInput{
@@ -173,7 +186,7 @@ func TestGoalUsecase_CreateAssignsLastSortOrder(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsTitleOver30Runes(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "1234567890123456789012345678901",
 		AchievementType:   "score_count",
@@ -185,7 +198,7 @@ func TestGoalUsecase_CreateRejectsTitleOver30Runes(t *testing.T) {
 
 func TestGoalUsecase_CreateAcceptsTitleAt30Runes(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "123456789012345678901234567890",
 		AchievementType:   "score_count",
@@ -197,7 +210,7 @@ func TestGoalUsecase_CreateAcceptsTitleAt30Runes(t *testing.T) {
 
 func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 	repo := &stubGoalRepo{count: 100}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{Title: "test", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)})
 	assert.True(t, errors.Is(err, ErrGoalLimitExceeded))
 }
@@ -205,7 +218,7 @@ func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 func TestGoalUsecase_Delete(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, SortOrder: 1}}
 	tm := &trackingTM{}
-	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	err := u.Delete(context.Background(), 1, 1)
 	require.NoError(t, err)
 	assert.Nil(t, repo.goal)
@@ -215,7 +228,7 @@ func TestGoalUsecase_Delete(t *testing.T) {
 
 func TestGoalUsecase_DeleteNotFound(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	err := u.Delete(context.Background(), 1, 999)
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
 }
@@ -227,7 +240,7 @@ func TestGoalUsecase_DeleteRenumbersRemainingGoals(t *testing.T) {
 		{ID: 20, UserID: 1, SortOrder: 2},
 		{ID: 30, UserID: 1, SortOrder: 3},
 	}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	err := u.Delete(context.Background(), 1, 20)
@@ -246,10 +259,10 @@ func TestGoalUsecase_Reorder(t *testing.T) {
 		{ID: 30, UserID: 1, SortOrder: 3},
 	}}
 	tm := &trackingTM{}
-	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
-	err := u.Reorder(context.Background(), 1, []uint32{30, 10, 20})
+	err := u.Reorder(context.Background(), 1, nil, []uint32{30, 10, 20})
 
 	// Then
 	require.NoError(t, err)
@@ -275,10 +288,10 @@ func TestGoalUsecase_ReorderRejectsInvalidGoalSet(t *testing.T) {
 				{ID: 10, UserID: 1, SortOrder: 1},
 				{ID: 20, UserID: 1, SortOrder: 2},
 			}}
-			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 			// When
-			err := u.Reorder(context.Background(), 1, tt.orderedIDs)
+			err := u.Reorder(context.Background(), 1, nil, tt.orderedIDs)
 
 			// Then
 			assert.ErrorIs(t, err, ErrInvalidGoalOrder)
@@ -287,9 +300,84 @@ func TestGoalUsecase_ReorderRejectsInvalidGoalSet(t *testing.T) {
 	}
 }
 
+func TestGoalUsecase_CreateRejectsUnknownGroup(t *testing.T) {
+	// Given
+	groupID := uint32(99)
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		GroupID:           &groupID,
+		Title:             "test",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+
+	// Then
+	assert.ErrorIs(t, err, ErrGoalGroupNotFound)
+}
+
+func TestGoalUsecase_UpdateRejectsOtherUsersGroup(t *testing.T) {
+	// Given
+	groupID := uint32(10)
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}}
+	groupRepo := &stubGoalGroupRepo{groups: []*entity.GoalGroup{
+		newTestGoalGroup(t, groupID, 2, "他ユーザーのグループ", 1),
+	}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, groupRepo)
+
+	// When
+	_, err := u.Update(context.Background(), 1, 1, &GoalInput{
+		GroupID:           &groupID,
+		Title:             "updated",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{}`),
+	})
+
+	// Then
+	assert.ErrorIs(t, err, ErrGoalGroupNotFound)
+}
+
+func TestGoalUsecase_ReorderRejectsUnknownGroup(t *testing.T) {
+	// Given
+	groupID := uint32(99)
+	u := NewGoalUsecase(nil, &stubTM{}, &stubGoalRepo{}, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When
+	err := u.Reorder(context.Background(), 1, &groupID, nil)
+
+	// Then
+	assert.ErrorIs(t, err, ErrGoalGroupNotFound)
+}
+
+func TestGoalUsecase_ReorderRejectsGoalsFromAnotherGroup(t *testing.T) {
+	// Given
+	targetGroupID := uint32(10)
+	otherGroupID := uint32(20)
+	repo := &stubGoalRepo{goals: []*entity.Goal{
+		{ID: 1, UserID: 1, GroupID: &targetGroupID, SortOrder: 1},
+		{ID: 2, UserID: 1, GroupID: &otherGroupID, SortOrder: 1},
+	}}
+	groupRepo := &stubGoalGroupRepo{groups: []*entity.GoalGroup{
+		newTestGoalGroup(t, targetGroupID, 1, "対象", 1),
+		newTestGoalGroup(t, otherGroupID, 1, "対象外", 2),
+	}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, groupRepo)
+
+	// When
+	err := u.Reorder(context.Background(), 1, &targetGroupID, []uint32{1, 2})
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidGoalOrder)
+	assert.Nil(t, repo.savedOrder)
+}
+
 func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1}, updateErr: repository.ErrGoalNotFound}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Update(context.Background(), 1, 1, &GoalInput{
 		Title:             "updated",
 		AchievementType:   "score_count",
@@ -301,7 +389,7 @@ func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
 
 func TestGoalUsecase_CreateMasterDataUnavailable(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubNilGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubNilGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -313,7 +401,7 @@ func TestGoalUsecase_CreateMasterDataUnavailable(t *testing.T) {
 
 func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -384,7 +472,7 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubGoalRepo{}
-			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 			// When
 			out, err := u.Create(context.Background(), 1, &GoalInput{
@@ -408,7 +496,7 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 func TestGoalUsecase_CreateAcceptsOPTargetAttribute(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	out, err := u.Create(context.Background(), 1, &GoalInput{
@@ -427,7 +515,7 @@ func TestGoalUsecase_CreateAcceptsOPTargetAttribute(t *testing.T) {
 func TestGoalUsecase_CreateRejectsOPTargetWithDifficulty(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	_, err := u.Create(context.Background(), 1, &GoalInput{
@@ -444,7 +532,7 @@ func TestGoalUsecase_CreateRejectsOPTargetWithDifficulty(t *testing.T) {
 func TestGoalUsecase_CreateRejectsUnknownChartTarget(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	_, err := u.Create(context.Background(), 1, &GoalInput{
@@ -460,7 +548,7 @@ func TestGoalUsecase_CreateRejectsUnknownChartTarget(t *testing.T) {
 
 func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	out, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -473,7 +561,7 @@ func TestGoalUsecase_CreateConstAttributeWithOmittedMinUsesDefault(t *testing.T)
 
 func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -485,7 +573,7 @@ func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T)
 
 func TestGoalUsecase_CreateOverpowerPercentRejectsOver100(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "overpower_percent",
@@ -497,7 +585,7 @@ func TestGoalUsecase_CreateOverpowerPercentRejectsOver100(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsControlCharacterInTitle(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "bad\ntitle",
 		AchievementType:   "score_count",
@@ -509,7 +597,7 @@ func TestGoalUsecase_CreateRejectsControlCharacterInTitle(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsUnknownAttributeKey(t *testing.T) {
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -521,7 +609,7 @@ func TestGoalUsecase_CreateRejectsUnknownAttributeKey(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -534,7 +622,7 @@ func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
 func TestGoalUsecase_CreateRejectsRainbowCountOverSongUpperBound(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 10, SongCount: 2}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	_, err := u.Create(context.Background(), 1, &GoalInput{
@@ -551,7 +639,7 @@ func TestGoalUsecase_CreateRejectsRainbowCountOverSongUpperBound(t *testing.T) {
 func TestGoalUsecase_CreateRejectsRainbowRemainingOverSongUpperBound(t *testing.T) {
 	// Given
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 10, SongCount: 2}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	_, err := u.Create(context.Background(), 1, &GoalInput{
@@ -579,7 +667,7 @@ func TestGoalUsecase_CreateRejectsChartAttributesForRainbowCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubGoalRepo{}
-			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 			// When
 			_, err := u.Create(context.Background(), 1, &GoalInput{
@@ -597,7 +685,7 @@ func TestGoalUsecase_CreateRejectsChartAttributesForRainbowCount(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsTotalScoreOverDynamicUpperBound(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "total_score",
@@ -609,7 +697,7 @@ func TestGoalUsecase_CreateRejectsTotalScoreOverDynamicUpperBound(t *testing.T) 
 
 func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 10.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "overpower_value",
@@ -621,7 +709,7 @@ func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing
 
 func TestGoalUsecase_CreateRejectsUnknownKeyInScoreCountParams(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -633,7 +721,7 @@ func TestGoalUsecase_CreateRejectsUnknownKeyInScoreCountParams(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsUnknownKeyInTotalScoreParams(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "total_score",
@@ -645,7 +733,7 @@ func TestGoalUsecase_CreateRejectsUnknownKeyInTotalScoreParams(t *testing.T) {
 
 func TestGoalUsecase_CreateRejectsUnknownKeyInOverpowerValueParams(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "overpower_value",
@@ -657,7 +745,7 @@ func TestGoalUsecase_CreateRejectsUnknownKeyInOverpowerValueParams(t *testing.T)
 
 func TestGoalUsecase_CreateAcceptsOmittedCountForScoreCount(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	out, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -670,7 +758,7 @@ func TestGoalUsecase_CreateAcceptsOmittedCountForScoreCount(t *testing.T) {
 
 func TestGoalUsecase_CreateAcceptsNullCountForScoreCount(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	out, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "score_count",
@@ -683,7 +771,7 @@ func TestGoalUsecase_CreateAcceptsNullCountForScoreCount(t *testing.T) {
 
 func TestGoalUsecase_CreateAcceptsOmittedTotalForTotalScore(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	out, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "total_score",
@@ -696,7 +784,7 @@ func TestGoalUsecase_CreateAcceptsOmittedTotalForTotalScore(t *testing.T) {
 
 func TestGoalUsecase_CreateAcceptsNullTotalForOverpowerValue(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 	out, err := u.Create(context.Background(), 1, &GoalInput{
 		Title:             "test",
 		AchievementType:   "overpower_value",
@@ -776,7 +864,7 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubGoalRepo{stats: tt.stats}
-			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 			// When
 			out, err := u.Create(context.Background(), 1, &GoalInput{
@@ -854,7 +942,7 @@ func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubGoalRepo{}
-			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 			// When
 			out, err := u.Create(context.Background(), 1, &GoalInput{
@@ -879,7 +967,7 @@ func TestGoalUsecase_Update(t *testing.T) {
 	// Given: 既存の Goal が存在する状態
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}
 	tm := &trackingTM{passedFloor: nil}
-	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, tm, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When: Update を呼び出す
 	out, err := u.Update(context.Background(), 1, 1, &GoalInput{
@@ -900,7 +988,7 @@ func TestGoalUsecase_Update(t *testing.T) {
 func TestGoalUsecase_UpdateReturnsNotFoundWhenGoalMissing(t *testing.T) {
 	// Given: 対象 Goal が存在しない
 	repo := &stubGoalRepo{}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
 
 	// When
 	_, err := u.Update(context.Background(), 1, 999, &GoalInput{
@@ -916,7 +1004,7 @@ func TestGoalUsecase_UpdateReturnsNotFoundWhenGoalMissing(t *testing.T) {
 
 func TestGoalUsecase_ListReturnsInternalErrorWhenAchievementTypeMissing(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, Title: "test", AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)}}
-	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubMissingTypeMasterProvider{})
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubMissingTypeMasterProvider{}, &stubGoalGroupRepo{})
 	_, err := u.List(context.Background(), 1)
 	assert.True(t, errors.Is(err, ErrInternalError))
 }
