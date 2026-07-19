@@ -178,6 +178,12 @@ type calculatedOverpowerSummary struct {
 	Percent *float64
 }
 
+type registeredSPHonor struct {
+	ID            int
+	ImageFilename string
+	ImageURL      string
+}
+
 // playerDataUsecase は PlayerDataUsecase の実装です。
 type playerDataUsecase struct {
 	tm               TransactionManager
@@ -310,6 +316,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		Changes:        []api_internal.PlayerDataRecordChange{},
 		SkippedRecords: []api_internal.SkippedRecord{},
 	}
+	registeredSPHonors := make([]registeredSPHonor, 0, 1)
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
 		masters, loadErr := us.loadMasterData(ctx, payload)
@@ -341,10 +348,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 		skippedRecords := make([]api_internal.SkippedRecord, 0, 4)
 
-		honorSkipped, honorErr := us.applyHonors(ctx, tx, playerID, payload.Honors, masters)
+		honorSkipped, registeredHonors, honorErr := us.applyHonors(ctx, tx, playerID, payload.Honors, masters)
 		if honorErr != nil {
 			return honorErr
 		}
+		registeredSPHonors = registeredHonors
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
 		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt, beforeStatistics)
@@ -406,8 +414,23 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, err
 	}
 
+	logRegisteredSPHonors(registeredSPHonors)
+
 	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
+}
+
+// logRegisteredSPHonors はトランザクションのコミット後に、手動対応が必要な新規SP称号を通知用ログへ出力します。
+func logRegisteredSPHonors(honors []registeredSPHonor) {
+	for _, honor := range honors {
+		slog.Warn(
+			"unknown SP honor registered",
+			"event", info.UnknownSPHonorRegisteredEvent,
+			"honor_id", honor.ID,
+			"image_filename", honor.ImageFilename,
+			"image_url", honor.ImageURL,
+		)
+	}
 }
 
 // parsePlayerDataTimes はゲーム由来の時刻をUTCへ正規化します。
@@ -623,14 +646,15 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 // applyHonors はプレイヤーの称号情報を更新します。
 // 既存の称号を削除し、新しい称号をバルクインサートします。
 // 称号は最大3つであるため、EnsureHonorのループ内呼び出しによるN+1問題を許容します。
-func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Executor, playerID int, honors map[string]PlayerDataHonorPayload, masters *playerDataMaster) ([]api_internal.SkippedRecord, error) {
+func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Executor, playerID int, honors map[string]PlayerDataHonorPayload, masters *playerDataMaster) ([]api_internal.SkippedRecord, []registeredSPHonor, error) {
 	skipped := make([]api_internal.SkippedRecord, 0, 4)
+	registered := make([]registeredSPHonor, 0, 1)
 	if honors == nil {
-		return skipped, nil
+		return skipped, registered, nil
 	}
 	preservedSlots := randomFavoriteHonorSlots(honors)
 	if err := us.honorRepo.DeletePlayerHonorsExceptSlots(ctx, tx, playerID, preservedSlots); err != nil {
-		return skipped, err
+		return skipped, registered, err
 	}
 
 	// バリデーション済みの称号情報を収集
@@ -691,7 +715,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			imageURL = nil
 		}
 
-		honorID, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, imageURL)
+		ensureResult, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, imageURL)
 		if err != nil {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
@@ -700,10 +724,17 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			})
 			continue
 		}
+		if honorTypeKey == "sp" && ensureResult.ImageURLRegistered {
+			registered = append(registered, registeredSPHonor{
+				ID:            ensureResult.ID,
+				ImageFilename: honorTitle,
+				ImageURL:      *imageURL,
+			})
+		}
 
 		assignments = append(assignments, repository.HonorAssignment{
 			PlayerID: playerID,
-			HonorID:  honorID,
+			HonorID:  ensureResult.ID,
 			Slot:     slot,
 		})
 	}
@@ -722,7 +753,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 		}
 	}
 
-	return skipped, nil
+	return skipped, registered, nil
 }
 
 // honorImageFilename はSP称号を一意に識別するため、画像URLからファイル名を取り出します。

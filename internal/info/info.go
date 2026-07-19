@@ -30,6 +30,7 @@ const (
 	RainbowRequiredDifficultyMaxID    = 4
 	RainbowRequiredDifficultyCount    = 4
 	RandomFavoriteHonorTitle          = "お気に入りからランダム"
+	UnknownSPHonorRegisteredEvent     = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName           = "chunisupport:recalculate-player-data"
 	PlayerLatestUpdateSchemaVersion   = 1
 	PlayerLatestUpdateMaxPayloadBytes = 1024 * 1024

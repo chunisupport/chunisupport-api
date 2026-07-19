@@ -104,8 +104,8 @@ func (m *honorRepositoryMock) Delete(context.Context, repository.Executor, int) 
 	return m.deleteErr
 }
 
-func (m *honorRepositoryMock) EnsureHonor(context.Context, repository.Executor, string, int, *string) (int, error) {
-	return 0, nil
+func (m *honorRepositoryMock) EnsureHonor(context.Context, repository.Executor, string, int, *string) (repository.HonorEnsureResult, error) {
+	return repository.HonorEnsureResult{}, nil
 }
 
 func (m *honorRepositoryMock) DeletePlayerHonors(context.Context, repository.Executor, int) error {

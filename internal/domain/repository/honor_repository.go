@@ -13,6 +13,12 @@ type HonorAssignment struct {
 	Slot     int // 1=上段, 2=中段, 3=下段
 }
 
+// HonorEnsureResult は称号の登録または取得結果を表します。
+type HonorEnsureResult struct {
+	ID                 int
+	ImageURLRegistered bool
+}
+
 // HonorRepository は称号に関する永続化を扱うリポジトリです。
 type HonorRepository interface {
 	// FindAll は称号をID昇順で全件取得します。
@@ -33,7 +39,8 @@ type HonorRepository interface {
 	// EnsureHonor は称号を登録または既存のIDを取得します。
 	// 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
 	// imageURL がnilの場合はNULLとして保存します。
-	EnsureHonor(ctx context.Context, exec Executor, title string, honorTypeID int, imageURL *string) (int, error)
+	// ImageURLRegistered は、imageURL付き称号をこの呼び出しで新規登録した場合のみtrueです。
+	EnsureHonor(ctx context.Context, exec Executor, title string, honorTypeID int, imageURL *string) (HonorEnsureResult, error)
 
 	// DeletePlayerHonors はプレイヤーの称号割り当てを全て削除します。
 	DeletePlayerHonors(ctx context.Context, exec Executor, playerID int) error

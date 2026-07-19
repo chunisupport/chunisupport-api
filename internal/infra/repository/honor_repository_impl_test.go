@@ -22,11 +22,13 @@ type honorEnsureExec struct {
 	afterMissID int
 	getCalled   bool
 	getCount    int
+	getQueries  []string
 }
 
-func (e *honorEnsureExec) GetContext(_ context.Context, dest any, _ string, _ ...any) error {
+func (e *honorEnsureExec) GetContext(_ context.Context, dest any, query string, _ ...any) error {
 	e.getCalled = true
 	e.getCount++
+	e.getQueries = append(e.getQueries, query)
 	existingID := e.existingID
 	if e.getCount > 1 {
 		existingID = e.afterMissID
@@ -54,11 +56,12 @@ func TestEnsureHonor_SP称号は画像URLの重複を事前確認して新規登
 	repo := &honorRepository{}
 
 	// When
-	id, err := repo.EnsureHonor(context.Background(), exec, " 称号A ", 2, &imageURL)
+	result, err := repo.EnsureHonor(context.Background(), exec, " 称号A ", 2, &imageURL)
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, 10, id)
+	assert.Equal(t, 10, result.ID)
+	assert.True(t, result.ImageURLRegistered)
 	assert.True(t, exec.getCalled)
 	assert.Contains(t, exec.query, "INSERT INTO honors (name, honor_type_id, image_url)")
 	assert.NotContains(t, exec.query, "ON DUPLICATE KEY UPDATE")
@@ -72,11 +75,12 @@ func TestEnsureHonor_画像URLがnilの場合はNULLでUpsertする(t *testing.T
 	repo := &honorRepository{}
 
 	// When
-	id, err := repo.EnsureHonor(context.Background(), exec, "称号A", 2, nil)
+	result, err := repo.EnsureHonor(context.Background(), exec, "称号A", 2, nil)
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, 10, id)
+	assert.Equal(t, 10, result.ID)
+	assert.False(t, result.ImageURLRegistered)
 	assert.Contains(t, exec.query, "ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)")
 	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
 }
@@ -88,11 +92,11 @@ func TestEnsureHonor_画像URLが空文字の場合はNULLでUpsertする(t *tes
 	repo := &honorRepository{}
 
 	// When
-	id, err := repo.EnsureHonor(context.Background(), exec, "称号A", 2, &imageURL)
+	result, err := repo.EnsureHonor(context.Background(), exec, "称号A", 2, &imageURL)
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, 10, id)
+	assert.Equal(t, 10, result.ID)
 	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
 }
 
@@ -103,11 +107,12 @@ func TestEnsureHonor_同じ画像URLの称号がある場合は手動変更済�
 	repo := &honorRepository{}
 
 	// When
-	id, err := repo.EnsureHonor(context.Background(), exec, "honor.png", 2, &imageURL)
+	result, err := repo.EnsureHonor(context.Background(), exec, "honor.png", 2, &imageURL)
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, 20, id)
+	assert.Equal(t, 20, result.ID)
+	assert.False(t, result.ImageURLRegistered)
 	assert.True(t, exec.getCalled)
 	assert.Empty(t, exec.query)
 	assert.Empty(t, exec.args)
@@ -152,12 +157,14 @@ func TestEnsureHonor_SP称号の並行登録で画像URLが重複した場合は
 			repo := &honorRepository{}
 
 			// When
-			id, err := repo.EnsureHonor(context.Background(), exec, "honor.png", 2, &imageURL)
+			result, err := repo.EnsureHonor(context.Background(), exec, "honor.png", 2, &imageURL)
 
 			// Then
 			require.NoError(t, err)
-			assert.Equal(t, 30, id)
+			assert.Equal(t, 30, result.ID)
+			assert.False(t, result.ImageURLRegistered)
 			assert.Equal(t, 2, exec.getCount)
+			assert.Contains(t, exec.getQueries[1], "FOR UPDATE")
 		})
 	}
 }

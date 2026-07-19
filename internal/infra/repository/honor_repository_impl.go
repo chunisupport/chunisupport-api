@@ -136,7 +136,7 @@ func toHonorEntity(row *honorRow) *entity.Honor {
 
 // EnsureHonor は称号を登録または既存のIDを取得します。
 // 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
-func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
+func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (repository.HonorEnsureResult, error) {
 	storedTitle := strings.TrimSpace(title)
 	var storedImageURL any
 	if imageURL != nil {
@@ -146,10 +146,10 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 		var existingID int
 		err := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
 		if err == nil {
-			return existingID, nil
+			return repository.HonorEnsureResult{ID: existingID}, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
-			return 0, err
+			return repository.HonorEnsureResult{}, err
 		}
 	}
 	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
@@ -161,21 +161,22 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 		if storedImageURL != nil && (isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") ||
 			isMySQLDuplicateEntryForKey(err, "unique_honor_name_type")) {
 			var existingID int
-			findErr := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+			// 先行トランザクションのコミット後の行をREPEATABLE READでも取得するためカレントリードする。
+			findErr := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ? FOR UPDATE`, storedImageURL)
 			if findErr == nil {
-				return existingID, nil
+				return repository.HonorEnsureResult{ID: existingID}, nil
 			}
 			if !errors.Is(findErr, sql.ErrNoRows) {
-				return 0, findErr
+				return repository.HonorEnsureResult{}, findErr
 			}
 		}
-		return 0, wrapHonorDuplicateError(err)
+		return repository.HonorEnsureResult{}, wrapHonorDuplicateError(err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, err
+		return repository.HonorEnsureResult{}, err
 	}
-	return int(id), nil
+	return repository.HonorEnsureResult{ID: int(id), ImageURLRegistered: storedImageURL != nil}, nil
 }
 
 // nullableHonorImageURL は画像URL未設定の称号を、一意制約で複数保持できるSQL NULLに変換します。
