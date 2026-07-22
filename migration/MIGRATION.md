@@ -35,7 +35,10 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **主なカラム**:
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
+    - `name`: ユーザー内で一意の管理用名。
     - `hashed_token`: トークンのハッシュ値。
+    - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
+    - `last_used_at`: 認証に最後に使用した日時。
     - `created_at`: 作成日時。
 
 ### プレイヤー・ゲームデータ関連
@@ -175,6 +178,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000028**: `goals` テーブルにユーザー内の表示順を保持する `sort_order` カラムを追加。既存データは作成順で採番し、一覧用インデックスを `(user_id, sort_order, id)` へ変更。MySQLのDDLは暗黙コミットされるため、適用開始から完了までGoalの作成・更新・削除・並び替えを停止する。
 - **000036**: レーティング帯マスタと譜面統計3表をMySQLへ追加。統計は別リポジトリのバッチが実行ごとに全削除して再生成する。
 - **000037**: ユーザー所有の `goal_groups` を追加し、`goals.group_id` とグループ内 `sort_order` による目標分類・並び替えへ変更。既存目標は未分類のまま従来順を保持する。
+- **000038**: `api_tokens` に名前、表示用prefix、最終利用日時を追加し、`user_id` の単独一意制約を削除して1ユーザー複数トークンに対応。既存ハッシュは変更せず、名前を「既存のトークン」、prefixと最終利用日時をNULLで移行する。
 
 #### 000028の失敗時復旧
 
@@ -227,6 +231,14 @@ DROP INDEX idx_goals_user_created_id ON goals;
 ### 000037 目標グループ
 
 適用中はGoalとGoalGroupの書き込みを停止する。MySQLのDDLは暗黙コミットされるため、失敗時は `goal_groups`、`goals.group_id`、`idx_goals_user_group_sort_order_id`、`fk_goals_group_user` の有無を確認し、up SQLの順序どおり不足分だけを適用してからバージョンを修復する。既存Goalは `group_id = NULL` の未分類となり、従来の `sort_order` を維持する。downでは現在のグループ順・グループ内順・未分類末尾の表示順をユーザー全体の連番へ変換してから `group_id` を削除する。
+
+### 000038 APIトークン複数発行
+
+upでは既存レコードと `hashed_token` を保持したまま管理用カラムを追加する。`name` は旧バイナリからのname未指定INSERTでNULL行が再発しないよう、「既存のトークン」を既定値とする。
+
+移行中も外部APIのトークン認証は継続できる。一方、旧バイナリの `DELETE /internal/auth/api-tokens` はユーザーの全トークンを削除するため、マイグレーション開始前から旧インスタンスの排出完了までAPIトークン管理CRUDを停止する。適用順は「管理CRUD停止 → 000038 up → 全インスタンスを新バイナリへ切替 → 管理CRUD再開」とする。
+
+downで1ユーザー1トークンへ戻す場合、複数発行済みのユーザーは `created_at DESC, id DESC` で最新の1件だけを保持し、それ以外を削除する。ロールバック前に必ず影響を確認すること。
 
 ### 000031 コース作成日時の削除
 

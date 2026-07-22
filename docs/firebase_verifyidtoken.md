@@ -106,7 +106,7 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 以下は strict 必須認証です。
 
-- `/internal/auth/api-tokens` の GET / POST / DELETE
+- `/internal/auth/api-tokens` の GET / POST と `/internal/auth/api-tokens/:id` の PATCH / DELETE
 - `/internal/me` 配下
 - `POST /internal/player-data/commit`
 - `/internal/users` の管理系操作

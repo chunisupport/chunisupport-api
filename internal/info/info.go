@@ -23,6 +23,10 @@ const (
 	RecordFilterMaxPerUser            = 100
 	RecordFilterNameMaxLength         = 30
 	RecordFilterMaxPayloadBytes       = 8 * 1024
+	APITokenMaxPerUser                = 10
+	APITokenRandomByteLength          = 32
+	APITokenPrefixLength              = 5
+	APITokenLastUsedUpdateInterval    = time.Hour
 	MaxScoreHistoryEntriesPerChart    = 50
 	ChartConstMin                     = constants.ChartConstMin
 	ChartConstMax                     = constants.ChartConstMax

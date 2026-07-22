@@ -17,6 +17,9 @@ var (
 	// ErrAPITokenNotFound はAPIトークンが見つからなかった場合に返されるエラーです。
 	ErrAPITokenNotFound = errors.New("api token not found")
 
+	// ErrAPITokenConflict は同一ユーザー内でAPIトークン名が重複した場合に返されます。
+	ErrAPITokenConflict = errors.New("api token conflict")
+
 	// ErrGoalNotFound は目標が見つからなかった場合に返されるエラーです。
 	ErrGoalNotFound = errors.New("goal not found")
 

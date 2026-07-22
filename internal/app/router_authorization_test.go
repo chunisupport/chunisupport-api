@@ -62,11 +62,15 @@ func authenticateTestUser(idToken string) *entity.User {
 
 type stubAPITokenUsecase struct{}
 
-func (stubAPITokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
-	return "", nil
+func (stubAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
+	return nil, nil
 }
 
-func (stubAPITokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (stubAPITokenUsecase) List(ctx context.Context, userID int) ([]*usecase.APITokenOutput, error) {
+	return nil, nil
+}
+
+func (stubAPITokenUsecase) Rename(ctx context.Context, userID int, id string, name string) (*usecase.APITokenOutput, error) {
 	return nil, nil
 }
 
@@ -74,7 +78,7 @@ func (stubAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 	return authenticateTestUser(rawToken), &entity.APIToken{ID: 1}, nil
 }
 
-func (stubAPITokenUsecase) Delete(ctx context.Context, userID int) error {
+func (stubAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
 	return nil
 }
 

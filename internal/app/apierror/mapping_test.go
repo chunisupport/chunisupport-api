@@ -82,3 +82,28 @@ func TestFromUsecaseError_コース未検出を404へ変換する(t *testing.T) 
 	require.NotNil(t, apiErr)
 	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 }
+
+func TestFromUsecaseError_APIトークン管理エラーを変換する(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "ID不正", err: usecase.ErrInvalidAPITokenID, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidAPITokenID},
+		{name: "名前不正", err: usecase.ErrInvalidAPITokenName, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidAPITokenName},
+		{name: "上限超過", err: usecase.ErrAPITokenLimitExceeded, wantStatus: http.StatusBadRequest, wantCode: CodeAPITokenLimitExceeded},
+		{name: "名前重複", err: usecase.ErrAPITokenNameConflict, wantStatus: http.StatusConflict, wantCode: CodeAPITokenNameConflict},
+		{name: "未検出", err: usecase.ErrAPITokenNotFound, wantStatus: http.StatusNotFound, wantCode: CodeAPITokenNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiErr := FromUsecaseError(tt.err)
+
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+		})
+	}
+}

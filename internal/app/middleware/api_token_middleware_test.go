@@ -21,17 +21,28 @@ type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.GeneratedAPITokenOutput), args.Error(1)
 }
 
-func (m *mockAPITokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (m *mockAPITokenUsecase) List(ctx context.Context, userID int) ([]*usecase.APITokenOutput, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.APIToken), args.Error(1)
+	return args.Get(0).([]*usecase.APITokenOutput), args.Error(1)
+}
+
+func (m *mockAPITokenUsecase) Rename(ctx context.Context, userID int, id string, name string) (*usecase.APITokenOutput, error) {
+	args := m.Called(ctx, userID, id, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.APITokenOutput), args.Error(1)
 }
 
 func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
@@ -42,8 +53,8 @@ func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
+func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
+	args := m.Called(ctx, userID, id)
 	return args.Error(0)
 }
 

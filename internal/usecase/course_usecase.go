@@ -74,6 +74,7 @@ func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*Cours
 	}
 	return result, nil
 }
+
 // GetCoursesUpdatedAt はコースマスタの updated_at の最大値を取得します。
 func (u *courseUsecase) GetCoursesUpdatedAt(ctx context.Context) (*time.Time, error) {
 	return u.repo.FindLatestUpdatedAt(ctx, u.db)
@@ -172,6 +173,7 @@ func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, delete
 	course.IsDeleted = deleted
 	return u.repo.Save(ctx, u.db, course)
 }
+
 // GetUserRecords はユーザーのコースレコード一覧を返す。
 // meta.updated_at 相当の UpdatedAt は、コースマスタの最大更新日時と
 // 対象プレイヤーのコースレコード最大更新日時のうち新しい方とする。

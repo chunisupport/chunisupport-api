@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)、reiwa互換API(`/compat/reiwa/1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年07月09日
+**最終更新日**: 2026年07月22日
 
 ## ベースURLと環境
 
@@ -37,7 +37,7 @@
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
 - `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
-- トークンは `/internal/auth/api-tokens` で発行します。
+- トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
 
 ## レートリミット（現行実装値）
 
@@ -118,9 +118,10 @@
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
-| `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン発行状態取得 |
-| `/internal/auth/api-tokens` | POST | Firebase Bearer | APIトークン発行 |
-| `/internal/auth/api-tokens` | DELETE | Firebase Bearer | APIトークン削除 |
+| `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン一覧取得 |
+| `/internal/auth/api-tokens` | POST | Firebase Bearer | 名前付きAPIトークン発行 |
+| `/internal/auth/api-tokens/:id` | PATCH | Firebase Bearer | APIトークン名変更 |
+| `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
@@ -378,13 +379,32 @@
 
 ### POST `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須
-- **レスポンス**: 200 OK
+- **リクエスト**:
 
 ```json
-{"token":"plain-text-api-token"}
+{"name":"Discord Bot"}
 ```
 
-トークンはレスポンスでのみ平文が取得できます。
+- `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
+- **レスポンス**: 201 Created
+
+```json
+{
+  "id": 42,
+  "name": "Discord Bot",
+  "token": "plain-text-api-token",
+  "token_prefix": "plain",
+  "last_used_at": null,
+  "created_at": "2026-07-22T12:34:56+09:00"
+}
+```
+
+平文の `token` はこのレスポンスでのみ取得できます。サーバーにはSHA-256ハッシュと表示用の先頭5文字だけを保存します。
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_api_token_name`): 名前が不正
+  - 400 Bad Request (`api_token_limit_exceeded`): 10個発行済み
+  - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 
 ### GET `/internal/auth/api-tokens`
 - **認証**: Firebase Bearer 必須
@@ -392,23 +412,49 @@
 
 ```json
 {
-  "has_token": true,
-  "created_at": "2026-04-16T12:34:56Z"
+  "tokens": [
+    {
+      "id": 42,
+      "name": "Discord Bot",
+      "token_prefix": "plain",
+      "last_used_at": "2026-07-22T13:00:00+09:00",
+      "created_at": "2026-07-22T12:34:56+09:00"
+    },
+    {
+      "id": 1,
+      "name": "既存のトークン",
+      "token_prefix": null,
+      "last_used_at": null,
+      "created_at": "2026-04-16T12:34:56+09:00"
+    }
+  ]
 }
 ```
 
-- APIトークンが未発行の場合は `has_token=false`、`created_at=null` を返します。
-- `created_at` は現在有効なAPIトークンの発行日時です。再発行した場合はその時刻に更新されます。
+- 未発行の場合は `tokens` が空配列になります。
+- 旧仕様から移行したトークンは平文を復元できないため `token_prefix=null` のままです。認証には引き続き使用できます。
+- `last_used_at` は認証成功時に更新されます。DB書き込みを抑えるため、最大1時間の遅延があります。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
-### DELETE `/internal/auth/api-tokens`
+### PATCH `/internal/auth/api-tokens/:id`
+- **認証**: Firebase Bearer 必須
+- **リクエスト**: `POST` と同じ `name`
+- **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
+- **主なエラー**:
+  - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDまたは名前が不正
+  - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
+  - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
+
+### DELETE `/internal/auth/api-tokens/:id`
 - **認証**: Firebase Bearer 必須
 - **レスポンス**: 204 No Content
-- 自分のAPIトークンを削除します。トークンが存在しない場合でも204を返します。
+- 自分が所有するAPIトークンをID指定で削除します。削除後はそのトークンを認証に使用できません。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 400 Bad Request (`invalid_api_token_id`): IDが不正
+  - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
 
 ---
 

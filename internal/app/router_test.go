@@ -181,6 +181,27 @@ func TestCORSAllowOrigins_ワイルドカード入りオリジンを許可する
 	}
 }
 
+func TestCORSAllowMethods_PATCHを許可する(t *testing.T) {
+	// Given
+	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
+	e := echo.New()
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+	e.PATCH("/internal/auth/api-tokens/:id", func(c *echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+	req := httptest.NewRequest(http.MethodOptions, "/internal/auth/api-tokens/1", nil)
+	req.Header.Set(echo.HeaderOrigin, "https://chunisupport.example.com")
+	req.Header.Set(echo.HeaderAccessControlRequestMethod, http.MethodPatch)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	assert.Equal(t, "https://chunisupport.example.com", rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+	assert.Contains(t, rec.Header().Get(echo.HeaderAccessControlAllowMethods), http.MethodPatch)
+}
+
 func TestHandleExternalHealth_外部監視向けに204NoContentを返す(t *testing.T) {
 	// Given
 	e := echo.New()

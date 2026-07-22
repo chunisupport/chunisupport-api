@@ -155,7 +155,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 	tm := transaction.NewTransactionManager(db)
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
-	apiTokenUsecase := usecase.NewAPITokenUsecase(db, apiTokenRepo, userRepo)
+	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
 	if configurable, ok := userUsecase.(interface {
 		SetFriendshipRepository(repository.FriendshipRepository)
@@ -319,9 +319,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
 		}))
-		authGroup.GET("/api-tokens", handlers.APIToken.GetStatus, firebaseAuthStrict)
+		authGroup.GET("/api-tokens", handlers.APIToken.List, firebaseAuthStrict)
 		authGroup.POST("/api-tokens", handlers.APIToken.Generate, firebaseAuthStrict)
-		authGroup.DELETE("/api-tokens", handlers.APIToken.Delete, firebaseAuthStrict)
+		authGroup.PATCH("/api-tokens/:id", handlers.APIToken.Rename, firebaseAuthStrict)
+		authGroup.DELETE("/api-tokens/:id", handlers.APIToken.Delete, firebaseAuthStrict)
 	}
 
 	// api.chunisupport.net/internal/me
@@ -628,6 +629,7 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodPut,
+			http.MethodPatch,
 			http.MethodDelete,
 			http.MethodOptions,
 		},

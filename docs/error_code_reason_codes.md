@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-06-28
+最終更新: 2026-07-22
 
 ## 更新ルール
 
@@ -39,6 +39,10 @@
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |
 | `api_token_not_found` | APIトークン未検出 |
+| `api_token_limit_exceeded` | APIトークン上限超過（最大10個） |
+| `api_token_name_conflict` | APIトークン名重複 |
+| `invalid_api_token_name` | APIトークン名不正 |
+| `invalid_api_token_id` | APIトークンID不正 |
 | `payload_too_large` | ペイロード過大 |
 | `unsupported_media_type` | Content-Type不正 |
 | `method_not_allowed` | HTTPメソッド不正 |

@@ -61,6 +61,13 @@ func wrapGoalGroupDuplicateError(err error) error {
 	return fmt.Errorf("%w: %v", domainrepo.ErrGoalGroupConflict, err)
 }
 
+func wrapAPITokenDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "uq_api_tokens_user_name") {
+		return err
+	}
+	return fmt.Errorf("%w: %v", domainrepo.ErrAPITokenConflict, err)
+}
+
 func isMySQLDuplicateEntryForKey(err error, key string) bool {
 	var mysqlErr *mysql.MySQLError
 	if !errors.As(err, &mysqlErr) {

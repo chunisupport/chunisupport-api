@@ -1,6 +1,7 @@
 package api_internal_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -16,23 +17,35 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.GeneratedAPITokenOutput), args.Error(1)
 }
 
-func (m *mockAPITokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (m *mockAPITokenUsecase) List(ctx context.Context, userID int) ([]*usecase.APITokenOutput, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.APIToken), args.Error(1)
+	return args.Get(0).([]*usecase.APITokenOutput), args.Error(1)
+}
+
+func (m *mockAPITokenUsecase) Rename(ctx context.Context, userID int, id string, name string) (*usecase.APITokenOutput, error) {
+	args := m.Called(ctx, userID, id, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.APITokenOutput), args.Error(1)
 }
 
 func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
@@ -43,8 +56,8 @@ func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
+func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
+	args := m.Called(ctx, userID, id)
 	return args.Error(0)
 }
 
@@ -54,170 +67,132 @@ func newAPITokenTestEcho() *echo.Echo {
 	return e
 }
 
-func TestAPITokenHandler_GetStatus(t *testing.T) {
+func TestAPITokenHandler_List(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockUsecase := new(mockAPITokenUsecase)
 	h := api_internal.NewAPITokenHandler(mockUsecase)
+	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
 
-	t.Run("認証済みユーザーのトークン状態を返す", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 10}
-		c.Set("userEntity", user)
-		createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
+	req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 10})
+	mockUsecase.On("List", mock.Anything, 10).Return([]*usecase.APITokenOutput{{
+		ID:        1,
+		Name:      "既存のトークン",
+		CreatedAt: createdAt,
+	}}, nil).Once()
 
-		mockUsecase.On("GetStatus", mock.Anything, user.ID).Return(&entity.APIToken{
-			ID:        1,
-			UserID:    user.ID,
-			CreatedAt: createdAt,
-		}, nil).Once()
+	err := h.List(c)
 
-		err := h.GetStatus(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"has_token":true,"created_at":"2026-04-16T12:34:56Z"}`, rec.Body.String())
-		mockUsecase.AssertExpectations(t)
-	})
-
-	t.Run("トークン未発行ならhas_token=falseを返す", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 10}
-		c.Set("userEntity", user)
-
-		mockUsecase.On("GetStatus", mock.Anything, user.ID).Return(nil, nil).Once()
-
-		err := h.GetStatus(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"has_token":false,"created_at":null}`, rec.Body.String())
-		mockUsecase.AssertExpectations(t)
-	})
-
-	t.Run("ユーザー情報が存在しない場合は401", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-
-		err := h.GetStatus(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
-	})
-
-	t.Run("状態取得に失敗した場合は500", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 10}
-		c.Set("userEntity", user)
-
-		mockUsecase.On("GetStatus", mock.Anything, user.ID).Return(nil, errors.New("failed")).Once()
-
-		err := h.GetStatus(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
-		mockUsecase.AssertExpectations(t)
-	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"tokens":[{"id":1,"name":"既存のトークン","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
+	mockUsecase.AssertExpectations(t)
 }
 
 func TestAPITokenHandler_Generate(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockUsecase := new(mockAPITokenUsecase)
 	h := api_internal.NewAPITokenHandler(mockUsecase)
+	createdAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
+	prefix := "abcde"
 
-	t.Run("認証済みユーザーに新しいトークンを返す", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 10}
-		c.Set("userEntity", user)
+	req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(`{"name":"Discord Bot"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 10})
+	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot").Return(&usecase.GeneratedAPITokenOutput{
+		Token: "abcde-secret",
+		Metadata: &usecase.APITokenOutput{
+			ID:          2,
+			Name:        "Discord Bot",
+			TokenPrefix: &prefix,
+			CreatedAt:   createdAt,
+		},
+	}, nil).Once()
 
-		mockUsecase.On("Generate", mock.Anything, user.ID).Return("plain-token", nil).Once()
+	err := h.Generate(c)
 
-		err := h.Generate(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
-		mockUsecase.AssertExpectations(t)
-	})
-
-	t.Run("ユーザー情報が存在しない場合は401", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-
-		err := h.Generate(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
-	})
-
-	t.Run("トークン生成に失敗した場合は500", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 10}
-		c.Set("userEntity", user)
-
-		mockUsecase.On("Generate", mock.Anything, user.ID).Return("", errors.New("failed")).Once()
-
-		err := h.Generate(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
-		mockUsecase.AssertExpectations(t)
-	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.JSONEq(t, `{"id":2,"name":"Discord Bot","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	mockUsecase.AssertExpectations(t)
 }
 
-var _ usecase.APITokenUsecase = (*mockAPITokenUsecase)(nil)
+func TestAPITokenHandler_GenerateRejectsUnknownField(t *testing.T) {
+	e := newAPITokenTestEcho()
+	mockUsecase := new(mockAPITokenUsecase)
+	h := api_internal.NewAPITokenHandler(mockUsecase)
+	req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(`{"name":"CLI","unknown":true}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 10})
+
+	err := h.Generate(c)
+
+	var apiErr *apierror.APIError
+	require.True(t, errors.As(err, &apiErr))
+	assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+	mockUsecase.AssertNotCalled(t, "Generate")
+}
+
+func TestAPITokenHandler_Rename(t *testing.T) {
+	e := newAPITokenTestEcho()
+	mockUsecase := new(mockAPITokenUsecase)
+	h := api_internal.NewAPITokenHandler(mockUsecase)
+	createdAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
+
+	req := httptest.NewRequest(http.MethodPatch, "/internal/auth/api-tokens/2", bytes.NewBufferString(`{"name":"Batch"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/internal/auth/api-tokens/:id")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "2"}})
+	c.Set("userEntity", &entity.User{ID: 10})
+	mockUsecase.On("Rename", mock.Anything, 10, "2", "Batch").Return(&usecase.APITokenOutput{ID: 2, Name: "Batch", CreatedAt: createdAt}, nil).Once()
+
+	err := h.Rename(c)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"id":2,"name":"Batch","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	mockUsecase.AssertExpectations(t)
+}
 
 func TestAPITokenHandler_Delete(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockUsecase := new(mockAPITokenUsecase)
 	h := api_internal.NewAPITokenHandler(mockUsecase)
+	req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens/2", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/internal/auth/api-tokens/:id")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "2"}})
+	c.Set("userEntity", &entity.User{ID: 10})
+	mockUsecase.On("Delete", mock.Anything, 10, "2").Return(nil).Once()
 
-	t.Run("認証済みユーザーのトークンを削除", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 42}
-		c.Set("userEntity", user)
+	err := h.Delete(c)
 
-		mockUsecase.On("Delete", mock.Anything, user.ID).Return(nil).Once()
-
-		err := h.Delete(c)
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusNoContent, rec.Code)
-		mockUsecase.AssertExpectations(t)
-	})
-
-	t.Run("ユーザー情報が存在しない場合は401", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-
-		err := h.Delete(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
-	})
-
-	t.Run("削除に失敗した場合は500", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		user := &entity.User{ID: 42}
-		c.Set("userEntity", user)
-
-		mockUsecase.On("Delete", mock.Anything, user.ID).Return(errors.New("failed")).Once()
-
-		err := h.Delete(c)
-		apiErr, ok := err.(*apierror.APIError)
-		assert.True(t, ok, "error should be *apierror.APIError")
-		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
-		mockUsecase.AssertExpectations(t)
-	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	mockUsecase.AssertExpectations(t)
 }
+
+func TestAPITokenHandler_RequiresAuthenticatedUser(t *testing.T) {
+	e := newAPITokenTestEcho()
+	h := api_internal.NewAPITokenHandler(new(mockAPITokenUsecase))
+	req := httptest.NewRequest(http.MethodGet, "/internal/auth/api-tokens", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.List(c)
+
+	var apiErr *apierror.APIError
+	require.True(t, errors.As(err, &apiErr))
+	assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
+}
+
+var _ usecase.APITokenUsecase = (*mockAPITokenUsecase)(nil)

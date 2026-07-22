@@ -354,3 +354,43 @@ func TestSchemaMySQL_プレイヤー最新登録結果テーブルを含む(t *t
 	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`)")
 	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE")
 }
+
+func TestExpandAPITokensUp_既存トークンを保持して複数発行に対応する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000038_expand_api_tokens.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ADD COLUMN name VARCHAR(50) NOT NULL DEFAULT '既存のトークン'")
+	assert.Contains(t, upSQL, "ADD COLUMN token_prefix CHAR(5) NULL")
+	assert.Contains(t, upSQL, "ADD COLUMN last_used_at DATETIME NULL")
+	assert.Contains(t, upSQL, "DROP INDEX uq_api_tokens_user_id")
+	assert.Contains(t, upSQL, "ADD UNIQUE KEY uq_api_tokens_user_name (user_id, name)")
+	assert.NotContains(t, upSQL, "UPDATE api_tokens SET name")
+	assert.NotContains(t, upSQL, "UPDATE api_tokens SET hashed_token")
+	assert.NotContains(t, upSQL, "DELETE FROM api_tokens")
+}
+
+func TestExpandAPITokensDown_1ユーザー1トークンへ戻す(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000038_expand_api_tokens.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "ROW_NUMBER() OVER ( PARTITION BY user_id ORDER BY created_at DESC, id DESC )")
+	assert.Contains(t, downSQL, "ADD UNIQUE KEY uq_api_tokens_user_id (user_id)")
+	assert.Contains(t, downSQL, "DROP COLUMN last_used_at")
+	assert.Contains(t, downSQL, "DROP COLUMN token_prefix")
+	assert.Contains(t, downSQL, "DROP COLUMN name")
+}
+
+func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "`name` varchar(50)")
+	assert.Contains(t, schemaSQL, "NOT NULL DEFAULT '既存のトークン'")
+	assert.Contains(t, schemaSQL, "`token_prefix` char(5)")
+	assert.Contains(t, schemaSQL, "`last_used_at` datetime DEFAULT NULL")
+	assert.Contains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`)")
+	assert.NotContains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_id` (`user_id`)")
+}

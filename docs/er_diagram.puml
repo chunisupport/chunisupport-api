@@ -26,8 +26,11 @@ entity "users" as users {
 entity "api_tokens" as api_tokens {
   + id: BIGINT [PK]
   --
-  user_id: INT NOT NULL [UNIQUE]
+  user_id: INT NOT NULL
+  name: VARCHAR(50) NOT NULL [UNIQUE WITH user_id]
   hashed_token: CHAR(64) NOT NULL [UNIQUE]
+  token_prefix: CHAR(5)
+  last_used_at: DATETIME
   created_at: TIMESTAMP
 }
 
@@ -207,7 +210,7 @@ entity "versions" as versions {
 
 ' relationships
 users ||--|o players
-users ||--|o api_tokens
+users ||--o{ api_tokens
 users }o--|| account_types
 
 players ||--o{ player_records
