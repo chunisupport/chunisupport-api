@@ -151,25 +151,22 @@ func (h *V1SongHandler) UpdateChartConstant(c *echo.Context) error {
 
 // convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。
 func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1SongDTO {
-	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songs))
-	for _, song := range songs {
-		v1Songs = append(v1Songs, h.convertToV1SongDTO(song))
-	}
-	return v1Songs
+	return api_v1.NewV1SongsResponse(
+		songs,
+		h.masterCache.GenreNamesByID,
+		h.masterCache.DifficultyNamesByID,
+		h.songUsecase.CalcSongMaxOP,
+	).Songs
 }
 
 // convertToV1SongDTO は Song を V1SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
-	maxOP := h.songUsecase.CalcSongMaxOP(song)
-	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)
-
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
-	difficultyNames := h.masterCache.DifficultyNamesByID
-
-	v1SongDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {
-		return api_v1.ToV1ChartDTO(chart)
-	})
-	return v1SongDTO
+	return api_v1.NewV1SongDTO(
+		song,
+		h.masterCache.GenreNamesByID,
+		h.masterCache.DifficultyNamesByID,
+		h.songUsecase.CalcSongMaxOP,
+	)
 }

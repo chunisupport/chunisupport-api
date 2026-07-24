@@ -37,6 +37,9 @@ const (
 	RandomFavoriteHonorTitle          = "お気に入りからランダム"
 	UnknownSPHonorRegisteredEvent     = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName           = "chunisupport:recalculate-player-data"
+	SongSnapshotExportBatchLockName   = "chunisupport:export-song-snapshots"
+	SongSnapshotObjectKey             = "v1/songs.json"
+	WorldsendSongSnapshotObjectKey    = "v1/worldsend-songs.json"
 	PlayerLatestUpdateSchemaVersion   = 1
 	PlayerLatestUpdateMaxPayloadBytes = 1024 * 1024
 

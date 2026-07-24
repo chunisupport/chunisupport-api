@@ -168,6 +168,19 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
+## Cloudflare R2楽曲スナップショット
+
+`cmd/export-song-snapshots` を実行する場合に限り、以下の環境変数が追加で必要です。
+
+- `R2_ENDPOINT_URL`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
+
+APIサーバーの起動にはこれらの環境変数は不要です。本番の秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
+
+出力するオブジェクトキーや実行方法は [楽曲スナップショットのR2エクスポート](song_snapshot_export.md) を参照してください。
+
 ## 起動失敗時の終了コード
 
 設定読み込み、ログ初期化、DB接続、マスタデータのプリロード、Firebase認証サービスの初期化、サーバ起動、graceful shutdown に失敗した場合、アプリケーションは終了コード `1` で終了します。正常な SIGINT / SIGTERM による停止は終了コード `0` で終了します。

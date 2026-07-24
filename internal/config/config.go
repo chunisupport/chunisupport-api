@@ -142,6 +142,16 @@ type Database struct {
 
 // LoadConfig は環境変数から環境を読み取り、対応する設定を読み込みます
 func LoadConfig() (Config, error) {
+	return loadConfig(true)
+}
+
+// LoadBatchConfig はHTTPサーバー固有のFirebase、Turnstile、ユーザー名ポリシーを除き、
+// バッチ実行に必要なログ、タイムゾーン、DB設定を読み込みます。
+func LoadBatchConfig() (Config, error) {
+	return loadConfig(false)
+}
+
+func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	var config Config
 
 	// .envファイルを読み込み(存在しない場合はスキップ)
@@ -169,10 +179,12 @@ func LoadConfig() (Config, error) {
 		return config, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
-	usernamePolicyPath := filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile)
-	config.UsernamePolicy, err = loadUsernamePolicy(usernamePolicyPath)
-	if err != nil {
-		return config, err
+	if loadApplicationSecrets {
+		usernamePolicyPath := filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile)
+		config.UsernamePolicy, err = loadUsernamePolicy(usernamePolicyPath)
+		if err != nil {
+			return config, err
+		}
 	}
 
 	var errors []string
@@ -227,14 +239,16 @@ func LoadConfig() (Config, error) {
 		}
 	}
 
-	config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))
-	if err := normalizeAndValidateFirebaseConfig(&config.Firebase); err != nil {
-		errors = append(errors, err.Error())
-	}
+	if loadApplicationSecrets {
+		config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))
+		if err := normalizeAndValidateFirebaseConfig(&config.Firebase); err != nil {
+			errors = append(errors, err.Error())
+		}
 
-	config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
-	if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
-		errors = append(errors, err.Error())
+		config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
+		if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
+			errors = append(errors, err.Error())
+		}
 	}
 
 	// データベース設定を環境変数から取得

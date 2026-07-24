@@ -37,16 +37,27 @@ github.com/googleapis/enterprise-certificate-proxy/client,https://github.com/goo
 github.com/googleapis/gax-go/v2,https://github.com/googleapis/gax-go/blob/v2.22.0/v2/LICENSE,BSD-3-Clause
 github.com/jmoiron/sqlx,https://github.com/jmoiron/sqlx/blob/v1.4.0/LICENSE,MIT
 github.com/joho/godotenv,https://github.com/joho/godotenv/blob/v1.5.1/LICENCE,MIT
+github.com/klauspost/compress,https://github.com/klauspost/compress/blob/v1.18.6/LICENSE,BSD-3-Clause
+github.com/klauspost/cpuid/v2,https://github.com/klauspost/cpuid/blob/v2.2.11/LICENSE,MIT
+github.com/klauspost/crc32,https://github.com/klauspost/crc32/blob/v1.3.0/LICENSE,BSD-3-Clause
 github.com/labstack/echo/v4,https://github.com/labstack/echo/blob/v4.15.2/LICENSE,MIT
 github.com/labstack/gommon,https://github.com/labstack/gommon/blob/v0.5.0/LICENSE,MIT
 github.com/leodido/go-urn,https://github.com/leodido/go-urn/blob/v1.4.0/LICENSE,MIT
 github.com/mattn/go-colorable,https://github.com/mattn/go-colorable/blob/v0.1.15/LICENSE,MIT
 github.com/mattn/go-isatty,https://github.com/mattn/go-isatty/blob/v0.0.22/LICENSE,MIT
+github.com/minio/crc64nvme,https://github.com/minio/crc64nvme/blob/v1.1.1/LICENSE,Apache-2.0
+github.com/minio/md5-simd,https://github.com/minio/md5-simd/blob/v1.1.2/LICENSE,Apache-2.0 AND BSD-3-Clause
+github.com/minio/minio-go/v7,https://github.com/minio/minio-go/blob/v7.2.1/LICENSE,Apache-2.0
 github.com/ncruces/go-strftime,https://github.com/ncruces/go-strftime/blob/v1.0.0/LICENSE,MIT
+github.com/philhofer/fwd,https://github.com/philhofer/fwd/blob/v1.2.0/LICENSE.md,MIT
 github.com/remyoudompheng/bigfft,https://github.com/remyoudompheng/bigfft/blob/24d4a6f8daec/LICENSE,BSD-3-Clause
+github.com/rs/xid,https://github.com/rs/xid/blob/v1.6.0/LICENSE,MIT
 github.com/spiffe/go-spiffe/v2,https://github.com/spiffe/go-spiffe/blob/v2.7.0/LICENSE,Apache-2.0
+github.com/tinylib/msgp,https://github.com/tinylib/msgp/blob/v1.6.1/LICENSE,MIT
 github.com/valyala/bytebufferpool,https://github.com/valyala/bytebufferpool/blob/v1.0.0/LICENSE,MIT
 github.com/valyala/fasttemplate,https://github.com/valyala/fasttemplate/blob/v1.2.2/LICENSE,MIT
+github.com/zeebo/xxh3,https://github.com/zeebo/xxh3/blob/v1.1.0/LICENSE,BSD-2-Clause
+go.yaml.in/yaml/v3,https://github.com/go-yaml/yaml/blob/v3.0.4/LICENSE,MIT AND Apache-2.0
 go.opentelemetry.io/auto/sdk,https://github.com/open-telemetry/opentelemetry-go-instrumentation/blob/sdk/v1.2.1/sdk/LICENSE,Apache-2.0
 go.opentelemetry.io/contrib/detectors/gcp,https://github.com/open-telemetry/opentelemetry-go-contrib/blob/detectors/gcp/v1.44.0/detectors/gcp/LICENSE,Apache-2.0
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc,https://github.com/open-telemetry/opentelemetry-go-contrib/blob/instrumentation/google.golang.org/grpc/otelgrpc/v0.69.0/instrumentation/google.golang.org/grpc/otelgrpc/LICENSE,Apache-2.0
@@ -62,7 +73,7 @@ golang.org/x/net,https://cs.opensource.google/go/x/net/+/v0.55.0:LICENSE,BSD-3-C
 golang.org/x/oauth2,https://cs.opensource.google/go/x/oauth2/+/v0.36.0:LICENSE,BSD-3-Clause
 golang.org/x/sync/semaphore,https://cs.opensource.google/go/x/sync/+/v0.20.0:LICENSE,BSD-3-Clause
 golang.org/x/sys,https://cs.opensource.google/go/x/sys/+/v0.45.0:LICENSE,BSD-3-Clause
-golang.org/x/text,https://cs.opensource.google/go/x/text/+/v0.37.0:LICENSE,BSD-3-Clause
+golang.org/x/text,https://cs.opensource.google/go/x/text/+/v0.39.0:LICENSE,BSD-3-Clause
 golang.org/x/time/rate,https://cs.opensource.google/go/x/time/+/v0.15.0:LICENSE,BSD-3-Clause
 google.golang.org/api,https://github.com/googleapis/google-api-go-client/blob/v0.283.0/LICENSE,BSD-3-Clause
 google.golang.org/api/internal/third_party/uritemplates,https://github.com/googleapis/google-api-go-client/blob/v0.283.0/internal\third_party\uritemplates\LICENSE,BSD-3-Clause
@@ -71,6 +82,7 @@ google.golang.org/genproto/googleapis/rpc,https://github.com/googleapis/go-genpr
 google.golang.org/genproto/googleapis/type,https://github.com/googleapis/go-genproto/blob/3dc84a4a5aaa/LICENSE,Apache-2.0
 google.golang.org/grpc,https://github.com/grpc/grpc-go/blob/v1.81.1/LICENSE,Apache-2.0
 google.golang.org/protobuf,https://github.com/protocolbuffers/protobuf-go/blob/v1.36.11/LICENSE,BSD-3-Clause
+gopkg.in/ini.v1,https://github.com/go-ini/ini/blob/v1.67.2/LICENSE,Apache-2.0
 modernc.org/libc,https://gitlab.com/cznic/libc/blob/v1.72.5/LICENSE-GO,BSD-3-Clause
 modernc.org/mathutil,Unknown,Unknown
 modernc.org/memory,https://gitlab.com/cznic/memory/blob/v1.11.0/LICENSE-GO,BSD-3-Clause
