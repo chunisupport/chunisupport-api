@@ -75,12 +75,17 @@ func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domain
 	return r
 }
 
-func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.Executor, data *entity.TemporaryPlayerData) error {
-	r.mu.Lock()
+func (r *temporaryPlayerDataRepository) Create(ctx context.Context, _ domainrepo.Executor, data *entity.TemporaryPlayerData) error {
+	if err := r.lockWithContext(ctx); err != nil {
+		return err
+	}
 	defer r.mu.Unlock()
 
 	now := time.Now().UTC()
 	r.cleanupExpiredLocked(now)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	ipTokens := r.tokensByIP[data.IPAddress]
 	if len(ipTokens) >= r.maxEntriesPerIP {
@@ -94,6 +99,10 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.E
 
 	copyData := *data
 	copyData.Payload = append([]byte(nil), data.Payload...)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	r.entriesByToken[copyData.Token] = &copyData
 	if ipTokens == nil {
 		ipTokens = make(map[string]struct{})
@@ -110,12 +119,17 @@ func (r *temporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.E
 	return nil
 }
 
-func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
-	r.mu.Lock()
+func (r *temporaryPlayerDataRepository) FindByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
+	if err := r.lockWithContext(ctx); err != nil {
+		return nil, err
+	}
 	defer r.mu.Unlock()
 
 	now := time.Now().UTC()
 	r.cleanupExpiredLocked(now)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	entry, ok := r.entriesByToken[token]
 	if !ok {
@@ -124,15 +138,23 @@ func (r *temporaryPlayerDataRepository) FindByToken(_ context.Context, _ domainr
 
 	copied := *entry
 	copied.Payload = append([]byte(nil), entry.Payload...)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return &copied, nil
 }
 
-func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
-	r.mu.Lock()
+func (r *temporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
+	if err := r.lockWithContext(ctx); err != nil {
+		return nil, err
+	}
 	defer r.mu.Unlock()
 
 	now := time.Now().UTC()
 	r.cleanupExpiredLocked(now)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	entry, ok := r.entriesByToken[token]
 	if !ok {
@@ -141,17 +163,26 @@ func (r *temporaryPlayerDataRepository) ConsumeByToken(_ context.Context, _ doma
 
 	copied := *entry
 	copied.Payload = append([]byte(nil), entry.Payload...)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	r.deleteEntryLocked(token, entry)
 
 	return &copied, nil
 }
 
-func (r *temporaryPlayerDataRepository) Delete(_ context.Context, _ domainrepo.Executor, token string) error {
-	r.mu.Lock()
+func (r *temporaryPlayerDataRepository) Delete(ctx context.Context, _ domainrepo.Executor, token string) error {
+	if err := r.lockWithContext(ctx); err != nil {
+		return err
+	}
 	defer r.mu.Unlock()
 
 	now := time.Now().UTC()
 	r.cleanupExpiredLocked(now)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	entry, ok := r.entriesByToken[token]
 	if !ok {
@@ -159,6 +190,21 @@ func (r *temporaryPlayerDataRepository) Delete(_ context.Context, _ domainrepo.E
 	}
 
 	r.deleteEntryLocked(token, entry)
+	return nil
+}
+
+// lockWithContext はMutex待機の前後でキャンセルを確認し、キャンセル後の処理継続を防ぎます。
+func (r *temporaryPlayerDataRepository) lockWithContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	if err := ctx.Err(); err != nil {
+		r.mu.Unlock()
+		return err
+	}
+
 	return nil
 }
 

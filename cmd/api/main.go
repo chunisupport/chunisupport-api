@@ -90,14 +90,6 @@ func run() int {
 
 	slog.Info("Connected to the database")
 
-	// 必須データの存在チェック
-	// if err := db.ValidateRequiredData(database); err != nil {
-	// 	slog.Error("Required data validation failed", "error", err)
-	// 	slog.Error("Application cannot start without required data in songs and charts tables")
-	// 	slog.Info("Please ensure the database has been properly migrated and populated with song/chart data")
-	// 	return
-	// }
-
 	ctx := context.Background()
 	masterCache, err := masterdata.Preload(ctx, database)
 	if err != nil {

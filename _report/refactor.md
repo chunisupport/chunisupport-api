@@ -92,10 +92,7 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **INFRA-002** | **Low** | `validation.go` が未使用のまま残存 | `internal/infra/db/validation.go` の `ValidateRequiredData` / `GetTableStats` に実行中の呼び出しはなく、`cmd/api/main.go:109-115` の唯一の呼び出しもコメントアウトされています。固定テーブル名の文字列組み立てやContext非対応を個別修正するより、不要ならファイルを削除し、必要なら起動フローへContext対応で正式に組み込むべきです。旧 `INFRA-005` は本項目へ統合しました。 |
 | **INFRA-007** | **Medium** | `FindAllWithPlayer` と管理者版の実装が重複 | `internal/infra/repository/user_repository_impl.go:102-281` で、SELECT、LIKE条件、rows走査、VO変換、Player組み立てが二重実装されています。公開範囲の条件だけを引数・query objectで分離し、共通の読み取り処理へまとめるべきです。 |
-| **INFRA-009** | **Medium** | DBからのNotes変換エラーを黙ってゼロ化 | `internal/infra/repository/song_repository_impl.go:204-214` はChartConstantのエラーを返すよう改善済みですが、`notes.NewNotes` のエラーを破棄し、負値などの不正データを0として復元します。DB不整合を早期検出できるよう、Chart変換全体をエラー返却に統一すべきです。 |
-| **INFRA-010** | **Low** | 一時プレイヤーデータリポジトリがContextを無視 | `internal/infra/repository/temporary_player_data_repository_impl.go` の4メソッドは `_ context.Context` とし、mutex待機やペイロードコピー中のキャンセルを確認しません。ロック前後で `ctx.Err()` を確認し、リポジトリ契約どおりキャンセルへ追従すべきです。 |
 | **INFRA-017** | **Medium** | repositoryのエラーラップが原エラーを切断 | `friendship_repository_impl.go:197-201`、`friend_chart_ranking_query_service_impl.go:244-248`、お気に入り・未解禁曲系のwrapperは、sentinelだけを `%w`、原エラーを `%v` で整形します。その結果 `errors.Is(context.Canceled)` や `errors.As(*mysql.MySQLError)` が失敗し、キャンセル・制約違反・再試行可否を上位で分類できません。sentinelとcauseの両方をラップできる形へ統一すべきです。 |
 
 ### ハンドラー / ルーター層 (HDL)

@@ -209,7 +209,10 @@ func (r *songRepository) toChartEntity(row *chartRow) (*entity.Chart, error) {
 
 	var notesVal *notes.Notes
 	if row.Notes != nil {
-		n, _ := notes.NewNotes(*row.Notes)
+		n, err := notes.NewNotes(*row.Notes)
+		if err != nil {
+			return nil, fmt.Errorf("invalid notes for chart %d: %w", row.ID, err)
+		}
 		notesVal = &n
 	}
 
