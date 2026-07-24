@@ -375,7 +375,7 @@ API表現の変換は、Clean Architecture上は外側の責務として扱う�
 本対応時には、少なくとも以下を更新する。
 
 - `docs/API.md`
-- `_report/goals-api-current-specification.md` または後継仕様書
+- `docs/goals-api-current-specification.md` または後継仕様書
 - 必要に応じて `docs/domain_model_specification.md`
 
 ---
