@@ -42,6 +42,30 @@ func (m *mockFirebaseAuthenticator) AuthenticateOptional(ctx context.Context, id
 func TestFirebaseIDTokenMiddleware(t *testing.T) {
 	e := echo.New()
 
+	t.Run("認証済みユーザーがContextにある場合はFirebaseを再検証しない", func(t *testing.T) {
+		// Given
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.FirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/me", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		c.Set("userEntity", user)
+
+		handler := middlewareFunc(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		// When
+		err := handler(c)
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertNotCalled(t, "Authenticate", mock.Anything, mock.Anything)
+	})
+
 	t.Run("Bearerトークンが有効な場合はuserEntityを設定して次のハンドラーを実行する", func(t *testing.T) {
 		// Given
 		mockAuthenticator := new(mockFirebaseAuthenticator)
@@ -248,6 +272,25 @@ func TestFirebaseIDTokenMiddleware(t *testing.T) {
 
 func TestOptionalFirebaseIDTokenMiddleware(t *testing.T) {
 	e := echo.New()
+
+	t.Run("認証済みユーザーがContextにある場合はFirebaseを再検証しない", func(t *testing.T) {
+		mockAuthenticator := new(mockFirebaseAuthenticator)
+		middlewareFunc := middleware.OptionalFirebaseIDTokenMiddleware(mockAuthenticator)
+		req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		c.Set("userEntity", user)
+
+		err := middlewareFunc(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockAuthenticator.AssertNotCalled(t, "AuthenticateOptional", mock.Anything, mock.Anything)
+	})
 
 	t.Run("Authorizationヘッダがない場合は匿名で次のハンドラーを実行する", func(t *testing.T) {
 		mockAuthenticator := new(mockFirebaseAuthenticator)

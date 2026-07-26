@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -91,6 +92,7 @@ type Handlers struct {
 	BestSlotStats        *api_internal.BestSlotStatsHandler
 	InternalScoreHistory *api_internal.ScoreHistoryHandler
 	Course               *api_internal.CourseHandler
+	SystemMaintenance    *api_internal.SystemMaintenanceHandler
 	// 外部API v1 用ハンドラ
 	V1Song       *api_v1.V1SongHandler
 	V1Worldsend  *api_v1.V1WorldsendHandler
@@ -106,7 +108,7 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
-func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *echo.Echo {
+func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, error) {
 	e := echo.New()
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
@@ -152,7 +154,12 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	courseRepo := infra.NewCourseRepository(db)
+	systemMaintenanceRepo := infra.NewSystemMaintenanceRepository(db)
 	tm := transaction.NewTransactionManager(db)
+	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(ctx, systemMaintenanceRepo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
+	}
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
@@ -217,7 +224,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
-	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache)
+	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)
 	usernamePolicy, err := service.NewForbiddenUsernamePolicy(cfg.UsernamePolicy.Exact, cfg.UsernamePolicy.Contains)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create username policy: %v", err))
@@ -246,6 +253,7 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 		BestSlotStats:        api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
 		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		Course:               api_internal.NewCourseHandler(courseUsecase),
+		SystemMaintenance:    api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend:  api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -261,17 +269,19 @@ func NewRouter(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 
 	// ルートの設定
 	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
+	firebaseMaintenance := middleware.FirebaseMaintenanceMiddleware(systemMaintenanceUsecase, firebaseAuthUsecaseStrict)
+	apiTokenMaintenance := middleware.APITokenMaintenanceMiddleware(systemMaintenanceUsecase, apiTokenUsecase)
 	e.OPTIONS("/healthz", func(c *echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
-	e.GET("/", handleRoot)
-	e.GET("/version", handleVersion, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
+	e.GET("/", handleRoot, firebaseMaintenance)
+	e.GET("/version", handleVersion, apiTokenMaintenance, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
 	// ルートの登録
-	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, cfg)
+	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
-	return e
+	return e, nil
 }
 
 func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) usecase.RecentSignInVerifier {
@@ -288,9 +298,20 @@ func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) us
 }
 
 // registerRoutes はすべてのルートを登録します
-func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStrict middleware.FirebaseAuthenticator, firebaseAuthenticatorReadOptimized middleware.FirebaseAuthenticator, apiTokenUsecase usecase.APITokenUsecase, cfg config.Config) {
+func registerRoutes(
+	e *echo.Echo,
+	handlers *Handlers,
+	firebaseAuthenticatorStrict middleware.FirebaseAuthenticator,
+	firebaseAuthenticatorReadOptimized middleware.FirebaseAuthenticator,
+	apiTokenUsecase usecase.APITokenUsecase,
+	maintenanceStateProvider usecase.MaintenanceStateProvider,
+	cfg config.Config,
+) {
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
+	// 一時保存APIの拡張CORSは、メンテナンス503にも適用できるようゲートより先に評価します。
+	internal.Use(echoMiddleware.CORSWithConfig(newTemporaryPlayerDataCORSConfig(cfg)))
+	internal.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
 
 	// Firebase認証ミドルウェア
 	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
@@ -306,6 +327,8 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 
 	// ADMIN以上の権限を要求するミドルウェア
 	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
+
+	internal.GET("/system/status", handlers.SystemMaintenance.Status)
 
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
@@ -380,11 +403,10 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
-	tempDataCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
 	temporaryPlayerDataGroup.OPTIONS("/temp", func(c *echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
-	}, tempDataCORS)
-	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, tempDataCORS, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+	})
+	temporaryPlayerDataGroup.POST("/temp", handlers.TemporaryPlayerData.CreateTemporaryData, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.TempDataRateLimitPerMin,
 		Window:   info.TempDataRateLimitWindow,
 	}))
@@ -426,6 +448,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	adminGroup.Use(firebaseAuthStrict, requireAdmin)
 	{
 		adminGroup.GET("/build-info", handleAdminBuildInfo)
+		adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
 	}
 
 	// api.chunisupport.net/internal/honors
@@ -532,6 +555,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	// 外部APIルートの登録
 	// api.chunisupport.net/v1
 	scoreHistoryV1 := e.Group("/v1")
+	scoreHistoryV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	scoreHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
 	scoreHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
 		info.APIRateLimitRequests,
@@ -543,6 +567,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	scoreHistoryV1.GET("/worldsend-songs/:displayid/score-history", handlers.ScoreHistory.GetWorldsend)
 
 	apiV1 := e.Group("/v1")
+	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミット: ADMINは15分150,000回、EDITOR/EXTDEVは15分3,000回、その他は15分150回
 	apiV1.Use(middleware.APIRateLimitMiddleware(
@@ -571,6 +596,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	chunirecGroup := e.Group("/compat/chunirec/2.0")
 	// chunirec専用エラーハンドリング（最初に適用）
 	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
+	chunirecGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	// レートリミットはv1と同じ設定を適用
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
@@ -589,6 +615,7 @@ func registerRoutes(e *echo.Echo, handlers *Handlers, firebaseAuthenticatorStric
 	// reiwa互換APIルートの登録
 	reiwaGroup := e.Group("/compat/reiwa/1")
 	reiwaGroup.Use(reiwa.ReiwaErrorHandlerMiddleware())
+	reiwaGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	reiwaGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	reiwaGroup.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
@@ -614,6 +641,14 @@ func newExternalCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
 	}
 
 	return newCORSConfig(allowOrigins, cfg, nil)
+}
+
+func newTemporaryPlayerDataCORSConfig(cfg config.Config) echoMiddleware.CORSConfig {
+	corsConfig := newExternalCORSConfig(cfg)
+	corsConfig.Skipper = func(c *echo.Context) bool {
+		return c.Request().URL.Path != "/internal/player-data/temp"
+	}
+	return corsConfig
 }
 
 func isExternalCORSPath(path string) bool {
@@ -643,6 +678,7 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 		},
 		ExposeHeaders: []string{
 			echo.HeaderContentLength,
+			echo.HeaderRetryAfter,
 		},
 		MaxAge: cfg.CORS.MaxAge,
 	}

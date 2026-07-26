@@ -12,6 +12,8 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 `migration/sqlite`はMySQL統計移行前の履歴として残しており、新規環境では適用しません。
 
+現在の本番対象データベースはMySQL 8.4です。
+
 ## 主要テーブルの概要
 
 以下は、アプリケーションのコア機能に関連する主要なテーブルの概要です。
@@ -40,6 +42,18 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
     - `last_used_at`: 認証に最後に使用した日時。
     - `created_at`: 作成日時。
+
+### システム運用関連
+
+#### `system_maintenance`
+- **役割**: API全体のメンテナンス状態と公開用コメントを単一行で永続化します。
+- **主なカラム**:
+    - `id`: singletonを表す固定ID。`CHECK (id = 1)` により1だけを許可します。
+    - `enabled`: メンテナンス状態（0=通常、1=メンテナンス中）。
+    - `comment`: 公開用コメント（最大1,000文字）。無効時は空文字です。
+    - `updated_by_user_id`: 最後に状態を変更したユーザー。`users.id` を参照し、ユーザー削除時はNULLになります。
+    - `updated_at`: 状態の最終更新日時（マイクロ秒精度）。
+- **初期行**: `id = 1`、`enabled = false`、空コメントで作成します。行が欠落している場合、APIは設定不備として起動に失敗します。
 
 ### プレイヤー・ゲームデータ関連
 
@@ -179,6 +193,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000036**: レーティング帯マスタと譜面統計3表をMySQLへ追加。統計は別リポジトリのバッチが実行ごとに全削除して再生成する。
 - **000037**: ユーザー所有の `goal_groups` を追加し、`goals.group_id` とグループ内 `sort_order` による目標分類・並び替えへ変更。既存目標は未分類のまま従来順を保持する。
 - **000038**: `api_tokens` に名前、表示用prefix、最終利用日時を追加し、`user_id` の単独一意制約を削除して1ユーザー複数トークンに対応。既存ハッシュは変更せず、名前を「既存のトークン」、prefixと最終利用日時をNULLで移行する。
+- **000039**: APIメンテナンス状態を永続化する `system_maintenance` テーブルと、無効状態の初期singleton行を追加。
 
 #### 000028の失敗時復旧
 
@@ -239,6 +254,14 @@ upでは既存レコードと `hashed_token` を保持したまま管理用カ�
 移行中も外部APIのトークン認証は継続できる。一方、旧バイナリの `DELETE /internal/auth/api-tokens` はユーザーの全トークンを削除するため、マイグレーション開始前から旧インスタンスの排出完了までAPIトークン管理CRUDを停止する。適用順は「管理CRUD停止 → 000038 up → 全インスタンスを新バイナリへ切替 → 管理CRUD再開」とする。
 
 downで1ユーザー1トークンへ戻す場合、複数発行済みのユーザーは `created_at DESC, id DESC` で最新の1件だけを保持し、それ以外を削除する。ロールバック前に必ず影響を確認すること。
+
+### 000039 システムメンテナンス状態
+
+`system_maintenance` は `id = 1` の単一行だけを保持します。MySQL 8.4で有効な `CHECK (id = 1)`、主キー、リポジトリ実装の固定ID指定を組み合わせてsingletonを保証します。`updated_by_user_id` は `users.id` を参照し、ユーザー削除時も運用状態を維持できるよう `ON DELETE SET NULL` とします。
+
+APIバイナリは起動時にこの行を必須で読み込むため、デプロイでは `000039` のupを新バイナリより先に適用してください。up直後の初期状態は通常運用です。
+
+downはテーブルと保存済みの状態・監査情報を削除します。旧バイナリへのロールバックでは原則としてテーブルを残し、downは保存データを破棄してよい場合だけ適用してください。
 
 ### 000031 コース作成日時の削除
 

@@ -2,7 +2,7 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)、reiwa互換API(`/compat/reiwa/1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年07月22日
+**最終更新日**: 2026年07月26日
 
 ## ベースURLと環境
 
@@ -22,6 +22,8 @@
 
 すべてのエンドポイントでCORSが有効です。基本設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
 ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
+
+メンテナンス中の待機時間をブラウザから参照できるよう、CORSの公開レスポンスヘッダーには `Retry-After` を含みます。
 
 ## 認証
 
@@ -100,10 +102,74 @@
 | `not_found` | エンドポイントが見つからない |
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
+| `maintenance_mode` | APIメンテナンス中の利用制限 |
 | `internal_error` | 予期しないサーバーエラー |
 | `friendship_limit_exceeded` | フレンド枠の上限超過 |
 | `friendship_conflict` | 既に申請中またはフレンド成立済み |
 | `friend_request_not_found` | 対象のフレンド申請が見つからない |
+
+## メンテナンスモード
+
+メンテナンス状態はMySQLの `system_maintenance` 単一行へ永続化され、APIプロセス起動時に読み込まれます。リクエスト処理ではメモリ上の不変スナップショットを参照するため、通常時のリクエストごとに追加のDB参照や認証処理は発生しません。API再起動後もDBに保存された状態を維持します。
+
+現在の構成は単一APIプロセスを前提とし、複数プロセス間のリアルタイムな状態同期は行いません。複数プロセスで運用する場合は、プロセス間同期方式を導入してから利用してください。
+
+### メンテナンス中のアクセス制御
+
+| 利用者 | 通常のエンドポイント | 状態変更 |
+| --- | --- | --- |
+| ADMIN | 利用可 | 利用可 |
+| EDITOR | 利用可 | 不可 |
+| PLAYER | `503 Service Unavailable` | 不可 |
+| EXTDEV | `503 Service Unavailable` | 不可 |
+| 未認証・不正な認証情報 | `503 Service Unavailable` | 不可 |
+
+ADMIN / EDITORの判定は、`/internal` と `/` ではFirebase IDトークン、`/v1`、`/compat`、`/version` ではAPIトークンを使用します。スタッフとしてメンテナンスゲートを通過しても、各エンドポイントに既存の権限要件がある場合は、その認可を引き続き適用します。
+
+次のリクエストはメンテナンスゲートの例外です。
+
+- すべての `OPTIONS` リクエスト
+- `GET /healthz`
+- `GET /internal/system/status`
+- `POST /internal/auth/login`
+
+`POST /internal/auth/signup` は例外ではなく、メンテナンス中はスタッフ以外に `503 maintenance_mode` を返します。未登録パスはメンテナンス中も `404 not_found` を返します。
+
+ログインでは既存のレートリミット、Turnstile検証、Firebase認証を維持します。認証に成功したADMIN / EDITORはログインでき、PLAYER / EXTDEVは `503 maintenance_mode` になります。認証に失敗した場合は、メンテナンス状態にかかわらず従来の認証エラーを返します。
+
+### 標準APIのメンテナンス応答
+
+互換API以外のメンテナンス遮断では、次のレスポンスを返します。コメントはこのレスポンスに含めず、`GET /internal/system/status` から取得してください。
+
+```http
+HTTP/1.1 503 Service Unavailable
+Retry-After: 60
+Cache-Control: no-store
+Content-Type: application/json
+```
+
+```json
+{
+  "error": {
+    "status": 503,
+    "code": "maintenance_mode"
+  }
+}
+```
+
+### 互換APIのメンテナンス応答
+
+`/compat/chunirec/2.0` と `/compat/reiwa/1` は、それぞれの既存互換エラー形式を維持します。`Retry-After: 60` と `Cache-Control: no-store` は標準APIと同様に付与します。
+
+```json
+{
+  "error": {
+    "code": 503,
+    "message": "service unavailable.",
+    "additional_message": ""
+  }
+}
+```
 
 ## マスターデータ概要
 
@@ -113,9 +179,10 @@
 
 | パス | メソッド | 認証 | 概要 |
 | ---- | -------- | ---- | ---- |
-| `/` | GET | 不要 | アプリケーション名とビルド日を返します |
+| `/` | GET | 通常時不要 | アプリケーション名とビルド日を返します。メンテナンス中はFirebase認証済みのADMIN / EDITORのみ利用可 |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
+| `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン一覧取得 |
@@ -123,6 +190,7 @@
 | `/internal/auth/api-tokens/:id` | PATCH | Firebase Bearer | APIトークン名変更 |
 | `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
+| `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -239,8 +307,8 @@
 > **警告**: これらのエンドポイントはアプリケーションの稼働状況を確認するために使用されます。本番環境では、不正な情報漏洩を防ぐため、ネットワーク設定（例: ファイアウォール、ロードバランサ）によってアクセスを内部ネットワークや特定のIPアドレスに制限することが強く推奨されます。
 
 ### GET `/`
-- **認証**: 不要
-- **レスポンス**: 常に 200 OK で、アプリケーション名とビルド日を返します。リビジョン（Git短縮ハッシュ）は公開しません。
+- **認証**: 通常時は不要。メンテナンス中はFirebase IDトークンで認証済みのADMIN / EDITORのみ利用できます。
+- **レスポンス**: 通常時とメンテナンス中のADMIN / EDITORには 200 OK で、アプリケーション名とビルド日を返します。リビジョン（Git短縮ハッシュ）は公開しません。それ以外の利用者はメンテナンス中に 503 Service Unavailable (`maintenance_mode`) となります。
 
 ```json
 {
@@ -256,7 +324,7 @@
   - それ以外の許可オリジンは通常どおり `cors.allow_origins` に従います。
 - **チェック内容**: APIプロセスがHTTP応答できることのみを確認します。DBなどの依存サービスは確認しません。
 - **レスポンス**:
-  - 204 No Content: 空レスポンス
+  - 204 No Content: 空レスポンス。メンテナンス中も同じレスポンスを維持します。
 
 ### GET `/version`
 - **認証**: APIトークン (ADMIN)
@@ -271,6 +339,87 @@
   "go_version": "go1.26.4"
 }
 ```
+
+---
+
+## システム状態・メンテナンスエンドポイント
+
+### GET `/internal/system/status`
+
+- **認証**: 不要
+- **概要**: APIの運用状態、公開用コメント、最終更新日時を取得します。
+- **メンテナンスゲート**: 例外。通常時・メンテナンス中ともに 200 OK を返します。
+- **レスポンスヘッダー**: `Cache-Control: no-store`
+
+通常時:
+
+```json
+{
+  "status": "operational",
+  "comment": "",
+  "updated_at": "2026-07-26T12:00:00+09:00"
+}
+```
+
+メンテナンス中:
+
+```json
+{
+  "status": "maintenance",
+  "comment": "データ更新のためメンテナンスを実施しています。",
+  "updated_at": "2026-07-26T12:30:00+09:00"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `status` | string | `operational` または `maintenance` |
+| `comment` | string | 公開用メンテナンスコメント。通常時は空文字 |
+| `updated_at` | string | 状態の最終更新日時（RFC3339） |
+
+内部監査用の更新者IDは公開レスポンスに含めません。
+
+### PUT `/internal/admin/maintenance`
+
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: メンテナンス状態の開始、稼働中コメントの更新、または終了を行います。EDITORは実行できません。
+- **リクエストヘッダー**:
+  - `Authorization: Bearer <Firebase ID Token>`
+  - `Content-Type: application/json`
+
+開始・稼働中コメント更新:
+
+```json
+{
+  "enabled": true,
+  "comment": "データ更新のためメンテナンスを実施しています。"
+}
+```
+
+終了:
+
+```json
+{
+  "enabled": false,
+  "comment": ""
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `enabled` | boolean | ✓ | `true` で開始、`false` で終了 |
+| `comment` | string | `enabled: true`（開始・更新）時は必須 | 最大1,000 Unicodeコードポイント。改行可 |
+
+コメントは `CRLF` と `CR` を `LF` へ正規化し、前後の空白を除去します。`LF` 以外の制御文字は使用できず、開始時に正規化後の空文字は指定できません。終了時はリクエストのコメントにかかわらず、保存値とレスポンスを空文字へ統一します。
+
+- **レスポンス**: 200 OK。`GET /internal/system/status` と同じ形式を返します。
+- **レスポンスヘッダー**: `Cache-Control: no-store`
+- **冪等性**: 現在と `enabled` が同じで、正規化・無効化時の空文字化を反映したコメントも同じ場合は完全なno-opです。DB保存、更新者・更新日時の変更、状態変更ログの出力を行いません。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON不正、`enabled` 未指定、またはコメント不正
+  - 401 Unauthorized: 通常時のFirebase認証失敗
+  - 403 Forbidden (`forbidden`): EDITORを含むADMIN以外による状態変更
+  - 503 Service Unavailable (`maintenance_mode`): メンテナンス中のPLAYER / EXTDEV / 未認証・不正な認証情報
 
 ---
 
@@ -317,6 +466,10 @@
 | `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
 
 - **レスポンス**: 200 OK。`UserDTO` を返します。
+- **メンテナンス中**:
+  - Firebase認証に成功したADMIN / EDITORはログインできます。
+  - Firebase認証に成功したPLAYER / EXTDEVは 503 Service Unavailable (`maintenance_mode`) になります。
+  - TurnstileまたはFirebase認証に失敗した場合は、従来の認証エラーを返します。
 
 ```json
 {
@@ -333,6 +486,7 @@
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み、または未登録ユーザー
   - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
+  - 503 Service Unavailable (`maintenance_mode`): メンテナンス中に認証済みのPLAYER / EXTDEVがログインを試みた
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/signup`
@@ -375,6 +529,7 @@
   - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
   - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
+  - 503 Service Unavailable (`maintenance_mode`): メンテナンス中のスタッフ以外によるアクセス
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
 
 ### POST `/internal/auth/api-tokens`
@@ -4188,6 +4343,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法は`/v1`と同様です。  
 なお、こちらのAPIで表示されるIDはあくまでChuniSupportのIDであり、chunirecのIDとは異なります。他のchunirec互換APIと同時に利用していただく想定です。
 
+メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
+
 ### GET `/compat/chunirec/2.0/music/showall`
 - **認証**: APIトークン必須
 - **概要**: WORLD'S END以外の全楽曲をchunirec互換形式で取得します（削除済み楽曲は除外）。
@@ -4411,6 +4568,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 
 reiwa互換APIは外部ツールとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
 
+メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
+
 ### GET `/compat/reiwa/1/chunithm_record/original`
 
 - **認証**: APIトークン必須
@@ -4590,11 +4749,22 @@ interface WorldsendRecordDTO {
   full_chain: string | null;      // マスタ値が「NONE」の場合はnull
 }
 
+// システム状態・メンテナンス
+interface SystemStatusResponse {
+  status: 'operational' | 'maintenance';
+  comment: string;
+  updated_at: string;
+}
+
+type SystemMaintenanceUpdateRequest =
+  | { enabled: true; comment: string }
+  | { enabled: false; comment?: string };
+
 // エラーレスポンス
 interface ErrorResponse {
   error: {
     status: number;
-    code: string;  // エラーコード (例: "invalid_token", "validation_failed")
+    code: string;  // エラーコード (例: "invalid_token", "validation_failed", "maintenance_mode")
     message?: string; // validation_failed の場合のみ返却されることがある
     details?: {
       field: string;

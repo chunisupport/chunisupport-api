@@ -394,3 +394,48 @@ func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *test
 	assert.Contains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`)")
 	assert.NotContains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_id` (`user_id`)")
 }
+
+func TestCreateSystemMaintenanceUp_単一行のメンテナンス状態を作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000039_create_system_maintenance.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE system_maintenance")
+	assert.Contains(t, upSQL, "id TINYINT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "enabled BOOLEAN NOT NULL")
+	assert.Contains(t, upSQL, "comment VARCHAR(1000) NOT NULL DEFAULT ''")
+	assert.Contains(t, upSQL, "updated_by_user_id INT UNSIGNED NULL")
+	assert.Contains(t, upSQL, "updated_at DATETIME(6) NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (id)")
+	assert.Contains(t, upSQL, "FOREIGN KEY (updated_by_user_id) REFERENCES users (id) ON DELETE SET NULL")
+	assert.Contains(t, upSQL, "CHECK (id = 1)")
+	assert.Contains(
+		t,
+		upSQL,
+		"INSERT INTO system_maintenance (id, enabled, comment, updated_by_user_id, updated_at) VALUES (1, FALSE, '', NULL, UTC_TIMESTAMP(6))",
+	)
+}
+
+func TestCreateSystemMaintenanceDown_メンテナンス状態を削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000039_create_system_maintenance.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP TABLE IF EXISTS system_maintenance")
+}
+
+func TestSchemaMySQL_メンテナンス状態テーブルを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "CREATE TABLE `system_maintenance`")
+	assert.Contains(t, schemaSQL, "`id` tinyint unsigned NOT NULL")
+	assert.Contains(t, schemaSQL, "`enabled` tinyint(1) NOT NULL")
+	assert.Contains(t, schemaSQL, "`comment` varchar(1000)")
+	assert.Contains(t, schemaSQL, "`updated_by_user_id` int unsigned DEFAULT NULL")
+	assert.Contains(t, schemaSQL, "`updated_at` datetime(6) NOT NULL")
+	assert.Contains(t, schemaSQL, "PRIMARY KEY (`id`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_system_maintenance_updated_by_user` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_system_maintenance_singleton` CHECK ((`id` = 1))")
+}

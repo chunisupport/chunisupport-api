@@ -26,6 +26,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrRecentSignInRequired.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecentSignInRequired):
 		return ErrRecentSignInRequired.WithInternal(err)
+	case errors.Is(err, usecase.ErrMaintenanceMode):
+		return ErrMaintenanceMode.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidMaintenanceComment):
+		return ErrBadRequest.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidIDToken):
 		return ErrInvalidToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidTurnstileToken):

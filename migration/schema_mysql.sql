@@ -1,4 +1,4 @@
-﻿CREATE TABLE `account_types` (
+CREATE TABLE `account_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
@@ -19,10 +19,53 @@ CREATE TABLE `api_tokens` (
   `last_used_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
+  UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   KEY `idx_api_tokens_user_created_id` (`user_id`,`created_at` DESC,`id` DESC),
   CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `chart_best_slot_stats_by_rating_band` (
+  `chart_id` mediumint unsigned NOT NULL,
+  `rating_band_id` tinyint unsigned NOT NULL,
+  `best_player_count` int unsigned NOT NULL,
+  `eligible_player_count` int unsigned NOT NULL,
+  `best_player_percentage` decimal(7,4) DEFAULT NULL,
+  PRIMARY KEY (`chart_id`,`rating_band_id`),
+  KEY `idx_chart_best_slot_stats_ranking` (`rating_band_id`,`best_player_percentage` DESC,`best_player_count` DESC,`chart_id`),
+  CONSTRAINT `chart_best_slot_stats_by_rating_band_ibfk_1` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chart_best_slot_stats_by_rating_band_ibfk_2` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`),
+  CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_1` CHECK ((`best_player_count` <= `eligible_player_count`)),
+  CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_2` CHECK (((`best_player_percentage` is null) or (`best_player_percentage` between 0 and 100))),
+  CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_3` CHECK ((((`eligible_player_count` = 0) and (`best_player_percentage` is null)) or ((`eligible_player_count` > 0) and (`best_player_percentage` is not null))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `chart_stats_by_rating_band` (
+  `chart_id` mediumint unsigned NOT NULL,
+  `rating_band_id` tinyint unsigned NOT NULL,
+  `rank_aaal` int unsigned NOT NULL DEFAULT '0',
+  `rank_s` int unsigned NOT NULL DEFAULT '0',
+  `rank_sp` int unsigned NOT NULL DEFAULT '0',
+  `rank_ss` int unsigned NOT NULL DEFAULT '0',
+  `rank_ssp` int unsigned NOT NULL DEFAULT '0',
+  `rank_sss` int unsigned NOT NULL DEFAULT '0',
+  `rank_sssp` int unsigned NOT NULL DEFAULT '0',
+  `rank_max` int unsigned NOT NULL DEFAULT '0',
+  `combo_none` int unsigned NOT NULL DEFAULT '0',
+  `combo_fc` int unsigned NOT NULL DEFAULT '0',
+  `combo_aj` int unsigned NOT NULL DEFAULT '0',
+  `combo_ajc` int unsigned NOT NULL DEFAULT '0',
+  `clear_failed` int unsigned NOT NULL DEFAULT '0',
+  `clear_clear` int unsigned NOT NULL DEFAULT '0',
+  `clear_hard` int unsigned NOT NULL DEFAULT '0',
+  `clear_brave` int unsigned NOT NULL DEFAULT '0',
+  `clear_absolute` int unsigned NOT NULL DEFAULT '0',
+  `clear_catastrophy` int unsigned NOT NULL DEFAULT '0',
+  `average_score` double DEFAULT NULL,
+  `median_score` double DEFAULT NULL,
+  `player_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`chart_id`,`rating_band_id`),
+  KEY `rating_band_id` (`rating_band_id`),
+  CONSTRAINT `chart_stats_by_rating_band_ibfk_1` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chart_stats_by_rating_band_ibfk_2` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `charts` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
@@ -163,8 +206,8 @@ CREATE TABLE `goals` (
   KEY `fk_goals_achievement_type_id` (`achievement_type_id`),
   KEY `idx_goals_user_group_sort_order_id` (`user_id`,`group_id`,`sort_order`,`id`),
   CONSTRAINT `fk_goals_achievement_type_id` FOREIGN KEY (`achievement_type_id`) REFERENCES `achievement_types` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_goals_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_goals_group_user` FOREIGN KEY (`user_id`,`group_id`) REFERENCES `goal_groups` (`user_id`,`id`) ON DELETE RESTRICT
+  CONSTRAINT `fk_goals_group_user` FOREIGN KEY (`user_id`, `group_id`) REFERENCES `goal_groups` (`user_id`, `id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_goals_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `honor_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
@@ -341,6 +384,16 @@ CREATE TABLE `players` (
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `rating_bands` (
+  `id` tinyint unsigned NOT NULL,
+  `label` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `min_inclusive` decimal(6,4) DEFAULT NULL,
+  `max_exclusive` decimal(6,4) DEFAULT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_rating_bands_label` (`label`),
+  UNIQUE KEY `uq_rating_bands_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `record_filters` (
   `id` binary(16) NOT NULL,
   `user_id` int unsigned NOT NULL,
@@ -387,6 +440,17 @@ CREATE TABLE `songs` (
   CONSTRAINT `songs_ibfk_1` FOREIGN KEY (`genre_id`) REFERENCES `genres` (`id`),
   CONSTRAINT `songs_chk_1` CHECK (((`bpm` is null) or (`bpm` > 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `system_maintenance` (
+  `id` tinyint unsigned NOT NULL,
+  `enabled` tinyint(1) NOT NULL,
+  `comment` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `updated_by_user_id` int unsigned DEFAULT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_system_maintenance_updated_by_user` (`updated_by_user_id`),
+  CONSTRAINT `fk_system_maintenance_updated_by_user` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `chk_system_maintenance_singleton` CHECK ((`id` = 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `users` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -412,6 +476,35 @@ CREATE TABLE `versions` (
   `released_at` date NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `worldsend_chart_stats_by_rating_band` (
+  `worldsend_chart_id` mediumint unsigned NOT NULL,
+  `rating_band_id` tinyint unsigned NOT NULL,
+  `rank_aaal` int unsigned NOT NULL DEFAULT '0',
+  `rank_s` int unsigned NOT NULL DEFAULT '0',
+  `rank_sp` int unsigned NOT NULL DEFAULT '0',
+  `rank_ss` int unsigned NOT NULL DEFAULT '0',
+  `rank_ssp` int unsigned NOT NULL DEFAULT '0',
+  `rank_sss` int unsigned NOT NULL DEFAULT '0',
+  `rank_sssp` int unsigned NOT NULL DEFAULT '0',
+  `rank_max` int unsigned NOT NULL DEFAULT '0',
+  `combo_none` int unsigned NOT NULL DEFAULT '0',
+  `combo_fc` int unsigned NOT NULL DEFAULT '0',
+  `combo_aj` int unsigned NOT NULL DEFAULT '0',
+  `combo_ajc` int unsigned NOT NULL DEFAULT '0',
+  `clear_failed` int unsigned NOT NULL DEFAULT '0',
+  `clear_clear` int unsigned NOT NULL DEFAULT '0',
+  `clear_hard` int unsigned NOT NULL DEFAULT '0',
+  `clear_brave` int unsigned NOT NULL DEFAULT '0',
+  `clear_absolute` int unsigned NOT NULL DEFAULT '0',
+  `clear_catastrophy` int unsigned NOT NULL DEFAULT '0',
+  `average_score` double DEFAULT NULL,
+  `median_score` double DEFAULT NULL,
+  `player_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`worldsend_chart_id`,`rating_band_id`),
+  KEY `rating_band_id` (`rating_band_id`),
+  CONSTRAINT `worldsend_chart_stats_by_rating_band_ibfk_1` FOREIGN KEY (`worldsend_chart_id`) REFERENCES `worldsend_charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `worldsend_chart_stats_by_rating_band_ibfk_2` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `worldsend_charts` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,

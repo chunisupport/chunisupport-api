@@ -29,11 +29,16 @@ type Server struct {
 	staticMasterCache *masterdata.StaticCache
 }
 
-// NewServer は新しいServerインスタンスを作成します
-func NewServer(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) *Server {
+// NewServer は永続化済みの運用状態を読み込んでServerインスタンスを作成します。
+func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*Server, error) {
+	router, err := NewRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
+	if err != nil {
+		return nil, err
+	}
+
 	startCtx, cancelStart := context.WithCancel(context.Background())
 	return &Server{
-		echo:              NewRouter(db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter),
+		echo:              router,
 		startCtx:          startCtx,
 		cancelStart:       cancelStart,
 		startDone:         make(chan struct{}),
@@ -41,7 +46,7 @@ func NewServer(db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, st
 		cfg:               cfg,
 		masterCache:       masterCache,
 		staticMasterCache: staticMasterCache,
-	}
+	}, nil
 }
 
 // Start はサーバーを開始します

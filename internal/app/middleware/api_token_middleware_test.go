@@ -64,6 +64,28 @@ func TestAPITokenMiddleware(t *testing.T) {
 	mockUsecase := new(mockAPITokenUsecase)
 	middlewareFunc := middleware.APITokenMiddleware(mockUsecase)
 
+	t.Run("認証済みユーザーとAPIトークンがContextにある場合は再検証しない", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		c.Set("userEntity", user)
+		c.Set("apiToken", token)
+
+		handler := middlewareFunc(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			assert.Same(t, token, c.Get("apiToken"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate", mock.Anything, mock.Anything)
+	})
+
 	t.Run("Bearerトークンが有効な場合は次のハンドラーが実行される", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer valid")
@@ -161,6 +183,27 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 func TestOptionalAPITokenMiddleware(t *testing.T) {
 	e := echo.New()
+
+	t.Run("認証済みユーザーとAPIトークンがContextにある場合は再検証しない", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		c.Set("userEntity", user)
+		c.Set("apiToken", token)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			assert.Same(t, token, c.Get("apiToken"))
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate", mock.Anything, mock.Anything)
+	})
 
 	t.Run("トークンなしでも次のハンドラーを実行する", func(t *testing.T) {
 		mockUsecase := new(mockAPITokenUsecase)

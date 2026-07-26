@@ -27,6 +27,24 @@ func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *te
 	assert.Equal(t, usecase.ErrInvalidCredentials, got.Internal)
 }
 
+func TestFromUsecaseError_メンテナンス中は専用503へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrMaintenanceMode)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusServiceUnavailable, apiErr.HTTPStatus)
+	assert.Equal(t, CodeMaintenanceMode, apiErr.Code)
+	assert.ErrorIs(t, apiErr.Internal, usecase.ErrMaintenanceMode)
+}
+
+func TestFromUsecaseError_不正なメンテナンスコメントは400へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrInvalidMaintenanceComment)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeBadRequest, apiErr.Code)
+	assert.ErrorIs(t, apiErr.Internal, usecase.ErrInvalidMaintenanceComment)
+}
+
 func TestFromUsecaseError_禁止ユーザー名は登録失敗に丸める(t *testing.T) {
 	got := FromUsecaseError(usecase.ErrUsernameForbidden)
 

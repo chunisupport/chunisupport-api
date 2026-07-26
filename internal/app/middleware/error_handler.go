@@ -5,9 +5,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
 
@@ -35,6 +37,10 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	// レスポンスがすでに送信されている場合は何もしない
 	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
+	}
+
+	if errorCode == apierror.CodeMaintenanceMode {
+		setMaintenanceResponseHeaders(c)
 	}
 
 	// エラーログの出力（詳細情報を含む）
@@ -111,6 +117,10 @@ func httpStatusToErrorCode(status int) string {
 
 // logError はエラーをログに出力します（詳細情報を含む）
 func logError(status int, code string, err error, c *echo.Context) {
+	if code == apierror.CodeMaintenanceMode {
+		return
+	}
+
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
@@ -137,6 +147,11 @@ func logError(status int, code string, err error, c *echo.Context) {
 			"error", errorMessage,
 		)
 	}
+}
+
+func setMaintenanceResponseHeaders(c *echo.Context) {
+	c.Response().Header().Set(echo.HeaderRetryAfter, strconv.Itoa(info.MaintenanceRetryAfterSeconds))
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 }
 
 func sanitizeLogValue(value string) string {

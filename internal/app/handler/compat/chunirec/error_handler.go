@@ -85,6 +85,11 @@ func handleChunirecError(err error, c *echo.Context) {
 
 // logChunirecError はエラーをログに出力します（詳細情報を含む）
 func logChunirecError(status int, err error, c *echo.Context) {
+	var apiErr *apierror.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == apierror.CodeMaintenanceMode {
+		return
+	}
+
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ

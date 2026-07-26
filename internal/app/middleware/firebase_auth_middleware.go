@@ -19,6 +19,10 @@ type FirebaseAuthenticator interface {
 func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
+			if user, ok := c.Get(contextKeyUserEntity).(*entity.User); ok && user != nil {
+				return next(c)
+			}
+
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return apierror.ErrMissingToken
@@ -35,7 +39,7 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 				return apierror.ErrInternalError.WithInternal(errors.New("firebase authenticator returned nil user"))
 			}
 
-			c.Set("userEntity", user)
+			c.Set(contextKeyUserEntity, user)
 			return next(c)
 		}
 	}
@@ -45,6 +49,10 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
+			if user, ok := c.Get(contextKeyUserEntity).(*entity.User); ok && user != nil {
+				return next(c)
+			}
+
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return next(c)
@@ -58,7 +66,7 @@ func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo
 				return apierror.FromUsecaseError(err)
 			}
 			if user != nil {
-				c.Set("userEntity", user)
+				c.Set(contextKeyUserEntity, user)
 			}
 
 			return next(c)

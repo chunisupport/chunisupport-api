@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-07-22
+最終更新: 2026-07-26
 
 ## 更新ルール
 
@@ -49,6 +49,7 @@
 | `not_found` | エンドポイント未検出 |
 | `too_many_requests` | レート制限 |
 | `service_unavailable` | サービス利用不可 |
+| `maintenance_mode` | APIメンテナンス中の利用制限 |
 | `username_empty` | ユーザー名空 |
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
@@ -67,6 +68,8 @@
 | `goal_group_conflict` | 目標グループ名重複 |
 | `goal_group_invalid_order` | 目標グループ並び順不正 |
 | `favorite_song_limit_exceeded` | お気に入り楽曲上限超過（最大100件） |
+
+`maintenance_mode` は、互換API以外でメンテナンスゲートまたはログイン時のロール制御が利用を遮断した場合にHTTP 503で返します。レスポンス本文にはメンテナンスコメントを含めません。状態とコメントは `GET /internal/system/status` から取得してください。`/compat/chunirec/2.0` と `/compat/reiwa/1` は既存の互換形式を維持するため、本文のコードは数値の `503` になります。
 
 ## 内部理由コード一覧（運用・調査用）
 

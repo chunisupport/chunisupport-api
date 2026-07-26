@@ -52,6 +52,7 @@ const (
 	CodeNotFound              = "not_found"
 	CodeTooManyRequests       = "too_many_requests"
 	CodeServiceUnavailable    = "service_unavailable"
+	CodeMaintenanceMode       = "maintenance_mode"
 
 	// 入力バリデーション詳細エラー
 	CodeUsernameEmpty       = "username_empty"

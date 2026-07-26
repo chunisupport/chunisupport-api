@@ -42,6 +42,7 @@ const (
 	WorldsendSongSnapshotObjectKey    = "v1/worldsend-songs.json"
 	PlayerLatestUpdateSchemaVersion   = 1
 	PlayerLatestUpdateMaxPayloadBytes = 1024 * 1024
+	MaintenanceRetryAfterSeconds      = 60
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

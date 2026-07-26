@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_v1"
@@ -34,9 +35,34 @@ func (stubFirebaseAuthenticator) AuthenticateOptional(ctx context.Context, idTok
 	return authenticateTestUser(idToken), nil
 }
 
+type stubMaintenanceUsecase struct {
+	state usecase.MaintenanceState
+}
+
+func (s stubMaintenanceUsecase) Current() usecase.MaintenanceState {
+	return s.state
+}
+
+func (s stubMaintenanceUsecase) Update(context.Context, int, bool, string) (usecase.MaintenanceState, error) {
+	return s.state, nil
+}
+
 type countingAuthenticator struct {
 	authenticateCalls         int
 	authenticateOptionalCalls int
+}
+
+type roleCountingAuthenticator struct {
+	authenticateCalls int
+}
+
+func (a *roleCountingAuthenticator) Authenticate(_ context.Context, idToken string) (*entity.User, error) {
+	a.authenticateCalls++
+	return authenticateTestUser(idToken), nil
+}
+
+func (a *roleCountingAuthenticator) AuthenticateOptional(_ context.Context, idToken string) (*entity.User, error) {
+	return authenticateTestUser(idToken), nil
 }
 
 func (a *countingAuthenticator) Authenticate(_ context.Context, _ string) (*entity.User, error) {
@@ -101,7 +127,7 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			// Given
 			e := echo.New()
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
-			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, config.Config{})
+			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
 
 			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
 			req.Header.Set(echo.HeaderAuthorization, "Bearer editor-token")
@@ -159,7 +185,7 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 					return nil
 				},
 			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
-			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, config.Config{})
+			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, stubMaintenanceUsecase{}, config.Config{})
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/songs", bytes.NewBufferString(`[{"id":"1234567890abcdef","title":"テスト楽曲","artist":"テストアーティスト"}]`))
 			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
@@ -203,7 +229,7 @@ func TestRegisterRoutes_外部譜面定数更新はEDITOR以上のAPIトーク�
 					return &entity.Song{OfficialIdx: "123", Charts: []*entity.Chart{}}, nil
 				},
 			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
-			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, config.Config{})
+			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, stubMaintenanceUsecase{}, config.Config{})
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(
 				`{"official_idx":"123","difficulty":"MAS","const":14.7}`,
@@ -273,7 +299,7 @@ func TestRegisterRoutes_公開GETはread最適化認証を使い書き込みはs
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 	strictAuth := &countingAuthenticator{}
 	readOptimizedAuth := &countingAuthenticator{}
-	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
 
 	// When
 	getReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/songs", nil)
@@ -301,7 +327,7 @@ func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 	strictAuth := &countingAuthenticator{}
 	readOptimizedAuth := &countingAuthenticator{}
-	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
 
 	// When
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/users/test/profile", nil)
@@ -321,7 +347,7 @@ func TestRegisterRoutes_usersUpdatedAtはread最適化認証を使う(t *testing
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 	strictAuth := &countingAuthenticator{}
 	readOptimizedAuth := &countingAuthenticator{}
-	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, config.Config{})
+	registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
 
 	// When
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/users/test/updated-at", nil)
@@ -333,6 +359,220 @@ func TestRegisterRoutes_usersUpdatedAtはread最適化認証を使う(t *testing
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
 	assert.Equal(t, 1, readOptimizedAuth.authenticateOptionalCalls)
+}
+
+func TestRegisterRoutes_メンテナンス中の標準API経路を遮断する(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		token  string
+	}{
+		{name: "未認証internal API", method: http.MethodGet, path: "/internal/master"},
+		{name: "PLAYERのv1 API", method: http.MethodGet, path: "/v1/songs", token: "player-token"},
+		{name: "signup", method: http.MethodPost, path: "/internal/auth/signup"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			handlers := newAuthorizationTestHandlers()
+			maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{
+				Enabled:   true,
+				Comment:   "データ更新中です",
+				UpdatedAt: time.Date(2026, time.July, 26, 3, 30, 0, 0, time.UTC),
+			}}
+			handlers.SystemMaintenance = internalhandler.NewSystemMaintenanceHandler(maintenance)
+			registerRoutes(
+				e,
+				handlers,
+				stubFirebaseAuthenticator{},
+				stubFirebaseAuthenticator{},
+				stubAPITokenUsecase{},
+				maintenance,
+				config.Config{},
+			)
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+			assert.Equal(t, "60", rec.Header().Get(echo.HeaderRetryAfter))
+			assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
+			assert.Contains(t, rec.Body.String(), `"code":"maintenance_mode"`)
+		})
+	}
+}
+
+func TestRegisterRoutes_メンテナンス中も状態確認とADMIN更新を許可する(t *testing.T) {
+	// Given
+	maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{
+		Enabled:   true,
+		Comment:   "データ更新中です",
+		UpdatedAt: time.Date(2026, time.July, 26, 3, 30, 0, 0, time.UTC),
+	}}
+	handlers := newAuthorizationTestHandlers()
+	handlers.SystemMaintenance = internalhandler.NewSystemMaintenanceHandler(maintenance)
+	authenticator := new(roleCountingAuthenticator)
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	registerRoutes(
+		e,
+		handlers,
+		authenticator,
+		authenticator,
+		stubAPITokenUsecase{},
+		maintenance,
+		config.Config{},
+	)
+
+	statusReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/system/status", nil)
+	statusRec := httptest.NewRecorder()
+	e.ServeHTTP(statusRec, statusReq)
+	require.Equal(t, http.StatusOK, statusRec.Code)
+	assert.Equal(t, "no-store", statusRec.Header().Get(echo.HeaderCacheControl))
+	assert.Contains(t, statusRec.Body.String(), `"status":"maintenance"`)
+	assert.Zero(t, authenticator.authenticateCalls)
+
+	updateReq := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPut,
+		"/internal/admin/maintenance",
+		bytes.NewBufferString(`{"enabled":false,"comment":""}`),
+	)
+	updateReq.Header.Set(echo.HeaderAuthorization, "Bearer admin-token")
+	updateReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	updateRec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(updateRec, updateReq)
+
+	// Then
+	require.Equal(t, http.StatusOK, updateRec.Code)
+	assert.Equal(t, "no-store", updateRec.Header().Get(echo.HeaderCacheControl))
+	assert.Equal(t, 1, authenticator.authenticateCalls)
+}
+
+func TestRegisterRoutes_メンテナンス中もEDITORは状態変更できない(t *testing.T) {
+	// Given
+	maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
+	handlers := newAuthorizationTestHandlers()
+	handlers.SystemMaintenance = internalhandler.NewSystemMaintenanceHandler(maintenance)
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	registerRoutes(
+		e,
+		handlers,
+		stubFirebaseAuthenticator{},
+		stubFirebaseAuthenticator{},
+		stubAPITokenUsecase{},
+		maintenance,
+		config.Config{},
+	)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPut,
+		"/internal/admin/maintenance",
+		bytes.NewBufferString(`{"enabled":false,"comment":""}`),
+	)
+	req.Header.Set(echo.HeaderAuthorization, "Bearer editor-token")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"code":"forbidden"`)
+}
+
+func TestRegisterRoutes_メンテナンス中のcompatは既存503形式を維持する(t *testing.T) {
+	paths := []string{
+		"/compat/chunirec/2.0/music/showall",
+		"/compat/reiwa/1/chunithm_record/original",
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			// Given
+			maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(
+				e,
+				newAuthorizationTestHandlers(),
+				stubFirebaseAuthenticator{},
+				stubFirebaseAuthenticator{},
+				stubAPITokenUsecase{},
+				maintenance,
+				config.Config{},
+			)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer player-token")
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+			assert.Equal(t, "60", rec.Header().Get(echo.HeaderRetryAfter))
+			assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
+			assert.JSONEq(t, `{
+				"error": {
+					"code": 503,
+					"message": "service unavailable.",
+					"additional_message": ""
+				}
+			}`, rec.Body.String())
+		})
+	}
+}
+
+func TestRegisterRoutes_メンテナンス中も未登録パスは404(t *testing.T) {
+	paths := []string{
+		"/internal/not-registered",
+		"/v1/not-registered",
+		"/compat/chunirec/2.0/not-registered",
+		"/compat/reiwa/1/not-registered",
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			// Given
+			maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(
+				e,
+				newAuthorizationTestHandlers(),
+				stubFirebaseAuthenticator{},
+				stubFirebaseAuthenticator{},
+				stubAPITokenUsecase{},
+				maintenance,
+				config.Config{},
+			)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusNotFound, rec.Code)
+			assert.Contains(t, rec.Body.String(), `"code":"not_found"`)
+			assert.NotContains(t, rec.Body.String(), "maintenance_mode")
+		})
+	}
 }
 
 func newAuthorizationTestHandlers() *Handlers {
@@ -350,6 +590,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		Me:                  new(internalhandler.MeHandler),
 		MasterData:          new(internalhandler.MasterDataHandler),
 		Goal:                new(internalhandler.GoalHandler),
+		SystemMaintenance:   internalhandler.NewSystemMaintenanceHandler(stubMaintenanceUsecase{}),
 		TemporaryPlayerData: new(internalhandler.TemporaryPlayerDataHandler),
 		V1Song:              new(api_v1.V1SongHandler),
 		V1Worldsend:         new(api_v1.V1WorldsendHandler),

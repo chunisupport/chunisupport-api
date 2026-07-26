@@ -102,6 +102,7 @@ var (
 	ErrNotFound                   = New(CodeNotFound, http.StatusNotFound)
 	ErrTooManyRequests            = New(CodeTooManyRequests, http.StatusTooManyRequests)
 	ErrServiceUnavailable         = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
+	ErrMaintenanceMode            = New(CodeMaintenanceMode, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
 	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)

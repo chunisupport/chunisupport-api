@@ -69,6 +69,11 @@ func handleReiwaError(err error, c *echo.Context) {
 }
 
 func logReiwaError(status int, err error, c *echo.Context) {
+	var apiErr *apierror.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == apierror.CodeMaintenanceMode {
+		return
+	}
+
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	if errors.Is(err, context.Canceled) {

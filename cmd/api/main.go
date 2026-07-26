@@ -123,7 +123,14 @@ func run() int {
 		return 0
 	}
 
-	server := app.NewServer(database, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
+	server, err := app.NewServer(signalCtx, database, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
+	if err != nil {
+		slog.Error("Failed to create server", "error", err)
+		if closeErr := database.Close(); closeErr != nil {
+			slog.Error("Failed to close database after server initialization failure", "error", closeErr)
+		}
+		return 1
+	}
 
 	serverErrCh := make(chan error, 1)
 	go func() {

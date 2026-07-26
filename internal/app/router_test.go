@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -115,6 +116,56 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 	}
 }
 
+func TestTemporaryPlayerDataCORS_内部グループでも対象パスだけ追加オリジンを許可する(t *testing.T) {
+	// Given
+	cfg := config.Config{
+		CORS: config.CORS{
+			AllowOrigins: []string{"https://chunisupport.example.com"},
+		},
+	}
+	e := echo.New()
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+	internal := e.Group("/internal")
+	internal.Use(echoMiddleware.CORSWithConfig(newTemporaryPlayerDataCORSConfig(cfg)))
+	internal.OPTIONS("/player-data/temp", func(c *echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	})
+	internal.OPTIONS("/me", func(c *echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	})
+
+	tests := []struct {
+		name      string
+		path      string
+		wantAllow string
+	}{
+		{
+			name:      "一時保存APIは追加オリジンを許可する",
+			path:      "/internal/player-data/temp",
+			wantAllow: info.ExternalCORSAllowOrigin,
+		},
+		{
+			name: "他の内部APIへ追加オリジンを広げない",
+			path: "/internal/me",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodOptions, tt.path, nil)
+			req.Header.Set(echo.HeaderOrigin, info.ExternalCORSAllowOrigin)
+			req.Header.Set(echo.HeaderAccessControlRequestMethod, http.MethodPost)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			assert.Equal(t, tt.wantAllow, rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+		})
+	}
+}
+
 func TestCORSAllowOrigins_ワイルドカード入りオリジンを許可する(t *testing.T) {
 	cfg := config.Config{
 		CORS: config.CORS{
@@ -200,6 +251,85 @@ func TestCORSAllowMethods_PATCHを許可する(t *testing.T) {
 	// Then
 	assert.Equal(t, "https://chunisupport.example.com", rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
 	assert.Contains(t, rec.Header().Get(echo.HeaderAccessControlAllowMethods), http.MethodPatch)
+}
+
+func TestCORSExposeHeaders_RetryAfterを公開する(t *testing.T) {
+	// Given
+	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
+
+	// When
+	corsConfig := newDefaultCORSConfig(cfg)
+
+	// Then
+	assert.Contains(t, corsConfig.ExposeHeaders, echo.HeaderRetryAfter)
+}
+
+func TestMaintenanceResponse_許可済みオリジンへCORSヘッダーを返す(t *testing.T) {
+	// Given
+	const origin = "https://chunisupport.example.com"
+	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{origin}}}
+	maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+	e.GET(
+		"/internal/songs",
+		func(c *echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		},
+		appmiddleware.FirebaseMaintenanceMiddleware(maintenance, nil),
+	)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/songs", nil)
+	req.Header.Set(echo.HeaderOrigin, origin)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, origin, rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+	assert.Contains(t, rec.Header().Get(echo.HeaderAccessControlExposeHeaders), echo.HeaderRetryAfter)
+	assert.Equal(t, "60", rec.Header().Get(echo.HeaderRetryAfter))
+}
+
+func TestMaintenanceResponse_一時保存APIの追加オリジンへCORSヘッダーを返す(t *testing.T) {
+	// Given
+	cfg := config.Config{
+		CORS: config.CORS{
+			AllowOrigins: []string{"https://chunisupport.example.com"},
+		},
+	}
+	maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
+	registerRoutes(
+		e,
+		newAuthorizationTestHandlers(),
+		stubFirebaseAuthenticator{},
+		stubFirebaseAuthenticator{},
+		stubAPITokenUsecase{},
+		maintenance,
+		cfg,
+	)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"/internal/player-data/temp",
+		nil,
+	)
+	req.Header.Set(echo.HeaderOrigin, info.ExternalCORSAllowOrigin)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, info.ExternalCORSAllowOrigin, rec.Header().Get(echo.HeaderAccessControlAllowOrigin))
+	assert.Contains(t, rec.Header().Get(echo.HeaderAccessControlExposeHeaders), echo.HeaderRetryAfter)
+	assert.Equal(t, "60", rec.Header().Get(echo.HeaderRetryAfter))
 }
 
 func TestHandleExternalHealth_外部監視向けに204NoContentを返す(t *testing.T) {
