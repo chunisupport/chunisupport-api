@@ -69,11 +69,27 @@ func TestUserName_Scan(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "nil",
+			name: "DBのNULLはエラー",
 			args: args{
 				src: nil,
 			},
-			want:    UserName{value: ""},
+			want:    UserName{value: "before"},
+			wantErr: assert.Error,
+		},
+		{
+			name: "有効な文字列",
+			args: args{
+				src: "testuser",
+			},
+			want:    UserName{value: "testuser"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "有効な[]byte",
+			args: args{
+				src: []byte("testuser"),
+			},
+			want:    UserName{value: "testuser"},
 			wantErr: assert.NoError,
 		},
 		{
@@ -81,7 +97,7 @@ func TestUserName_Scan(t *testing.T) {
 			args: args{
 				src: "test",
 			},
-			want:    UserName{},
+			want:    UserName{value: "before"},
 			wantErr: assert.Error,
 		},
 		{
@@ -89,21 +105,21 @@ func TestUserName_Scan(t *testing.T) {
 			args: args{
 				src: []byte("test"),
 			},
-			want:    UserName{},
+			want:    UserName{value: "before"},
 			wantErr: assert.Error,
 		},
 		{
-			name: "DBからの空文字列",
+			name: "DBの空文字列はエラー",
 			args: args{
 				src: "",
 			},
-			want:    UserName{value: ""},
-			wantErr: assert.NoError,
+			want:    UserName{value: "before"},
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &UserName{}
+			u := &UserName{value: "before"}
 			err := u.Scan(tt.args.src)
 			if !tt.wantErr(t, err, fmt.Sprintf("Scan(%v)", tt.args.src)) {
 				return
