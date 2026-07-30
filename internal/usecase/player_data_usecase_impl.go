@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/url"
 	"path"
 	"slices"
@@ -25,6 +26,7 @@ const (
 	maxPlayerDataChangeDetails = 100
 	maxScoreValue              = 1010000
 	minScoreValue              = 0
+	playerDataMetricDiffScale  = 10_000
 	tokyoLayout                = "2006/01/02 15:04"
 	defaultSlotName            = "none"
 )
@@ -331,7 +333,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.ClassEmblemID = classID
 		summaryInput.ClassBaseID = baseID
 
-		playerID, ensureErr := us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -363,7 +365,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.OverpowerValue = overpowerSummary.Value
 		summaryInput.OverpowerPercent = overpowerSummary.Percent
 
-		playerID, ensureErr = us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		playerID, _, ensureErr = us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -396,6 +398,16 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			LastPlayedAt:     summaryInput.LastPlayedAt,
 			OverpowerValue:   summaryInput.OverpowerValue,
 			OverpowerPercent: summaryInput.OverpowerPercent,
+		}
+		var previousRating *float64
+		var previousOverpowerValue *float64
+		if previousPlayer != nil {
+			previousRating = previousPlayer.CalculatedRating
+			previousOverpowerValue = previousPlayer.OverpowerValue
+		}
+		result.MetricDiffs = api_internal.PlayerDataMetricDiffs{
+			Rating:         buildPlayerDataFloat64Diff(previousRating, &ratingStats.PlayerRating),
+			OverpowerValue: buildPlayerDataFloat64Diff(previousOverpowerValue, summaryInput.OverpowerValue),
 		}
 		result.Statistics = statistics
 		result.SkippedRecords = skippedRecords
@@ -585,18 +597,18 @@ func normalizeClassEmblemKey(raw string) string {
 }
 
 // ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。
-// プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDを返します。
-func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, error) {
+// プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDと更新前状態を返します。
+func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, *entity.Player, error) {
 	// ユーザーに紐づくプレイヤーを検索
 	existingPlayer, err := us.playerRepo.FindByUserID(ctx, tx, user.ID)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	// PlayerNameのバリデーション
 	playerName, err := playername.NewPlayerName(summary.Name)
 	if err != nil {
-		return 0, fmt.Errorf("invalid player name: %w", err)
+		return 0, nil, fmt.Errorf("invalid player name: %w", err)
 	}
 
 	// エンティティを作成または更新
@@ -629,18 +641,18 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）
 	if err := us.playerRepo.Save(ctx, tx, player); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	// ユーザーとプレイヤーのリンク
 	if user.PlayerID == nil || *user.PlayerID != player.ID {
 		user.LinkPlayer(player.ID)
 		if err := us.userRepo.Save(ctx, tx, user); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
 
-	return player.ID, nil
+	return player.ID, existingPlayer, nil
 }
 
 // applyHonors はプレイヤーの称号情報を更新します。
@@ -1039,6 +1051,28 @@ func buildPlayerDataStatisticsDiff(before service.PlayerRecordStatisticsSnapshot
 		statistics.ByDifficulty[difficulty] = buildPlayerDataStatisticsGroupDiff(before.ByDifficulty[difficulty], after.ByDifficulty[difficulty])
 	}
 	return statistics
+}
+
+// buildPlayerDataFloat64Diff は登録前後の値が揃う場合だけ小数差分を計算します。
+func buildPlayerDataFloat64Diff(before *float64, after *float64) api_internal.PlayerDataFloat64Diff {
+	diff := api_internal.PlayerDataFloat64Diff{
+		Before: cloneFloat64Pointer(before),
+		After:  cloneFloat64Pointer(after),
+	}
+	if before != nil && after != nil {
+		delta := math.Round((*after-*before)*playerDataMetricDiffScale) / playerDataMetricDiffScale
+		diff.Delta = &delta
+	}
+	return diff
+}
+
+// cloneFloat64Pointer は呼び出し元の値と共有しないfloat64ポインタを返します。
+func cloneFloat64Pointer(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func buildPlayerDataStatisticsGroupDiff(before service.PlayerRecordStatistics, after service.PlayerRecordStatistics) api_internal.PlayerDataStatisticsGroup {

@@ -11,6 +11,15 @@ type Summary struct {
 	OverpowerValue   *float64
 	OverpowerPercent *float64
 }
+type Float64Diff struct {
+	Before *float64
+	After  *float64
+	Delta  *float64
+}
+type MetricDiffs struct {
+	Rating         Float64Diff
+	OverpowerValue Float64Diff
+}
 type Profile struct {
 	PlayerID          int
 	Name              string
@@ -92,6 +101,7 @@ type Result struct {
 	ImportedAt     time.Time
 	Profile        Profile
 	Summary        Summary
+	MetricDiffs    MetricDiffs
 	Statistics     Statistics
 	Counts         Counts
 	Changes        []RecordChange
@@ -99,6 +109,8 @@ type Result struct {
 }
 
 type PlayerDataSummary = Summary
+type PlayerDataFloat64Diff = Float64Diff
+type PlayerDataMetricDiffs = MetricDiffs
 type PlayerDataProfile = Profile
 type PlayerDataInt64Diff = Int64Diff
 type PlayerDataIntDiff = IntDiff

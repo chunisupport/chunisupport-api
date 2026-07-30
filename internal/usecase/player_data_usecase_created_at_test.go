@@ -94,12 +94,13 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 				Once()
 
 			// When
-			playerID, err := uc.ensurePlayer(context.Background(), nil, user, summary, updatedAt)
+			playerID, previousPlayer, err := uc.ensurePlayer(context.Background(), nil, user, summary, updatedAt)
 			after := time.Now()
 
 			// Then
 			require.NoError(t, err)
 			assert.Equal(t, 99, playerID)
+			assert.Nil(t, previousPlayer)
 			require.NotNil(t, playerRepo.savedPlayer)
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.IsZero())
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.Before(before))

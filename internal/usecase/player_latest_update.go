@@ -69,7 +69,10 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 		return nil, fmt.Errorf("%w: failed to decode player latest update: %v", ErrInternalError, err)
 	}
 	var schemaVersion int
-	if err := json.Unmarshal(envelope["schema_version"], &schemaVersion); err != nil || schemaVersion != update.SchemaVersion() || schemaVersion != playerLatestUpdateSchemaVersion {
+	if err := json.Unmarshal(envelope["schema_version"], &schemaVersion); err != nil ||
+		schemaVersion != update.SchemaVersion() ||
+		schemaVersion < info.PlayerLatestUpdateMinSupportedSchemaVersion ||
+		schemaVersion > playerLatestUpdateSchemaVersion {
 		return nil, fmt.Errorf("%w: unsupported player latest update schema", ErrInternalError)
 	}
 	requiredFields := [...]string{"player_id", "app_ver", "imported_at", "profile", "summary", "statistics", "counts", "changes"}
@@ -77,6 +80,9 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 		if len(envelope[field]) == 0 {
 			return nil, fmt.Errorf("%w: player latest update field is missing: %s", ErrInternalError, field)
 		}
+	}
+	if schemaVersion >= info.PlayerLatestUpdateMetricDiffSchemaVersion && len(envelope["metric_diffs"]) == 0 {
+		return nil, fmt.Errorf("%w: player latest update field is missing: metric_diffs", ErrInternalError)
 	}
 	var playerID int
 	if err := json.Unmarshal(envelope["player_id"], &playerID); err != nil || playerID != update.PlayerID() || playerID != *user.PlayerID {
@@ -116,10 +122,18 @@ func playerLatestUpdatePayload(result *playerdataresult.Result) map[string]any {
 			"overpower_value":      result.Summary.OverpowerValue,
 			"overpower_percentage": result.Summary.OverpowerPercent,
 		},
+		"metric_diffs": map[string]any{
+			"rating":          playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.Rating),
+			"overpower_value": playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.OverpowerValue),
+		},
 		"statistics": playerLatestUpdateStatisticsPayload(result.Statistics),
 		"counts":     playerLatestUpdateCountsPayload(result.Counts),
 		"changes":    changes,
 	}
+}
+
+func playerLatestUpdateFloat64DiffPayload(diff playerdataresult.Float64Diff) map[string]*float64 {
+	return map[string]*float64{"before": diff.Before, "after": diff.After, "delta": diff.Delta}
 }
 
 func playerLatestUpdateStatisticsPayload(statistics playerdataresult.Statistics) map[string]any {

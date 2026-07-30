@@ -33,9 +33,18 @@ func toPlayerDataResponse(result *playerdataresult.Result) *dto.PlayerDataResult
 			LastPlayedAt: result.Summary.LastPlayedAt, OverpowerValue: result.Summary.OverpowerValue,
 			OverpowerPercent: result.Summary.OverpowerPercent,
 		},
+		MetricDiffs: dto.PlayerDataMetricDiffs{
+			Rating:         toPlayerDataFloat64Diff(result.MetricDiffs.Rating),
+			OverpowerValue: toPlayerDataFloat64Diff(result.MetricDiffs.OverpowerValue),
+		},
 		Statistics: toPlayerDataStatistics(result.Statistics), Counts: dto.PlayerDataCounts(result.Counts),
 		Changes: changes, SkippedRecords: skippedRecords,
 	}
+}
+
+// toPlayerDataFloat64Diff はユースケースの小数差分をAPIレスポンスへ変換します。
+func toPlayerDataFloat64Diff(diff playerdataresult.Float64Diff) dto.PlayerDataFloat64Diff {
+	return dto.PlayerDataFloat64Diff{Before: diff.Before, After: diff.After, Delta: diff.Delta}
 }
 
 func toPlayerDataStatistics(statistics playerdataresult.Statistics) dto.PlayerDataStatistics {

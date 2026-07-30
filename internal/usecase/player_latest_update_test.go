@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,11 @@ func TestBuildPlayerLatestUpdate_skippedRecordsを除外して登録結果を圧
 			Level:    99,
 		},
 		Summary: playerdataresult.Summary{Name: "TEST", Level: 99},
-		Counts:  playerdataresult.Counts{FullRecordsActuallyChanged: 2, FullRecordsSkipped: 1},
+		MetricDiffs: playerdataresult.MetricDiffs{
+			Rating:         playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
+			OverpowerValue: playerdataresult.Float64Diff{Before: float64Pointer(96120.123), After: float64Pointer(96123.91), Delta: float64Pointer(3.787)},
+		},
+		Counts: playerdataresult.Counts{FullRecordsActuallyChanged: 2, FullRecordsSkipped: 1},
 		Changes: []playerdataresult.RecordChange{{
 			RecordType: "standard",
 			ChangeType: "updated",
@@ -56,11 +61,54 @@ func TestBuildPlayerLatestUpdate_skippedRecordsを除外して登録結果を圧
 	assert.Equal(t, "1.2.3", payload["app_ver"])
 	assert.Contains(t, payload, "profile")
 	assert.Contains(t, payload, "summary")
+	assert.Contains(t, payload, "metric_diffs")
 	assert.Contains(t, payload, "statistics")
 	assert.Contains(t, payload, "counts")
 	assert.Contains(t, payload, "changes")
 	assert.NotContains(t, payload, "skipped_records")
 	assert.NotContains(t, string(raw), "secret")
+}
+
+func TestBuildPlayerDataFloat64Diff_登録前後がある場合だけ差分を返す(t *testing.T) {
+	tests := []struct {
+		name   string
+		before *float64
+		after  *float64
+		want   playerdataresult.Float64Diff
+	}{
+		{
+			name:   "登録前後がある場合はdeltaを計算する",
+			before: float64Pointer(16.42),
+			after:  float64Pointer(16.45),
+			want:   playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
+		},
+		{
+			name:  "初回登録ではdeltaを返さない",
+			after: float64Pointer(16.45),
+			want:  playerdataresult.Float64Diff{After: float64Pointer(16.45)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got := buildPlayerDataFloat64Diff(tt.before, tt.after)
+
+			// Then
+			assert.Equal(t, tt.want.Before, got.Before)
+			assert.Equal(t, tt.want.After, got.After)
+			if tt.want.Delta == nil {
+				assert.Nil(t, got.Delta)
+			} else {
+				require.NotNil(t, got.Delta)
+				assert.InDelta(t, *tt.want.Delta, *got.Delta, 1e-9)
+			}
+		})
+	}
+}
+
+func float64Pointer(value float64) *float64 {
+	return &value
 }
 
 func TestPlayerDataUsecase_GetLatestUpdate(t *testing.T) {
@@ -87,6 +135,45 @@ func TestPlayerDataUsecase_GetLatestUpdate(t *testing.T) {
 	assert.Equal(t, float64(playerLatestUpdateSchemaVersion), payload["schema_version"])
 	assert.Equal(t, "1.2.3", payload["app_ver"])
 	assert.NotContains(t, payload, "skipped_records")
+}
+
+func TestPlayerDataUsecase_GetLatestUpdate_schema1の保存結果も返す(t *testing.T) {
+	// Given
+	playerID := 12
+	result := &playerdataresult.Result{
+		PlayerID:   playerID,
+		AppVersion: "1.2.3",
+		ImportedAt: time.Date(2026, 7, 16, 2, 3, 4, 0, time.UTC),
+		Changes:    []playerdataresult.RecordChange{},
+	}
+	payload := playerLatestUpdatePayload(result)
+	payload["schema_version"] = info.PlayerLatestUpdateMinSupportedSchemaVersion
+	delete(payload, "metric_diffs")
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	compressed, err := gzipBytes(raw)
+	require.NoError(t, err)
+	update, err := entity.NewPlayerLatestUpdate(
+		playerID,
+		info.PlayerLatestUpdateMinSupportedSchemaVersion,
+		compressed,
+		result.ImportedAt.Add(-time.Minute),
+		result.ImportedAt,
+		"body-hash",
+	)
+	require.NoError(t, err)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}
+	u := &playerDataUsecase{playerDataRepo: repo}
+
+	// When
+	got, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
+
+	// Then
+	require.NoError(t, err)
+	var gotPayload map[string]any
+	require.NoError(t, json.Unmarshal(got, &gotPayload))
+	assert.Equal(t, float64(info.PlayerLatestUpdateMinSupportedSchemaVersion), gotPayload["schema_version"])
+	assert.NotContains(t, gotPayload, "metric_diffs")
 }
 
 func TestPlayerDataUsecase_GetLatestUpdate_未連携と未保存を区別する(t *testing.T) {
@@ -125,6 +212,21 @@ func TestPlayerDataUsecase_GetLatestUpdate_不正な保存内容は内部エラ�
 	}
 	validUpdate, err := buildPlayerLatestUpdate(validResult, time.Now().UTC(), "hash")
 	require.NoError(t, err)
+	missingMetricPayload := playerLatestUpdatePayload(validResult)
+	delete(missingMetricPayload, "metric_diffs")
+	missingMetricRaw, err := json.Marshal(missingMetricPayload)
+	require.NoError(t, err)
+	missingMetricGzip, err := gzipBytes(missingMetricRaw)
+	require.NoError(t, err)
+	missingMetricUpdate, err := entity.NewPlayerLatestUpdate(
+		playerID,
+		playerLatestUpdateSchemaVersion,
+		missingMetricGzip,
+		time.Now().UTC(),
+		time.Now().UTC(),
+		"missing-metric-hash",
+	)
+	require.NoError(t, err)
 	missingFieldGzip, err := gzipBytes([]byte(`{"schema_version":1}`))
 	require.NoError(t, err)
 	mismatchResult := *validResult
@@ -146,6 +248,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_不正な保存内容は内部エラ�
 	}{
 		{name: "gzipが壊れている", update: brokenGzipUpdate},
 		{name: "必須フィールドがない", update: missingFieldUpdate},
+		{name: "schema 2でメトリクス差分がない", update: missingMetricUpdate},
 		{name: "DBとJSONのスキーマが一致しない", update: schemaMismatchUpdate},
 		{name: "DBとJSONのプレイヤーIDが一致しない", update: mismatchPlayerUpdate},
 	}

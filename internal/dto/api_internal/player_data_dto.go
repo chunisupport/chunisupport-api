@@ -10,6 +10,15 @@ type PlayerDataSummary struct {
 	OverpowerValue   *float64   `json:"overpower_value"`
 	OverpowerPercent *float64   `json:"overpower_percentage"`
 }
+type PlayerDataFloat64Diff struct {
+	Before *float64 `json:"before"`
+	After  *float64 `json:"after"`
+	Delta  *float64 `json:"delta"`
+}
+type PlayerDataMetricDiffs struct {
+	Rating         PlayerDataFloat64Diff `json:"rating"`
+	OverpowerValue PlayerDataFloat64Diff `json:"overpower_value"`
+}
 type PlayerDataProfile struct {
 	PlayerID          int        `json:"player_id"`
 	Name              string     `json:"name"`
@@ -91,6 +100,7 @@ type PlayerDataResult struct {
 	ImportedAt     time.Time                `json:"imported_at"`
 	Profile        PlayerDataProfile        `json:"profile"`
 	Summary        PlayerDataSummary        `json:"summary"`
+	MetricDiffs    PlayerDataMetricDiffs    `json:"metric_diffs"`
 	Statistics     PlayerDataStatistics     `json:"statistics"`
 	Counts         PlayerDataCounts         `json:"counts"`
 	Changes        []PlayerDataRecordChange `json:"changes"`
@@ -105,6 +115,7 @@ type PlayerLatestUpdateResult struct {
 	ImportedAt    time.Time                `json:"imported_at"`
 	Profile       PlayerDataProfile        `json:"profile"`
 	Summary       PlayerDataSummary        `json:"summary"`
+	MetricDiffs   *PlayerDataMetricDiffs   `json:"metric_diffs,omitempty"`
 	Statistics    PlayerDataStatistics     `json:"statistics"`
 	Counts        PlayerDataCounts         `json:"counts"`
 	Changes       []PlayerDataRecordChange `json:"changes"`

@@ -91,6 +91,7 @@ func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
 		assert.Equal(t, float64(1), response["schema_version"])
 		assert.Equal(t, "1.2.3", response["app_ver"])
 		assert.Equal(t, "2026-07-16T11:03:04+09:00", response["imported_at"])
+		assert.NotContains(t, response, "metric_diffs")
 		profile := response["profile"].(map[string]any)
 		assert.Equal(t, "2026-07-16T10:00:00+09:00", profile["last_played_at"])
 		assert.NotContains(t, response, "skipped_records")
