@@ -84,7 +84,8 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 			AchievementParams: validated.AchievementParams,
 			Attributes:        validated.Attributes,
 			Invert:            validated.Invert,
-			SortOrder:         uint16(groupCount + 1),
+			// ユーザー単位の目標上限を検証済みのため、uint16の範囲を超えません。
+			SortOrder: uint16(groupCount + 1), // #nosec G115
 		}
 		if err := u.goalRepo.Create(ctx, tx, goal); err != nil {
 			return err
