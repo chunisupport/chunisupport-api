@@ -54,6 +54,9 @@ func (s *CourseScore) Scan(value any) error {
 	if n < 0 {
 		return errors.New("course score cannot be negative")
 	}
+	if n > int64(Max) {
+		return fmt.Errorf("course score cannot exceed %d", Max)
+	}
 	parsed, err := New(uint32(n))
 	if err != nil {
 		return err

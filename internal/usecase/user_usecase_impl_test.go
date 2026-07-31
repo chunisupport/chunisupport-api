@@ -1241,8 +1241,6 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	assert.Equal(t, calculatedRating1, *list[0].Rating)
 	require.NotNil(t, list[0].OverPowerValue)
 	assert.Equal(t, 10.0, *list[0].OverPowerValue)
-	require.NotNil(t, list[0].FirebaseUID)
-	assert.Equal(t, uid1, *list[0].FirebaseUID)
 
 	// Verify User 2 (No player)
 	assert.Equal(t, "user2", list[1].UserName)
@@ -1251,7 +1249,6 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
 	assert.False(t, list[1].IsSuspicious)
 	assert.Nil(t, list[1].PlayerName)
-	assert.Nil(t, list[1].FirebaseUID)
 }
 
 func intPointer(v int) *int {

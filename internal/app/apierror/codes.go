@@ -41,11 +41,11 @@ const (
 	CodeValidationFailed      = "validation_failed"
 	CodeResourceNotFound      = "resource_not_found"
 	CodeConflict              = "conflict"
-	CodeAPITokenNotFound      = "api_token_not_found" // #nosec G101
-	CodeAPITokenLimitExceeded = "api_token_limit_exceeded"
-	CodeAPITokenNameConflict  = "api_token_name_conflict"
-	CodeInvalidAPITokenName   = "invalid_api_token_name" // #nosec G101
-	CodeInvalidAPITokenID     = "invalid_api_token_id"   // #nosec G101
+	CodeAPITokenNotFound      = "api_token_not_found"      // #nosec G101
+	CodeAPITokenLimitExceeded = "api_token_limit_exceeded" // #nosec G101 -- 公開APIのエラーコードであり認証情報ではありません。
+	CodeAPITokenNameConflict  = "api_token_name_conflict"  // #nosec G101 -- 公開APIのエラーコードであり認証情報ではありません。
+	CodeInvalidAPITokenName   = "invalid_api_token_name"   // #nosec G101
+	CodeInvalidAPITokenID     = "invalid_api_token_id"     // #nosec G101
 	CodePayloadTooLarge       = "payload_too_large"
 	CodeUnsupportedMedia      = "unsupported_media_type"
 	CodeMethodNotAllowed      = "method_not_allowed"

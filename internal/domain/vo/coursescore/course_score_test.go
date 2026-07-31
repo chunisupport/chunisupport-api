@@ -30,3 +30,30 @@ func TestNewCourseScore(t *testing.T) {
 		})
 	}
 }
+
+func TestCourseScore_Scan(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		{name: "理論値", value: int64(Max)},
+		{name: "上限超過", value: int64(Max) + 1, wantErr: true},
+		{name: "uint32の範囲を超える値", value: int64(1) << 32, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var score CourseScore
+
+			err := score.Scan(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, Max, score.Uint32())
+		})
+	}
+}

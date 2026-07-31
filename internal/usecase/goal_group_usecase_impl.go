@@ -53,7 +53,8 @@ func (u *goalGroupUsecase) Create(ctx context.Context, userID int, name string) 
 		if count >= info.GoalGroupMaxPerUser {
 			return ErrGoalGroupLimitExceeded
 		}
-		group.SortOrder = uint16(count + 1)
+		// ユーザー単位の上限を直前で検証しているため、uint16の範囲を超えません。
+		group.SortOrder = uint16(count + 1) // #nosec G115
 		if err := u.groupRepo.Save(ctx, tx, group); err != nil {
 			if errors.Is(err, repository.ErrGoalGroupConflict) {
 				return ErrGoalGroupConflict
