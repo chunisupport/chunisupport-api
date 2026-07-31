@@ -15,6 +15,7 @@ const (
 	BulkInsertChunkSize                         = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
 	BulkSelectChunkSize                         = 1000 // IN句のプレースホルダ上限を避けるための分割数
 	DefaultUserListLimit                        = 100
+	AdminUserStatisticsActivePeriod             = 30 * 24 * time.Hour
 	DefaultSongListLimit                        = 100
 	DefaultBestSlotRankingLimit                 = 50
 	MaxBestSlotRankingLimit                     = 100

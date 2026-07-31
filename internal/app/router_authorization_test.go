@@ -39,6 +39,12 @@ type stubMaintenanceUsecase struct {
 	state usecase.MaintenanceState
 }
 
+type stubAdminUserStatisticsUsecase struct{}
+
+func (stubAdminUserStatisticsUsecase) Get(context.Context) (usecase.AdminUserStatisticsOutput, error) {
+	return usecase.AdminUserStatisticsOutput{}, nil
+}
+
 func (s stubMaintenanceUsecase) Current() usecase.MaintenanceState {
 	return s.state
 }
@@ -139,6 +145,38 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 			// Then
 			require.Equal(t, http.StatusForbidden, rec.Code)
 			assert.Contains(t, rec.Body.String(), "forbidden")
+		})
+	}
+}
+
+func TestRegisterRoutes_ユーザー集計はADMINだけが取得できる(t *testing.T) {
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{name: "ADMINは取得できる", token: "admin-token", wantStatus: http.StatusOK},
+		{name: "EDITORは拒否される", token: "editor-token", wantStatus: http.StatusForbidden},
+		{name: "PLAYERは拒否される", token: "player-token", wantStatus: http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			handlers := newAuthorizationTestHandlers()
+			handlers.AdminUserStatistics = internalhandler.NewAdminUserStatisticsHandler(stubAdminUserStatisticsUsecase{})
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/admin/user-stats", nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			assert.Equal(t, tt.wantStatus, rec.Code)
 		})
 	}
 }
@@ -582,6 +620,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		Profile:             new(internalhandler.ProfileHandler),
 		User:                new(internalhandler.UserHandler),
 		AdminUser:           new(internalhandler.AdminUserHandler),
+		AdminUserStatistics: new(internalhandler.AdminUserStatisticsHandler),
 		Song:                new(internalhandler.SongHandler),
 		BestSlotStats:       new(internalhandler.BestSlotStatsHandler),
 		Honor:               new(internalhandler.HonorHandler),

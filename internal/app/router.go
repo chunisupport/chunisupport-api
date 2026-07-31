@@ -75,6 +75,7 @@ type Handlers struct {
 	Profile              *api_internal.ProfileHandler
 	User                 *api_internal.UserHandler
 	AdminUser            *api_internal.AdminUserHandler
+	AdminUserStatistics  *api_internal.AdminUserStatisticsHandler
 	Song                 *api_internal.SongHandler
 	Honor                *api_internal.HonorHandler
 	Worldsend            *api_internal.WorldsendHandler
@@ -153,6 +154,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
+	adminUserStatisticsQuery := infra.NewAdminUserStatisticsQueryService(db)
 	courseRepo := infra.NewCourseRepository(db)
 	systemMaintenanceRepo := infra.NewSystemMaintenanceRepository(db)
 	tm := transaction.NewTransactionManager(db)
@@ -230,12 +232,14 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		panic(fmt.Sprintf("failed to create username policy: %v", err))
 	}
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
+	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	handlers := &Handlers{
 		Login:                api_internal.NewLoginHandler(loginUsecase),
 		Signup:               api_internal.NewSignupHandler(signupUsecase),
 		Profile:              api_internal.NewProfileHandler(userCredentialUsecase),
 		User:                 api_internal.NewUserHandler(userUsecase),
 		AdminUser:            api_internal.NewAdminUserHandler(userUsecase),
+		AdminUserStatistics:  api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
 		Song:                 api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		Honor:                api_internal.NewHonorHandler(honorUsecase),
 		Worldsend:            api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
@@ -448,6 +452,7 @@ func registerRoutes(
 	adminGroup.Use(firebaseAuthStrict, requireAdmin)
 	{
 		adminGroup.GET("/build-info", handleAdminBuildInfo)
+		adminGroup.GET("/user-stats", handlers.AdminUserStatistics.Get)
 		adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
 	}
 

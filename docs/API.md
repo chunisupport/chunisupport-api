@@ -188,6 +188,7 @@ Content-Type: application/json
 | `/internal/auth/api-tokens/:id` | PATCH | Firebase Bearer | APIトークン名変更 |
 | `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
+| `/internal/admin/user-stats` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けユーザー集計取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
@@ -422,6 +423,26 @@ Content-Type: application/json
 ---
 
 ## 管理者向け情報エンドポイント
+
+### GET `/internal/admin/user-stats`
+
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: ユーザー数、プレイヤーデータ連携済みユーザー数、直近30日以内に更新されたプレイヤーデータ数を返します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "total_users": 100,
+  "users_with_player_data": 80,
+  "active_player_data_last_30_days": 50
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `total_users` | integer | 全ユーザー数 |
+| `users_with_player_data` | integer | プレイヤーデータが紐付けられているユーザー数 |
+| `active_player_data_last_30_days` | integer | `players.data_collected_at` が取得時点から30日前以降のプレイヤーデータ数（境界日時を含む） |
 
 ### GET `/internal/admin/build-info`
 - **認証**: Firebase Bearer (ADMIN)
@@ -4646,6 +4667,13 @@ interface AdminUserListResponse {
   overpower_value: number | null;
   is_suspicious: boolean;
   is_private: boolean;
+}
+
+// ユーザー集計レスポンス（ADMIN用）
+interface AdminUserStatisticsResponse {
+  total_users: number;
+  users_with_player_data: number;
+  active_player_data_last_30_days: number;
 }
 
 // プロファイル＋レコード統合レスポンス
