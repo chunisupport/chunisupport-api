@@ -362,7 +362,6 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 			UpdatedAt:    u.User.UpdatedAt,
 			IsSuspicious: u.User.IsSuspicious,
 			IsPrivate:    u.User.IsPrivate,
-			FirebaseUID:  u.User.FirebaseUID,
 		}
 		if u.Player != nil {
 			playerName := u.Player.Name.String()

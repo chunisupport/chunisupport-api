@@ -2184,8 +2184,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 17.25,
     "overpower_value": 9500.00,
     "is_suspicious": false,
-    "is_private": false,
-    "firebase_uid": "firebase-uid-1"
+    "is_private": false
   },
   {
     "username": "user2",
@@ -2196,8 +2195,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": null,
     "overpower_value": null,
     "is_suspicious": true,
-    "is_private": true,
-    "firebase_uid": null
+    "is_private": true
   }
 ]
 ```
@@ -2215,7 +2213,6 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `overpower_value` | number \| null | オーバーパワー値（未連携の場合は null） |
 | `is_suspicious` | boolean | 不審アカウントフラグ |
 | `is_private` | boolean | プライベートアカウントかどうか |
-| `firebase_uid` | string \| null | 連携済み Firebase UID（未連携の場合は `null`） |
 
 ---
 
@@ -4649,7 +4646,6 @@ interface AdminUserListResponse {
   overpower_value: number | null;
   is_suspicious: boolean;
   is_private: boolean;
-  firebase_uid: string | null;
 }
 
 // プロファイル＋レコード統合レスポンス

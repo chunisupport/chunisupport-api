@@ -614,7 +614,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := createdAt.Add(2 * time.Hour)
 
-	uid := "firebase-uid-1"
 	expected := []usecase.AdminUserOutput{
 		{
 			UserName:       "user1",
@@ -626,7 +625,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: new(float64(9500)),
 			IsSuspicious:   true,
 			IsPrivate:      false,
-			FirebaseUID:    &uid,
 		},
 		{
 			UserName:       "user2",
@@ -638,7 +636,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: nil,
 			IsSuspicious:   false,
 			IsPrivate:      true,
-			FirebaseUID:    nil,
 		},
 	}
 
@@ -665,7 +662,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, 9500.0, body[0]["overpower_value"])
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
-	assert.Equal(t, uid, body[0]["firebase_uid"])
+	assert.NotContains(t, body[0], "firebase_uid")
 	assert.NotContains(t, body[0], "is_deleted")
 	assert.NotContains(t, body[0], "email")
 	assert.Equal(t, "user2", body[1]["username"])
@@ -677,7 +674,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Nil(t, body[1]["overpower_value"])
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
-	assert.Nil(t, body[1]["firebase_uid"])
+	assert.NotContains(t, body[1], "firebase_uid")
 	assert.NotContains(t, body[1], "email")
 	mockUsecase.AssertExpectations(t)
 }

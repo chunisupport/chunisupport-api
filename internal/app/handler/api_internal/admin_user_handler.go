@@ -44,7 +44,7 @@ func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 
 	result := make([]internaldto.AdminUserListResponse, 0, len(users))
 	for _, user := range users {
-		result = append(result, internaldto.AdminUserListResponse{UserName: user.UserName, AccountType: user.AccountType, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt, PlayerName: user.PlayerName, Rating: user.Rating, OverPowerValue: user.OverPowerValue, IsSuspicious: user.IsSuspicious, IsPrivate: user.IsPrivate, FirebaseUID: user.FirebaseUID})
+		result = append(result, internaldto.AdminUserListResponse{UserName: user.UserName, AccountType: user.AccountType, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt, PlayerName: user.PlayerName, Rating: user.Rating, OverPowerValue: user.OverPowerValue, IsSuspicious: user.IsSuspicious, IsPrivate: user.IsPrivate})
 	}
 	return c.JSON(http.StatusOK, result)
 }

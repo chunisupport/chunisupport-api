@@ -163,5 +163,4 @@ type AdminUserOutput struct {
 	OverPowerValue *float64
 	IsSuspicious   bool
 	IsPrivate      bool
-	FirebaseUID    *string
 }
