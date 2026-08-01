@@ -343,7 +343,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		if beforeRecordsErr != nil {
 			return fmt.Errorf("failed to fetch player records before registration: %w", beforeRecordsErr)
 		}
-		beforeStatistics, beforeStatisticsErr := service.CalculatePlayerRecordStatistics(beforeRecords)
+		beforeWorldsendRecords, beforeWorldsendRecordsErr := us.worldsendRecRepo.FindByPlayerID(ctx, tx, playerID)
+		if beforeWorldsendRecordsErr != nil {
+			return fmt.Errorf("failed to fetch player worldsend records before registration: %w", beforeWorldsendRecordsErr)
+		}
+		beforeStatistics, beforeStatisticsErr := service.CalculatePlayerRecordStatistics(beforeRecords, beforeWorldsendRecords)
 		if beforeStatisticsErr != nil {
 			return fmt.Errorf("failed to aggregate player records before registration: %w", beforeStatisticsErr)
 		}
@@ -888,7 +892,11 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if recErr != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player records for overpower calculation: %w", recErr)
 	}
-	afterStatistics, statisticsErr := service.CalculatePlayerRecordStatistics(records)
+	worldsendRecords, worldsendRecErr := us.worldsendRecRepo.FindByPlayerID(ctx, tx, playerID)
+	if worldsendRecErr != nil {
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch player worldsend records for statistics: %w", worldsendRecErr)
+	}
+	afterStatistics, statisticsErr := service.CalculatePlayerRecordStatistics(records, worldsendRecords)
 	if statisticsErr != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate player records after registration: %w", statisticsErr)
 	}
@@ -1045,9 +1053,9 @@ func buildWorldsendHistories(
 func buildPlayerDataStatisticsDiff(before service.PlayerRecordStatisticsSnapshot, after service.PlayerRecordStatisticsSnapshot) api_internal.PlayerDataStatistics {
 	statistics := api_internal.PlayerDataStatistics{
 		Overall:      buildPlayerDataStatisticsGroupDiff(before.Overall, after.Overall),
-		ByDifficulty: make(map[string]api_internal.PlayerDataStatisticsGroup, len(service.PlayerRecordDifficultyNames())),
+		ByDifficulty: make(map[string]api_internal.PlayerDataStatisticsGroup, len(service.PlayerRecordStatisticsGroupNames())),
 	}
-	for _, difficulty := range service.PlayerRecordDifficultyNames() {
+	for _, difficulty := range service.PlayerRecordStatisticsGroupNames() {
 		statistics.ByDifficulty[difficulty] = buildPlayerDataStatisticsGroupDiff(before.ByDifficulty[difficulty], after.ByDifficulty[difficulty])
 	}
 	return statistics

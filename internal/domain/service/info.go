@@ -29,6 +29,10 @@ const (
 
 var playerRecordDifficultyNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 
+const playerRecordStatisticsWorldsendName = "WE"
+
+var playerRecordStatisticsGroupNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA", playerRecordStatisticsWorldsendName}
+
 const (
 	// comboLampAllJustice は ALL JUSTICE のコンボランプIDです。
 	comboLampAllJustice = 3

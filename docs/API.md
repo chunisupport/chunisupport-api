@@ -1461,6 +1461,18 @@ curl -X POST \
           "s_plus": { "before": 1, "after": 1, "delta": 0 },
           "s": { "before": 1, "after": 1, "delta": 0 }
         }
+      },
+      "WE": {
+        "total_high_score": { "before": 118000000, "after": 118019000, "delta": 19000 },
+        "record_statistics": {
+          "aj": { "before": 8, "after": 8, "delta": 0 }, "fc": { "before": 30, "after": 31, "delta": 1 },
+          "clr": { "before": 100, "after": 101, "delta": 1 }, "fch": { "before": 2, "after": 2, "delta": 0 },
+          "max": { "before": 1, "after": 1, "delta": 0 }, "sss_plus": { "before": 10, "after": 10, "delta": 0 },
+          "sss": { "before": 25, "after": 25, "delta": 0 }, "ss_plus": { "before": 40, "after": 40, "delta": 0 },
+          "ss": { "before": 60, "after": 60, "delta": 0 },
+          "s_plus": { "before": 80, "after": 81, "delta": 1 },
+          "s": { "before": 90, "after": 91, "delta": 1 }
+        }
       }
     }
   },
@@ -1526,14 +1538,14 @@ curl -X POST \
 | `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
 | `metric_diffs` | object | 計算レートとOVER POWER値の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
-| `statistics` | object | 通常譜面の登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
+| `statistics` | object | 通常譜面とWORLD'S ENDの登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
 | `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
 | `skipped_records` | array | スキップされたレコード情報。0件の場合は空配列 |
 
-`statistics.overall` は全難易度、`statistics.by_difficulty` は難易度別の集計です。`by_difficulty` にはデータの有無にかかわらず `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` の5キーを返します。例では簡略化のため `BASIC` だけを記載しています。
+`statistics.overall` は通常譜面の全難易度、`statistics.by_difficulty` は通常難易度別およびWORLD'S ENDの集計です。`by_difficulty` にはデータの有無にかかわらず `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` / `WE` の6キーを返します。`WE` はWORLD'S ENDを表し、`overall` には含まれません。例では通常難易度を簡略化して `BASIC` だけ記載しています。
 
-`total_high_score` は削除済み楽曲を除く通常譜面スコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` / `s_plus` / `s` の累積達成件数です。WORLD'S ENDは含みません。スコアランクは各ボーダー以上を数え、`s_plus` は990,000点以上、`s` は975,000点以上です。各値は `delta = after - before` で、減少時は負数になります。
+`total_high_score` は削除済み楽曲を除く対象グループのスコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` / `s_plus` / `s` の累積達成件数です。スコアランクは各ボーダー以上を数え、`s_plus` は990,000点以上、`s` は975,000点以上です。各値は `delta = after - before` で、減少時は負数になります。
 
 `metric_diffs.rating` は保存済み全スコアから計算したレート、`metric_diffs.overpower_value` は通常楽曲レコードから再集計したOVER POWER値の差分です。初回登録など登録前の値が存在しない場合、`before` と `delta` は `null` になります。OVER POWER達成率は差分に含みません。
 

@@ -16,9 +16,12 @@ func TestCalculatePlayerRecordStatistics_全体と難易度別に累積集計す
 		newStatisticsRecord(t, "MASTER", 1008999, "FAILED", "FULL COMBO", "NONE"),
 		newStatisticsRecord(t, "ULTIMA", 1000000, "CLEAR", "NONE", "FULL CHAIN PLATINUM"),
 	}
+	worldsendRecords := []*entity.PlayerWorldsendRecord{
+		newWorldsendStatisticsRecord(t, 1009000, "HARD", "FULL COMBO", "FULL CHAIN GOLD"),
+	}
 
 	// When
-	result, err := CalculatePlayerRecordStatistics(records)
+	result, err := CalculatePlayerRecordStatistics(records, worldsendRecords)
 
 	// Then
 	require.NoError(t, err)
@@ -26,7 +29,9 @@ func TestCalculatePlayerRecordStatistics_全体と難易度別に累積集計す
 	assert.Equal(t, RecordAchievementStatistics{AJ: 1, FC: 2, CLR: 2, FCH: 2, MAX: 1, SSSPlus: 1, SSS: 2, SSPlus: 2, SS: 3, SPlus: 3, S: 3}, result.Overall.Achievements)
 	assert.Equal(t, int64(1010000), result.ByDifficulty["BASIC"].TotalHighScore)
 	assert.Equal(t, int64(1008999), result.ByDifficulty["MASTER"].TotalHighScore)
-	assert.Len(t, result.ByDifficulty, 5)
+	assert.Equal(t, int64(1009000), result.ByDifficulty["WE"].TotalHighScore)
+	assert.Equal(t, RecordAchievementStatistics{FC: 1, CLR: 1, FCH: 1, SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}, result.ByDifficulty["WE"].Achievements)
+	assert.Len(t, result.ByDifficulty, 6)
 	assert.Zero(t, result.ByDifficulty["ADVANCED"].TotalHighScore)
 }
 
@@ -52,7 +57,7 @@ func TestCalculatePlayerRecordStatistics_スコア境界値を集計する(t *te
 			record := newStatisticsRecord(t, "EXPERT", tt.score, "FAILED", "NONE", "NONE")
 
 			// When
-			result, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{record})
+			result, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{record}, nil)
 
 			// Then
 			require.NoError(t, err)
@@ -78,11 +83,23 @@ func TestCalculatePlayerRecordStatistics_不正な関連情報を拒否する(t 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// When
-			_, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{tt.record})
+			_, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{tt.record}, nil)
 
 			// Then
 			assert.Error(t, err)
 		})
+	}
+}
+
+func newWorldsendStatisticsRecord(t *testing.T, value uint32, clearLamp string, comboLamp string, fullChain string) *entity.PlayerWorldsendRecord {
+	t.Helper()
+	recordScore, err := score.NewScore(value)
+	require.NoError(t, err)
+	return &entity.PlayerWorldsendRecord{
+		Score:     recordScore,
+		ClearLamp: &entity.ClearLampType{Name: clearLamp},
+		ComboLamp: &entity.ComboLampType{Name: comboLamp},
+		FullChain: &entity.FullChainType{Name: fullChain},
 	}
 }
 
