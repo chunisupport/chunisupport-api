@@ -24,14 +24,14 @@ type putObjectClient interface {
 	) (minio.UploadInfo, error)
 }
 
-// R2Writer はminio-goを使用してCloudflare R2へJSONを保存します。
-type R2Writer struct {
+// Writer はminio-goを使用してオブジェクトストレージへJSONを保存します。
+type Writer struct {
 	client     putObjectClient
 	bucketName string
 }
 
-// NewR2Writer はR2のS3互換エンドポイントへ接続するJSON Writerを生成します。
-func NewR2Writer(cfg config.R2Config) (*R2Writer, error) {
+// NewWriter はS3互換エンドポイントへ接続するJSON Writerを生成します。
+func NewWriter(cfg config.ObjectStorageConfig) (*Writer, error) {
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:        credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
 		Secure:       cfg.Secure,
@@ -39,18 +39,18 @@ func NewR2Writer(cfg config.R2Config) (*R2Writer, error) {
 		BucketLookup: minio.BucketLookupPath,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create R2 client: %w", err)
+		return nil, fmt.Errorf("failed to create object storage client: %w", err)
 	}
-	return newR2Writer(client, cfg.BucketName), nil
+	return newWriter(client, cfg.BucketName), nil
 }
 
-func newR2Writer(client putObjectClient, bucketName string) *R2Writer {
-	return &R2Writer{client: client, bucketName: bucketName}
+func newWriter(client putObjectClient, bucketName string) *Writer {
+	return &Writer{client: client, bucketName: bucketName}
 }
 
 // PutJSON は指定した固定キーへJSONを上書きします。
 // PutObjectが成功するまで既存オブジェクトは置き換わらないため、失敗時は前回のJSONが残ります。
-func (w *R2Writer) PutJSON(ctx context.Context, objectKey string, body []byte) error {
+func (w *Writer) PutJSON(ctx context.Context, objectKey string, body []byte) error {
 	_, err := w.client.PutObject(
 		ctx,
 		w.bucketName,
@@ -60,7 +60,7 @@ func (w *R2Writer) PutJSON(ctx context.Context, objectKey string, body []byte) e
 		minio.PutObjectOptions{ContentType: jsonContentType},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to put R2 object %s: %w", objectKey, err)
+		return fmt.Errorf("failed to put object storage object %s: %w", objectKey, err)
 	}
 	return nil
 }

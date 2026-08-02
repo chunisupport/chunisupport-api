@@ -7,23 +7,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadR2ConfigFromEnv(t *testing.T) {
+func TestLoadObjectStorageConfigFromEnv(t *testing.T) {
 	tests := []struct {
 		name       string
 		endpoint   string
 		accessKey  string
 		secretKey  string
 		bucketName string
-		want       R2Config
+		want       ObjectStorageConfig
 		wantErr    bool
 	}{
 		{
-			name:       "Cloudflare R2の接続情報を読み込める",
+			name:       "オブジェクトストレージの接続情報を読み込める",
 			endpoint:   " https://account-id.r2.cloudflarestorage.com ",
 			accessKey:  " access-key ",
 			secretKey:  " secret-key ",
 			bucketName: " song-snapshots ",
-			want: R2Config{
+			want: ObjectStorageConfig{
 				Endpoint:        "account-id.r2.cloudflarestorage.com",
 				AccessKeyID:     "access-key",
 				SecretAccessKey: "secret-key",
@@ -60,13 +60,13 @@ func TestLoadR2ConfigFromEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			t.Setenv("R2_ENDPOINT_URL", tt.endpoint)
-			t.Setenv("R2_ACCESS_KEY_ID", tt.accessKey)
-			t.Setenv("R2_SECRET_ACCESS_KEY", tt.secretKey)
-			t.Setenv("R2_BUCKET_NAME", tt.bucketName)
+			t.Setenv("OBJECT_STORAGE_ENDPOINT_URL", tt.endpoint)
+			t.Setenv("OBJECT_STORAGE_ACCESS_KEY_ID", tt.accessKey)
+			t.Setenv("OBJECT_STORAGE_SECRET_ACCESS_KEY", tt.secretKey)
+			t.Setenv("OBJECT_STORAGE_BUCKET_NAME", tt.bucketName)
 
 			// When
-			got, err := LoadR2ConfigFromEnv()
+			got, err := LoadObjectStorageConfigFromEnv()
 
 			// Then
 			if tt.wantErr {

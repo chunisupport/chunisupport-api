@@ -41,14 +41,14 @@ func run() int {
 	slog.SetDefault(slog.New(logHandler))
 	defer logHandler.Close()
 
-	r2Config, err := config.LoadR2ConfigFromEnv()
+	objectStorageConfig, err := config.LoadObjectStorageConfigFromEnv()
 	if err != nil {
-		slog.Error("R2設定の読み込みに失敗しました", "error", err)
+		slog.Error("オブジェクトストレージ設定の読み込みに失敗しました", "error", err)
 		return 1
 	}
-	r2Writer, err := objectstorage.NewR2Writer(r2Config)
+	objectStorageWriter, err := objectstorage.NewWriter(objectStorageConfig)
 	if err != nil {
-		slog.Error("R2クライアントの初期化に失敗しました", "error", err)
+		slog.Error("オブジェクトストレージクライアントの初期化に失敗しました", "error", err)
 		return 1
 	}
 
@@ -99,7 +99,7 @@ func run() int {
 		worldsendUsecase,
 		masterCache.GenreNamesByID,
 		masterCache.DifficultyNamesByID,
-		r2Writer,
+		objectStorageWriter,
 	)
 
 	startedAt := time.Now()

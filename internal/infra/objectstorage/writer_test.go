@@ -38,10 +38,10 @@ func (c *recordingPutObjectClient) PutObject(
 	return minio.UploadInfo{Key: objectKey, Size: objectSize}, nil
 }
 
-func TestR2WriterPutJSON_JSON用メタデータでアップロードする(t *testing.T) {
+func TestWriterPutJSON_JSON用メタデータでアップロードする(t *testing.T) {
 	// Given
 	client := &recordingPutObjectClient{}
-	writer := newR2Writer(client, "song-snapshots")
+	writer := newWriter(client, "song-snapshots")
 	body := []byte(`{"songs":[]}`)
 
 	// When
