@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
-	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 type songSource interface {
@@ -27,6 +24,9 @@ type JSONWriter interface {
 	PutJSON(ctx context.Context, objectKey string, body []byte) error
 }
 
+// CompatibilitySnapshotBuilder は通常楽曲から互換API用レスポンスと件数を構築します。
+type CompatibilitySnapshotBuilder func(songs []*entity.Song) (response any, count int)
+
 // Result は正常に公開したスナップショットの件数を表します。
 type Result struct {
 	SongCount          int
@@ -39,7 +39,10 @@ type Result struct {
 type Exporter struct {
 	songs                 songSource
 	worldsendSongs        worldsendSource
-	masterCache           *masterdata.Cache
+	genreNamesByID        map[int]string
+	difficultyNamesByID   map[int]string
+	buildChunirecSnapshot CompatibilitySnapshotBuilder
+	buildReiwaSnapshot    CompatibilitySnapshotBuilder
 	objectStorageJSONSink JSONWriter
 }
 
@@ -47,19 +50,25 @@ type Exporter struct {
 func NewExporter(
 	songs songSource,
 	worldsendSongs worldsendSource,
-	masterCache *masterdata.Cache,
+	genreNamesByID map[int]string,
+	difficultyNamesByID map[int]string,
+	buildChunirecSnapshot CompatibilitySnapshotBuilder,
+	buildReiwaSnapshot CompatibilitySnapshotBuilder,
 	objectStorageJSONSink JSONWriter,
 ) *Exporter {
 	return &Exporter{
 		songs:                 songs,
 		worldsendSongs:        worldsendSongs,
-		masterCache:           masterCache,
+		genreNamesByID:        genreNamesByID,
+		difficultyNamesByID:   difficultyNamesByID,
+		buildChunirecSnapshot: buildChunirecSnapshot,
+		buildReiwaSnapshot:    buildReiwaSnapshot,
 		objectStorageJSONSink: objectStorageJSONSink,
 	}
 }
 
-// Export は通常楽曲とWORLD'S END楽曲を取得し、両方のJSON生成後に固定キーへ保存します。
-// 取得件数が0件の場合は、異常な空スナップショットによる上書きを防ぐため失敗させます。
+// Export は通常楽曲とWORLD'S END楽曲を取得し、4種類のJSON生成後に固定キーへ保存します。
+// 通常楽曲、WORLD'S END楽曲、またはreiwa互換譜面が0件の場合は、異常な空スナップショットによる上書きを防ぐため失敗させます。
 func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	songs, err := e.songs.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
@@ -77,33 +86,26 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 		return Result{}, fmt.Errorf("refusing to export an empty worldsend song snapshot")
 	}
 
-	var genreNamesByID map[int]string
-	var difficultyNamesByID map[int]string
-	if e.masterCache != nil {
-		genreNamesByID = e.masterCache.GenreNamesByID
-		difficultyNamesByID = e.masterCache.DifficultyNamesByID
-	}
-
 	songsJSON, err := json.Marshal(api_v1.NewV1SongsResponse(
 		songs,
-		genreNamesByID,
-		difficultyNamesByID,
+		e.genreNamesByID,
+		e.difficultyNamesByID,
 		e.songs.CalcSongMaxOP,
 	))
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal song snapshot: %w", err)
 	}
-	worldsendSongsJSON, err := json.Marshal(api_v1.NewV1WorldsendSongsResponse(worldsendSongs, genreNamesByID))
+	worldsendSongsJSON, err := json.Marshal(api_v1.NewV1WorldsendSongsResponse(worldsendSongs, e.genreNamesByID))
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal worldsend song snapshot: %w", err)
 	}
-	chunirecSongs := chunirec.ToMusicShowAllResponse(songs, e.masterCache.SongMasters())
+	chunirecSongs, chunirecSongCount := e.buildChunirecSnapshot(songs)
 	chunirecSongsJSON, err := json.Marshal(chunirecSongs)
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal chunirec song snapshot: %w", err)
 	}
-	reiwaRecords := reiwa.ToChunithmRecordOriginalResponse(songs, e.masterCache)
-	if len(reiwaRecords) == 0 {
+	reiwaRecords, reiwaRecordCount := e.buildReiwaSnapshot(songs)
+	if reiwaRecordCount == 0 {
 		return Result{}, fmt.Errorf("refusing to export an empty reiwa song snapshot")
 	}
 	reiwaRecordsJSON, err := json.Marshal(reiwaRecords)
@@ -127,7 +129,7 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	return Result{
 		SongCount:          len(songs),
 		WorldsendSongCount: len(worldsendSongs),
-		ChunirecSongCount:  len(chunirecSongs),
-		ReiwaRecordCount:   len(reiwaRecords),
+		ChunirecSongCount:  chunirecSongCount,
+		ReiwaRecordCount:   reiwaRecordCount,
 	}, nil
 }

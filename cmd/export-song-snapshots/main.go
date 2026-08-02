@@ -8,8 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/songexport"
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
@@ -97,7 +100,16 @@ func run() int {
 	exporter := songexport.NewExporter(
 		songUsecase,
 		worldsendUsecase,
-		masterCache,
+		masterCache.GenreNamesByID,
+		masterCache.DifficultyNamesByID,
+		func(songs []*entity.Song) (any, int) {
+			response := chunirec.ToMusicShowAllResponse(songs, masterCache.SongMasters())
+			return response, len(response)
+		},
+		func(songs []*entity.Song) (any, int) {
+			response := reiwa.ToChunithmRecordOriginalResponse(songs, masterCache)
+			return response, len(response)
+		},
 		objectStorageWriter,
 	)
 
