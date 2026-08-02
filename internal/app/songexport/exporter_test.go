@@ -10,6 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,11 +79,14 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 		Chart: &entity.WorldsendChart{},
 	}
 	writer := &recordingWriter{}
+	masterCache := &masterdata.Cache{
+		GenreNamesByID:      map[int]string{1: "POPS & ANIME"},
+		DifficultyNamesByID: map[int]string{1: "BASIC", 2: "ADVANCED", 3: "EXPERT", 4: "MASTER", 5: "ULTIMA"},
+	}
 	exporter := NewExporter(
 		&stubSongSource{songs: []*entity.Song{song}},
 		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
-		map[int]string{1: "POPS & ANIME"},
-		map[int]string{1: "BASIC", 2: "ADVANCED", 3: "EXPERT", 4: "MASTER", 5: "ULTIMA"},
+		masterCache,
 		writer,
 	)
 
@@ -91,9 +95,11 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, Result{SongCount: 1, WorldsendSongCount: 1}, result)
+	assert.Equal(t, Result{SongCount: 1, WorldsendSongCount: 1, ChunirecSongCount: 1, ReiwaRecordCount: 1}, result)
 	require.Contains(t, writer.objects, info.SongSnapshotObjectKey)
 	require.Contains(t, writer.objects, info.WorldsendSongSnapshotObjectKey)
+	require.Contains(t, writer.objects, info.ChunirecSongSnapshotObjectKey)
+	require.Contains(t, writer.objects, info.ReiwaSongSnapshotObjectKey)
 
 	var songsResponse api_v1.V1SongsResponse
 	require.NoError(t, json.Unmarshal(writer.objects[info.SongSnapshotObjectKey], &songsResponse))
@@ -105,6 +111,24 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 	require.NoError(t, json.Unmarshal(writer.objects[info.WorldsendSongSnapshotObjectKey], &worldsendResponse))
 	require.Len(t, worldsendResponse.Songs, 1)
 	assert.Equal(t, "WORLD'S END楽曲", worldsendResponse.Songs[0].Title)
+
+	var chunirecResponse []struct {
+		Meta struct {
+			Title string `json:"title"`
+		} `json:"meta"`
+	}
+	require.NoError(t, json.Unmarshal(writer.objects[info.ChunirecSongSnapshotObjectKey], &chunirecResponse))
+	require.Len(t, chunirecResponse, 1)
+	assert.Equal(t, "通常楽曲", chunirecResponse[0].Meta.Title)
+
+	var reiwaResponse []struct {
+		Title string `json:"title"`
+		Diff  string `json:"diff"`
+	}
+	require.NoError(t, json.Unmarshal(writer.objects[info.ReiwaSongSnapshotObjectKey], &reiwaResponse))
+	require.Len(t, reiwaResponse, 1)
+	assert.Equal(t, "通常楽曲", reiwaResponse[0].Title)
+	assert.Equal(t, "MAS", reiwaResponse[0].Diff)
 }
 
 func TestExporterExport_取得または検証失敗時はアップロードしない(t *testing.T) {
@@ -132,13 +156,18 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 			songSource:      &stubSongSource{songs: []*entity.Song{{DisplayID: "0123456789abcdef"}}},
 			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{}},
 		},
+		{
+			name:            "reiwa互換の譜面が0件",
+			songSource:      &stubSongSource{songs: []*entity.Song{{DisplayID: "0123456789abcdef"}}},
+			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			writer := &recordingWriter{}
-			exporter := NewExporter(tt.songSource, tt.worldsendSource, nil, nil, writer)
+			exporter := NewExporter(tt.songSource, tt.worldsendSource, nil, writer)
 
 			// When
 			_, err := exporter.Export(context.Background())
@@ -154,12 +183,14 @@ func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 	// Given
 	writer := &recordingWriter{failOnKey: info.WorldsendSongSnapshotObjectKey}
 	exporter := NewExporter(
-		&stubSongSource{songs: []*entity.Song{{DisplayID: "0123456789abcdef"}}},
+		&stubSongSource{songs: []*entity.Song{{
+			DisplayID: "0123456789abcdef",
+			Charts:    []*entity.Chart{{DifficultyID: 4}},
+		}}},
 		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{{
 			Song:  &entity.Song{DisplayID: "fedcba9876543210"},
 			Chart: &entity.WorldsendChart{},
 		}}},
-		nil,
 		nil,
 		writer,
 	)
@@ -171,4 +202,41 @@ func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), info.WorldsendSongSnapshotObjectKey)
 	assert.Contains(t, writer.objects, info.SongSnapshotObjectKey)
+}
+
+func TestExporterExport_互換APIのアップロード失敗を返す(t *testing.T) {
+	tests := []struct {
+		name      string
+		failOnKey string
+	}{
+		{name: "chunirec互換", failOnKey: info.ChunirecSongSnapshotObjectKey},
+		{name: "reiwa互換", failOnKey: info.ReiwaSongSnapshotObjectKey},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			writer := &recordingWriter{failOnKey: tt.failOnKey}
+			exporter := NewExporter(
+				&stubSongSource{songs: []*entity.Song{{
+					DisplayID: "0123456789abcdef",
+					Charts:    []*entity.Chart{{DifficultyID: 4}},
+				}}},
+				&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{{
+					Song:  &entity.Song{DisplayID: "fedcba9876543210"},
+					Chart: &entity.WorldsendChart{},
+				}}},
+				nil,
+				writer,
+			)
+
+			// When
+			_, err := exporter.Export(context.Background())
+
+			// Then
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.failOnKey)
+			assert.NotContains(t, writer.objects, tt.failOnKey)
+		})
+	}
 }

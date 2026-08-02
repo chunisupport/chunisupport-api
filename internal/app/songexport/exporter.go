@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
+	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
 
 type songSource interface {
@@ -28,14 +31,15 @@ type JSONWriter interface {
 type Result struct {
 	SongCount          int
 	WorldsendSongCount int
+	ChunirecSongCount  int
+	ReiwaRecordCount   int
 }
 
 // Exporter は公開用の楽曲一覧JSONを生成してオブジェクトストレージへ保存します。
 type Exporter struct {
 	songs                 songSource
 	worldsendSongs        worldsendSource
-	genreNamesByID        map[int]string
-	difficultyNamesByID   map[int]string
+	masterCache           *masterdata.Cache
 	objectStorageJSONSink JSONWriter
 }
 
@@ -43,15 +47,13 @@ type Exporter struct {
 func NewExporter(
 	songs songSource,
 	worldsendSongs worldsendSource,
-	genreNamesByID map[int]string,
-	difficultyNamesByID map[int]string,
+	masterCache *masterdata.Cache,
 	objectStorageJSONSink JSONWriter,
 ) *Exporter {
 	return &Exporter{
 		songs:                 songs,
 		worldsendSongs:        worldsendSongs,
-		genreNamesByID:        genreNamesByID,
-		difficultyNamesByID:   difficultyNamesByID,
+		masterCache:           masterCache,
 		objectStorageJSONSink: objectStorageJSONSink,
 	}
 }
@@ -75,18 +77,38 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 		return Result{}, fmt.Errorf("refusing to export an empty worldsend song snapshot")
 	}
 
+	var genreNamesByID map[int]string
+	var difficultyNamesByID map[int]string
+	if e.masterCache != nil {
+		genreNamesByID = e.masterCache.GenreNamesByID
+		difficultyNamesByID = e.masterCache.DifficultyNamesByID
+	}
+
 	songsJSON, err := json.Marshal(api_v1.NewV1SongsResponse(
 		songs,
-		e.genreNamesByID,
-		e.difficultyNamesByID,
+		genreNamesByID,
+		difficultyNamesByID,
 		e.songs.CalcSongMaxOP,
 	))
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal song snapshot: %w", err)
 	}
-	worldsendSongsJSON, err := json.Marshal(api_v1.NewV1WorldsendSongsResponse(worldsendSongs, e.genreNamesByID))
+	worldsendSongsJSON, err := json.Marshal(api_v1.NewV1WorldsendSongsResponse(worldsendSongs, genreNamesByID))
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal worldsend song snapshot: %w", err)
+	}
+	chunirecSongs := chunirec.ToMusicShowAllResponse(songs, e.masterCache.SongMasters())
+	chunirecSongsJSON, err := json.Marshal(chunirecSongs)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to marshal chunirec song snapshot: %w", err)
+	}
+	reiwaRecords := reiwa.ToChunithmRecordOriginalResponse(songs, e.masterCache)
+	if len(reiwaRecords) == 0 {
+		return Result{}, fmt.Errorf("refusing to export an empty reiwa song snapshot")
+	}
+	reiwaRecordsJSON, err := json.Marshal(reiwaRecords)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to marshal reiwa song snapshot: %w", err)
 	}
 
 	if err := e.objectStorageJSONSink.PutJSON(ctx, info.SongSnapshotObjectKey, songsJSON); err != nil {
@@ -95,9 +117,17 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	if err := e.objectStorageJSONSink.PutJSON(ctx, info.WorldsendSongSnapshotObjectKey, worldsendSongsJSON); err != nil {
 		return Result{}, fmt.Errorf("failed to upload %s: %w", info.WorldsendSongSnapshotObjectKey, err)
 	}
+	if err := e.objectStorageJSONSink.PutJSON(ctx, info.ChunirecSongSnapshotObjectKey, chunirecSongsJSON); err != nil {
+		return Result{}, fmt.Errorf("failed to upload %s: %w", info.ChunirecSongSnapshotObjectKey, err)
+	}
+	if err := e.objectStorageJSONSink.PutJSON(ctx, info.ReiwaSongSnapshotObjectKey, reiwaRecordsJSON); err != nil {
+		return Result{}, fmt.Errorf("failed to upload %s: %w", info.ReiwaSongSnapshotObjectKey, err)
+	}
 
 	return Result{
 		SongCount:          len(songs),
 		WorldsendSongCount: len(worldsendSongs),
+		ChunirecSongCount:  len(chunirecSongs),
+		ReiwaRecordCount:   len(reiwaRecords),
 	}, nil
 }

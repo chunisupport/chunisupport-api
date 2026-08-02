@@ -38,12 +38,14 @@ HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、
 | --- | --- |
 | `v1/songs.json` | `GET /v1/songs` と同じ `V1SongsResponse` |
 | `v1/worldsend-songs.json` | `GET /v1/worldsend-songs` と同じ `V1WorldsendSongsResponse` |
+| `compat/chunirec/2.0/music/showall.json` | `GET /compat/chunirec/2.0/music/showall` と同じchunirec互換楽曲配列 |
+| `compat/reiwa/1/chunithm_record/original.json` | `GET /compat/reiwa/1/chunithm_record/original` と同じreiwa互換譜面配列 |
 
 アップロード時の `Content-Type` は `application/json; charset=utf-8` です。
-通常楽曲またはWORLD'S END楽曲が0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。
+通常楽曲、WORLD'S END楽曲、またはreiwa互換譜面が0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。
 
-両方のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、2オブジェクトのPUTは単一トランザクションではありません。
-後から書き込む `v1/worldsend-songs.json` だけが失敗した場合、`v1/songs.json` は新しい内容、`v1/worldsend-songs.json` は前回の内容になります。次回の正常実行で揃います。
+4種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、各オブジェクトのPUTは単一トランザクションではありません。
+途中のPUTが失敗した場合、それより前のオブジェクトだけが新しい内容になります。次回の正常実行ですべて揃います。
 
 ## スケジュールと監視
 

@@ -41,6 +41,8 @@ const (
 	SongSnapshotExportBatchLockName             = "chunisupport:export-song-snapshots"
 	SongSnapshotObjectKey                       = "v1/songs.json"
 	WorldsendSongSnapshotObjectKey              = "v1/worldsend-songs.json"
+	ChunirecSongSnapshotObjectKey               = "compat/chunirec/2.0/music/showall.json"
+	ReiwaSongSnapshotObjectKey                  = "compat/reiwa/1/chunithm_record/original.json"
 	PlayerLatestUpdateSchemaVersion             = 2
 	PlayerLatestUpdateMinSupportedSchemaVersion = 1
 	PlayerLatestUpdateMetricDiffSchemaVersion   = 2

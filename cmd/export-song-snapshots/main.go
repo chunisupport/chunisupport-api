@@ -97,8 +97,7 @@ func run() int {
 	exporter := songexport.NewExporter(
 		songUsecase,
 		worldsendUsecase,
-		masterCache.GenreNamesByID,
-		masterCache.DifficultyNamesByID,
+		masterCache,
 		objectStorageWriter,
 	)
 
@@ -112,6 +111,8 @@ func run() int {
 		"楽曲スナップショットのエクスポートが完了しました",
 		"songs", result.SongCount,
 		"worldsend_songs", result.WorldsendSongCount,
+		"chunirec_songs", result.ChunirecSongCount,
+		"reiwa_records", result.ReiwaRecordCount,
 		"duration", time.Since(startedAt),
 	)
 	return 0
