@@ -21,7 +21,8 @@ type GoalInput struct {
 	AchievementType   string
 	AchievementParams []byte
 	Attributes        []byte
-	Invert            bool
+	InvertValue       bool
+	InvertPercentage  bool
 }
 
 // GoalOutput は目標API向けの出力です。
@@ -32,7 +33,8 @@ type GoalOutput struct {
 	AchievementType   string
 	AchievementParams map[string]any
 	Attributes        map[string]any
-	Invert            bool
+	InvertValue       bool
+	InvertPercentage  bool
 	SortOrder         uint16
 	CreatedAt         time.Time
 }

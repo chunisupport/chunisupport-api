@@ -13,6 +13,7 @@
 - `migration/mysql/000005_add_goals.up.sql`
 - `migration/mysql/000010_add_updated_at_to_song_tables.up.sql`
 - `migration/mysql/000013_optimize_player_records_last_update_index.up.sql`
+- `migration/mysql/000040_split_goal_invert_flags.up.sql`
 
 ## 1. 概要
 
@@ -40,7 +41,8 @@ CREATE TABLE goals (
   achievement_type_id TINYINT UNSIGNED NOT NULL,
   achievement_params JSON NOT NULL,
   attributes JSON NOT NULL,
-  invert BOOLEAN NOT NULL DEFAULT FALSE,
+  invert_value BOOLEAN NOT NULL DEFAULT FALSE,
+  invert_percentage BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY fk_goals_achievement_type_id (achievement_type_id),
@@ -57,6 +59,7 @@ CREATE TABLE goals (
 - 初期マイグレーションにあった `idx_goals_user_id(user_id)` は、`idx_goals_user_created_id` に包含されるため `000013` で削除されています。
 - `achievement_type` はDBに文字列では保存されず、`achievement_type_id` で保存されます。
 - `achievement_params` と `attributes` は JSON 型で保存されます。
+- `000040` 適用時、旧 `invert` の値は `invert_value` と `invert_percentage` の両方へ引き継がれます。
 
 ## 3. 認証と対象範囲
 
@@ -95,7 +98,8 @@ CREATE TABLE goals (
           "max": 16.0
         }
       },
-      "invert": false,
+      "invert_value": false,
+      "invert_percentage": true,
       "created_at": "2026-04-12T10:00:00+09:00"
     }
   ]
@@ -132,7 +136,8 @@ CREATE TABLE goals (
       "max": 16.0
     }
   },
-  "invert": false
+  "invert_value": false,
+  "invert_percentage": true
 }
 ```
 
@@ -145,7 +150,7 @@ CREATE TABLE goals (
 - 認証: 必須
 - ステータス: `200 OK`
 - `:id` は `uint32` として解釈可能な10進数のみ有効
-- 更新方法: 部分更新ではなく、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert` の完全上書きです
+- 更新方法: 部分更新ではなく、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` の完全上書きです
 
 リクエスト形状は `POST` と同じです。
 レスポンスは更新後の単一 goal オブジェクトです。
@@ -172,7 +177,8 @@ CREATE TABLE goals (
   "achievement_type": "string",
   "achievement_params": {},
   "attributes": {},
-  "invert": false
+  "invert_value": false,
+  "invert_percentage": true
 }
 ```
 
@@ -184,7 +190,8 @@ CREATE TABLE goals (
 | `achievement_type` | string | 必須 | 達成条件の種別コード |
 | `achievement_params` | object | 必須 | `achievement_type` ごとの可変JSON |
 | `attributes` | object | 任意 | 対象譜面の絞り込み条件 |
-| `invert` | boolean | 任意 | 表示用フラグ。未指定時は `false` |
+| `invert_value` | boolean | 任意 | `28/100` などの実数値表示用反転フラグ。未指定時は `false` |
+| `invert_percentage` | boolean | 任意 | パーセンテージ表示用反転フラグ。未指定時は `false` |
 
 重要な仕様:
 
@@ -213,7 +220,8 @@ CREATE TABLE goals (
       "max": 16.0
     }
   },
-  "invert": false,
+  "invert_value": false,
+  "invert_percentage": true,
   "created_at": "2026-04-12T10:00:00+09:00"
 }
 ```
@@ -227,7 +235,8 @@ CREATE TABLE goals (
 | `achievement_type` | string | マスタ逆引きしたコード |
 | `achievement_params` | object | 保存済みJSONをデコードしたもの |
 | `attributes` | object | 保存済みJSONをデコードしたもの |
-| `invert` | boolean | 保存値そのまま |
+| `invert_value` | boolean | 実数値表示用の保存値そのまま |
+| `invert_percentage` | boolean | パーセンテージ表示用の保存値そのまま |
 | `created_at` | string | RFC3339形式文字列 |
 
 補足:
@@ -707,7 +716,7 @@ CREATE TABLE goals (
 - `created_at` は常に文字列で返り、UNIX時刻ではありません。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
 - `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。また `remaining` / `percent` が代わりに指定されている場合もあります。受信側は欠落・`null` を許容してください。
-- `invert` はサーバー側で評価条件に使われていません。保存・返却される表示用フラグです。
+- `invert_value` と `invert_percentage` はサーバー側で評価条件に使われていません。それぞれ独立して保存・返却される表示用フラグです。
 
 ## 14. 実装から見える補足事項
 
@@ -744,7 +753,8 @@ type GoalRequest = {
   achievement_type: GoalAchievementType;
   achievement_params: Record<string, unknown>;
   attributes?: GoalAttributes;
-  invert?: boolean;
+  invert_value?: boolean;
+  invert_percentage?: boolean;
 };
 
 type GoalResponse = {
@@ -753,7 +763,8 @@ type GoalResponse = {
   achievement_type: GoalAchievementType;
   achievement_params: Record<string, unknown>;
   attributes: GoalAttributes;
-  invert: boolean;
+  invert_value: boolean;
+  invert_percentage: boolean;
   created_at: string;
 };
 

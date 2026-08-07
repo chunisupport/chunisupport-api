@@ -439,3 +439,40 @@ func TestSchemaMySQL_メンテナンス状態テーブルを含む(t *testing.T)
 	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_system_maintenance_updated_by_user` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL")
 	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_system_maintenance_singleton` CHECK ((`id` = 1))")
 }
+
+func TestSplitGoalInvertFlagsUp_既存値を実数値と割合の両方へ引き継ぐ(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000040_split_goal_invert_flags.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CHANGE COLUMN invert invert_value BOOLEAN NOT NULL DEFAULT FALSE")
+	assert.Contains(t, upSQL, "ADD COLUMN invert_percentage BOOLEAN NOT NULL DEFAULT FALSE AFTER invert_value")
+	assert.Contains(t, upSQL, "UPDATE goals SET invert_percentage = invert_value")
+	assert.Less(t,
+		strings.Index(upSQL, "ADD COLUMN invert_percentage"),
+		strings.Index(upSQL, "UPDATE goals SET invert_percentage = invert_value"),
+	)
+}
+
+func TestSplitGoalInvertFlagsDown_実数値側を旧カラムへ戻す(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000040_split_goal_invert_flags.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP COLUMN invert_percentage")
+	assert.Contains(t, downSQL, "CHANGE COLUMN invert_value invert BOOLEAN NOT NULL DEFAULT FALSE")
+	assert.Less(t,
+		strings.Index(downSQL, "DROP COLUMN invert_percentage"),
+		strings.Index(downSQL, "CHANGE COLUMN invert_value invert"),
+	)
+}
+
+func TestSchemaMySQL_目標の反転フラグを実数値と割合で分ける(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "`invert_value` tinyint(1) NOT NULL DEFAULT '0'")
+	assert.Contains(t, schemaSQL, "`invert_percentage` tinyint(1) NOT NULL DEFAULT '0'")
+	assert.NotContains(t, schemaSQL, "`invert` tinyint(1)")
+}

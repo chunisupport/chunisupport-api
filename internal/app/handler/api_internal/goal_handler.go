@@ -135,7 +135,15 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 			return nil, err
 		}
 	}
-	return &usecase.GoalInput{GroupID: req.GroupID, Title: req.Title, AchievementType: req.AchievementType, AchievementParams: params, Attributes: attrs, Invert: req.Invert}, nil
+	return &usecase.GoalInput{
+		GroupID:           req.GroupID,
+		Title:             req.Title,
+		AchievementType:   req.AchievementType,
+		AchievementParams: params,
+		Attributes:        attrs,
+		InvertValue:       req.InvertValue,
+		InvertPercentage:  req.InvertPercentage,
+	}, nil
 }
 
 func getUser(c *echo.Context) (*entity.User, error) {
@@ -154,7 +162,8 @@ func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
 		AchievementType:   goal.AchievementType,
 		AchievementParams: goal.AchievementParams,
 		Attributes:        goal.Attributes,
-		Invert:            goal.Invert,
+		InvertValue:       goal.InvertValue,
+		InvertPercentage:  goal.InvertPercentage,
 		SortOrder:         goal.SortOrder,
 		CreatedAt:         goal.CreatedAt,
 	}

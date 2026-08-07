@@ -1721,7 +1721,8 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-  "invert": false,
+  "invert_value": false,
+  "invert_percentage": true,
   "sort_order": 1,
   "created_at": "2026-01-01T09:00:00+09:00"
 }
@@ -1735,7 +1736,8 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `achievement_type` | `string` | 双方向 | 成果種別コード（`achievement_types.code` と完全一致。大文字小文字の混在不可） |
 | `achievement_params` | `object` | 双方向 | 成果種別ごとの可変パラメータ（詳細は後述） |
 | `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
-| `invert` | `boolean` | 双方向 | UI表示反転フラグ。サーバー側の達成判定には影響しない |
+| `invert_value` | `boolean` | 双方向 | `28/100` などの実数値表示用反転フラグ。サーバー側の達成判定には影響しない |
+| `invert_percentage` | `boolean` | 双方向 | パーセンテージ表示用反転フラグ。サーバー側の達成判定には影響しない |
 | `sort_order` | `integer` | レスポンスのみ | 同一グループ内での表示順。1から始まる連番 |
 | `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
 
@@ -1744,7 +1746,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - `title` / `achievement_type` / `achievement_params` は必須です。
 - `attributes` は省略可能です。省略時は絞り込み条件なしとして扱います。明示する場合は空オブジェクト `{}` を推奨します。
 - `group_id` は省略可能です。省略または `null` の場合は未分類として扱います。
-- `invert` は省略可能です。省略時は `false` として扱います。
+- `invert_value` / `invert_percentage` はそれぞれ省略可能です。省略時は `false` として扱います。
 - `id` / `sort_order` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
 
 ### `achievement_type` 一覧
@@ -1955,7 +1957,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 #### 境界（Handler/DTO）での検査
 
-- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert` 以外の未知キーを含むと `bad_request` になります。
+- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` 以外の未知キーを含むと `bad_request` になります。
 
 #### Usecase層での業務ルール検査
 
@@ -1995,7 +1997,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "achievement_type": "score_count",
       "achievement_params": { "score": 1007500, "count": 100 },
       "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-      "invert": false,
+      "invert_value": false,
+      "invert_percentage": true,
       "sort_order": 1,
       "created_at": "2026-01-01T09:00:00+09:00"
     }
@@ -2018,7 +2021,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
-  "invert": false
+  "invert_value": false,
+  "invert_percentage": true
 }
 ```
 

@@ -317,7 +317,8 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | AchievementType | string | - | 成果種別コード（DBには永続化されない。マスタ逆引きで出力時に解決） |
 | AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
 | Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
-| Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
+| InvertValue | bool | ✓ | 実数値表示用反転フラグ（サーバー側の達成判定には不使用） |
+| InvertPercentage | bool | ✓ | パーセンテージ表示用反転フラグ（サーバー側の達成判定には不使用） |
 | SortOrder | uint16 | ✓ | 同一グループ内での表示順（1から始まる連番） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 

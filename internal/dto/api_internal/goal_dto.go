@@ -9,7 +9,8 @@ type GoalRequest struct {
 	AchievementType   string         `json:"achievement_type" validate:"required"`
 	AchievementParams map[string]any `json:"achievement_params" validate:"required"`
 	Attributes        map[string]any `json:"attributes"`
-	Invert            bool           `json:"invert"`
+	InvertValue       bool           `json:"invert_value"`
+	InvertPercentage  bool           `json:"invert_percentage"`
 }
 
 // GoalResponse は目標レスポンスです。
@@ -20,7 +21,8 @@ type GoalResponse struct {
 	AchievementType   string         `json:"achievement_type"`
 	AchievementParams map[string]any `json:"achievement_params"`
 	Attributes        map[string]any `json:"attributes"`
-	Invert            bool           `json:"invert"`
+	InvertValue       bool           `json:"invert_value"`
+	InvertPercentage  bool           `json:"invert_percentage"`
 	SortOrder         uint16         `json:"sort_order"`
 	CreatedAt         time.Time      `json:"created_at"`
 }

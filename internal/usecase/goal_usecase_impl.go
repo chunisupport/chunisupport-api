@@ -83,7 +83,8 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 			AchievementTypeID: validated.AchievementTypeID,
 			AchievementParams: validated.AchievementParams,
 			Attributes:        validated.Attributes,
-			Invert:            validated.Invert,
+			InvertValue:       validated.InvertValue,
+			InvertPercentage:  validated.InvertPercentage,
 			// ユーザー単位の目標上限を検証済みのため、uint16の範囲を超えません。
 			SortOrder: uint16(groupCount + 1), // #nosec G115
 		}
@@ -152,7 +153,8 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 		g.AchievementTypeID = validated.AchievementTypeID
 		g.AchievementParams = validated.AchievementParams
 		g.Attributes = validated.Attributes
-		g.Invert = validated.Invert
+		g.InvertValue = validated.InvertValue
+		g.InvertPercentage = validated.InvertPercentage
 		if err := u.goalRepo.Save(ctx, tx, g); err != nil {
 			if errors.Is(err, repository.ErrGoalNotFound) {
 				return ErrGoalNotFound
@@ -254,7 +256,8 @@ type validatedGoalInput struct {
 	AchievementTypeID int
 	AchievementParams []byte
 	Attributes        []byte
-	Invert            bool
+	InvertValue       bool
+	InvertPercentage  bool
 }
 
 type goalAttributeFilter struct {
@@ -309,7 +312,14 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 		return nil, err
 	}
 
-	return &validatedGoalInput{Title: title, AchievementTypeID: item.ID, AchievementParams: paramsRaw, Attributes: attrsRaw, Invert: input.Invert}, nil
+	return &validatedGoalInput{
+		Title:             title,
+		AchievementTypeID: item.ID,
+		AchievementParams: paramsRaw,
+		Attributes:        attrsRaw,
+		InvertValue:       input.InvertValue,
+		InvertPercentage:  input.InvertPercentage,
+	}, nil
 }
 
 func validateAttributes(
@@ -872,7 +882,18 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 		if err := json.Unmarshal(g.Attributes, &a); err != nil {
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
-		outs = append(outs, &GoalOutput{ID: g.ID, GroupID: cloneUint32Pointer(g.GroupID), Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, SortOrder: g.SortOrder, CreatedAt: g.CreatedAt})
+		outs = append(outs, &GoalOutput{
+			ID:                g.ID,
+			GroupID:           cloneUint32Pointer(g.GroupID),
+			Title:             g.Title,
+			AchievementType:   typeCode,
+			AchievementParams: p,
+			Attributes:        a,
+			InvertValue:       g.InvertValue,
+			InvertPercentage:  g.InvertPercentage,
+			SortOrder:         g.SortOrder,
+			CreatedAt:         g.CreatedAt,
+		})
 	}
 	return outs, nil
 }

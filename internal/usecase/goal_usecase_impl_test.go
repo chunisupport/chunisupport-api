@@ -158,11 +158,22 @@ func (s *stubMissingTypeMasterProvider) GoalMasters() *domainmasterdata.GoalMast
 func TestGoalUsecase_Create(t *testing.T) {
 	repo := &stubGoalRepo{}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
-	in := &GoalInput{Title: "  test  ", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"diff":4,"genre":1,"ver":20}`)}
+	in := &GoalInput{
+		Title:             "  test  ",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+		InvertValue:       true,
+		InvertPercentage:  false,
+	}
 	out, err := u.Create(context.Background(), 1, in)
 	require.NoError(t, err)
 	assert.Equal(t, "test", out.Title)
 	assert.Equal(t, "score_count", out.AchievementType)
+	assert.True(t, repo.goal.InvertValue)
+	assert.False(t, repo.goal.InvertPercentage)
+	assert.True(t, out.InvertValue)
+	assert.False(t, out.InvertPercentage)
 }
 
 func TestGoalUsecase_CreateAssignsLastSortOrder(t *testing.T) {

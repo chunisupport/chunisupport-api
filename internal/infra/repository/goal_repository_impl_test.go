@@ -40,9 +40,10 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 			achievement_type_id INTEGER NOT NULL,
 			achievement_params TEXT NOT NULL,
 			attributes TEXT NOT NULL,
-			invert INTEGER NOT NULL,
+			invert_value INTEGER NOT NULL,
+			invert_percentage INTEGER NOT NULL,
 			sort_order INTEGER NOT NULL,
-			created_at DATETIME NOT NULL
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE songs (
 			id INTEGER PRIMARY KEY,
@@ -86,12 +87,12 @@ func TestGoalRepository_ListByUserIDOrdersByGroupAndPutsUnclassifiedLast(t *test
 		(20, 1, 'first group', 1, '2026-01-01')`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO goals
-		(id, user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at)
+		(id, user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order, created_at)
 		VALUES
-		(1, 1, NULL, 'unclassified', 1, '{}', '{}', 0, 1, '2026-01-01'),
-		(2, 1, 10, 'group second', 1, '{}', '{}', 0, 1, '2026-01-01'),
-		(3, 1, 20, 'within second', 1, '{}', '{}', 0, 2, '2026-01-01'),
-		(4, 1, 20, 'within first', 1, '{}', '{}', 0, 1, '2026-01-01')`)
+		(1, 1, NULL, 'unclassified', 1, '{}', '{}', 0, 0, 1, '2026-01-01'),
+		(2, 1, 10, 'group second', 1, '{}', '{}', 0, 0, 1, '2026-01-01'),
+		(3, 1, 20, 'within second', 1, '{}', '{}', 0, 0, 2, '2026-01-01'),
+		(4, 1, 20, 'within first', 1, '{}', '{}', 0, 0, 1, '2026-01-01')`)
 	require.NoError(t, err)
 	repo := &goalRepository{db: db}
 
@@ -107,10 +108,10 @@ func TestGoalRepository_ListByUserIDReturnsSortOrder(t *testing.T) {
 	// Given
 	db := setupGoalRepositorySQLite(t)
 	_, err := db.Exec(`INSERT INTO goals
-		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at)
+		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order, created_at)
 		VALUES
-		(10, 1, 'second', 1, '{}', '{}', 0, 2, '2026-01-01'),
-		(20, 1, 'first', 1, '{}', '{}', 0, 1, '2026-01-02')`)
+		(10, 1, 'second', 1, '{}', '{}', 0, 0, 2, '2026-01-01'),
+		(20, 1, 'first', 1, '{}', '{}', 0, 0, 1, '2026-01-02')`)
 	require.NoError(t, err)
 	repo := &goalRepository{db: db}
 
@@ -126,16 +127,54 @@ func TestGoalRepository_ListByUserIDReturnsSortOrder(t *testing.T) {
 	assert.Equal(t, uint16(2), goals[1].SortOrder)
 }
 
+func TestGoalRepository_PersistsInvertFlagsIndependently(t *testing.T) {
+	// Given
+	db := setupGoalRepositorySQLite(t)
+	repo := &goalRepository{db: db}
+	goal := &entity.Goal{
+		UserID:            1,
+		Title:             "反転テスト",
+		AchievementTypeID: 1,
+		AchievementParams: []byte(`{}`),
+		Attributes:        []byte(`{}`),
+		InvertValue:       true,
+		InvertPercentage:  false,
+		SortOrder:         1,
+	}
+
+	// When
+	err := repo.Create(context.Background(), db, goal)
+
+	// Then
+	require.NoError(t, err)
+	created, err := repo.FindByIDAndUserID(context.Background(), db, goal.ID, goal.UserID)
+	require.NoError(t, err)
+	assert.True(t, created.InvertValue)
+	assert.False(t, created.InvertPercentage)
+
+	// When
+	created.InvertValue = false
+	created.InvertPercentage = true
+	err = repo.Save(context.Background(), db, created)
+
+	// Then
+	require.NoError(t, err)
+	updated, err := repo.FindByIDAndUserID(context.Background(), db, goal.ID, goal.UserID)
+	require.NoError(t, err)
+	assert.False(t, updated.InvertValue)
+	assert.True(t, updated.InvertPercentage)
+}
+
 func TestGoalRepository_SaveGoalOrderAssignsDenseSortOrders(t *testing.T) {
 	// Given
 	db := setupGoalRepositorySQLite(t)
 	_, err := db.Exec(`INSERT INTO goals
-		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at)
+		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order, created_at)
 		VALUES
-		(10, 1, 'first', 1, '{}', '{}', 0, 1, '2026-01-01'),
-		(20, 1, 'second', 1, '{}', '{}', 0, 2, '2026-01-02'),
-		(30, 1, 'third', 1, '{}', '{}', 0, 3, '2026-01-03'),
-		(99, 2, 'other user', 1, '{}', '{}', 0, 1, '2026-01-04')`)
+		(10, 1, 'first', 1, '{}', '{}', 0, 0, 1, '2026-01-01'),
+		(20, 1, 'second', 1, '{}', '{}', 0, 0, 2, '2026-01-02'),
+		(30, 1, 'third', 1, '{}', '{}', 0, 0, 3, '2026-01-03'),
+		(99, 2, 'other user', 1, '{}', '{}', 0, 0, 1, '2026-01-04')`)
 	require.NoError(t, err)
 	repo := &goalRepository{db: db}
 
@@ -163,8 +202,8 @@ func TestGoalRepository_SaveGoalOrderRejectsMismatchedGoalSet(t *testing.T) {
 	// Given
 	db := setupGoalRepositorySQLite(t)
 	_, err := db.Exec(`INSERT INTO goals
-		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at)
-		VALUES (10, 1, 'first', 1, '{}', '{}', 0, 1, '2026-01-01')`)
+		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order, created_at)
+		VALUES (10, 1, 'first', 1, '{}', '{}', 0, 0, 1, '2026-01-01')`)
 	require.NoError(t, err)
 	repo := &goalRepository{db: db}
 	arrangement, err := entity.NewGoalArrangement(1, []*entity.Goal{{ID: 99, UserID: 1}})

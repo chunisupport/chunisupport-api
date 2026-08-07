@@ -26,7 +26,7 @@ func NewGoalRepository(db *sqlx.DB) repository.GoalRepository {
 
 func (r *goalRepository) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
 	var goalModels []*models.GoalModel
-	query := `SELECT g.id, g.user_id, g.group_id, g.title, g.achievement_type_id, g.achievement_params, g.attributes, g.invert, g.sort_order, g.created_at
+	query := `SELECT g.id, g.user_id, g.group_id, g.title, g.achievement_type_id, g.achievement_params, g.attributes, g.invert_value, g.invert_percentage, g.sort_order, g.created_at
 		FROM goals g
 		LEFT JOIN goal_groups gg ON gg.id = g.group_id AND gg.user_id = g.user_id
 		WHERE g.user_id = ?
@@ -43,7 +43,7 @@ func (r *goalRepository) ListByUserID(ctx context.Context, exec repository.Execu
 
 func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
 	var m models.GoalModel
-	query := `SELECT id, user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order, created_at FROM goals WHERE id = ? AND user_id = ?`
+	query := `SELECT id, user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order, created_at FROM goals WHERE id = ? AND user_id = ?`
 	if err := exec.GetContext(ctx, &m, query, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.Join(repository.ErrGoalNotFound, err)
@@ -54,8 +54,8 @@ func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.
 }
 
 func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
-	query := `INSERT INTO goals (user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert, goal.SortOrder)
+	query := `INSERT INTO goals (user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.InvertValue, goal.InvertPercentage, goal.SortOrder)
 	if err != nil {
 		return err
 	}
@@ -71,8 +71,8 @@ func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, g
 }
 
 func (r *goalRepository) Save(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
-	query := `UPDATE goals SET group_id = ?, title = ?, achievement_type_id = ?, achievement_params = ?, attributes = ?, invert = ?, sort_order = ? WHERE id = ? AND user_id = ?`
-	res, err := exec.ExecContext(ctx, query, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.Invert, goal.SortOrder, goal.ID, goal.UserID)
+	query := `UPDATE goals SET group_id = ?, title = ?, achievement_type_id = ?, achievement_params = ?, attributes = ?, invert_value = ?, invert_percentage = ?, sort_order = ? WHERE id = ? AND user_id = ?`
+	res, err := exec.ExecContext(ctx, query, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.InvertValue, goal.InvertPercentage, goal.SortOrder, goal.ID, goal.UserID)
 	if err != nil {
 		return err
 	}

@@ -268,7 +268,8 @@ func TestToGoalInput(t *testing.T) {
 		Attributes: map[string]any{
 			"diff": 4,
 		},
-		Invert: true,
+		InvertValue:      true,
+		InvertPercentage: false,
 	}
 
 	in, err := toGoalInput(req)
@@ -295,7 +296,29 @@ func TestToGoalInput(t *testing.T) {
 	if gotAttrs["diff"].(float64) != 4 {
 		require.Failf(t, "前提条件失敗", "Attributes = %#v, want diff=4", gotAttrs)
 	}
-	if !in.Invert {
-		require.Fail(t, "Invert = false, want true")
+	assert.True(t, in.InvertValue)
+	assert.False(t, in.InvertPercentage)
+}
+
+func TestToGoalResponseKeepsInvertFlagsIndependent(t *testing.T) {
+	// Given
+	goal := &usecase.GoalOutput{
+		InvertValue:      false,
+		InvertPercentage: true,
 	}
+
+	// When
+	response := toGoalResponse(goal)
+
+	// Then
+	assert.False(t, response.InvertValue)
+	assert.True(t, response.InvertPercentage)
+
+	encoded, err := json.Marshal(response)
+	require.NoError(t, err)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &body))
+	assert.Equal(t, false, body["invert_value"])
+	assert.Equal(t, true, body["invert_percentage"])
+	assert.NotContains(t, body, "invert")
 }
