@@ -79,6 +79,9 @@ var (
 	// ErrScoreHistoryTimestampConflict は同一譜面・同一秒の履歴が既に存在する場合に返されます。
 	ErrScoreHistoryTimestampConflict = errors.New("score history timestamp conflict")
 
+	// ErrPlayerMetricHistoryTimestampConflict は同一プレイヤー・同一秒の公式指標履歴が既に存在する場合に返されます。
+	ErrPlayerMetricHistoryTimestampConflict = errors.New("player metric history timestamp conflict")
+
 	// ErrSystemMaintenanceNotFound はメンテナンス状態の単一行が存在しない場合に返されます。
 	ErrSystemMaintenanceNotFound = errors.New("system maintenance not found")
 )

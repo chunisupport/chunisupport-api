@@ -13,7 +13,7 @@ type PlayerModel struct {
 	UserID            int        `db:"user_id"`
 	Name              string     `db:"player_name"`
 	Level             int        `db:"player_level"`
-	OfficialRating    *float64   `db:"official_player_rating"`
+	OfficialRating    float64    `db:"official_player_rating"`
 	CalculatedRating  *float64   `db:"calculated_player_rating"`
 	NewAverageRating  *float64   `db:"new_average_rating"`
 	BestAverageRating *float64   `db:"best_average_rating"`

@@ -42,6 +42,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrUserNotFound.WithInternal(err) // 403 → 404 でユーザー存在を隠蔽
 	case errors.Is(err, usecase.ErrPlayerNotLinked):
 		return ErrPlayerNotLinked.WithInternal(err)
+	case errors.Is(err, usecase.ErrPlayerMetricHistoryNotFound):
+		return ErrPlayerMetricHistoryNotFound.WithInternal(err)
 
 	case errors.Is(err, usecase.ErrOperationFailed):
 		return ErrOperationFailed.WithInternal(err)
@@ -77,6 +79,8 @@ func FromUsecaseError(err error) *APIError {
 	case errors.Is(err, repository.ErrHonorConflict):
 		return ErrConflict.WithInternal(err)
 	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
+		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):
 		return ErrConflict.WithInternal(err)
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):

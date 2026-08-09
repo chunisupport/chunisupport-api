@@ -19,6 +19,22 @@ func TestFromUsecaseError_スコア履歴時刻競合を409へ変換する(t *te
 	assert.Equal(t, CodeConflict, apiErr.Code)
 }
 
+func TestFromUsecaseError_公式指標履歴時刻競合を409へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(repository.ErrPlayerMetricHistoryTimestampConflict)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+	assert.Equal(t, CodeConflict, apiErr.Code)
+}
+
+func TestFromUsecaseError_公式指標履歴なしを404へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrPlayerMetricHistoryNotFound)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, CodePlayerMetricHistoryNotFound, apiErr.Code)
+}
+
 func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *testing.T) {
 	got := FromUsecaseError(usecase.ErrInvalidCredentials)
 

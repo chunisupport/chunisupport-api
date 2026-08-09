@@ -19,6 +19,8 @@ type PlayerRepository interface {
 	FindByIDWithHonors(ctx context.Context, exec Executor, id int) (*PlayerWithHonors, error)
 	// FindByUserID はユーザーIDでプレイヤーを検索します。見つからない場合は(nil, nil)を返します。
 	FindByUserID(ctx context.Context, exec Executor, userID int) (*entity.Player, error)
+	// FindByUserIDForUpdate はユーザーIDでプレイヤーを検索し、更新用に行ロックします。
+	FindByUserIDForUpdate(ctx context.Context, exec Executor, userID int) (*entity.Player, error)
 	// FindHonorsByPlayerID はプレイヤーIDで称号情報を取得します。スロット順（1,2,3）でソートされます。
 	FindHonorsByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerHonor, error)
 	// UpdateCalculatedRatings はプレイヤーの計算されたレーティング情報を更新します。

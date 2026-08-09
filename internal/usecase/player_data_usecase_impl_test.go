@@ -57,7 +57,7 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 				Rating:     &rating,
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
-					Value:      0.0,
+					Value:      &rating,
 					Percentage: 0.0,
 				},
 				ClassEmblem: PlayerDataClassPayload{
@@ -80,6 +80,69 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestValidatePlayerDataPayload_公式指標は両方必須(t *testing.T) {
+	rating := 17.25
+	overpower := 12345.67
+	tests := []struct {
+		name    string
+		payload *PlayerDataPayload
+		field   string
+	}{
+		{
+			name: "公式RATINGがない場合はエラー",
+			payload: &PlayerDataPayload{
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+			},
+			field: "rating",
+		},
+		{
+			name: "公式OPがない場合はエラー",
+			payload: &PlayerDataPayload{
+				Rating: &rating,
+			},
+			field: "overpower.value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePlayerDataPayload(tt.payload)
+
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, tt.field, validationErr.Field)
+		})
+	}
+}
+
+func TestValidatePlayerDataPayload_公式指標の範囲外を拒否する(t *testing.T) {
+	rating := -0.01
+	overpower := 0.0
+	err := validatePlayerDataPayload(&PlayerDataPayload{
+		Rating: &rating, Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+	})
+
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "rating", validationErr.Field)
+}
+
+func TestValidatePlayerDataPayload_公式指標の小数第3位を拒否する(t *testing.T) {
+	rating := 17.251
+	overpower := 12345.67
+	err := validatePlayerDataPayload(&PlayerDataPayload{
+		Rating: &rating, Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+	})
+
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "rating", validationErr.Field)
+}
+
+func TestNormalizeOfficialMetric_許容誤差内の値を小数2桁へ正規化する(t *testing.T) {
+	assert.Equal(t, 17.25, normalizeOfficialMetric(17.2500000005))
 }
 
 // TestValidatePlayerDataPayload_NilPayload は、payloadがnilの場合のテストです

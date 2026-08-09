@@ -38,7 +38,7 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- `/v1/*/score-history*` のスコア履歴取得だけはAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
+- `/v1/*/score-history*` のスコア履歴取得と `/v1/users/:username/rating-op-history` の公式指標履歴取得はAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
 
 ## レートリミット（現行実装値）
@@ -231,6 +231,7 @@ Content-Type: application/json
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
+| `/internal/users/:username/rating-op-history` | GET | Firebase Bearer (任意) | 公式RATING・公式OVER POWER履歴取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username/record/songs/:displayid` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
 | `/internal/users/:username/record/songs/:displayid/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
@@ -289,6 +290,7 @@ Content-Type: application/json
 | `/v1/worldsend-songs/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/worldsend-songs/:displayid/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
+| `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:displayid` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -1374,6 +1376,8 @@ curl -X POST \
 | `scores.worldsend` | array | ✓ | WORLD'S END スコア配列 |
 | `scores.course` | array | | コーススコア配列。省略時は空配列として扱う |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
+
+`rating`と`overpower.value`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。既存の`data_collected_at`より古い`updated_at`、または同一`updated_at`で異なる公式指標を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。
 
 **スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
 
@@ -2497,6 +2501,36 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   }
 }
 ```
+
+### GET `/internal/users/:username/rating-op-history`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: CHUNITHM-NETから取得した公式RATINGと公式OVER POWERの履歴を、現在値を先頭に新しい順で返します。計算RATING・計算OVER POWERは含みません。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: 200 OK
+
+```json
+{
+  "entries": [
+    {
+      "rating": 17.25,
+      "overpower": 12345.67,
+      "data_collected_at": "2026-08-08T12:00:00Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | array | 公式指標のスナップショット配列（現在値を先頭に新しい順） |
+| `entries[].rating` | number | 公式RATING |
+| `entries[].overpower` | number | 公式OVER POWER |
+| `entries[].data_collected_at` | string | CHUNITHM-NETからのデータ取得完了日時（ISO8601） |
+
+- **主なエラー**:
+  - 404 Not Found (`player_metric_history_not_found`): プレイヤー未連携などにより履歴が存在しない
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/internal/users/:username/record`
 - **認証**: Firebase Bearer (任意)
@@ -4289,6 +4323,20 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` 未指定
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
+### GET `/v1/users/:username/rating-op-history`
+- **認証**: APIトークン（任意）
+- **概要**: CHUNITHM-NETから取得した公式RATINGと公式OVER POWERの履歴を、現在値を先頭に新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK（スキーマはinternal APIの公式RATING・公式OVER POWER履歴と同一）
+- **主なエラー**:
+  - 404 Not Found (`player_metric_history_not_found`): プレイヤー未連携などにより履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username`

@@ -24,8 +24,9 @@ const (
 	CodeOperationFailed    = "operation_failed"    // 操作失敗（詳細を隠蔽）
 
 	// プレイヤー関連エラー
-	CodePlayerNotLinked = "player_not_linked"
-	CodePlayerNotFound  = "player_not_found"
+	CodePlayerNotLinked             = "player_not_linked"
+	CodePlayerNotFound              = "player_not_found"
+	CodePlayerMetricHistoryNotFound = "player_metric_history_not_found"
 
 	// 楽曲・譜面関連エラー
 	CodeSongNotFound                      = "song_not_found"

@@ -35,6 +35,7 @@
 | `invalid_difficulty` | 難易度指定不正 |
 | `score_history_not_found` | 指定譜面の現行スコア履歴が存在しない |
 | `score_history_unsupported_difficulty` | スコア履歴対象外のBASIC / ADVANCEDを指定 |
+| `player_metric_history_not_found` | プレイヤー未連携などにより公式RATING・公式OVER POWER履歴が存在しない |
 | `validation_failed` | バリデーション失敗 |
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |

@@ -270,3 +270,19 @@ downはテーブルと保存済みの状態・監査情報を削除します。�
 ### 000033 コース表示用ID
 
 `courses` テーブルに16文字の小文字16進数で表す一意な `display_id` を追加する。既存コースにはマイグレーションで暗号学的乱数を採番し、以後の個別コースAPIでは `official_idx` ではなく `display_id` を外部識別子として利用する。
+
+### 000041 プレイヤー公式RATING・公式OVER POWER履歴
+
+`players.official_player_rating`を`NOT NULL`へ変更し、公式RATINGと公式OVER POWERを同一取得時点の組として保存する`player_metric_histories`を追加する。連続取得の順序と履歴主キーを正確に扱うため、現在値と履歴の`data_collected_at`はともにマイクロ秒精度の`TIMESTAMP(6)`とする。
+
+適用前に次のSQLで既存NULLを必ず監査する。該当行を`0`などの推測値で補完してはならず、CHUNITHM-NETから公式データを再取得してからマイグレーションを適用する。
+
+```sql
+SELECT id, user_id
+FROM players
+WHERE official_player_rating IS NULL;
+```
+
+該当行が残っている場合、`ALTER TABLE`は失敗して移行を停止する。履歴は変更時のみ保存し、保持件数に上限を設けない。
+
+デプロイ順は「プレイヤーデータ登録を停止 → NULL監査と公式データ再取得 → `000041` up → 新バイナリへ切替 → 登録再開」とする。旧バイナリは`rating: null`を受理し得る一方、新バイナリは履歴テーブルを必要とするため、登録を継続したままのローリング移行は行わない。

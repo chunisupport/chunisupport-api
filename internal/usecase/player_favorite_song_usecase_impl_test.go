@@ -67,6 +67,10 @@ func (s *stubPlayerRepoForFav) FindByUserID(ctx context.Context, exec repository
 	return s.player, s.err
 }
 
+func (s *stubPlayerRepoForFav) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.FindByUserID(ctx, exec, userID)
+}
+
 func (s *stubPlayerRepoForFav) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
 	return nil, errors.New("not implemented")
 }

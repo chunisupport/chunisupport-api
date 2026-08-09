@@ -33,6 +33,10 @@ func (s *stubPlayerLockedSongPlayerRepository) FindByUserID(ctx context.Context,
 	return s.player, nil
 }
 
+func (s *stubPlayerLockedSongPlayerRepository) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.FindByUserID(ctx, exec, userID)
+}
+
 func (s *stubPlayerLockedSongPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	return nil, nil
 }

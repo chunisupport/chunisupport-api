@@ -104,7 +104,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | UserID | int | ✓ | 所属ユーザーID（外部キー） |
 | Name | playername.PlayerName | ✓ | プレイヤー名（値オブジェクト） |
 | Level | int | ✓ | プレイヤーレベル |
-| OfficialRating | *float64 | - | 公式レーティング |
+| OfficialRating | float64 | ✓ | 公式レーティング |
 | CalculatedRating | *float64 | - | 計算レーティング |
 | NewAverageRating | *float64 | - | 新曲枠平均レーティング |
 | BestAverageRating | *float64 | - | ベスト枠平均レーティング |
@@ -112,6 +112,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | ClassEmblemBaseID | *int | - | クラスエンブレムベースID |
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
+| OfficialOverpower | float64 | ✓ | 公式オーバーパワー値 |
 | OverpowerPercent | *float64 | - | オーバーパワー割合（%） |
 | DataCollectedAt | *time.Time | - | CHUNITHM-NETからのデータ取得完了日時 |
 | CreatedAt | time.Time | ✓ | 作成日時 |
@@ -128,6 +129,28 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 - `Level` は0以上
 - `OfficialRating`, `CalculatedRating` は0.0以上
 - `OverpowerPercent` は0.0～100.0の範囲
+
+---
+
+### PlayerMetricHistoryEntry（プレイヤー公式指標履歴）
+
+CHUNITHM-NETから同時に取得した公式RATINGと公式OVER POWERのスナップショットを表します。両値は常にセットで保持し、どちらか一方でも変化した場合だけ更新前の組を履歴へ保存します。最新値は`Player`に保持します。
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| PlayerID | int | ✓ | プレイヤーID |
+| OfficialRating | float64 | ✓ | 公式RATING |
+| OfficialOverpower | float64 | ✓ | 公式OVER POWER |
+| DataCollectedAt | time.Time | ✓ | CHUNITHM-NETからのデータ取得完了日時 |
+
+#### 不変条件
+
+- 公式RATINGと公式OVER POWERの欠落・`null`は許可しない
+- 公式RATINGと公式OVER POWERはDB精度に合わせて小数第2位までとする
+- 初回登録では履歴を作らず、現在値のみを`players`へ保存する
+- `DataCollectedAt`のない既存プレイヤーは公式値の取得履歴がないため、最初のデータ登録時に更新前状態を履歴化しない
+- 現在より古い取得日時への更新、および同一取得日時で異なる公式指標への更新は拒否する
+- 履歴の保持件数に上限は設けない
 
 ---
 

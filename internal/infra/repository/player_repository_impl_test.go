@@ -202,6 +202,13 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)`,
+		`CREATE TABLE player_metric_histories (
+			player_id INTEGER NOT NULL,
+			official_rating REAL NOT NULL,
+			official_overpower REAL NOT NULL,
+			data_collected_at DATETIME NOT NULL,
+			PRIMARY KEY (player_id, data_collected_at)
+		)`,
 		`CREATE TABLE honor_types (
 			id INTEGER PRIMARY KEY,
 			name TEXT NOT NULL
@@ -225,6 +232,30 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 	}
 
 	return db
+}
+
+func TestPlayerRepository_Save_公式指標履歴と現在値を同一トランザクションで保存する(t *testing.T) {
+	db := setupPlayerRepositorySQLite(t)
+	now := seedPlayerWithHonors(t, db, 1, false)
+	repo := &playerRepository{db: db}
+	player, err := repo.FindByID(context.Background(), db, 1)
+	require.NoError(t, err)
+	require.NoError(t, player.ChangeOfficialMetrics(16.26, 1240.12, now.Add(time.Hour)))
+	tx, err := db.Beginx()
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Save(context.Background(), tx, player))
+	var transactionHistoryCount int
+	require.NoError(t, tx.Get(&transactionHistoryCount, `SELECT COUNT(*) FROM player_metric_histories WHERE player_id = 1`))
+	require.Equal(t, 1, transactionHistoryCount)
+	require.NoError(t, tx.Rollback())
+
+	var historyCount int
+	require.NoError(t, db.Get(&historyCount, `SELECT COUNT(*) FROM player_metric_histories WHERE player_id = 1`))
+	require.Zero(t, historyCount)
+	var rating float64
+	require.NoError(t, db.Get(&rating, `SELECT official_player_rating FROM players WHERE id = 1`))
+	require.Equal(t, 16.25, rating)
 }
 
 func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bool) time.Time {

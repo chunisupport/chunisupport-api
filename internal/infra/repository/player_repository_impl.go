@@ -177,6 +177,15 @@ func (r *playerRepository) UpdateCalculatedRatings(ctx context.Context, exec rep
 
 // FindByUserID はユーザーIDでプレイヤーを検索します。見つからない場合は(nil, nil)を返します。
 func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return r.findByUserID(ctx, exec, userID, false)
+}
+
+// FindByUserIDForUpdate はユーザーIDでプレイヤーを検索し、更新用に行ロックします。
+func (r *playerRepository) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return r.findByUserID(ctx, exec, userID, true)
+}
+
+func (r *playerRepository) findByUserID(ctx context.Context, exec repository.Executor, userID int, forUpdate bool) (*entity.Player, error) {
 	query := `
 		SELECT
 			id, user_id, player_name, player_level,
@@ -188,6 +197,9 @@ func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Exe
 		FROM players
 		WHERE user_id = ?
 	`
+	if forUpdate && r.db.DriverName() != "sqlite" {
+		query += " FOR UPDATE"
+	}
 	var playerModel models.PlayerModel
 	if err := exec.GetContext(ctx, &playerModel, query, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -237,6 +249,11 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 // update は既存のプレイヤーをUPDATEします。
 // Saveからのみ呼び出され、既存レコード（player.ID != 0）の更新のみを担当します。
 func (r *playerRepository) update(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	if history := player.PendingMetricHistory(); history != nil {
+		if err := insertPlayerMetricHistory(ctx, exec, *history); err != nil {
+			return err
+		}
+	}
 	query := `
 		UPDATE players
 		SET player_name = ?,

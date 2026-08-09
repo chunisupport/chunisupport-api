@@ -70,37 +70,39 @@ func (cv *CustomValidator) Validate(i any) error {
 
 // Handlers はすべてのハンドラーを保持するコンテナです
 type Handlers struct {
-	Login                *api_internal.LoginHandler
-	Signup               *api_internal.SignupHandler
-	Profile              *api_internal.ProfileHandler
-	User                 *api_internal.UserHandler
-	AdminUser            *api_internal.AdminUserHandler
-	AdminUserStatistics  *api_internal.AdminUserStatisticsHandler
-	Song                 *api_internal.SongHandler
-	Honor                *api_internal.HonorHandler
-	Worldsend            *api_internal.WorldsendHandler
-	APIToken             *api_internal.APITokenHandler
-	Me                   *api_internal.MeHandler
-	MasterData           *api_internal.MasterDataHandler
-	Goal                 *api_internal.GoalHandler
-	GoalGroup            *api_internal.GoalGroupHandler
-	RecordFilter         *api_internal.RecordFilterHandler
-	TemporaryPlayerData  *api_internal.TemporaryPlayerDataHandler
-	PlayerLockedSong     *api_internal.PlayerLockedSongHandler
-	PlayerFavoriteSong   *api_internal.PlayerFavoriteSongHandler
-	Friendship           *api_internal.FriendshipHandler
-	FriendChartRanking   *api_internal.FriendChartRankingHandler
-	BestSlotStats        *api_internal.BestSlotStatsHandler
-	InternalScoreHistory *api_internal.ScoreHistoryHandler
-	Course               *api_internal.CourseHandler
-	SystemMaintenance    *api_internal.SystemMaintenanceHandler
+	Login                 *api_internal.LoginHandler
+	Signup                *api_internal.SignupHandler
+	Profile               *api_internal.ProfileHandler
+	User                  *api_internal.UserHandler
+	AdminUser             *api_internal.AdminUserHandler
+	AdminUserStatistics   *api_internal.AdminUserStatisticsHandler
+	Song                  *api_internal.SongHandler
+	Honor                 *api_internal.HonorHandler
+	Worldsend             *api_internal.WorldsendHandler
+	APIToken              *api_internal.APITokenHandler
+	Me                    *api_internal.MeHandler
+	MasterData            *api_internal.MasterDataHandler
+	Goal                  *api_internal.GoalHandler
+	GoalGroup             *api_internal.GoalGroupHandler
+	RecordFilter          *api_internal.RecordFilterHandler
+	TemporaryPlayerData   *api_internal.TemporaryPlayerDataHandler
+	PlayerLockedSong      *api_internal.PlayerLockedSongHandler
+	PlayerFavoriteSong    *api_internal.PlayerFavoriteSongHandler
+	Friendship            *api_internal.FriendshipHandler
+	FriendChartRanking    *api_internal.FriendChartRankingHandler
+	BestSlotStats         *api_internal.BestSlotStatsHandler
+	InternalScoreHistory  *api_internal.ScoreHistoryHandler
+	InternalMetricHistory *api_internal.PlayerMetricHistoryHandler
+	Course                *api_internal.CourseHandler
+	SystemMaintenance     *api_internal.SystemMaintenanceHandler
 	// 外部API v1 用ハンドラ
-	V1Song       *api_v1.V1SongHandler
-	V1Worldsend  *api_v1.V1WorldsendHandler
-	V1User       *api_v1.V1UserHandler
-	V1Version    *api_v1.V1VersionHandler
-	ScoreHistory *api_v1.ScoreHistoryHandler
-	V1Course     *api_v1.V1CourseHandler
+	V1Song        *api_v1.V1SongHandler
+	V1Worldsend   *api_v1.V1WorldsendHandler
+	V1User        *api_v1.V1UserHandler
+	V1Version     *api_v1.V1VersionHandler
+	ScoreHistory  *api_v1.ScoreHistoryHandler
+	MetricHistory *api_v1.PlayerMetricHistoryHandler
+	V1Course      *api_v1.V1CourseHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 	// reiwa互換APIハンドラ
@@ -137,6 +139,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	worldsendRecordRepo := infra.NewWorldsendRecordRepository(db)
 	playerDataRepo := infra.NewPlayerDataRepository(db)
 	scoreHistoryRepo := infra.NewScoreHistoryRepository(db)
+	playerMetricHistoryQuery := infra.NewPlayerMetricHistoryQueryService(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
 	chartStatsRepo := infra.NewChartStatsRepository(db)
 	apiTokenRepo := infra.NewAPITokenRepository(db)
@@ -179,6 +182,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
+	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)
 	if configurable, ok := scoreHistoryUsecase.(interface {
 		SetFriendshipRepository(repository.FriendshipRepository)
 	}); ok {
@@ -234,37 +238,39 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	handlers := &Handlers{
-		Login:                api_internal.NewLoginHandler(loginUsecase),
-		Signup:               api_internal.NewSignupHandler(signupUsecase),
-		Profile:              api_internal.NewProfileHandler(userCredentialUsecase),
-		User:                 api_internal.NewUserHandler(userUsecase),
-		AdminUser:            api_internal.NewAdminUserHandler(userUsecase),
-		AdminUserStatistics:  api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
-		Song:                 api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		Honor:                api_internal.NewHonorHandler(honorUsecase),
-		Worldsend:            api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
-		APIToken:             api_internal.NewAPITokenHandler(apiTokenUsecase),
-		Me:                   api_internal.NewMeHandler(playerDataUsecase),
-		MasterData:           api_internal.NewMasterDataHandler(masterDataUsecase),
-		Goal:                 api_internal.NewGoalHandler(goalUsecase),
-		GoalGroup:            api_internal.NewGoalGroupHandler(goalGroupUsecase),
-		RecordFilter:         api_internal.NewRecordFilterHandler(recordFilterUsecase),
-		TemporaryPlayerData:  api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
-		PlayerLockedSong:     api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
-		PlayerFavoriteSong:   api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
-		Friendship:           api_internal.NewFriendshipHandler(friendshipUsecase),
-		FriendChartRanking:   api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
-		BestSlotStats:        api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
-		InternalScoreHistory: api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
-		Course:               api_internal.NewCourseHandler(courseUsecase),
-		SystemMaintenance:    api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
+		Login:                 api_internal.NewLoginHandler(loginUsecase),
+		Signup:                api_internal.NewSignupHandler(signupUsecase),
+		Profile:               api_internal.NewProfileHandler(userCredentialUsecase),
+		User:                  api_internal.NewUserHandler(userUsecase),
+		AdminUser:             api_internal.NewAdminUserHandler(userUsecase),
+		AdminUserStatistics:   api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
+		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		Honor:                 api_internal.NewHonorHandler(honorUsecase),
+		Worldsend:             api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
+		APIToken:              api_internal.NewAPITokenHandler(apiTokenUsecase),
+		Me:                    api_internal.NewMeHandler(playerDataUsecase),
+		MasterData:            api_internal.NewMasterDataHandler(masterDataUsecase),
+		Goal:                  api_internal.NewGoalHandler(goalUsecase),
+		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
+		RecordFilter:          api_internal.NewRecordFilterHandler(recordFilterUsecase),
+		TemporaryPlayerData:   api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
+		PlayerLockedSong:      api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
+		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
+		Friendship:            api_internal.NewFriendshipHandler(friendshipUsecase),
+		FriendChartRanking:    api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
+		BestSlotStats:         api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
+		InternalScoreHistory:  api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
+		InternalMetricHistory: api_internal.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
+		Course:                api_internal.NewCourseHandler(courseUsecase),
+		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		// 外部API v1 用ハンドラ
-		V1Song:       api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		V1Worldsend:  api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
-		V1User:       api_v1.NewV1UserHandler(userUsecase),
-		V1Version:    api_v1.NewV1VersionHandler(masterDataUsecase),
-		ScoreHistory: api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
-		V1Course:     api_v1.NewV1CourseHandler(courseUsecase),
+		V1Song:        api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		V1Worldsend:   api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
+		V1User:        api_v1.NewV1UserHandler(userUsecase),
+		V1Version:     api_v1.NewV1VersionHandler(masterDataUsecase),
+		ScoreHistory:  api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
+		MetricHistory: api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
+		V1Course:      api_v1.NewV1CourseHandler(courseUsecase),
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache, cfg.Location),
 		// reiwa互換APIハンドラ
@@ -429,6 +435,7 @@ func registerRoutes(
 	{
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
+		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
 		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
 		publicUsersGroup.GET("/:username/record/songs/:displayid/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
 		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
@@ -559,17 +566,18 @@ func registerRoutes(
 
 	// 外部APIルートの登録
 	// api.chunisupport.net/v1
-	scoreHistoryV1 := e.Group("/v1")
-	scoreHistoryV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
-	scoreHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
-	scoreHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
+	optionalHistoryV1 := e.Group("/v1")
+	optionalHistoryV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
+	optionalHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
+	optionalHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
 		info.APIRateLimitRequests,
 		info.APIRateLimitEditorRequests,
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))
-	scoreHistoryV1.GET("/songs/:displayid/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
-	scoreHistoryV1.GET("/worldsend-songs/:displayid/score-history", handlers.ScoreHistory.GetWorldsend)
+	optionalHistoryV1.GET("/songs/:displayid/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
+	optionalHistoryV1.GET("/worldsend-songs/:displayid/score-history", handlers.ScoreHistory.GetWorldsend)
+	optionalHistoryV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
 
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))

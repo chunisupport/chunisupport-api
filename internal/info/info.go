@@ -29,6 +29,10 @@ const (
 	APITokenPrefixLength                        = 5
 	APITokenLastUsedUpdateInterval              = time.Hour
 	MaxScoreHistoryEntriesPerChart              = 50
+	MaxOfficialRating                           = 99.99
+	MaxOfficialOverpower                        = 999999.99
+	OfficialMetricDecimalScale                  = 100
+	OfficialMetricDecimalTolerance              = 1e-7
 	ChartConstMin                               = constants.ChartConstMin
 	ChartConstMax                               = constants.ChartConstMax
 	GoalChartTargetOP                           = "OP_TARGET"

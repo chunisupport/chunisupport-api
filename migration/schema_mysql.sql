@@ -363,7 +363,7 @@ CREATE TABLE `players` (
   `user_id` int unsigned NOT NULL,
   `player_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `player_level` int NOT NULL,
-  `official_player_rating` decimal(4,2) DEFAULT NULL,
+  `official_player_rating` decimal(4,2) NOT NULL,
   `calculated_player_rating` decimal(6,4) DEFAULT NULL,
   `new_average_rating` decimal(6,4) DEFAULT NULL,
   `best_average_rating` decimal(6,4) DEFAULT NULL,
@@ -372,7 +372,7 @@ CREATE TABLE `players` (
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
-  `data_collected_at` timestamp NULL DEFAULT NULL,
+  `data_collected_at` timestamp(6) NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -384,6 +384,14 @@ CREATE TABLE `players` (
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_metric_histories` (
+  `player_id` mediumint unsigned NOT NULL,
+  `official_rating` decimal(4,2) NOT NULL,
+  `official_overpower` decimal(8,2) NOT NULL,
+  `data_collected_at` timestamp(6) NOT NULL,
+  PRIMARY KEY (`player_id`,`data_collected_at`),
+  CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (
   `id` tinyint unsigned NOT NULL,

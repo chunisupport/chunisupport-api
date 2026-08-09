@@ -65,6 +65,24 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 			Message: "payload cannot be nil",
 		}
 	}
+	if payload.Rating == nil {
+		return &PlayerDataValidationError{Field: "rating", Message: "rating is required"}
+	}
+	if *payload.Rating < 0 || *payload.Rating > info.MaxOfficialRating || math.IsNaN(*payload.Rating) || math.IsInf(*payload.Rating, 0) {
+		return &PlayerDataValidationError{Field: "rating", Message: "rating is out of range"}
+	}
+	if !hasOfficialMetricPrecision(*payload.Rating) {
+		return &PlayerDataValidationError{Field: "rating", Message: "rating must have at most 2 decimal places"}
+	}
+	if payload.Overpower.Value == nil {
+		return &PlayerDataValidationError{Field: "overpower.value", Message: "overpower.value is required"}
+	}
+	if *payload.Overpower.Value < 0 || *payload.Overpower.Value > info.MaxOfficialOverpower || math.IsNaN(*payload.Overpower.Value) || math.IsInf(*payload.Overpower.Value, 0) {
+		return &PlayerDataValidationError{Field: "overpower.value", Message: "overpower.value is out of range"}
+	}
+	if !hasOfficialMetricPrecision(*payload.Overpower.Value) {
+		return &PlayerDataValidationError{Field: "overpower.value", Message: "overpower.value must have at most 2 decimal places"}
+	}
 
 	// スコアデータの整合性検証
 	errorCount := 0
@@ -114,6 +132,15 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 	}
 
 	return nil
+}
+
+func hasOfficialMetricPrecision(value float64) bool {
+	scaled := value * info.OfficialMetricDecimalScale
+	return math.Abs(scaled-math.Round(scaled)) <= info.OfficialMetricDecimalTolerance
+}
+
+func normalizeOfficialMetric(value float64) float64 {
+	return math.Round(value*info.OfficialMetricDecimalScale) / info.OfficialMetricDecimalScale
 }
 
 func validateCourseScoreEntry(entry PlayerDataCourseEntry, index int) error {
@@ -307,8 +334,8 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	summaryInput := &PlayerDataSummaryInput{
 		Name:              nameVO.String(),
 		Level:             payload.Level,
-		OfficialRating:    payload.Rating,
-		OfficialOverpower: payload.Overpower.Value,
+		OfficialRating:    normalizeOfficialMetric(*payload.Rating),
+		OfficialOverpower: normalizeOfficialMetric(*payload.Overpower.Value),
 		LastPlayedAt:      lastPlayedAt,
 	}
 
@@ -604,7 +631,7 @@ func normalizeClassEmblemKey(raw string) string {
 // プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDと更新前状態を返します。
 func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, *entity.Player, error) {
 	// ユーザーに紐づくプレイヤーを検索
-	existingPlayer, err := us.playerRepo.FindByUserID(ctx, tx, user.ID)
+	existingPlayer, err := us.playerRepo.FindByUserIDForUpdate(ctx, tx, user.ID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -620,14 +647,11 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		UserID:            user.ID,
 		Name:              playerName,
 		Level:             summary.Level,
-		OfficialRating:    summary.OfficialRating,
-		OfficialOverpower: summary.OfficialOverpower,
 		ClassEmblemID:     summary.ClassEmblemID,
 		ClassEmblemBaseID: summary.ClassBaseID,
 		LastPlayedAt:      summary.LastPlayedAt,
 		OverpowerValue:    summary.OverpowerValue,
 		OverpowerPercent:  summary.OverpowerPercent,
-		DataCollectedAt:   &updatedAt,
 		UpdatedAt:         updatedAt,
 	}
 
@@ -639,8 +663,15 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		player.CalculatedRating = existingPlayer.CalculatedRating
 		player.NewAverageRating = existingPlayer.NewAverageRating
 		player.BestAverageRating = existingPlayer.BestAverageRating
+		player.OfficialRating = existingPlayer.OfficialRating
+		player.OfficialOverpower = existingPlayer.OfficialOverpower
+		player.DataCollectedAt = existingPlayer.DataCollectedAt
 	} else {
 		player.CreatedAt = time.Now().UTC()
+	}
+
+	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, updatedAt); err != nil {
+		return 0, nil, &PlayerDataConflictError{Reason: err.Error()}
 	}
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）

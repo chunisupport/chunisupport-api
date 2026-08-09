@@ -75,8 +75,9 @@ var (
 	ErrOperationFailed    = New(CodeOperationFailed, http.StatusBadRequest)    // 削除系操作失敗
 
 	// プレイヤー関連エラー
-	ErrPlayerNotLinked = New(CodePlayerNotLinked, http.StatusNotFound)
-	ErrPlayerNotFound  = New(CodePlayerNotFound, http.StatusNotFound)
+	ErrPlayerNotLinked             = New(CodePlayerNotLinked, http.StatusNotFound)
+	ErrPlayerNotFound              = New(CodePlayerNotFound, http.StatusNotFound)
+	ErrPlayerMetricHistoryNotFound = New(CodePlayerMetricHistoryNotFound, http.StatusNotFound)
 
 	// 楽曲・譜面関連エラー
 	ErrSongNotFound                      = New(CodeSongNotFound, http.StatusNotFound)

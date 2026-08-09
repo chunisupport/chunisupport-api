@@ -200,6 +200,10 @@ func (s *stubPlayerRepository) FindByUserID(ctx context.Context, exec repository
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubPlayerRepository) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.FindByUserID(ctx, exec, userID)
+}
+
 func (s *stubPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	return nil, errors.New("not implemented")
 }
@@ -626,7 +630,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 
 	playerUpdatedAt := now.Add(-time.Hour) // プレイヤーのupdated_atはレコードより前の時刻
 	rating := 15.0
-	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, OfficialRating: &rating, UpdatedAt: playerUpdatedAt}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, OfficialRating: rating, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil)
 
@@ -1200,7 +1204,7 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 			Player: &entity.Player{
 				ID:               1,
 				Name:             pn1,
-				OfficialRating:   &officialRating1,
+				OfficialRating:   officialRating1,
 				CalculatedRating: &calculatedRating1,
 				OverpowerValue:   &op1,
 			},

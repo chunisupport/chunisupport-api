@@ -189,6 +189,30 @@ func TestCreateChartStatisticsDown_依存順に統計テーブルを削除する
 	assert.Less(t, worldsendIndex, ratingBandIndex)
 }
 
+func TestCreatePlayerMetricHistoriesUp_公式指標を必須の組として保存する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000041_create_player_metric_histories.up.sql")
+
+	assert.Contains(t, upSQL, "MODIFY COLUMN official_player_rating DECIMAL(4, 2) NOT NULL")
+	assert.Contains(t, upSQL, "MODIFY COLUMN data_collected_at TIMESTAMP(6) NULL")
+	assert.Contains(t, upSQL, "CREATE TABLE player_metric_histories")
+	assert.Contains(t, upSQL, "official_rating DECIMAL(4, 2) NOT NULL")
+	assert.Contains(t, upSQL, "official_overpower DECIMAL(8, 2) NOT NULL")
+	assert.Contains(t, upSQL, "data_collected_at TIMESTAMP(6) NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (player_id, data_collected_at)")
+	assert.Contains(t, upSQL, "FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE")
+}
+
+func TestCreatePlayerMetricHistoriesDown_履歴削除後にRATINGをNULL許可へ戻す(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000041_create_player_metric_histories.down.sql")
+
+	dropIndex := strings.Index(downSQL, "DROP TABLE IF EXISTS player_metric_histories")
+	alterIndex := strings.Index(downSQL, "MODIFY COLUMN official_player_rating DECIMAL(4, 2) NULL")
+	require.NotEqual(t, -1, dropIndex)
+	require.NotEqual(t, -1, alterIndex)
+	assert.Less(t, dropIndex, alterIndex)
+	assert.Contains(t, downSQL, "MODIFY COLUMN data_collected_at TIMESTAMP NULL")
+}
+
 func TestCreateCoursesUp_コースマスタとレコードを作成する(t *testing.T) {
 	// Given
 	upSQL := readNormalizedMigrationSQL(t, "000030_create_courses.up.sql")

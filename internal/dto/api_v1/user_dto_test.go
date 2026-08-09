@@ -18,7 +18,7 @@ func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	calculatedRating := 17.1234
 	player := &entity.Player{
 		Name:             playername.MustNewPlayerName("テストプレイヤー"),
-		OfficialRating:   &officialRating,
+		OfficialRating:   officialRating,
 		CalculatedRating: &calculatedRating,
 	}
 

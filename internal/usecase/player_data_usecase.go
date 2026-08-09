@@ -26,7 +26,7 @@ type PlayerDataPayload struct {
 
 // PlayerDataOverpowerPayload はオーバーパワー情報です。
 type PlayerDataOverpowerPayload struct {
-	Value      float64
+	Value      *float64
 	Percentage float64
 }
 
@@ -121,7 +121,7 @@ func (e *PlayerDataConflictError) Error() string {
 type PlayerDataSummaryInput struct {
 	Name              string
 	Level             int
-	OfficialRating    *float64
+	OfficialRating    float64
 	OfficialOverpower float64
 	LastPlayedAt      *time.Time
 	OverpowerValue    *float64
