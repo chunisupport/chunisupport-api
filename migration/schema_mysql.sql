@@ -372,7 +372,7 @@ CREATE TABLE `players` (
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
-  `data_collected_at` timestamp(6) NULL DEFAULT NULL,
+  `data_collected_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -389,7 +389,7 @@ CREATE TABLE `player_metric_histories` (
   `player_id` mediumint unsigned NOT NULL,
   `official_rating` decimal(4,2) NOT NULL,
   `official_overpower` decimal(8,2) NOT NULL,
-  `data_collected_at` timestamp(6) NOT NULL,
+  `data_collected_at` timestamp NOT NULL,
   PRIMARY KEY (`player_id`,`data_collected_at`),
   CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

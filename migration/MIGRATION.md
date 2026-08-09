@@ -194,6 +194,8 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000037**: ユーザー所有の `goal_groups` を追加し、`goals.group_id` とグループ内 `sort_order` による目標分類・並び替えへ変更。既存目標は未分類のまま従来順を保持する。
 - **000038**: `api_tokens` に名前、表示用prefix、最終利用日時を追加し、`user_id` の単独一意制約を削除して1ユーザー複数トークンに対応。既存ハッシュは変更せず、名前を「既存のトークン」、prefixと最終利用日時をNULLで移行する。
 - **000039**: APIメンテナンス状態を永続化する `system_maintenance` テーブルと、無効状態の初期singleton行を追加。
+- **000041**: プレイヤーの公式RATING・公式OVER POWER履歴を追加し、取得日時をマイクロ秒精度へ変更。
+- **000042**: プレイヤー現在値と公式指標履歴の取得日時を秒精度へ変更。
 
 #### 000028の失敗時復旧
 
@@ -286,3 +288,27 @@ WHERE official_player_rating IS NULL;
 該当行が残っている場合、`ALTER TABLE`は失敗して移行を停止する。履歴は変更時のみ保存し、保持件数に上限を設けない。
 
 デプロイ順は「プレイヤーデータ登録を停止 → NULL監査と公式データ再取得 → `000041` up → 新バイナリへ切替 → 登録再開」とする。旧バイナリは`rating: null`を受理し得る一方、新バイナリは履歴テーブルを必要とするため、登録を継続したままのローリング移行は行わない。
+
+### 000042 公式指標履歴の取得日時を秒精度へ変更
+
+1プレイヤーにつき1秒間に複数回の登録は行わない仕様に合わせ、`players.data_collected_at`と`player_metric_histories.data_collected_at`を秒精度の`TIMESTAMP`へ変更する。適用済みの`000041`は変更せず、本マイグレーションで現行スキーマを修正する。
+
+適用前に次のSQLを実行し、同一プレイヤー・同一秒の履歴が重複していないことを確認する。
+
+```sql
+SELECT
+    player_id,
+    DATE_FORMAT(data_collected_at, '%Y-%m-%d %H:%i:%s') AS collected_second,
+    COUNT(*) AS history_count
+FROM player_metric_histories
+GROUP BY
+    player_id,
+    DATE_FORMAT(data_collected_at, '%Y-%m-%d %H:%i:%s')
+HAVING COUNT(*) > 1;
+```
+
+結果が0件であることを確認してから適用する。重複がある場合、秒精度への変換時に主キーが衝突するため、対象データを確認・解消してから再実行する。`up`では履歴テーブルを先に変更し、衝突時に`players`だけが先行して秒精度になることを防ぐ。
+
+MySQLは小数秒の精度縮小時に既定で値を丸めるため、`up`では`TIMESTAMPADD`で小数秒を明示的に切り捨ててからカラム型を変更する。これにより、上記監査SQLと実際の変換規則を一致させる。
+
+`down`はカラム型を`TIMESTAMP(6)`へ戻すが、`up`で切り捨てた小数秒の値は復元できない。

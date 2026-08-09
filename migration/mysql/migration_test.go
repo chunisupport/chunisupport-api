@@ -213,6 +213,29 @@ func TestCreatePlayerMetricHistoriesDown_履歴削除後にRATINGをNULL許可�
 	assert.Contains(t, downSQL, "MODIFY COLUMN data_collected_at TIMESTAMP NULL")
 }
 
+func TestReducePlayerMetricTimestampPrecisionUp_UsesSecondPrecision(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000042_reduce_player_metric_timestamp_precision.up.sql")
+
+	historyNormalize := "UPDATE player_metric_histories SET data_collected_at = TIMESTAMPADD(MICROSECOND, -MICROSECOND(data_collected_at), data_collected_at) WHERE MICROSECOND(data_collected_at) <> 0;"
+	historyAlter := "ALTER TABLE player_metric_histories MODIFY COLUMN data_collected_at TIMESTAMP NOT NULL;"
+	playerNormalize := "UPDATE players SET data_collected_at = TIMESTAMPADD(MICROSECOND, -MICROSECOND(data_collected_at), data_collected_at) WHERE data_collected_at IS NOT NULL AND MICROSECOND(data_collected_at) <> 0;"
+	playerAlter := "ALTER TABLE players MODIFY COLUMN data_collected_at TIMESTAMP NULL;"
+	require.Contains(t, upSQL, historyNormalize)
+	require.Contains(t, upSQL, historyAlter)
+	require.Contains(t, upSQL, playerNormalize)
+	require.Contains(t, upSQL, playerAlter)
+	assert.Less(t, strings.Index(upSQL, historyNormalize), strings.Index(upSQL, historyAlter))
+	assert.Less(t, strings.Index(upSQL, historyAlter), strings.Index(upSQL, playerNormalize))
+	assert.Less(t, strings.Index(upSQL, playerNormalize), strings.Index(upSQL, playerAlter))
+}
+
+func TestReducePlayerMetricTimestampPrecisionDown_RestoresMicrosecondColumnType(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000042_reduce_player_metric_timestamp_precision.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players MODIFY COLUMN data_collected_at TIMESTAMP(6) NULL;")
+	assert.Contains(t, downSQL, "ALTER TABLE player_metric_histories MODIFY COLUMN data_collected_at TIMESTAMP(6) NOT NULL;")
+}
+
 func TestCreateCoursesUp_コースマスタとレコードを作成する(t *testing.T) {
 	// Given
 	upSQL := readNormalizedMigrationSQL(t, "000030_create_courses.up.sql")
