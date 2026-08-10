@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	maxPlayerDataChangeDetails = 100
-	maxScoreValue              = 1010000
-	minScoreValue              = 0
-	playerDataMetricDiffScale  = 10_000
-	tokyoLayout                = "2006/01/02 15:04"
-	defaultSlotName            = "none"
+	maxPlayerDataChangeDetails          = 100
+	maxScoreValue                       = 1010000
+	minScoreValue                       = 0
+	playerDataMetricDiffScale           = 10_000
+	playerDataOverpowerPercentDiffScale = 100_000
+	tokyoLayout                         = "2006/01/02 15:04"
+	defaultSlotName                     = "none"
 )
 
 var (
@@ -203,8 +204,9 @@ type playerDataMaster struct {
 }
 
 type calculatedOverpowerSummary struct {
-	Value   *float64
-	Percent *float64
+	Value             *float64
+	Percent           *float64
+	MaxOverpowerTotal float64
 }
 
 type registeredSPHonor struct {
@@ -437,8 +439,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			previousOverpowerValue = previousPlayer.OverpowerValue
 		}
 		result.MetricDiffs = api_internal.PlayerDataMetricDiffs{
-			Rating:         buildPlayerDataFloat64Diff(previousRating, &ratingStats.PlayerRating),
-			OverpowerValue: buildPlayerDataFloat64Diff(previousOverpowerValue, summaryInput.OverpowerValue),
+			Rating:           buildPlayerDataFloat64Diff(previousRating, &ratingStats.PlayerRating),
+			OverpowerValue:   buildPlayerDataFloat64Diff(previousOverpowerValue, summaryInput.OverpowerValue),
+			OverpowerPercent: buildPlayerDataOverpowerPercentDiff(previousOverpowerValue, summaryInput.OverpowerPercent, overpowerSummary.MaxOverpowerTotal),
 		}
 		result.Statistics = statistics
 		result.SkippedRecords = skippedRecords
@@ -910,7 +913,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		}
 	}
 
-	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStats(ctx, repository.OverpowerTargetFilter{
+	overpowerTargetStats, err := us.playerDataRepo.GetOverpowerTargetStatsWithExecutor(ctx, tx, repository.OverpowerTargetFilter{
 		ExcludeWorldsend: true,
 		ExcludeDeleted:   true,
 		PlayerID:         &playerID,
@@ -1094,12 +1097,27 @@ func buildPlayerDataStatisticsDiff(before service.PlayerRecordStatisticsSnapshot
 
 // buildPlayerDataFloat64Diff は登録前後の値が揃う場合だけ小数差分を計算します。
 func buildPlayerDataFloat64Diff(before *float64, after *float64) api_internal.PlayerDataFloat64Diff {
+	return buildPlayerDataFloat64DiffWithScale(before, after, playerDataMetricDiffScale)
+}
+
+// buildPlayerDataOverpowerPercentDiff は更新前OP値を今回と同じ分母で割合へ変換し、OP%のポイント差を計算します。
+func buildPlayerDataOverpowerPercentDiff(beforeValue *float64, afterPercent *float64, maxOverpowerTotal float64) api_internal.PlayerDataFloat64Diff {
+	var beforePercent *float64
+	if beforeValue != nil {
+		beforePercentValue := service.CalcOverpowerPercent(*beforeValue, maxOverpowerTotal)
+		beforePercent = &beforePercentValue
+	}
+	return buildPlayerDataFloat64DiffWithScale(beforePercent, afterPercent, playerDataOverpowerPercentDiffScale)
+}
+
+// buildPlayerDataFloat64DiffWithScale は指定精度で登録前後の小数差分を計算します。
+func buildPlayerDataFloat64DiffWithScale(before *float64, after *float64, scale float64) api_internal.PlayerDataFloat64Diff {
 	diff := api_internal.PlayerDataFloat64Diff{
 		Before: cloneFloat64Pointer(before),
 		After:  cloneFloat64Pointer(after),
 	}
 	if before != nil && after != nil {
-		delta := math.Round((*after-*before)*playerDataMetricDiffScale) / playerDataMetricDiffScale
+		delta := math.Round((*after-*before)*scale) / scale
 		diff.Delta = &delta
 	}
 	return diff
@@ -1668,7 +1686,7 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 		slog.Warn("skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", unexpectedSkippedRecords)
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
-	return calculatedOverpowerSummary{Value: &value, Percent: &percent}, nil
+	return calculatedOverpowerSummary{Value: &value, Percent: &percent, MaxOverpowerTotal: maxOverpowerTotal}, nil
 }
 
 func resolveChart(entry PlayerDataScoreEntry, masters *playerDataMaster) (entity.PlayerDataChart, entity.PlayerDataSong, string, error) {

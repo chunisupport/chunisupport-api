@@ -47,9 +47,10 @@ const (
 	WorldsendSongSnapshotObjectKey              = "v1/worldsend-songs.json"
 	ChunirecSongSnapshotObjectKey               = "compat/chunirec/2.0/music/showall.json"
 	ReiwaSongSnapshotObjectKey                  = "compat/reiwa/1/chunithm_record/original.json"
-	PlayerLatestUpdateSchemaVersion             = 2
+	PlayerLatestUpdateSchemaVersion             = 3
 	PlayerLatestUpdateMinSupportedSchemaVersion = 1
 	PlayerLatestUpdateMetricDiffSchemaVersion   = 2
+	PlayerLatestUpdateOPPercentSchemaVersion    = 3
 	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
 	MaintenanceRetryAfterSeconds                = 60
 

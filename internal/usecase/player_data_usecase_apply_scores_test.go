@@ -130,6 +130,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
+	assert.Equal(t, repo.overpowerStats.MaxOverpowerTotal, overpower.MaxOverpowerTotal)
 }
 
 func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t *testing.T) {

@@ -153,6 +153,32 @@ func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
 		// Then
 		assert.Equal(t, apierror.ErrUnauthorized, err)
 	})
+
+	t.Run("schema2ではOP割合差分を補完せず返す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		mockUsecase := new(mockPlayerDataUsecase)
+		raw := json.RawMessage(`{"schema_version":2,"metric_diffs":{"rating":{"before":null,"after":null,"delta":null},"overpower_value":{"before":null,"after":null,"delta":null}}}`)
+		mockUsecase.On("GetLatestUpdate", mock.Anything, testUser).Return(raw, nil).Once()
+		h := api_internal.NewMeHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/latest-update", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", testUser)
+
+		// When
+		err := h.GetLatestPlayerUpdate(c)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var response struct {
+			MetricDiffs map[string]any `json:"metric_diffs"`
+		}
+		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+		assert.NotContains(t, response.MetricDiffs, "overpower_percent")
+		mockUsecase.AssertExpectations(t)
+	})
 }
 
 func TestMeHandler_RegisterData(t *testing.T) {

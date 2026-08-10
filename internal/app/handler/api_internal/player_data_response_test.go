@@ -13,6 +13,9 @@ func TestToPlayerDataResponse_JSON契約を維持する(t *testing.T) {
 	ratingBefore := 16.42
 	ratingAfter := 16.45
 	ratingDelta := 0.03
+	overpowerPercentBefore := 76.26789
+	overpowerPercentAfter := 76.27011
+	overpowerPercentDelta := 0.00222
 	response := toPlayerDataResponse(&playerdataresult.Result{
 		PlayerID: 42,
 		MetricDiffs: playerdataresult.MetricDiffs{
@@ -20,6 +23,11 @@ func TestToPlayerDataResponse_JSON契約を維持する(t *testing.T) {
 				Before: &ratingBefore,
 				After:  &ratingAfter,
 				Delta:  &ratingDelta,
+			},
+			OverpowerPercent: playerdataresult.Float64Diff{
+				Before: &overpowerPercentBefore,
+				After:  &overpowerPercentAfter,
+				Delta:  &overpowerPercentDelta,
 			},
 		},
 		Changes: []playerdataresult.RecordChange{{
@@ -34,7 +42,7 @@ func TestToPlayerDataResponse_JSON契約を維持する(t *testing.T) {
 	encoded, err := json.Marshal(response)
 	require.NoError(t, err)
 	assert.Contains(t, string(encoded), `"player_id":42`)
-	assert.Contains(t, string(encoded), `"metric_diffs":{"rating":{"before":16.42,"after":16.45,"delta":0.03},"overpower_value":{"before":null,"after":null,"delta":null}}`)
+	assert.Contains(t, string(encoded), `"metric_diffs":{"rating":{"before":16.42,"after":16.45,"delta":0.03},"overpower_value":{"before":null,"after":null,"delta":null},"overpower_percent":{"before":76.26789,"after":76.27011,"delta":0.00222}}`)
 	assert.Contains(t, string(encoded), `"changes":[{"record_type":"standard","change_type":"new","idx":"1","before":null,"after":{"score":1000000,"clear_lamp":null,"combo_lamp":null,"full_chain":null}}]`)
 	assert.Contains(t, string(encoded), `"skipped_records":[]`)
 }

@@ -34,18 +34,21 @@
 
 `changes` と `skipped_records` は該当データがない場合も省略せず、空配列 `[]` を返す。
 
-## 3. レート・OVER POWER差分 (`metric_diffs`)
+## 3. レート・OVER POWER・OP%差分 (`metric_diffs`)
 
-`metric_diffs` は、登録前後の計算レートとOVER POWER値を返す。OVER POWER達成率は分母となるマスタデータや未解禁設定でも変化するため、この差分には含めない。
+`metric_diffs` は、登録前後の計算レート、OVER POWER値、OP%を返す。
 
 ```json
 {
   "rating": { "before": 16.42, "after": 16.45, "delta": 0.03 },
-  "overpower_value": { "before": 96120.123, "after": 96123.91, "delta": 3.787 }
+  "overpower_value": { "before": 96120.123, "after": 96123.91, "delta": 3.787 },
+  "overpower_percent": { "before": 76.26789, "after": 76.27011, "delta": 0.00222 }
 }
 ```
 
 各値の `delta` は `after - before` である。初回登録など登録前の計算値が存在しない場合、該当項目の `before` と `delta` は `null` になり、`after` だけを返す。
+
+`overpower_percent.before` は更新前OVER POWER値を登録処理時点の `after` と同じ最大OVER POWER合計で割合へ変換した値である。これにより、マスタデータや未解禁設定による分母の変化を今回のスコア更新差分へ混在させない。`delta` は小数点以下5桁で丸めたパーセントポイント差である。
 
 ## 4. レコード単位の差分 (`changes`)
 
@@ -221,15 +224,15 @@
 5. 保存対象だけの保存前状態を通常譜面・WORLD'S END・コースごとに一括取得する。
 6. 保存前状態とupsert予定値を比較し、`changes` と `*_actually_changed` を作る。
 7. 通常譜面、WORLD'S END、コースをbulk upsertする。
-8. 保存済み通常譜面全件を再取得し、`statistics.after` とOVER POWERを計算する。
-9. 保存済み全スコアからレーティングを再計算し、`metric_diffs` とレスポンスを組み立てる。
+8. 保存済み通常譜面全件を再取得し、`statistics.after`、OVER POWER、登録時点の最大OVER POWER合計を計算する。
+9. 保存済み全スコアからレーティングを再計算し、更新前OVER POWER値を手順8と同じ分母でOP%へ変換して、`metric_diffs` とレスポンスを組み立てる。
 10. 最新登録結果をJSON化してgzip圧縮し、スコア更新と同じトランザクションで保存する。
 
 保存前状態の取得は譜面ごとの個別問い合わせではなく一括取得する。集計も登録前後に通常譜面全件を1回ずつ取得して行うため、譜面数に比例したN+1問い合わせは発生しない。
 
 ## 9. 初回登録と同時登録
 
-初回登録では保存済み譜面がないため、`statistics.before` の全項目は0となり、保存対象の各譜面は `new` になる。登録前の計算レートとOVER POWER値も存在しないため、`metric_diffs` の `before` と `delta` は `null` になる。
+初回登録では保存済み譜面がないため、`statistics.before` の全項目は0となり、保存対象の各譜面は `new` になる。登録前の計算レートとOVER POWER値も存在しないため、`metric_diffs.rating`、`metric_diffs.overpower_value`、`metric_diffs.overpower_percent` の `before` と `delta` は `null` になる。
 
 差分は「保存前状態の取得」と「upsert予定値」の比較で作る。同一プレイヤーに対する複数の登録リクエストを同時実行した場合、別リクエストが取得後に状態を変更すると、返却した差分が最終的なDB更新内容と一致しない可能性がある。現行実装は同一プレイヤーの登録が同時実行されない通常利用を前提とし、排他制御による差分の直列化は行わない。
 
@@ -237,7 +240,7 @@
 
 登録成功時の結果は `player_latest_updates` にプレイヤーごとに1件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
 
-`metric_diffs` を含む保存形式はschema version 2である。schema version 1の保存済み結果も取得可能だが、`metric_diffs` は含まれない。
+最新の保存形式はschema version 3であり、`metric_diffs.overpower_percent` を含む。schema version 1の保存済み結果も取得可能だが `metric_diffs` は含まれず、schema version 2には `rating` と `overpower_value` の差分だけが含まれる。
 
 JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` をUTCへ正規化した値を `source_updated_at`、サーバーの登録受付日時を `imported_at`、入力本文のSHA-256を `body_hash` として別カラムにも保存する。
 

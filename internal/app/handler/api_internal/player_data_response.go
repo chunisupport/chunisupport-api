@@ -19,6 +19,7 @@ func toPlayerDataResponse(result *playerdataresult.Result) *dto.PlayerDataResult
 	for i, skipped := range result.SkippedRecords {
 		skippedRecords[i] = dto.SkippedRecord{RecordType: skipped.RecordType, Reason: skipped.Reason, Details: skipped.Details}
 	}
+	overpowerPercentDiff := toPlayerDataFloat64Diff(result.MetricDiffs.OverpowerPercent)
 
 	return &dto.PlayerDataResult{
 		PlayerID: result.PlayerID, AppVersion: result.AppVersion, ImportedAt: result.ImportedAt,
@@ -34,8 +35,9 @@ func toPlayerDataResponse(result *playerdataresult.Result) *dto.PlayerDataResult
 			OverpowerPercent: result.Summary.OverpowerPercent,
 		},
 		MetricDiffs: dto.PlayerDataMetricDiffs{
-			Rating:         toPlayerDataFloat64Diff(result.MetricDiffs.Rating),
-			OverpowerValue: toPlayerDataFloat64Diff(result.MetricDiffs.OverpowerValue),
+			Rating:           toPlayerDataFloat64Diff(result.MetricDiffs.Rating),
+			OverpowerValue:   toPlayerDataFloat64Diff(result.MetricDiffs.OverpowerValue),
+			OverpowerPercent: &overpowerPercentDiff,
 		},
 		Statistics: toPlayerDataStatistics(result.Statistics), Counts: dto.PlayerDataCounts(result.Counts),
 		Changes: changes, SkippedRecords: skippedRecords,

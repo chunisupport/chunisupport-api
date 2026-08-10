@@ -1422,7 +1422,7 @@ curl -X POST \
     "class_emblem_base_id": 4,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
-    "overpower_percent": 76.27
+    "overpower_percent": 76.27011
   },
   "summary": {
     "name": "プレイヤー名",
@@ -1430,11 +1430,12 @@ curl -X POST \
     "rating": 17.29,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
-    "overpower_percentage": 76.27
+    "overpower_percentage": 76.27011
   },
   "metric_diffs": {
     "rating": { "before": 17.28, "after": 17.29, "delta": 0.01 },
-    "overpower_value": { "before": 96120.123, "after": 96123.91, "delta": 3.787 }
+    "overpower_value": { "before": 96120.123, "after": 96123.91, "delta": 3.787 },
+    "overpower_percent": { "before": 76.26789, "after": 76.27011, "delta": 0.00222 }
   },
   "statistics": {
     "overall": {
@@ -1541,7 +1542,7 @@ curl -X POST \
 | `imported_at` | string | インポート実行日時 (ISO8601) |
 | `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
-| `metric_diffs` | object | 計算レートとOVER POWER値の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
+| `metric_diffs` | object | 計算レート、OVER POWER値、OP%の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
 | `statistics` | object | 通常譜面とWORLD'S ENDの登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
 | `counts` | object | 各種レコードの処理件数。`*_actually_changed` は保存前状態と比較して `new` または `updated` になった件数 |
 | `changes` | array | 実際に新規追加または更新されたスコア差分。0件の場合は空配列。詳細は最大100件 |
@@ -1551,7 +1552,7 @@ curl -X POST \
 
 `total_high_score` は削除済み楽曲を除く対象グループのスコア合計です。`record_statistics` は `aj` / `fc` / `clr` / `fch` / `max` / `sss_plus` / `sss` / `ss_plus` / `ss` / `s_plus` / `s` の累積達成件数です。スコアランクは各ボーダー以上を数え、`s_plus` は990,000点以上、`s` は975,000点以上です。各値は `delta = after - before` で、減少時は負数になります。
 
-`metric_diffs.rating` は保存済み全スコアから計算したレート、`metric_diffs.overpower_value` は通常楽曲レコードから再集計したOVER POWER値の差分です。初回登録など登録前の値が存在しない場合、`before` と `delta` は `null` になります。OVER POWER達成率は差分に含みません。
+`metric_diffs.rating` は保存済み全スコアから計算したレート、`metric_diffs.overpower_value` は通常楽曲レコードから再集計したOVER POWER値の差分です。`metric_diffs.overpower_percent` の `before` は更新前OVER POWER値を登録処理時点の `after` と同じ最大OVER POWER合計で割合へ変換した値であり、`delta` は小数点以下5桁で丸めたパーセントポイント差です。初回登録など登録前の値が存在しない場合、`before` と `delta` は `null` になります。
 
 **`changes` の要素スキーマ**:
 
@@ -1588,7 +1589,7 @@ curl -X POST \
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "player_id": 42,
   "app_ver": "0.1.0",
   "imported_at": "2026-07-16T12:00:00+09:00",
@@ -1601,7 +1602,7 @@ curl -X POST \
 }
 ```
 
-schema version 1の保存済み結果も取得できますが、`metric_diffs` は含まれません。
+schema version 1の保存済み結果も取得できますが、`metric_diffs` は含まれません。schema version 2には `rating` と `overpower_value` の差分だけが含まれ、`overpower_percent` はschema version 3から追加されます。
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
@@ -4892,6 +4893,7 @@ interface PlayerDataFloat64Diff {
 interface PlayerDataMetricDiffs {
   rating: PlayerDataFloat64Diff;
   overpower_value: PlayerDataFloat64Diff;
+  overpower_percent: PlayerDataFloat64Diff;
 }
 
 interface PlayerDataProfile {

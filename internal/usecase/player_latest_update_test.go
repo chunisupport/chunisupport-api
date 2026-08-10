@@ -30,8 +30,9 @@ func TestBuildPlayerLatestUpdate_skippedRecordsを除外して登録結果を圧
 		},
 		Summary: playerdataresult.Summary{Name: "TEST", Level: 99},
 		MetricDiffs: playerdataresult.MetricDiffs{
-			Rating:         playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
-			OverpowerValue: playerdataresult.Float64Diff{Before: float64Pointer(96120.123), After: float64Pointer(96123.91), Delta: float64Pointer(3.787)},
+			Rating:           playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
+			OverpowerValue:   playerdataresult.Float64Diff{Before: float64Pointer(96120.123), After: float64Pointer(96123.91), Delta: float64Pointer(3.787)},
+			OverpowerPercent: playerdataresult.Float64Diff{Before: float64Pointer(76.26789), After: float64Pointer(76.27011), Delta: float64Pointer(0.00222)},
 		},
 		Counts: playerdataresult.Counts{FullRecordsActuallyChanged: 2, FullRecordsSkipped: 1},
 		Changes: []playerdataresult.RecordChange{{
@@ -62,6 +63,9 @@ func TestBuildPlayerLatestUpdate_skippedRecordsを除外して登録結果を圧
 	assert.Contains(t, payload, "profile")
 	assert.Contains(t, payload, "summary")
 	assert.Contains(t, payload, "metric_diffs")
+	metricDiffs, ok := payload["metric_diffs"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, map[string]any{"before": 76.26789, "after": 76.27011, "delta": 0.00222}, metricDiffs["overpower_percent"])
 	assert.Contains(t, payload, "statistics")
 	assert.Contains(t, payload, "counts")
 	assert.Contains(t, payload, "changes")
@@ -248,7 +252,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_不正な保存内容は内部エラ�
 	}{
 		{name: "gzipが壊れている", update: brokenGzipUpdate},
 		{name: "必須フィールドがない", update: missingFieldUpdate},
-		{name: "schema 2でメトリクス差分がない", update: missingMetricUpdate},
+		{name: "schema 3でメトリクス差分がない", update: missingMetricUpdate},
 		{name: "DBとJSONのスキーマが一致しない", update: schemaMismatchUpdate},
 		{name: "DBとJSONのプレイヤーIDが一致しない", update: mismatchPlayerUpdate},
 	}
@@ -260,6 +264,153 @@ func TestPlayerDataUsecase_GetLatestUpdate_不正な保存内容は内部エラ�
 
 			// When
 			_, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
+
+			// Then
+			assert.True(t, errors.Is(err, ErrInternalError))
+		})
+	}
+}
+
+func TestBuildPlayerDataOverpowerPercentDiff_更新前OP値を同一分母で割合へ変換する(t *testing.T) {
+	tests := []struct {
+		name              string
+		beforeValue       *float64
+		afterPercent      *float64
+		maxOverpowerTotal float64
+		wantBefore        *float64
+		wantDelta         *float64
+	}{
+		{
+			name:              "増加時は小数点以下5桁のポイント差を返す",
+			beforeValue:       float64Pointer(2),
+			afterPercent:      float64Pointer(66.679),
+			maxOverpowerTotal: 3,
+			wantBefore:        float64Pointer(66.66666),
+			wantDelta:         float64Pointer(0.01234),
+		},
+		{
+			name:              "減少時は負のポイント差を返す",
+			beforeValue:       float64Pointer(2),
+			afterPercent:      float64Pointer(66.65432),
+			maxOverpowerTotal: 3,
+			wantBefore:        float64Pointer(66.66666),
+			wantDelta:         float64Pointer(-0.01234),
+		},
+		{
+			name:              "初回登録ではbeforeとdeltaを返さない",
+			afterPercent:      float64Pointer(66.679),
+			maxOverpowerTotal: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got := buildPlayerDataOverpowerPercentDiff(tt.beforeValue, tt.afterPercent, tt.maxOverpowerTotal)
+
+			// Then
+			assert.Equal(t, tt.wantBefore, got.Before)
+			assert.Equal(t, tt.afterPercent, got.After)
+			if tt.wantDelta == nil {
+				assert.Nil(t, got.Delta)
+				return
+			}
+			require.NotNil(t, got.Delta)
+			assert.InDelta(t, *tt.wantDelta, *got.Delta, 1e-9)
+		})
+	}
+}
+
+func TestPlayerDataUsecase_GetLatestUpdate_schema2の保存結果も返す(t *testing.T) {
+	// Given
+	playerID := 12
+	result := &playerdataresult.Result{
+		PlayerID:   playerID,
+		AppVersion: "1.2.3",
+		ImportedAt: time.Date(2026, 7, 16, 2, 3, 4, 0, time.UTC),
+		Changes:    []playerdataresult.RecordChange{},
+	}
+	payload := playerLatestUpdatePayload(result)
+	payload["schema_version"] = info.PlayerLatestUpdateMetricDiffSchemaVersion
+	metricDiffs, ok := payload["metric_diffs"].(map[string]any)
+	require.True(t, ok)
+	delete(metricDiffs, "overpower_percent")
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	compressed, err := gzipBytes(raw)
+	require.NoError(t, err)
+	update, err := entity.NewPlayerLatestUpdate(
+		playerID,
+		info.PlayerLatestUpdateMetricDiffSchemaVersion,
+		compressed,
+		result.ImportedAt.Add(-time.Minute),
+		result.ImportedAt,
+		"body-hash",
+	)
+	require.NoError(t, err)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}
+	u := &playerDataUsecase{playerDataRepo: repo}
+
+	// When
+	got, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
+
+	// Then
+	require.NoError(t, err)
+	var gotPayload map[string]any
+	require.NoError(t, json.Unmarshal(got, &gotPayload))
+	assert.Equal(t, float64(info.PlayerLatestUpdateMetricDiffSchemaVersion), gotPayload["schema_version"])
+	gotMetricDiffs, ok := gotPayload["metric_diffs"].(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, gotMetricDiffs, "overpower_percent")
+}
+
+func TestPlayerDataUsecase_GetLatestUpdate_schema3のOP割合差分形式を検証する(t *testing.T) {
+	playerID := 12
+	validResult := &playerdataresult.Result{
+		PlayerID:   playerID,
+		AppVersion: "1.0.0",
+		ImportedAt: time.Now().UTC(),
+		Changes:    []playerdataresult.RecordChange{},
+	}
+	tests := []struct {
+		name        string
+		value       any
+		deleteField bool
+	}{
+		{name: "overpower_percentがない", deleteField: true},
+		{name: "overpower_percentがnull", value: nil},
+		{name: "overpower_percentがobjectではない", value: "invalid"},
+		{name: "overpower_percentの必須項目がない", value: map[string]any{"before": nil}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			payload := playerLatestUpdatePayload(validResult)
+			metricDiffs, ok := payload["metric_diffs"].(map[string]any)
+			require.True(t, ok)
+			if tt.deleteField {
+				delete(metricDiffs, "overpower_percent")
+			} else {
+				metricDiffs["overpower_percent"] = tt.value
+			}
+			raw, err := json.Marshal(payload)
+			require.NoError(t, err)
+			compressed, err := gzipBytes(raw)
+			require.NoError(t, err)
+			update, err := entity.NewPlayerLatestUpdate(
+				playerID,
+				playerLatestUpdateSchemaVersion,
+				compressed,
+				time.Now().UTC(),
+				time.Now().UTC(),
+				"body-hash",
+			)
+			require.NoError(t, err)
+			u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
+
+			// When
+			_, err = u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
 
 			// Then
 			assert.True(t, errors.Is(err, ErrInternalError))

@@ -84,6 +84,20 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 	if schemaVersion >= info.PlayerLatestUpdateMetricDiffSchemaVersion && len(envelope["metric_diffs"]) == 0 {
 		return nil, fmt.Errorf("%w: player latest update field is missing: metric_diffs", ErrInternalError)
 	}
+	if schemaVersion >= info.PlayerLatestUpdateOPPercentSchemaVersion {
+		var metricDiffs map[string]json.RawMessage
+		if err := json.Unmarshal(envelope["metric_diffs"], &metricDiffs); err != nil {
+			return nil, fmt.Errorf("%w: player latest update field is invalid: metric_diffs", ErrInternalError)
+		}
+		var overpowerPercentDiff map[string]json.RawMessage
+		if err := json.Unmarshal(metricDiffs["overpower_percent"], &overpowerPercentDiff); err != nil ||
+			overpowerPercentDiff == nil ||
+			len(overpowerPercentDiff["before"]) == 0 ||
+			len(overpowerPercentDiff["after"]) == 0 ||
+			len(overpowerPercentDiff["delta"]) == 0 {
+			return nil, fmt.Errorf("%w: player latest update field is invalid: metric_diffs.overpower_percent", ErrInternalError)
+		}
+	}
 	var playerID int
 	if err := json.Unmarshal(envelope["player_id"], &playerID); err != nil || playerID != update.PlayerID() || playerID != *user.PlayerID {
 		return nil, fmt.Errorf("%w: player latest update player_id is invalid", ErrInternalError)
@@ -123,8 +137,9 @@ func playerLatestUpdatePayload(result *playerdataresult.Result) map[string]any {
 			"overpower_percentage": result.Summary.OverpowerPercent,
 		},
 		"metric_diffs": map[string]any{
-			"rating":          playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.Rating),
-			"overpower_value": playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.OverpowerValue),
+			"rating":            playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.Rating),
+			"overpower_value":   playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.OverpowerValue),
+			"overpower_percent": playerLatestUpdateFloat64DiffPayload(result.MetricDiffs.OverpowerPercent),
 		},
 		"statistics": playerLatestUpdateStatisticsPayload(result.Statistics),
 		"counts":     playerLatestUpdateCountsPayload(result.Counts),

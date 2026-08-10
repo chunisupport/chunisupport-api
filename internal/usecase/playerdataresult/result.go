@@ -17,8 +17,9 @@ type Float64Diff struct {
 	Delta  *float64
 }
 type MetricDiffs struct {
-	Rating         Float64Diff
-	OverpowerValue Float64Diff
+	Rating           Float64Diff
+	OverpowerValue   Float64Diff
+	OverpowerPercent Float64Diff
 }
 type Profile struct {
 	PlayerID          int

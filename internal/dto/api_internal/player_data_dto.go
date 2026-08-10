@@ -16,8 +16,9 @@ type PlayerDataFloat64Diff struct {
 	Delta  *float64 `json:"delta"`
 }
 type PlayerDataMetricDiffs struct {
-	Rating         PlayerDataFloat64Diff `json:"rating"`
-	OverpowerValue PlayerDataFloat64Diff `json:"overpower_value"`
+	Rating           PlayerDataFloat64Diff  `json:"rating"`
+	OverpowerValue   PlayerDataFloat64Diff  `json:"overpower_value"`
+	OverpowerPercent *PlayerDataFloat64Diff `json:"overpower_percent,omitempty"`
 }
 type PlayerDataProfile struct {
 	PlayerID          int        `json:"player_id"`
