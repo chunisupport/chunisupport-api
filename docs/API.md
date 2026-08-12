@@ -4432,7 +4432,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ## chunirec互換API `/compat/chunirec/2.0`
 
 chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法は`/v1`と同様です。  
-なお、こちらのAPIで表示されるIDはあくまでChuniSupportのIDであり、chunirecのIDとは異なります。他のchunirec互換APIと同時に利用していただく想定です。
+なお、楽曲IDにはChuniSupportのIDを使用します。chunirecの楽曲IDとは異なるため、他のchunirec互換APIから取得した楽曲IDを使用してください。
 
 メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
 
@@ -4617,7 +4617,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 
 ```json
 {
-  "user_id": 283,
+  "user_id": 0,
   "player_name": "Ｕ＋ＦＦ３１",
   "title": "邪気眼",
   "title_rarity": "platinum",
@@ -4633,7 +4633,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `user_id` | number | 内部ユーザーID |
+| `user_id` | number | 内部ユーザーIDを公開しないため常に `0` |
 | `player_name` | string | プレイヤー名 |
 | `title` | string\|null | 1番目の称号（スロット1） |
 | `title_rarity` | string\|null | 1番目の称号のレアリティ（normal, copper, silver, gold, platinum, rainbow等）。ChuniSupport内部では"platina"を"platinum"に変換 |

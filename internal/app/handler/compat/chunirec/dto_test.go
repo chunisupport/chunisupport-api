@@ -1,6 +1,7 @@
 package chunirec
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -237,6 +238,31 @@ func TestToChunirecUserDTO_プレイヤー未連携ではnullへ変換する(t *
 
 	// Then
 	assert.Nil(t, result)
+}
+
+func TestToChunirecUserDTO_内部ユーザーIDを公開しない(t *testing.T) {
+	// Given
+	profile := &api_internal.UserProfileWithRecordsDTO{
+		UserID: 283,
+		Player: &dto.PlayerDTO{
+			UpdatedAt: time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	// When
+	result := ToChunirecUserDTO(profile, nil, time.UTC)
+
+	// Then
+	require.NotNil(t, result)
+	assert.Zero(t, result.UserID)
+
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(body, &response))
+	userID, exists := response["user_id"]
+	require.True(t, exists)
+	assert.Equal(t, float64(0), userID)
 }
 
 func stringPtr(value string) *string {

@@ -253,7 +253,7 @@ func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCa
 	}
 
 	dto := &ChunirecUserDTO{
-		UserID:       profile.UserID,
+		UserID:       undisclosedUserID,
 		PlayerName:   profile.Player.Name,
 		Level:        profile.Player.Level,
 		IsJoinedTeam: nil, // ChuniSupportでは保持しないデータ
