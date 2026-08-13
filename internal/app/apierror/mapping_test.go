@@ -141,3 +141,31 @@ func TestFromUsecaseError_APIトークン管理エラーを変換する(t *testi
 		})
 	}
 }
+
+func TestFromUsecaseError_データ移行エラーを専用HTTPエラーへ変換する(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{name: "プレイヤーなし", err: usecase.ErrDataTransferPlayerNotFound, wantCode: CodeDataTransferPlayerNotFound, wantStatus: http.StatusBadRequest},
+		{name: "ファイル不正", err: usecase.ErrDataTransferInvalidFile, wantCode: CodeDataTransferInvalidFile, wantStatus: http.StatusBadRequest},
+		{name: "署名不正", err: usecase.ErrDataTransferInvalidSignature, wantCode: CodeDataTransferInvalidSignature, wantStatus: http.StatusBadRequest},
+		{name: "スキーマ非対応", err: usecase.ErrDataTransferUnsupportedSchema, wantCode: CodeDataTransferUnsupportedSchema, wantStatus: http.StatusBadRequest},
+		{name: "データ不正", err: usecase.ErrDataTransferInvalidData, wantCode: CodeDataTransferInvalidData, wantStatus: http.StatusBadRequest},
+		{name: "参照未解決", err: usecase.ErrDataTransferUnresolvedReference, wantCode: CodeDataTransferUnresolvedReference, wantStatus: http.StatusBadRequest},
+		{name: "移行先に既存データあり", err: usecase.ErrDataTransferDestinationNotEmpty, wantCode: CodeDataTransferDestinationNotEmpty, wantStatus: http.StatusConflict},
+		{name: "サイズ超過", err: usecase.ErrDataTransferPayloadTooLarge, wantCode: CodePayloadTooLarge, wantStatus: http.StatusRequestEntityTooLarge},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiErr := FromUsecaseError(tt.err)
+
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.ErrorIs(t, apiErr, tt.err)
+		})
+	}
+}

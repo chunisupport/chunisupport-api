@@ -627,6 +627,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		Worldsend:           new(internalhandler.WorldsendHandler),
 		APIToken:            new(internalhandler.APITokenHandler),
 		Me:                  new(internalhandler.MeHandler),
+		DataTransfer:        internalhandler.NewDataTransferHandler(),
 		MasterData:          new(internalhandler.MasterDataHandler),
 		Goal:                new(internalhandler.GoalHandler),
 		SystemMaintenance:   internalhandler.NewSystemMaintenanceHandler(stubMaintenanceUsecase{}),

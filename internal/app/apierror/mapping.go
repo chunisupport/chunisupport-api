@@ -44,6 +44,22 @@ func FromUsecaseError(err error) *APIError {
 		return ErrPlayerNotLinked.WithInternal(err)
 	case errors.Is(err, usecase.ErrPlayerMetricHistoryNotFound):
 		return ErrPlayerMetricHistoryNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferPlayerNotFound):
+		return ErrDataTransferPlayerNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidFile):
+		return ErrDataTransferInvalidFile.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidSignature):
+		return ErrDataTransferInvalidSignature.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferUnsupportedSchema):
+		return ErrDataTransferUnsupportedSchema.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidData):
+		return ErrDataTransferInvalidData.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferUnresolvedReference):
+		return ErrDataTransferUnresolvedReference.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferDestinationNotEmpty):
+		return ErrDataTransferDestinationNotEmpty.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferPayloadTooLarge):
+		return ErrPayloadTooLarge.WithInternal(err)
 
 	case errors.Is(err, usecase.ErrOperationFailed):
 		return ErrOperationFailed.WithInternal(err)

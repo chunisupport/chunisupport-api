@@ -20,7 +20,7 @@ import (
 )
 
 func TestExternalCORS_対象エンドポイントのみ追加オリジンを許可する(t *testing.T) {
-	cfg := config.Config{
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 		CORS: config.CORS{
 			AllowOrigins:     []string{"https://chunisupport.example.com"},
 			AllowCredentials: true,
@@ -118,7 +118,7 @@ func TestExternalCORS_対象エンドポイントのみ追加オリジンを許�
 
 func TestTemporaryPlayerDataCORS_内部グループでも対象パスだけ追加オリジンを許可する(t *testing.T) {
 	// Given
-	cfg := config.Config{
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 		CORS: config.CORS{
 			AllowOrigins: []string{"https://chunisupport.example.com"},
 		},
@@ -167,7 +167,7 @@ func TestTemporaryPlayerDataCORS_内部グループでも対象パスだけ追�
 }
 
 func TestCORSAllowOrigins_ワイルドカード入りオリジンを許可する(t *testing.T) {
-	cfg := config.Config{
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 		CORS: config.CORS{
 			AllowOrigins: []string{
 				"https://chunisupport.example.com",
@@ -234,7 +234,7 @@ func TestCORSAllowOrigins_ワイルドカード入りオリジンを許可する
 
 func TestCORSAllowMethods_PATCHを許可する(t *testing.T) {
 	// Given
-	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret, CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
 	e := echo.New()
 	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
 	e.PATCH("/internal/auth/api-tokens/:id", func(c *echo.Context) error {
@@ -255,7 +255,7 @@ func TestCORSAllowMethods_PATCHを許可する(t *testing.T) {
 
 func TestCORSExposeHeaders_RetryAfterを公開する(t *testing.T) {
 	// Given
-	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret, CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
 
 	// When
 	corsConfig := newDefaultCORSConfig(cfg)
@@ -267,7 +267,7 @@ func TestCORSExposeHeaders_RetryAfterを公開する(t *testing.T) {
 func TestMaintenanceResponse_許可済みオリジンへCORSヘッダーを返す(t *testing.T) {
 	// Given
 	const origin = "https://chunisupport.example.com"
-	cfg := config.Config{CORS: config.CORS{AllowOrigins: []string{origin}}}
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret, CORS: config.CORS{AllowOrigins: []string{origin}}}
 	maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: true}}
 	e := echo.New()
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
@@ -295,7 +295,7 @@ func TestMaintenanceResponse_許可済みオリジンへCORSヘッダーを返�
 
 func TestMaintenanceResponse_一時保存APIの追加オリジンへCORSヘッダーを返す(t *testing.T) {
 	// Given
-	cfg := config.Config{
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 		CORS: config.CORS{
 			AllowOrigins: []string{"https://chunisupport.example.com"},
 		},

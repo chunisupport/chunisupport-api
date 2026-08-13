@@ -23,6 +23,7 @@ type GoalRepository interface {
 	CountByUserIDAndGroupID(ctx context.Context, exec Executor, userID int, groupID *uint32) (int, error)
 	LockUserByID(ctx context.Context, exec Executor, userID int) error
 	GetTargetStats(ctx context.Context, exec Executor, filter GoalTargetFilter) (*GoalTargetStats, error)
+	GetTargetStatsBatch(ctx context.Context, exec Executor, filters []GoalTargetFilter) ([]GoalTargetStats, error)
 }
 
 // GoalTargetFilter は目標対象譜面の絞り込み条件です。

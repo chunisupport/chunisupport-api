@@ -45,6 +45,7 @@
    # .env
    APP_ENV=develop
    FIREBASE_CREDENTIALS_FILE=path/to/service-account.json
+   DATA_TRANSFER_HMAC_SECRET=<Base64で表現した32バイト以上のランダム値>
    DB_NAME=chunisupport
    DB_HOST=localhost
    DB_PORT=3306

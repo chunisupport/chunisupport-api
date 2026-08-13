@@ -28,6 +28,15 @@ const (
 	CodePlayerNotFound              = "player_not_found"
 	CodePlayerMetricHistoryNotFound = "player_metric_history_not_found"
 
+	// ユーザーデータ移行関連エラー
+	CodeDataTransferPlayerNotFound      = "data_transfer_player_not_found"
+	CodeDataTransferInvalidFile         = "data_transfer_invalid_file"
+	CodeDataTransferInvalidSignature    = "data_transfer_invalid_signature"
+	CodeDataTransferUnsupportedSchema   = "data_transfer_unsupported_schema"
+	CodeDataTransferInvalidData         = "data_transfer_invalid_data"
+	CodeDataTransferUnresolvedReference = "data_transfer_unresolved_reference"
+	CodeDataTransferDestinationNotEmpty = "data_transfer_destination_not_empty"
+
 	// 楽曲・譜面関連エラー
 	CodeSongNotFound                      = "song_not_found"
 	CodeChartNotFound                     = "chart_not_found"

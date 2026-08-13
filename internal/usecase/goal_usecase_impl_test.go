@@ -14,14 +14,15 @@ import (
 )
 
 type stubGoalRepo struct {
-	count      int
-	goal       *entity.Goal
-	goals      []*entity.Goal
-	updateErr  error
-	stats      *repository.GoalTargetStats
-	lastFilter repository.GoalTargetFilter
-	savedOrder []uint32
-	savedSorts []uint16
+	count           int
+	goal            *entity.Goal
+	goals           []*entity.Goal
+	updateErr       error
+	stats           *repository.GoalTargetStats
+	lastFilter      repository.GoalTargetFilter
+	savedOrder      []uint32
+	savedSorts      []uint16
+	statsBatchCalls int
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
@@ -103,6 +104,19 @@ func (s *stubGoalRepo) GetTargetStats(ctx context.Context, exec repository.Execu
 		return &repository.GoalTargetStats{ChartCount: 1000, TotalChartConst: 17000}, nil
 	}
 	return s.stats, nil
+}
+
+func (s *stubGoalRepo) GetTargetStatsBatch(ctx context.Context, exec repository.Executor, filters []repository.GoalTargetFilter) ([]repository.GoalTargetStats, error) {
+	s.statsBatchCalls++
+	result := make([]repository.GoalTargetStats, len(filters))
+	for index, filter := range filters {
+		stats, err := s.GetTargetStats(ctx, exec, filter)
+		if err != nil {
+			return nil, err
+		}
+		result[index] = *stats
+	}
+	return result, nil
 }
 
 type stubTM struct{}

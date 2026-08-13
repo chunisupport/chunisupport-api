@@ -79,6 +79,14 @@ var (
 	ErrPlayerNotFound              = New(CodePlayerNotFound, http.StatusNotFound)
 	ErrPlayerMetricHistoryNotFound = New(CodePlayerMetricHistoryNotFound, http.StatusNotFound)
 
+	ErrDataTransferPlayerNotFound      = New(CodeDataTransferPlayerNotFound, http.StatusBadRequest)
+	ErrDataTransferInvalidFile         = New(CodeDataTransferInvalidFile, http.StatusBadRequest)
+	ErrDataTransferInvalidSignature    = New(CodeDataTransferInvalidSignature, http.StatusBadRequest)
+	ErrDataTransferUnsupportedSchema   = New(CodeDataTransferUnsupportedSchema, http.StatusBadRequest)
+	ErrDataTransferInvalidData         = New(CodeDataTransferInvalidData, http.StatusBadRequest)
+	ErrDataTransferUnresolvedReference = New(CodeDataTransferUnresolvedReference, http.StatusBadRequest)
+	ErrDataTransferDestinationNotEmpty = New(CodeDataTransferDestinationNotEmpty, http.StatusConflict)
+
 	// 楽曲・譜面関連エラー
 	ErrSongNotFound                      = New(CodeSongNotFound, http.StatusNotFound)
 	ErrChartNotFound                     = New(CodeChartNotFound, http.StatusNotFound)

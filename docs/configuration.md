@@ -11,6 +11,7 @@
 - `APP_ENV` (例: `develop`)
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
+- `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
 - `DB_PORT`
@@ -186,3 +187,9 @@ APIサーバーの起動にはこれらの環境変数は不要です。本番�
 設定読み込み、ログ初期化、DB接続、マスタデータのプリロード、Firebase認証サービスの初期化、サーバ起動、graceful shutdown に失敗した場合、アプリケーションは終了コード `1` で終了します。正常な SIGINT / SIGTERM による停止は終了コード `0` で終了します。
 
 systemd 管理下で運用する場合は、`Restart=always` または `Restart=on-failure` の利用を検討してください。DBが同一ホストにある場合は `After=mysql.service`、外部DBを使う場合は `network-online.target` までの依存も併用できます。logrotate を使う場合は、`ExecReload=/bin/kill -HUP $MAINPID` を設定してください。
+
+## ユーザーデータ移行
+
+settings JSONにデータ移行用の設定節はありません。エクスポート、検証、インポートの各APIは常時登録されます。
+
+APIサーバーでは、環境変数`DATA_TRANSFER_HMAC_SECRET`へBase64で表現した32バイト以上の共有秘密鍵を必ず設定します。移行ファイルを相互利用するChuniSupportサーバーには同じ秘密鍵を設定してください。秘密鍵が異なるサーバーのファイルは署名検証で拒否されます。

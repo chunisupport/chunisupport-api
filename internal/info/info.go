@@ -19,20 +19,20 @@ const (
 	DefaultSongListLimit                        = 100
 	DefaultBestSlotRankingLimit                 = 50
 	MaxBestSlotRankingLimit                     = 100
-	GoalMaxPerUser                              = 100
-	GoalGroupMaxPerUser                         = 20
-	RecordFilterMaxPerUser                      = 100
-	RecordFilterNameMaxLength                   = 30
-	RecordFilterMaxPayloadBytes                 = 8 * 1024
+	GoalMaxPerUser                              = constants.GoalMaxPerUser
+	GoalGroupMaxPerUser                         = constants.GoalGroupMaxPerUser
+	RecordFilterMaxPerUser                      = constants.RecordFilterMaxPerUser
+	RecordFilterNameMaxLength                   = constants.RecordFilterNameMaxLength
+	RecordFilterMaxPayloadBytes                 = constants.RecordFilterMaxPayloadBytes
 	APITokenMaxPerUser                          = 10
 	APITokenRandomByteLength                    = 32
 	APITokenPrefixLength                        = 5
 	APITokenLastUsedUpdateInterval              = time.Hour
-	MaxScoreHistoryEntriesPerChart              = 50
-	MaxOfficialRating                           = 99.99
-	MaxOfficialOverpower                        = 999999.99
-	OfficialMetricDecimalScale                  = 100
-	OfficialMetricDecimalTolerance              = 1e-7
+	MaxScoreHistoryEntriesPerChart              = constants.MaxScoreHistoryEntriesPerChart
+	MaxOfficialRating                           = constants.MaxOfficialRating
+	MaxOfficialOverpower                        = constants.MaxOfficialOverpower
+	OfficialMetricDecimalScale                  = constants.OfficialMetricDecimalScale
+	OfficialMetricDecimalTolerance              = constants.OfficialMetricDecimalTolerance
 	ChartConstMin                               = constants.ChartConstMin
 	ChartConstMax                               = constants.ChartConstMax
 	GoalChartTargetOP                           = "OP_TARGET"
@@ -94,7 +94,15 @@ const (
 	AccountTypeExtDev = 4 // 外部API開発者
 
 	// リクエストボディサイズ上限
-	RequestBodyLimit = 5 * 1024 * 1024
+	RequestBodyLimit                      = 5 * 1024 * 1024
+	DataTransferFormat                    = "chunisupport-user-transfer"
+	DataTransferSchemaVersion             = 1
+	DataTransferHMACSecretMinBytes        = 32
+	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024
+	DataTransferCompressedPayloadMaxBytes = 24 * 1024 * 1024
+	DataTransferPayloadMaxBytes           = 128 * 1024 * 1024
+	DataTransferRateLimitRequests         = 5
+	DataTransferRateLimitWindow           = time.Minute
 
 	// DBコネクションプールのデフォルト設定
 	DefaultDBMaxOpenConns       = 25
@@ -105,7 +113,7 @@ const (
 	DefaultDBStartupIntervalSec = 5
 
 	// プレイヤーお気に入り楽曲
-	PlayerFavoriteSongMaxCount = 100
+	PlayerFavoriteSongMaxCount = constants.PlayerFavoriteSongMaxCount
 
 	// フレンド機能
 	FriendshipMaxOutgoingActive = 100

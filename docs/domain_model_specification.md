@@ -795,3 +795,11 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 - 集約ルートごとにリポジトリを定義
 - `Save(ctx, entity)` メソッドで集約全体を永続化（INSERT/UPDATE判定は内部で実施）
 - 部分更新メソッド（`UpdatePrivacy`, `LinkFirebaseUID`相当など）は廃止し、集約指向の永続化を推進
+
+## UserDataTransferSnapshot集約
+
+UserDataTransferSnapshotは、ユーザーに属するプレイヤー、通常譜面・WORLD'S ENDの現在レコードと履歴、公式指標履歴、コース、称号、お気に入り、未解禁楽曲、目標、保存済みフィルタを一括移行する集約です。
+
+移行ファイルにはサーバー固有IDを含めません。楽曲とコースはofficial_idx、譜面はofficial_idxと大文字の難易度名、各種マスターは名称で参照します。目標属性のdiff、genre、verも名称へ外部化し、移行先で一括解決します。
+
+集約は件数上限、キーと時刻の重複、表示順、スロット順、値域、UTC時刻、非nil配列を検証します。移行先ではユーザー行をロックし、プレイヤー・目標・目標グループ・保存済みフィルタがないことを再確認してから、全セクションを一つのトランザクションで保存します。

@@ -16,6 +16,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+var testDataTransferHMACSecret = []byte("0123456789abcdef0123456789abcdef")
+
 func TestServerAddress(t *testing.T) {
 	// Given: アプリケーションの待受ポート
 	const port = 3000
@@ -39,7 +41,7 @@ func TestNewServer_メンテナンス状態を復元できなければ起動準�
 	server, err := NewServer(
 		context.Background(),
 		database,
-		config.Config{
+		config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 			CORS: config.CORS{
 				AllowOrigins: []string{"https://example.com"},
 			},
@@ -84,7 +86,7 @@ func TestNewRouter_永続化済みメンテナンス状態を全体へ適用す�
 		time.Date(2026, time.July, 26, 3, 30, 0, 0, time.UTC),
 	)
 	require.NoError(t, err)
-	cfg := config.Config{
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 		Location: time.FixedZone("JST", 9*60*60),
 		CORS: config.CORS{
 			AllowOrigins: []string{"https://example.com"},

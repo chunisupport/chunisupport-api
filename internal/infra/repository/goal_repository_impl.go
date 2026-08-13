@@ -200,9 +200,48 @@ func (r *goalRepository) LockUserByID(ctx context.Context, exec repository.Execu
 }
 
 func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
+	stats, err := r.GetTargetStatsBatch(ctx, exec, []repository.GoalTargetFilter{filter})
+	if err != nil {
+		return nil, err
+	}
+	return &stats[0], nil
+}
+
+func (r *goalRepository) GetTargetStatsBatch(ctx context.Context, exec repository.Executor, filters []repository.GoalTargetFilter) ([]repository.GoalTargetStats, error) {
+	if len(filters) == 0 {
+		return []repository.GoalTargetStats{}, nil
+	}
+	queries := make([]string, 0, len(filters))
+	args := make([]any, 0, len(filters)*8)
+	for index, filter := range filters {
+		query, queryArgs := buildGoalTargetStatsQuery(filter)
+		queries = append(queries, fmt.Sprintf("SELECT %d AS filter_index, target_stats.* FROM (%s) target_stats", index, query))
+		args = append(args, queryArgs...)
+	}
+	query, args, err := sqlx.In(strings.Join(queries, " UNION ALL "), args...)
+	if err != nil {
+		return nil, err
+	}
+	query = r.db.Rebind(query)
+	var rows []struct {
+		FilterIndex     int     `db:"filter_index"`
+		ChartCount      int     `db:"chart_count"`
+		SongCount       int     `db:"song_count"`
+		TotalChartConst float64 `db:"total_chart_const"`
+	}
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	result := make([]repository.GoalTargetStats, len(filters))
+	for _, row := range rows {
+		result[row.FilterIndex] = repository.GoalTargetStats{ChartCount: row.ChartCount, SongCount: row.SongCount, TotalChartConst: row.TotalChartConst}
+	}
+	return result, nil
+}
+
+func buildGoalTargetStatsQuery(filter repository.GoalTargetFilter) (string, []any) {
 	where := []string{"s.is_deleted = 0"}
 	args := make([]any, 0, 8)
-
 	if len(filter.DifficultyIDs) > 0 {
 		where = append(where, "c.difficulty_id IN (?)")
 		args = append(args, filter.DifficultyIDs)
@@ -240,7 +279,6 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 			  AND (higher.const > c.const OR (higher.const = c.const AND higher.difficulty_id > c.difficulty_id))
 		)`)
 	}
-
 	query := `
 		SELECT
 			COUNT(*) AS chart_count,
@@ -256,30 +294,5 @@ func (r *goalRepository) GetTargetStats(ctx context.Context, exec repository.Exe
 			HAVING COUNT(DISTINCT difficulty_id) = %d
 		) rainbow ON rainbow.song_id = s.id
 		WHERE ` + strings.Join(where, " AND ")
-	query = fmt.Sprintf(
-		query,
-		info.RainbowRequiredDifficultyMinID,
-		info.RainbowRequiredDifficultyMaxID,
-		info.RainbowRequiredDifficultyCount,
-	)
-	query, args, err := sqlx.In(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	query = r.db.Rebind(query)
-
-	var row struct {
-		ChartCount      int     `db:"chart_count"`
-		SongCount       int     `db:"song_count"`
-		TotalChartConst float64 `db:"total_chart_const"`
-	}
-	if err := exec.GetContext(ctx, &row, query, args...); err != nil {
-		return nil, err
-	}
-
-	return &repository.GoalTargetStats{
-		ChartCount:      row.ChartCount,
-		SongCount:       row.SongCount,
-		TotalChartConst: row.TotalChartConst,
-	}, nil
+	return fmt.Sprintf(query, info.RainbowRequiredDifficultyMinID, info.RainbowRequiredDifficultyMaxID, info.RainbowRequiredDifficultyCount), args
 }

@@ -4978,3 +4978,23 @@ interface SkippedRecord {
 - エラーコードと内部理由コードの最新一覧は `docs/error_code_reason_codes.md` を参照してください。
 - CORSの許可オリジンは環境ごとに設定ファイルで管理します。
 - ユーザーを物理削除すると、ログインはできなくなり、関連データも削除されます。
+
+## ユーザーデータ移行API
+
+すべてのエンドポイントでFirebase Bearer認証が必要です。3つの操作ルートは常時利用できます。
+
+### POST /internal/me/data-transfer/export
+
+認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。移行元にプレイヤーがない場合は400を返します。
+
+### POST /internal/me/data-transfer/validate
+
+エクスポートされたJSONファイル本体をリクエストボディへ指定します。署名、形式、集約の不変条件、移行先マスター参照、移行先アカウントの空状態を検証します。
+
+形式が正しくても移行できない場合は200を返し、importableをfalseにします。blockersにはdestination_not_emptyまたはunresolved_referencesが入り、unresolved_referencesは先頭100件まで、unresolved_reference_countは全件数を表します。
+
+### POST /internal/me/data-transfer/import
+
+validateと同じファイルを再送します。すべての検証を再実行し、ユーザー行をロックして空状態を再確認した後、移行対象を1トランザクションで保存します。成功時は新しいplayer_idとセクション別保存件数を返します。
+
+移行先が空でない場合は409 data_transfer_destination_not_empty、参照を解決できない場合は400 data_transfer_unresolved_referenceを返します。リクエスト上限は32MiB、3つの操作APIはユーザー単位で1分間に5回までです。

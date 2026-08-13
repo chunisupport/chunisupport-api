@@ -24,6 +24,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/datatransfer"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
@@ -81,6 +82,7 @@ type Handlers struct {
 	Worldsend             *api_internal.WorldsendHandler
 	APIToken              *api_internal.APITokenHandler
 	Me                    *api_internal.MeHandler
+	DataTransfer          *api_internal.DataTransferHandler
 	MasterData            *api_internal.MasterDataHandler
 	Goal                  *api_internal.GoalHandler
 	GoalGroup             *api_internal.GoalGroupHandler
@@ -127,7 +129,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	}
 
 	e.Use(echoMiddleware.Recover())
-	e.Use(echoMiddleware.BodyLimit(info.RequestBodyLimit))
+	e.Use(newRequestBodyLimitMiddleware())
 
 	// CORS設定を適用
 	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
@@ -225,6 +227,12 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
 	bestSlotRankingUsecase := usecase.NewBestSlotRankingUsecase(bestSlotRankingQueryService, chartStatsMasterProvider)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
+	dataTransferCodec, err := datatransfer.NewCodec(cfg.DataTransferHMACSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize data transfer codec: %w", err)
+	}
+	dataTransferRepo := infra.NewUserDataTransferRepository(db)
+	dataTransferUsecase := usecase.NewUserDataTransferUsecase(dataTransferCodec, dataTransferRepo, goalUsecase)
 
 	// DI - Handlers
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
@@ -249,6 +257,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		Worldsend:             api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
 		APIToken:              api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:                    api_internal.NewMeHandler(playerDataUsecase),
+		DataTransfer:          api_internal.NewDataTransferHandler(dataTransferUsecase),
 		MasterData:            api_internal.NewMasterDataHandler(masterDataUsecase),
 		Goal:                  api_internal.NewGoalHandler(goalUsecase),
 		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
@@ -332,6 +341,10 @@ func registerRoutes(
 		Window:   info.InternalPublicRateLimitWindow,
 	})
 
+	dataTransferRateLimit := middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.DataTransferRateLimitRequests,
+		Window:   info.DataTransferRateLimitWindow,
+	})
 	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
 
@@ -363,6 +376,9 @@ func registerRoutes(
 	meGroup.Use(firebaseAuthStrict)
 	{
 		meGroup.GET("", handlers.Profile.Me)
+		meGroup.POST("/data-transfer/export", handlers.DataTransfer.Export, dataTransferRateLimit)
+		meGroup.POST("/data-transfer/validate", handlers.DataTransfer.Validate, dataTransferRateLimit)
+		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
@@ -830,4 +846,21 @@ func handleVersion(c *echo.Context) error {
 		"commit_hash": info.Revision,
 		"go_version":  runtime.Version(),
 	})
+}
+
+func newRequestBodyLimitMiddleware() echo.MiddlewareFunc {
+	standard := echoMiddleware.BodyLimit(info.RequestBodyLimit)
+	dataTransfer := echoMiddleware.BodyLimit(info.DataTransferEnvelopeMaxBytes)
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		standardHandler := standard(next)
+		dataTransferHandler := dataTransfer(next)
+		return func(context *echo.Context) error {
+			switch context.Request().URL.Path {
+			case "/internal/me/data-transfer/validate", "/internal/me/data-transfer/import":
+				return dataTransferHandler(context)
+			default:
+				return standardHandler(context)
+			}
+		}
+	}
 }

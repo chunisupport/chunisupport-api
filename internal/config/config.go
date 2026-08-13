@@ -74,6 +74,7 @@ type Config struct {
 	CORS                   CORS           `json:"cors"`
 	TempData               TempData       `json:"temp_data"`
 	UsernamePolicy         UsernamePolicy `json:"-"`
+	DataTransferHMACSecret []byte         `json:"-"`
 	Firebase               Firebase       // 環境変数から読み込み
 	Turnstile              Turnstile      // 環境変数から読み込み
 	Database               Database       // 環境変数から読み込み
@@ -249,6 +250,12 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
 			errors = append(errors, err.Error())
 		}
+	}
+	dataTransferSecret, err := decodeDataTransferHMACSecret(os.Getenv("DATA_TRANSFER_HMAC_SECRET"), loadApplicationSecrets)
+	if err != nil {
+		errors = append(errors, err.Error())
+	} else {
+		config.DataTransferHMACSecret = dataTransferSecret
 	}
 
 	// データベース設定を環境変数から取得

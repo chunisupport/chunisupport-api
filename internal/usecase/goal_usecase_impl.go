@@ -39,7 +39,7 @@ type goalUsecase struct {
 
 // NewGoalUsecase は目標ユースケースを生成します。
 // グループ所有権の検証漏れを配線時に検出できるよう、関連リポジトリはすべて必須依存とします。
-func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider, groupRepo repository.GoalGroupRepository) GoalUsecase {
+func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider, groupRepo repository.GoalGroupRepository) GoalUsecaseWithTransferValidation {
 	return &goalUsecase{db: db, tm: tm, goalRepo: goalRepo, groupRepo: groupRepo, masterProvider: masterProvider}
 }
 
@@ -279,39 +279,40 @@ type goalAchievementParam struct {
 }
 
 func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*validatedGoalInput, error) {
-	if input == nil {
-		return nil, ErrInvalidGoalInput
+	validated, attrs, params, err := u.validateInputStatic(input)
+	if err != nil {
+		return nil, err
 	}
-	title := input.Title
-	title = strings.TrimSpace(title)
+	if err := u.validateDynamicUpperBound(ctx, input.AchievementType, attrs, params); err != nil {
+		return nil, err
+	}
+	return validated, nil
+}
+
+func (u *goalUsecase) validateInputStatic(input *GoalInput) (*validatedGoalInput, *goalAttributeFilter, *goalAchievementParam, error) {
+	if input == nil {
+		return nil, nil, nil, ErrInvalidGoalInput
+	}
+	title := strings.TrimSpace(input.Title)
 	if title == "" || len([]rune(title)) > 30 || hasControlCharacter(title) {
-		return nil, ErrInvalidGoalTitle
+		return nil, nil, nil, ErrInvalidGoalTitle
 	}
 	masters := u.masterProvider.GoalMasters()
 	if masters == nil {
-		return nil, ErrInternalError
+		return nil, nil, nil, ErrInternalError
 	}
 	item, ok := masters.AchievementTypesByCode[input.AchievementType]
 	if !ok {
-		return nil, ErrInvalidAchievementType
+		return nil, nil, nil, ErrInvalidAchievementType
 	}
-	attrsRaw, attrsFilter, err := validateAttributes(
-		input.Attributes,
-		masters,
-		input.AchievementType,
-	)
+	attrsRaw, attrsFilter, err := validateAttributes(input.Attributes, masters, input.AchievementType)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	paramsRaw, params, err := validateAchievementParams(input.AchievementType, input.AchievementParams)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-
-	if err := u.validateDynamicUpperBound(ctx, input.AchievementType, attrsFilter, params); err != nil {
-		return nil, err
-	}
-
 	return &validatedGoalInput{
 		Title:             title,
 		AchievementTypeID: item.ID,
@@ -319,9 +320,8 @@ func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*val
 		Attributes:        attrsRaw,
 		InvertValue:       input.InvertValue,
 		InvertPercentage:  input.InvertPercentage,
-	}, nil
+	}, attrsFilter, params, nil
 }
-
 func validateAttributes(
 	raw []byte,
 	masters *domainmasterdata.GoalMasters,
@@ -766,7 +766,15 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 }
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
-	filter := repository.GoalTargetFilter{
+	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, goalTargetFilter(attrs))
+	if err != nil {
+		return err
+	}
+	return validateDynamicUpperBoundWithStats(achievementType, params, stats)
+}
+
+func goalTargetFilter(attrs *goalAttributeFilter) repository.GoalTargetFilter {
+	return repository.GoalTargetFilter{
 		DifficultyIDs: attrs.DifficultyIDs,
 		GenreIDs:      attrs.GenreIDs,
 		VersionRanges: attrs.VersionRanges,
@@ -774,11 +782,9 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 		ConstMax:      attrs.ConstMax,
 		OPTargetOnly:  attrs.OPTargetOnly,
 	}
-	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
-	if err != nil {
-		return err
-	}
+}
 
+func validateDynamicUpperBoundWithStats(achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
 	switch achievementType {
 	case "rank_count", "score_count", "hardlamp_count", "combolamp_count":
 		if params.Count != nil && *params.Count > stats.ChartCount {
