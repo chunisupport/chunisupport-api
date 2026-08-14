@@ -102,7 +102,7 @@ func readDataTransferBody(context *echo.Context) ([]byte, error) {
 }
 
 func toDataTransferValidationResponse(output *usecase.UserDataTransferValidationOutput) *dto_internal.DataTransferValidationResponse {
-	return &dto_internal.DataTransferValidationResponse{Importable: output.Importable, PlayerName: output.PlayerName, Counts: toDataTransferCountsResponse(output.Counts), Blockers: output.Blockers, UnresolvedReferences: output.UnresolvedReferences, UnresolvedReferenceCount: output.UnresolvedReferenceCount}
+	return &dto_internal.DataTransferValidationResponse{Importable: output.Importable, PlayerName: output.PlayerName, Counts: toDataTransferCountsResponse(output.Counts), Blockers: append([]string{}, output.Blockers...), UnresolvedReferences: append([]string{}, output.UnresolvedReferences...), UnresolvedReferenceCount: output.UnresolvedReferenceCount}
 }
 
 func toDataTransferCountsResponse(counts usecase.UserDataTransferCounts) dto_internal.DataTransferCountsResponse {

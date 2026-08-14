@@ -73,6 +73,24 @@ func TestDataTransferHandlerValidatePassesEnvelope(t *testing.T) {
 	assert.True(t, response.Importable)
 }
 
+func TestDataTransferHandlerValidateReturnsEmptyArraysForNoValidationIssues(t *testing.T) {
+	output := &usecase.UserDataTransferValidationOutput{
+		Importable: true,
+		PlayerName: "TEST",
+	}
+	handler := NewDataTransferHandler(&dataTransferUsecaseStub{validateOutput: output})
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/data-transfer/validate", bytes.NewBufferString("{\"signed\":true}"))
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.Set("userEntity", &entity.User{ID: 1})
+
+	err := handler.Validate(ctx)
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"importable":true,"player_name":"TEST","counts":{"records":0,"record_histories":0,"worldsend_records":0,"worldsend_record_histories":0,"metric_histories":0,"course_records":0,"honors":0,"favorite_songs":0,"locked_songs":0,"goal_groups":0,"goals":0,"record_filters":0},"blockers":[],"unresolved_references":[],"unresolved_reference_count":0}`, rec.Body.String())
+}
+
 func TestDataTransferHandlerValidateRejectsEmptyBodyAsInvalidFile(t *testing.T) {
 	handler := NewDataTransferHandler(&dataTransferUsecaseStub{})
 	e := echo.New()
