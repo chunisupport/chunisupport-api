@@ -26,6 +26,7 @@ type ChartStatsByRatingBandDTO struct {
 	Combo        ChartComboStatsDTO `json:"combo"`
 	Clear        ChartClearStatsDTO `json:"clear"`
 	AverageScore *float64           `json:"average_score"`
+	MedianScore  *float64           `json:"median_score"`
 	PlayerCount  int                `json:"player_count"`
 }
 
@@ -46,6 +47,7 @@ type ChartComboStatsDTO struct {
 	None int `json:"none"`
 	FC   int `json:"fc"`
 	AJ   int `json:"aj"`
+	AJC  int `json:"ajc"`
 }
 
 // ChartClearStatsDTO はクリアランプ別人数のDTOです。
@@ -102,6 +104,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 					None: stat.Combo.None,
 					FC:   stat.Combo.FC,
 					AJ:   stat.Combo.AJ,
+					AJC:  stat.Combo.AJC,
 				},
 				Clear: ChartClearStatsDTO{
 					Failed:      stat.Clear.Failed,
@@ -112,6 +115,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 					Catastrophy: stat.Clear.Catastrophy,
 				},
 				AverageScore: stat.AverageScore,
+				MedianScore:  stat.MedianScore,
 				PlayerCount:  stat.PlayerCount,
 			})
 		}
@@ -162,6 +166,7 @@ func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*r
 				None: stat.Combo.None,
 				FC:   stat.Combo.FC,
 				AJ:   stat.Combo.AJ,
+				AJC:  stat.Combo.AJC,
 			},
 			Clear: ChartClearStatsDTO{
 				Failed:      stat.Clear.Failed,
@@ -172,6 +177,7 @@ func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*r
 				Catastrophy: stat.Clear.Catastrophy,
 			},
 			AverageScore: stat.AverageScore,
+			MedianScore:  stat.MedianScore,
 			PlayerCount:  stat.PlayerCount,
 		})
 	}

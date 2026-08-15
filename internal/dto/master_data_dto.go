@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+import (
+	"time"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+)
 
 // MasterItemDTO はマスタデータの単一項目を表します。
 type MasterItemDTO struct {
@@ -22,7 +26,7 @@ func ToVersionDTOs(versions []masterdata.Version) []*VersionDTO {
 		dtos[i] = &VersionDTO{
 			ID:         int(v.ID),
 			Name:       v.Name,
-			ReleasedAt: v.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ReleasedAt: v.ReleasedAt.Format(time.DateOnly),
 		}
 	}
 	return dtos
@@ -40,7 +44,7 @@ func ToVersionSummaryDTOs(versions []masterdata.Version) []*VersionSummaryDTO {
 	for i, v := range versions {
 		dtos[i] = &VersionSummaryDTO{
 			Name:       v.Name,
-			ReleasedAt: v.ReleasedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ReleasedAt: v.ReleasedAt.Format(time.DateOnly),
 		}
 	}
 	return dtos

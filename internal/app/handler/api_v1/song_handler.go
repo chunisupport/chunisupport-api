@@ -12,7 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // V1SongHandler は外部API v1 の楽曲関連エンドポイントを処理します。
@@ -34,7 +34,7 @@ func NewV1SongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.Char
 }
 
 // GetSongs は全楽曲を取得します（WORLD'S END以外、削除済み除外）。
-func (h *V1SongHandler) GetSongs(c echo.Context) error {
+func (h *V1SongHandler) GetSongs(c *echo.Context) error {
 	// 外部APIでは削除済み楽曲は含めない、requesterAccountTypeIDはnilを渡す
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), false, nil)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *V1SongHandler) GetSongs(c echo.Context) error {
 }
 
 // GetSong は指定された displayid の楽曲を取得します。
-func (h *V1SongHandler) GetSong(c echo.Context) error {
+func (h *V1SongHandler) GetSong(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -70,7 +70,7 @@ func (h *V1SongHandler) GetSong(c echo.Context) error {
 }
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
-func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
+func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
 	if apiErr != nil {
 		return apiErr
@@ -97,7 +97,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c echo.Context) error {
 }
 
 // UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
-func (h *V1SongHandler) UpdateSongs(c echo.Context) error {
+func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateSongRequest
 	if err := c.Bind(&requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -120,34 +120,53 @@ func (h *V1SongHandler) UpdateSongs(c echo.Context) error {
 		}
 	}
 
-	if err := h.songUsecase.UpdateSongs(c.Request().Context(), requests); err != nil {
+	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(requests)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
 }
 
+// UpdateChartConstant は公式IDと難易度の先頭3文字を使って譜面定数を更新します。
+func (h *V1SongHandler) UpdateChartConstant(c *echo.Context) error {
+	var request api_v1.UpdateChartConstantRequest
+	if err := handler.BindStrictJSON(c, &request); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&request); err != nil {
+		return apierror.ErrValidationFailedBadRequest.WithInternal(err)
+	}
+
+	song, err := h.songUsecase.UpdateChartConstant(c.Request().Context(), usecase.UpdateChartConstantInput{
+		OfficialIdx: request.OfficialIdx,
+		Difficulty:  request.Difficulty,
+		Const:       *request.Const,
+	})
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, h.convertToV1SongDTO(song))
+}
+
 // convertToV1SongDTOs は Song のスライスを V1SongDTO のスライスに変換します。
 func (h *V1SongHandler) convertToV1SongDTOs(songs []*entity.Song) []*api_v1.V1SongDTO {
-	v1Songs := make([]*api_v1.V1SongDTO, 0, len(songs))
-	for _, song := range songs {
-		v1Songs = append(v1Songs, h.convertToV1SongDTO(song))
-	}
-	return v1Songs
+	return api_v1.NewV1SongsResponse(
+		songs,
+		h.masterCache.GenreNamesByID,
+		h.masterCache.DifficultyNamesByID,
+		h.songUsecase.CalcSongMaxOP,
+	).Songs
 }
 
 // convertToV1SongDTO は Song を V1SongDTO に変換します。
 // Charts フィールドは難易度名をキーとするマップに変換されます。
 // マッピングルール: 1->"BASIC", 2->"ADVANCED", 3->"EXPERT", 4->"MASTER", 5->"ULTIMA"
 func (h *V1SongHandler) convertToV1SongDTO(song *entity.Song) *api_v1.V1SongDTO {
-	maxOP := h.songUsecase.CalcSongMaxOP(song)
-	v1SongDTO := api_v1.ToV1SongDTO(song, h.masterCache.GenreNamesByID, maxOP)
-
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
-	difficultyNames := h.masterCache.DifficultyNamesByID
-
-	v1SongDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_v1.V1ChartDTO {
-		return api_v1.ToV1ChartDTO(chart)
-	})
-	return v1SongDTO
+	return api_v1.NewV1SongDTO(
+		song,
+		h.masterCache.GenreNamesByID,
+		h.masterCache.DifficultyNamesByID,
+		h.songUsecase.CalcSongMaxOP,
+	)
 }

@@ -76,12 +76,20 @@ type V1SongDTO struct {
 	MaxOP              float64            `json:"maxop"`
 	IsMaxOPUnknown     bool               `json:"is_maxop_unknown"`
 	OpTargetDifficulty *string            `json:"op_target_difficulty"`
+	IsNew              bool               `json:"is_new"`
 	Charts             V1OrderedChartsMap `json:"charts"`
 }
 
 // V1SongsResponse は外部API v1 用の楽曲一覧レスポンスです。
 type V1SongsResponse struct {
 	Songs []*V1SongDTO `json:"songs"`
+}
+
+// UpdateChartConstantRequest は外部APIから譜面定数だけを更新するリクエストです。
+type UpdateChartConstantRequest struct {
+	OfficialIdx string   `json:"official_idx" validate:"required,max=10"`
+	Difficulty  string   `json:"difficulty" validate:"required,len=3"`
+	Const       *float64 `json:"const" validate:"required"`
 }
 
 // ToV1ChartDTO はChartエンティティから V1ChartDTO へ変換します。
@@ -138,6 +146,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 		MaxOP:              maxOP,
 		IsMaxOPUnknown:     song.IsMaxOPUnknown,
 		OpTargetDifficulty: sharedto.OpTargetDifficultyPtr(song.OpTargetDifficultyID),
+		IsNew:              song.IsNew,
 		Charts:             make(V1OrderedChartsMap),
 	}
 }

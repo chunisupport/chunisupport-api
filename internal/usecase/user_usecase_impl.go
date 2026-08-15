@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -21,10 +20,13 @@ type userUsecase struct {
 	playerRepo                   repository.PlayerRepository
 	playerRecordRepo             repository.PlayerRecordRepository
 	worldsendRecordRepo          repository.WorldsendRecordRepository
+	courseRepo                   repository.CourseRepository
 	songRepo                     repository.SongRepository
 	worldsendChartRepo           repository.WorldsendChartRepository
 	playerLockedSongRepo         repository.PlayerLockedSongRepository
+	friendshipRepo               repository.FriendshipRepository
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
+	userUpdatedAtQuery           repository.UserUpdatedAtQueryService
 	recordCompletionSvc          *service.RecordCompletionService
 	masterProvider               userMasterProvider
 	firebaseDeleter              FirebaseUserDeleter
@@ -36,8 +38,8 @@ type userMasterProvider interface {
 }
 
 type userProfilePlayerRecords struct {
-	all             []*dto.PlayerRecordDTO
-	slotMap         map[string][]*dto.PlayerRecordDTO
+	all             []*entity.PlayerRecord
+	slotMap         map[string][]*entity.PlayerRecord
 	latestUpdatedAt time.Time
 }
 
@@ -69,6 +71,16 @@ func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo rep
 	return impl
 }
 
+// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
+func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
+	s.friendshipRepo = friendshipRepo
+}
+
+// SetCourseRepository はユーザーレコードレスポンスへコースを統合します。
+func (s *userUsecase) SetCourseRepository(courseRepo repository.CourseRepository) {
+	s.courseRepo = courseRepo
+}
+
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
 func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
 	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
@@ -83,7 +95,7 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 }
 
 // NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
 	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, firebaseDeleter)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
@@ -91,12 +103,13 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Exec
 	}
 	impl.playerLockedSongRepo = playerLockedSongRepo
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	impl.userUpdatedAtQuery = userUpdatedAtQuery
 	return impl
 }
 
 // GetUserProfile はユーザー名をキーにプロファイル（username + player）を軽量に取得します。
-// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-func (s *userUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileDTO, error) {
+// 対象ユーザーが非公開設定の場合は、本人または承認済みフレンド以外は ErrUserPrivate を返します。
+func (s *userUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*UserProfileOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -105,24 +118,35 @@ func (s *userUsecase) GetUserProfile(ctx context.Context, username string, reque
 	if err != nil {
 		return nil, err
 	}
-	return &api_internal.UserProfileDTO{
+	return &UserProfileOutput{
 		Username: user.Username.String(),
 		Player:   player,
 	}, nil
 }
 
 // GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方を返します。
-func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*api_internal.UserUpdatedAtDTO, error) {
+func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*UserUpdatedAtOutput, error) {
+	if s.userUpdatedAtQuery != nil {
+		return s.getUserUpdatedAtByQuery(ctx, username, requester)
+	}
+
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
 	}
-	player, err := s.getOptionalPlayer(ctx, user)
+	if user.PlayerID == nil {
+		return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+	}
+
+	player, err := s.playerRepo.FindByID(ctx, s.db, *user.PlayerID)
 	if err != nil {
+		if errors.Is(err, repository.ErrPlayerNotFound) {
+			return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+		}
 		return nil, err
 	}
-	if player == nil || user.PlayerID == nil {
-		return &api_internal.UserUpdatedAtDTO{
+	if player == nil {
+		return &UserUpdatedAtOutput{
 			UpdatedAt: nil,
 		}, nil
 	}
@@ -142,14 +166,44 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 		latestUpdatedAt = *lastScoreUpdate
 	}
 
-	return &api_internal.UserUpdatedAtDTO{
+	return &UserUpdatedAtOutput{
 		UpdatedAt: &latestUpdatedAt,
 	}, nil
 }
 
+func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username string, requester *entity.User) (*UserUpdatedAtOutput, error) {
+	result, err := s.userUpdatedAtQuery.FindByUsername(ctx, s.db, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	if result == nil || result.User == nil {
+		return nil, ErrUserNotFound
+	}
+	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, result.User, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
+		return nil, ErrUserPrivate
+	}
+	if result.PlayerUpdatedAt == nil {
+		return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+	}
+
+	latestUpdatedAt := *result.PlayerUpdatedAt
+	if result.RecordsUpdatedAt != nil && result.RecordsUpdatedAt.After(latestUpdatedAt) {
+		latestUpdatedAt = *result.RecordsUpdatedAt
+	}
+
+	return &UserUpdatedAtOutput{UpdatedAt: &latestUpdatedAt}, nil
+}
+
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
-// 対象ユーザーが非公開設定の場合は、本人以外は ErrUserPrivate を返します。
-func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileWithRecordsDTO, error) {
+// 対象ユーザーが非公開設定の場合は、本人または承認済みフレンド以外は ErrUserPrivate を返します。
+func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileWithRecordsOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -159,7 +213,7 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		return nil, err
 	}
 	if player == nil {
-		return &api_internal.UserProfileWithRecordsDTO{
+		return &UserProfileWithRecordsOutput{
 			UserID:    user.ID,
 			Username:  user.Username.String(),
 			Player:    nil,
@@ -177,32 +231,37 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 	if err != nil {
 		return nil, err
 	}
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
+	}
 
-	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords), courseUpdatedAt)
 	if recordsUpdatedAt.IsZero() {
-		recordsUpdatedAt = player.UpdatedAt
+		recordsUpdatedAt = player.Player.UpdatedAt
 	}
-	recordsDTO := &dto.UserRecordResponseDTO{
+	recordsDTO := &UserRecordOutput{
 		UpdatedAt:     recordsUpdatedAt,
-		Best:          playerRecords.slotMap["best"],
-		BestCandidate: playerRecords.slotMap["best_candidate"],
-		New:           playerRecords.slotMap["new"],
-		NewCandidate:  playerRecords.slotMap["new_candidate"],
-		All:           playerRecords.all,
-		WorldsEnd:     worldsendRecords,
+		Best:          toPlayerRecordOutputs(playerRecords.slotMap["best"]),
+		BestCandidate: toPlayerRecordOutputs(playerRecords.slotMap["best_candidate"]),
+		New:           toPlayerRecordOutputs(playerRecords.slotMap["new"]),
+		NewCandidate:  toPlayerRecordOutputs(playerRecords.slotMap["new_candidate"]),
+		All:           toPlayerRecordOutputs(playerRecords.all),
+		WorldsEnd:     toWorldsendRecordOutputs(worldsendRecords),
+		Courses:       courseRecords,
 	}
 
-	return &api_internal.UserProfileWithRecordsDTO{
+	return &UserProfileWithRecordsOutput{
 		UserID:    user.ID,
 		Username:  user.Username.String(),
 		Player:    player,
 		Records:   recordsDTO,
-		UpdatedAt: &player.UpdatedAt,
+		UpdatedAt: &player.Player.UpdatedAt,
 	}, nil
 }
 
 // GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
-func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*api_internal.UserProfileRatingViewDTO, error) {
+func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*UserProfileRatingViewOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -212,7 +271,7 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		return nil, err
 	}
 	if player == nil {
-		return &api_internal.UserProfileRatingViewDTO{
+		return &UserProfileRatingViewOutput{
 			Username:  user.Username.String(),
 			Player:    nil,
 			Records:   nil,
@@ -229,15 +288,23 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		}
 		return nil, err
 	}
+	opTargetSourceRecords, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find player records for OP target due to context canceled", "player_id", *user.PlayerID, "error", err)
+		} else {
+			slog.Error("failed to find player records for OP target", "player_id", *user.PlayerID, "error", err)
+		}
+		return nil, err
+	}
+	applyOPTargetFlags(records, calculateOPTargetChartIDs(opTargetSourceRecords))
 
 	slotMap := initializeRatingSlotMap()
 	var latestRecordUpdatedAt time.Time
 	for _, record := range records {
-		dtoRecord := dto.ToPlayerRecordDTO(record)
-
 		slotKey := record.SlotKey()
 		if slotKey != "" {
-			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
+			slotMap[slotKey] = append(slotMap[slotKey], record)
 		}
 		if record.UpdatedAt.After(latestRecordUpdatedAt) {
 			latestRecordUpdatedAt = record.UpdatedAt
@@ -246,27 +313,27 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 
 	recordsUpdatedAt := latestRecordUpdatedAt
 	if recordsUpdatedAt.IsZero() {
-		recordsUpdatedAt = player.UpdatedAt
+		recordsUpdatedAt = player.Player.UpdatedAt
 	}
-	recordsDTO := &api_internal.UserRatingRecordResponseDTO{
+	recordsDTO := &UserRatingRecordOutput{
 		UpdatedAt:     recordsUpdatedAt,
-		Best:          slotMap["best"],
-		BestCandidate: slotMap["best_candidate"],
-		New:           slotMap["new"],
-		NewCandidate:  slotMap["new_candidate"],
+		Best:          toPlayerRecordOutputs(slotMap["best"]),
+		BestCandidate: toPlayerRecordOutputs(slotMap["best_candidate"]),
+		New:           toPlayerRecordOutputs(slotMap["new"]),
+		NewCandidate:  toPlayerRecordOutputs(slotMap["new_candidate"]),
 	}
 
-	return &api_internal.UserProfileRatingViewDTO{
+	return &UserProfileRatingViewOutput{
 		Username:  user.Username.String(),
 		Player:    player,
 		Records:   recordsDTO,
-		UpdatedAt: &player.UpdatedAt,
+		UpdatedAt: &player.Player.UpdatedAt,
 	}, nil
 }
 
 // GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。
 // プライベート・削除済み・プレイヤー未紐付けアカウントを含みます。
-func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]api_internal.AdminUserListResponse, error) {
+func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]AdminUserOutput, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -281,21 +348,20 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 		return nil, err
 	}
 
-	responses := make([]api_internal.AdminUserListResponse, 0, len(users))
+	responses := make([]AdminUserOutput, 0, len(users))
 	for _, u := range users {
 		accountTypeName := "UNKNOWN"
 		if s.masterProvider != nil {
 			accountTypeName = s.masterProvider.GetAccountTypeNameByID(u.User.AccountTypeID)
 		}
 
-		resp := api_internal.AdminUserListResponse{
+		resp := AdminUserOutput{
 			UserName:     u.User.Username.String(),
 			AccountType:  accountTypeName,
 			CreatedAt:    u.User.CreatedAt,
 			UpdatedAt:    u.User.UpdatedAt,
 			IsSuspicious: u.User.IsSuspicious,
 			IsPrivate:    u.User.IsPrivate,
-			FirebaseUID:  u.User.FirebaseUID,
 		}
 		if u.Player != nil {
 			playerName := u.Player.Name.String()
@@ -364,7 +430,7 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID in
 }
 
 // GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
-func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*api_internal.UserProfileRecordViewDTO, error) {
+func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileRecordViewOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -374,7 +440,7 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		return nil, err
 	}
 	if player == nil {
-		return &api_internal.UserProfileRecordViewDTO{
+		return &UserProfileRecordViewOutput{
 			Username:  user.Username.String(),
 			Player:    nil,
 			Records:   nil,
@@ -391,22 +457,160 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 	if err != nil {
 		return nil, err
 	}
-
-	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords))
-	if recordsUpdatedAt.IsZero() {
-		recordsUpdatedAt = player.UpdatedAt
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	if err != nil {
+		return nil, err
 	}
 
-	return &api_internal.UserProfileRecordViewDTO{
+	recordsUpdatedAt := latestUserRecordUpdatedAt(playerRecords.latestUpdatedAt, latestWorldsendRecordUpdatedAt(worldsendRecords), courseUpdatedAt)
+	if recordsUpdatedAt.IsZero() {
+		recordsUpdatedAt = player.Player.UpdatedAt
+	}
+
+	return &UserProfileRecordViewOutput{
 		Username: user.Username.String(),
 		Player:   player,
-		Records: &api_internal.UserRecordViewResponseDTO{
+		Records: &UserRecordViewOutput{
 			UpdatedAt: recordsUpdatedAt,
-			All:       playerRecords.all,
-			Worldsend: worldsendRecords,
+			All:       toPlayerRecordOutputs(playerRecords.all),
+			Worldsend: toWorldsendRecordOutputs(worldsendRecords),
+			Courses:   courseRecords,
 		},
-		UpdatedAt: &player.UpdatedAt,
+		UpdatedAt: &player.Player.UpdatedAt,
 	}, nil
+}
+
+// GetUserSongRecord は指定した通常楽曲に属するレコードだけを返します。
+func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*UserSongRecordOutput, error) {
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	song, err := s.songRepo.FindByDisplayID(ctx, s.db, displayID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSongNotFound) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+	if song == nil || song.IsDeleted || song.IsWorldsend {
+		return nil, repository.ErrSongNotFound
+	}
+
+	difficultyID, err := s.resolveSongDifficulty(song, difficulty)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UserSongRecordOutput{Standard: []*PlayerRecordOutput{}, Meta: &UserSongRecordMetaOutput{}}
+	if !user.HasLinkedPlayer() {
+		return response, nil
+	}
+
+	records, err := s.playerRecordRepo.FindByPlayerIDAndSongDisplayID(ctx, s.db, *user.PlayerID, displayID)
+	if err != nil {
+		return nil, err
+	}
+	markOPTargetPlayerRecords(records)
+
+	allRecords := records
+	if includeNoPlay {
+		difficultyNames, difficultySortOrders := s.songDifficultyMasters()
+		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, []*entity.Song{song}, difficultyNames, difficultySortOrders)
+	}
+	if difficultyID != nil {
+		allRecords = filterPlayerRecordsByDifficultyID(allRecords, *difficultyID)
+	}
+
+	response.Standard = toPlayerRecordOutputs(allRecords)
+	if latest := latestPlayerRecordUpdatedAt(allRecords); !latest.IsZero() {
+		response.UpdatedAt = &latest
+		response.Meta.UpdatedAt = &latest
+	}
+	return response, nil
+}
+
+// GetUserWorldsendSongRecord は指定した WORLD'S END 楽曲のレコードを返します。
+func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*UserWorldsendSongRecordOutput, error) {
+	user, err := s.getAccessibleUser(ctx, username, requester)
+	if err != nil {
+		return nil, err
+	}
+
+	songChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, s.db, displayID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSongNotFound) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+	if songChart == nil || songChart.Song == nil || songChart.Chart == nil ||
+		songChart.Song.IsDeleted || !songChart.Song.IsWorldsend {
+		return nil, repository.ErrSongNotFound
+	}
+
+	response := &UserWorldsendSongRecordOutput{Meta: &UserSongRecordMetaOutput{}}
+	if !user.HasLinkedPlayer() {
+		return response, nil
+	}
+
+	records, err := s.worldsendRecordRepo.FindByPlayerIDAndSongDisplayID(ctx, s.db, *user.PlayerID, displayID)
+	if err != nil {
+		return nil, err
+	}
+	if includeNoPlay {
+		records = s.recordCompletionSvc.CompleteWorldsendRecords(records, []*entity.WorldsendSongWithChart{songChart})
+	}
+	if len(records) == 0 {
+		return response, nil
+	}
+
+	response.Worldsend = toWorldsendRecordOutput(records[0])
+	if !records[0].UpdatedAt.IsZero() {
+		value := records[0].UpdatedAt
+		response.UpdatedAt = &value
+		response.Meta.UpdatedAt = &value
+	}
+	return response, nil
+}
+
+func (s *userUsecase) resolveSongDifficulty(song *entity.Song, difficulty string) (*int, error) {
+	if difficulty == "" {
+		return nil, nil
+	}
+	normalized := strings.ToUpper(difficulty)
+	switch normalized {
+	case "BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA":
+	default:
+		return nil, ErrInvalidDifficulty
+	}
+
+	names, _ := s.songDifficultyMasters()
+	for difficultyID, name := range names {
+		if strings.ToUpper(name) == normalized && song.HasDifficultyChart(difficultyID) {
+			return &difficultyID, nil
+		}
+	}
+	return nil, ErrInvalidDifficulty
+}
+
+func (s *userUsecase) songDifficultyMasters() (map[int]string, map[int]int) {
+	if s.masterProvider == nil || s.masterProvider.SongMasters() == nil {
+		return nil, nil
+	}
+	masters := s.masterProvider.SongMasters()
+	return masters.DifficultyNamesByID, masters.DifficultySortOrderByID()
+}
+
+func filterPlayerRecordsByDifficultyID(records []*entity.PlayerRecord, difficultyID int) []*entity.PlayerRecord {
+	filtered := make([]*entity.PlayerRecord, 0, 1)
+	for _, record := range records {
+		if record != nil && record.Chart != nil && record.Chart.DifficultyID == difficultyID {
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered
 }
 
 func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int, includeNoPlay bool) (*userProfilePlayerRecords, error) {
@@ -421,6 +625,7 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	}
 
 	allRecords := records
+	markOPTargetPlayerRecords(records)
 	if includeNoPlay {
 		allRecords, err = s.completePlayerRecords(ctx, playerID, records)
 		if err != nil {
@@ -429,16 +634,12 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	}
 
 	slotMap := initializeSlotMap()
-	allRecordDTOs := make([]*dto.PlayerRecordDTO, 0, len(allRecords))
-	for _, record := range allRecords {
-		allRecordDTOs = append(allRecordDTOs, dto.ToPlayerRecordDTO(record))
-	}
+	allRecordDTOs := allRecords
 
 	for _, record := range records {
-		dtoRecord := dto.ToPlayerRecordDTO(record)
 		slotKey := record.SlotKey()
 		if slotKey != "" {
-			slotMap[slotKey] = append(slotMap[slotKey], dtoRecord)
+			slotMap[slotKey] = append(slotMap[slotKey], record)
 		}
 	}
 
@@ -447,6 +648,74 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 		slotMap:         slotMap,
 		latestUpdatedAt: latestPlayerRecordUpdatedAt(records),
 	}, nil
+}
+
+type opTargetCandidate struct {
+	record       *entity.PlayerRecord
+	overpower    float64
+	difficultyID int
+}
+
+func markOPTargetPlayerRecords(records []*entity.PlayerRecord) {
+	applyOPTargetFlags(records, calculateOPTargetChartIDs(records))
+}
+
+func applyOPTargetFlags(records []*entity.PlayerRecord, targetChartIDs map[int]struct{}) {
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		chartID := playerRecordChartID(record)
+		_, record.IsOPTarget = targetChartIDs[chartID]
+		if chartID == 0 {
+			record.IsOPTarget = false
+		}
+	}
+}
+
+func calculateOPTargetChartIDs(records []*entity.PlayerRecord) map[int]struct{} {
+	bestBySongID := make(map[int]opTargetCandidate, len(records))
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		if record.UpdatedAt.IsZero() || record.Song == nil || record.Chart == nil {
+			continue
+		}
+
+		overpower := service.CalcSingleOverpower(uint32(record.Score), record.Chart.Const.Float64(), record.ComboLampID)
+		candidate := opTargetCandidate{
+			record:       record,
+			overpower:    overpower,
+			difficultyID: record.Chart.DifficultyID,
+		}
+		current, exists := bestBySongID[record.Song.ID]
+		if !exists || candidate.overpower > current.overpower ||
+			(candidate.overpower == current.overpower && candidate.difficultyID > current.difficultyID) {
+			bestBySongID[record.Song.ID] = candidate
+		}
+	}
+
+	targetChartIDs := make(map[int]struct{}, len(bestBySongID))
+	for _, candidate := range bestBySongID {
+		if chartID := playerRecordChartID(candidate.record); chartID != 0 {
+			targetChartIDs[chartID] = struct{}{}
+		}
+	}
+	return targetChartIDs
+}
+
+func playerRecordChartID(record *entity.PlayerRecord) int {
+	if record == nil {
+		return 0
+	}
+	if record.ChartID != 0 {
+		return record.ChartID
+	}
+	if record.Chart != nil {
+		return record.Chart.ID
+	}
+	return 0
 }
 
 func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, records []*entity.PlayerRecord) ([]*entity.PlayerRecord, error) {
@@ -473,9 +742,9 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID, difficultySortOrderByID), nil
 }
 
-func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*dto.WorldsendRecordDTO, error) {
+func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*entity.PlayerWorldsendRecord, error) {
 	if s.worldsendRecordRepo == nil {
-		return []*dto.WorldsendRecordDTO{}, nil
+		return []*entity.PlayerWorldsendRecord{}, nil
 	}
 
 	records, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, playerID)
@@ -485,7 +754,7 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 		} else {
 			slog.Error("failed to find worldsend records", "player_id", playerID, "error", err)
 		}
-		return []*dto.WorldsendRecordDTO{}, nil
+		return nil, err
 	}
 
 	if includeNoPlay {
@@ -495,11 +764,7 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 		}
 	}
 
-	worldsendRecords := make([]*dto.WorldsendRecordDTO, len(records))
-	for i, record := range records {
-		worldsendRecords[i] = dto.ToWorldsendRecordDTO(record)
-	}
-	return worldsendRecords, nil
+	return records, nil
 }
 
 func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int, records []*entity.PlayerWorldsendRecord) ([]*entity.PlayerWorldsendRecord, error) {
@@ -526,63 +791,67 @@ func latestPlayerRecordUpdatedAt(records []*entity.PlayerRecord) time.Time {
 	return latest
 }
 
-func latestWorldsendRecordUpdatedAt(records []*dto.WorldsendRecordDTO) time.Time {
+func latestWorldsendRecordUpdatedAt(records []*entity.PlayerWorldsendRecord) time.Time {
 	var latest time.Time
 	for _, record := range records {
-		if record == nil || record.UpdatedAt == nil {
+		if record == nil || record.UpdatedAt.IsZero() {
 			continue
 		}
 		if record.UpdatedAt.After(latest) {
-			latest = *record.UpdatedAt
+			latest = record.UpdatedAt
 		}
 	}
 	return latest
 }
 
-func latestUserRecordUpdatedAt(playerRecordsUpdatedAt time.Time, worldsendRecordsUpdatedAt time.Time) time.Time {
-	if worldsendRecordsUpdatedAt.After(playerRecordsUpdatedAt) {
-		return worldsendRecordsUpdatedAt
-	}
-	return playerRecordsUpdatedAt
-}
-
-func buildPlayerDTO(playerWithHonors *repository.PlayerWithHonors) *dto.PlayerDTO {
-	playerDTO := dto.ToPlayerDTO(playerWithHonors.Player)
-	honors := make([]*dto.HonorDTO, len(playerWithHonors.Honors))
-	for i, honor := range playerWithHonors.Honors {
-		honors[i] = &dto.HonorDTO{
-			Slot:     honor.Slot,
-			Name:     honor.Name,
-			TypeName: honor.TypeName,
-			ImageURL: derefString(honor.ImageURL),
+func latestUserRecordUpdatedAt(values ...time.Time) time.Time {
+	var latest time.Time
+	for _, value := range values {
+		if value.After(latest) {
+			latest = value
 		}
 	}
-	playerDTO.Honors = honors
-	return playerDTO
+	return latest
 }
 
-func derefString(value *string) string {
-	if value == nil {
-		return ""
+func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*CourseRecordOutput, time.Time, error) {
+	if s.courseRepo == nil {
+		return []*CourseRecordOutput{}, time.Time{}, nil
 	}
-	return *value
+	records, err := s.courseRepo.FindRecordsByPlayerID(ctx, s.db, playerID, false, includeNoPlay)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	result := make([]*CourseRecordOutput, 0, len(records))
+	var latest time.Time
+	for _, record := range records {
+		result = append(result, toCourseRecordOutput(record))
+		if record.UpdatedAt.After(latest) {
+			latest = record.UpdatedAt
+		}
+	}
+	return result, latest, nil
+}
+
+func buildPlayerOutput(playerWithHonors *repository.PlayerWithHonors) *UserPlayerOutput {
+	return &UserPlayerOutput{Player: playerWithHonors.Player, Honors: playerWithHonors.Honors}
 }
 
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
-func initializeSlotMap() map[string][]*dto.PlayerRecordDTO {
+func initializeSlotMap() map[string][]*entity.PlayerRecord {
 	slots := []string{"best", "best_candidate", "new", "new_candidate"}
-	result := make(map[string][]*dto.PlayerRecordDTO, len(slots))
+	result := make(map[string][]*entity.PlayerRecord, len(slots))
 	for _, slot := range slots {
-		result[slot] = []*dto.PlayerRecordDTO{}
+		result[slot] = []*entity.PlayerRecord{}
 	}
 	return result
 }
 
-func initializeRatingSlotMap() map[string][]*dto.PlayerRecordDTO {
+func initializeRatingSlotMap() map[string][]*entity.PlayerRecord {
 	slots := []string{"best", "best_candidate", "new", "new_candidate"}
-	result := make(map[string][]*dto.PlayerRecordDTO, len(slots))
+	result := make(map[string][]*entity.PlayerRecord, len(slots))
 	for _, slot := range slots {
-		result[slot] = []*dto.PlayerRecordDTO{}
+		result[slot] = []*entity.PlayerRecord{}
 	}
 	return result
 }
@@ -601,7 +870,11 @@ func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, re
 		return nil, ErrUserNotFound
 	}
 
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, user, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 
@@ -612,7 +885,7 @@ func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, re
 	return user, nil
 }
 
-func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) (*dto.PlayerDTO, error) {
+func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) (*UserPlayerOutput, error) {
 	if user == nil || !user.HasLinkedPlayer() {
 		return nil, nil
 	}
@@ -634,15 +907,15 @@ func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) 
 		return nil, nil
 	}
 
-	player := buildPlayerDTO(playerWithHonors)
+	player := buildPlayerOutput(playerWithHonors)
 	if err := s.applyDynamicOverpowerPercent(ctx, player, *user.PlayerID); err != nil {
 		return nil, err
 	}
 	return player, nil
 }
 
-func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *dto.PlayerDTO, playerID int) error {
-	if player == nil || player.OverpowerValue == nil || s.overpowerDenominatorProvider == nil {
+func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *UserPlayerOutput, playerID int) error {
+	if player == nil || player.Player == nil || player.Player.OverpowerValue == nil || s.overpowerDenominatorProvider == nil {
 		return nil
 	}
 
@@ -698,7 +971,7 @@ func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *
 		}
 	}
 
-	percent := service.CalcOverpowerPercent(*player.OverpowerValue, denominator)
-	player.OverpowerPercent = &percent
+	percent := service.CalcOverpowerPercent(*player.Player.OverpowerValue, denominator)
+	player.Player.OverpowerPercent = &percent
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -14,12 +14,12 @@ type mockUserCredentialUsecase struct {
 	mock.Mock
 }
 
-func (m *mockUserCredentialUsecase) GetUser(ctx context.Context, id int) (*dto_internal.UserDTO, error) {
+func (m *mockUserCredentialUsecase) GetUser(ctx context.Context, id int) (*usecase.UserOutput, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserOutput), args.Error(1)
 }
 
 func (m *mockUserCredentialUsecase) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {

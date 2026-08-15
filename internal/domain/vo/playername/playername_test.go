@@ -103,12 +103,12 @@ func TestPlayerName_Scan(t *testing.T) {
 		skip    bool
 	}{
 		{
-			name: "nil",
+			name: "DBのNULLはエラー",
 			args: args{
 				src: nil,
 			},
-			want:    PlayerName{value: ""},
-			wantErr: assert.NoError,
+			want:    PlayerName{value: "変更前"},
+			wantErr: assert.Error,
 		},
 		{
 			name: "有効な文字列",
@@ -131,16 +131,16 @@ func TestPlayerName_Scan(t *testing.T) {
 			args: args{
 				src: "太郎12AB",
 			},
-			want:    PlayerName{},
+			want:    PlayerName{value: "変更前"},
 			wantErr: assert.Error,
 		},
 		{
-			name: "DBからの空文字列",
+			name: "DBの空文字列はエラー",
 			args: args{
 				src: "",
 			},
-			want:    PlayerName{value: ""},
-			wantErr: assert.NoError,
+			want:    PlayerName{value: "変更前"},
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -148,7 +148,7 @@ func TestPlayerName_Scan(t *testing.T) {
 			if tt.skip {
 				t.Skip("プレイヤー名の仕様が確定するまでスキップ")
 			}
-			p := &PlayerName{}
+			p := &PlayerName{value: "変更前"}
 			err := p.Scan(tt.args.src)
 			if !tt.wantErr(t, err, fmt.Sprintf("Scan(%v)", tt.args.src)) {
 				return

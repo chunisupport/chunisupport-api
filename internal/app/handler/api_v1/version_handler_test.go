@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -68,6 +68,6 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, response.Versions, 1)
 	assert.Equal(t, "LUMINOUS", response.Versions[0].Name)
-	assert.Equal(t, "2026-02-05T00:00:00Z", response.Versions[0].ReleasedAt)
+	assert.Equal(t, "2026-02-05", response.Versions[0].ReleasedAt)
 	usecaseMock.AssertExpectations(t)
 }

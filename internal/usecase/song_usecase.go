@@ -5,8 +5,29 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
+
+// UpdateChartInput は譜面の一括更新値です。
+type UpdateChartInput struct {
+	Const          float64
+	IsConstUnknown bool
+	Notes          *int
+	NotesDesigner  *string
+}
+
+// UpdateSongInput は楽曲と譜面の一括更新値です。
+type UpdateSongInput struct {
+	DisplayID  string
+	Title      string
+	Reading    *string
+	Artist     string
+	Genre      *string
+	BPM        *int
+	ReleasedAt *time.Time
+	Jacket     *string
+	IsNew      *bool
+	Charts     map[string]*UpdateChartInput
+}
 
 // CreateChartInput は譜面追加入力を表します。
 type CreateChartInput struct {
@@ -27,7 +48,15 @@ type CreateSongInput struct {
 	BPM         *int
 	ReleasedAt  *time.Time
 	Jacket      *string
+	IsNew       bool
 	Charts      []*CreateChartInput
+}
+
+// UpdateChartConstantInput は公式IDを使った譜面定数更新の入力です。
+type UpdateChartConstantInput struct {
+	OfficialIdx string
+	Difficulty  string
+	Const       float64
 }
 
 // SongUsecase は楽曲に関するユースケースを提供します。
@@ -51,7 +80,10 @@ type SongUsecase interface {
 
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// マスタデータの検証およびリポジトリへの委譲を行います。
-	UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
+	UpdateSongs(ctx context.Context, requests []*UpdateSongInput) error
+
+	// UpdateChartConstant は公式IDと難易度の先頭3文字を使って既存譜面の定数を更新し、更新後の楽曲を返します。
+	UpdateChartConstant(ctx context.Context, input UpdateChartConstantInput) (*entity.Song, error)
 
 	// CreateSong は新規楽曲を追加します。
 	// display_id はサーバー側で crypto/rand を使って生成します。

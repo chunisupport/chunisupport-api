@@ -3,17 +3,17 @@ package api_internal
 import (
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
@@ -23,7 +23,7 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
 
-	newPutSongsContext := func(body string) echo.Context {
+	newPutSongsContext := func(body string) *echo.Context {
 		req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -31,9 +31,9 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 	}
 
 	t.Run("YYYY-MM-DDは受理される", func(t *testing.T) {
-		var captured []*api_internal.UpdateSongRequest
+		var captured []*usecase.UpdateSongInput
 		mockUsecase := &testutil.MockSongUsecase{
-			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+			UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 				captured = requests
 				return nil
 			},
@@ -41,7 +41,8 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 		handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
 		c := newPutSongsContext(`[{"id":"1234567890123456","title":"test","artist":"artist","released_at":"2024-01-01"}]`)
-		rec := c.Response().Writer.(*httptest.ResponseRecorder)
+		response, _ := echo.UnwrapResponse(c.Response())
+		rec := response.ResponseWriter.(*httptest.ResponseRecorder)
 
 		err := handler.UpdateSongs(c)
 		if err != nil {
@@ -66,7 +67,7 @@ func TestUpdateSongs_ReleaseDateFormat(t *testing.T) {
 	t.Run("時刻付きはbad_requestになる", func(t *testing.T) {
 		called := false
 		mockUsecase := &testutil.MockSongUsecase{
-			UpdateSongsFunc: func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+			UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 				called = true
 				return nil
 			},

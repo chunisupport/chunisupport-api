@@ -94,3 +94,17 @@ func TestWrapUsernameDuplicateError(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapGoalGroupDuplicateError(t *testing.T) {
+	// Given
+	err := &mysql.MySQLError{
+		Number:  mysqlDuplicateEntryErrorNumber,
+		Message: "Duplicate entry '1-攻略中' for key 'uq_goal_groups_user_name'",
+	}
+
+	// When
+	got := wrapGoalGroupDuplicateError(err)
+
+	// Then
+	assert.ErrorIs(t, got, domainrepo.ErrGoalGroupConflict)
+}

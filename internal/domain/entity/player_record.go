@@ -16,6 +16,7 @@ type PlayerRecord struct {
 	FullChainID int
 	SlotID      int
 	SlotOrder   *int
+	IsOPTarget  bool
 	UpdatedAt   time.Time
 
 	Chart           *Chart

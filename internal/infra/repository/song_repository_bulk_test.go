@@ -47,6 +47,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			official_idx TEXT NOT NULL UNIQUE,
 			jacket TEXT,
 			is_worldsend INTEGER NOT NULL DEFAULT 0,
+			is_new INTEGER NOT NULL DEFAULT 0,
 			is_deleted INTEGER NOT NULL DEFAULT 0,
 			updated_at TEXT,
 			FOREIGN KEY (genre_id) REFERENCES genres(id)
@@ -82,10 +83,10 @@ func TestBulkUpdateSongs_ArgumentOrder(t *testing.T) {
 
 	// 初期データを挿入（2曲）
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES 
-			(1, 'DISPLAY001', 'Original Title 1', 'Original Artist 1', 1, 180, '2024-01-01', 'IDX001', 'jacket1.png', 0, 0),
-			(2, 'DISPLAY002', 'Original Title 2', 'Original Artist 2', 2, 200, '2024-02-01', 'IDX002', 'jacket2.png', 0, 0)
+			(1, 'DISPLAY001', 'Original Title 1', 'Original Artist 1', 1, 180, '2024-01-01', 'IDX001', 'jacket1.png', 0, 0, 0),
+			(2, 'DISPLAY002', 'Original Title 2', 'Original Artist 2', 2, 200, '2024-02-01', 'IDX002', 'jacket2.png', 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -186,10 +187,10 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 
 	// 初期データを挿入（2曲）
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES 
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0),
-			(2, 'DISPLAY002', 'Song 2', 'Artist 2', 1, 200, '2024-02-01', 'IDX002', NULL, 0, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0, 0),
+			(2, 'DISPLAY002', 'Song 2', 'Artist 2', 1, 200, '2024-02-01', 'IDX002', NULL, 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -296,8 +297,8 @@ func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicat
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'DISPLAY001', 'Original Title', 'Original Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -331,8 +332,8 @@ func TestSongUpdateSongs_ReturnsErrorWhenTargetIsWorldsendSong(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 180, '2024-01-01', 'IDX001', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -379,10 +380,10 @@ func TestBulkUpdateSongs_DoesNotUpdateWorldsendSongs(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0),
-			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0),
+			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -427,10 +428,10 @@ func TestSongUpdateSongs_ReturnsErrorWithoutPartialUpdateWhenMixedWithWorldsend(
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0),
-			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+			(1, 'NORMAL001', 'Normal Title', 'Normal Artist', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0),
+			(2, 'WORLD001', 'Worldsend Title', 'Worldsend Artist', 1, 200, NULL, 'IDX002', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 

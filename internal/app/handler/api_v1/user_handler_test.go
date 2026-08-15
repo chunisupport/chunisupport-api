@@ -8,40 +8,47 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
 type mockV1UserUsecase struct {
-	getUserProfileWithRecordsFunc func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error)
+	getUserProfileWithRecordsFunc func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error)
 }
 
-func (m *mockV1UserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileDTO, error) {
+func (m *mockV1UserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserUpdatedAtDTO, error) {
+func (m *mockV1UserUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*usecase.UserUpdatedAtOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+func (m *mockV1UserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
 	if m.getUserProfileWithRecordsFunc != nil {
 		return m.getUserProfileWithRecordsFunc(ctx, username, requester, includeNoPlay)
 	}
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
+func (m *mockV1UserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileRecordViewDTO, error) {
+func (m *mockV1UserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileRecordViewOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
+func (m *mockV1UserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*usecase.UserSongRecordOutput, error) {
+	return nil, nil
+}
+
+func (m *mockV1UserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*usecase.UserWorldsendSongRecordOutput, error) {
+	return nil, nil
+}
+
+func (m *mockV1UserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]usecase.AdminUserOutput, error) {
 	return nil, nil
 }
 
@@ -54,7 +61,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		// Given
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
-			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
 				assert.Equal(t, "privateuser", username)
 				assert.True(t, includeNoPlay)
 				return nil, usecase.ErrUserPrivate
@@ -64,8 +71,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("privateuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "privateuser"}})
 
 		// When
 		err := handler.GetUser(c)
@@ -83,7 +89,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		called := false
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
-			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
 				called = true
 				return nil, nil
 			},
@@ -92,8 +98,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/users/PrivateUser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("PrivateUser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "PrivateUser"}})
 
 		// When
 		err := handler.GetUser(c)

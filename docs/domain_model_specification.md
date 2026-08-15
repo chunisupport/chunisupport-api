@@ -104,7 +104,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | UserID | int | ✓ | 所属ユーザーID（外部キー） |
 | Name | playername.PlayerName | ✓ | プレイヤー名（値オブジェクト） |
 | Level | int | ✓ | プレイヤーレベル |
-| OfficialRating | *float64 | - | 公式レーティング |
+| OfficialRating | float64 | ✓ | 公式レーティング |
 | CalculatedRating | *float64 | - | 計算レーティング |
 | NewAverageRating | *float64 | - | 新曲枠平均レーティング |
 | BestAverageRating | *float64 | - | ベスト枠平均レーティング |
@@ -112,7 +112,9 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | ClassEmblemBaseID | *int | - | クラスエンブレムベースID |
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
+| OfficialOverpower | float64 | ✓ | 公式オーバーパワー値 |
 | OverpowerPercent | *float64 | - | オーバーパワー割合（%） |
+| DataCollectedAt | *time.Time | - | CHUNITHM-NETからのデータ取得完了日時 |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
 | Users | *User | - | 紐づくユーザー（関連エンティティ） |
@@ -127,6 +129,28 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 - `Level` は0以上
 - `OfficialRating`, `CalculatedRating` は0.0以上
 - `OverpowerPercent` は0.0～100.0の範囲
+
+---
+
+### PlayerMetricHistoryEntry（プレイヤー公式指標履歴）
+
+CHUNITHM-NETから同時に取得した公式RATINGと公式OVER POWERのスナップショットを表します。両値は常にセットで保持し、どちらか一方でも変化した場合だけ更新前の組を履歴へ保存します。最新値は`Player`に保持します。
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| PlayerID | int | ✓ | プレイヤーID |
+| OfficialRating | float64 | ✓ | 公式RATING |
+| OfficialOverpower | float64 | ✓ | 公式OVER POWER |
+| DataCollectedAt | time.Time | ✓ | CHUNITHM-NETからのデータ取得完了日時 |
+
+#### 不変条件
+
+- 公式RATINGと公式OVER POWERの欠落・`null`は許可しない
+- 公式RATINGと公式OVER POWERはDB精度に合わせて小数第2位までとする
+- 初回登録では履歴を作らず、現在値のみを`players`へ保存する
+- `DataCollectedAt`のない既存プレイヤーは公式値の取得履歴がないため、最初のデータ登録時に更新前状態を履歴化しない
+- 現在より古い取得日時への更新、および同一取得日時で異なる公式指標への更新は拒否する
+- 履歴の保持件数に上限は設けない
 
 ---
 
@@ -310,24 +334,31 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 |------------|-----|-----|------|
 | ID | uint32 | ✓ | 目標ID（主キー、自動採番） |
 | UserID | int | ✓ | 所属ユーザーID（外部キー） |
+| GroupID | *uint32 | - | 所属目標グループID。nilは未分類 |
 | Title | string | ✓ | 目標タイトル（trim後30文字以内、空文字不可、制御文字不可） |
 | AchievementTypeID | int | ✓ | 成果種別ID（`achievement_types.id` への外部キー） |
 | AchievementType | string | - | 成果種別コード（DBには永続化されない。マスタ逆引きで出力時に解決） |
 | AchievementParams | []byte | ✓ | 成果種別ごとの可変パラメータ（JSON） |
 | Attributes | []byte | ✓ | 対象譜面の絞り込み条件（JSON） |
-| Invert | bool | ✓ | UI表示反転フラグ（サーバー側の達成判定には不使用） |
+| InvertValue | bool | ✓ | 実数値表示用反転フラグ（サーバー側の達成判定には不使用） |
+| InvertPercentage | bool | ✓ | パーセンテージ表示用反転フラグ（サーバー側の達成判定には不使用） |
+| SortOrder | uint16 | ✓ | 同一グループ内での表示順（1から始まる連番） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 
 #### 振る舞い（メソッド）
 
-現在、振る舞いメソッドなし。将来的に型安全な `AchievementParams` / `Attributes` 構造体への段階移行を予定。
+- `GoalArrangement.Reorder(groupID, orderedGoalIDs)`: 指定グループ内の全目標を並び替える
+- `GoalArrangement.Move(id, destinationGroupID)`: 移動元を詰め、移動先末尾へ目標を移動する
+- `GoalArrangement.Remove(id)`: 目標を取り除き、同じグループの順番を詰める
+- `GoalArrangement.RemoveGroup(groupID)`: 削除対象グループの目標を未分類末尾へ移動する
 
 #### 不変条件
 
 - `Title` はtrim後に1文字以上30文字（ルーン単位）以内。制御文字を含まない
 - `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
 - `AchievementParams` は `AchievementType` に対応する構造のJSON
-- `Attributes` は許可キー（`diff`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- `Attributes` は許可キー（`diff`, `chart_target`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- 同一ユーザー・同一グループ（未分類を含む）の `SortOrder` は1から所属目標件数までの連番。作成・削除・移動・並び替え時にユーザー行ロック下で更新する
 - 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
 
 #### `AchievementParams` の型整合ルール
@@ -339,6 +370,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | キー | 型 | 説明 |
 |---|---|---|
 | `diff` | `integer` | 難易度ID（`difficulties.id` と同値、1〜5）。IDの数値は順序を表すが、`genre`/`ver` とは異なり固定序列 |
+| `chart_target` | `string` | `"OP_TARGET"` の場合、曲ごとの理論OVER POWER対象譜面のみを対象にする。`diff` との同時指定は不可 |
 | `const` | `object` | 譜面定数レンジ（`min`/`max`。`float64`、小数1桁）。有効範囲: `1.0 ≤ min, max ≤ 16.0` |
 | `genre` | `integer` | ジャンルマスタID（単値）。IDの数値は順序を表さない |
 | `ver` | `integer` | バージョンマスタID（単値）。IDの数値は順序を表さない |
@@ -350,7 +382,32 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `achievement_params` / `attributes` はDB上ではJSON型で保存されます
 - DB保存時はコンパクトJSON（インデントなし）で、バリデーション済み構造体から再エンコードしたJSONを保存します（入力原文をそのまま保持しません）
 - `updated_at` / 達成日時カラムは持ちません（楽曲追加により達成状態が揺らぐ可能性があるため）
-- `created_at` はソート基準として使用されます
+- 一覧はグループ順、グループ内の `sort_order` 順、未分類の順で返し、`created_at` は作成日時としてのみ保持します
+- `sort_order` に一意制約は付与しない。連番不変条件はユーザー行ロック下で直列化し、`GoalArrangement`集約を単一更新で保存する
+
+---
+
+### GoalGroup（目標グループエンティティ）
+
+ユーザーが作成する目標の分類です。空グループを保持でき、1ユーザー最大20件です。名称は `GoalGroupName` 値オブジェクトとしてtrim後1〜30文字・制御文字禁止を保証し、同一ユーザー内で重複できません。`SortOrder` はユーザー内で1からの連番です。未分類はGoalGroupとして永続化せず、`Goal.GroupID == nil` で表し、常に表示上の末尾に配置します。
+
+グループ削除時は所属目標を削除せず、並び順を保って未分類末尾へ移動します。`goals(user_id, group_id)` から `goal_groups(user_id, id)` への複合外部キーにより、別ユーザーのグループを参照できません。
+
+---
+
+### GoalArrangement（目標配置集約）
+
+#### 概要
+
+1ユーザーが所有する全Goalのグループ所属とグループ内表示順を管理する集約です。
+
+#### 不変条件
+
+- 内包するすべてのGoalは同一ユーザーに属する
+- Goal IDは集約内で重複しない
+- グループ内のGoal IDは重複せず、`Reorder`は指定グループの全IDを1回ずつ指定した場合のみ成功する
+- 移動先グループへの追加位置は常に末尾
+- 既存の`SortOrder`に不整合があっても、一覧取得順を正として次回の変更時にグループ単位で正規化する
 
 ---
 
@@ -382,7 +439,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 ### ChartStatsByRatingBand（譜面×レーティング帯統計）
 
 #### 概要
-譜面ごとのレーティング帯別統計データを表すエンティティ。プレイヤーのランク分布、コンボランプ分布、クリアランプ分布、平均スコアを管理します。
+譜面ごとのレーティング帯別統計データを表すエンティティ。プレイヤーのランク分布、コンボランプ分布、クリアランプ分布、平均スコア、中央スコアを管理します。
 
 #### フィールド
 
@@ -394,19 +451,22 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | Combo | ChartComboStats | ✓ | コンボランプ別人数統計 |
 | Clear | ChartClearStats | ✓ | クリアランプ別人数統計 |
 | AverageScore | *float64 | - | レーティング帯別平均スコア（レコード数0件の場合はnil） |
+| MedianScore | *float64 | - | レーティング帯別中央スコア（レコード数0件の場合はnil） |
 | PlayerCount | int | ✓ | レーティング帯別プレイヤー数 |
 
 #### 不変条件
 
 - `ChartID` + `RatingBandID` の組み合わせは一意
 - `AverageScore` は 0.0～1,010,000.0 の範囲（nilを除く）
+- `MedianScore` は 0.0～1,010,000.0 の範囲（nilを除く）
 - 人数カウント（Rank, Combo, Clear）は非負整数
 
 #### 統計データの仕様
 
 - **レーティング帯の判定基準**: プレイヤーの「ベスト枠平均レーティング」を小数点1桁で切り捨てた値
 - **平均スコアの計算**: 各レーティング帯のプレイヤーレコードのスコア平均値（AVG）
-- **NULL値の扱い**: 該当レーティング帯にレコードが0件の場合、`AverageScore` は `nil`
+- **中央スコアの計算**: 各レーティング帯のプレイヤーレコードのスコア中央値
+- **NULL値の扱い**: 該当レーティング帯にレコードが0件の場合、`AverageScore` と `MedianScore` は `nil`
 - **更新タイミング**: 統計データは定期バッチで更新され、過去データは保持しない
 
 ---
@@ -442,7 +502,10 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 |------------|-----|------|
 | None | int | コンボランプなし人数 |
 | FC | int | FULL COMBO人数 |
-| AJ | int | ALL JUSTICE人数 |
+| AJ | int | AJCを除くALL JUSTICE人数 |
+| AJC | int | ALL JUSTICEかつ1,010,000点の人数 |
+
+`AJ` と `AJC` は排他的に集計します。
 
 ---
 
@@ -732,3 +795,11 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 - 集約ルートごとにリポジトリを定義
 - `Save(ctx, entity)` メソッドで集約全体を永続化（INSERT/UPDATE判定は内部で実施）
 - 部分更新メソッド（`UpdatePrivacy`, `LinkFirebaseUID`相当など）は廃止し、集約指向の永続化を推進
+
+## UserDataTransferSnapshot集約
+
+UserDataTransferSnapshotは、ユーザーに属するプレイヤー、通常譜面・WORLD'S ENDの現在レコードと履歴、公式指標履歴、コース、称号、お気に入り、未解禁楽曲、目標、保存済みフィルタを一括移行する集約です。
+
+移行ファイルにはサーバー固有IDを含めません。楽曲とコースはofficial_idx、譜面はofficial_idxと大文字の難易度名、各種マスターは名称で参照します。目標属性のdiff、genre、verも名称へ外部化し、移行先で一括解決します。
+
+集約は件数上限、キーと時刻の重複、表示順、スロット順、値域、UTC時刻、非nil配列を検証します。移行先ではユーザー行をロックし、プレイヤー・目標・目標グループ・保存済みフィルタがないことを再確認してから、全セクションを一つのトランザクションで保存します。

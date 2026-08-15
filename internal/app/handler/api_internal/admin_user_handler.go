@@ -5,9 +5,10 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // AdminUserHandler はADMIN専用のユーザー関連HTTPリクエストを処理します。
@@ -22,7 +23,7 @@ func NewAdminUserHandler(userUsecase usecase.UserUsecase) *AdminUserHandler {
 
 // GetAllUsers handles GET /internal/users/
 // ADMIN専用で、プライベート・削除済み・プレイヤー未紐付けアカウントを含むすべてのユーザーを返します。
-func (h *AdminUserHandler) GetAllUsers(c echo.Context) error {
+func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 	pageParam := c.QueryParam("page")
 	page := 1
 	if pageParam != "" {
@@ -41,5 +42,9 @@ func (h *AdminUserHandler) GetAllUsers(c echo.Context) error {
 		return apierror.ErrInternalError
 	}
 
-	return c.JSON(http.StatusOK, users)
+	result := make([]internaldto.AdminUserListResponse, 0, len(users))
+	for _, user := range users {
+		result = append(result, internaldto.AdminUserListResponse{UserName: user.UserName, AccountType: user.AccountType, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt, PlayerName: user.PlayerName, Rating: user.Rating, OverPowerValue: user.OverPowerValue, IsSuspicious: user.IsSuspicious, IsPrivate: user.IsPrivate})
+	}
+	return c.JSON(http.StatusOK, result)
 }

@@ -11,26 +11,38 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int) (string, error) {
-	args := m.Called(ctx, userID)
-	return args.String(0), args.Error(1)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.GeneratedAPITokenOutput), args.Error(1)
 }
 
-func (m *mockAPITokenUsecase) GetStatus(ctx context.Context, userID int) (*entity.APIToken, error) {
+func (m *mockAPITokenUsecase) List(ctx context.Context, userID int) ([]*usecase.APITokenOutput, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.APIToken), args.Error(1)
+	return args.Get(0).([]*usecase.APITokenOutput), args.Error(1)
+}
+
+func (m *mockAPITokenUsecase) Rename(ctx context.Context, userID int, id string, name string) (*usecase.APITokenOutput, error) {
+	args := m.Called(ctx, userID, id, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.APITokenOutput), args.Error(1)
 }
 
 func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
@@ -41,8 +53,8 @@ func (m *mockAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*e
 	return args.Get(0).(*entity.User), args.Get(1).(*entity.APIToken), args.Error(2)
 }
 
-func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int) error {
-	args := m.Called(ctx, userID)
+func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
+	args := m.Called(ctx, userID, id)
 	return args.Error(0)
 }
 
@@ -51,6 +63,28 @@ func TestAPITokenMiddleware(t *testing.T) {
 	e.Validator = nil
 	mockUsecase := new(mockAPITokenUsecase)
 	middlewareFunc := middleware.APITokenMiddleware(mockUsecase)
+
+	t.Run("認証済みユーザーとAPIトークンがContextにある場合は再検証しない", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		c.Set("userEntity", user)
+		c.Set("apiToken", token)
+
+		handler := middlewareFunc(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			assert.Same(t, token, c.Get("apiToken"))
+			return c.NoContent(http.StatusOK)
+		})
+
+		err := handler(c)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate", mock.Anything, mock.Anything)
+	})
 
 	t.Run("Bearerトークンが有効な場合は次のハンドラーが実行される", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
@@ -63,7 +97,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		mockUsecase.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
 
 		handlerCalled := false
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			handlerCalled = true
 			return c.String(http.StatusOK, "ok")
 		})
@@ -80,7 +114,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -97,7 +131,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -115,7 +149,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 		mockUsecase.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -135,7 +169,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 
 		mockUsecase.On("Validate", mock.Anything, "error").Return(nil, nil, errors.New("boom")).Once()
 
-		handler := middlewareFunc(func(c echo.Context) error {
+		handler := middlewareFunc(func(c *echo.Context) error {
 			return c.NoContent(http.StatusOK)
 		})
 
@@ -143,6 +177,84 @@ func TestAPITokenMiddleware(t *testing.T) {
 		apiErr, ok := err.(*apierror.APIError)
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+		mockUsecase.AssertExpectations(t)
+	})
+}
+
+func TestOptionalAPITokenMiddleware(t *testing.T) {
+	e := echo.New()
+
+	t.Run("認証済みユーザーとAPIトークンがContextにある場合は再検証しない", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		c.Set("userEntity", user)
+		c.Set("apiToken", token)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			assert.Same(t, token, c.Get("apiToken"))
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate", mock.Anything, mock.Anything)
+	})
+
+	t.Run("トークンなしでも次のハンドラーを実行する", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertNotCalled(t, "Validate")
+	})
+
+	t.Run("有効なトークンならユーザーを設定する", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		user := &entity.User{ID: 1}
+		token := &entity.APIToken{ID: 2}
+		mockUsecase.On("Validate", mock.Anything, "valid").Return(user, token, nil).Once()
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer valid")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
+			assert.Same(t, user, c.Get("userEntity"))
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		mockUsecase.AssertExpectations(t)
+	})
+
+	t.Run("不正なトークンは401を返す", func(t *testing.T) {
+		mockUsecase := new(mockAPITokenUsecase)
+		mockUsecase.On("Validate", mock.Anything, "invalid").Return(nil, nil, usecase.ErrInvalidAPIToken).Once()
+		req := httptest.NewRequest(http.MethodGet, "/v1/songs/1/score-history/master", nil)
+		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err := middleware.OptionalAPITokenMiddleware(mockUsecase)(func(c *echo.Context) error {
+			return c.NoContent(http.StatusOK)
+		})(c)
+
+		apiErr, ok := err.(*apierror.APIError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 		mockUsecase.AssertExpectations(t)
 	})
 }

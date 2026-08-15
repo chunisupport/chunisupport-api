@@ -5,13 +5,14 @@
 このプロジェクトでは、データベースのスキーマ管理とマイグレーションのために [**golang-migrate**](https://github.com/golang-migrate/migrate) を使用しています。インストールにはバイナリのダウンロードではなく、以下のコマンドを利用してください。
 
 ```plaintext
-go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ``` 
 
 マイグレーションファイルは `migration/mysql` ディレクトリに格納されており、`*.up.sql` ファイルがスキーマの追加・変更、`*.down.sql` ファイルが変更のロールバックを定義します。
 
-静的データ用のSQLiteスキーマは `migration/sqlite` ディレクトリに配置しています。
-保存済みフィルタなどの小規模データ用SQLiteスキーマは `migration/sqlite_smalldata` ディレクトリに配置しています。
+`migration/sqlite`はMySQL統計移行前の履歴として残しており、新規環境では適用しません。
+
+現在の本番対象データベースはMySQL 8.4です。
 
 ## 主要テーブルの概要
 
@@ -25,7 +26,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `id`: ユーザーのユニークID。
     - `username`: アプリ内で一意なユーザー名（ユニーク制約）。
     - `firebase_uid`: Firebase Authentication の UID（ユニーク制約、NULL可）。
-    - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN）。
+    - `account_type_id`: `account_types`マスタへの外部キー（PLAYER/EDITOR/ADMIN/EXTDEV）。
     - `player_id`: `players`テーブルへの外部キー（ユニーク制約、NULL可）。
     - `is_private`: プライバシー設定（0=公開, 1=非公開）。
     - `is_suspicious`: 不審アカウントフラグ（0=正常, 1=不審）。
@@ -36,8 +37,23 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **主なカラム**:
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
+    - `name`: ユーザー内で一意の管理用名。
     - `hashed_token`: トークンのハッシュ値。
+    - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
+    - `last_used_at`: 認証に最後に使用した日時。
     - `created_at`: 作成日時。
+
+### システム運用関連
+
+#### `system_maintenance`
+- **役割**: API全体のメンテナンス状態と公開用コメントを単一行で永続化します。
+- **主なカラム**:
+    - `id`: singletonを表す固定ID。`CHECK (id = 1)` により1だけを許可します。
+    - `enabled`: メンテナンス状態（0=通常、1=メンテナンス中）。
+    - `comment`: 公開用コメント（最大1,000文字）。無効時は空文字です。
+    - `updated_by_user_id`: 最後に状態を変更したユーザー。`users.id` を参照し、ユーザー削除時はNULLになります。
+    - `updated_at`: 状態の最終更新日時（マイクロ秒精度）。
+- **初期行**: `id = 1`、`enabled = false`、空コメントで作成します。行が欠落している場合、APIは設定不備として起動に失敗します。
 
 ### プレイヤー・ゲームデータ関連
 
@@ -55,6 +71,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
+    - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
     - `created_at`, `updated_at`: 作成日時、更新日時。
 
 #### `player_records`
@@ -138,7 +155,7 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - `genres` / `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
-- `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN）。
+- `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN、EXTDEV）。
 - `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。
 
 #### ゲームコンテンツマスタ
@@ -171,3 +188,103 @@ go install -tags 'mysql sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate
 - **000017**: `honors` テーブルの `image_url` を空文字デフォルトの非NULLに変更し、称号のユニーク制約を `(name, honor_type_id, image_url)` へ変更。`sp` 称号は空文字の `name` と画像URLの組み合わせで一意に扱えるようにする。
 - **000018**: `players.overpower_percentage` カラムを削除。OVER POWER割合は保存値ではなく、レスポンス時点の最新マスタと未解禁設定から随時計算する。
 - **000019**: バージョンマスタに「CHUNITHM Mate」（2026年7月2日稼働）を追加。
+- **000024**: `players` テーブルにCHUNITHM-NETからのデータ取得完了日時を保持する `data_collected_at` カラムを追加。
+- **000028**: `goals` テーブルにユーザー内の表示順を保持する `sort_order` カラムを追加。既存データは作成順で採番し、一覧用インデックスを `(user_id, sort_order, id)` へ変更。MySQLのDDLは暗黙コミットされるため、適用開始から完了までGoalの作成・更新・削除・並び替えを停止する。
+- **000036**: レーティング帯マスタと譜面統計3表をMySQLへ追加。統計は別リポジトリのバッチが実行ごとに全削除して再生成する。
+- **000037**: ユーザー所有の `goal_groups` を追加し、`goals.group_id` とグループ内 `sort_order` による目標分類・並び替えへ変更。既存目標は未分類のまま従来順を保持する。
+- **000038**: `api_tokens` に名前、表示用prefix、最終利用日時を追加し、`user_id` の単独一意制約を削除して1ユーザー複数トークンに対応。既存ハッシュは変更せず、名前を「既存のトークン」、prefixと最終利用日時をNULLで移行する。
+- **000039**: APIメンテナンス状態を永続化する `system_maintenance` テーブルと、無効状態の初期singleton行を追加。
+- **000041**: プレイヤーの公式RATING・公式OVER POWER履歴を追加し、取得日時をマイクロ秒精度へ変更。
+- **000042**: プレイヤー現在値と公式指標履歴の取得日時を秒精度へ変更。
+
+#### 000028の失敗時復旧
+
+`000028` は列追加、既存行への採番、`NOT NULL`化、インデックス置換を別々に実行します。失敗時に`migrate force 28`を実行する前に、必ず以下を確認します。
+
+```sql
+SHOW COLUMNS FROM goals LIKE 'sort_order';
+SELECT COUNT(*) AS null_sort_order_count FROM goals WHERE sort_order IS NULL;
+SHOW INDEX FROM goals WHERE Key_name IN (
+  'idx_goals_user_created_id',
+  'idx_goals_user_sort_order_id'
+);
+```
+
+- `sort_order`列が存在しない場合は、`migrate force 27`でdirty状態を戻してから、修正済みの`000028`を再実行する。
+- `sort_order`がNULL許容、またはNULL値が1件でもある場合は、書き込み停止を維持したまま次を実行する。
+
+```sql
+UPDATE goals g
+INNER JOIN (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY created_at ASC, id ASC
+        ) AS sort_order
+    FROM goals
+) ranked ON ranked.id = g.id
+SET g.sort_order = ranked.sort_order;
+
+ALTER TABLE goals
+    MODIFY COLUMN sort_order SMALLINT UNSIGNED NOT NULL;
+```
+
+- 新インデックスが存在しない場合は、先に作成する。旧インデックスは新インデックスの存在を確認してから削除する。
+
+```sql
+CREATE INDEX idx_goals_user_sort_order_id
+    ON goals(user_id, sort_order, id);
+
+DROP INDEX idx_goals_user_created_id ON goals;
+```
+
+最後に`sort_order`が`NOT NULL`で、NULL件数が0件、新インデックスのみが存在することを確認してから`migrate force 28`でdirty状態を解消する。すでに新インデックスが存在する場合は、重複作成せず旧インデックスの削除から再開する。
+
+### 000030 コースレコード
+
+`course_classes`、`courses`、`player_course_records`を追加する。コースクラスは`1`～`5`、`inf`、`extra`の固定値であり、コースは論理削除に対応する。コーススコアは0～3,030,000点を保持する。
+
+### 000037 目標グループ
+
+適用中はGoalとGoalGroupの書き込みを停止する。MySQLのDDLは暗黙コミットされるため、失敗時は `goal_groups`、`goals.group_id`、`idx_goals_user_group_sort_order_id`、`fk_goals_group_user` の有無を確認し、up SQLの順序どおり不足分だけを適用してからバージョンを修復する。既存Goalは `group_id = NULL` の未分類となり、従来の `sort_order` を維持する。downでは現在のグループ順・グループ内順・未分類末尾の表示順をユーザー全体の連番へ変換してから `group_id` を削除する。
+
+### 000038 APIトークン複数発行
+
+upでは既存レコードと `hashed_token` を保持したまま管理用カラムを追加する。`name` は旧バイナリからのname未指定INSERTでNULL行が再発しないよう、「既存のトークン」を既定値とする。
+
+移行中も外部APIのトークン認証は継続できる。一方、旧バイナリの `DELETE /internal/auth/api-tokens` はユーザーの全トークンを削除するため、マイグレーション開始前から旧インスタンスの排出完了までAPIトークン管理CRUDを停止する。適用順は「管理CRUD停止 → 000038 up → 全インスタンスを新バイナリへ切替 → 管理CRUD再開」とする。
+
+downで1ユーザー1トークンへ戻す場合、複数発行済みのユーザーは `created_at DESC, id DESC` で最新の1件だけを保持し、それ以外を削除する。ロールバック前に必ず影響を確認すること。
+
+### 000039 システムメンテナンス状態
+
+`system_maintenance` は `id = 1` の単一行だけを保持します。MySQL 8.4で有効な `CHECK (id = 1)`、主キー、リポジトリ実装の固定ID指定を組み合わせてsingletonを保証します。`updated_by_user_id` は `users.id` を参照し、ユーザー削除時も運用状態を維持できるよう `ON DELETE SET NULL` とします。
+
+APIバイナリは起動時にこの行を必須で読み込むため、デプロイでは `000039` のupを新バイナリより先に適用してください。up直後の初期状態は通常運用です。
+
+downはテーブルと保存済みの状態・監査情報を削除します。旧バイナリへのロールバックでは原則としてテーブルを残し、downは保存データを破棄してよい場合だけ適用してください。
+
+### 000031 コース作成日時の削除
+
+`courses` テーブルの `created_at` カラムを削除する。コースマスタでは作成日時を利用しないため、更新日時のみを保持する。
+
+### 000033 コース表示用ID
+
+`courses` テーブルに16文字の小文字16進数で表す一意な `display_id` を追加する。既存コースにはマイグレーションで暗号学的乱数を採番し、以後の個別コースAPIでは `official_idx` ではなく `display_id` を外部識別子として利用する。
+
+### 000041 プレイヤー公式RATING・公式OVER POWER履歴
+
+`players.official_player_rating`を`NOT NULL`へ変更し、公式RATINGと公式OVER POWERを同一取得時点の組として保存する`player_metric_histories`を追加する。連続取得の順序と履歴主キーを正確に扱うため、現在値と履歴の`data_collected_at`はともにマイクロ秒精度の`TIMESTAMP(6)`とする。
+
+適用前に次のSQLで既存NULLを必ず監査する。該当行を`0`などの推測値で補完してはならず、CHUNITHM-NETから公式データを再取得してからマイグレーションを適用する。
+
+```sql
+SELECT id, user_id
+FROM players
+WHERE official_player_rating IS NULL;
+```
+
+該当行が残っている場合、`ALTER TABLE`は失敗して移行を停止する。履歴は変更時のみ保存し、保持件数に上限を設けない。
+
+デプロイ順は「プレイヤーデータ登録を停止 → NULL監査と公式データ再取得 → `000041` up → 新バイナリへ切替 → 登録再開」とする。旧バイナリは`rating: null`を受理し得る一方、新バイナリは履歴テーブルを必要とするため、登録を継続したままのローリング移行は行わない。

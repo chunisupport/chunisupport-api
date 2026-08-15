@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -25,6 +25,8 @@ type songUsecaseImpl struct {
 	tm                           TransactionManager
 	defaultExecutor              repository.Executor
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
+	favoriteRepo                 repository.PlayerFavoriteSongRepository
+	lockedRepo                   repository.PlayerLockedSongRepository
 }
 
 // NewSongUsecase は新しい SongUsecase を生成します。
@@ -56,6 +58,26 @@ func NewSongUsecaseWithOverpowerDenominator(
 		panic("NewSongUsecaseWithOverpowerDenominator: NewSongUsecase returned unexpected type, expected *songUsecaseImpl")
 	}
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
+	return impl
+}
+
+// NewSongUsecaseWithCascadeDelete はお気に入り・未解禁設定の楽曲削除カスケード連携付きで SongUsecase を生成します。
+func NewSongUsecaseWithCascadeDelete(
+	songRepo repository.SongRepository,
+	masterCache repository.SongMasterProvider,
+	tm TransactionManager,
+	defaultExecutor repository.Executor,
+	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
+	favoriteRepo repository.PlayerFavoriteSongRepository,
+	lockedRepo repository.PlayerLockedSongRepository,
+) SongUsecase {
+	usecase := NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, defaultExecutor, overpowerDenominatorProvider)
+	impl, ok := usecase.(*songUsecaseImpl)
+	if !ok {
+		panic("NewSongUsecaseWithCascadeDelete: NewSongUsecaseWithOverpowerDenominator returned unexpected type, expected *songUsecaseImpl")
+	}
+	impl.favoriteRepo = favoriteRepo
+	impl.lockedRepo = lockedRepo
 	return impl
 }
 
@@ -99,13 +121,26 @@ func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, er
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) error {
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayIDForUpdate(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
 
 		song.Delete()
-		return s.songRepo.Save(ctx, tx, song)
+		if err := s.songRepo.Save(ctx, tx, song); err != nil {
+			return err
+		}
+		if s.favoriteRepo != nil {
+			if err := s.favoriteRepo.DeleteBySongID(ctx, tx, song.ID); err != nil {
+				return err
+			}
+		}
+		if s.lockedRepo != nil {
+			if err := s.lockedRepo.DeleteBySongID(ctx, tx, song.ID); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -131,7 +166,7 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
-func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSongInput) error {
 	if len(requests) == 0 {
 		return nil
 	}
@@ -158,6 +193,61 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*api_inter
 	return nil
 }
 
+// UpdateChartConstant は公式IDと難易度の先頭3文字を使って既存譜面の定数を更新します。
+func (s *songUsecaseImpl) UpdateChartConstant(ctx context.Context, input UpdateChartConstantInput) (*entity.Song, error) {
+	masters := s.masterCache.SongMasters()
+	if masters == nil {
+		return nil, fmt.Errorf("master cache is not initialized")
+	}
+
+	difficultyPrefix := strings.ToUpper(input.Difficulty)
+	if len(difficultyPrefix) != 3 {
+		return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+	}
+
+	difficultyID := 0
+	for name, difficulty := range masters.Difficulties {
+		if strings.HasPrefix(name, difficultyPrefix) {
+			if difficultyID != 0 {
+				return nil, fmt.Errorf("%w: ambiguous difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+			}
+			difficultyID = difficulty.ID
+		}
+	}
+	if difficultyID == 0 {
+		return nil, fmt.Errorf("%w: difficulty=%s", ErrInvalidDifficulty, input.Difficulty)
+	}
+
+	constant, err := chartconstant.NewChartConstant(input.Const)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidDifficulty, err)
+	}
+
+	var updatedSong *entity.Song
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		song, err := s.songRepo.FindByOfficialIdx(ctx, tx, input.OfficialIdx)
+		if err != nil {
+			return err
+		}
+		if err := song.ChangeChartConstant(difficultyID, constant); err != nil {
+			if errors.Is(err, entity.ErrChartNotFound) {
+				return fmt.Errorf("%w: difficulty=%s", ErrChartNotFound, difficultyPrefix)
+			}
+			return err
+		}
+		if err := s.songRepo.Save(ctx, tx, song); err != nil {
+			return err
+		}
+		updatedSong = song
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	s.invalidateOverpowerDenominator(ctx)
+	return updatedSong, nil
+}
+
 // CalcSongMaxOP は楽曲の最大譜面定数から理論値の最大OPを計算します。
 // MaxChartConst はドメインサービスにより譜面集約で設定済みです。
 func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
@@ -168,9 +258,9 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	return service.CalcSongMaxOP(song.MaxChartConst)
 }
 
-// convertRequestsToEntities はDTOリストからエンティティリストに変換します。
+// convertRequestsToEntities はユースケース入力からエンティティリストに変換します。
 // IDフィールドは既存データの参照に使用されないため、0のままです。
-func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.UpdateSongRequest, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
+func (s *songUsecaseImpl) convertRequestsToEntities(requests []*UpdateSongInput, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
 	result := make([]*entity.Song, 0, len(requests))
 
 	for _, req := range requests {
@@ -191,8 +281,11 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*api_internal.Upd
 		song.Artist = req.Artist
 		song.GenreID = genreID
 		song.BPM = req.BPM
-		song.ReleasedAt = req.ReleasedAt.TimePtr()
+		song.ReleasedAt = req.ReleasedAt
 		song.Jacket = req.Jacket
+		if req.IsNew != nil {
+			song.IsNew = *req.IsNew
+		}
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
 		for diffName, chartReq := range req.Charts {
@@ -320,6 +413,7 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.BPM = input.BPM
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
+	song.IsNew = input.IsNew
 	song.Charts = charts
 
 	var created *entity.Song

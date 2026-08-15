@@ -8,7 +8,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
-// ValidateDisplayID は境界で受け取った楽曲DisplayIDを検証します。
+// ValidateDisplayID は境界で受け取った表示用IDを検証します。
 // Usecaseへ渡す前にVOと同じ形式制約を適用し、無効な入力を早期に拒否します。
 func ValidateDisplayID(value string) (string, *apierror.APIError) {
 	if _, err := displayid.NewDisplayID(value); err != nil {

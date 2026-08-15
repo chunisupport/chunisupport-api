@@ -34,6 +34,7 @@ func TestToV1SongDTO(t *testing.T) {
 		Jacket:               &imgURL,
 		IsMaxOPUnknown:       true,
 		OpTargetDifficultyID: 5,
+		IsNew:                true,
 		Charts: []*entity.Chart{
 			{DifficultyID: 4, Const: masterConst},
 			{DifficultyID: 5, Const: ultimaConst},
@@ -106,6 +107,8 @@ func TestToV1SongDTO(t *testing.T) {
 	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "ULTIMA" {
 		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "ULTIMA")
 	}
+
+	assert.True(t, dto.IsNew)
 
 	// Charts は空の map として初期化される
 	if dto.Charts == nil {
@@ -187,6 +190,7 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 		Jacket:             &jacket,
 		MaxOP:              85,
 		OpTargetDifficulty: stringPtr("EXPERT"),
+		IsNew:              true,
 		Charts: V1OrderedChartsMap{
 			"BASIC":  &V1ChartDTO{Const: chartBasic, IsConstUnknown: false},
 			"EXPERT": &V1ChartDTO{Const: chartExpert, IsConstUnknown: false},
@@ -212,6 +216,10 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 
 	if !containsString(jsonString, `"op_target_difficulty":"EXPERT"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain op_target_difficulty field, got: %s", jsonString)
+	}
+
+	if !containsString(jsonString, `"is_new":true`) {
+		assert.Failf(t, "アサーション失敗", "JSON should contain is_new field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）

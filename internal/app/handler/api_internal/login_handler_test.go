@@ -10,9 +10,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app"
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
-	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,13 +21,13 @@ type mockLoginUsecase struct {
 	mock.Mock
 }
 
-func (m *mockLoginUsecase) Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*dto_internal.UserDTO, error) {
+func (m *mockLoginUsecase) Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*usecase.UserOutput, error) {
 	args := m.Called(ctx, idToken, turnstileToken, remoteIP)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*dto_internal.UserDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserOutput), args.Error(1)
 }
 
 func TestLoginHandler_Login(t *testing.T) {
@@ -38,7 +37,7 @@ func TestLoginHandler_Login(t *testing.T) {
 	t.Run("正常系: BearerトークンとTurnstileトークンでログインできる", func(t *testing.T) {
 		loginUsecase := new(mockLoginUsecase)
 		h := api_internal.NewLoginHandler(loginUsecase)
-		loginUsecase.On("Login", mock.Anything, "firebase-id-token", "turnstile-token", "192.0.2.1").Return(&dto_internal.UserDTO{
+		loginUsecase.On("Login", mock.Anything, "firebase-id-token", "turnstile-token", "192.0.2.1").Return(&usecase.UserOutput{
 			Username:    "sampleuser",
 			AccountType: "PLAYER",
 		}, nil).Once()

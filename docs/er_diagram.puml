@@ -26,8 +26,11 @@ entity "users" as users {
 entity "api_tokens" as api_tokens {
   + id: BIGINT [PK]
   --
-  user_id: INT NOT NULL [UNIQUE]
+  user_id: INT NOT NULL
+  name: VARCHAR(50) NOT NULL [UNIQUE WITH user_id]
   hashed_token: CHAR(64) NOT NULL [UNIQUE]
+  token_prefix: CHAR(5)
+  last_used_at: DATETIME
   created_at: TIMESTAMP
 }
 
@@ -37,7 +40,7 @@ entity "players" as players {
   user_id: INT NOT NULL [UNIQUE]
   player_name: VARCHAR(20) NOT NULL
   player_level: INT NOT NULL
-  official_player_rating: DECIMAL(4, 2)
+  official_player_rating: DECIMAL(4, 2) NOT NULL
   calculated_player_rating: DECIMAL(6, 4)
   new_average_rating: DECIMAL(6, 4)
   best_average_rating: DECIMAL(6, 4)
@@ -45,9 +48,21 @@ entity "players" as players {
   class_emblem_base_id: TINYINT
   last_played_at: DATETIME
   overpower_value: DECIMAL(9, 3)
+  official_overpower: DECIMAL(8, 2) NOT NULL
+  data_collected_at: TIMESTAMP
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
 }
+
+entity "player_metric_histories" as player_metric_histories {
+  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + data_collected_at: TIMESTAMP [PK]
+  --
+  official_rating: DECIMAL(4, 2) NOT NULL
+  official_overpower: DECIMAL(8, 2) NOT NULL
+}
+
+players ||--o{ player_metric_histories
 
 entity "player_honors" as player_honors {
   + player_id: MEDIUMINT UNSIGNED [PK, FK]
@@ -207,7 +222,7 @@ entity "versions" as versions {
 
 ' relationships
 users ||--|o players
-users ||--|o api_tokens
+users ||--o{ api_tokens
 users }o--|| account_types
 
 players ||--o{ player_records

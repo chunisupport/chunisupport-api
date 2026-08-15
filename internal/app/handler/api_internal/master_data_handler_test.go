@@ -68,7 +68,7 @@ func TestMasterDataHandler_GetVersions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, response.Versions, 1)
 	assert.Equal(t, "VERSE", response.Versions[0].Name)
-	assert.Equal(t, "2025-10-30T15:00:00+09:00", response.Versions[0].ReleasedAt)
+	assert.Equal(t, "2025-10-30", response.Versions[0].ReleasedAt)
 	usecaseMock.AssertExpectations(t)
 }
 
@@ -132,6 +132,6 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"released_at\":\"2015-07-16T00:00:00Z\"}]")
+	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"released_at\":\"2015-07-16\"}]")
 	usecaseMock.AssertExpectations(t)
 }

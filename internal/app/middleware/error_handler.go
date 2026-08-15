@@ -5,29 +5,29 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/labstack/echo/v4"
+	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/labstack/echo/v5"
 )
 
 // CustomHTTPErrorHandler はカスタムエラーハンドラーです
-func CustomHTTPErrorHandler(err error, c echo.Context) {
-	var apiErr *apierror.APIError
+func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	var httpStatus int
 	var errorCode string
 	errorMessage := ""
 	var errorDetails []apierror.ValidationErrorDetail
 
 	// APIErrorの場合
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok {
 		httpStatus = apiErr.HTTPStatus
 		errorCode = apiErr.Code
 		errorMessage, errorDetails = buildClientErrorInfo(apiErr)
-	} else if he, ok := err.(*echo.HTTPError); ok {
-		// echo.HTTPErrorの場合（フォールバック）
-		httpStatus = he.Code
-		errorCode = httpStatusToErrorCode(he.Code)
+	} else if httpStatus = echo.StatusCode(err); httpStatus != 0 {
+		// EchoネイティブのHTTPエラー（*httpError / *HTTPError 両対応）
+		errorCode = httpStatusToErrorCode(httpStatus)
 	} else {
 		// その他のエラー
 		httpStatus = http.StatusInternalServerError
@@ -35,8 +35,12 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	}
 
 	// レスポンスがすでに送信されている場合は何もしない
-	if c.Response().Committed {
+	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
+	}
+
+	if errorCode == apierror.CodeMaintenanceMode {
+		setMaintenanceResponseHeaders(c)
 	}
 
 	// エラーログの出力（詳細情報を含む）
@@ -112,7 +116,11 @@ func httpStatusToErrorCode(status int) string {
 }
 
 // logError はエラーをログに出力します（詳細情報を含む）
-func logError(status int, code string, err error, c echo.Context) {
+func logError(status int, code string, err error, c *echo.Context) {
+	if code == apierror.CodeMaintenanceMode {
+		return
+	}
+
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
@@ -139,6 +147,11 @@ func logError(status int, code string, err error, c echo.Context) {
 			"error", errorMessage,
 		)
 	}
+}
+
+func setMaintenanceResponseHeaders(c *echo.Context) {
+	c.Response().Header().Set(echo.HeaderRetryAfter, strconv.Itoa(info.MaintenanceRetryAfterSeconds))
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 }
 
 func sanitizeLogValue(value string) string {

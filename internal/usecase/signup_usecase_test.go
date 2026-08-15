@@ -7,6 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,17 @@ func TestSignupUsecase_Signup(t *testing.T) {
 				})).Return(nil).Once()
 			},
 			wantUser: "newuser",
+		},
+		{
+			name:      "禁止語を含むユーザー名は登録しない",
+			idToken:   "valid-token",
+			username:  "iamadmin",
+			turnstile: "turnstile-token",
+			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
+			},
+			wantErr: ErrUsernameForbidden,
 		},
 		{
 			name:      "空のIDトークンはErrInvalidIDTokenを返す",
@@ -133,10 +145,12 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			verifier := new(mockTokenVerifier)
 			turnstileVerifier := new(mockTurnstileVerifier)
 			userRepo := new(MockUserRepository)
-			service := NewSignupUsecase(&mockTransactionManager{}, userRepo, verifier, turnstileVerifier, newMockMasterCache())
+			usernamePolicy, err := service.NewForbiddenUsernamePolicy(nil, []string{"admin"})
+			require.NoError(t, err)
+			signupUsecase := NewSignupUsecase(&mockTransactionManager{}, userRepo, verifier, turnstileVerifier, newMockMasterCache(), usernamePolicy)
 			tt.setup(verifier, turnstileVerifier, userRepo)
 
-			got, err := service.Signup(context.Background(), tt.idToken, tt.username, tt.turnstile, tt.remoteIP)
+			got, err := signupUsecase.Signup(context.Background(), tt.idToken, tt.username, tt.turnstile, tt.remoteIP)
 
 			if tt.wantErr != nil {
 				require.Error(t, err)

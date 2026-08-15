@@ -7,21 +7,52 @@ import (
 )
 
 const (
-	Name                        = "chunisupport-api"
-	ConfigDir                   = ".config/"
-	ResourceDir                 = ".resources/"
-	MigrationDir                = "migration/mysql/"
-	StaticDBFilename            = "static.db"
-	BulkInsertChunkSize         = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
-	BulkSelectChunkSize         = 1000 // IN句のプレースホルダ上限を避けるための分割数
-	DefaultUserListLimit        = 100
-	DefaultSongListLimit        = 100
-	GoalMaxPerUser              = 100
-	RecordFilterMaxPerUser      = 100
-	RecordFilterNameMaxLength   = 30
-	RecordFilterMaxPayloadBytes = 8 * 1024
-	ChartConstMin               = constants.ChartConstMin
-	ChartConstMax               = constants.ChartConstMax
+	Name                                        = "chunisupport-api"
+	ConfigDir                                   = ".config/"
+	UsernameForbiddenWordsFile                  = "username_forbidden_words.json"
+	ResourceDir                                 = ".resources/"
+	MigrationDir                                = "migration/mysql/"
+	BulkInsertChunkSize                         = 3000 // 2GB RAM以上を想定。1GB以下なら1000に下げる
+	BulkSelectChunkSize                         = 1000 // IN句のプレースホルダ上限を避けるための分割数
+	DefaultUserListLimit                        = 100
+	AdminUserStatisticsActivePeriod             = 30 * 24 * time.Hour
+	DefaultSongListLimit                        = 100
+	DefaultBestSlotRankingLimit                 = 50
+	MaxBestSlotRankingLimit                     = 100
+	GoalMaxPerUser                              = constants.GoalMaxPerUser
+	GoalGroupMaxPerUser                         = constants.GoalGroupMaxPerUser
+	RecordFilterMaxPerUser                      = constants.RecordFilterMaxPerUser
+	RecordFilterNameMaxLength                   = constants.RecordFilterNameMaxLength
+	RecordFilterMaxPayloadBytes                 = constants.RecordFilterMaxPayloadBytes
+	APITokenMaxPerUser                          = 10
+	APITokenRandomByteLength                    = 32
+	APITokenPrefixLength                        = 5
+	APITokenLastUsedUpdateInterval              = time.Hour
+	MaxScoreHistoryEntriesPerChart              = constants.MaxScoreHistoryEntriesPerChart
+	MaxOfficialRating                           = constants.MaxOfficialRating
+	MaxOfficialOverpower                        = constants.MaxOfficialOverpower
+	OfficialMetricDecimalScale                  = constants.OfficialMetricDecimalScale
+	OfficialMetricDecimalTolerance              = constants.OfficialMetricDecimalTolerance
+	ChartConstMin                               = constants.ChartConstMin
+	ChartConstMax                               = constants.ChartConstMax
+	GoalChartTargetOP                           = "OP_TARGET"
+	RainbowRequiredDifficultyMinID              = 1
+	RainbowRequiredDifficultyMaxID              = 4
+	RainbowRequiredDifficultyCount              = 4
+	RandomFavoriteHonorTitle                    = "お気に入りからランダム"
+	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
+	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
+	SongSnapshotExportBatchLockName             = "chunisupport:export-song-snapshots"
+	SongSnapshotObjectKey                       = "v1/songs.json"
+	WorldsendSongSnapshotObjectKey              = "v1/worldsend-songs.json"
+	ChunirecSongSnapshotObjectKey               = "compat/chunirec/2.0/music/showall.json"
+	ReiwaSongSnapshotObjectKey                  = "compat/reiwa/1/chunithm_record/original.json"
+	PlayerLatestUpdateSchemaVersion             = 3
+	PlayerLatestUpdateMinSupportedSchemaVersion = 1
+	PlayerLatestUpdateMetricDiffSchemaVersion   = 2
+	PlayerLatestUpdateOPPercentSchemaVersion    = 3
+	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
+	MaintenanceRetryAfterSeconds                = 60
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
@@ -30,9 +61,10 @@ const (
 	TheoreticalOverpowerBonus   = 5.0
 
 	// レートリミット設定: 外部API v1
-	APIRateLimitRequests      = 150              // 一般ユーザーのリクエスト制限（15分間）
-	APIRateLimitAdminRequests = 150000           // ADMINユーザーのリクエスト制限（15分間）
-	APIRateLimitWindow        = 15 * time.Minute // レートリミットのウィンドウ期間
+	APIRateLimitRequests       = 150              // 一般ユーザーのリクエスト制限（15分間）
+	APIRateLimitEditorRequests = 3000             // EDITOR/EXTDEV共用のリクエスト制限（15分間）
+	APIRateLimitAdminRequests  = 150000           // ADMINユーザーのリクエスト制限（15分間）
+	APIRateLimitWindow         = 15 * time.Minute // レートリミットのウィンドウ期間
 
 	// レートリミット設定: 認証エンドポイント（IPベース）
 	LoginRateLimitRequests          = 10              // ログインエンドポイントのリクエスト制限（1分間）
@@ -59,9 +91,18 @@ const (
 	AccountTypePlayer = 1 // 一般ユーザー
 	AccountTypeEditor = 2 // 編集者
 	AccountTypeAdmin  = 3 // 管理者
+	AccountTypeExtDev = 4 // 外部API開発者
 
 	// リクエストボディサイズ上限
-	RequestBodyLimit = "5M"
+	RequestBodyLimit                      = 5 * 1024 * 1024
+	DataTransferFormat                    = "chunisupport-user-transfer"
+	DataTransferSchemaVersion             = 1
+	DataTransferHMACSecretMinBytes        = 32
+	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024
+	DataTransferCompressedPayloadMaxBytes = 24 * 1024 * 1024
+	DataTransferPayloadMaxBytes           = 128 * 1024 * 1024
+	DataTransferRateLimitRequests         = 5
+	DataTransferRateLimitWindow           = time.Minute
 
 	// DBコネクションプールのデフォルト設定
 	DefaultDBMaxOpenConns       = 25
@@ -70,6 +111,12 @@ const (
 	DefaultDBConnMaxIdleTimeSec = 60
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
+
+	// プレイヤーお気に入り楽曲
+	PlayerFavoriteSongMaxCount = constants.PlayerFavoriteSongMaxCount
+
+	// フレンド機能
+	FriendshipMaxOutgoingActive = 100
 )
 
 var (
@@ -84,6 +131,7 @@ var (
 			AccountTypePlayer: {},
 			AccountTypeEditor: {},
 			AccountTypeAdmin:  {},
+			AccountTypeExtDev: {},
 		},
 		AccountTypeEditor: {
 			AccountTypeEditor: {},
@@ -91,6 +139,10 @@ var (
 		},
 		AccountTypeAdmin: {
 			AccountTypeAdmin: {},
+		},
+		// EXTDEVはPLAYERの操作を利用できる一方、専用ゲートではEXTDEV自身だけを許可する。
+		AccountTypeExtDev: {
+			AccountTypeExtDev: {},
 		},
 	}
 )

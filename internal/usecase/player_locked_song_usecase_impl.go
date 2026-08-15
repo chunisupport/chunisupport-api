@@ -27,8 +27,14 @@ type playerLockedSongUsecase struct {
 	playerDataRepo repository.PlayerDataRepository
 	songRepo       repository.SongRepository
 	lockedRepo     repository.PlayerLockedSongRepository
+	friendshipRepo repository.FriendshipRepository
 	queryService   PlayerLockedSongQueryService
 	resolver       PlayerSongIDResolver
+}
+
+// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
+func (u *playerLockedSongUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
+	u.friendshipRepo = friendshipRepo
 }
 
 func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) (PlayerLockedSongUsecase, error) {
@@ -53,7 +59,11 @@ func (u *playerLockedSongUsecase) List(ctx context.Context, username string, req
 	if user == nil {
 		return nil, ErrUserNotFound
 	}
-	if user.IsPrivate && (requester == nil || requester.ID != user.ID) {
+	accessible, err := canAccessPrivateUser(ctx, u.db, u.friendshipRepo, user, requester)
+	if err != nil {
+		return nil, err
+	}
+	if !accessible {
 		return nil, ErrUserPrivate
 	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, user.ID)

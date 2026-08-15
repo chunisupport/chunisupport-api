@@ -1,6 +1,9 @@
 package api_internal
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // RecordFilterRequest は保存済み譜面フィルタの作成・更新リクエストです。
 type RecordFilterRequest struct {
@@ -17,8 +20,8 @@ type RecordFilterResponse struct {
 	FilterType    string          `json:"filter_type"`
 	SchemaVersion int             `json:"schema_version"`
 	Filter        json.RawMessage `json:"filter"`
-	CreatedAt     string          `json:"created_at"`
-	UpdatedAt     string          `json:"updated_at"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 // RecordFiltersResponse は保存済み譜面フィルタ一覧のレスポンスです。

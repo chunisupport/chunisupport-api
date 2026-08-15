@@ -24,28 +24,45 @@ const (
 	CodeOperationFailed    = "operation_failed"    // 操作失敗（詳細を隠蔽）
 
 	// プレイヤー関連エラー
-	CodePlayerNotLinked = "player_not_linked"
-	CodePlayerNotFound  = "player_not_found"
+	CodePlayerNotLinked             = "player_not_linked"
+	CodePlayerNotFound              = "player_not_found"
+	CodePlayerMetricHistoryNotFound = "player_metric_history_not_found"
+
+	// ユーザーデータ移行関連エラー
+	CodeDataTransferPlayerNotFound      = "data_transfer_player_not_found"
+	CodeDataTransferInvalidFile         = "data_transfer_invalid_file"
+	CodeDataTransferInvalidSignature    = "data_transfer_invalid_signature"
+	CodeDataTransferUnsupportedSchema   = "data_transfer_unsupported_schema"
+	CodeDataTransferInvalidData         = "data_transfer_invalid_data"
+	CodeDataTransferUnresolvedReference = "data_transfer_unresolved_reference"
+	CodeDataTransferDestinationNotEmpty = "data_transfer_destination_not_empty"
 
 	// 楽曲・譜面関連エラー
-	CodeSongNotFound         = "song_not_found"
-	CodeChartNotFound        = "chart_not_found"
-	CodeInvalidGenreID       = "invalid_genre_id"
-	CodeInvalidDifficultyID  = "invalid_difficulty_id"
-	CodeInvalidDifficulty    = "invalid_difficulty"     // 無効な難易度パラメータ
-	CodeDuplicateOfficialIdx = "duplicate_official_idx" // official_idx 重複
+	CodeSongNotFound                      = "song_not_found"
+	CodeChartNotFound                     = "chart_not_found"
+	CodeInvalidGenreID                    = "invalid_genre_id"
+	CodeInvalidDifficultyID               = "invalid_difficulty_id"
+	CodeInvalidDifficulty                 = "invalid_difficulty"     // 無効な難易度パラメータ
+	CodeDuplicateOfficialIdx              = "duplicate_official_idx" // official_idx 重複
+	CodeScoreHistoryNotFound              = "score_history_not_found"
+	CodeScoreHistoryUnsupportedDifficulty = "score_history_unsupported_difficulty"
 
 	// データ関連エラー
-	CodeValidationFailed   = "validation_failed"
-	CodeResourceNotFound   = "resource_not_found"
-	CodeConflict           = "conflict"
-	CodeAPITokenNotFound   = "api_token_not_found" // #nosec G101
-	CodePayloadTooLarge    = "payload_too_large"
-	CodeUnsupportedMedia   = "unsupported_media_type"
-	CodeMethodNotAllowed   = "method_not_allowed"
-	CodeNotFound           = "not_found"
-	CodeTooManyRequests    = "too_many_requests"
-	CodeServiceUnavailable = "service_unavailable"
+	CodeValidationFailed      = "validation_failed"
+	CodeResourceNotFound      = "resource_not_found"
+	CodeConflict              = "conflict"
+	CodeAPITokenNotFound      = "api_token_not_found"      // #nosec G101
+	CodeAPITokenLimitExceeded = "api_token_limit_exceeded" // #nosec G101 -- 公開APIのエラーコードであり認証情報ではありません。
+	CodeAPITokenNameConflict  = "api_token_name_conflict"  // #nosec G101 -- 公開APIのエラーコードであり認証情報ではありません。
+	CodeInvalidAPITokenName   = "invalid_api_token_name"   // #nosec G101
+	CodeInvalidAPITokenID     = "invalid_api_token_id"     // #nosec G101
+	CodePayloadTooLarge       = "payload_too_large"
+	CodeUnsupportedMedia      = "unsupported_media_type"
+	CodeMethodNotAllowed      = "method_not_allowed"
+	CodeNotFound              = "not_found"
+	CodeTooManyRequests       = "too_many_requests"
+	CodeServiceUnavailable    = "service_unavailable"
+	CodeMaintenanceMode       = "maintenance_mode"
 
 	// 入力バリデーション詳細エラー
 	CodeUsernameEmpty       = "username_empty"
@@ -61,10 +78,24 @@ const (
 	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
 	CodeInvalidGoalInput             = "invalid_goal_input"
+	CodeGoalInvalidOrder             = "goal_invalid_order"
+	CodeGoalGroupNotFound            = "goal_group_not_found"
+	CodeGoalGroupLimitExceeded       = "goal_group_limit_exceeded"
+	CodeGoalGroupInvalidName         = "goal_group_invalid_name"
+	CodeGoalGroupConflict            = "goal_group_conflict"
+	CodeGoalGroupInvalidOrder        = "goal_group_invalid_order"
 
 	// 保存済みフィルタ関連エラー
 	CodeRecordFilterNotFound      = "record_filter_not_found"
 	CodeRecordFilterLimitExceeded = "record_filter_limit_exceeded"
 	CodeInvalidRecordFilterInput  = "invalid_record_filter_input"
 	CodeInvalidRecordFilterID     = "invalid_record_filter_id"
+
+	// お気に入り楽曲関連エラー
+	CodeFavoriteSongLimitExceeded = "favorite_song_limit_exceeded"
+
+	// フレンド関連エラー
+	CodeFriendshipLimitExceeded = "friendship_limit_exceeded"
+	CodeFriendshipConflict      = "friendship_conflict"
+	CodeFriendRequestNotFound   = "friend_request_not_found"
 )

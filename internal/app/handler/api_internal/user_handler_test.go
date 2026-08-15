@@ -11,10 +11,12 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -24,49 +26,149 @@ type mockUserUsecase struct {
 	mock.Mock
 }
 
-func (m *mockUserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileWithRecordsDTO, error) {
+func testUserPlayerOutput(t *testing.T, name string, level int, now time.Time) *usecase.UserPlayerOutput {
+	t.Helper()
+	value, err := playername.NewPlayerName(name)
+	if err != nil {
+		value, err = playername.NewPlayerName("テストプレイヤー")
+	}
+	assert.NoError(t, err)
+	return &usecase.UserPlayerOutput{Player: &entity.Player{Name: value, Level: level, CreatedAt: now, UpdatedAt: now}, Honors: []*entity.PlayerHonor{}}
+}
+
+func testPlayerRecordOutput(id string) *usecase.PlayerRecordOutput {
+	return &usecase.PlayerRecordOutput{PlayerRecord: &entity.PlayerRecord{Song: &entity.Song{DisplayID: id}}}
+}
+
+func testWorldsendRecordOutput(id string) *usecase.WorldsendRecordOutput {
+	return &usecase.WorldsendRecordOutput{PlayerWorldsendRecord: &entity.PlayerWorldsendRecord{Song: &entity.Song{DisplayID: id}}, ID: id}
+}
+
+func (m *mockUserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
 	args := m.Called(ctx, username, requester, includeNoPlay)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserProfileWithRecordsDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserProfileWithRecordsOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserUpdatedAtDTO, error) {
+func (m *mockUserUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*usecase.UserUpdatedAtOutput, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserUpdatedAtDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserUpdatedAtOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*dto_internal.UserProfileRatingViewDTO, error) {
+func (m *mockUserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
 	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserProfileRatingViewDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserProfileRatingViewOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*dto_internal.UserProfileRecordViewDTO, error) {
+func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileRecordViewOutput, error) {
 	args := m.Called(ctx, username, requester, includeNoPlay)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto_internal.UserProfileRecordViewDTO), args.Error(1)
+	return args.Get(0).(*usecase.UserProfileRecordViewOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]dto_internal.AdminUserListResponse, error) {
+func (m *mockUserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*usecase.UserSongRecordOutput, error) {
+	args := m.Called(ctx, username, requester, displayID, includeNoPlay, difficulty)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.UserSongRecordOutput), args.Error(1)
+}
+
+func (m *mockUserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*usecase.UserWorldsendSongRecordOutput, error) {
+	args := m.Called(ctx, username, requester, displayID, includeNoPlay)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*usecase.UserWorldsendSongRecordOutput), args.Error(1)
+}
+
+func (m *mockUserUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]usecase.AdminUserOutput, error) {
 	args := m.Called(ctx, page, limit, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]dto_internal.AdminUserListResponse), args.Error(1)
+	return args.Get(0).([]usecase.AdminUserOutput), args.Error(1)
 }
 
 func (m *mockUserUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	args := m.Called(ctx, requester, username)
 	return args.Error(0)
+}
+
+func TestUserHandler_GetUserSongRecord(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
+	expected := &usecase.UserSongRecordOutput{
+		Standard: []*usecase.PlayerRecordOutput{},
+		Meta:     &usecase.UserSongRecordMetaOutput{},
+	}
+	mockUsecase.On(
+		"GetUserSongRecord",
+		mock.Anything,
+		"testuser",
+		(*entity.User)(nil),
+		"0000000000000001",
+		true,
+		"MASTER",
+	).Return(expected, nil).Once()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/0000000000000001?include_noplay=true&difficulty=master", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{
+		{Name: "username", Value: "testuser"},
+		{Name: "displayid", Value: "0000000000000001"},
+	})
+
+	// When
+	err := h.GetUserSongRecord(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestUserHandler_GetUserWorldsendSongRecord_楽曲不存在(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
+	mockUsecase.On(
+		"GetUserWorldsendSongRecord",
+		mock.Anything,
+		"testuser",
+		(*entity.User)(nil),
+		"0000000000000002",
+		false,
+	).Return((*usecase.UserWorldsendSongRecordOutput)(nil), repository.ErrSongNotFound).Once()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/0000000000000002", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{
+		{Name: "username", Value: "testuser"},
+		{Name: "displayid", Value: "0000000000000002"},
+	})
+
+	// When
+	err := h.GetUserWorldsendSongRecord(c)
+
+	// Then
+	apiErr, ok := err.(*apierror.APIError)
+	assert.True(t, ok)
+	assert.Equal(t, apierror.CodeSongNotFound, apiErr.Code)
+	mockUsecase.AssertExpectations(t)
 }
 
 func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
@@ -76,15 +178,14 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	now := time.Date(2026, 4, 18, 12, 34, 56, 0, time.UTC)
 
 	t.Run("正常系: updated_at を返す", func(t *testing.T) {
-		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserUpdatedAtOutput{
 			UpdatedAt: &now,
 		}, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -99,15 +200,14 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("プレイヤー未連携時は null を返す", func(t *testing.T) {
-		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserUpdatedAtDTO{
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserUpdatedAtOutput{
 			UpdatedAt: nil,
 		}, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -120,13 +220,12 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserUpdatedAtDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return((*usecase.UserUpdatedAtOutput)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserUpdatedAt(c)
 
@@ -140,36 +239,30 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
-	player := &dto.PlayerDTO{
-		Name:      "player",
-		Level:     10,
-		Honors:    []*dto.HonorDTO{},
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	records := &dto.UserRecordResponseDTO{
+	player := testUserPlayerOutput(t, "player", 10, now)
+	records := &usecase.UserRecordOutput{
 		UpdatedAt:     now,
-		Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
-		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
-		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
-		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
-		All:           []*dto.PlayerRecordDTO{{ID: "standard1"}},
-		WorldsEnd:     []*dto.WorldsendRecordDTO{{ID: "we1"}},
+		Best:          []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best1")},
+		BestCandidate: []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best_candidate1")},
+		New:           []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new1")},
+		NewCandidate:  []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new_candidate1")},
+		All:           []*usecase.PlayerRecordOutput{testPlayerRecordOutput("standard1")},
+		WorldsEnd:     []*usecase.WorldsendRecordOutput{testWorldsendRecordOutput("we1")},
 	}
-	result := &dto_internal.UserProfileWithRecordsDTO{
+	result := &usecase.UserProfileWithRecordsOutput{
 		Username:  "testuser",
 		Player:    player,
 		Records:   records,
 		UpdatedAt: &now,
 	}
-	ratingRecords := &dto_internal.UserRatingRecordResponseDTO{
+	ratingRecords := &usecase.UserRatingRecordOutput{
 		UpdatedAt:     now,
-		Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
-		BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
-		New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
-		NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
+		Best:          []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best1")},
+		BestCandidate: []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best_candidate1")},
+		New:           []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new1")},
+		NewCandidate:  []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new_candidate1")},
 	}
-	ratingResult := &dto_internal.UserProfileRatingViewDTO{
+	ratingResult := &usecase.UserProfileRatingViewOutput{
 		Username:  "testuser",
 		Player:    player,
 		Records:   ratingRecords,
@@ -182,8 +275,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -201,7 +293,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	})
 
 	t.Run("viewなしでプレイヤー未連携なら player と records は null を返す", func(t *testing.T) {
-		noPlayerResult := &dto_internal.UserProfileWithRecordsDTO{
+		noPlayerResult := &usecase.UserProfileWithRecordsOutput{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -212,8 +304,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -235,8 +326,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserProfileWithRecords(c)
 
@@ -273,13 +363,12 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
-				mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), testCase.usecaseError).Once()
+				mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*usecase.UserProfileRatingViewOutput)(nil), testCase.usecaseError).Once()
 
 				req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=rating", nil)
 				rec := httptest.NewRecorder()
 				c := e.NewContext(req, rec)
-				c.SetParamNames("username")
-				c.SetParamValues("testuser")
+				c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 				err := h.GetUserProfileWithRecords(c)
 
@@ -298,25 +387,17 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	calculatedRating := 17.1234
 	bestAverageRating := 17.2345
 	newAverageRating := 16.9567
-	player := &dto.PlayerDTO{
-		Name:              "player",
-		Level:             10,
-		CalculatedRating:  &calculatedRating,
-		BestAverageRating: &bestAverageRating,
-		NewAverageRating:  &newAverageRating,
-		Honors:            []*dto.HonorDTO{},
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	ratingResult := &dto_internal.UserProfileRatingViewDTO{
+	player := testUserPlayerOutput(t, "player", 10, now)
+	player.CalculatedRating, player.BestAverageRating, player.NewAverageRating = &calculatedRating, &bestAverageRating, &newAverageRating
+	ratingResult := &usecase.UserProfileRatingViewOutput{
 		Username: "testuser",
 		Player:   player,
-		Records: &dto_internal.UserRatingRecordResponseDTO{
+		Records: &usecase.UserRatingRecordOutput{
 			UpdatedAt:     now,
-			Best:          []*dto.PlayerRecordDTO{{ID: "best1"}},
-			BestCandidate: []*dto.PlayerRecordDTO{{ID: "best_candidate1"}},
-			New:           []*dto.PlayerRecordDTO{{ID: "new1"}},
-			NewCandidate:  []*dto.PlayerRecordDTO{{ID: "new_candidate1"}},
+			Best:          []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best1")},
+			BestCandidate: []*usecase.PlayerRecordOutput{testPlayerRecordOutput("best_candidate1")},
+			New:           []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new1")},
+			NewCandidate:  []*usecase.PlayerRecordOutput{testPlayerRecordOutput("new_candidate1")},
 		},
 		UpdatedAt: &now,
 	}
@@ -327,8 +408,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -354,7 +434,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	})
 
 	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&dto_internal.UserProfileRatingViewDTO{
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserProfileRatingViewOutput{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -364,8 +444,7 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -387,13 +466,12 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*dto_internal.UserProfileRatingViewDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserProfileRatingView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*usecase.UserProfileRatingViewOutput)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/rating", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRating(c)
 
@@ -407,19 +485,13 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
-	recordResult := &dto_internal.UserProfileRecordViewDTO{
+	recordResult := &usecase.UserProfileRecordViewOutput{
 		Username: "testuser",
-		Player: &dto.PlayerDTO{
-			Name:      "player",
-			Level:     10,
-			Honors:    []*dto.HonorDTO{},
-			CreatedAt: now,
+		Player:   testUserPlayerOutput(t, "player", 10, now),
+		Records: &usecase.UserRecordViewOutput{
 			UpdatedAt: now,
-		},
-		Records: &dto_internal.UserRecordViewResponseDTO{
-			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
-			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
+			All:       []*usecase.PlayerRecordOutput{testPlayerRecordOutput("standard1")},
+			Worldsend: []*usecase.WorldsendRecordOutput{testWorldsendRecordOutput("we1")},
 		},
 		UpdatedAt: &now,
 	}
@@ -430,8 +502,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record?include_noplay=true", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -452,7 +523,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	})
 
 	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&dto_internal.UserProfileRecordViewDTO{
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&usecase.UserProfileRecordViewOutput{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -462,8 +533,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -480,13 +550,12 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*dto_internal.UserProfileRecordViewDTO)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*usecase.UserProfileRecordViewOutput)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 		err := h.GetUserRecord(c)
 
@@ -500,20 +569,14 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
-	player := &dto.PlayerDTO{
-		Name:      "player",
-		Level:     10,
-		Honors:    []*dto.HonorDTO{},
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	recordViewResult := &dto_internal.UserProfileRecordViewDTO{
+	player := testUserPlayerOutput(t, "player", 10, now)
+	recordViewResult := &usecase.UserProfileRecordViewOutput{
 		Username: "testuser",
 		Player:   player,
-		Records: &dto_internal.UserRecordViewResponseDTO{
+		Records: &usecase.UserRecordViewOutput{
 			UpdatedAt: now,
-			All:       []*dto.PlayerRecordDTO{{ID: "standard1"}},
-			Worldsend: []*dto.WorldsendRecordDTO{{ID: "we1"}},
+			All:       []*usecase.PlayerRecordOutput{testPlayerRecordOutput("standard1")},
+			Worldsend: []*usecase.WorldsendRecordOutput{testWorldsendRecordOutput("we1")},
 		},
 		UpdatedAt: &now,
 	}
@@ -523,8 +586,7 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record&include_noplay=true", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("username")
-	c.SetParamValues("testuser")
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 
 	err := h.GetUserProfileWithRecords(c)
 
@@ -552,8 +614,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := createdAt.Add(2 * time.Hour)
 
-	uid := "firebase-uid-1"
-	expected := []dto_internal.AdminUserListResponse{
+	expected := []usecase.AdminUserOutput{
 		{
 			UserName:       "user1",
 			AccountType:    "EDITOR",
@@ -564,7 +625,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: new(float64(9500)),
 			IsSuspicious:   true,
 			IsPrivate:      false,
-			FirebaseUID:    &uid,
 		},
 		{
 			UserName:       "user2",
@@ -576,7 +636,6 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			OverPowerValue: nil,
 			IsSuspicious:   false,
 			IsPrivate:      true,
-			FirebaseUID:    nil,
 		},
 	}
 
@@ -603,7 +662,8 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Equal(t, 9500.0, body[0]["overpower_value"])
 	assert.Equal(t, true, body[0]["is_suspicious"])
 	assert.Equal(t, false, body[0]["is_private"])
-	assert.Equal(t, uid, body[0]["firebase_uid"])
+	assert.NotContains(t, body[0], "firebase_uid")
+	assert.NotContains(t, body[0], "is_deleted")
 	assert.NotContains(t, body[0], "email")
 	assert.Equal(t, "user2", body[1]["username"])
 	assert.Equal(t, "PLAYER", body[1]["account_type"])
@@ -614,7 +674,7 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	assert.Nil(t, body[1]["overpower_value"])
 	assert.Equal(t, false, body[1]["is_suspicious"])
 	assert.Equal(t, true, body[1]["is_private"])
-	assert.Nil(t, body[1]["firebase_uid"])
+	assert.NotContains(t, body[1], "firebase_uid")
 	assert.NotContains(t, body[1], "email")
 	mockUsecase.AssertExpectations(t)
 }
@@ -631,8 +691,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 		c.Set("userEntity", adminUser)
 
 		err := h.DeleteUser(c)
@@ -648,8 +707,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/nonexistent", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("nonexistent")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "nonexistent"}})
 		c.Set("userEntity", adminUser)
 
 		err := h.DeleteUser(c)
@@ -669,8 +727,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames("username")
-		c.SetParamValues("testuser")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
 		c.Set("userEntity", normalUser)
 
 		err := h.DeleteUser(c)

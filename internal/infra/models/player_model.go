@@ -13,7 +13,7 @@ type PlayerModel struct {
 	UserID            int        `db:"user_id"`
 	Name              string     `db:"player_name"`
 	Level             int        `db:"player_level"`
-	OfficialRating    *float64   `db:"official_player_rating"`
+	OfficialRating    float64    `db:"official_player_rating"`
 	CalculatedRating  *float64   `db:"calculated_player_rating"`
 	NewAverageRating  *float64   `db:"new_average_rating"`
 	BestAverageRating *float64   `db:"best_average_rating"`
@@ -21,6 +21,8 @@ type PlayerModel struct {
 	ClassEmblemBaseID *int       `db:"class_emblem_base_id"`
 	LastPlayedAt      *time.Time `db:"last_played_at"`
 	OverpowerValue    *float64   `db:"overpower_value"`
+	OfficialOverpower float64    `db:"official_overpower"`
+	DataCollectedAt   *time.Time `db:"data_collected_at"`
 	CreatedAt         time.Time  `db:"created_at"`
 	UpdatedAt         time.Time  `db:"updated_at"`
 }
@@ -44,6 +46,8 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		ClassEmblemBaseID: m.ClassEmblemBaseID,
 		LastPlayedAt:      m.LastPlayedAt,
 		OverpowerValue:    m.OverpowerValue,
+		OfficialOverpower: m.OfficialOverpower,
+		DataCollectedAt:   m.DataCollectedAt,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}, nil
@@ -63,6 +67,8 @@ func FromPlayerEntity(e *entity.Player) *PlayerModel {
 		ClassEmblemBaseID: e.ClassEmblemBaseID,
 		LastPlayedAt:      e.LastPlayedAt,
 		OverpowerValue:    e.OverpowerValue,
+		OfficialOverpower: e.OfficialOverpower,
+		DataCollectedAt:   e.DataCollectedAt,
 		CreatedAt:         e.CreatedAt,
 		UpdatedAt:         e.UpdatedAt,
 	}

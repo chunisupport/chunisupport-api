@@ -7,7 +7,7 @@ import (
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // RecordFilterHandler は保存済み譜面フィルタAPIを扱います。
@@ -20,7 +20,7 @@ func NewRecordFilterHandler(recordFilterUsecase usecase.RecordFilterUsecase) *Re
 	return &RecordFilterHandler{recordFilterUsecase: recordFilterUsecase}
 }
 
-func (h *RecordFilterHandler) List(c echo.Context) error {
+func (h *RecordFilterHandler) List(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func (h *RecordFilterHandler) List(c echo.Context) error {
 	return c.JSON(http.StatusOK, &internaldto.RecordFiltersResponse{Filters: items})
 }
 
-func (h *RecordFilterHandler) Create(c echo.Context) error {
+func (h *RecordFilterHandler) Create(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (h *RecordFilterHandler) Create(c echo.Context) error {
 	return c.JSON(http.StatusCreated, toRecordFilterResponse(filter))
 }
 
-func (h *RecordFilterHandler) Update(c echo.Context) error {
+func (h *RecordFilterHandler) Update(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (h *RecordFilterHandler) Update(c echo.Context) error {
 	return c.JSON(http.StatusOK, toRecordFilterResponse(filter))
 }
 
-func (h *RecordFilterHandler) Delete(c echo.Context) error {
+func (h *RecordFilterHandler) Delete(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err

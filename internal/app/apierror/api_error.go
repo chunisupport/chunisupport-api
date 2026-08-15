@@ -75,26 +75,43 @@ var (
 	ErrOperationFailed    = New(CodeOperationFailed, http.StatusBadRequest)    // 削除系操作失敗
 
 	// プレイヤー関連エラー
-	ErrPlayerNotLinked = New(CodePlayerNotLinked, http.StatusNotFound)
-	ErrPlayerNotFound  = New(CodePlayerNotFound, http.StatusNotFound)
+	ErrPlayerNotLinked             = New(CodePlayerNotLinked, http.StatusNotFound)
+	ErrPlayerNotFound              = New(CodePlayerNotFound, http.StatusNotFound)
+	ErrPlayerMetricHistoryNotFound = New(CodePlayerMetricHistoryNotFound, http.StatusNotFound)
+
+	ErrDataTransferPlayerNotFound      = New(CodeDataTransferPlayerNotFound, http.StatusBadRequest)
+	ErrDataTransferInvalidFile         = New(CodeDataTransferInvalidFile, http.StatusBadRequest)
+	ErrDataTransferInvalidSignature    = New(CodeDataTransferInvalidSignature, http.StatusBadRequest)
+	ErrDataTransferUnsupportedSchema   = New(CodeDataTransferUnsupportedSchema, http.StatusBadRequest)
+	ErrDataTransferInvalidData         = New(CodeDataTransferInvalidData, http.StatusBadRequest)
+	ErrDataTransferUnresolvedReference = New(CodeDataTransferUnresolvedReference, http.StatusBadRequest)
+	ErrDataTransferDestinationNotEmpty = New(CodeDataTransferDestinationNotEmpty, http.StatusConflict)
 
 	// 楽曲・譜面関連エラー
-	ErrSongNotFound         = New(CodeSongNotFound, http.StatusNotFound)
-	ErrChartNotFound        = New(CodeChartNotFound, http.StatusNotFound)
-	ErrInvalidDifficulty    = New(CodeInvalidDifficulty, http.StatusBadRequest)
-	ErrDuplicateOfficialIdx = New(CodeDuplicateOfficialIdx, http.StatusConflict)
+	ErrSongNotFound                      = New(CodeSongNotFound, http.StatusNotFound)
+	ErrChartNotFound                     = New(CodeChartNotFound, http.StatusNotFound)
+	ErrInvalidDifficulty                 = New(CodeInvalidDifficulty, http.StatusBadRequest)
+	ErrDuplicateOfficialIdx              = New(CodeDuplicateOfficialIdx, http.StatusConflict)
+	ErrScoreHistoryNotFound              = New(CodeScoreHistoryNotFound, http.StatusNotFound)
+	ErrScoreHistoryUnsupportedDifficulty = New(CodeScoreHistoryUnsupportedDifficulty, http.StatusBadRequest)
 
 	// データ関連エラー
-	ErrValidationFailed   = New(CodeValidationFailed, http.StatusUnprocessableEntity)
-	ErrResourceNotFound   = New(CodeResourceNotFound, http.StatusBadRequest)
-	ErrConflict           = New(CodeConflict, http.StatusConflict)
-	ErrAPITokenNotFound   = New(CodeAPITokenNotFound, http.StatusNotFound)
-	ErrPayloadTooLarge    = New(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
-	ErrUnsupportedMedia   = New(CodeUnsupportedMedia, http.StatusUnsupportedMediaType)
-	ErrMethodNotAllowed   = New(CodeMethodNotAllowed, http.StatusMethodNotAllowed)
-	ErrNotFound           = New(CodeNotFound, http.StatusNotFound)
-	ErrTooManyRequests    = New(CodeTooManyRequests, http.StatusTooManyRequests)
-	ErrServiceUnavailable = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
+	ErrValidationFailed           = New(CodeValidationFailed, http.StatusUnprocessableEntity)
+	ErrValidationFailedBadRequest = New(CodeValidationFailed, http.StatusBadRequest)
+	ErrResourceNotFound           = New(CodeResourceNotFound, http.StatusBadRequest)
+	ErrConflict                   = New(CodeConflict, http.StatusConflict)
+	ErrAPITokenNotFound           = New(CodeAPITokenNotFound, http.StatusNotFound)
+	ErrAPITokenLimitExceeded      = New(CodeAPITokenLimitExceeded, http.StatusBadRequest)
+	ErrAPITokenNameConflict       = New(CodeAPITokenNameConflict, http.StatusConflict)
+	ErrInvalidAPITokenName        = New(CodeInvalidAPITokenName, http.StatusBadRequest)
+	ErrInvalidAPITokenID          = New(CodeInvalidAPITokenID, http.StatusBadRequest)
+	ErrPayloadTooLarge            = New(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
+	ErrUnsupportedMedia           = New(CodeUnsupportedMedia, http.StatusUnsupportedMediaType)
+	ErrMethodNotAllowed           = New(CodeMethodNotAllowed, http.StatusMethodNotAllowed)
+	ErrNotFound                   = New(CodeNotFound, http.StatusNotFound)
+	ErrTooManyRequests            = New(CodeTooManyRequests, http.StatusTooManyRequests)
+	ErrServiceUnavailable         = New(CodeServiceUnavailable, http.StatusServiceUnavailable)
+	ErrMaintenanceMode            = New(CodeMaintenanceMode, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
 	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)
@@ -109,11 +126,23 @@ var (
 	ErrGoalInvalidAchievementParams = New(CodeGoalInvalidAchievementParams, http.StatusBadRequest)
 	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
 	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
+	ErrGoalInvalidOrder             = New(CodeGoalInvalidOrder, http.StatusBadRequest)
+	ErrGoalGroupNotFound            = New(CodeGoalGroupNotFound, http.StatusNotFound)
+	ErrGoalGroupLimitExceeded       = New(CodeGoalGroupLimitExceeded, http.StatusBadRequest)
+	ErrGoalGroupInvalidName         = New(CodeGoalGroupInvalidName, http.StatusBadRequest)
+	ErrGoalGroupConflict            = New(CodeGoalGroupConflict, http.StatusConflict)
+	ErrGoalGroupInvalidOrder        = New(CodeGoalGroupInvalidOrder, http.StatusBadRequest)
 
 	ErrRecordFilterNotFound      = New(CodeRecordFilterNotFound, http.StatusNotFound)
 	ErrRecordFilterLimitExceeded = New(CodeRecordFilterLimitExceeded, http.StatusBadRequest)
 	ErrInvalidRecordFilterInput  = New(CodeInvalidRecordFilterInput, http.StatusBadRequest)
 	ErrInvalidRecordFilterID     = New(CodeInvalidRecordFilterID, http.StatusBadRequest)
+
+	ErrFavoriteSongLimitExceeded = New(CodeFavoriteSongLimitExceeded, http.StatusBadRequest)
+
+	ErrFriendshipLimitExceeded = New(CodeFriendshipLimitExceeded, http.StatusBadRequest)
+	ErrFriendshipConflict      = New(CodeFriendshipConflict, http.StatusConflict)
+	ErrFriendRequestNotFound   = New(CodeFriendRequestNotFound, http.StatusNotFound)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

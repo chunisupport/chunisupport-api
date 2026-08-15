@@ -5,8 +5,9 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/httpheader"
+	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type signupRequest struct {
@@ -25,7 +26,7 @@ func NewSignupHandler(signupUsecase usecase.SignupUsecase) *SignupHandler {
 }
 
 // Signup は Bearer の Firebase ID トークンでアプリ内ユーザーを作成します。
-func (h *SignupHandler) Signup(c echo.Context) error {
+func (h *SignupHandler) Signup(c *echo.Context) error {
 	req := new(signupRequest)
 	if err := c.Bind(req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -44,5 +45,5 @@ func (h *SignupHandler) Signup(c echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusCreated, user)
+	return c.JSON(http.StatusCreated, dto_internal.UserDTO{Username: user.Username, AccountType: user.AccountType, IsPrivate: user.IsPrivate, LastScoreUpdate: user.LastScoreUpdate})
 }

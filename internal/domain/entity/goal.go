@@ -6,11 +6,14 @@ import "time"
 type Goal struct {
 	ID                uint32
 	UserID            int
+	GroupID           *uint32
 	Title             string
 	AchievementTypeID int
 	AchievementType   string
 	AchievementParams []byte
 	Attributes        []byte
-	Invert            bool
+	InvertValue       bool
+	InvertPercentage  bool
+	SortOrder         uint16
 	CreatedAt         time.Time
 }

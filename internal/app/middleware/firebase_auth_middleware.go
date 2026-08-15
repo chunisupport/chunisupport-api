@@ -6,7 +6,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // FirebaseAuthenticator はFirebase IDトークンからユーザーを解決する最小インターフェースです。
@@ -18,7 +18,11 @@ type FirebaseAuthenticator interface {
 // FirebaseIDTokenMiddleware はBearerのFirebase IDトークン認証を行います。
 func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
+			if user, ok := c.Get(contextKeyUserEntity).(*entity.User); ok && user != nil {
+				return next(c)
+			}
+
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return apierror.ErrMissingToken
@@ -35,7 +39,7 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 				return apierror.ErrInternalError.WithInternal(errors.New("firebase authenticator returned nil user"))
 			}
 
-			c.Set("userEntity", user)
+			c.Set(contextKeyUserEntity, user)
 			return next(c)
 		}
 	}
@@ -44,7 +48,11 @@ func FirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.Middlew
 // OptionalFirebaseIDTokenMiddleware はBearerのFirebase IDトークンがある場合のみ認証を行います。
 func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
+			if user, ok := c.Get(contextKeyUserEntity).(*entity.User); ok && user != nil {
+				return next(c)
+			}
+
 			idToken := extractBearerToken(c)
 			if idToken == "" {
 				return next(c)
@@ -58,7 +66,7 @@ func OptionalFirebaseIDTokenMiddleware(authenticator FirebaseAuthenticator) echo
 				return apierror.FromUsecaseError(err)
 			}
 			if user != nil {
-				c.Set("userEntity", user)
+				c.Set(contextKeyUserEntity, user)
 			}
 
 			return next(c)

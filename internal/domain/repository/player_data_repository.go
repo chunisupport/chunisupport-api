@@ -55,4 +55,11 @@ type PlayerDataRepository interface {
 
 	// GetOverpowerTargetStatsWithExecutor は指定されたExecutorでOVER POWER割合計算の分母を取得します。
 	GetOverpowerTargetStatsWithExecutor(ctx context.Context, exec Executor, filter OverpowerTargetFilter) (*OverpowerTargetStats, error)
+
+	// SaveLatestUpdate はプレイヤーの最新データ登録結果を保存します。
+	// スコア更新との整合性を保つため、必ず同じトランザクションのexecを渡してください。
+	SaveLatestUpdate(ctx context.Context, exec Executor, update *entity.PlayerLatestUpdate) error
+
+	// FindLatestUpdateByPlayerID はプレイヤーの最新データ登録結果を取得します。
+	FindLatestUpdateByPlayerID(ctx context.Context, playerID int) (*entity.PlayerLatestUpdate, error)
 }

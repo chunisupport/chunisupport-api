@@ -13,7 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,8 +81,7 @@ func TestHonorHandler_GetHonor_不正IDはValidationFailedを返す(t *testing.T
 	req := httptest.NewRequest(http.MethodGet, "/internal/honors/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("invalid")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	// When
 	err := handler.GetHonor(c)
@@ -137,8 +136,7 @@ func TestHonorHandler_DeleteHonor_参照中はConflictを返す(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/internal/honors/1", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("id")
-	c.SetParamValues("1")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 
 	// When
 	err := handler.DeleteHonor(c)

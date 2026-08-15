@@ -37,7 +37,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26.4'
+          go-version: '1.26.5'
 
       - name: Determine target
         id: target
@@ -45,6 +45,8 @@ jobs:
           ARCH="${{ matrix.goarch }}"
           echo "goarch=${ARCH}" >> $GITHUB_OUTPUT
           echo "binary_name=chunisupport-api-linux-${ARCH}" >> $GITHUB_OUTPUT
+          echo "batch_binary_name=chunisupport-recalculate-player-data-linux-${ARCH}" >> $GITHUB_OUTPUT
+          echo "song_snapshot_export_binary_name=chunisupport-export-song-snapshots-linux-${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Build binary
         id: build-binary
@@ -57,13 +59,22 @@ jobs:
           REVISION=$(git rev-parse --short HEAD)
           go build -trimpath \
             -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
-            -o "${{ steps.target.outputs.binary_name }}" .
+            -o "${{ steps.target.outputs.binary_name }}" ./cmd/api
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+            -o "${{ steps.target.outputs.batch_binary_name }}" ./cmd/recalculate-player-data
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+            -o "${{ steps.target.outputs.song_snapshot_export_binary_name }}" ./cmd/export-song-snapshots
 
       - name: Package (binary + migration, flat structure)
         id: package
         run: |
           tar -czf ${{ steps.target.outputs.binary_name }}.tar.gz \
-            ${{ steps.target.outputs.binary_name }} migration/
+            ${{ steps.target.outputs.binary_name }} \
+            ${{ steps.target.outputs.batch_binary_name }} \
+            ${{ steps.target.outputs.song_snapshot_export_binary_name }} \
+            migration/
 
       - name: Upload artifact
         id: upload-artifact

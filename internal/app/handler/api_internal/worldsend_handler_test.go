@@ -18,7 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +26,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
 
-	newPutWorldsendContext := func(body string) echo.Context {
+	newPutWorldsendContext := func(body string) *echo.Context {
 		req := httptest.NewRequest(http.MethodPut, "/internal/worldsend-songs", bytes.NewBufferString(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -165,7 +165,8 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 
 			handler := NewWorldsendHandler(mockUsecase, &masterdata.Cache{Genres: map[string]master.Genre{"POPS & ANIME": {ID: 1, Name: "POPS & ANIME"}}})
 			c := newPutWorldsendContext(tc.body)
-			rec := c.Response().Writer.(*httptest.ResponseRecorder)
+			response, _ := echo.UnwrapResponse(c.Response())
+			rec := response.ResponseWriter.(*httptest.ResponseRecorder)
 
 			err := handler.UpdateWorldsendSongs(c)
 
@@ -210,8 +211,7 @@ func TestWorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T) 
 	req := httptest.NewRequest(http.MethodGet, "/internal/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("displayid")
-	c.SetParamValues("invalid")
+	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
 
 	err := handler.GetWorldsendSong(c)
 
@@ -235,8 +235,7 @@ func TestWorldsendHandler_DeleteWorldsendSongRejectsInvalidDisplayID(t *testing.
 	req := httptest.NewRequest(http.MethodDelete, "/internal/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetParamNames("displayid")
-	c.SetParamValues("invalid")
+	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
 
 	err := handler.DeleteWorldsendSong(c)
 

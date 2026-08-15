@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
@@ -16,7 +15,8 @@ type MockSongUsecase struct {
 	GetSongsUpdatedAtFunc             func(ctx context.Context) (*time.Time, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
-	UpdateSongsFunc                   func(ctx context.Context, requests []*api_internal.UpdateSongRequest) error
+	UpdateSongsFunc                   func(ctx context.Context, requests []*usecase.UpdateSongInput) error
+	UpdateChartConstantFunc           func(ctx context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error)
 	CalcSongMaxOPFunc                 func(song *entity.Song) float64
 	CreateSongFunc                    func(ctx context.Context, input *usecase.CreateSongInput) (*entity.Song, error)
 }
@@ -56,11 +56,18 @@ func (m *MockSongUsecase) RestoreSong(ctx context.Context, displayID string) err
 	return nil
 }
 
-func (m *MockSongUsecase) UpdateSongs(ctx context.Context, requests []*api_internal.UpdateSongRequest) error {
+func (m *MockSongUsecase) UpdateSongs(ctx context.Context, requests []*usecase.UpdateSongInput) error {
 	if m.UpdateSongsFunc != nil {
 		return m.UpdateSongsFunc(ctx, requests)
 	}
 	return nil
+}
+
+func (m *MockSongUsecase) UpdateChartConstant(ctx context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
+	if m.UpdateChartConstantFunc != nil {
+		return m.UpdateChartConstantFunc(ctx, input)
+	}
+	return nil, nil
 }
 
 func (m *MockSongUsecase) CalcSongMaxOP(song *entity.Song) float64 {

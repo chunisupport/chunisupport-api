@@ -10,13 +10,12 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // UserCredentialUsecase は認証済みユーザー自身の資格情報・プロフィール設定管理を扱います。
 type UserCredentialUsecase interface {
-	GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error)
+	GetUser(ctx context.Context, id int) (*UserOutput, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
 	DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error
 }
@@ -28,7 +27,7 @@ type clock interface {
 type systemClock struct{}
 
 func (systemClock) Now() time.Time {
-	return time.Now()
+	return time.Now().UTC()
 }
 
 type userCredentialUsecaseImpl struct {
@@ -113,7 +112,7 @@ func NewUserCredentialUsecaseWithFirebaseServices(
 	return impl
 }
 
-func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_internal.UserDTO, error) {
+func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*UserOutput, error) {
 	user, err := s.userRepo.FindByID(ctx, s.db, id)
 	if err != nil {
 		return nil, err
@@ -126,7 +125,7 @@ func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*api_i
 		}
 	}
 	accountTypeName := s.masterCache.GetAccountTypeNameByID(user.AccountTypeID)
-	return api_internal.ToUserDTO(user, accountTypeName, user.IsPrivate, lastScoreUpdate), nil
+	return &UserOutput{Username: user.Username.String(), AccountType: accountTypeName, IsPrivate: user.IsPrivate, LastScoreUpdate: lastScoreUpdate}, nil
 }
 
 func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {

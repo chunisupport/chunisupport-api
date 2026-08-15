@@ -17,10 +17,10 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0),
-			(2, 'DISPLAY002', 'Song 2', 'Artist 2', 2, 200, NULL, 'IDX002', NULL, 0, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 1, 0),
+			(2, 'DISPLAY002', 'Song 2', 'Artist 2', 2, 200, NULL, 'IDX002', NULL, 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -47,6 +47,7 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	song1, ok := songsByDisplayID["DISPLAY001"]
 	require.True(t, ok)
 	require.Len(t, song1.Charts, 2)
+	assert.True(t, song1.IsNew)
 
 	song1ChartsByDifficulty := make(map[int]*entity.Chart, len(song1.Charts))
 	for _, chart := range song1.Charts {
@@ -79,6 +80,7 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	assert.InDelta(t, 14.3, float64(song2.Charts[0].Const), 0.001)
 	require.NotNil(t, song2.Charts[0].NotesDesigner)
 	assert.Equal(t, "譜面作者C", *song2.Charts[0].NotesDesigner)
+	assert.False(t, song2.IsNew)
 
 	// Song2の集約結果も検証
 	assert.InDelta(t, 14.3, song2.MaxChartConst, 0.001)
@@ -92,9 +94,9 @@ func TestFindByDisplayIDs_ReturnsEmptyChartsWhenSongHasNoCharts(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -118,9 +120,9 @@ func TestFindByDisplayIDs_SetsIsMaxOPUnknownWhenMasterOrUltimaIsConstUnknown(t *
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -150,10 +152,10 @@ func TestFindByDisplayIDs_ExcludesWorldsendSongs(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0),
-			(2, 'WORLD001', 'Worldsend Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0),
+			(2, 'WORLD001', 'Worldsend Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -182,9 +184,9 @@ func TestFindByDisplayID_ExcludesWorldsendSong(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'WORLD001', 'Worldsend Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0)
+			(1, 'WORLD001', 'Worldsend Song', 'Artist W', 1, 200, NULL, 'IDX002', NULL, 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -200,9 +202,9 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0)
+			(1, 'DISPLAY001', 'Song 1', 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 1, 0)
 	`)
 	require.NoError(t, err)
 
@@ -221,6 +223,7 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 
 	assert.Equal(t, "DISPLAY001", song.DisplayID)
 	assert.False(t, song.IsWorldsend)
+	assert.True(t, song.IsNew)
 	require.Len(t, song.Charts, 2)
 	assert.InDelta(t, 13.8, song.MaxChartConst, 0.001)
 	assert.False(t, song.IsMaxOPUnknown)

@@ -39,6 +39,7 @@ type songRow struct {
 	OfficialIdx string     `db:"official_idx"`
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
+	IsNew       bool       `db:"is_new"`
 	IsDeleted   bool       `db:"is_deleted"`
 	UpdatedAt   *time.Time `db:"updated_at"`
 }
@@ -61,7 +62,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -118,7 +119,10 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		if !ok {
 			continue
 		}
-		chart := r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
 		results[idx].Charts = append(results[idx].Charts, chart)
 	}
 
@@ -191,17 +195,24 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.OfficialIdx = row.OfficialIdx
 	song.Jacket = row.Jacket
 	song.IsWorldsend = row.IsWorldsend
+	song.IsNew = row.IsNew
 	song.IsDeleted = row.IsDeleted
 	song.UpdatedAt = row.UpdatedAt
 	return song
 }
 
-func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
-	constVal, _ := chartconstant.NewChartConstant(row.Const)
+func (r *songRepository) toChartEntity(row *chartRow) (*entity.Chart, error) {
+	constVal, err := chartconstant.NewChartConstant(row.Const)
+	if err != nil {
+		return nil, fmt.Errorf("invalid chart constant for chart %d: %w", row.ID, err)
+	}
 
 	var notesVal *notes.Notes
 	if row.Notes != nil {
-		n, _ := notes.NewNotes(*row.Notes)
+		n, err := notes.NewNotes(*row.Notes)
+		if err != nil {
+			return nil, fmt.Errorf("invalid notes for chart %d: %w", row.ID, err)
+		}
 		notesVal = &n
 	}
 
@@ -214,7 +225,7 @@ func (r *songRepository) toChartEntity(row *chartRow) *entity.Chart {
 		Notes:          notesVal,
 		NotesDesigner:  row.NotesDesigner,
 		UpdatedAt:      row.UpdatedAt,
-	}
+	}, nil
 }
 
 // FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
@@ -227,7 +238,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -285,7 +296,10 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		if !ok {
 			continue
 		}
-		chart := r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
 		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
@@ -300,14 +314,75 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 // FindByDisplayID は指定されたDisplayIDの通常楽曲（WORLD'S END除く）を取得します。
 // 削除済み楽曲も取得します。
 func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
-	// 1. 楽曲を取得
+	return r.findByIdentifier(ctx, exec, "display_id", displayID)
+}
+
+// FindByOfficialIdx は指定された公式IDの通常楽曲を取得します。
+// 削除済み楽曲も取得します。
+func (r *songRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return r.findByIdentifier(ctx, exec, "official_idx", officialIdx)
+}
+
+// FindByDisplayIDForUpdate は指定されたDisplayIDの通常楽曲をFOR UPDATEロック付きで取得します。
+func (r *songRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	// 1. 楽曲をFOR UPDATEで取得
 	songQuery := `
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted, updated_at
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE display_id = ? AND is_worldsend = 0
+		FOR UPDATE
 	`
 	var songRow songRow
 	if err := exec.GetContext(ctx, &songRow, songQuery, displayID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrSongNotFound
+		}
+		return nil, err
+	}
+
+	song := r.toSongEntity(&songRow)
+
+	// 2. 譜面を取得（FOR UPDATE不要）
+	chartsQuery := `
+		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
+		FROM charts
+		WHERE song_id = ?
+		ORDER BY difficulty_id
+	`
+	var chartRows []chartRow
+	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, songRow.ID); err != nil {
+		return nil, err
+	}
+
+	charts := make([]*entity.Chart, len(chartRows))
+	for i, cr := range chartRows {
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
+		charts[i] = chart
+	}
+
+	song.Charts = charts
+	service.ApplyAggregation(song)
+
+	return song, nil
+}
+
+// findByIdentifier は許可済みの識別カラムで通常楽曲集約を取得します。
+func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.Executor, column, value string) (*entity.Song, error) {
+	if column != "display_id" && column != "official_idx" {
+		return nil, fmt.Errorf("unsupported song identifier column: %s", column)
+	}
+
+	// 1. 楽曲を取得
+	songQuery := fmt.Sprintf(`
+		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		FROM songs
+		WHERE %s = ? AND is_worldsend = 0
+	`, column)
+	var songRow songRow
+	if err := exec.GetContext(ctx, &songRow, songQuery, value); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -330,7 +405,11 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 
 	charts := make([]*entity.Chart, len(chartRows))
 	for i, cr := range chartRows {
-		charts[i] = r.toChartEntity(&cr)
+		chart, err := r.toChartEntity(&cr)
+		if err != nil {
+			return nil, err
+		}
+		charts[i] = chart
 	}
 
 	song.Charts = charts
@@ -341,12 +420,13 @@ func (r *songRepository) FindByDisplayID(ctx context.Context, exec repository.Ex
 	return song, nil
 }
 
-// Save は楽曲エンティティの現在の状態を永続化します。
+// Save は楽曲集約（楽曲本体と既存譜面）の現在の状態を永続化します。
+// 譜面の追加・削除は行いません。
 // 対象が存在しない場合は ErrSongNotFound を返します。
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_deleted = ?
+		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -362,6 +442,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		song.OfficialIdx,
 		song.Jacket,
 		song.IsWorldsend,
+		song.IsNew,
 		song.IsDeleted,
 		song.ID,
 	)
@@ -374,10 +455,18 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		return err
 	}
 	if rowsAffected == 0 {
-		return repository.ErrSongNotFound
+		var exists bool
+		if err := exec.GetContext(ctx, &exists, `SELECT EXISTS(SELECT 1 FROM songs WHERE id = ?)`, song.ID); err != nil {
+			return err
+		}
+		if !exists {
+			return repository.ErrSongNotFound
+		}
 	}
 
-	return nil
+	return r.bulkUpdateCharts(ctx, exec, []*entity.Song{song}, map[string]int{
+		song.DisplayID: song.ID,
+	})
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
@@ -462,8 +551,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
-	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
+	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
+	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
 
 	for _, song := range songs {
 		songID := displayIDToSongID[song.DisplayID]
@@ -488,9 +577,12 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
 		jacketArgs = append(jacketArgs, songID, song.Jacket)
+
+		isNewCases = append(isNewCases, "WHEN id = ? THEN ?")
+		isNewArgs = append(isNewArgs, songID, song.IsNew)
 	}
 
-	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→IN句
+	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→is_new→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
 	args = append(args, readingArgs...)
@@ -499,6 +591,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, bpmArgs...)
 	args = append(args, releasedArgs...)
 	args = append(args, jacketArgs...)
+	args = append(args, isNewArgs...)
 
 	// IN句用の引数を追加
 	for _, id := range songIDs {
@@ -518,7 +611,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
 			released_at = CASE %s END,
-			jacket = CASE %s END
+			jacket = CASE %s END,
+			is_new = CASE %s END
 		WHERE id IN (%s)
 		  AND is_worldsend = 0
 	`,
@@ -529,6 +623,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		strings.Join(bpmCases, " "),
 		strings.Join(releasedCases, " "),
 		strings.Join(jacketCases, " "),
+		strings.Join(isNewCases, " "),
 		strings.Join(placeholders, ","),
 	)
 
@@ -560,7 +655,7 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 			updates = append(updates, chartUpdate{
 				SongID:         songID,
 				DifficultyID:   chart.DifficultyID,
-				Const:          float64(chart.Const),
+				Const:          chart.Const.Float64(),
 				IsConstUnknown: chart.IsConstUnknown,
 				Notes:          notesPtr,
 				NotesDesigner:  chart.NotesDesigner,
@@ -633,8 +728,8 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
@@ -645,6 +740,7 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		song.ReleasedAt,
 		song.OfficialIdx,
 		song.Jacket,
+		song.IsNew,
 	)
 	if err != nil {
 		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {

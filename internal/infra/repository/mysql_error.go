@@ -37,7 +37,8 @@ func wrapOfficialIdxDuplicateError(err error) error {
 }
 
 func wrapHonorDuplicateError(err error) error {
-	if !isMySQLDuplicateEntryForKey(err, "unique_honor_name_type_image_url") {
+	if !isMySQLDuplicateEntryForKey(err, "unique_honor_name_type") &&
+		!isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") {
 		return err
 	}
 
@@ -51,6 +52,20 @@ func wrapHonorReferencedError(err error) error {
 	}
 
 	return fmt.Errorf("%w: %v", domainrepo.ErrHonorConflict, err)
+}
+
+func wrapGoalGroupDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "uq_goal_groups_user_name") {
+		return err
+	}
+	return fmt.Errorf("%w: %v", domainrepo.ErrGoalGroupConflict, err)
+}
+
+func wrapAPITokenDuplicateError(err error) error {
+	if !isMySQLDuplicateEntryForKey(err, "uq_api_tokens_user_name") {
+		return err
+	}
+	return fmt.Errorf("%w: %v", domainrepo.ErrAPITokenConflict, err)
 }
 
 func isMySQLDuplicateEntryForKey(err error, key string) bool {

@@ -76,6 +76,7 @@ func (s *stubRecordFilterRepository) CountByUserID(ctx context.Context, userID i
 
 func TestRecordFilterUsecase_CreateListUpdateDelete(t *testing.T) {
 	ctx := context.Background()
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	repo := newStubRecordFilterRepository()
 	uc := NewRecordFilterUsecase(repo)
 
@@ -91,8 +92,8 @@ func TestRecordFilterUsecase_CreateListUpdateDelete(t *testing.T) {
 	assert.Equal(t, RecordFilterTypeStandard, created.FilterType)
 	assert.Equal(t, 3, created.SchemaVersion)
 	assert.JSONEq(t, `{"title":"","difficulties":["MASTER"]}`, string(created.Filter))
-	assert.Equal(t, "2026-06-15T12:00:00Z", created.CreatedAt)
-	assert.Equal(t, "2026-06-15T12:00:00Z", created.UpdatedAt)
+	assert.Equal(t, now, created.CreatedAt)
+	assert.Equal(t, now, created.UpdatedAt)
 	_, err = uuid.Parse(created.ID)
 	require.NoError(t, err)
 

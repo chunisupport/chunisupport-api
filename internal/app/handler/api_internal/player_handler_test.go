@@ -13,9 +13,10 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -25,12 +26,12 @@ type mockPlayerUsecase struct {
 	mock.Mock
 }
 
-func (m *mockPlayerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*dto.PlayerDTO, error) {
+func (m *mockPlayerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*entity.Player, error) {
 	args := m.Called(ctx, userID, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto.PlayerDTO), args.Error(1)
+	return args.Get(0).(*entity.Player), args.Error(1)
 }
 
 func TestPlayerHandler_CreatePlayer(t *testing.T) {
@@ -40,7 +41,9 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 
 	// モックの期待値設定
 	mockUsecase := new(mockPlayerUsecase)
-	expectedPlayer := &dto.PlayerDTO{Name: "太郎"}
+	name, err := playername.NewPlayerName("太郎")
+	assert.NoError(t, err)
+	expectedPlayer := entity.NewPlayer(1, name)
 	mockUsecase.On("CreatePlayer", mock.Anything, 1, "太郎").Return(expectedPlayer, nil)
 	mockUsecase.On("CreatePlayer", mock.Anything, 1, "エラープレイヤー").Return(nil, errors.New("failed to create player"))
 	mockUsecase.On("CreatePlayer", mock.Anything, 1, "不正名").Return(nil, usecase.ErrInvalidPlayerName)
@@ -62,7 +65,7 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 		var playerDTO dto.PlayerDTO
 		err = json.Unmarshal(rec.Body.Bytes(), &playerDTO)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedPlayer.Name, playerDTO.Name)
+		assert.Equal(t, expectedPlayer.Name.String(), playerDTO.Name)
 	})
 
 	t.Run("アンハッピーパス: 入力検証エラー（名前が長すぎる）", func(t *testing.T) {

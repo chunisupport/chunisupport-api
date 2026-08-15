@@ -89,7 +89,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			authUsecase := new(mockFirebaseAuthUsecase)
 			turnstileVerifier := new(mockTurnstileVerifier)
-			service := NewLoginUsecase(authUsecase, turnstileVerifier, newMockMasterCache())
+			service := NewLoginUsecase(authUsecase, turnstileVerifier, newMockMasterCache(), maintenanceStateStub{})
 			tt.setup(authUsecase, turnstileVerifier)
 
 			got, err := service.Login(context.Background(), tt.idToken, tt.turnstile, tt.remoteIP)
@@ -111,41 +111,189 @@ func TestLoginUsecase_Login(t *testing.T) {
 	}
 }
 
+func TestLoginUsecase_Login_メンテナンス中のロール制御(t *testing.T) {
+	tests := []struct {
+		name          string
+		accountTypeID int
+		wantErr       error
+	}{
+		{
+			name:          "ADMINはログインできる",
+			accountTypeID: info.AccountTypeAdmin,
+		},
+		{
+			name:          "EDITORはログインできる",
+			accountTypeID: info.AccountTypeEditor,
+		},
+		{
+			name:          "PLAYERはメンテナンスエラーになる",
+			accountTypeID: info.AccountTypePlayer,
+			wantErr:       ErrMaintenanceMode,
+		},
+		{
+			name:          "EXTDEVはメンテナンスエラーになる",
+			accountTypeID: info.AccountTypeExtDev,
+			wantErr:       ErrMaintenanceMode,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			authUsecase := new(mockFirebaseAuthUsecase)
+			turnstileVerifier := new(mockTurnstileVerifier)
+			un := username.MustNewUserName("loginuser")
+			user := &entity.User{ID: 10, Username: un, AccountTypeID: tt.accountTypeID}
+			turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
+			authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()
+			service := NewLoginUsecase(
+				authUsecase,
+				turnstileVerifier,
+				newMockMasterCache(),
+				maintenanceStateStub{enabled: true},
+			)
+
+			// When
+			got, err := service.Login(context.Background(), "valid-token", "turnstile-token", "203.0.113.1")
+
+			// Then
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, got)
+				assert.Equal(t, "loginuser", got.Username)
+			}
+			turnstileVerifier.AssertExpectations(t)
+			authUsecase.AssertExpectations(t)
+		})
+	}
+}
+
+func TestLoginUsecase_Login_メンテナンス中も認証エラーを維持する(t *testing.T) {
+	// Given
+	authUsecase := new(mockFirebaseAuthUsecase)
+	turnstileVerifier := new(mockTurnstileVerifier)
+	maintenanceProvider := &countingMaintenanceStateStub{enabled: true}
+	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+	authUsecase.On("Authenticate", mock.Anything, "invalid-token").Return(nil, ErrInvalidIDToken).Once()
+	service := NewLoginUsecase(
+		authUsecase,
+		turnstileVerifier,
+		newMockMasterCache(),
+		maintenanceProvider,
+	)
+
+	// When
+	got, err := service.Login(context.Background(), "invalid-token", "turnstile-token", "")
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidIDToken)
+	assert.NotErrorIs(t, err, ErrMaintenanceMode)
+	assert.Nil(t, got)
+	assert.Zero(t, maintenanceProvider.calls)
+	turnstileVerifier.AssertExpectations(t)
+	authUsecase.AssertExpectations(t)
+}
+
+func TestLoginUsecase_Login_メンテナンス中もTurnstileエラーを維持する(t *testing.T) {
+	// Given
+	authUsecase := new(mockFirebaseAuthUsecase)
+	turnstileVerifier := new(mockTurnstileVerifier)
+	maintenanceProvider := &countingMaintenanceStateStub{enabled: true}
+	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "").Return(ErrInvalidTurnstileToken).Once()
+	service := NewLoginUsecase(
+		authUsecase,
+		turnstileVerifier,
+		newMockMasterCache(),
+		maintenanceProvider,
+	)
+
+	// When
+	got, err := service.Login(context.Background(), "firebase-token", "invalid-turnstile-token", "")
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidTurnstileToken)
+	assert.NotErrorIs(t, err, ErrMaintenanceMode)
+	assert.Nil(t, got)
+	assert.Zero(t, maintenanceProvider.calls)
+	turnstileVerifier.AssertExpectations(t)
+	authUsecase.AssertNotCalled(t, "Authenticate", mock.Anything, mock.Anything)
+}
+
 func TestNewLoginUsecase_必須依存がnilならpanicする(t *testing.T) {
 	tests := []struct {
 		name                string
 		authUsecase         FirebaseAuthUsecase
 		turnstileVerifier   TurnstileVerifier
 		accountTypeProvider AccountTypeProvider
+		maintenanceProvider MaintenanceStateProvider
 		wantPanic           string
 	}{
 		{
 			name:                "FirebaseAuthUsecaseがnil",
 			turnstileVerifier:   new(mockTurnstileVerifier),
 			accountTypeProvider: newMockMasterCache(),
+			maintenanceProvider: maintenanceStateStub{},
 			wantPanic:           "loginUsecase: FirebaseAuthUsecase is nil",
 		},
 		{
 			name:                "TurnstileVerifierがnil",
 			authUsecase:         new(mockFirebaseAuthUsecase),
 			accountTypeProvider: newMockMasterCache(),
+			maintenanceProvider: maintenanceStateStub{},
 			wantPanic:           "loginUsecase: TurnstileVerifier is nil",
 		},
 		{
-			name:              "AccountTypeProviderがnil",
-			authUsecase:       new(mockFirebaseAuthUsecase),
-			turnstileVerifier: new(mockTurnstileVerifier),
-			wantPanic:         "loginUsecase: AccountTypeProvider is nil",
+			name:                "AccountTypeProviderがnil",
+			authUsecase:         new(mockFirebaseAuthUsecase),
+			turnstileVerifier:   new(mockTurnstileVerifier),
+			maintenanceProvider: maintenanceStateStub{},
+			wantPanic:           "loginUsecase: AccountTypeProvider is nil",
+		},
+		{
+			name:                "MaintenanceStateProviderがnil",
+			authUsecase:         new(mockFirebaseAuthUsecase),
+			turnstileVerifier:   new(mockTurnstileVerifier),
+			accountTypeProvider: newMockMasterCache(),
+			wantPanic:           "loginUsecase: MaintenanceStateProvider is nil",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.PanicsWithValue(t, tt.wantPanic, func() {
-				NewLoginUsecase(tt.authUsecase, tt.turnstileVerifier, tt.accountTypeProvider)
+				NewLoginUsecase(
+					tt.authUsecase,
+					tt.turnstileVerifier,
+					tt.accountTypeProvider,
+					tt.maintenanceProvider,
+				)
 			})
 		})
 	}
+}
+
+type maintenanceStateStub struct {
+	enabled bool
+}
+
+func (s maintenanceStateStub) Current() MaintenanceState {
+	return MaintenanceState{Enabled: s.enabled}
+}
+
+type countingMaintenanceStateStub struct {
+	enabled bool
+	calls   int
+}
+
+func (s *countingMaintenanceStateStub) Current() MaintenanceState {
+	s.calls++
+	return MaintenanceState{Enabled: s.enabled}
 }
 
 type mockFirebaseAuthUsecase struct {

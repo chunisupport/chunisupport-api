@@ -22,6 +22,12 @@ func TestNewChartConstant(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:        "小数点以下2桁ならエラーになる",
+			input:       15.01,
+			expectedErr: "chart constant must have at most one decimal place: 15.01",
+			wantErr:     true,
+		},
+		{
 			name:        "16.0を超える値ならエラーになる",
 			input:       16.1,
 			expectedErr: "chart constant must be between 0.0 and 16.0",

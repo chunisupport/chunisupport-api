@@ -1,0 +1,2 @@
+ALTER TABLE songs
+    ADD COLUMN is_new BOOLEAN NOT NULL DEFAULT 0 AFTER is_worldsend;

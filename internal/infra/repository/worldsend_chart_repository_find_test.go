@@ -13,8 +13,8 @@ func TestFindByDisplayID_ScansLevelStarValueObject(t *testing.T) {
 	defer db.Close()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -41,8 +41,8 @@ func TestFindByDisplayID_ScansNilLevelStarAsNil(t *testing.T) {
 	defer db.Close()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'title', 'artist', 1, 180, NULL, 'WEIDX001', 'we.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 

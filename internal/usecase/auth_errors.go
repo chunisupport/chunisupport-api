@@ -16,4 +16,5 @@ var (
 	ErrUsernameTooShort    = errors.New("username must be at least 5 characters")
 	ErrUsernameTooLong     = errors.New("username must be 50 characters or less")
 	ErrUsernameInvalidChar = errors.New("username can only contain lowercase letters and numbers")
+	ErrUsernameForbidden   = errors.New("username is forbidden")
 )

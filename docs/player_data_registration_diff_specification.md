@@ -9,13 +9,13 @@
 - `POST /internal/me/register-data`
 - `POST /internal/player-data/commit`
 
-`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
+`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、コース、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
 
 リクエスト形式、認証、バリデーション、エラー仕様を含むAPI全体の仕様は [API.md](./API.md) を参照する。
 
 ## 2. レスポンス全体
 
-登録成功時は `PlayerDataResult` を返す。差分に関係するフィールドは `statistics`、`counts`、`changes`、`skipped_records` である。
+登録成功時は `PlayerDataResult` を返す。差分に関係するフィールドは `metric_diffs`、`statistics`、`counts`、`changes`、`skipped_records` である。
 
 ```json
 {
@@ -24,6 +24,7 @@
   "imported_at": "2026-06-21T12:00:00Z",
   "profile": {},
   "summary": {},
+  "metric_diffs": {},
   "statistics": {},
   "counts": {},
   "changes": [],
@@ -33,11 +34,27 @@
 
 `changes` と `skipped_records` は該当データがない場合も省略せず、空配列 `[]` を返す。
 
-## 3. レコード単位の差分 (`changes`)
+## 3. レート・OVER POWER・OP%差分 (`metric_diffs`)
 
-### 3.1 差分の判定対象
+`metric_diffs` は、登録前後の計算レート、OVER POWER値、OP%を返す。
 
-入力から解決でき、保存対象になった通常譜面とWORLD'S ENDについて、保存直前のDB状態とupsert予定値を譜面ID単位で比較する。
+```json
+{
+  "rating": { "before": 16.42, "after": 16.45, "delta": 0.03 },
+  "overpower_value": { "before": 96120.123, "after": 96123.91, "delta": 3.787 },
+  "overpower_percent": { "before": 76.26789, "after": 76.27011, "delta": 0.00222 }
+}
+```
+
+各値の `delta` は `after - before` である。初回登録など登録前の計算値が存在しない場合、該当項目の `before` と `delta` は `null` になり、`after` だけを返す。
+
+`overpower_percent.before` は更新前OVER POWER値を登録処理時点の `after` と同じ最大OVER POWER合計で割合へ変換した値である。これにより、マスタデータや未解禁設定による分母の変化を今回のスコア更新差分へ混在させない。`delta` は小数点以下5桁で丸めたパーセントポイント差である。
+
+## 4. レコード単位の差分 (`changes`)
+
+### 4.1 差分の判定対象
+
+入力から解決でき、保存対象になった通常譜面、WORLD'S END、コースについて、保存直前のDB状態とupsert予定値を対象ID単位で比較する。コースはスコア、クリア状態、コンボランプIDを比較する。
 
 次の4項目のいずれかが異なる場合だけ、実際に変化したレコードとして扱う。
 
@@ -50,7 +67,7 @@
 
 保存前に対象譜面が存在しない場合は、4項目の値にかかわらず `new` とする。保存前に存在し、4項目のいずれかが異なる場合は `updated` とする。全項目が同じ場合は `changes` に含めない。
 
-### 3.2 要素スキーマ
+### 4.2 要素スキーマ
 
 ```json
 {
@@ -75,16 +92,17 @@
 
 | フィールド | 型 | 仕様 |
 | --- | --- | --- |
-| `record_type` | string | 通常譜面は `standard`、WORLD'S ENDは `worldsend` |
+| `record_type` | string | 通常譜面は `standard`、WORLD'S ENDは `worldsend`、コースは `course` |
 | `change_type` | string | 新規レコードは `new`、既存レコードの更新は `updated` |
 | `idx` | string | 楽曲の公式インデックス。マスタから解決できない内部不整合時は楽曲IDまたは譜面IDの文字列 |
-| `diff` | string | 通常譜面はマスタ上の大文字難易度名、WORLD'S ENDは常に `WE` |
+| `diff` | string | 通常譜面はマスタ上の大文字難易度名、WORLD'S ENDは常に `WE`。コースでは省略 |
+| `course_class` | string | コースの場合のみコースクラスを返す |
 | `before` | object \| null | 更新前状態。`new` の場合は `null` |
 | `after` | object | upsert予定の登録後状態 |
 
-`before` と `after` は `score`、`clear_lamp`、`combo_lamp`、`full_chain` を常に含む。ランプはマスタの `Name` をそのまま返す。マスタ名が `none`（大文字・小文字を区別しない）、未設定、またはマスタから解決できない場合は `null` を返す。
+通常譜面とWORLD'S ENDの`before`と`after`は`score`、`clear_lamp`、`combo_lamp`、`full_chain`を含む。コースは`score`、`is_clear`、`combo_lamp`を使用する。ランプはマスタの`Name`を返し、`none`相当、未設定、またはマスタから解決できない場合は`null`を返す。
 
-### 3.3 並び順と件数上限
+### 4.3 並び順と件数上限
 
 `changes` は次の優先順で昇順に並べる。
 
@@ -96,11 +114,11 @@
 
 数値として解釈できる `idx` は、解釈できない `idx` より前に並ぶ。レスポンスに含める詳細は先頭100件までである。実際の変更総数は後述の `counts.*_actually_changed` で確認する。
 
-### 3.4 同一payload内の重複
+### 4.4 同一payload内の重複
 
 同一の譜面IDがpayload内に複数回現れた場合は、最後の有効な1件を保存値および差分表示に使用する。正規化は通常譜面とWORLD'S ENDで個別に行う。
 
-## 4. 集計差分 (`statistics`)
+## 5. 集計差分 (`statistics`)
 
 `statistics` は保存済みの通常譜面全件を登録前後に集計した結果である。WORLD'S ENDは含めない。`overall` は全難易度の合計、`by_difficulty` は難易度別の集計を返す。
 
@@ -134,7 +152,7 @@
 
 `by_difficulty` はレコードの有無にかかわらず、`BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA` の5キーを必ず返す。各集計値は `before`、`after`、`delta` を持ち、`delta = after - before` で計算する。登録によって達成状態が下がった場合、`delta` は負数になる。
 
-### 4.1 集計項目
+### 5.1 集計項目
 
 | キー | 条件 |
 | --- | --- |
@@ -153,7 +171,7 @@
 
 ランク件数はそれぞれのボーダー以上を数える累積値である。たとえば1,009,000点の譜面は `sss_plus`、`sss`、`ss_plus`、`ss`、`s_plus`、`s` のすべてに含まれる。
 
-## 5. 件数 (`counts`)
+## 6. 件数 (`counts`)
 
 ```json
 {
@@ -179,9 +197,11 @@
 
 `*_actually_changed` は100件制限前の件数であるため、`changes` の要素数と一致しない場合がある。また、`*_upserted` は入力要素ごとに加算してから検証するため、スキップや同一譜面の重複がある場合は、実際にDBへ渡すupsert行数より大きくなる。
 
-## 6. スキップ情報 (`skipped_records`)
+称号名が `お気に入りからランダム` のスロットは、CHUNITHM-NETのランダム選択機能を表す表示用データとして扱う。この値を称号マスタへ登録せず、そのスロットの保存済み称号も削除・更新しない。また、入力不備によるスキップではないため `honors_skipped` と `skipped_records` には含めない。
 
-保存対象にできなかった通常譜面、WORLD'S END、称号は次の形式で返す。
+## 7. スキップ情報 (`skipped_records`)
+
+保存対象にできなかった通常譜面、WORLD'S END、コース、称号は次の形式で返す。
 
 ```json
 {
@@ -191,34 +211,49 @@
 }
 ```
 
-`record_type` は `standard`、`worldsend`、または `honor` である。`reason` と `details` は失敗箇所が生成する診断用文字列であり、固定のエラーコードではない。スキップされた要素は `changes` と `statistics.after` に含まれない。
+`record_type` は `standard`、`worldsend`、`course`、または `honor` である。`reason` と `details` は失敗箇所が生成する診断用文字列であり、固定のエラーコードではない。スキップされた要素は `changes` と `statistics.after` に含まれない。
 
-## 7. 計算と保存の順序
+## 8. 計算と保存の順序
 
 差分関連処理はトランザクション内で次の順序で行う。
 
-1. プレイヤーを新規作成または更新する。
+1. 保存済みプレイヤーから登録前の計算レートとOVER POWER値を退避し、プレイヤーを新規作成または更新する。
 2. 保存済み通常譜面全件を取得し、`statistics.before` を計算する。
 3. payloadのスコアをマスタIDへ変換し、保存できない要素をスキップする。
 4. 同一譜面の重複を最後の1件へ正規化する。
-5. 保存対象譜面だけの保存前状態を通常譜面・WORLD'S ENDごとに一括取得する。
+5. 保存対象だけの保存前状態を通常譜面・WORLD'S END・コースごとに一括取得する。
 6. 保存前状態とupsert予定値を比較し、`changes` と `*_actually_changed` を作る。
-7. 通常譜面とWORLD'S ENDをbulk upsertする。
-8. 保存済み通常譜面全件を再取得し、`statistics.after` とOVER POWERを計算する。
-9. 保存済み全スコアからレーティングを再計算し、レスポンスを組み立てる。
+7. 通常譜面、WORLD'S END、コースをbulk upsertする。
+8. 保存済み通常譜面全件を再取得し、`statistics.after`、OVER POWER、登録時点の最大OVER POWER合計を計算する。
+9. 保存済み全スコアからレーティングを再計算し、更新前OVER POWER値を手順8と同じ分母でOP%へ変換して、`metric_diffs` とレスポンスを組み立てる。
+10. 最新登録結果をJSON化してgzip圧縮し、スコア更新と同じトランザクションで保存する。
 
 保存前状態の取得は譜面ごとの個別問い合わせではなく一括取得する。集計も登録前後に通常譜面全件を1回ずつ取得して行うため、譜面数に比例したN+1問い合わせは発生しない。
 
-## 8. 初回登録と同時登録
+## 9. 初回登録と同時登録
 
-初回登録では保存済み譜面がないため、`statistics.before` の全項目は0となり、保存対象の各譜面は `new` になる。
+初回登録では保存済み譜面がないため、`statistics.before` の全項目は0となり、保存対象の各譜面は `new` になる。登録前の計算レートとOVER POWER値も存在しないため、`metric_diffs.rating`、`metric_diffs.overpower_value`、`metric_diffs.overpower_percent` の `before` と `delta` は `null` になる。
 
 差分は「保存前状態の取得」と「upsert予定値」の比較で作る。同一プレイヤーに対する複数の登録リクエストを同時実行した場合、別リクエストが取得後に状態を変更すると、返却した差分が最終的なDB更新内容と一致しない可能性がある。現行実装は同一プレイヤーの登録が同時実行されない通常利用を前提とし、排他制御による差分の直列化は行わない。
 
-## 9. 実装上の参照先
+## 10. 最新登録結果の保存
+
+登録成功時の結果は `player_latest_updates` にプレイヤーごとに1件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
+
+最新の保存形式はschema version 3であり、`metric_diffs.overpower_percent` を含む。schema version 1の保存済み結果も取得可能だが `metric_diffs` は含まれず、schema version 2には `rating` と `overpower_value` の差分だけが含まれる。
+
+JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` をUTCへ正規化した値を `source_updated_at`、サーバーの登録受付日時を `imported_at`、入力本文のSHA-256を `body_hash` として別カラムにも保存する。
+
+既存行より `source_updated_at` が新しい場合だけ最新結果を更新する。同じ `source_updated_at` で本文ハッシュが異なる場合は `imported_at` が新しい結果を採用し、本文ハッシュも同じ場合は更新しない。日時はマイクロ秒精度で保存する。保存はスコア更新と同じトランザクション内で行うため、最新登録結果の保存に失敗した場合はプレイヤーデータ登録全体をロールバックする。
+
+保存済みの最新登録結果は、Firebase認証が必要な `GET /internal/me/player-data/latest-update` で本人だけが参照できる。プレイヤー連携済みで保存済み結果がない場合は `204 No Content`、プレイヤー未連携の場合は `404 player_not_linked` を返す。
+
+## 11. 実装上の参照先
 
 - レスポンスDTO: `internal/dto/api_internal/player_data_dto.go`
 - 登録・差分計算: `internal/usecase/player_data_usecase_impl.go`
 - 集計条件: `internal/domain/service/player_record_statistics.go`
 - DB upsert条件: `internal/infra/repository/player_data_repository_impl.go`
+- 最新登録結果の変換: `internal/usecase/player_latest_update.go`
+- 最新登録結果テーブル: `migration/mysql/000035_create_player_latest_updates.up.sql`
 - HTTPエンドポイント: `internal/app/handler/api_internal/me_handler.go`、`internal/app/handler/api_internal/temporary_player_data_handler.go`

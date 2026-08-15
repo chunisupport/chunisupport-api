@@ -2,13 +2,14 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,6 +76,10 @@ func (s *stubPlayerDataUsecase) Register(ctx context.Context, user *entity.User,
 		return s.registerFn(ctx, user, payload, hash)
 	}
 	return &api_internal.PlayerDataResult{PlayerID: 1}, nil
+}
+
+func (s *stubPlayerDataUsecase) GetLatestUpdate(_ context.Context, _ *entity.User) (json.RawMessage, error) {
+	return nil, ErrPlayerLatestUpdateNotFound
 }
 
 func (s *stubPlayerDataUsecase) Delete(_ context.Context, _ *entity.User) error { return nil }

@@ -18,7 +18,7 @@ func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	calculatedRating := 17.1234
 	player := &entity.Player{
 		Name:             playername.MustNewPlayerName("テストプレイヤー"),
-		OfficialRating:   &officialRating,
+		OfficialRating:   officialRating,
 		CalculatedRating: &calculatedRating,
 	}
 
@@ -62,6 +62,20 @@ func TestToV1PlayerRecordDTO_OverpowerPercent(t *testing.T) {
 	// Then
 	require.NotNil(t, actual)
 	assert.Equal(t, 97.9412, actual.OverpowerPercent)
+}
+
+func TestToV1PlayerRecordDTO_IsOPTarget(t *testing.T) {
+	// Given
+	record := &dto.PlayerRecordDTO{
+		IsOPTarget: true,
+	}
+
+	// When
+	actual := ToV1PlayerRecordDTO(record)
+
+	// Then
+	require.NotNil(t, actual)
+	assert.True(t, actual.IsOPTarget)
 }
 
 func TestToV1PlayerRecordDTO_JusticeCount(t *testing.T) {

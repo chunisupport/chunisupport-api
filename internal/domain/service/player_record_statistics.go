@@ -6,7 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
-// RecordAchievementStatistics は通常譜面の達成件数を表します。
+// RecordAchievementStatistics は譜面レコードの達成件数を表します。
 type RecordAchievementStatistics struct {
 	AJ      int
 	FC      int
@@ -21,7 +21,7 @@ type RecordAchievementStatistics struct {
 	S       int
 }
 
-// PlayerRecordStatistics は通常譜面のスコア合計と達成件数を表します。
+// PlayerRecordStatistics は譜面レコードのスコア合計と達成件数を表します。
 type PlayerRecordStatistics struct {
 	TotalHighScore int64
 	Achievements   RecordAchievementStatistics
@@ -33,17 +33,18 @@ type PlayerRecordStatisticsSnapshot struct {
 	ByDifficulty map[string]PlayerRecordStatistics
 }
 
-// PlayerRecordDifficultyNames は統計で返す固定難易度名を返します。
-func PlayerRecordDifficultyNames() []string {
-	return append([]string(nil), playerRecordDifficultyNames[:]...)
+// PlayerRecordStatisticsGroupNames は統計で返す通常難易度とWORLD'S ENDの固定キーを返します。
+func PlayerRecordStatisticsGroupNames() []string {
+	return append([]string(nil), playerRecordStatisticsGroupNames[:]...)
 }
 
-// CalculatePlayerRecordStatistics は通常譜面レコードを全体・難易度別に集計します。
+// CalculatePlayerRecordStatistics は通常譜面を全体・難易度別に、WORLD'S ENDをWEへ集計します。
+// Overallは既存仕様を維持するため通常譜面だけを対象とします。
 // マスタ不整合を統計へ混入させないため、関連情報の欠損や未知の難易度はエラーにします。
-func CalculatePlayerRecordStatistics(records []*entity.PlayerRecord) (PlayerRecordStatisticsSnapshot, error) {
-	snapshot := PlayerRecordStatisticsSnapshot{ByDifficulty: make(map[string]PlayerRecordStatistics, len(playerRecordDifficultyNames))}
-	for _, difficulty := range playerRecordDifficultyNames {
-		snapshot.ByDifficulty[difficulty] = PlayerRecordStatistics{}
+func CalculatePlayerRecordStatistics(records []*entity.PlayerRecord, worldsendRecords []*entity.PlayerWorldsendRecord) (PlayerRecordStatisticsSnapshot, error) {
+	snapshot := PlayerRecordStatisticsSnapshot{ByDifficulty: make(map[string]PlayerRecordStatistics, len(playerRecordStatisticsGroupNames))}
+	for _, groupName := range playerRecordStatisticsGroupNames {
+		snapshot.ByDifficulty[groupName] = PlayerRecordStatistics{}
 	}
 
 	for _, record := range records {
@@ -56,29 +57,37 @@ func CalculatePlayerRecordStatistics(records []*entity.PlayerRecord) (PlayerReco
 			return PlayerRecordStatisticsSnapshot{}, fmt.Errorf("unknown chart difficulty: %s", difficulty)
 		}
 
-		addPlayerRecordStatistics(&snapshot.Overall, record)
-		addPlayerRecordStatistics(&group, record)
+		addPlayerRecordStatistics(&snapshot.Overall, int(record.Score), record.ClearLamp.Name, record.ComboLamp.Name, record.FullChain.Name)
+		addPlayerRecordStatistics(&group, int(record.Score), record.ClearLamp.Name, record.ComboLamp.Name, record.FullChain.Name)
 		snapshot.ByDifficulty[difficulty] = group
 	}
+
+	worldsendGroup := snapshot.ByDifficulty[playerRecordStatisticsWorldsendName]
+	for _, record := range worldsendRecords {
+		if record == nil || record.ClearLamp == nil || record.ComboLamp == nil || record.FullChain == nil {
+			return PlayerRecordStatisticsSnapshot{}, fmt.Errorf("player worldsend record has missing statistics relation")
+		}
+		addPlayerRecordStatistics(&worldsendGroup, int(record.Score), record.ClearLamp.Name, record.ComboLamp.Name, record.FullChain.Name)
+	}
+	snapshot.ByDifficulty[playerRecordStatisticsWorldsendName] = worldsendGroup
 
 	return snapshot, nil
 }
 
-func addPlayerRecordStatistics(statistics *PlayerRecordStatistics, record *entity.PlayerRecord) {
-	score := int(record.Score)
+func addPlayerRecordStatistics(statistics *PlayerRecordStatistics, score int, clearLamp string, comboLamp string, fullChain string) {
 	statistics.TotalHighScore += int64(score)
 	achievements := &statistics.Achievements
 
-	if record.ComboLamp.Name == "ALL JUSTICE" {
+	if comboLamp == "ALL JUSTICE" {
 		achievements.AJ++
 	}
-	if record.ComboLamp.Name == "FULL COMBO" || record.ComboLamp.Name == "ALL JUSTICE" {
+	if comboLamp == "FULL COMBO" || comboLamp == "ALL JUSTICE" {
 		achievements.FC++
 	}
-	if record.ClearLamp.Name != "FAILED" {
+	if clearLamp != "FAILED" {
 		achievements.CLR++
 	}
-	if record.FullChain.Name == "FULL CHAIN GOLD" || record.FullChain.Name == "FULL CHAIN PLATINUM" {
+	if fullChain == "FULL CHAIN GOLD" || fullChain == "FULL CHAIN PLATINUM" {
 		achievements.FCH++
 	}
 	if score == playerRecordScoreMax {

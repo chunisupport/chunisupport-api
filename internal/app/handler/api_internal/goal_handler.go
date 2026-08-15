@@ -10,7 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // GoalHandler は目標APIを扱います。
@@ -23,7 +23,7 @@ func NewGoalHandler(goalUsecase usecase.GoalUsecase) *GoalHandler {
 	return &GoalHandler{goalUsecase: goalUsecase}
 }
 
-func (h *GoalHandler) List(c echo.Context) error {
+func (h *GoalHandler) List(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func (h *GoalHandler) List(c echo.Context) error {
 	return c.JSON(http.StatusOK, &internaldto.GoalsResponse{Goals: items})
 }
 
-func (h *GoalHandler) Create(c echo.Context) error {
+func (h *GoalHandler) Create(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (h *GoalHandler) Create(c echo.Context) error {
 	return c.JSON(http.StatusCreated, toGoalResponse(goal))
 }
 
-func (h *GoalHandler) Update(c echo.Context) error {
+func (h *GoalHandler) Update(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (h *GoalHandler) Update(c echo.Context) error {
 	return c.JSON(http.StatusOK, toGoalResponse(goal))
 }
 
-func (h *GoalHandler) Delete(c echo.Context) error {
+func (h *GoalHandler) Delete(c *echo.Context) error {
 	user, err := getUser(c)
 	if err != nil {
 		return err
@@ -99,6 +99,25 @@ func (h *GoalHandler) Delete(c echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := h.goalUsecase.Delete(c.Request().Context(), user.ID, uint32(id64)); err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// Reorder はフロントエンドが指定した目標IDの順序を保存します。
+func (h *GoalHandler) Reorder(c *echo.Context) error {
+	user, err := getUser(c)
+	if err != nil {
+		return err
+	}
+	var req internaldto.GoalOrderRequest
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if req.GoalIDs == nil {
+		return apierror.ErrBadRequest
+	}
+	if err := h.goalUsecase.Reorder(c.Request().Context(), user.ID, req.GroupID, req.GoalIDs); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -116,10 +135,18 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 			return nil, err
 		}
 	}
-	return &usecase.GoalInput{Title: req.Title, AchievementType: req.AchievementType, AchievementParams: params, Attributes: attrs, Invert: req.Invert}, nil
+	return &usecase.GoalInput{
+		GroupID:           req.GroupID,
+		Title:             req.Title,
+		AchievementType:   req.AchievementType,
+		AchievementParams: params,
+		Attributes:        attrs,
+		InvertValue:       req.InvertValue,
+		InvertPercentage:  req.InvertPercentage,
+	}, nil
 }
 
-func getUser(c echo.Context) (*entity.User, error) {
+func getUser(c *echo.Context) (*entity.User, error) {
 	user, ok := c.Get("userEntity").(*entity.User)
 	if !ok || user == nil {
 		return nil, apierror.ErrUnauthorized
@@ -130,11 +157,14 @@ func getUser(c echo.Context) (*entity.User, error) {
 func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
 	return &internaldto.GoalResponse{
 		ID:                goal.ID,
+		GroupID:           goal.GroupID,
 		Title:             goal.Title,
 		AchievementType:   goal.AchievementType,
 		AchievementParams: goal.AchievementParams,
 		Attributes:        goal.Attributes,
-		Invert:            goal.Invert,
+		InvertValue:       goal.InvertValue,
+		InvertPercentage:  goal.InvertPercentage,
+		SortOrder:         goal.SortOrder,
 		CreatedAt:         goal.CreatedAt,
 	}
 }

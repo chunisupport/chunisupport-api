@@ -1,16 +1,34 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParsePlayerDataTimes_UTCへ正規化する(t *testing.T) {
+	lastPlayedAt, updatedAt, err := parsePlayerDataTimes("2024/01/01 00:00", "2024-01-01T00:00:00+09:00")
+
+	require.NoError(t, err)
+	require.NotNil(t, lastPlayedAt)
+	assert.Equal(t, time.UTC, lastPlayedAt.Location())
+	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), *lastPlayedAt)
+	assert.Equal(t, time.UTC, updatedAt.Location())
+	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), updatedAt)
+}
 
 // TestValidatePlayerDataPayload_AppVersion は、app_verに関係なく登録できることをテストします。
 func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
@@ -31,14 +49,15 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 最小限のペイロードを作成（スコアは空）
+			rating := 0.0
 			payload := &PlayerDataPayload{
 				AppVersion: tt.appVersion,
 				Name:       "テストプレイヤー",
 				Level:      1,
-				Rating:     new(0.0),
+				Rating:     &rating,
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
-					Value:      0.0,
+					Value:      &rating,
 					Percentage: 0.0,
 				},
 				ClassEmblem: PlayerDataClassPayload{
@@ -61,6 +80,69 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestValidatePlayerDataPayload_公式指標は両方必須(t *testing.T) {
+	rating := 17.25
+	overpower := 12345.67
+	tests := []struct {
+		name    string
+		payload *PlayerDataPayload
+		field   string
+	}{
+		{
+			name: "公式RATINGがない場合はエラー",
+			payload: &PlayerDataPayload{
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+			},
+			field: "rating",
+		},
+		{
+			name: "公式OPがない場合はエラー",
+			payload: &PlayerDataPayload{
+				Rating: &rating,
+			},
+			field: "overpower.value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePlayerDataPayload(tt.payload)
+
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, tt.field, validationErr.Field)
+		})
+	}
+}
+
+func TestValidatePlayerDataPayload_公式指標の範囲外を拒否する(t *testing.T) {
+	rating := -0.01
+	overpower := 0.0
+	err := validatePlayerDataPayload(&PlayerDataPayload{
+		Rating: &rating, Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+	})
+
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "rating", validationErr.Field)
+}
+
+func TestValidatePlayerDataPayload_公式指標の小数第3位を拒否する(t *testing.T) {
+	rating := 17.251
+	overpower := 12345.67
+	err := validatePlayerDataPayload(&PlayerDataPayload{
+		Rating: &rating, Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+	})
+
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "rating", validationErr.Field)
+}
+
+func TestNormalizeOfficialMetric_許容誤差内の値を小数2桁へ正規化する(t *testing.T) {
+	assert.Equal(t, 17.25, normalizeOfficialMetric(17.2500000005))
 }
 
 // TestValidatePlayerDataPayload_NilPayload は、payloadがnilの場合のテストです
@@ -163,8 +245,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "06",
 				BaseClass:  "06",
 			},
-			wantClassID: new(6),
-			wantBaseID:  new(6),
+			wantClassID: intPtrForApplyScoresTest(6),
+			wantBaseID:  intPtrForApplyScoresTest(6),
 		},
 		{
 			name: "infの直接指定も従来通り解決できる",
@@ -172,8 +254,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "INF",
 				BaseClass:  "inf",
 			},
-			wantClassID: new(6),
-			wantBaseID:  new(6),
+			wantClassID: intPtrForApplyScoresTest(6),
+			wantBaseID:  intPtrForApplyScoresTest(6),
 		},
 		{
 			name: "未定義値はnil扱いになる",
@@ -210,14 +292,14 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 	}
 }
 
-func TestApplyHonors_SP称号はタイトル空文字と画像URLで登録する(t *testing.T) {
-	img1 := "https://example.com/sp-1.png"
+func TestApplyHonors_SP称号は画像ファイル名と画像URLで登録する(t *testing.T) {
+	img1 := "https://example.com/sp-%E3%83%86%E3%82%B9%E3%83%88.png?version=1#fragment"
 	img2 := "https://example.com/sp-2.png"
 	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
 	uc := &playerDataUsecase{honorRepo: honorRepo}
 	masters := newApplyHonorsTestMasters()
 
-	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
 		"1": {Title: "ペイロード上の称号名", Class: "sp", Img: &img1},
 		"2": {Class: "sp", Img: &img2},
 	}, masters)
@@ -227,8 +309,50 @@ func TestApplyHonors_SP称号はタイトル空文字と画像URLで登録する
 	assert.Equal(t, 1, honorRepo.deleteCount)
 	require.Len(t, honorRepo.ensureCalls, 2)
 	assert.ElementsMatch(t, []string{img1, img2}, honorRepo.ensureImageURLs())
-	assert.ElementsMatch(t, []string{"", ""}, honorRepo.ensureTitles())
+	assert.ElementsMatch(t, []string{"sp-%E3%83%86%E3%82%B9%E3%83%88.png", "sp-2.png"}, honorRepo.ensureTitles())
 	assert.Len(t, honorRepo.assignments, 2)
+	require.Len(t, registered, 2)
+	registeredIDs := []int{registered[0].ID, registered[1].ID}
+	registeredFilenames := []string{registered[0].ImageFilename, registered[1].ImageFilename}
+	registeredImageURLs := []string{registered[0].ImageURL, registered[1].ImageURL}
+	assert.ElementsMatch(t, []int{1, 2}, registeredIDs)
+	assert.ElementsMatch(t, []string{"sp-%E3%83%86%E3%82%B9%E3%83%88.png", "sp-2.png"}, registeredFilenames)
+	assert.ElementsMatch(t, []string{img1, img2}, registeredImageURLs)
+}
+
+func TestApplyHonors_登録済みSP称号は通知対象にしない(t *testing.T) {
+	imageURL := "https://example.com/sp.png"
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{existing: true}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Class: "sp", Img: &imageURL},
+	}, newApplyHonorsTestMasters())
+
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	assert.Empty(t, registered)
+}
+
+func TestLogRegisteredSPHonors_通常ログ形式でWarnを出力する(t *testing.T) {
+	var buffer bytes.Buffer
+	original := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buffer, nil)))
+	t.Cleanup(func() { slog.SetDefault(original) })
+
+	logRegisteredSPHonors([]registeredSPHonor{{
+		ID:            10,
+		ImageFilename: "sp.png",
+		ImageURL:      "https://example.com/sp.png",
+	}})
+
+	logLine := buffer.String()
+	assert.Contains(t, logLine, "level=WARN")
+	assert.Contains(t, logLine, `msg="unknown SP honor registered"`)
+	assert.Contains(t, logLine, "event="+info.UnknownSPHonorRegisteredEvent)
+	assert.Contains(t, logLine, "honor_id=10")
+	assert.Contains(t, logLine, "image_filename=sp.png")
+	assert.True(t, strings.Contains(logLine, "image_url=https://example.com/sp.png"))
 }
 
 func TestApplyHonors_SP称号で画像URLがない場合はスキップする(t *testing.T) {
@@ -236,7 +360,7 @@ func TestApplyHonors_SP称号で画像URLがない場合はスキップする(t 
 	uc := &playerDataUsecase{honorRepo: honorRepo}
 	masters := newApplyHonorsTestMasters()
 
-	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
 		"1": {Class: "sp"},
 	}, masters)
 
@@ -245,15 +369,17 @@ func TestApplyHonors_SP称号で画像URLがない場合はスキップする(t 
 	assert.Equal(t, "sp honor image_url is required", skipped[0].Reason)
 	assert.Empty(t, honorRepo.ensureCalls)
 	assert.Empty(t, honorRepo.assignments)
+	assert.Empty(t, registered)
 }
 
-func TestApplyHonors_通常称号はタイトルと空画像URLで登録する(t *testing.T) {
+func TestApplyHonors_通常称号は入力画像URLを保存せずNULLで登録する(t *testing.T) {
+	imageURL := "https://example.com/honor_bg_123.png"
 	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
 	uc := &playerDataUsecase{honorRepo: honorRepo}
 	masters := newApplyHonorsTestMasters()
 
-	skipped, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
-		"1": {Title: "通常称号", Class: "normal"},
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Title: "通常称号", Class: "normal", Img: &imageURL},
 	}, masters)
 
 	require.NoError(t, err)
@@ -261,6 +387,27 @@ func TestApplyHonors_通常称号はタイトルと空画像URLで登録する(t
 	require.Len(t, honorRepo.ensureCalls, 1)
 	assert.Equal(t, "通常称号", honorRepo.ensureCalls[0].title)
 	assert.Nil(t, honorRepo.ensureCalls[0].imageURL)
+	assert.Empty(t, registered)
+}
+
+func TestApplyHonors_お気に入りからランダムのスロットは更新しない(t *testing.T) {
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+		"1": {Title: "お気に入りからランダム", Class: "normal"},
+		"2": {Title: "更新する称号", Class: "normal"},
+	}, masters)
+
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	assert.Equal(t, []int{1}, honorRepo.preservedSlots)
+	require.Len(t, honorRepo.ensureCalls, 1)
+	assert.Equal(t, "更新する称号", honorRepo.ensureCalls[0].title)
+	require.Len(t, honorRepo.assignments, 1)
+	assert.Equal(t, 2, honorRepo.assignments[0].Slot)
+	assert.Empty(t, registered)
 }
 
 func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
@@ -276,10 +423,12 @@ type honorEnsureCallForApplyHonorsTest struct {
 }
 
 type stubHonorRepositoryForApplyHonorsTest struct {
-	deleteCount int
-	ensureCalls []honorEnsureCallForApplyHonorsTest
-	assignments []repository.HonorAssignment
-	nextHonorID int
+	deleteCount    int
+	preservedSlots []int
+	ensureCalls    []honorEnsureCallForApplyHonorsTest
+	assignments    []repository.HonorAssignment
+	nextHonorID    int
+	existing       bool
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) FindAll(_ context.Context, _ repository.Executor) ([]*entity.Honor, error) {
@@ -302,18 +451,24 @@ func (s *stubHonorRepositoryForApplyHonorsTest) Delete(_ context.Context, _ repo
 	return nil
 }
 
-func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _ repository.Executor, title string, honorTypeID int, imageURL *string) (int, error) {
+func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _ repository.Executor, title string, honorTypeID int, imageURL *string) (repository.HonorEnsureResult, error) {
 	s.ensureCalls = append(s.ensureCalls, honorEnsureCallForApplyHonorsTest{
 		title:       title,
 		honorTypeID: honorTypeID,
 		imageURL:    imageURL,
 	})
 	s.nextHonorID++
-	return s.nextHonorID, nil
+	return repository.HonorEnsureResult{ID: s.nextHonorID, ImageURLRegistered: imageURL != nil && !s.existing}, nil
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonors(_ context.Context, _ repository.Executor, _ int) error {
 	s.deleteCount++
+	return nil
+}
+
+func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonorsExceptSlots(_ context.Context, _ repository.Executor, _ int, preservedSlots []int) error {
+	s.deleteCount++
+	s.preservedSlots = append(s.preservedSlots, preservedSlots...)
 	return nil
 }
 
@@ -351,4 +506,279 @@ func newApplyHonorsTestMasters() *playerDataMaster {
 			},
 		},
 	}
+}
+
+func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
+	t.Run("ChartDifficultyがnilのレコードをスキップしWARNログを出力する", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ChartDifficultyがnilのレコード（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "テスト曲1"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				// ChartDifficulty: nil
+			},
+			// 正常なレコード（集計される）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 101, Title: "テスト曲2"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 200, IsUltima: false},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// WARNログが出力されていることを確認
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "level=WARN")
+		assert.Contains(t, logOutput, "skipped player records during overpower recalculation")
+		assert.Contains(t, logOutput, "chart_difficulty_nil")
+	})
+
+	t.Run("ロック楽曲のレコードをスキップしてもWARNログは出力しない", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ロックされている楽曲（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ロック曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+			// 正常なレコード（集計される）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 101, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: false},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// 未解禁曲のスキップは自然な挙動のためWARNログは出力されない
+		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
+	})
+
+	t.Run("異常なスキップと混在してもロック楽曲はWARNログに含めない", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ロック曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 101, Title: "難易度欠損曲"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+			},
+		}
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: false},
+		}
+
+		// Act
+		_, err = calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		logOutput := logBuffer.String()
+		assert.Contains(t, logOutput, "level=WARN")
+		assert.Contains(t, logOutput, "chart_difficulty_nil")
+		assert.NotContains(t, logOutput, "locked_song")
+	})
+
+	t.Run("ULTIMAのロック楽曲も正しくスキップする", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			// ULTIMAでロックされている楽曲（スキップされる）
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ULTIMA曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   5,
+					Name: "ULTIMA",
+				},
+			},
+			// 同じ曲の別の難易度（スキップされない）
+			{
+				PlayerID: 1,
+				ChartID:  11,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "ULTIMA曲"},
+				Chart:    &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: true},
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// 未解禁曲のスキップは自然な挙動のためWARNログは出力されない
+		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
+	})
+
+	t.Run("ロック楽曲がない場合はスキップ処理をバイパスする", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				// ChartDifficultyがnilでもロック楽曲が空ならスキップチェックはバイパスされる
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// ロック楽曲がないのでWARNログは出力されない（または別の理由でスキップされた場合のみ出力される）
+		logOutput := logBuffer.String()
+		// この場合はChartDifficultyがnilでもスキップロジックがバイパスされるため、WARNログは出ない
+		assert.NotContains(t, logOutput, "chart_difficulty_nil")
+		assert.NotContains(t, logOutput, "locked_song")
+	})
+
+	t.Run("スキップレコードが空の場合はWARNログを出力しない", func(t *testing.T) {
+		// Arrange
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_000_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(10.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID: 1,
+				ChartID:  10,
+				Score:    recordScore,
+				Song:     &entity.Song{ID: 100, Title: "通常曲"},
+				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{
+					ID:   1,
+					Name: "MASTER",
+				},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 200, IsUltima: false}, // 別の曲をロック
+		}
+
+		// Act
+		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+
+		// Assert
+		require.NoError(t, err)
+		assert.NotNil(t, result.Value)
+		assert.NotNil(t, result.Percent)
+
+		// スキップレコードがないのでWARNログは出力されない
+		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
+	})
 }

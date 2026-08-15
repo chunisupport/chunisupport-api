@@ -37,6 +37,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				OfficialIdx: "WEIDX001-UPDATED",
 				Jacket:      stringPtrForWorldsendSaveTest("we-updated.png"),
 				IsWorldsend: true,
+				IsNew:       true,
 				IsDeleted:   true,
 				ReleasedAt:  timePtrForWorldsendSaveTest(releasedAt),
 			},
@@ -71,8 +72,8 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 			}
 
 			_, err := db.Exec(`
-				INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-				VALUES (1, 'WE001', 'WE Title', 'WE Artist', 1, 210, ?, 'WEIDX001', 'we.png', ?, 0)
+				INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+				VALUES (1, 'WE001', 'WE Title', 'WE Artist', 1, 210, ?, 'WEIDX001', 'we.png', ?, 0, 0)
 			`, time.Now().UTC(), isWorldsendFlag)
 			require.NoError(t, err)
 
@@ -102,10 +103,11 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 					OfficialIdx string         `db:"official_idx"`
 					Jacket      *string        `db:"jacket"`
 					IsWorldsend bool           `db:"is_worldsend"`
+					IsNew       bool           `db:"is_new"`
 					IsDeleted   bool           `db:"is_deleted"`
 				}
 				err = db.Get(&saved, `
-					SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted
+					SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted
 					FROM songs
 					WHERE id = ?
 				`, tt.saveSong.ID)
@@ -130,6 +132,7 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				require.NotNil(t, saved.Jacket)
 				assert.Equal(t, *tt.saveSong.Jacket, *saved.Jacket)
 				assert.Equal(t, tt.saveSong.IsWorldsend, saved.IsWorldsend)
+				assert.Equal(t, tt.saveSong.IsNew, saved.IsNew)
 				assert.Equal(t, tt.saveSong.IsDeleted, saved.IsDeleted)
 			}
 		})

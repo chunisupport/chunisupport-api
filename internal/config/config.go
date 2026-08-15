@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/joho/godotenv"
@@ -63,19 +64,20 @@ type TempData struct {
 }
 
 type Config struct {
-	AppPort int     `json:"app_port"`
-	Logging Logging `json:"logging"`
-	// StaticDBPath は静的データ用SQLiteのファイルパスです
-	StaticDBPath string `json:"static_db_path"`
-	// SmallDataDBPath は小規模なユーザー補助データ用SQLiteのファイルパスです。
-	SmallDataDBPath string `json:"smalldata_db_path"`
+	AppPort  int     `json:"app_port"`
+	Logging  Logging `json:"logging"`
+	Timezone string  `json:"timezone"`
+	// Location は検証済みのAPI出力用タイムゾーンです。
+	Location *time.Location `json:"-"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int       `json:"shutdown_timeout_seconds"`
-	CORS                   CORS      `json:"cors"`
-	TempData               TempData  `json:"temp_data"`
-	Firebase               Firebase  // 環境変数から読み込み
-	Turnstile              Turnstile // 環境変数から読み込み
-	Database               Database  // 環境変数から読み込み
+	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
+	CORS                   CORS           `json:"cors"`
+	TempData               TempData       `json:"temp_data"`
+	UsernamePolicy         UsernamePolicy `json:"-"`
+	DataTransferHMACSecret []byte         `json:"-"`
+	Firebase               Firebase       // 環境変数から読み込み
+	Turnstile              Turnstile      // 環境変数から読み込み
+	Database               Database       // 環境変数から読み込み
 	loggingSet             bool
 }
 
@@ -83,8 +85,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		AppPort                int      `json:"app_port"`
 		Logging                *Logging `json:"logging"`
-		StaticDBPath           string   `json:"static_db_path"`
-		SmallDataDBPath        string   `json:"smalldata_db_path"`
+		Timezone               string   `json:"timezone"`
 		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
 		CORS                   CORS     `json:"cors"`
 		TempData               TempData `json:"temp_data"`
@@ -95,12 +96,11 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 
 	c.AppPort = raw.AppPort
+	c.Timezone = raw.Timezone
 	if raw.Logging != nil {
 		c.Logging = *raw.Logging
 		c.loggingSet = true
 	}
-	c.StaticDBPath = raw.StaticDBPath
-	c.SmallDataDBPath = raw.SmallDataDBPath
 	c.ShutdownTimeoutSeconds = raw.ShutdownTimeoutSeconds
 	c.CORS = raw.CORS
 	c.TempData = raw.TempData
@@ -143,6 +143,16 @@ type Database struct {
 
 // LoadConfig は環境変数から環境を読み取り、対応する設定を読み込みます
 func LoadConfig() (Config, error) {
+	return loadConfig(true)
+}
+
+// LoadBatchConfig はHTTPサーバー固有のFirebase、Turnstile、ユーザー名ポリシーを除き、
+// バッチ実行に必要なログ、タイムゾーン、DB設定を読み込みます。
+func LoadBatchConfig() (Config, error) {
+	return loadConfig(false)
+}
+
+func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	var config Config
 
 	// .envファイルを読み込み(存在しない場合はスキップ)
@@ -170,6 +180,14 @@ func LoadConfig() (Config, error) {
 		return config, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
+	if loadApplicationSecrets {
+		usernamePolicyPath := filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile)
+		config.UsernamePolicy, err = loadUsernamePolicy(usernamePolicyPath)
+		if err != nil {
+			return config, err
+		}
+	}
+
 	var errors []string
 
 	// 設定ファイルの検証
@@ -177,11 +195,8 @@ func LoadConfig() (Config, error) {
 		errors = append(errors, "shutdown_timeout_seconds must be greater than 0")
 	}
 
-	if strings.TrimSpace(config.StaticDBPath) == "" {
-		errors = append(errors, "static_db_path is required")
-	}
-	if strings.TrimSpace(config.SmallDataDBPath) == "" {
-		errors = append(errors, "smalldata_db_path is required")
+	if err := normalizeAndValidateTimezone(&config); err != nil {
+		errors = append(errors, err.Error())
 	}
 
 	if err := normalizeAndValidateLoggingConfig(&config.Logging, config.loggingSet); err != nil {
@@ -225,14 +240,22 @@ func LoadConfig() (Config, error) {
 		}
 	}
 
-	config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))
-	if err := normalizeAndValidateFirebaseConfig(&config.Firebase); err != nil {
-		errors = append(errors, err.Error())
-	}
+	if loadApplicationSecrets {
+		config.Firebase.CredentialsFile = strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_FILE"))
+		if err := normalizeAndValidateFirebaseConfig(&config.Firebase); err != nil {
+			errors = append(errors, err.Error())
+		}
 
-	config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
-	if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
+		config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
+		if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
+			errors = append(errors, err.Error())
+		}
+	}
+	dataTransferSecret, err := decodeDataTransferHMACSecret(os.Getenv("DATA_TRANSFER_HMAC_SECRET"), loadApplicationSecrets)
+	if err != nil {
 		errors = append(errors, err.Error())
+	} else {
+		config.DataTransferHMACSecret = dataTransferSecret
 	}
 
 	// データベース設定を環境変数から取得
@@ -288,6 +311,21 @@ func LoadConfig() (Config, error) {
 	}
 
 	return config, nil
+}
+
+// normalizeAndValidateTimezone はAPI出力用のIANAタイムゾーンを起動時に解決します。
+func normalizeAndValidateTimezone(config *Config) error {
+	config.Timezone = strings.TrimSpace(config.Timezone)
+	if config.Timezone == "" {
+		return fmt.Errorf("timezone is required")
+	}
+
+	location, err := time.LoadLocation(config.Timezone)
+	if err != nil {
+		return fmt.Errorf("timezone must be a valid IANA time zone: %w", err)
+	}
+	config.Location = location
+	return nil
 }
 
 func normalizeAndValidateLoggingConfig(logging *Logging, loggingSet bool) error {

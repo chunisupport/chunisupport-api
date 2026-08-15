@@ -36,6 +36,7 @@ type V1PlayerDTO struct {
 type V1PlayerRecordDTO struct {
 	UpdatedAt        *time.Time                  `json:"updated_at"`
 	IsPlayed         bool                        `json:"is_played"`
+	IsOPTarget       bool                        `json:"is_op_target"`
 	Difficulty       string                      `json:"difficulty"`
 	ID               string                      `json:"id"`
 	Title            string                      `json:"title"`
@@ -81,6 +82,7 @@ type V1UserRecordResponseDTO struct {
 	NewCandidate  []*V1PlayerRecordDTO    `json:"new_candidate"`
 	All           []*V1PlayerRecordDTO    `json:"standard"`
 	WorldsEnd     []*V1WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
+	Courses       []*dto.CourseRecordDTO  `json:"course"`
 }
 
 // V1UserProfileDTO は外部API v1 用のユーザープロファイルDTOです。
@@ -134,6 +136,7 @@ func ToV1PlayerRecordDTO(record *dto.PlayerRecordDTO) *V1PlayerRecordDTO {
 	return &V1PlayerRecordDTO{
 		UpdatedAt:        record.UpdatedAt,
 		IsPlayed:         record.IsPlayed,
+		IsOPTarget:       record.IsOPTarget,
 		Difficulty:       record.Difficulty,
 		ID:               record.ID,
 		Title:            record.Title,
@@ -206,6 +209,7 @@ func ToV1UserRecordResponseDTO(records *dto.UserRecordResponseDTO) *V1UserRecord
 		NewCandidate:  convertSlice(records.NewCandidate),
 		All:           convertSlice(records.All),
 		WorldsEnd:     convertWorldsendSlice(records.WorldsEnd),
+		Courses:       records.Courses,
 	}
 }
 

@@ -28,6 +28,7 @@ func setupOverpowerDenominatorProviderSQLite(t *testing.T) *sqlx.DB {
 		`CREATE TABLE songs (
 			id INTEGER PRIMARY KEY,
 			is_worldsend INTEGER NOT NULL,
+			is_new INTEGER NOT NULL DEFAULT 0,
 			is_deleted INTEGER NOT NULL
 		)`,
 		`CREATE TABLE difficulties (
@@ -41,11 +42,11 @@ func setupOverpowerDenominatorProviderSQLite(t *testing.T) *sqlx.DB {
 			const REAL NOT NULL
 		)`,
 		`INSERT INTO difficulties (id, name) VALUES (1, 'BASIC'), (5, 'ULTIMA')`,
-		`INSERT INTO songs (id, is_worldsend, is_deleted) VALUES
-			(10, 0, 0),
-			(20, 0, 0),
-			(30, 1, 0),
-			(40, 0, 1)`,
+		`INSERT INTO songs (id, is_worldsend, is_new, is_deleted) VALUES
+			(10, 0, 0, 0),
+			(20, 0, 0, 0),
+			(30, 1, 0, 0),
+			(40, 0, 0, 1)`,
 		`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES
 			(101, 10, 1, 14.0),
 			(102, 10, 5, 15.0),
@@ -80,7 +81,7 @@ func TestOverpowerDenominatorProvider_SnapshotはULTIMA以外の譜面がない�
 	db := setupOverpowerDenominatorProviderSQLite(t)
 	provider := NewOverpowerDenominatorProviderWithTTL(db, time.Hour)
 
-	_, err := db.Exec(`INSERT INTO songs (id, is_worldsend, is_deleted) VALUES (50, 0, 0)`)
+	_, err := db.Exec(`INSERT INTO songs (id, is_worldsend, is_new, is_deleted) VALUES (50, 0, 0, 0)`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES (501, 50, 5, 15.5)`)
 	require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestOverpowerDenominatorProvider_キャッシュとInvalidate(t *testing.T)
 	first, err := provider.Snapshot(context.Background())
 	require.NoError(t, err)
 
-	_, err = db.Exec(`INSERT INTO songs (id, is_worldsend, is_deleted) VALUES (50, 0, 0)`)
+	_, err = db.Exec(`INSERT INTO songs (id, is_worldsend, is_new, is_deleted) VALUES (50, 0, 0, 0)`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES (501, 50, 1, 12.0)`)
 	require.NoError(t, err)

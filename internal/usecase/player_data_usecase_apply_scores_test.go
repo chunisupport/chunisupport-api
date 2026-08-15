@@ -13,7 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,6 +38,12 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 				ComboLamp:       &entity.ComboLampType{Name: "ALL JUSTICE"},
 				FullChain:       &entity.FullChainType{Name: "FULL CHAIN GOLD"},
 				ChartDifficulty: &entity.ChartDifficulty{Name: "MASTER"},
+			}},
+		},
+		worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{
+			records: []*entity.PlayerWorldsendRecord{{
+				Score: 1009000, ClearLamp: &entity.ClearLampType{Name: "HARD"},
+				ComboLamp: &entity.ComboLampType{Name: "FULL COMBO"}, FullChain: &entity.FullChainType{Name: "FULL CHAIN GOLD"},
 			}},
 		},
 	}
@@ -84,7 +90,9 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	assert.Equal(t, 1, statistics.Overall.RecordStatistics.AJ.After)
 	assert.Equal(t, 1, statistics.Overall.RecordStatistics.FC.After)
 	assert.Equal(t, 1, statistics.ByDifficulty["MASTER"].RecordStatistics.MAX.After)
-	assert.Len(t, statistics.ByDifficulty, 5)
+	assert.Equal(t, int64(1009000), statistics.ByDifficulty["WE"].TotalHighScore.After)
+	assert.Equal(t, 1, statistics.ByDifficulty["WE"].RecordStatistics.FC.After)
+	assert.Len(t, statistics.ByDifficulty, 6)
 	require.Equal(t, 1, repo.saveCalls)
 	assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: intPtrForApplyScoresTest(99)}, repo.receivedFilter)
 
@@ -119,9 +127,10 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
+	assert.Equal(t, repo.overpowerStats.MaxOverpowerTotal, overpower.MaxOverpowerTotal)
 }
 
 func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t *testing.T) {
@@ -152,7 +161,7 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 			},
 		},
 	}
-	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
 	masters := newApplyScoresTestMasters()
 	payload := PlayerDataScorePayload{
 		Standard: []PlayerDataScoreEntry{{
@@ -169,7 +178,7 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 14.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
@@ -224,7 +233,7 @@ func TestApplyScores_未解禁曲を除外してOVERPOWERを再計算する(t *t
 			{PlayerID: 99, SongID: 3, IsUltima: true},
 		},
 	}
-	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo, lockedRepo: lockedRepo}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: playerRecRepo, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}, lockedRepo: lockedRepo}
 
 	// When
 	_, _, _, _, overpower, err := uc.applyScores(context.Background(), nil, 99, PlayerDataScorePayload{}, newApplyScoresTestMasters(), updatedAt, service.PlayerRecordStatisticsSnapshot{})
@@ -235,7 +244,7 @@ func TestApplyScores_未解禁曲を除外してOVERPOWERを再計算する(t *t
 	require.NotNil(t, overpower.Value)
 	require.NotNil(t, overpower.Percent)
 	wantValue := service.CalcSingleOverpower(1010000, 15.0, 3) + service.CalcSingleOverpower(1009000, 13.0, 3)
-	wantPercent := roundFloat(wantValue/repo.overpowerStats.MaxOverpowerTotal*100, 4)
+	wantPercent := service.CalcOverpowerPercent(wantValue, repo.overpowerStats.MaxOverpowerTotal)
 	assert.InDelta(t, wantValue, *overpower.Value, 0.0001)
 	assert.InDelta(t, wantPercent, *overpower.Percent, 0.0001)
 }
@@ -246,8 +255,9 @@ func TestApplyScores_既存レコード取得失敗時はエラーを返す(t *t
 		overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
 	}
 	uc := &playerDataUsecase{
-		playerDataRepo: repo,
-		playerRecRepo:  &stubPlayerRecordRepositoryForApplyScoresTest{err: context.DeadlineExceeded},
+		playerDataRepo:   repo,
+		playerRecRepo:    &stubPlayerRecordRepositoryForApplyScoresTest{err: context.DeadlineExceeded},
+		worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{},
 	}
 
 	// When
@@ -273,6 +283,7 @@ func TestApplyScores_統計用の関連情報欠損時はエラーを返す(t *t
 				Chart:       &entity.Chart{Const: chartconstant.ChartConstant(15.0)},
 			}},
 		},
+		worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{},
 	}
 
 	// When
@@ -281,6 +292,48 @@ func TestApplyScores_統計用の関連情報欠損時はエラーを返す(t *t
 	// Then
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing statistics relation")
+}
+
+func TestApplyScores_0点スコアを保存できる(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 4, 27, 12, 34, 56, 0, time.UTC)
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
+	}
+	uc := &playerDataUsecase{
+		playerDataRepo:   repo,
+		playerRecRepo:    &stubPlayerRecordRepositoryForApplyScoresTest{},
+		worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{},
+	}
+	payload := PlayerDataScorePayload{
+		Standard: []PlayerDataScoreEntry{
+			{Idx: "full-song", Diff: "MAS", Score: 0},
+		},
+		Worldsend: []PlayerDataScoreEntry{
+			{Idx: "world-song", Score: 0},
+		},
+	}
+
+	// When
+	counts, skipped, changes, statistics, _, err := uc.applyScores(
+		context.Background(), nil, 99, payload, newApplyScoresTestMasters(), updatedAt, service.PlayerRecordStatisticsSnapshot{},
+	)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, api_internal.PlayerDataCounts{
+		FullRecordsUpserted:             1,
+		WorldsendRecordsUpserted:        1,
+		FullRecordsActuallyChanged:      1,
+		WorldsendRecordsActuallyChanged: 1,
+	}, counts)
+	assert.Empty(t, skipped)
+	assert.Len(t, changes, 2)
+	assert.Equal(t, int64(0), statistics.Overall.TotalHighScore.After)
+	require.Len(t, repo.savedInput.FullRecords, 1)
+	assert.Equal(t, 0, repo.savedInput.FullRecords[0].State.Score)
+	require.Len(t, repo.savedInput.WorldsendRecords, 1)
+	assert.Equal(t, 0, repo.savedInput.WorldsendRecords[0].State.Score)
 }
 
 func TestApplyScores_不正レコードをスキップして理由を保持する(t *testing.T) {
@@ -344,7 +397,7 @@ func TestApplyScores_不正レコードをスキップして理由を保持す�
 			repo := &stubPlayerDataRepositoryForApplyScoresTest{
 				overpowerStats: &repository.OverpowerTargetStats{MaxOverpowerTotal: service.CalcSongMaxOP(15.0)},
 			}
-			uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}}
+			uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
 
 			// When
 			counts, skipped, changes, _, overpower, err := uc.applyScores(context.Background(), nil, 77, tt.payload, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC), service.PlayerRecordStatisticsSnapshot{})
@@ -428,6 +481,8 @@ type stubPlayerDataRepositoryForApplyScoresTest struct {
 	overpowerErr    error
 	fullBefore      map[int]repository.PlayerRecordState
 	worldsendBefore map[int]repository.WorldsendRecordState
+	latestUpdate    *entity.PlayerLatestUpdate
+	latestUpdateErr error
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
@@ -474,6 +529,14 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStatsWith
 	return s.GetOverpowerTargetStats(ctx, filter)
 }
 
+func (s *stubPlayerDataRepositoryForApplyScoresTest) SaveLatestUpdate(_ context.Context, _ repository.Executor, _ *entity.PlayerLatestUpdate) error {
+	return nil
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerID(_ context.Context, _ int) (*entity.PlayerLatestUpdate, error) {
+	return s.latestUpdate, s.latestUpdateErr
+}
+
 type stubPlayerLockedSongRepositoryForApplyScoresTest struct {
 	lockedSongs      []*entity.PlayerLockedSong
 	receivedPlayerID int
@@ -498,6 +561,10 @@ func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) BulkCreate(_ context.
 }
 
 func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) BulkDelete(_ context.Context, _ repository.Executor, _ int, _ []int, _ []bool) error {
+	return nil
+}
+
+func (s *stubPlayerLockedSongRepositoryForApplyScoresTest) DeleteBySongID(_ context.Context, _ repository.Executor, _ int) error {
 	return nil
 }
 
@@ -551,11 +618,31 @@ type stubPlayerRecordRepositoryForApplyScoresTest struct {
 	err     error
 }
 
+type stubWorldsendRecordRepositoryForApplyScoresTest struct {
+	records []*entity.PlayerWorldsendRecord
+	err     error
+}
+
+func (s *stubWorldsendRecordRepositoryForApplyScoresTest) FindByPlayerID(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerWorldsendRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.records, nil
+}
+
+func (s *stubWorldsendRecordRepositoryForApplyScoresTest) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, _ string) ([]*entity.PlayerWorldsendRecord, error) {
+	return s.FindByPlayerID(ctx, exec, playerID)
+}
+
 func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerID(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerRecord, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.records, nil
+}
+
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error) {
+	return s.FindByPlayerID(ctx, exec, playerID)
 }
 
 func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDForRating(_ context.Context, _ repository.Executor, _ int) ([]*entity.PlayerRecord, error) {
@@ -633,7 +720,7 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 				fullBefore:      tt.fullBefore,
 				worldsendBefore: tt.worldBefore,
 			}
-			uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}}
+			uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
 
 			// When
 			counts, skipped, changes, _, _, err := uc.applyScores(context.Background(), nil, 77, tt.payload, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC), service.PlayerRecordStatisticsSnapshot{})
@@ -676,7 +763,7 @@ func TestFullRecordDisplayKeys_難易度マスタ欠損時は難易度IDをDiff�
 	assert.Equal(t, "99", diff)
 }
 
-func TestPlayerDataRecordState_JSON_none相当はnullで返す(t *testing.T) {
+func TestPlayerDataRecordState_ランプ未設定をnilで保持する(t *testing.T) {
 	// Given
 	dto := playerRecordStateDTO(repository.PlayerRecordState{
 		Score:       1000000,
@@ -690,10 +777,10 @@ func TestPlayerDataRecordState_JSON_none相当はnullで返す(t *testing.T) {
 
 	// Then
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"score":1000000,"clear_lamp":"FAILED","combo_lamp":null,"full_chain":null}`, string(encoded))
+	assert.JSONEq(t, `{"Score":1000000,"ClearLamp":"FAILED","ComboLamp":null,"FullChain":null,"IsClear":null}`, string(encoded))
 }
 
-func TestPlayerDataRecordChange_JSON_newではbeforeがnullになる(t *testing.T) {
+func TestPlayerDataRecordChange_newではBeforeがnilになる(t *testing.T) {
 	// Given
 	change := api_internal.PlayerDataRecordChange{
 		RecordType: "standard",
@@ -711,8 +798,8 @@ func TestPlayerDataRecordChange_JSON_newではbeforeがnullになる(t *testing.
 
 	// Then
 	require.NoError(t, err)
-	assert.Contains(t, string(encoded), `"before":null`)
-	assert.Contains(t, string(encoded), `"combo_lamp":null`)
+	assert.Contains(t, string(encoded), `"Before":null`)
+	assert.Contains(t, string(encoded), `"ComboLamp":null`)
 }
 
 func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *testing.T) {
@@ -721,12 +808,14 @@ func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *t
 		Overall: service.PlayerRecordStatistics{TotalHighScore: 2000000, Achievements: service.RecordAchievementStatistics{FC: 2, SS: 2, SPlus: 3, S: 4}},
 		ByDifficulty: map[string]service.PlayerRecordStatistics{
 			"MASTER": {TotalHighScore: 2000000, Achievements: service.RecordAchievementStatistics{FC: 2, SS: 2}},
+			"WE":     {TotalHighScore: 990000, Achievements: service.RecordAchievementStatistics{FC: 1, SPlus: 1, S: 1}},
 		},
 	}
 	after := service.PlayerRecordStatisticsSnapshot{
 		Overall: service.PlayerRecordStatistics{TotalHighScore: 1010000, Achievements: service.RecordAchievementStatistics{AJ: 1, FC: 1, MAX: 1, SS: 1, SPlus: 2, S: 3}},
 		ByDifficulty: map[string]service.PlayerRecordStatistics{
 			"MASTER": {TotalHighScore: 1010000, Achievements: service.RecordAchievementStatistics{AJ: 1, FC: 1, MAX: 1, SS: 1}},
+			"WE":     {TotalHighScore: 1009000, Achievements: service.RecordAchievementStatistics{FC: 1, SSSPlus: 1, SPlus: 1, S: 1}},
 		},
 	}
 
@@ -739,10 +828,12 @@ func TestBuildPlayerDataStatisticsDiff_登録前後の差分を集計する(t *t
 	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 3, After: 2, Delta: -1}, statistics.Overall.RecordStatistics.SPlus)
 	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 4, After: 3, Delta: -1}, statistics.Overall.RecordStatistics.S)
 	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 0, After: 1, Delta: 1}, statistics.ByDifficulty["MASTER"].RecordStatistics.AJ)
-	assert.Len(t, statistics.ByDifficulty, 5)
+	assert.Equal(t, api_internal.PlayerDataInt64Diff{Before: 990000, After: 1009000, Delta: 19000}, statistics.ByDifficulty["WE"].TotalHighScore)
+	assert.Equal(t, api_internal.PlayerDataIntDiff{Before: 0, After: 1, Delta: 1}, statistics.ByDifficulty["WE"].RecordStatistics.SSSPlus)
+	assert.Len(t, statistics.ByDifficulty, 6)
 }
 
-func TestPlayerDataResult_JSON_changesとskippedRecordsは空配列で返す(t *testing.T) {
+func TestPlayerDataResult_changesとskippedRecordsは空スライスで返す(t *testing.T) {
 	// Given
 	result := api_internal.PlayerDataResult{
 		PlayerID:       42,
@@ -757,11 +848,11 @@ func TestPlayerDataResult_JSON_changesとskippedRecordsは空配列で返す(t *
 
 	// Then
 	require.NoError(t, err)
-	assert.Contains(t, string(encoded), `"changes":[]`)
-	assert.Contains(t, string(encoded), `"skipped_records":[]`)
+	assert.Contains(t, string(encoded), `"Changes":[]`)
+	assert.Contains(t, string(encoded), `"SkippedRecords":[]`)
 }
 
-func TestPlayerDataStatistics_JSON固定5難易度と全差分フィールドを返す(t *testing.T) {
+func TestPlayerDataStatistics_固定5難易度とWORLDSENDと全差分フィールドを保持する(t *testing.T) {
 	// Given
 	statistics := buildPlayerDataStatisticsDiff(
 		service.PlayerRecordStatisticsSnapshot{},
@@ -773,14 +864,14 @@ func TestPlayerDataStatistics_JSON固定5難易度と全差分フィールドを
 
 	// Then
 	require.NoError(t, err)
-	for _, difficulty := range service.PlayerRecordDifficultyNames() {
+	for _, difficulty := range service.PlayerRecordStatisticsGroupNames() {
 		assert.Contains(t, string(encoded), `"`+difficulty+`"`)
 	}
-	assert.Contains(t, string(encoded), `"total_high_score":{"before":0,"after":0,"delta":0}`)
-	assert.Contains(t, string(encoded), `"record_statistics":{"aj":`)
-	assert.Contains(t, string(encoded), `"s_plus":{"before":0,"after":0,"delta":0}`)
-	assert.Contains(t, string(encoded), `"s":{"before":0,"after":0,"delta":0}`)
-	assert.NotContains(t, string(encoded), `"lamp_counts"`)
+	assert.Contains(t, string(encoded), `"TotalHighScore":{"Before":0,"After":0,"Delta":0}`)
+	assert.Contains(t, string(encoded), `"RecordStatistics":{"AJ":`)
+	assert.Contains(t, string(encoded), `"SPlus":{"Before":0,"After":0,"Delta":0}`)
+	assert.Contains(t, string(encoded), `"S":{"Before":0,"After":0,"Delta":0}`)
+	assert.NotContains(t, string(encoded), `"LampCounts"`)
 }
 
 func TestPlayerRecordStateDTO_マスタ欠損時はランプ名をnullで返す(t *testing.T) {

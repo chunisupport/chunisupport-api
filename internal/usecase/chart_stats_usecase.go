@@ -23,6 +23,44 @@ type ChartStatsUsecase interface {
 	// または "WORLD'S END" である必要があります。
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetChartStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartStats, error)
+
+	// GetChartBestSlotStatsByDisplayIDAndDifficulty は指定譜面のベスト枠採用統計を取得します。
+	GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartBestSlotStats, error)
+}
+
+// GetChartBestSlotStatsByDisplayIDAndDifficulty は通常譜面のレート帯別ベスト枠採用統計を返します。
+func (u *chartStatsUsecaseImpl) GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx context.Context, displayID, difficultyName string, requesterAccountTypeID *int) (*entity.SingleChartBestSlotStats, error) {
+	if difficultyName == info.StatsDifficultyWorldsend {
+		return nil, ErrInvalidDifficulty
+	}
+
+	song, err := u.songRepo.FindByDisplayID(ctx, u.executor, displayID)
+	if err != nil {
+		return nil, err
+	}
+	if !song.IsActive() && (requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor)) {
+		return nil, repository.ErrSongNotFound
+	}
+
+	entry, err := u.findChartEntryByDifficulty(song, difficultyName)
+	if err != nil {
+		return nil, err
+	}
+	stats, err := u.statsRepo.FindChartBestSlotStatsByChartIDs(ctx, u.executor, []int{entry.id})
+	if err != nil {
+		return nil, err
+	}
+
+	ratingBands := u.masterProvider.RatingBands()
+	bandOrder := make(map[int]int, len(ratingBands))
+	for _, band := range ratingBands {
+		bandOrder[band.ID] = band.SortOrder
+	}
+	slices.SortFunc(stats, func(a, b *entity.ChartBestSlotStatsByRatingBand) int {
+		return cmp.Compare(bandOrder[a.RatingBandID], bandOrder[b.RatingBandID])
+	})
+
+	return &entity.SingleChartBestSlotStats{SongID: song.DisplayID, Difficulty: entry.key, Stats: stats}, nil
 }
 
 type chartStatsUsecaseImpl struct {
@@ -31,8 +69,7 @@ type chartStatsUsecaseImpl struct {
 	statsRepo          repository.ChartStatsRepository
 	masterCache        repository.SongMasterProvider
 	masterProvider     repository.ChartStatsMasterProvider
-	defaultExecutor    repository.Executor
-	statsExecutor      repository.Executor
+	executor           repository.Executor
 }
 
 // NewChartStatsUsecase は ChartStatsUsecase の実装を生成します。
@@ -42,8 +79,7 @@ func NewChartStatsUsecase(
 	statsRepo repository.ChartStatsRepository,
 	masterCache repository.SongMasterProvider,
 	masterProvider repository.ChartStatsMasterProvider,
-	defaultExecutor repository.Executor,
-	statsExecutor repository.Executor,
+	executor repository.Executor,
 ) ChartStatsUsecase {
 	return &chartStatsUsecaseImpl{
 		songRepo:           songRepo,
@@ -51,8 +87,7 @@ func NewChartStatsUsecase(
 		statsRepo:          statsRepo,
 		masterCache:        masterCache,
 		masterProvider:     masterProvider,
-		defaultExecutor:    defaultExecutor,
-		statsExecutor:      statsExecutor,
+		executor:           executor,
 	}
 }
 
@@ -64,7 +99,7 @@ type chartEntry struct {
 // GetSongStatsByDisplayID は指定されたDisplayIDの譜面統計を取得します。
 // requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SongChartStats, error) {
-	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	song, err := u.songRepo.FindByDisplayID(ctx, u.executor, displayID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +153,7 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 
 func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *entity.Song) ([]chartEntry, error) {
 	if song.IsWorldsend {
-		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, song.DisplayID)
+		worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.executor, song.DisplayID)
 		if err != nil {
 			if errors.Is(err, repository.ErrSongNotFound) {
 				return nil, repository.ErrSongNotFound
@@ -148,10 +183,10 @@ func (u *chartStatsUsecaseImpl) buildChartEntries(ctx context.Context, song *ent
 
 func (u *chartStatsUsecaseImpl) findStatsRows(ctx context.Context, isWorldsend bool, chartIDs []int) ([]*entity.ChartStatsByRatingBand, error) {
 	if isWorldsend {
-		return u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
+		return u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.executor, chartIDs)
 	}
 
-	return u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, chartIDs)
+	return u.statsRepo.FindChartStatsByChartIDs(ctx, u.executor, chartIDs)
 }
 
 // GetChartStatsByDisplayIDAndDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
@@ -162,7 +197,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		return u.getWorldsendSingleChartStats(ctx, displayID, requesterAccountTypeID)
 	}
 
-	song, err := u.songRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	song, err := u.songRepo.FindByDisplayID(ctx, u.executor, displayID)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +215,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 		return nil, err
 	}
 
-	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.statsExecutor, []int{entry.id})
+	statsRows, err := u.statsRepo.FindChartStatsByChartIDs(ctx, u.executor, []int{entry.id})
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +235,7 @@ func (u *chartStatsUsecaseImpl) GetChartStatsByDisplayIDAndDifficulty(ctx contex
 // getWorldsendSingleChartStats はWORLD'S END譜面の統計をworldsendChartRepo経由で取得します。
 // songRepo.FindByDisplayIDがWORLD'S END楽曲を除外するため、専用メソッドで処理します。
 func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.SingleChartStats, error) {
-	worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.defaultExecutor, displayID)
+	worldsend, err := u.worldsendChartRepo.FindByDisplayID(ctx, u.executor, displayID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +249,7 @@ func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context
 
 	ratingBands := u.masterProvider.RatingBands()
 
-	statsRows, err := u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.statsExecutor, []int{worldsend.Chart.ID})
+	statsRows, err := u.statsRepo.FindWorldsendChartStatsByChartIDs(ctx, u.executor, []int{worldsend.Chart.ID})
 	if err != nil {
 		return nil, err
 	}

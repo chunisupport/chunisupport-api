@@ -4,14 +4,17 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
+	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // ChunirecHandler はchunirec互換APIのハンドラです
@@ -19,20 +22,25 @@ type ChunirecHandler struct {
 	songUsecase usecase.SongUsecase
 	userUsecase usecase.UserUsecase
 	masterCache *masterdata.Cache
+	location    *time.Location
 }
 
 // NewChunirecHandler はChunirecHandlerの新しいインスタンスを返します
-func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache) *ChunirecHandler {
+func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache, location *time.Location) *ChunirecHandler {
+	if location == nil {
+		location = time.UTC
+	}
 	return &ChunirecHandler{
 		songUsecase: songUsecase,
 		userUsecase: userUsecase,
 		masterCache: masterCache,
+		location:    location,
 	}
 }
 
 // GetMusicShowAll は全楽曲情報をchunirec互換形式で返します
 // GET /compat/chunirec/2.0/music/showall
-func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
+func (h *ChunirecHandler) GetMusicShowAll(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
@@ -50,7 +58,7 @@ func (h *ChunirecHandler) GetMusicShowAll(c echo.Context) error {
 
 // GetMusicShow は指定されたDisplay IDの楽曲情報をchunirec互換形式で返します
 // GET /compat/chunirec/2.0/music/show?id=xxx
-func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
+func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	// クエリパラメータ id を取得
@@ -81,24 +89,55 @@ func (h *ChunirecHandler) GetMusicShow(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
-// GET /compat/chunirec/2.0/users/show
-func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
+// GetRecordsShowAll は指定ユーザーの通常譜面全レコードをchunirec互換形式で返します。
+// GET /compat/chunirec/2.0/records/showall
+func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	// クエリパラメータ user_name を取得
-	username := c.QueryParam("user_name")
+	username, apiErr := h.resolveTargetUsername(c)
+	if apiErr != nil {
+		return apiErr
+	}
 
-	// user_name が指定されていない場合、APIトークン所有者のユーザー名を使用
-	if username == "" {
-		if userEntity, ok := c.Get("userEntity").(*entity.User); ok && userEntity != nil {
-			username = userEntity.Username.String()
-		} else {
-			// APIトークン認証必須のエンドポイントなので、ここには到達しないはず
-			return apierror.ErrUnauthorized
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserProfileRecordView(ctx, username, requester, false)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrUserNotFound):
+			return apierror.ErrUserNotFound
+		case errors.Is(err, usecase.ErrUserPrivate):
+			return apierror.ErrUserNotFound
+		default:
+			slog.Error("failed to get user records", "username", username, "error", err)
+			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}
-	validUsername, apiErr := handler.ValidateUsername(username)
+
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
+	if err != nil {
+		slog.Error("failed to get songs for chunirec records", "username", username, "error", err)
+		return apierror.ErrInternalError.WithInternal(err)
+	}
+
+	var records []*dto.PlayerRecordDTO
+	if result != nil && result.Records != nil {
+		records = internalhandler.ToPlayerRecordDTOs(result.Records.All)
+	}
+	response := ToRecordsShowAllResponse(records, h.genresBySongID(songs), h.location)
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
+// GET /compat/chunirec/2.0/users/show
+func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
+	ctx := c.Request().Context()
+
+	validUsername, apiErr := h.resolveTargetUsername(c)
 	if apiErr != nil {
 		return apiErr
 	}
@@ -119,13 +158,40 @@ func (h *ChunirecHandler) GetUserShow(c echo.Context) error {
 			// セキュリティ: 非公開と未発見を区別しない
 			return apierror.ErrUserNotFound
 		default:
-			slog.Error("failed to get user profile", "username", username, "error", err)
+			slog.Error("failed to get user profile", "username", validUsername, "error", err)
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}
 
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(result, h.masterCache)
+	response := ToChunirecUserDTO(internalhandler.ToUserProfileWithRecordsDTO(result), h.masterCache, h.location)
 
 	return c.JSON(http.StatusOK, response)
+}
+
+func (h *ChunirecHandler) resolveTargetUsername(c *echo.Context) (string, *apierror.APIError) {
+	username := c.QueryParam("user_name")
+	if username == "" {
+		if userEntity, ok := c.Get("userEntity").(*entity.User); ok && userEntity != nil {
+			username = userEntity.Username.String()
+		} else {
+			return "", apierror.ErrUnauthorized
+		}
+	}
+
+	return handler.ValidateUsername(username)
+}
+
+func (h *ChunirecHandler) genresBySongID(songs []*entity.Song) map[string]string {
+	genres := make(map[string]string, len(songs))
+	masters := h.masterCache.SongMasters()
+	for _, song := range songs {
+		if song == nil || song.GenreID == nil {
+			continue
+		}
+		if genreName, ok := masters.GenreNamesByID[*song.GenreID]; ok {
+			genres[song.DisplayID] = genreName
+		}
+	}
+	return genres
 }

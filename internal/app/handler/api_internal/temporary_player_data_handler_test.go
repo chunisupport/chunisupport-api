@@ -12,10 +12,10 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
+	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,12 +31,12 @@ func (m *mockTemporaryPlayerDataUsecase) Create(ctx context.Context, input useca
 	return args.Get(0).(*usecase.CreateTemporaryPlayerDataOutput), args.Error(1)
 }
 
-func (m *mockTemporaryPlayerDataUsecase) Commit(ctx context.Context, input usecase.CommitTemporaryPlayerDataInput) (*api_internal.PlayerDataResult, error) {
+func (m *mockTemporaryPlayerDataUsecase) Commit(ctx context.Context, input usecase.CommitTemporaryPlayerDataInput) (*playerdataresult.Result, error) {
 	args := m.Called(ctx, input)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*api_internal.PlayerDataResult), args.Error(1)
+	return args.Get(0).(*playerdataresult.Result), args.Error(1)
 }
 
 func gzipJSON(t *testing.T, payload any) []byte {
@@ -149,7 +149,7 @@ func TestTemporaryPlayerDataHandler_CommitTemporaryData(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 1})
 
-	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "11111111-1111-4111-8111-111111111111"}).Return(&api_internal.PlayerDataResult{PlayerID: 1}, nil).Once()
+	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "11111111-1111-4111-8111-111111111111"}).Return(&playerdataresult.Result{PlayerID: 1}, nil).Once()
 
 	err := h.CommitTemporaryData(c)
 	require.NoError(t, err)

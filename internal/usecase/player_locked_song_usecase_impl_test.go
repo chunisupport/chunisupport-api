@@ -33,6 +33,10 @@ func (s *stubPlayerLockedSongPlayerRepository) FindByUserID(ctx context.Context,
 	return s.player, nil
 }
 
+func (s *stubPlayerLockedSongPlayerRepository) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.FindByUserID(ctx, exec, userID)
+}
+
 func (s *stubPlayerLockedSongPlayerRepository) FindHonorsByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerHonor, error) {
 	return nil, nil
 }
@@ -82,6 +86,10 @@ func (s *spyPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec rep
 	return nil
 }
 
+func (s *spyPlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	return nil
+}
+
 type stubPlayerSongIDResolver struct {
 	songID *int
 }
@@ -106,6 +114,9 @@ type stubPlayerRecordRepositoryForLockedSong struct {
 }
 
 func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
+	return s.records, nil
+}
+func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDAndSongDisplayID(ctx context.Context, exec repository.Executor, playerID int, displayID string) ([]*entity.PlayerRecord, error) {
 	return s.records, nil
 }
 func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDForRating(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
@@ -141,6 +152,14 @@ func (s *stubPlayerDataRepositoryForLockedSong) GetOverpowerTargetStatsWithExecu
 	return s.GetOverpowerTargetStats(ctx, filter)
 }
 
+func (s *stubPlayerDataRepositoryForLockedSong) SaveLatestUpdate(_ context.Context, _ repository.Executor, _ *entity.PlayerLatestUpdate) error {
+	return nil
+}
+
+func (s *stubPlayerDataRepositoryForLockedSong) FindLatestUpdateByPlayerID(_ context.Context, _ int) (*entity.PlayerLatestUpdate, error) {
+	return nil, repository.ErrPlayerLatestUpdateNotFound
+}
+
 type stubPlayerLockedSongQueryService struct {
 	gotPlayerID int
 	rows        []*PlayerLockedSongReadModel
@@ -157,6 +176,7 @@ func TestPlayerLockedSongList(t *testing.T) {
 		targetUser  *entity.User
 		player      *entity.Player
 		requester   *entity.User
+		friend      bool
 		wantErr     error
 		wantRowsHit bool
 	}{
@@ -185,6 +205,14 @@ func TestPlayerLockedSongList(t *testing.T) {
 			wantErr:    ErrUserPrivate,
 		},
 		{
+			name:        "非公開ユーザーを承認済みフレンドが取得できる",
+			targetUser:  &entity.User{ID: 100, IsPrivate: true},
+			player:      &entity.Player{ID: 10},
+			requester:   &entity.User{ID: 200},
+			friend:      true,
+			wantRowsHit: true,
+		},
+		{
 			name:    "存在しないユーザーは見つからないエラー",
 			wantErr: ErrUserNotFound,
 		},
@@ -205,10 +233,15 @@ func TestPlayerLockedSongList(t *testing.T) {
 				},
 			}
 			playerRepo := &stubPlayerLockedSongPlayerRepository{player: tt.player}
+			friendshipRepo := newStubFriendshipRepo()
+			if tt.friend {
+				friendshipRepo.exists[[2]int{tt.requester.ID, tt.targetUser.ID}] = true
+			}
 			u := &playerLockedSongUsecase{
-				userRepo:     userRepo,
-				playerRepo:   playerRepo,
-				queryService: queryService,
+				userRepo:       userRepo,
+				playerRepo:     playerRepo,
+				friendshipRepo: friendshipRepo,
+				queryService:   queryService,
 			}
 
 			// When

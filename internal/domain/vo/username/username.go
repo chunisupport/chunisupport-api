@@ -56,24 +56,16 @@ func (u UserName) Value() (driver.Value, error) {
 	return u.value, nil
 }
 
+// Scan はDBから取得した値を検証し、UserNameを復元します。
+// 不正なDB値から値オブジェクトの不変条件が壊れないよう、NULLもエラーとして扱います。
 func (u *UserName) Scan(src any) error {
 	if src == nil {
-		// DBからnullが来た場合は空のUserNameを設定
-		// ただしバリデーションは行わない（DB上のデータは信頼する）
-		*u = UserName{value: ""}
-		return nil
+		return ErrEmpty
 	}
 
 	s, err := vo.ToString(src)
 	if err != nil {
 		return err
-	}
-
-	// DBから取得した値はバリデーション済みとみなす
-	// 空文字の場合もそのまま設定
-	if s == "" {
-		*u = UserName{value: ""}
-		return nil
 	}
 
 	userName, err := NewUserName(s)

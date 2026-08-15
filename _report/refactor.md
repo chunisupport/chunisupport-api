@@ -1,21 +1,33 @@
-# リファクタリング指摘書 (2026-06-14時点)
+# リファクタリング指摘書 (2026-07-10時点 / セキュリティ再確認 2026-07-23)
 
-本ドキュメントは、現在のコードベースを再確認したうえで、**まだ残っている改善点のみ**を整理したものです。
-解消済み、または根拠が現状と一致しなくなった項目は削除しました。
+本ドキュメントは、現行コードベースを再確認したうえで、**未解決の改善点のみ**を整理したものです。
+解消済みの項目、現行実装では成立しない項目、他項目と重複する指摘は削除または統合しています。
+2026-07-23 に前日のセキュリティ追記を現行仕様・実装と再照合し、実害の根拠がある未解決項目だけに整理しました。
 
 ## 優先度定義
+
 - **Critical (緊急)**: セキュリティ上の重大な欠陥、または主要機能の停止に直結する問題。即時対応が必要。
-- **High (高)**: アーキテクチャの根幹に関わる、またはセキュリティ・安定性に重大なリスクがある項目。優先して対応が必要。
-- **Medium (中)**: 保守性や拡張性を阻害している項目。機能追加の前に解消することが望ましい。
-- **Low (低)**: コード品質や一貫性に関わる項目。余裕がある際に対応する。
+- **High (高)**: データ破損・認可不備・アーキテクチャの根幹に関わる問題。優先して対応が必要。
+- **Medium (中)**: 安定性、性能、保守性、API契約を明確に損なう問題。機能追加の前に解消することが望ましい。
+- **Low (低)**: コード品質や一貫性に関わる問題。計画的に解消する。
 
 ## 対象範囲
-- Goコード: `internal/app`, `internal/domain`, `internal/usecase`, `internal/infra`, `internal/dto`, `internal/info`
-- ドキュメント: `docs/API.md`, `docs/domain_model_specification.md`
+
+- Goコード: `cmd`, `internal` 配下の本番コードおよび関連テスト
+- データベース: `migration` 配下のマイグレーション、`migration/schema_mysql.sql`
+- ドキュメント: `README.md`, `ARCHITECTURE.md`, `docs/*.md`
 - レポート: `_report/*.md`
 
+## 確認結果
+
+- `go test ./...`: 成功
+- `go vet ./...`: 成功
+- コンパイルや既存テストでは検出されない、認可・並行更新・境界設計・API契約の問題を中心に記載しています。
+
 ## 作業者へ注意
+
 解決した事項は「解決済み」と追記せず、**必ずこの文書から削除してください**。
+過去の適用済みマイグレーションは変更せず、必要なスキーマ変更は新しいマイグレーションとして追加してください。
 
 ---
 
@@ -25,75 +37,79 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **SEC-03** | **Medium** | `#nosec` コメントの妥当性レビュー不足 | `internal/app/apierror/codes.go` の `G101` 抑制はコメント根拠がなく、`internal/usecase/player_data_usecase_impl.go` の `G115` 抑制も説明不足です。`internal/dto/worldsend_dto.go` や `internal/infra/models/*record*_model.go` の `G115` は理由付きですが、`Value()` 失敗時の扱いも含めた棚卸しが未完了です。 |
-| **SEC-04** | **Medium** | HTTPサーバーのタイムアウト未設定 | `internal/app/server.go` で `echo.Start` を直接使っており、`ReadHeaderTimeout` / `ReadTimeout` / `WriteTimeout` / `IdleTimeout` が明示されていません。Slowloris 系のリソース枯渇対策として、`http.Server` を明示生成してタイムアウトを設定すべきです。 |
-| **SEC-05** | **Medium** | DB接続のTLS設定がない | `internal/infra/db/connection.go` のMySQL DSNに `tls` 指定がありません。DBが同一ホストまたは信頼できる閉域網に限定されない場合、通信経路上の盗聴・改ざんリスクがあります。本番設定ではTLS必須化を検討すべきです。 |
-| **SEC-06** | **Low** | CORS設定の危険値検証がない | `internal/app/router.go` のCORSは設定値をそのまま反映しています。`allow_credentials=true` と広すぎる `allow_origins` の組み合わせを設定時に拒否するなど、起動時検証を追加すべきです。 |
-| **SEC-07** | **Low** | ログ出力のサニタイズ方針が限定的 | `internal/app/middleware/error_handler.go` ではエラー文字列の改行除去がありますが、全ログ出力で統一された機微情報・制御文字サニタイズ方針は見当たりません。`router.go` の health check では `slog.Error("Database health check failed: " + err.Error())` のような文字列連結ログも残っています。ログ注入やトークン・UID等の混入を防ぐため、ログ出力ルールを統一すべきです。 |
+| **SEC-04** | **Medium** | HTTPタイムアウトがEchoの既定値に依存 | `internal/app/server.go:56-60` は `echo.StartConfig` へ移行済みで、Echo v5.2.1は内部で `ReadTimeout=30秒` を設定しています。`ReadHeaderTimeout` / `IdleTimeout` は標準ライブラリのフォールバックでこの値を使いますが、`WriteTimeout` は0のままです。依存ライブラリの既定値に任せず、`BeforeServeFunc` で `ReadHeaderTimeout` / `ReadTimeout` / `WriteTimeout` / `IdleTimeout` を用途に合わせて明示すべきです。 |
+| **SEC-05** | **Medium** | DB接続のTLS設定がない | `internal/infra/db/connection.go:78-84` のMySQL DSNに `tls` 指定がなく、`internal/config/config.go:113-125` にもTLS設定がありません。DBが同一ホストまたは信頼できる閉域網に限定されない環境では、TLSを設定可能にして本番で必須化すべきです。 |
+| **SEC-07** | **Low** | ログの機微情報・サニタイズ方針が統一されていない | `internal/usecase/firebase_auth_usecase.go:107`、`internal/usecase/user_credential_usecase.go:179-210` などがFirebase UIDを記録します。標準・chunirec・reiwaの各エラーハンドラーにはCR/LF除去が個別実装されていますが、全ログ属性へ適用される共通方針はありません。識別子の記録要否、マスキング、制御文字除去、保存期間、閲覧権限を統一すべきです。 |
+| **SEC-08** | **High** | フレンド申請一覧が非公開ユーザー情報を未承認相手へ開示 | 非公開情報は本人または双方向 `accepted` のフレンドだけが閲覧可能という仕様ですが、`internal/infra/repository/friendship_repository_impl.go:135-150` の送信申請一覧は相手の公開設定や承認状態を確認せず、プレイヤー名・レベル・レーティングをJOINします。攻撃者は非公開ユーザーへ申請した直後に送信一覧を取得するだけで概要を参照できます。`pending` 用の読み取りモデルを分離し、未承認の非公開相手についてはプレイヤー概要を返さない設計にすべきです。 |
+| **SEC-09** | **Medium** | フレンド申請が非公開ユーザー名の存在オラクルになる | `docs/friendship.md:9` は存在しないユーザーと非公開ユーザーをレスポンス上で区別しない方針ですが、`internal/usecase/friendship_usecase_impl.go:60-110` の `SendRequest` は不存在なら404、存在すれば204または409等を返すため、認証済み利用者が完全一致の候補名についてアカウントの存在を判別できます。さらに申請作成にはユーザー単位レート制限がありません。非公開ユーザーを申請可能にするかを先に仕様として決め、申請不可なら不存在と同じ応答へ正規化し、申請可能なら不存在・重複を含めた外部応答と申請一覧から存在を判別できない設計にしたうえで、ユーザー単位レート制限を追加すべきです。申請スパム対策は `PERF-008` とあわせて扱います。 |
+| **SEC-10** | **Medium** | APIトークンに有効期限・権限スコープがない | APIトークンは32バイト乱数で生成され、SHA-256ハッシュだけを保存します。現行実装では名前付きトークンを1ユーザー最大10件まで発行でき、個別削除と `last_used_at` の記録もあります。一方、`expires_at` と権限スコープはなく、漏えいしたトークンは手動削除まで有効です。また `/v1` には EDITOR / ADMIN 向けの更新APIもあるため、トークンは所有ユーザーの現在のロール権限をそのまま行使できます。有効期限を導入し、既定を読み取り専用とした用途別スコープを定義するか、長期・全権限トークンを許容する明示的な運用方針と失効手順を定めるべきです。 |
+| **SEC-15** | **Low** | 管理者によるユーザー削除の監査ログに実行者が残らない | `DeleteUser` は strict な Firebase 認証、ADMIN ロールのミドルウェア、Usecase内の再検証で認可されています。管理操作に recent sign-in を必須とする要件がない限り、その欠如だけを脆弱性とは扱いません。一方、`internal/usecase/user_usecase_impl.go:411` の成功ログは削除対象のユーザー名・IDだけを記録し、実行した管理者を記録しません。少なくとも実行者IDと削除対象IDを同じ監査イベントへ残し、`OPS-001` のリクエストIDとも関連付けるべきです。step-up認証を導入する場合は、管理操作全体の認証強度ポリシーとして別途定義します。 |
 
 ### パフォーマンス (PERF)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **PERF-003** | **Medium** | ユーザーレコードAPIが全件返却前提 | `GetUserProfileWithRecords` と `GetUserProfileRecordView` は `records.all` と `records.worldsend` をまとめて返しており、ページネーションがありません。`view=rating` で軽量化できる経路はありますが、レコード一覧系はユーザーの蓄積データ増加に比例してレスポンスが肥大化します。 |
-| **PERF-004** | **Medium** | レコード表示系の `FindByPlayerID` / `FindByPlayerID`(WORLD'S END) が全件取得 | `user_usecase_impl.go` の profile / record 系では通常譜面・WORLD'S ENDともに `FindByPlayerID` で全件取得してからDTO化や未プレイ補完を行っています。`view=rating` では `FindByPlayerIDForRating` に分離済みですが、レコード表示用途は用途別取得への分割余地があります。 |
-| **PERF-005** | **Low** | 楽曲一覧APIが全件返却前提 | `song_handler.go` / `v1/song_handler.go` / `worldsend_handler.go` / `v1_worldsend_handler.go` の楽曲一覧はページネーションなしで全件返却します。マスターデータ的用途として許容する判断もあり得ますが、データ増加時のレスポンス肥大化リスクは `PERF-003` と同様に棚卸しすべきです。 |
+| **PERF-003** | **Medium** | ユーザーレコードAPIが通常・WORLD'S ENDを全件返却 | `GetUserProfileWithRecords` / `GetUserProfileRecordView` は通常譜面とWORLD'S ENDの全レコードを取得・DTO化し、リポジトリクエリにも `LIMIT` がありません。楽曲単位APIとrating viewは分離済みですが、一覧レスポンスは収録譜面数に比例して肥大化します。用途別エンドポイントまたはページネーションを導入すべきです。旧 `PERF-004` は本項目の実装原因と重複するため統合しました。 |
+| **PERF-005** | **Low** | 楽曲一覧・互換マスタAPIが毎回全楽曲と全譜面を生成 | internal/v1の楽曲一覧に加え、`internal/app/handler/compat/chunirec/chunirec_handler.go:36-49` と `internal/app/handler/compat/reiwa/reiwa_handler.go:29-40` も全楽曲・全譜面を取得します。互換仕様上ページネーションできない場合は、更新時キャッシュ、ETag、Last-ModifiedなどでDB取得・変換・転送を抑制すべきです。 |
+| **PERF-006** | **Medium** | rating viewがOP対象判定のため通常レコードを重複取得 | `internal/usecase/user_usecase_impl.go:273-291` は `FindByPlayerIDForRating` の直後に、OP対象フラグ算出だけのため `FindByPlayerID` で通常レコード全件を再取得します。OP対象譜面IDを含む用途別クエリ、または1回の取得で両用途を満たす読み取りモデルにすべきです。 |
+| **PERF-007** | **Medium** | chunirec互換APIがレスポンスに不要な集約を全件取得 | `/users/show` は `GetUserProfileWithRecords` を呼びながらレコードを一切使用しません。`/records/showall` はRecordView経由でWORLD'S END、称号、動的OP計算まで取得して捨て、さらにジャンル解決だけのため全楽曲・全譜面を取得します（`internal/app/handler/compat/chunirec/chunirec_handler.go:90-123,145-159`）。各レスポンス専用のquery portを用意し、必要列を1回で取得すべきです。 |
+| **PERF-008** | **Medium** | フレンド受信申請が無上限かつ全件返却 | 上限100件は送信者側の外向き `pending` / `accepted` だけに適用され、1ユーザーが受信できる申請数には上限がありません。`internal/infra/repository/friendship_repository_impl.go:117-132` の受信一覧にも `LIMIT` がないため、多数アカウントから集中申請されるとレスポンスとDB負荷が無界に増えます。受信上限、ページネーション、申請作成のユーザー単位レート制限を組み合わせるべきです。 |
+
+### データ整合性・並行実行 (DATA)
+
+| ID | 優先度 | 概要 | 詳細・対応方針 |
+|---|---|---|---|
+| **DATA-001** | **High** | 古いプレイヤーデータで新しい状態を巻き戻せる | `internal/usecase/player_data_usecase_impl.go:257,480-530` はペイロードの `updated_at` を `DataCollectedAt` / `UpdatedAt` へ無条件設定し、既存値との前後関係を比較しません。`internal/infra/repository/player_data_repository_impl.go:357-397` のレコードUPSERTもスコア・ランプ・枠を無条件に置換します。古い一時データの遅延commitや並行登録の順序逆転で、プロフィールと現行ベストを古いスナップショットへ戻せます。トランザクション冒頭で対象Playerをロックし、収集時刻が既存値以下なら冪等扱いまたは競合として拒否し、SQL側にも条件を持たせるべきです。 |
+| **DATA-002** | **High** | 譜面定数PATCHが未ロックの集約全体を上書き | `internal/usecase/song_usecase_impl.go:228-242` は非ロックの `FindByOfficialIdx` 後に、`internal/infra/repository/song_repository_impl.go:423-466` の全列・全譜面 `Save` を実行します。読み取り後に削除や別編集がcommitされると、古い `IsDeleted`・タイトル・他譜面で再上書きできます。また `Song.ChangeChartConstant` は `MaxChartConst` / `IsMaxOPUnknown` / `OpTargetDifficultyID` を再集約しないため、直後の200レスポンスも変更譜面とトップレベル値が矛盾します。集約を `FOR UPDATE` で復元し、変更メソッド内で派生値まで再計算してから保存すべきです。 |
+| **DATA-003** | **High** | 未解禁曲更新が古いPlayer集約を保存して並行更新を失う | `internal/usecase/player_locked_song_usecase_impl.go` の `Lock` / `Unlock` / `Batch` はPlayerをトランザクション外で読み、子行変更とOP再計算後にその古いPlayerを `Save` します。`PlayerRepository.Save` はOPだけでなく名前・レベル・公式値・`data_collected_at` 等も更新するため、並行するデータ登録を巻き戻せます。複数のLock/Unlock同士でも、各トランザクションが片側変更しか見ないOP値を後勝ち保存する可能性があります。トランザクション冒頭でPlayer行をロック・再読込し、全経路のロック順をPlayer→子行へ統一すべきです。 |
+| **DATA-004** | **Medium** | 再計算バッチのマスタ「スナップショット」が原子的でない | `internal/infra/repository/player_data_batch_repository_impl.go:23-69` はversion、songs、charts、slots、Player上限を5本のautocommit SELECTで取得します。途中で編集がcommitされると、旧楽曲属性と新譜面定数が混在したrun全体スナップショットになります。`REPEATABLE READ` または明示的なconsistent snapshotを使うread-only transactionでまとめて取得し、そのトランザクションから構築した値だけをrun中に使用すべきです。 |
 
 ### 信頼性・運用 (OPS)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **OPS-001** | **Low** | リクエストIDがない | `X-Request-ID` 付与やログへの相関ID埋め込みがなく、障害解析時のトレース性が低い状態です。 |
-| **OPS-002** | **Low** | DBクエリの明示的タイムアウトなし | `context.Context` は伝播されていますが、`context.WithTimeout` 等による通常リクエスト中のDBアクセス上限時間設定が見当たりません。`router.go` の health check も `db.Ping()` を使っており、リクエストContextを使っていません。 |
+| **OPS-001** | **Low** | リクエストIDがない | `X-Request-ID` の受理・生成とログへの相関ID付与がなく、複数ログを1リクエスト単位で追跡できません。共通ミドルウェアで設定し、アプリケーションログとアクセスログへ同じ値を渡すべきです。 |
+| **OPS-002** | **Low** | 通常DBクエリにアプリケーション側タイムアウトがない | `context.Context` は伝播されていますが、`context.WithTimeout` はDB起動再試行などに限られ、通常リクエストのDBアクセス上限はありません。クライアント接続が維持された長時間クエリを抑止できるよう、ユースケースまたはトランザクション境界で設定可能な期限を設けるべきです。 |
 
 ### 実装品質・保守性 (QUAL)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **QUAL-002** | **Medium** | セキュリティヘッダー未設定 | Echo の `Secure` ミドルウェア相当の設定がなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` などの標準ヘッダーが不足しています。 |
-| **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows`, `*sqlx.Row` を直接公開しており、ドメイン層がインフラ実装詳細に依存しています。 |
+| **QUAL-002** | **Medium** | セキュリティヘッダーの付与元がコード上で保証されない | EchoのSecure相当ミドルウェアがなく、HSTS、`X-Content-Type-Options`、`X-Frame-Options` 等をアプリケーションでは設定していません。リバースプロキシで付与する方針ならインフラ設定と検証手順を文書化し、そうでなければ共通ミドルウェアで設定すべきです。 |
+| **QUAL-010** | **Medium** | Domain層の `Executor` が `sqlx` に依存 | `internal/domain/repository/executor.go` が `*sqlx.Rows` / `*sqlx.Row` とSQL実行APIを公開します。新設のFriendship・ランキング・お気に入り系portにも `Executor` 引数が広がり、Domainがインフラ実装詳細を定義する範囲が拡大しています。トランザクション境界をUsecase向け抽象へ切り出し、repository portから `sqlx` 型を排除すべきです。 |
+| **QUAL-011** | **Low** | 難易度文字列の大文字統一方針と実装・API仕様が不一致 | `internal/info/statistics.go:15-54` は難易度パスを小文字定数で定義し、検索に `strings.ToLower()` を使用します。AGENTS.mdの「DB・コード・API入出力で大文字統一」「比較に `ToLower` を使わない」方針と衝突しています。公開済みパスとの互換性を確認したうえで、正規化・定数・API.mdを一つの規約へ揃えるべきです。 |
 
-
-### アーキテクチャ・ドメイン (ARCH / DOM / DTO)
+### アーキテクチャ・ドメイン (ARCH / DOM)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **ARCH-002** | **Low** | `OfficialSongWithGenreDTO` に `db:` タグが残存 | `internal/dto/official_dto.go` の DTO がDBタグを持っています。DTO層に永続化都合が漏れており、さらに現状参照箇所も見当たりません。削除または `infra/models` への移動を検討すべきです。 |
-| **DOM-006** | **Medium** | `Goal` エンティティが `[]byte` でJSONを保持 | `internal/domain/entity/goal.go` の `AchievementParams` / `Attributes` はインフラ表現に引きずられたままです。型安全な表現への移行余地があります。 |
-| **DOM-007** | **Low** | 本番コードに `Must` 系Value Objectコンストラクタが残存 | AGENTS.md ではテストコードを除き `panic` を起こす `Must` 系関数を避ける方針ですが、`internal/domain/vo/username/username.go` / `reauthtoken/reauth_token.go` / `playername/playername.go` に `MustNew...` が定義されています。利用箇所は主にテストですが、本番パッケージの公開APIとして残っています。 |
-| **DTO-001** | **Low** | `GoalRequest` / `GoalResponse` が `map[string]any` 依存 | `internal/dto/api_internal/goal_dto.go` で型安全性がなく、スキーマの明確性も低い状態です。現状はUsecase側で厳しめに検証していますが、DTO設計としては弱いままです。 |
+| **ARCH-004** | **Medium** | フレンド認可依存を匿名interfaceで後注入 | User、ScoreHistory、LockedSong、FavoriteSongの各Usecaseはコンストラクタで `FriendshipRepository` を受け取らず、`internal/app/router.go:151-192` が匿名interfaceへの型アサーションで `SetFriendshipRepository` を呼びます。アサーション失敗時も起動を継続し、非公開フレンド閲覧だけが静かに404へ退行します。認可に必要な依存はコンストラクタ契約へ明示し、欠落時は生成エラーにすべきです。 |
+| **ARCH-005** | **Medium** | Player集約の永続化経路が部分更新と直接SQLへ分裂 | `internal/domain/repository/player_repository.go:25` に禁止方針と逆行する `UpdateCalculatedRatings` が残り、通常登録の `Save`、未解禁曲更新の `Save`、再計算バッチの直接UPDATEと更新経路が分散しています。並行更新時の所有列とロック規約が揃わない根因になっているため、Playerの変更メソッドとロック済み集約の `Save` へ統一し、バッチ固有の競合条件も同じ規約上で定義すべきです。 |
+| **DOM-006** | **Medium** | GoalのJSON表現がDomainからAPIまで型安全でない | `internal/domain/entity/goal.go` は `AchievementParams` / `Attributes` を `[]byte` で保持し、`internal/dto/api_internal/goal_dto.go` は対応値を `map[string]any` で公開します。インフラ表現がDomainへ入り、コンパイル時にスキーマを保証できません。achievement typeごとの値オブジェクトまたは明示的なunion型へ移し、永続化モデルだけでJSONへ変換すべきです。旧 `DTO-001` は本項目へ統合しました。 |
+| **DOM-007** | **Low** | 本番パッケージにpanicする `Must` コンストラクタが残存 | `username.MustNewUserName`、`reauthtoken.MustNew`、`playername.MustNewPlayerName` は本番パッケージの公開APIとして残っています。現行の非テストコードからは呼ばれていませんが、誤用余地をなくすためテストヘルパーへ移すか非公開化すべきです。 |
 
 ### インフラ層 (INFRA)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **INFRA-002** | **Low** | `validation.go` のテーブル名組み立てが文字列連結 | 現状は固定値しか使っていませんが、`fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)` に依存しています。ホワイトリスト化して誤用余地をなくすべきです。 |
-| **INFRA-005** | **Low** | `validation.go` がContext非対応 | `ValidateRequiredData` / `GetTableStats` は `context.Context` を受け取らず、`db.Get` を使っています。起動時専用でも、I/O規約の一貫性は崩れています。 |
-| **INFRA-007** | **Medium** | `FindAllWithPlayer` と `FindAllWithPlayerForAdmin` の重複 | `internal/infra/repository/user_repository_impl.go` で、クエリ構築・LIKE検索・rows処理がかなり重複しています。 |
-| **INFRA-009** | **Medium** | 譜面定数・ノーツ変換時のエラー無視 | `internal/infra/models/song_chart_model.go` の `FromChartEntity` では `ParseFloat` のエラーチェックは追加されましたが、`e.Notes.Value()` / `e.Const.Value()` のエラーは依然として `_` で破棄しています。`internal/infra/repository/song_repository_impl.go` の `toChartEntity` も `chartconstant.NewChartConstant` / `notes.NewNotes` のエラーを無視しています。 |
-| **INFRA-010** | **Low** | 一時プレイヤーデータリポジトリが `context.Context` を無視 | `internal/infra/repository/temporary_player_data_repository_impl.go` の `Create` / `FindByToken` / `ConsumeByToken` / `Delete` は `context.Context` を受け取りながら `_ context.Context` として無視しています。インメモリ実装でも、ロック取得前後や重いペイロード処理前にキャンセルを確認するなど、リポジトリ契約の一貫性を保つべきです。 |
-| **INFRA-016** | **Medium** | スコアVOからの変換でエラー無視 | `internal/infra/models/player_record_model.go` と `player_worldsend_record_model.go` が `Value()` のエラーを `_` で破棄し、`scoreVal.(int64)` の型アサーション前提で変換しています。`#nosec G115` コメントに範囲保証の根拠は記述されましたが、`scoreVal` が `nil` の場合（`Value()` が失敗した場合）にパニックが発生するリスクは残存しています。 |
-
-### ユースケース層 (UC)
-
-| ID | 優先度 | 概要 | 詳細・対応方針 |
-|---|---|---|---|
-| **UC-014** | **Medium** | WORLD'S ENDレコード取得エラーを握りつぶしている | `user_usecase_impl.go` の `getUserProfileWorldsendRecords` は `worldsendRecordRepo.FindByPlayerID` のエラーをログ出力後に空スライス・nil errorとして返します。通常譜面側はエラーを返すため挙動が不一致で、障害時に部分的な欠損レスポンスを正常扱いするリスクがあります。 |
+| **INFRA-007** | **Medium** | `FindAllWithPlayer` と管理者版の実装が重複 | `internal/infra/repository/user_repository_impl.go:102-281` で、SELECT、LIKE条件、rows走査、VO変換、Player組み立てが二重実装されています。公開範囲の条件だけを引数・query objectで分離し、共通の読み取り処理へまとめるべきです。 |
+| **INFRA-017** | **Medium** | repositoryのエラーラップが原エラーを切断 | `friendship_repository_impl.go:197-201`、`friend_chart_ranking_query_service_impl.go:244-248`、お気に入り・未解禁曲系のwrapperは、sentinelだけを `%w`、原エラーを `%v` で整形します。その結果 `errors.Is(context.Canceled)` や `errors.As(*mysql.MySQLError)` が失敗し、キャンセル・制約違反・再試行可否を上位で分類できません。sentinelとcauseの両方をラップできる形へ統一すべきです。 |
 
 ### ハンドラー / ルーター層 (HDL)
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **HDL-001** | **Medium** | `RealIP()` の信頼境界未設定 | `router.go` で `e.IPExtractor` を設定しておらず、リバースプロキシ配下での `RealIP()` 利用が危険です。レートリミットやログに影響します。 |
-| **HDL-010** | **Low** | `knownFields` が手書きハードコード | `me_handler.go` 内の未知フィールド検出は `PlayerDataPayload` と手動同期になっており、メンテナンス漏れの温床です。 |
-| **HDL-011** | **Low** | `include_noplay` の不正値を黙って `false` 扱い | `user_handler.go` / `api_v1/user_handler.go` で `strconv.ParseBool(c.QueryParam("include_noplay"))` のエラーを `_` で破棄しており、不正なクエリ値がバリデーションエラーになりません。 |
-| **HDL-012** | **Low** | 厳格JSONデコードの適用が不統一 | `BindStrictJSON` が導入されていますが、`login_handler.go` / `song_handler.go` / `worldsend_handler.go` / `honor_handler.go` などに `c.Bind` が残っています。未知フィールドの扱いがエンドポイントごとに不統一です。 |
-
----
+| **HDL-001** | **Medium** | リバースプロキシ時のクライアントIP抽出が未設定 | Echo v5.2.1は `IPExtractor` 未設定時にヘッダーを信頼せず `RemoteAddr` を返すため、旧記述の「ヘッダー偽装」ではなく、プロキシ配下で全利用者がプロキシIPとして記録・制限される問題です。`RealIP()` はログ、ログイン、匿名・一時データのレート制限に使われます。直接公開なら `ExtractIPDirect`、プロキシ配下なら信頼するproxy範囲を限定したXFF/X-Real-IP extractorを明示すべきです。 |
+| **HDL-010** | **Low** | `knownFields` が入力構造体と手動同期 | `internal/app/handler/api_internal/me_handler.go:89-114` の未知フィールド検出は `PlayerDataPayload` のJSONタグ一覧を手書きしています。現在は一致していますが、項目追加時に警告だけがずれるため、厳格decoderまたはリフレクションで単一の定義から導出すべきです。 |
+| **HDL-011** | **Low** | クエリパラメータの不正値を既定値へ黙ってフォールバック | `include_noplay` は5箇所で `strconv.ParseBool` のエラーを破棄し、楽曲一覧の `include_deleted` は文字列が厳密に `"true"` の場合だけtrue、Userの未知 `view` は全件表示へフォールバックします。不正値を400系で返す共通parserへ統一すべきです。 |
+| **HDL-012** | **Low** | 厳格JSONデコードの適用が不統一 | `BindStrictJSON` 導入後も本番コードに `c.Bind` が12箇所残り、`player_locked_song_handler.go` 内でも両方式が混在します。未知フィールド、Content-Type、複数JSON値の扱いを全JSONエンドポイントで統一すべきです。 |
+| **HDL-013** | **Medium** | 互換APIの専用エラー変換が認証・入力エラーを503化 | chunirec/reiwaの専用switchは400/404/405/429/503だけを扱うため、APIトークンの401、通常バリデーションの422、内部エラーの500を503へ変換します。さらにGroup middlewareはルート不一致の404/405では実行されず、同じprefix内でレスポンス形式が変わります。`docs/API.md` の401/500および標準エラーコード記載とも不一致です。互換APIのstatus・body変換を共通化し、認証ミドルウェアを含むcontract testを追加すべきです。 |
+| **HDL-014** | **Medium** | スコア履歴APIがDisplay IDと削除済み楽曲を検証しない | internal/v1の両ScoreHistoryHandlerは `displayid` を `ValidateDisplayID` に通さずUsecaseへ渡します。Usecaseは削除済みも返す `SongRepository.FindByDisplayID` / WORLD'S END queryを使いながら `IsDeleted` を確認しないため、他の公開レコードAPIでは隠れる削除済み楽曲の履歴を取得できます。境界で形式検証し、Usecaseで楽曲種別と公開状態を404へ正規化すべきです。 |
+| **HDL-015** | **Medium** | chunirec互換の `is_clear` がFAILEDでもtrue | `internal/app/handler/compat/chunirec/dto.go:121` は `record.ClearLamp != nil` だけでクリア判定します。`FAILED` は有効な非nilマスタ値なので、FAILEDレコードも `is_clear: true` になります。ランプ名またはドメインのクリア判定メソッドを使い、FAILEDケースのテストを追加すべきです。 |
 
 ## まとめ
 
-- 優先度が高いのは、**Goal更新の非トランザクション**、**Domain層の `sqlx` 依存**、**WORLD'S ENDレコード取得エラーの握りつぶし** です。
-- 次に、**エラー変換の不統一**, **パスパラメータ未検証**, **巨大レスポンス / 全件取得**, **VO変換時のエラー無視**, **Context伝播の不徹底** を詰めると、APIの安定性と保守性が上がります。
-- AGENTS.md 準拠の観点では、**`interface{}` 残存**, **本番パッケージの `Must` 系関数**, **厳格JSONデコードの不統一** が追加の棚卸し対象です。
-- `refactor.md` は現在の未解消課題だけを残したため、今後は項目を消し込んでいけば現状把握に使いやすい状態です。
+- 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**古いプレイヤーデータによる巻き戻し (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
+- 2026-07-23 の再レビューでは Critical な認証バイパスや SQL インジェクションは見つかりませんでした。前日の追記からは、**非公開ユーザー名の存在オラクルと申請濫用 (`SEC-09`)**、**APIトークンの無期限・無スコープ (`SEC-10`)**、**管理者削除の監査主体欠落 (`SEC-15`)**だけを未解決事項として残しました。`SEC-09` は `SEC-08` および `PERF-008` とあわせて対応するのが効率的です。
+- 直近追加の互換APIでは、不要な全件取得、401/422/500の503化、FAILEDのクリア誤判定が見つかりました。機能単位の正常系テストだけでなく、認証・入力不正・非公開・削除済み・並行更新を含む境界テストが必要です。
+- プレイヤーデータの真正性（クライアント申告スコア）はプロダクト前提として本リストの脆弱性対象外とします。管理用の `is_suspicious` は別途運用で扱う想定です。

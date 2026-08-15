@@ -1,6 +1,7 @@
 package chunirec
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -8,7 +9,10 @@ import (
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
+	"github.com/chunisupport/chunisupport-api/internal/dto"
+	api_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateLevel(t *testing.T) {
@@ -110,4 +114,157 @@ func TestToMusicShowResponse(t *testing.T) {
 	assert.Nil(t, result.Data.ADV)
 	assert.Nil(t, result.Data.EXP)
 	assert.Nil(t, result.Data.ULT)
+}
+
+func TestToRecordsShowAllResponse(t *testing.T) {
+	// Given
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	updatedAt := time.Date(1970, 1, 1, 9, 0, 0, 0, jst)
+	chartConst, err := chartconstant.NewChartConstant(10.7)
+	require.NoError(t, err)
+
+	clearLamp := "CLEAR"
+	allJustice := "ALL JUSTICE"
+	fullChain := "FULL CHAIN GOLD"
+	records := []*dto.PlayerRecordDTO{
+		{
+			UpdatedAt:      &updatedAt,
+			IsPlayed:       true,
+			Difficulty:     "EXPERT",
+			ID:             "6a88218b1a936bd3",
+			Title:          "B.B.K.K.B.K.K.",
+			Const:          chartConst,
+			IsConstUnknown: true,
+			Score:          1003215,
+			Rating:         11.32,
+			ClearLamp:      &clearLamp,
+			ComboLamp:      &allJustice,
+			FullChain:      &fullChain,
+		},
+		{
+			IsPlayed:   false,
+			Difficulty: "MASTER",
+			ID:         "未プレイ",
+		},
+	}
+
+	// When
+	result := ToRecordsShowAllResponse(records, map[string]string{
+		"6a88218b1a936bd3": "VARIETY",
+	}, jst)
+
+	// Then
+	require.NotNil(t, result)
+	require.Len(t, result.Records, 1)
+	record := result.Records[0]
+	assert.Equal(t, "6a88218b1a936bd3", record.ID)
+	assert.Equal(t, "EXP", record.Diff)
+	assert.Equal(t, 10.5, record.Level)
+	assert.Equal(t, "B.B.K.K.B.K.K.", record.Title)
+	assert.Equal(t, 10.7, record.Const)
+	assert.Equal(t, uint32(1003215), record.Score)
+	assert.Equal(t, 11.32, record.Rating)
+	assert.True(t, record.IsConstUnknown)
+	assert.True(t, record.IsClear)
+	assert.True(t, record.IsFullCombo)
+	assert.True(t, record.IsAllJustice)
+	assert.True(t, record.IsFullChain)
+	assert.Equal(t, "VARIETY", record.Genre)
+	assert.Equal(t, "1970-01-01T09:00:00+0900", record.UpdatedAt)
+	assert.True(t, record.IsPlayed)
+}
+
+func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
+	tests := []struct {
+		name           string
+		comboLamp      *string
+		wantFullCombo  bool
+		wantAllJustice bool
+	}{
+		{
+			name:           "FULL COMBOはFCのみtrue",
+			comboLamp:      stringPtr("FULL COMBO"),
+			wantFullCombo:  true,
+			wantAllJustice: false,
+		},
+		{
+			name:           "ALL JUSTICEはFCとAJがtrue",
+			comboLamp:      stringPtr("ALL JUSTICE"),
+			wantFullCombo:  true,
+			wantAllJustice: true,
+		},
+		{
+			name:           "コンボランプなしはどちらもfalse",
+			comboLamp:      nil,
+			wantFullCombo:  false,
+			wantAllJustice: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			updatedAt := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+			chartConst, err := chartconstant.NewChartConstant(14.0)
+			require.NoError(t, err)
+			records := []*dto.PlayerRecordDTO{
+				{
+					UpdatedAt:  &updatedAt,
+					IsPlayed:   true,
+					Difficulty: "MAS",
+					ID:         "song001",
+					Const:      chartConst,
+					ComboLamp:  tt.comboLamp,
+				},
+			}
+
+			// When
+			result := ToRecordsShowAllResponse(records, nil, time.UTC)
+
+			// Then
+			require.Len(t, result.Records, 1)
+			assert.Equal(t, tt.wantFullCombo, result.Records[0].IsFullCombo)
+			assert.Equal(t, tt.wantAllJustice, result.Records[0].IsAllJustice)
+		})
+	}
+}
+
+func TestToChunirecUserDTO_プレイヤー未連携ではnullへ変換する(t *testing.T) {
+	// Given
+	profile := &api_internal.UserProfileWithRecordsDTO{}
+
+	// When
+	result := ToChunirecUserDTO(profile, nil, time.UTC)
+
+	// Then
+	assert.Nil(t, result)
+}
+
+func TestToChunirecUserDTO_内部ユーザーIDを公開しない(t *testing.T) {
+	// Given
+	profile := &api_internal.UserProfileWithRecordsDTO{
+		UserID: 283,
+		Player: &dto.PlayerDTO{
+			UpdatedAt: time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	// When
+	result := ToChunirecUserDTO(profile, nil, time.UTC)
+
+	// Then
+	require.NotNil(t, result)
+	assert.Zero(t, result.UserID)
+
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(body, &response))
+	userID, exists := response["user_id"]
+	require.True(t, exists)
+	assert.Equal(t, float64(0), userID)
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

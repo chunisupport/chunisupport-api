@@ -8,10 +8,55 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func TestUpdateChartConstant_公式IDと難易度接頭辞で譜面定数を更新する(t *testing.T) {
+	// Given
+	original, err := chartconstant.NewChartConstant(14.5)
+	assert.NoError(t, err)
+	song := &entity.Song{
+		ID:          1,
+		DisplayID:   "display-id",
+		OfficialIdx: "123",
+		Charts: []*entity.Chart{{
+			ID:             10,
+			SongID:         1,
+			DifficultyID:   4,
+			Const:          original,
+			IsConstUnknown: true,
+		}},
+	}
+	mockRepo := new(MockSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	mockMasterCache.On("SongMasters").Return(&masterdata.SongMasters{
+		Difficulties: map[string]master.ChartDifficulty{
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	})
+	mockRepo.On("FindByOfficialIdx", mock.Anything, mockExec, "123").Return(song, nil)
+	mockRepo.On("Save", mock.Anything, mockExec, song).Return(nil)
+	uc := NewSongUsecase(mockRepo, mockMasterCache, &passthroughTransactionManager{tx: mockExec}, mockExec)
+
+	// When
+	updatedSong, err := uc.UpdateChartConstant(context.Background(), UpdateChartConstantInput{
+		OfficialIdx: "123",
+		Difficulty:  "mas",
+		Const:       14.7,
+	})
+
+	// Then
+	assert.NoError(t, err)
+	assert.Same(t, song, updatedSong)
+	assert.Equal(t, 14.7, song.Charts[0].Const.Float64())
+	assert.False(t, song.Charts[0].IsConstUnknown)
+	mockRepo.AssertExpectations(t)
+}
 
 // MockSongRepository は SongRepository のモックです。
 type MockSongRepository struct {
@@ -28,6 +73,22 @@ func (m *MockSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec
 
 func (m *MockSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	args := m.Called(ctx, exec, displayID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
+func (m *MockSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	args := m.Called(ctx, exec, displayID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
+func (m *MockSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	args := m.Called(ctx, exec, officialIdx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -57,6 +118,72 @@ func (m *MockSongRepository) Save(ctx context.Context, exec repository.Executor,
 
 func (m *MockSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
 	args := m.Called(ctx, exec, songs)
+	return args.Error(0)
+}
+
+type MockPlayerFavoriteSongRepository struct {
+	mock.Mock
+}
+
+func (m *MockPlayerFavoriteSongRepository) CountByPlayerID(ctx context.Context, exec repository.Executor, playerID int) (int, error) {
+	args := m.Called(ctx, exec, playerID)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Exists(ctx context.Context, exec repository.Executor, playerID int, songID int) (bool, error) {
+	args := m.Called(ctx, exec, playerID, songID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Save(ctx context.Context, exec repository.Executor, favorite *entity.PlayerFavoriteSong) error {
+	args := m.Called(ctx, exec, favorite)
+	return args.Error(0)
+}
+
+func (m *MockPlayerFavoriteSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int) error {
+	args := m.Called(ctx, exec, playerID, songID)
+	return args.Error(0)
+}
+
+func (m *MockPlayerFavoriteSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	args := m.Called(ctx, exec, songID)
+	return args.Error(0)
+}
+
+type MockPlayerLockedSongRepository struct {
+	mock.Mock
+}
+
+func (m *MockPlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
+	args := m.Called(ctx, exec, playerID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*entity.PlayerLockedSong), args.Error(1)
+}
+
+func (m *MockPlayerLockedSongRepository) Create(ctx context.Context, exec repository.Executor, lockedSong *entity.PlayerLockedSong) error {
+	args := m.Called(ctx, exec, lockedSong)
+	return args.Error(0)
+}
+
+func (m *MockPlayerLockedSongRepository) Delete(ctx context.Context, exec repository.Executor, playerID int, songID int, isUltima bool) error {
+	args := m.Called(ctx, exec, playerID, songID, isUltima)
+	return args.Error(0)
+}
+
+func (m *MockPlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec repository.Executor, songID int) error {
+	args := m.Called(ctx, exec, songID)
+	return args.Error(0)
+}
+
+func (m *MockPlayerLockedSongRepository) BulkCreate(ctx context.Context, exec repository.Executor, lockedSongs []*entity.PlayerLockedSong) error {
+	args := m.Called(ctx, exec, lockedSongs)
+	return args.Error(0)
+}
+
+func (m *MockPlayerLockedSongRepository) BulkDelete(ctx context.Context, exec repository.Executor, playerID int, songIDs []int, isUltimaFlags []bool) error {
+	args := m.Called(ctx, exec, playerID, songIDs, isUltimaFlags)
 	return args.Error(0)
 }
 
@@ -279,6 +406,96 @@ func TestGetSongByDisplayID_DeletedSongPermission(t *testing.T) {
 	}
 }
 
+func TestDeleteSong_DeletesFavoritesWhenFavoriteRepoIsSet(t *testing.T) {
+	mockRepo := new(MockSongRepository)
+	mockFavoriteRepo := new(MockPlayerFavoriteSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, nil)
+	ctx := context.Background()
+
+	song := &entity.Song{
+		ID:        10,
+		DisplayID: "S010",
+		IsDeleted: false,
+		Charts:    []*entity.Chart{},
+	}
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
+		return saved == song && saved.IsDeleted
+	})).Return(nil).Once()
+	mockFavoriteRepo.On("DeleteBySongID", ctx, mockExec, 10).Return(nil).Once()
+
+	err := uc.DeleteSong(ctx, "S010")
+
+	assert.NoError(t, err)
+	assert.True(t, song.IsDeleted)
+	mockRepo.AssertExpectations(t)
+	mockFavoriteRepo.AssertExpectations(t)
+}
+
+func TestDeleteSong_DeletesLockedSongsWhenLockedRepoIsSet(t *testing.T) {
+	mockRepo := new(MockSongRepository)
+	mockLockedRepo := new(MockPlayerLockedSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, nil, mockLockedRepo)
+	ctx := context.Background()
+
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "S020",
+		IsDeleted: false,
+		Charts:    []*entity.Chart{},
+	}
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S020").Return(song, nil).Once()
+	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
+		return saved == song && saved.IsDeleted
+	})).Return(nil).Once()
+	mockLockedRepo.On("DeleteBySongID", ctx, mockExec, 20).Return(nil).Once()
+
+	err := uc.DeleteSong(ctx, "S020")
+
+	assert.NoError(t, err)
+	assert.True(t, song.IsDeleted)
+	mockRepo.AssertExpectations(t)
+	mockLockedRepo.AssertExpectations(t)
+}
+
+func TestDeleteSong_DeletesBothFavoritesAndLockedSongs(t *testing.T) {
+	mockRepo := new(MockSongRepository)
+	mockFavoriteRepo := new(MockPlayerFavoriteSongRepository)
+	mockLockedRepo := new(MockPlayerLockedSongRepository)
+	mockMasterCache := new(MockSongMasterProvider)
+	mockExec := new(MockExecutor)
+	tm := &passthroughTransactionManager{tx: mockExec}
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo)
+	ctx := context.Background()
+
+	song := &entity.Song{
+		ID:        30,
+		DisplayID: "S030",
+		IsDeleted: false,
+		Charts:    []*entity.Chart{},
+	}
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S030").Return(song, nil).Once()
+	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
+		return saved == song && saved.IsDeleted
+	})).Return(nil).Once()
+	mockFavoriteRepo.On("DeleteBySongID", ctx, mockExec, 30).Return(nil).Once()
+	mockLockedRepo.On("DeleteBySongID", ctx, mockExec, 30).Return(nil).Once()
+
+	err := uc.DeleteSong(ctx, "S030")
+
+	assert.NoError(t, err)
+	assert.True(t, song.IsDeleted)
+	mockRepo.AssertExpectations(t)
+	mockFavoriteRepo.AssertExpectations(t)
+	mockLockedRepo.AssertExpectations(t)
+}
+
 func TestDeleteSong_SavesDeletedState(t *testing.T) {
 	// Given
 	mockRepo := new(MockSongRepository)
@@ -294,7 +511,7 @@ func TestDeleteSong_SavesDeletedState(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayID", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()

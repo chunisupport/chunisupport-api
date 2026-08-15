@@ -23,11 +23,60 @@ func (s *stubPlayerRepositoryForPlayerData) FindByID(ctx context.Context, exec r
 	return nil, nil
 }
 
+func TestEnsurePlayer_公式指標が変化した場合は更新前の組を履歴へ保存する(t *testing.T) {
+	collectedAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
+	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
+		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 40,
+		OfficialRating: 17.24, OfficialOverpower: 12340.12,
+		DataCollectedAt: &collectedAt, CreatedAt: collectedAt.Add(-24 * time.Hour), UpdatedAt: collectedAt,
+	}}
+	userRepo := new(MockUserRepository)
+	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
+	playerID := 10
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	updatedAt := collectedAt.Add(time.Hour)
+	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+		Name: "変更後", Level: 41, OfficialRating: 17.25, OfficialOverpower: 12345.67,
+	}, updatedAt)
+
+	require.NoError(t, err)
+	require.NotNil(t, playerRepo.savedPlayer.PendingMetricHistory())
+	assert.Equal(t, 17.24, playerRepo.savedPlayer.PendingMetricHistory().OfficialRating)
+	assert.Equal(t, 12340.12, playerRepo.savedPlayer.PendingMetricHistory().OfficialOverpower)
+	assert.Equal(t, collectedAt, playerRepo.savedPlayer.PendingMetricHistory().DataCollectedAt)
+}
+
+func TestEnsurePlayer_取得日時のない既存値は履歴へ保存しない(t *testing.T) {
+	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
+	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
+		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		OfficialRating: 0, OfficialOverpower: 0, CreatedAt: createdAt, UpdatedAt: createdAt,
+	}}
+	userRepo := new(MockUserRepository)
+	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
+	playerID := 10
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+		Name: "変更後", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
+	}, createdAt.Add(time.Hour))
+
+	require.NoError(t, err)
+	assert.Nil(t, playerRepo.savedPlayer.PendingMetricHistory())
+}
+
 func (s *stubPlayerRepositoryForPlayerData) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
 	return nil, nil
 }
 
 func (s *stubPlayerRepositoryForPlayerData) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
+	return s.foundPlayer, nil
+}
+
+func (s *stubPlayerRepositoryForPlayerData) FindByUserIDForUpdate(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
 	return s.foundPlayer, nil
 }
 
@@ -83,7 +132,7 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 			summary := &PlayerDataSummaryInput{
 				Name:           playerName.String(),
 				Level:          42,
-				OfficialRating: &officialRating,
+				OfficialRating: officialRating,
 			}
 
 			userRepo.
@@ -94,17 +143,20 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 				Once()
 
 			// When
-			playerID, err := uc.ensurePlayer(context.Background(), nil, user, summary, updatedAt)
+			playerID, previousPlayer, err := uc.ensurePlayer(context.Background(), nil, user, summary, updatedAt)
 			after := time.Now()
 
 			// Then
 			require.NoError(t, err)
 			assert.Equal(t, 99, playerID)
+			assert.Nil(t, previousPlayer)
 			require.NotNil(t, playerRepo.savedPlayer)
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.IsZero())
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.Before(before))
 			assert.False(t, playerRepo.savedPlayer.CreatedAt.After(after))
 			assert.True(t, playerRepo.savedPlayer.UpdatedAt.Equal(updatedAt))
+			require.NotNil(t, playerRepo.savedPlayer.DataCollectedAt)
+			assert.True(t, playerRepo.savedPlayer.DataCollectedAt.Equal(updatedAt))
 			userRepo.AssertExpectations(t)
 		})
 	}

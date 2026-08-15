@@ -88,6 +88,20 @@ func (e *execResultExecutor) ExecContext(ctx context.Context, query string, args
 
 var _ domainrepo.Executor = (*execResultExecutor)(nil)
 
+type goalSaveExecutor struct {
+	execResultExecutor
+	exists int
+}
+
+func (e *goalSaveExecutor) GetContext(ctx context.Context, dest any, query string, args ...any) error {
+	count, ok := dest.(*int)
+	if !ok {
+		return errors.New("unexpected destination type")
+	}
+	*count = e.exists
+	return nil
+}
+
 func TestFindByUserID_ReturnsNilWhenWrappedNoRows(t *testing.T) {
 	repo := &playerRepository{}
 	exec := &noRowsWrappedExecutor{}
@@ -115,11 +129,11 @@ func TestAPITokenFindByHashedToken_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t
 	require.Nil(t, token)
 }
 
-func TestAPITokenFindByUserID_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
+func TestAPITokenFindByIDAndUserID_ReturnsErrAPITokenNotFoundWhenWrappedNoRows(t *testing.T) {
 	repo := &apiTokenRepository{}
 	exec := &noRowsWrappedExecutor{}
 
-	token, err := repo.FindByUserID(context.Background(), exec, 10)
+	token, err := repo.FindByIDAndUserID(context.Background(), exec, 1, 10)
 	require.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
 	require.Nil(t, token)
 }
@@ -133,12 +147,23 @@ func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testin
 	require.Nil(t, goal)
 }
 
-func TestGoalUpdate_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
+func TestGoalSave_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
 	repo := &goalRepository{}
-	exec := &execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}
+	exec := &goalSaveExecutor{execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}}
 
-	err := repo.Update(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
+	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
 	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
+}
+
+func TestGoalSave_AllowsIdempotentUpdate(t *testing.T) {
+	repo := &goalRepository{}
+	exec := &goalSaveExecutor{
+		execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}},
+		exists:             1,
+	}
+
+	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
+	require.NoError(t, err)
 }
 
 func TestGoalDelete_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
@@ -172,8 +197,17 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			class_emblem_base_id INTEGER NULL,
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
+			official_overpower REAL NULL,
+			data_collected_at DATETIME NULL,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
+		)`,
+		`CREATE TABLE player_metric_histories (
+			player_id INTEGER NOT NULL,
+			official_rating REAL NOT NULL,
+			official_overpower REAL NOT NULL,
+			data_collected_at DATETIME NOT NULL,
+			PRIMARY KEY (player_id, data_collected_at)
 		)`,
 		`CREATE TABLE honor_types (
 			id INTEGER PRIMARY KEY,
@@ -200,6 +234,30 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 	return db
 }
 
+func TestPlayerRepository_Save_公式指標履歴と現在値を同一トランザクションで保存する(t *testing.T) {
+	db := setupPlayerRepositorySQLite(t)
+	now := seedPlayerWithHonors(t, db, 1, false)
+	repo := &playerRepository{db: db}
+	player, err := repo.FindByID(context.Background(), db, 1)
+	require.NoError(t, err)
+	require.NoError(t, player.ChangeOfficialMetrics(16.26, 1240.12, now.Add(time.Hour)))
+	tx, err := db.Beginx()
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Save(context.Background(), tx, player))
+	var transactionHistoryCount int
+	require.NoError(t, tx.Get(&transactionHistoryCount, `SELECT COUNT(*) FROM player_metric_histories WHERE player_id = 1`))
+	require.Equal(t, 1, transactionHistoryCount)
+	require.NoError(t, tx.Rollback())
+
+	var historyCount int
+	require.NoError(t, db.Get(&historyCount, `SELECT COUNT(*) FROM player_metric_histories WHERE player_id = 1`))
+	require.Zero(t, historyCount)
+	var rating float64
+	require.NoError(t, db.Get(&rating, `SELECT official_player_rating FROM players WHERE id = 1`))
+	require.Equal(t, 16.25, rating)
+}
+
 func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bool) time.Time {
 	t.Helper()
 
@@ -209,9 +267,9 @@ func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, now, now)
+			overpower_value, official_overpower, data_collected_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, 1234.567, now, now, now)
 	require.NoError(t, err)
 
 	if !withHonors {
@@ -249,6 +307,9 @@ func TestFindByIDWithHonors_ReturnsPlayerWithSortedHonors(t *testing.T) {
 	require.NotNil(t, result.Player)
 	require.Equal(t, 1, result.Player.ID)
 	require.Equal(t, "テストプレイヤー", result.Player.Name.String())
+	require.Equal(t, 1234.567, result.Player.OfficialOverpower)
+	require.NotNil(t, result.Player.DataCollectedAt)
+	require.True(t, result.Player.DataCollectedAt.Equal(now))
 	require.True(t, result.Player.UpdatedAt.Equal(now))
 	require.Len(t, result.Honors, 3)
 	require.Equal(t, 1, result.Honors[0].Slot)

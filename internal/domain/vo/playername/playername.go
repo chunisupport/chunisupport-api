@@ -44,24 +44,16 @@ func (p PlayerName) Value() (driver.Value, error) {
 	return p.value, nil
 }
 
+// Scan はDBから取得した値を検証し、PlayerNameを復元します。
+// 不正なDB値から値オブジェクトの不変条件が壊れないよう、NULLもエラーとして扱います。
 func (p *PlayerName) Scan(src any) error {
 	if src == nil {
-		// DBからnullが来た場合は空のPlayerNameを設定
-		// ただしバリデーションは行わない（DB上のデータは信頼する）
-		*p = PlayerName{value: ""}
-		return nil
+		return validatePlayerName("")
 	}
 
 	s, err := vo.ToString(src)
 	if err != nil {
 		return err
-	}
-
-	// DBから取得した値はバリデーション済みとみなす
-	// 空文字の場合もそのまま設定
-	if s == "" {
-		*p = PlayerName{value: ""}
-		return nil
 	}
 
 	playerName, err := NewPlayerName(s)

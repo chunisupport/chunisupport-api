@@ -6,10 +6,11 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
+	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // V1UserHandler は外部API v1 のユーザー関連エンドポイントを処理します。
@@ -23,7 +24,7 @@ func NewV1UserHandler(userUsecase usecase.UserUsecase) *V1UserHandler {
 }
 
 // GetUser は指定された username のユーザープロファイルを取得します。
-func (h *V1UserHandler) GetUser(c echo.Context) error {
+func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	username, apiErr := handler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {
 		return apiErr
@@ -39,5 +40,5 @@ func (h *V1UserHandler) GetUser(c echo.Context) error {
 	}
 
 	// 既存DTOから V1DTO へ変換
-	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(result))
+	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(internalhandler.ToUserProfileWithRecordsDTO(result)))
 }

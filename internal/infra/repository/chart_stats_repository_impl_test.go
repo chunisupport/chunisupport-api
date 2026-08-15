@@ -29,6 +29,7 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			combo_none INTEGER NOT NULL,
 			combo_fc INTEGER NOT NULL,
 			combo_aj INTEGER NOT NULL,
+			combo_ajc INTEGER NOT NULL,
 			clear_failed INTEGER NOT NULL,
 			clear_clear INTEGER NOT NULL,
 			clear_hard INTEGER NOT NULL,
@@ -36,6 +37,7 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			clear_absolute INTEGER NOT NULL,
 			clear_catastrophy INTEGER NOT NULL,
 			average_score REAL,
+			median_score REAL,
 			player_count INTEGER NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS worldsend_chart_stats_by_rating_band (
@@ -52,6 +54,7 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			combo_none INTEGER NOT NULL,
 			combo_fc INTEGER NOT NULL,
 			combo_aj INTEGER NOT NULL,
+			combo_ajc INTEGER NOT NULL,
 			clear_failed INTEGER NOT NULL,
 			clear_clear INTEGER NOT NULL,
 			clear_hard INTEGER NOT NULL,
@@ -59,12 +62,45 @@ func setupChartStatsDB(t *testing.T) *sqlx.DB {
 			clear_absolute INTEGER NOT NULL,
 			clear_catastrophy INTEGER NOT NULL,
 			average_score REAL,
+			median_score REAL,
 			player_count INTEGER NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS chart_best_slot_stats_by_rating_band (
+			chart_id INTEGER NOT NULL,
+			rating_band_id INTEGER NOT NULL,
+			best_player_count INTEGER NOT NULL,
+			eligible_player_count INTEGER NOT NULL,
+			best_player_percentage REAL
 		);
 	`)
 	require.NoError(t, err)
 
 	return db
+}
+
+func TestFindChartBestSlotStatsByChartIDs_対象譜面を一括取得する(t *testing.T) {
+	// Given
+	db := setupChartStatsDB(t)
+	defer db.Close()
+	_, err := db.Exec(`
+		INSERT INTO chart_best_slot_stats_by_rating_band
+			(chart_id, rating_band_id, best_player_count, eligible_player_count, best_player_percentage)
+		VALUES (100, 0, 10, 40, 25.0), (100, 22, 4, 8, 50.0), (200, 22, 1, 8, 12.5)
+	`)
+	require.NoError(t, err)
+	repo := &chartStatsRepository{db: db}
+
+	// When
+	stats, err := repo.FindChartBestSlotStatsByChartIDs(context.Background(), db, []int{100})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, stats, 2)
+	assert.Equal(t, 0, stats[0].RatingBandID)
+	assert.Equal(t, 22, stats[1].RatingBandID)
+	assert.Equal(t, 4, stats[1].BestPlayerCount)
+	require.NotNil(t, stats[1].BestPlayerPercentage)
+	assert.InDelta(t, 50.0, *stats[1].BestPlayerPercentage, 0.0001)
 }
 
 func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
@@ -74,26 +110,33 @@ func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
 	_, err := db.Exec(`
 		INSERT INTO chart_stats_by_rating_band (
 			chart_id, rating_band_id, rank_aaal, rank_s, rank_sp, rank_ss, rank_ssp, rank_sss, rank_sssp, rank_max,
-			combo_none, combo_fc, combo_aj, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
-			average_score, player_count
+			combo_none, combo_fc, combo_aj, combo_ajc, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
+			average_score, median_score, player_count
 		) VALUES (
 			100, 1, 10, 11, 12, 13, 14, 15, 16, 17,
-			18, 19, 20, 21, 22, 23, 24, 25, 26,
-			900000, 27
+			18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+			900000, NULL, 27
 		);
 		INSERT INTO worldsend_chart_stats_by_rating_band (
 			worldsend_chart_id, rating_band_id, rank_aaal, rank_s, rank_sp, rank_ss, rank_ssp, rank_sss, rank_sssp, rank_max,
-			combo_none, combo_fc, combo_aj, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
-			average_score, player_count
+			combo_none, combo_fc, combo_aj, combo_ajc, clear_failed, clear_clear, clear_hard, clear_brave, clear_absolute, clear_catastrophy,
+			average_score, median_score, player_count
 		) VALUES (
 			100, 1, 1, 2, 3, 4, 5, 6, 7, 8,
-			9, 10, 11, 12, 13, 14, 15, 16, 17,
-			950000, 18
+			9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+			950000, 960000, 18
 		);
 	`)
 	require.NoError(t, err)
 
 	repo := &chartStatsRepository{db: db}
+
+	chartStats, err := repo.FindChartStatsByChartIDs(context.Background(), db, []int{100})
+	require.NoError(t, err)
+	require.Len(t, chartStats, 1)
+	assert.Equal(t, 20, chartStats[0].Combo.AJ)
+	assert.Equal(t, 21, chartStats[0].Combo.AJC)
+	assert.Nil(t, chartStats[0].MedianScore)
 
 	stats, err := repo.FindWorldsendChartStatsByChartIDs(context.Background(), db, []int{100})
 	require.NoError(t, err)
@@ -103,9 +146,14 @@ func TestFindWorldsendChartStatsByChartIDs_UsesWorldsendTable(t *testing.T) {
 	assert.Equal(t, 1, stats[0].Rank.AAAL)
 	assert.Equal(t, 2, stats[0].Rank.S)
 	assert.Equal(t, 9, stats[0].Combo.None)
-	assert.Equal(t, 12, stats[0].Clear.Failed)
+	assert.Equal(t, 11, stats[0].Combo.AJ)
+	assert.Equal(t, 12, stats[0].Combo.AJC)
+	assert.Equal(t, 13, stats[0].Clear.Failed)
 	if assert.NotNil(t, stats[0].AverageScore) {
 		assert.InDelta(t, 950000, *stats[0].AverageScore, 0.001)
+	}
+	if assert.NotNil(t, stats[0].MedianScore) {
+		assert.InDelta(t, 960000, *stats[0].MedianScore, 0.001)
 	}
 	assert.Equal(t, 18, stats[0].PlayerCount)
 }

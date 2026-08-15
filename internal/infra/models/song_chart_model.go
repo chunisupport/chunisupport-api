@@ -22,6 +22,7 @@ type SongModel struct {
 	OfficialIdx string     `db:"official_idx"`
 	Jacket      *string    `db:"jacket"`
 	IsWorldsend bool       `db:"is_worldsend"`
+	IsNew       bool       `db:"is_new"`
 	IsDeleted   bool       `db:"is_deleted"`
 	UpdatedAt   *time.Time `db:"updated_at"`
 }
@@ -40,6 +41,7 @@ func (m *SongModel) ToEntity() *entity.Song {
 	song.OfficialIdx = m.OfficialIdx
 	song.Jacket = m.Jacket
 	song.IsWorldsend = m.IsWorldsend
+	song.IsNew = m.IsNew
 	song.IsDeleted = m.IsDeleted
 	song.UpdatedAt = m.UpdatedAt
 	return song
@@ -59,6 +61,7 @@ func FromSongEntity(e *entity.Song) *SongModel {
 		OfficialIdx: e.OfficialIdx,
 		Jacket:      e.Jacket,
 		IsWorldsend: e.IsWorldsend,
+		IsNew:       e.IsNew,
 		IsDeleted:   e.IsDeleted,
 		UpdatedAt:   e.UpdatedAt,
 	}

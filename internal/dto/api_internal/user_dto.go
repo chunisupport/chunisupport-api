@@ -51,6 +51,7 @@ type UserRecordMetaDTO struct {
 type UserRecordDTO struct {
 	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+	Courses   []*dto.CourseRecordDTO    `json:"course"`
 	Meta      *UserRecordMetaDTO        `json:"meta"`
 }
 
@@ -59,6 +60,7 @@ type UserRecordViewResponseDTO struct {
 	UpdatedAt time.Time                 `json:"updated_at"`
 	All       []*dto.PlayerRecordDTO    `json:"standard"`
 	Worldsend []*dto.WorldsendRecordDTO `json:"worldsend"`
+	Courses   []*dto.CourseRecordDTO    `json:"course"`
 }
 
 // UserProfileRatingViewDTO はレーティングビュー用のユーザープロファイルDTOです。

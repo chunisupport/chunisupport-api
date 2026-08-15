@@ -2,7 +2,7 @@ package api_internal_test
 
 import (
 	appinternal "github.com/chunisupport/chunisupport-api/internal/app"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func newTestEcho() *echo.Echo {

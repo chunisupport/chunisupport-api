@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -134,11 +136,88 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	return nil
 }
 
+// SaveLatestUpdate は収集日時が新しいプレイヤーデータ登録結果だけを保存します。
+func (r *playerDataRepository) SaveLatestUpdate(ctx context.Context, exec repository.Executor, update *entity.PlayerLatestUpdate) error {
+	if exec == nil {
+		return fmt.Errorf("SaveLatestUpdate requires a non-nil executor: must be called within a transaction")
+	}
+	if update == nil {
+		return fmt.Errorf("SaveLatestUpdate requires a non-nil update")
+	}
+
+	model := models.FromPlayerLatestUpdateEntity(update)
+	insertQuery := `
+		INSERT INTO player_latest_updates (
+			player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+		) VALUES (
+			:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
+		)
+		ON DUPLICATE KEY UPDATE player_id = player_id
+	`
+	if r.db.DriverName() == "sqlite" {
+		insertQuery = `
+			INSERT INTO player_latest_updates (
+				player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+			) VALUES (
+				:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
+			)
+			ON CONFLICT(player_id) DO NOTHING
+		`
+	}
+	if _, err := exec.NamedExecContext(ctx, insertQuery, model); err != nil {
+		return fmt.Errorf("failed to save player latest update: %w", err)
+	}
+
+	updateQuery := `
+		UPDATE player_latest_updates
+		SET schema_version = :schema_version,
+			result_gzip = :result_gzip,
+			source_updated_at = :source_updated_at,
+			imported_at = :imported_at,
+			body_hash = :body_hash
+		WHERE player_id = :player_id
+		  AND (
+			source_updated_at < :source_updated_at
+			OR (
+				source_updated_at = :source_updated_at
+				AND body_hash <> :body_hash
+				AND imported_at < :imported_at
+			)
+		  )
+	`
+	if _, err := exec.NamedExecContext(ctx, updateQuery, model); err != nil {
+		return fmt.Errorf("failed to update player latest update: %w", err)
+	}
+	return nil
+}
+
+// FindLatestUpdateByPlayerID はプレイヤーIDに対応する最新データ登録結果を取得します。
+func (r *playerDataRepository) FindLatestUpdateByPlayerID(ctx context.Context, playerID int) (*entity.PlayerLatestUpdate, error) {
+	var model models.PlayerLatestUpdateModel
+	query := `
+		SELECT player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+		FROM player_latest_updates
+		WHERE player_id = ?
+	`
+	if err := r.db.GetContext(ctx, &model, query, playerID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrPlayerLatestUpdateNotFound
+		}
+		return nil, fmt.Errorf("failed to find player latest update: %w", err)
+	}
+	update, err := model.ToEntity()
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore player latest update: %w", err)
+	}
+	return update, nil
+}
+
 // FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
 func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
 	if exec == nil {
 		return nil, fmt.Errorf("FindPlayerRecordStatesByChartIDs requires a non-nil executor")
 	}
+	lockClause := r.recordLockClause()
 	rows, err := selectModelsInChunks[int, playerDataRecordRow](ctx, exec, chartIDs, `
 		SELECT
 			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
@@ -146,7 +225,7 @@ func (r *playerDataRepository) FindPlayerRecordStatesByChartIDs(ctx context.Cont
 		FROM player_records
 		WHERE player_id = ?
 		  AND chart_id IN (?)
-	`, "player record states", func(batch []int) []any { return []any{playerID, batch} })
+	`+lockClause, "player record states", func(batch []int) []any { return []any{playerID, batch} })
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +250,7 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 	if exec == nil {
 		return nil, fmt.Errorf("FindWorldsendRecordStatesByChartIDs requires a non-nil executor")
 	}
+	lockClause := r.recordLockClause()
 	rows, err := selectModelsInChunks[int, playerDataWorldsendRecordRow](ctx, exec, worldsendChartIDs, `
 		SELECT
 			player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id,
@@ -178,7 +258,7 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 		FROM player_worldsend_records
 		WHERE player_id = ?
 		  AND worldsend_chart_id IN (?)
-	`, "worldsend record states", func(batch []int) []any { return []any{playerID, batch} })
+	`+lockClause, "worldsend record states", func(batch []int) []any { return []any{playerID, batch} })
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +274,13 @@ func (r *playerDataRepository) FindWorldsendRecordStatesByChartIDs(ctx context.C
 		}
 	}
 	return states, nil
+}
+
+func (r *playerDataRepository) recordLockClause() string {
+	if r.db.DriverName() == "mysql" {
+		return " FOR UPDATE"
+	}
+	return ""
 }
 
 // GetOverpowerTargetStats はOVER POWER割合計算の分母となる対象楽曲の最大OP合計を取得します。

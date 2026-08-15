@@ -118,8 +118,8 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -200,8 +200,8 @@ func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -282,8 +282,8 @@ func TestUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicates(t
 	repo := &worldsendChartRepository{db: db}
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -318,8 +318,8 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 	repo := &worldsendChartRepository{db: db}
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -366,8 +366,8 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenChartDisappearsAndRequestHasNoCha
 	repo := &worldsendChartRepository{db: db}
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -408,10 +408,10 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenMixedChartUpdatesSkipOneAndSkippe
 	repo := &worldsendChartRepository{db: db}
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'WE001', 'old title 1', 'old artist 1', 1, 180, '2024-01-01', 'WEIDX001', 'old1.png', 1, 0),
-			(2, 'WE002', 'old title 2', 'old artist 2', 2, 190, '2024-01-02', 'WEIDX002', 'old2.png', 1, 0)
+			(1, 'WE001', 'old title 1', 'old artist 1', 1, 180, '2024-01-01', 'WEIDX001', 'old1.png', 1, 0, 0),
+			(2, 'WE002', 'old title 2', 'old artist 2', 2, 190, '2024-01-02', 'WEIDX002', 'old2.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -480,8 +480,8 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenSongSoftDeletedDuringUpdate(t *te
 	repo := &worldsendChartRepository{db: db}
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
-		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (1, 'WE001', 'old title', 'old artist', 1, 180, '2024-01-01', 'WEIDX001', 'old.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 
@@ -547,10 +547,10 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	ctx := context.Background()
 
 	_, err := db.Exec(`
-		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_deleted)
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
 		VALUES
-			(1, 'WE001', 'old title 1', 'old artist 1', 1, 180, '2024-01-01', 'WEIDX001', 'old1.png', 1, 0),
-			(2, 'WE002', 'old title 2', 'old artist 2', 2, 190, '2024-01-02', 'WEIDX002', 'old2.png', 1, 0)
+			(1, 'WE001', 'old title 1', 'old artist 1', 1, 180, '2024-01-01', 'WEIDX001', 'old1.png', 1, 0, 0),
+			(2, 'WE002', 'old title 2', 'old artist 2', 2, 190, '2024-01-02', 'WEIDX002', 'old2.png', 1, 0, 0)
 	`)
 	require.NoError(t, err)
 

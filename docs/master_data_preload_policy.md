@@ -8,13 +8,14 @@
 | `genres` | 7件のみの楽曲ジャンルマスタで固定値。表示順は `sort_order` で管理する。 |
 | `difficulties` | 5件のみの難易度マスタで固定値。 |
 | `class_emblems` / `class_emblem_bases` | クラスエンブレム種別で件数少、定義済みマスタ。 |
+| `course_classes` | 7種類で固定されたコースクラス。 |
 | `clear_lamp_types` / `combo_lamp_types` | クリア・コンボランプ種別で件数少、定義済みマスタ。 |
 | `slots` | 称号スロット種別、5件の固定マスタ。 |
 | `full_chain_types` | フルチェインランプ種別、3件の固定マスタ。 |
 | `honor_types` | 称号の種類マスタで固定値が事前投入されている。 |
-| `account_types` | ユーザー権限区分。3件のみで固定値。 |
+| `account_types` | ユーザー権限区分。4件の固定マスタ（PLAYER/EDITOR/ADMIN/EXTDEV）。 |
 | `versions` | CHUNITHMバージョン名マスタで固定値。起動日時点でリリース済みのバージョンのみをプリロードする（`released_at <= 起動日の日本時間`）。日付跨ぎ後に新バージョンを反映するには再起動が必要。 |
-| `achievement_types` | 目標機能の成果種別マスタ（8件の固定値）。`goals.achievement_type_id` の外部キー参照元で、実体は `code` 列の固定値です。 |
+| `achievement_types` | 目標機能の成果種別マスタ（9件の固定値）。`goals.achievement_type_id` の外部キー参照元で、実体は `code` 列の固定値です。 |
 
 ## 読み込まない（随時参照）
 | テーブル | 理由 |
@@ -23,16 +24,17 @@
 | `songs` | 楽曲の基本情報。件数が多く、検索・絞り込みが必要なためオンデマンドで取得。 |
 | `charts` | 譜面情報。楽曲ごとに複数行がありデータ量が大きいため除外。 |
 | `worldsend_charts` | WORLD'S END譜面情報。件数は多く、曲データと同様に除外。 |
+| `courses` | `song_batch`の直接DB更新を再起動なしで反映するため、必要なidxだけを随時参照する。 |
 | `users` / `players` / `player_honors` | ユーザーやプレイヤープロフィールの動的データで更新が入るためキャッシュしない。 |
 | `api_tokens` | 認証系の動的データで更新が入るため除外。 |
-| `player_records` / `player_worldsend_records` | スコア記録。更新頻度が高く件数も多いためプリロードしない。 |
+| `player_records` / `player_worldsend_records` / `player_course_records` | スコア記録。更新頻度が高く件数も多いためプリロードしない。 |
 
 ## 補足
 - プリロード対象でも、更新手段が今後追加される場合はリロード機構を用意することを推奨します。
 
-## 統計用データベース（SQLite）
+## 統計データ
 
-統計データは別途SQLiteデータベース（`static_db_path`で指定）に保存されます。
+統計データはアプリケーション本体と同じMySQLデータベースに保存されます。
 
 ### 統計用テーブル
 
@@ -41,5 +43,6 @@
 | `rating_bands` | レーティング帯マスタ（28件の固定値）。起動時にメモリへ読み込まれます。 |
 | `chart_stats_by_rating_band` | 譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
+| `chart_best_slot_stats_by_rating_band` | 通常譜面×レーティング帯別のベスト枠採用統計。定期バッチで更新されます。 |
 
-統計データベースは読み取り専用で使用され、メインのMySQLデータベースとは独立して管理されます。
+`rating_bands`は起動時にプリロードし、統計3表はリクエスト時に参照します。

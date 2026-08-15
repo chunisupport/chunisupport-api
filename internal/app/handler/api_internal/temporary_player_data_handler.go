@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,7 +17,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // TemporaryPlayerDataHandler はプレイヤーデータ一時受付・確定保存APIを扱います。
@@ -30,8 +31,8 @@ func NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase usecase.TemporaryP
 }
 
 type createTemporaryPlayerDataResponse struct {
-	UploadToken string `json:"uploadToken"`
-	ExpiresAt   string `json:"expiresAt"`
+	UploadToken string    `json:"uploadToken"`
+	ExpiresAt   time.Time `json:"expiresAt"`
 }
 
 type commitTemporaryPlayerDataRequest struct {
@@ -39,7 +40,7 @@ type commitTemporaryPlayerDataRequest struct {
 }
 
 // CreateTemporaryData は未ログインユーザーの一時アップロードを受け付けます。
-func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
+func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error {
 	if !strings.EqualFold(c.Request().Header.Get(echo.HeaderContentEncoding), "gzip") {
 		return apierror.ErrBadRequest
 	}
@@ -73,9 +74,18 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 	}
 
 	hash := sha256.Sum256(jsonBody)
+	var request playerDataRequest
+	if err := json.Unmarshal(jsonBody, &request); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	payload := request.toUsecase()
+	internalPayload, err := json.Marshal(payload)
+	if err != nil {
+		return apierror.ErrInternalError.WithInternal(err)
+	}
 	result, err := h.temporaryPlayerDataUsecase.Create(c.Request().Context(), usecase.CreateTemporaryPlayerDataInput{
 		IPAddress: c.RealIP(),
-		Payload:   jsonBody,
+		Payload:   internalPayload,
 		BodyHash:  hex.EncodeToString(hash[:]),
 	})
 	if err != nil {
@@ -91,7 +101,7 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, createTemporaryPlayerDataResponse{
 		UploadToken: result.UploadToken,
-		ExpiresAt:   result.ExpiresAt.Format(time.RFC3339),
+		ExpiresAt:   result.ExpiresAt,
 	})
 }
 
@@ -112,7 +122,7 @@ func readAllWithMaxBytes(r io.Reader, maxBytes int) ([]byte, bool, error) {
 }
 
 // CommitTemporaryData は一時データを認証済みユーザーに紐づけて確定保存します。
-func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c echo.Context) error {
+func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c *echo.Context) error {
 	user, ok := c.Get("userEntity").(*entity.User)
 	if !ok || user == nil {
 		return apierror.ErrUnauthorized
@@ -141,5 +151,5 @@ func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c echo.Context) error {
 		}
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, toPlayerDataResponse(result))
 }

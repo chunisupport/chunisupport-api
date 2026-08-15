@@ -41,6 +41,7 @@ type chartStatsRow struct {
 	ComboNone        int      `db:"combo_none"`
 	ComboFC          int      `db:"combo_fc"`
 	ComboAJ          int      `db:"combo_aj"`
+	ComboAJC         int      `db:"combo_ajc"`
 	ClearFailed      int      `db:"clear_failed"`
 	ClearClear       int      `db:"clear_clear"`
 	ClearHard        int      `db:"clear_hard"`
@@ -48,6 +49,7 @@ type chartStatsRow struct {
 	ClearAbsolute    int      `db:"clear_absolute"`
 	ClearCatastrophy int      `db:"clear_catastrophy"`
 	AverageScore     *float64 `db:"average_score"`
+	MedianScore      *float64 `db:"median_score"`
 	PlayerCount      int      `db:"player_count"`
 }
 
@@ -86,6 +88,7 @@ func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exe
 				None: row.ComboNone,
 				FC:   row.ComboFC,
 				AJ:   row.ComboAJ,
+				AJC:  row.ComboAJC,
 			},
 			Clear: entity.ChartClearStats{
 				Failed:      row.ClearFailed,
@@ -96,6 +99,7 @@ func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exe
 				Catastrophy: row.ClearCatastrophy,
 			},
 			AverageScore: row.AverageScore,
+			MedianScore:  row.MedianScore,
 			PlayerCount:  row.PlayerCount,
 		})
 	}
@@ -146,6 +150,7 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 			combo_none,
 			combo_fc,
 			combo_aj,
+			combo_ajc,
 			clear_failed,
 			clear_clear,
 			clear_hard,
@@ -153,11 +158,54 @@ func (r *chartStatsRepository) FindChartStatsByChartIDs(ctx context.Context, exe
 			clear_absolute,
 			clear_catastrophy,
 			average_score,
+			median_score,
 			player_count
 		FROM chart_stats_by_rating_band
 		WHERE chart_id IN (?)
 		ORDER BY chart_id, rating_band_id
 	`, chartIDs)
+}
+
+// FindChartBestSlotStatsByChartIDs は通常譜面のベスト枠採用統計を一括取得します。
+func (r *chartStatsRepository) FindChartBestSlotStatsByChartIDs(ctx context.Context, exec repository.Executor, chartIDs []int) ([]*entity.ChartBestSlotStatsByRatingBand, error) {
+	if len(chartIDs) == 0 {
+		return []*entity.ChartBestSlotStatsByRatingBand{}, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT chart_id, rating_band_id, best_player_count, eligible_player_count, best_player_percentage
+		FROM chart_best_slot_stats_by_rating_band
+		WHERE chart_id IN (?)
+		ORDER BY chart_id, rating_band_id
+	`, chartIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = exec.Rebind(query)
+
+	type row struct {
+		ChartID              int      `db:"chart_id"`
+		RatingBandID         int      `db:"rating_band_id"`
+		BestPlayerCount      int      `db:"best_player_count"`
+		EligiblePlayerCount  int      `db:"eligible_player_count"`
+		BestPlayerPercentage *float64 `db:"best_player_percentage"`
+	}
+	var rows []row
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+
+	results := make([]*entity.ChartBestSlotStatsByRatingBand, 0, len(rows))
+	for _, item := range rows {
+		results = append(results, &entity.ChartBestSlotStatsByRatingBand{
+			ChartID:              item.ChartID,
+			RatingBandID:         item.RatingBandID,
+			BestPlayerCount:      item.BestPlayerCount,
+			EligiblePlayerCount:  item.EligiblePlayerCount,
+			BestPlayerPercentage: item.BestPlayerPercentage,
+		})
+	}
+	return results, nil
 }
 
 // FindWorldsendChartStatsByChartIDs はWORLD'S END譜面ID一覧に対する統計を返します。
@@ -177,6 +225,7 @@ func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Con
 			combo_none,
 			combo_fc,
 			combo_aj,
+			combo_ajc,
 			clear_failed,
 			clear_clear,
 			clear_hard,
@@ -184,6 +233,7 @@ func (r *chartStatsRepository) FindWorldsendChartStatsByChartIDs(ctx context.Con
 			clear_absolute,
 			clear_catastrophy,
 			average_score,
+			median_score,
 			player_count
 		FROM worldsend_chart_stats_by_rating_band
 		WHERE worldsend_chart_id IN (?)

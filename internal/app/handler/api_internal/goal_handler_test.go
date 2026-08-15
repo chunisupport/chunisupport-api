@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,7 +15,9 @@ import (
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type goalTestValidator struct {
@@ -28,10 +29,13 @@ func (tv *goalTestValidator) Validate(i any) error {
 }
 
 type mockGoalUsecase struct {
-	createCalled bool
-	updateCalled bool
-	createErr    error
-	updateErr    error
+	createCalled     bool
+	updateCalled     bool
+	reorderCalled    bool
+	reorderedIDs     []uint32
+	reorderedGroupID *uint32
+	createErr        error
+	updateErr        error
 }
 
 func (m *mockGoalUsecase) List(ctx context.Context, userID int) ([]*usecase.GoalOutput, error) {
@@ -55,6 +59,13 @@ func (m *mockGoalUsecase) Update(ctx context.Context, userID int, id uint32, inp
 }
 
 func (m *mockGoalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
+	return nil
+}
+
+func (m *mockGoalUsecase) Reorder(ctx context.Context, userID int, groupID *uint32, orderedGoalIDs []uint32) error {
+	m.reorderCalled = true
+	m.reorderedGroupID = groupID
+	m.reorderedIDs = append([]uint32(nil), orderedGoalIDs...)
 	return nil
 }
 
@@ -185,8 +196,7 @@ func TestGoalHandlerUpdateRejectsUnknownTopLevelKey(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPath("/internal/me/goals/:id")
-	c.SetParamNames("id")
-	c.SetParamValues("1")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 	c.Set("userEntity", &entity.User{ID: 1})
 
 	err := h.Update(c)
@@ -205,6 +215,48 @@ func TestGoalHandlerUpdateRejectsUnknownTopLevelKey(t *testing.T) {
 	}
 }
 
+func TestGoalHandlerReorder(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &goalTestValidator{validator: validator.New()}
+	uc := &mockGoalUsecase{}
+	h := NewGoalHandler(uc)
+	req := httptest.NewRequest(http.MethodPut, "/internal/me/goals/order", bytes.NewBufferString(`{"goal_ids":[30,10,20]}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	// When
+	err := h.Reorder(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, []uint32{30, 10, 20}, uc.reorderedIDs)
+}
+
+func TestGoalHandlerReorderRejectsMissingGoalIDs(t *testing.T) {
+	// Given
+	e := echo.New()
+	uc := &mockGoalUsecase{}
+	h := NewGoalHandler(uc)
+	req := httptest.NewRequest(http.MethodPut, "/internal/me/goals/order", bytes.NewBufferString(`{}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	// When
+	err := h.Reorder(c)
+
+	// Then
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+	assert.False(t, uc.reorderCalled)
+}
+
 func TestToGoalInput(t *testing.T) {
 	req := &internaldto.GoalRequest{
 		Title:           "test",
@@ -216,7 +268,8 @@ func TestToGoalInput(t *testing.T) {
 		Attributes: map[string]any{
 			"diff": 4,
 		},
-		Invert: true,
+		InvertValue:      true,
+		InvertPercentage: false,
 	}
 
 	in, err := toGoalInput(req)
@@ -243,7 +296,29 @@ func TestToGoalInput(t *testing.T) {
 	if gotAttrs["diff"].(float64) != 4 {
 		require.Failf(t, "前提条件失敗", "Attributes = %#v, want diff=4", gotAttrs)
 	}
-	if !in.Invert {
-		require.Fail(t, "Invert = false, want true")
+	assert.True(t, in.InvertValue)
+	assert.False(t, in.InvertPercentage)
+}
+
+func TestToGoalResponseKeepsInvertFlagsIndependent(t *testing.T) {
+	// Given
+	goal := &usecase.GoalOutput{
+		InvertValue:      false,
+		InvertPercentage: true,
 	}
+
+	// When
+	response := toGoalResponse(goal)
+
+	// Then
+	assert.False(t, response.InvertValue)
+	assert.True(t, response.InvertPercentage)
+
+	encoded, err := json.Marshal(response)
+	require.NoError(t, err)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &body))
+	assert.Equal(t, false, body["invert_value"])
+	assert.Equal(t, true, body["invert_percentage"])
+	assert.NotContains(t, body, "invert")
 }

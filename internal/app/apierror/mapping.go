@@ -18,12 +18,18 @@ func FromUsecaseError(err error) *APIError {
 	switch {
 	case errors.Is(err, usecase.ErrUsernameTaken):
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
+	case errors.Is(err, usecase.ErrUsernameForbidden):
+		return ErrRegistrationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidCredentials):
 		return ErrInvalidCredentials.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecentSignInAuthTimeMissing):
 		return ErrRecentSignInRequired.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecentSignInRequired):
 		return ErrRecentSignInRequired.WithInternal(err)
+	case errors.Is(err, usecase.ErrMaintenanceMode):
+		return ErrMaintenanceMode.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidMaintenanceComment):
+		return ErrBadRequest.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidIDToken):
 		return ErrInvalidToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidTurnstileToken):
@@ -36,6 +42,24 @@ func FromUsecaseError(err error) *APIError {
 		return ErrUserNotFound.WithInternal(err) // 403 → 404 でユーザー存在を隠蔽
 	case errors.Is(err, usecase.ErrPlayerNotLinked):
 		return ErrPlayerNotLinked.WithInternal(err)
+	case errors.Is(err, usecase.ErrPlayerMetricHistoryNotFound):
+		return ErrPlayerMetricHistoryNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferPlayerNotFound):
+		return ErrDataTransferPlayerNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidFile):
+		return ErrDataTransferInvalidFile.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidSignature):
+		return ErrDataTransferInvalidSignature.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferUnsupportedSchema):
+		return ErrDataTransferUnsupportedSchema.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferInvalidData):
+		return ErrDataTransferInvalidData.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferUnresolvedReference):
+		return ErrDataTransferUnresolvedReference.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferDestinationNotEmpty):
+		return ErrDataTransferDestinationNotEmpty.WithInternal(err)
+	case errors.Is(err, usecase.ErrDataTransferPayloadTooLarge):
+		return ErrPayloadTooLarge.WithInternal(err)
 
 	case errors.Is(err, usecase.ErrOperationFailed):
 		return ErrOperationFailed.WithInternal(err)
@@ -45,20 +69,48 @@ func FromUsecaseError(err error) *APIError {
 		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPIToken):
 		return ErrInvalidToken.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAPITokenName):
+		return ErrInvalidAPITokenName.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAPITokenID):
+		return ErrInvalidAPITokenID.WithInternal(err)
+	case errors.Is(err, usecase.ErrAPITokenNotFound):
+		return ErrAPITokenNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrAPITokenLimitExceeded):
+		return ErrAPITokenLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrAPITokenNameConflict):
+		return ErrAPITokenNameConflict.WithInternal(err)
 	// 楽曲関連エラー
 	case errors.Is(err, repository.ErrSongNotFound):
 		return ErrSongNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrDuplicateOfficialIdx):
 		return ErrDuplicateOfficialIdx.WithInternal(err)
+	case errors.Is(err, usecase.ErrCourseNotFound), errors.Is(err, repository.ErrCourseNotFound):
+		return ErrNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrCourseClassNotFound):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidCourseInput):
+		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorNotFound):
 		return ErrNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorConflict):
 		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
+		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):
+		return ErrConflict.WithInternal(err)
 	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidRatingBand):
+		return ErrValidationFailed.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidBestSlotRankingCursor):
+		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrChartNotFound):
 		return ErrChartNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrScoreHistoryNotFound):
+		return ErrScoreHistoryNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrScoreHistoryUnsupportedDifficulty):
+		return ErrScoreHistoryUnsupportedDifficulty.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidPlayerName):
 		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidWorldsendInput):
@@ -88,6 +140,18 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalInvalidAchievementParams.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
 		return ErrGoalInvalidAttributes.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalOrder):
+		return ErrGoalInvalidOrder.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupNotFound):
+		return ErrGoalGroupNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupLimitExceeded):
+		return ErrGoalGroupLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalGroupName):
+		return ErrGoalGroupInvalidName.WithInternal(err)
+	case errors.Is(err, usecase.ErrGoalGroupConflict):
+		return ErrGoalGroupConflict.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalGroupOrder):
+		return ErrGoalGroupInvalidOrder.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecordFilterNotFound):
 		return ErrRecordFilterNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrRecordFilterLimitExceeded):
@@ -96,6 +160,16 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidRecordFilterInput.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidRecordFilterID):
 		return ErrInvalidRecordFilterID.WithInternal(err)
+	case errors.Is(err, usecase.ErrPlayerFavoriteSongLimitExceeded):
+		return ErrFavoriteSongLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendshipLimitExceeded):
+		return ErrFriendshipLimitExceeded.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendshipAlreadyExists):
+		return ErrFriendshipConflict.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendRequestNotFound):
+		return ErrFriendRequestNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidFriendRequest):
+		return ErrValidationFailedBadRequest.WithInternal(err)
 	}
 
 	// PlayerDataValidationError

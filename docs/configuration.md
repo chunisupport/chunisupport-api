@@ -2,6 +2,8 @@
 
 アプリケーションは `.env` が存在すればそれを読み込み、そのうえで `APP_ENV` に対応する `.config/<APP_ENV>.settings.json` を読み込みます。最低限必要な項目だけを記載しています。
 
+加えて、新規登録ユーザー名の禁止語を `.config/username_forbidden_words.json` から読み込みます。このファイルは必須で、変更を反映するにはアプリケーションの再起動が必要です。
+
 ## `.env` (任意、開発時に推奨)
 
 `.env` ファイル自体は必須ではありませんが、以下の環境変数は `.env` または実行環境の環境変数として必ず設定してください。
@@ -9,6 +11,7 @@
 - `APP_ENV` (例: `develop`)
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
+- `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
 - `DB_PORT`
@@ -22,11 +25,11 @@
 最低限、以下のキーを持つJSONを用意してください。
 
 - `app_port`
+- `timezone` (APIレスポンスに使用するIANAタイムゾーン。例: `Asia/Tokyo`)
 - `logging.level` (`debug`, `info`, `warn`, `error`)
 - `logging.stdout`
 - `logging.app_file`（任意。空文字ならアプリログのファイル出力なし）
 - `logging.access_file`（任意。空文字ならアクセスログのファイル出力なし）
-- `static_db_path` (統計データ用SQLiteデータベースのパス)
 - `shutdown_timeout_seconds` (1以上)
 - `cors.allow_origins`
 - `cors.allow_credentials`
@@ -46,6 +49,8 @@
 `database.startup.*` は起動時のMySQL接続待機設定です。
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
 
+MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
+
 `logging` は必須です。旧 `log_level` / `log_paths` 形式にはフォールバックしません。
 `logging.stdout=false` の場合は `logging.app_file` と `logging.access_file` の両方が必須です。
 `logging.app_file` と `logging.access_file` に同じパスは指定できません。
@@ -54,6 +59,32 @@ MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `inte
 Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照してください。
 
 旧設定から移行する場合は、デプロイ前に全環境の `.config/<APP_ENV>.settings.json` を更新してください。リポジトリ外の本番・ステージング設定も対象です。
+
+## `.config/username_forbidden_words.json` (必須)
+
+新規登録時だけ適用するユーザー名の禁止語を指定します。既存ユーザーの参照やDBからの復元には適用されません。
+
+```json
+{
+  "exact": [
+    "root",
+    "official"
+  ],
+  "contains": [
+    "admin",
+    "system"
+  ]
+}
+```
+
+- `exact`: ユーザー名全体が一致した場合に拒否します。
+- `contains`: ユーザー名の一部に含まれた場合に拒否します。
+- 禁止語には空文字以外の任意の文字列を指定できます。
+- UTF-8 BOMの有無にかかわらず読み込めます。
+- 空文字、不明なJSONフィールド、壊れたJSONがある場合は起動に失敗します。
+- 重複した禁止語は起動時に除去されます。
+
+禁止語に該当した場合、APIは一致した単語を公開せず、`registration_failed`を返します。
 
 旧形式:
 
@@ -85,13 +116,13 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 ```json
 {
   "app_port": 3002,
+  "timezone": "Asia/Tokyo",
   "logging": {
     "level": "debug",
     "app_file": ".log/app.log",
     "access_file": ".log/access.log",
     "stdout": true
   },
-  "static_db_path": "./static.db",
   "shutdown_timeout_seconds": 20,
   "cors": {
     "allow_origins": [
@@ -116,7 +147,9 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 ```
 
 `cors.allow_origins` は全体の基本設定です。
-ただし `/` の `GET` と `OPTIONS`、および `/internal/player-data/temp` の `POST` と `OPTIONS` に限っては、固定で `https://new.chunithm-net.com` も追加許可されます。
+オリジンには `https://*.example.pages.dev` のような `*` / `?` を含むパターンを指定できます。
+この場合、許可された実際のリクエスト元オリジンが `Access-Control-Allow-Origin` に返されます。
+ただし `/healthz` の `GET` と `OPTIONS`、および `/internal/player-data/temp` の `POST` と `OPTIONS` に限っては、固定で `https://new.chunithm-net.com` も追加許可されます。
 
 ## Firebase 認証
 
@@ -136,8 +169,27 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
+## オブジェクトストレージ楽曲スナップショット
+
+`cmd/export-song-snapshots` を実行する場合に限り、以下の環境変数が追加で必要です。
+
+- `OBJECT_STORAGE_ENDPOINT_URL`
+- `OBJECT_STORAGE_ACCESS_KEY_ID`
+- `OBJECT_STORAGE_SECRET_ACCESS_KEY`
+- `OBJECT_STORAGE_BUCKET_NAME`
+
+APIサーバーの起動にはこれらの環境変数は不要です。本番の秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
+
+出力するオブジェクトキーや実行方法は [楽曲スナップショットのオブジェクトストレージエクスポート](song_snapshot_export.md) を参照してください。
+
 ## 起動失敗時の終了コード
 
 設定読み込み、ログ初期化、DB接続、マスタデータのプリロード、Firebase認証サービスの初期化、サーバ起動、graceful shutdown に失敗した場合、アプリケーションは終了コード `1` で終了します。正常な SIGINT / SIGTERM による停止は終了コード `0` で終了します。
 
 systemd 管理下で運用する場合は、`Restart=always` または `Restart=on-failure` の利用を検討してください。DBが同一ホストにある場合は `After=mysql.service`、外部DBを使う場合は `network-online.target` までの依存も併用できます。logrotate を使う場合は、`ExecReload=/bin/kill -HUP $MAINPID` を設定してください。
+
+## ユーザーデータ移行
+
+settings JSONにデータ移行用の設定節はありません。エクスポート、検証、インポートの各APIは常時登録されます。
+
+APIサーバーでは、環境変数`DATA_TRANSFER_HMAC_SECRET`へBase64で表現した32バイト以上の共有秘密鍵を必ず設定します。移行ファイルを相互利用するChuniSupportサーバーには同じ秘密鍵を設定してください。秘密鍵が異なるサーバーのファイルは署名検証で拒否されます。

@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-05-28
+最終更新: 2026-07-26
 
 ## 更新ルール
 
@@ -33,16 +33,31 @@
 | `invalid_genre_id` | ジャンルID不正 |
 | `invalid_difficulty_id` | 難易度ID不正 |
 | `invalid_difficulty` | 難易度指定不正 |
+| `score_history_not_found` | 指定譜面の現行スコア履歴が存在しない |
+| `score_history_unsupported_difficulty` | スコア履歴対象外のBASIC / ADVANCEDを指定 |
+| `player_metric_history_not_found` | プレイヤー未連携などにより公式RATING・公式OVER POWER履歴が存在しない |
+| data_transfer_player_not_found | 移行元にプレイヤーデータが存在しない |
+| data_transfer_invalid_file | 移行ファイルのJSON、Base64URL、gzip、必須項目が不正 |
+| data_transfer_invalid_signature | 移行ファイルのHMAC署名が一致しない |
+| data_transfer_unsupported_schema | 移行ファイル形式またはスキーマバージョンが未対応 |
+| data_transfer_invalid_data | 移行データの値域、件数、重複、順序が不正 |
+| data_transfer_unresolved_reference | 移行先マスターへ参照を解決できない |
+| data_transfer_destination_not_empty | 移行先アカウントに移行対象データが存在する |
 | `validation_failed` | バリデーション失敗 |
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |
 | `api_token_not_found` | APIトークン未検出 |
+| `api_token_limit_exceeded` | APIトークン上限超過（最大10個） |
+| `api_token_name_conflict` | APIトークン名重複 |
+| `invalid_api_token_name` | APIトークン名不正 |
+| `invalid_api_token_id` | APIトークンID不正 |
 | `payload_too_large` | ペイロード過大 |
 | `unsupported_media_type` | Content-Type不正 |
 | `method_not_allowed` | HTTPメソッド不正 |
 | `not_found` | エンドポイント未検出 |
 | `too_many_requests` | レート制限 |
 | `service_unavailable` | サービス利用不可 |
+| `maintenance_mode` | APIメンテナンス中の利用制限 |
 | `username_empty` | ユーザー名空 |
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
@@ -53,7 +68,16 @@
 | `goal_invalid_achievement_type` | goal達成種別不正 |
 | `goal_invalid_achievement_params` | goal達成条件不正 |
 | `goal_invalid_attributes` | goal属性不正 |
+| `goal_invalid_order` | goal並び順不正 |
 | `invalid_goal_input` | goal入力不正 |
+| `goal_group_not_found` | 目標グループ未検出 |
+| `goal_group_limit_exceeded` | 目標グループ上限超過（最大20件） |
+| `goal_group_invalid_name` | 目標グループ名不正 |
+| `goal_group_conflict` | 目標グループ名重複 |
+| `goal_group_invalid_order` | 目標グループ並び順不正 |
+| `favorite_song_limit_exceeded` | お気に入り楽曲上限超過（最大100件） |
+
+`maintenance_mode` は、互換API以外でメンテナンスゲートまたはログイン時のロール制御が利用を遮断した場合にHTTP 503で返します。レスポンス本文にはメンテナンスコメントを含めません。状態とコメントは `GET /internal/system/status` から取得してください。`/compat/chunirec/2.0` と `/compat/reiwa/1` は既存の互換形式を維持するため、本文のコードは数値の `503` になります。
 
 ## 内部理由コード一覧（運用・調査用）
 

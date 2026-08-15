@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 )
 
 // CreateTemporaryPlayerDataInput は一時登録入力です。
@@ -30,5 +30,5 @@ type CommitTemporaryPlayerDataInput struct {
 // TemporaryPlayerDataUsecase は一時プレイヤーデータの登録・確定保存ユースケースです。
 type TemporaryPlayerDataUsecase interface {
 	Create(ctx context.Context, input CreateTemporaryPlayerDataInput) (*CreateTemporaryPlayerDataOutput, error)
-	Commit(ctx context.Context, input CommitTemporaryPlayerDataInput) (*api_internal.PlayerDataResult, error)
+	Commit(ctx context.Context, input CommitTemporaryPlayerDataInput) (*playerdataresult.Result, error)
 }

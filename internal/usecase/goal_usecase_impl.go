@@ -26,17 +26,21 @@ var (
 	ErrInvalidAchievementType  = errors.New("invalid achievement type")
 	ErrInvalidAchievementParam = errors.New("invalid achievement params")
 	ErrInvalidGoalAttributes   = errors.New("invalid goal attributes")
+	ErrInvalidGoalOrder        = errors.New("invalid goal order")
 )
 
 type goalUsecase struct {
 	db             repository.Executor
 	tm             TransactionManager
 	goalRepo       repository.GoalRepository
+	groupRepo      repository.GoalGroupRepository
 	masterProvider repository.GoalMasterProvider
 }
 
-func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider) GoalUsecase {
-	return &goalUsecase{db: db, tm: tm, goalRepo: goalRepo, masterProvider: masterProvider}
+// NewGoalUsecase は目標ユースケースを生成します。
+// グループ所有権の検証漏れを配線時に検出できるよう、関連リポジトリはすべて必須依存とします。
+func NewGoalUsecase(db repository.Executor, tm TransactionManager, goalRepo repository.GoalRepository, masterProvider repository.GoalMasterProvider, groupRepo repository.GoalGroupRepository) GoalUsecaseWithTransferValidation {
+	return &goalUsecase{db: db, tm: tm, goalRepo: goalRepo, groupRepo: groupRepo, masterProvider: masterProvider}
 }
 
 func (u *goalUsecase) List(ctx context.Context, userID int) ([]*GoalOutput, error) {
@@ -65,13 +69,24 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 		if count >= info.GoalMaxPerUser {
 			return ErrGoalLimitExceeded
 		}
+		if err := u.validateGroupOwnership(ctx, tx, userID, input.GroupID); err != nil {
+			return err
+		}
+		groupCount, err := u.goalRepo.CountByUserIDAndGroupID(ctx, tx, userID, input.GroupID)
+		if err != nil {
+			return err
+		}
 		goal := &entity.Goal{
 			UserID:            userID,
+			GroupID:           cloneUint32Pointer(input.GroupID),
 			Title:             validated.Title,
 			AchievementTypeID: validated.AchievementTypeID,
 			AchievementParams: validated.AchievementParams,
 			Attributes:        validated.Attributes,
-			Invert:            validated.Invert,
+			InvertValue:       validated.InvertValue,
+			InvertPercentage:  validated.InvertPercentage,
+			// ユーザー単位の目標上限を検証済みのため、uint16の範囲を超えません。
+			SortOrder: uint16(groupCount + 1), // #nosec G115
 		}
 		if err := u.goalRepo.Create(ctx, tx, goal); err != nil {
 			return err
@@ -108,12 +123,39 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 			}
 			return err
 		}
+		if err := u.validateGroupOwnership(ctx, tx, userID, input.GroupID); err != nil {
+			return err
+		}
+		if !equalUint32Pointers(g.GroupID, input.GroupID) {
+			goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+			if err != nil {
+				return err
+			}
+			arrangement, err := entity.NewGoalArrangement(userID, goals)
+			if err != nil {
+				return ErrInternalError
+			}
+			if err := arrangement.Move(g.ID, input.GroupID); err != nil {
+				return ErrInternalError
+			}
+			if err := u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement); err != nil {
+				return err
+			}
+			g.GroupID = cloneUint32Pointer(input.GroupID)
+			for _, arrangedGoal := range arrangement.Goals() {
+				if arrangedGoal.ID == g.ID {
+					g.SortOrder = arrangedGoal.SortOrder
+					break
+				}
+			}
+		}
 		g.Title = validated.Title
 		g.AchievementTypeID = validated.AchievementTypeID
 		g.AchievementParams = validated.AchievementParams
 		g.Attributes = validated.Attributes
-		g.Invert = validated.Invert
-		if err := u.goalRepo.Update(ctx, tx, g); err != nil {
+		g.InvertValue = validated.InvertValue
+		g.InvertPercentage = validated.InvertPercentage
+		if err := u.goalRepo.Save(ctx, tx, g); err != nil {
 			if errors.Is(err, repository.ErrGoalNotFound) {
 				return ErrGoalNotFound
 			}
@@ -133,11 +175,80 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 }
 
 func (u *goalUsecase) Delete(ctx context.Context, userID int, id uint32) error {
-	err := u.goalRepo.DeleteByIDAndUserID(ctx, u.db, id, userID)
-	if errors.Is(err, repository.ErrGoalNotFound) {
-		return ErrGoalNotFound
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
+			return err
+		}
+		goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		arrangement, err := entity.NewGoalArrangement(userID, goals)
+		if err != nil {
+			return ErrInternalError
+		}
+		if err := arrangement.Remove(id); errors.Is(err, entity.ErrGoalArrangementMissing) {
+			return ErrGoalNotFound
+		} else if err != nil {
+			return ErrInternalError
+		}
+		if err := u.goalRepo.DeleteByIDAndUserID(ctx, tx, id, userID); err != nil {
+			if errors.Is(err, repository.ErrGoalNotFound) {
+				return ErrGoalNotFound
+			}
+			return err
+		}
+		return u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement)
+	})
+}
+
+// Reorder は所有目標の完全なID集合だけを受け付け、欠落や他ユーザーIDの混入を防ぎます。
+func (u *goalUsecase) Reorder(ctx context.Context, userID int, groupID *uint32, orderedGoalIDs []uint32) error {
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		if err := u.goalRepo.LockUserByID(ctx, tx, userID); err != nil {
+			return err
+		}
+		goals, err := u.goalRepo.ListByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		if err := u.validateGroupOwnership(ctx, tx, userID, groupID); err != nil {
+			return err
+		}
+		arrangement, err := entity.NewGoalArrangement(userID, goals)
+		if err != nil {
+			return ErrInternalError
+		}
+		if err := arrangement.Reorder(groupID, orderedGoalIDs); err != nil {
+			return ErrInvalidGoalOrder
+		}
+		return u.goalRepo.SaveGoalArrangement(ctx, tx, arrangement)
+	})
+}
+
+func (u *goalUsecase) validateGroupOwnership(ctx context.Context, exec repository.Executor, userID int, groupID *uint32) error {
+	if groupID == nil {
+		return nil
 	}
-	return err
+	if _, err := u.groupRepo.FindByIDAndUserID(ctx, exec, *groupID, userID); err != nil {
+		if errors.Is(err, repository.ErrGoalGroupNotFound) {
+			return ErrGoalGroupNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func equalUint32Pointers(a, b *uint32) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
+
+func cloneUint32Pointer(value *uint32) *uint32 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 type validatedGoalInput struct {
@@ -145,7 +256,8 @@ type validatedGoalInput struct {
 	AchievementTypeID int
 	AchievementParams []byte
 	Attributes        []byte
-	Invert            bool
+	InvertValue       bool
+	InvertPercentage  bool
 }
 
 type goalAttributeFilter struct {
@@ -154,48 +266,67 @@ type goalAttributeFilter struct {
 	ConstMax      *float64
 	GenreIDs      []int
 	VersionRanges []repository.VersionRange
+	OPTargetOnly  bool
 }
 
 type goalAchievementParam struct {
-	Score *int
-	Count *int
-	Total *float64
+	Score          *int
+	Count          *int
+	Total          *float64
+	RemainingInt   *int64
+	RemainingFloat *float64
+	Percent        *float64
 }
 
 func (u *goalUsecase) validateInput(ctx context.Context, input *GoalInput) (*validatedGoalInput, error) {
-	if input == nil {
-		return nil, ErrInvalidGoalInput
+	validated, attrs, params, err := u.validateInputStatic(input)
+	if err != nil {
+		return nil, err
 	}
-	title := input.Title
-	title = strings.TrimSpace(title)
+	if err := u.validateDynamicUpperBound(ctx, input.AchievementType, attrs, params); err != nil {
+		return nil, err
+	}
+	return validated, nil
+}
+
+func (u *goalUsecase) validateInputStatic(input *GoalInput) (*validatedGoalInput, *goalAttributeFilter, *goalAchievementParam, error) {
+	if input == nil {
+		return nil, nil, nil, ErrInvalidGoalInput
+	}
+	title := strings.TrimSpace(input.Title)
 	if title == "" || len([]rune(title)) > 30 || hasControlCharacter(title) {
-		return nil, ErrInvalidGoalTitle
+		return nil, nil, nil, ErrInvalidGoalTitle
 	}
 	masters := u.masterProvider.GoalMasters()
 	if masters == nil {
-		return nil, ErrInternalError
+		return nil, nil, nil, ErrInternalError
 	}
 	item, ok := masters.AchievementTypesByCode[input.AchievementType]
 	if !ok {
-		return nil, ErrInvalidAchievementType
+		return nil, nil, nil, ErrInvalidAchievementType
 	}
-	attrsRaw, attrsFilter, err := validateAttributes(input.Attributes, masters)
+	attrsRaw, attrsFilter, err := validateAttributes(input.Attributes, masters, input.AchievementType)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	paramsRaw, params, err := validateAchievementParams(input.AchievementType, input.AchievementParams)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-
-	if err := u.validateDynamicUpperBound(ctx, input.AchievementType, attrsFilter, params); err != nil {
-		return nil, err
-	}
-
-	return &validatedGoalInput{Title: title, AchievementTypeID: item.ID, AchievementParams: paramsRaw, Attributes: attrsRaw, Invert: input.Invert}, nil
+	return &validatedGoalInput{
+		Title:             title,
+		AchievementTypeID: item.ID,
+		AchievementParams: paramsRaw,
+		Attributes:        attrsRaw,
+		InvertValue:       input.InvertValue,
+		InvertPercentage:  input.InvertPercentage,
+	}, attrsFilter, params, nil
 }
-
-func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]byte, *goalAttributeFilter, error) {
+func validateAttributes(
+	raw []byte,
+	masters *domainmasterdata.GoalMasters,
+	achievementType string,
+) ([]byte, *goalAttributeFilter, error) {
 	var attrs map[string]json.RawMessage
 	if len(raw) == 0 {
 		return []byte("{}"), &goalAttributeFilter{}, nil
@@ -203,14 +334,33 @@ func validateAttributes(raw []byte, masters *domainmasterdata.GoalMasters) ([]by
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
-	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true}
+	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true, "chart_target": true}
 	for k := range attrs {
 		if !allowed[k] {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
 	}
+	if achievementType == "rainbow_count" {
+		for _, key := range []string{"diff", "const", "chart_target"} {
+			if _, ok := attrs[key]; ok {
+				return nil, nil, ErrInvalidGoalAttributes
+			}
+		}
+	}
 
 	result := &goalAttributeFilter{}
+	if v, ok := attrs["chart_target"]; ok {
+		var chartTarget string
+		if err := json.Unmarshal(v, &chartTarget); err != nil || chartTarget != info.GoalChartTargetOP {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+		result.OPTargetOnly = true
+	}
+	if result.OPTargetOnly {
+		if _, ok := attrs["diff"]; ok {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
+	}
 	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "diff", func(id int) bool {
 		_, exists := masters.DifficultyNamesByID[id]
 		return exists
@@ -404,23 +554,50 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 	scoreCountTypes := map[string]bool{"rank_count": true, "score_count": true}
 	switch {
 	case scoreCountTypes[achievementType]:
-		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "score", "count") {
+		if len(m) < 1 || !hasOnlyKeys(m, "score", "count", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		score, ok, err := parseOptional[int](m["score"])
 		if err != nil || !ok || score < 0 || score > info.TheoreticalScore {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptional[int](m["count"])
+		result.Score = &score
+
+		count, countOK, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok && count < 1 {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		result.Score = &score
-		if ok {
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(countOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if countOK {
+			if count < 1 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
 			result.Count = &count
+		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
 		}
 	case achievementType == "avg_score":
 		var score int
@@ -428,56 +605,149 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
-	case achievementType == "hardlamp_count" || achievementType == "combolamp_count":
-		var lamp string
-		if len(m) < 1 || len(m) > 2 || !hasOnlyKeys(m, "lamp", "count") || json.Unmarshal(m["lamp"], &lamp) != nil {
+	case achievementType == "hardlamp_count" || achievementType == "combolamp_count" || achievementType == "rainbow_count":
+		if !hasOnlyKeys(m, "lamp", "count", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		count, ok, err := parseOptional[int](m["count"])
+		var lamp string
+		if achievementType != "rainbow_count" {
+			if len(m) < 1 || json.Unmarshal(m["lamp"], &lamp) != nil {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+		} else if _, ok := m["lamp"]; ok {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		count, countOK, err := parseOptional[int](m["count"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok && count < 1 {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if achievementType == "hardlamp_count" {
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(countOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if countOK && count < 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		switch achievementType {
+		case "hardlamp_count":
 			if _, ok := info.HardLampAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
 			}
-		} else if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
-			return nil, nil, ErrInvalidAchievementParam
+		case "combolamp_count":
+			if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
+				return nil, nil, ErrInvalidAchievementParam
+			}
 		}
-		if ok {
+
+		if countOK {
 			result.Count = &count
 		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
+		}
 	case achievementType == "total_score":
-		if len(m) > 1 || !hasOnlyKeys(m, "total") {
+		if !hasOnlyKeys(m, "total", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptional[int64](m["total"])
+
+		total, totalOK, err := parseOptional[int64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok {
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(totalOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if totalOK {
 			if total < 0 {
 				return nil, nil, ErrInvalidAchievementParam
 			}
 			totalFloat := float64(total)
 			result.Total = &totalFloat
 		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
+		}
 	case achievementType == "overpower_value":
-		if len(m) > 1 || !hasOnlyKeys(m, "total") {
+		if !hasOnlyKeys(m, "total", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		total, ok, err := parseOptional[float64](m["total"])
+
+		total, totalOK, err := parseOptional[float64](m["total"])
 		if err != nil {
 			return nil, nil, ErrInvalidAchievementParam
 		}
-		if ok {
+		remaining, remOK, err := parseOptional[float64](m["remaining"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		cnt := countBoolToInt(totalOK) + countBoolToInt(remOK) + countBoolToInt(pctOK)
+		if cnt > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+
+		if totalOK {
 			if total < 0 || !isScale(total, 3) {
 				return nil, nil, ErrInvalidAchievementParam
 			}
 			result.Total = &total
+		}
+		if remOK {
+			if remaining < 0 || !isScale(remaining, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingFloat = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 || !isScale(percent, 3) {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
 		}
 	case achievementType == "overpower_percent":
 		var total float64
@@ -496,39 +766,67 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 }
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
-	filter := repository.GoalTargetFilter{
+	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, goalTargetFilter(attrs))
+	if err != nil {
+		return err
+	}
+	return validateDynamicUpperBoundWithStats(achievementType, params, stats)
+}
+
+func goalTargetFilter(attrs *goalAttributeFilter) repository.GoalTargetFilter {
+	return repository.GoalTargetFilter{
 		DifficultyIDs: attrs.DifficultyIDs,
 		GenreIDs:      attrs.GenreIDs,
 		VersionRanges: attrs.VersionRanges,
 		ConstMin:      attrs.ConstMin,
 		ConstMax:      attrs.ConstMax,
+		OPTargetOnly:  attrs.OPTargetOnly,
 	}
-	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, filter)
-	if err != nil {
-		return err
-	}
+}
 
+func validateDynamicUpperBoundWithStats(achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
 	switch achievementType {
 	case "rank_count", "score_count", "hardlamp_count", "combolamp_count":
 		if params.Count != nil && *params.Count > stats.ChartCount {
 			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
+			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
+	case "rainbow_count":
+		if params.Count != nil && *params.Count > stats.SongCount {
+			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.SongCount)
+			return ErrInvalidAchievementParam
+		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.SongCount) {
+			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.SongCount)
+			return ErrInvalidAchievementParam
+		}
 	case "total_score":
+		maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 		if params.Total != nil {
-			maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 			if *params.Total > maxTotal {
 				slog.Info("goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
 		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount)*int64(info.TheoreticalScore) {
+			slog.Info("goal validation failed", "reason", "total_score_remaining_over_dynamic_max", "input", *params.RemainingInt, "max", maxTotal)
+			return ErrInvalidAchievementParam
+		}
 	case "overpower_value":
+		maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
 		if params.Total != nil {
-			maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
 			if *params.Total > maxTotal {
 				slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
+		}
+		if params.RemainingFloat != nil && *params.RemainingFloat > maxTotal {
+			slog.Info("goal validation failed", "reason", "overpower_value_remaining_over_dynamic_max", "input", *params.RemainingFloat, "max", maxTotal)
+			return ErrInvalidAchievementParam
 		}
 	case "overpower_percent":
 		// 割合(0-100)で扱うため動的上限は不要
@@ -540,6 +838,13 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 func isScale(v float64, scale int) bool {
 	f := math.Pow10(scale)
 	return math.Abs(v*f-math.Round(v*f)) < 1e-9
+}
+
+func countBoolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func parseOptional[T any](raw json.RawMessage) (T, bool, error) {
@@ -583,7 +888,18 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 		if err := json.Unmarshal(g.Attributes, &a); err != nil {
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
-		outs = append(outs, &GoalOutput{ID: g.ID, Title: g.Title, AchievementType: typeCode, AchievementParams: p, Attributes: a, Invert: g.Invert, CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00")})
+		outs = append(outs, &GoalOutput{
+			ID:                g.ID,
+			GroupID:           cloneUint32Pointer(g.GroupID),
+			Title:             g.Title,
+			AchievementType:   typeCode,
+			AchievementParams: p,
+			Attributes:        a,
+			InvertValue:       g.InvertValue,
+			InvertPercentage:  g.InvertPercentage,
+			SortOrder:         g.SortOrder,
+			CreatedAt:         g.CreatedAt,
+		})
 	}
 	return outs, nil
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // RateLimitConfig はレートリミットの設定を保持します
@@ -24,7 +24,7 @@ type RateLimitConfig struct {
 type rateLimitEntry struct {
 	Count       int       // 現在のウィンドウ内でのリクエスト数
 	WindowStart time.Time // 現在のウィンドウの開始時刻
-	Limit       int       // このエントリの制限数（ADMINは150000、その他は150）
+	Limit       int       // このエントリの制限数（ADMIN: 150000, EDITOR/EXTDEV: 3000, その他: 150）
 }
 
 // FixedWindowStore はFixed Window方式のレートリミットストアです
@@ -127,14 +127,14 @@ func (s *FixedWindowStore) Cleanup() {
 }
 
 // APIRateLimitMiddleware は外部API向けのレートリミットミドルウェアを提供します。
-// ADMINアカウントは150,000回/15分、その他のアカウントは150回/15分の制限が適用されます。
+// ADMINアカウントはadminLimit、EDITOR/EXTDEVアカウントはeditorLimit、それ以外はnormalLimitが適用されます。
 // レスポンスにX-RateLimit-*ヘッダーを追加します。
 // このミドルウェアはAPITokenMiddlewareの後に使用することを想定しています。
-func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
+func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// ユーザーエンティティを取得
 			userObj := c.Get("userEntity")
 			if userObj == nil {
@@ -148,10 +148,13 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 			// ユーザーIDを識別子として使用
 			identifier := strconv.Itoa(user.ID)
 
-			// ADMINかどうかで制限数を変更
+			// アカウントタイプに応じて制限数を変更
 			limit := normalLimit
-			if user.AccountTypeID == info.AccountTypeAdmin {
+			switch user.AccountTypeID {
+			case info.AccountTypeAdmin:
 				limit = adminLimit
+			case info.AccountTypeEditor, info.AccountTypeExtDev:
+				limit = editorLimit
 			}
 
 			// レートリミットチェック
@@ -171,6 +174,41 @@ func APIRateLimitMiddleware(normalLimit, adminLimit int, window time.Duration) e
 	}
 }
 
+// OptionalAPIRateLimitMiddleware は未認証ユーザーをIP、認証済みユーザーをユーザーIDで識別します。
+func OptionalAPIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
+	store := newFixedWindowStoreWithCleanup(window)
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			identifier := "ip:" + c.RealIP()
+			limit := normalLimit
+
+			if userObj := c.Get("userEntity"); userObj != nil {
+				user, ok := userObj.(*entity.User)
+				if !ok {
+					return apierror.ErrUnauthorized
+				}
+				identifier = "user:" + strconv.Itoa(user.ID)
+				switch user.AccountTypeID {
+				case info.AccountTypeAdmin:
+					limit = adminLimit
+				case info.AccountTypeEditor, info.AccountTypeExtDev:
+					limit = editorLimit
+				}
+			}
+
+			allowed, remaining, resetTime := store.Allow(identifier, limit)
+			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
+			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+			return next(c)
+		}
+	}
+}
+
 // IPRateLimitMiddleware はIPアドレスベースのレートリミットミドルウェアを提供します。
 // 未認証ユーザーのエンドポイント保護などに使用します。
 // このミドルウェアはヘッダーを追加しません（外部APIのみヘッダー追加）。
@@ -178,7 +216,7 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// IPアドレスを識別子として使用
 			identifier := c.RealIP()
 
@@ -200,7 +238,7 @@ func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			user, ok := c.Get("userEntity").(*entity.User)
 			if !ok || user == nil {
 				return apierror.ErrUnauthorized
@@ -225,7 +263,7 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 	store := newFixedWindowStoreWithCleanup(config.Window)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			userObj := c.Get("userEntity")
 			if userObj != nil {
 				if _, ok := userObj.(*entity.User); !ok {

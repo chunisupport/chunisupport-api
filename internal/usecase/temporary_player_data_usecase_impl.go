@@ -9,7 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/google/uuid"
 )
 
@@ -69,7 +69,7 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 	}, nil
 }
 
-func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTemporaryPlayerDataInput) (*api_internal.PlayerDataResult, error) {
+func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTemporaryPlayerDataInput) (*playerdataresult.Result, error) {
 	if input.UploadToken == "" {
 		return nil, &PlayerDataValidationError{Field: "upload_token", Message: "is required"}
 	}

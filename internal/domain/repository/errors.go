@@ -17,8 +17,18 @@ var (
 	// ErrAPITokenNotFound はAPIトークンが見つからなかった場合に返されるエラーです。
 	ErrAPITokenNotFound = errors.New("api token not found")
 
+	// ErrAPITokenConflict は同一ユーザー内でAPIトークン名が重複した場合に返されます。
+	ErrAPITokenConflict = errors.New("api token conflict")
+
 	// ErrGoalNotFound は目標が見つからなかった場合に返されるエラーです。
 	ErrGoalNotFound = errors.New("goal not found")
+
+	// ErrGoalOrderInconsistent は保存対象の目標順集約と永続化済み目標の集合が一致しない場合に返されます。
+	ErrGoalOrderInconsistent = errors.New("goal order is inconsistent")
+
+	ErrGoalGroupNotFound          = errors.New("goal group not found")
+	ErrGoalGroupConflict          = errors.New("goal group conflict")
+	ErrGoalGroupOrderInconsistent = errors.New("goal group order is inconsistent")
 
 	// ErrRecordFilterNotFound は譜面フィルタが見つからなかった場合に返されるエラーです。
 	ErrRecordFilterNotFound = errors.New("record filter not found")
@@ -31,6 +41,12 @@ var (
 
 	// ErrSongNotFound は楽曲が見つからなかった場合に返されるエラーです。
 	ErrSongNotFound = errors.New("song not found")
+
+	// ErrCourseNotFound はコースが見つからない場合に返されるエラーです。
+	ErrCourseNotFound = errors.New("course not found")
+
+	// ErrCourseClassNotFound はコースクラスが見つからない場合に返されるエラーです。
+	ErrCourseClassNotFound = errors.New("course class not found")
 
 	// ErrDuplicateDisplayID はリクエスト内に重複したdisplay_idが含まれる場合に返されるエラーです。
 	ErrDuplicateDisplayID = errors.New("duplicate display_id")
@@ -45,6 +61,9 @@ var (
 	// ErrTemporaryPlayerDataNotFound は一時プレイヤーデータが見つからない場合に返されるエラーです。
 	ErrTemporaryPlayerDataNotFound = errors.New("temporary player data not found")
 
+	// ErrPlayerLatestUpdateNotFound はプレイヤーの最新登録結果が見つからない場合に返されるエラーです。
+	ErrPlayerLatestUpdateNotFound = errors.New("player latest update not found")
+
 	// ErrTemporaryPlayerDataPerIPLimitExceeded はIP単位の一時データ上限を超えた場合に返されるエラーです。
 	ErrTemporaryPlayerDataPerIPLimitExceeded = errors.New("temporary player data per ip limit exceeded")
 
@@ -56,4 +75,13 @@ var (
 
 	// ErrRepositoryOperationFailed はリポジトリ操作が永続化層の事情で失敗した場合に返されるエラーです。
 	ErrRepositoryOperationFailed = errors.New("repository operation failed")
+
+	// ErrScoreHistoryTimestampConflict は同一譜面・同一秒の履歴が既に存在する場合に返されます。
+	ErrScoreHistoryTimestampConflict = errors.New("score history timestamp conflict")
+
+	// ErrPlayerMetricHistoryTimestampConflict は同一プレイヤー・同一秒の公式指標履歴が既に存在する場合に返されます。
+	ErrPlayerMetricHistoryTimestampConflict = errors.New("player metric history timestamp conflict")
+
+	// ErrSystemMaintenanceNotFound はメンテナンス状態の単一行が存在しない場合に返されます。
+	ErrSystemMaintenanceNotFound = errors.New("system maintenance not found")
 )
