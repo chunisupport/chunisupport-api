@@ -4447,7 +4447,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
     "meta": {
       "id": "0000000000000001",
       "title": "楽曲名",
-      "genre": "POPS & ANIME",
+      "genre": "POPS&ANIME",
       "artist": "アーティスト名",
       "release": "2015-07-16",
       "bpm": 180.0
@@ -4474,7 +4474,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | ---------- | -- | ---- |
 | `meta.id` | string | 楽曲の識別ID（16桁） |
 | `meta.title` | string | 楽曲名 |
-| `meta.genre` | string\|null | ジャンル名 |
+| `meta.genre` | string\|null | ジャンル名（`POPS & ANIME`は`POPS&ANIME`に変換） |
 | `meta.artist` | string | アーティスト名 |
 | `meta.release` | string\|null | リリース日（YYYY-MM-DD形式） |
 | `meta.bpm` | number\|null | BPM |
@@ -4505,7 +4505,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
   "meta": {
     "id": "0000000000000001",
     "title": "楽曲名",
-    "genre": "POPS & ANIME",
+    "genre": "POPS&ANIME",
     "artist": "アーティスト名",
     "release": "2015-07-16",
     "bpm": 180.0
@@ -4531,7 +4531,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | ---------- | -- | ---- |
 | `meta.id` | string | 楽曲の識別ID（16桁） |
 | `meta.title` | string | 楽曲名 |
-| `meta.genre` | string\|null | ジャンル名 |
+| `meta.genre` | string\|null | ジャンル名（`POPS & ANIME`は`POPS&ANIME`に変換） |
 | `meta.artist` | string | アーティスト名 |
 | `meta.release` | string\|null | リリース日（YYYY-MM-DD形式） |
 | `meta.bpm` | number\|null | BPM |
@@ -4598,7 +4598,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `records[].is_fullcombo` | boolean | コンボランプがFULL COMBOまたはALL JUSTICEの場合true |
 | `records[].is_alljustice` | boolean | コンボランプがALL JUSTICEの場合true |
 | `records[].is_fullchain` | boolean | フルチェインランプが付いている場合true |
-| `records[].genre` | string | ジャンル名 |
+| `records[].genre` | string | ジャンル名（`POPS & ANIME`は`POPS&ANIME`に変換） |
 | `records[].updated_at` | string | レコード更新日時（`YYYY-MM-DDTHH:mm:ss+0900`形式） |
 | `records[].is_played` | boolean | 常にtrue |
 
@@ -4693,7 +4693,7 @@ reiwa互換APIは外部ツールとの互換性を持つエンドポイントで
 | `title` | string | 楽曲タイトル |
 | `artist` | string | アーティスト名 |
 | `img` | string | ジャケット画像識別子 |
-| `genre` | string | ジャンル名（"POPS&ANIME"は"POPS & ANIME"に変換） |
+| `genre` | string | ジャンル名（`POPS & ANIME`は`POPS&ANIME`に変換） |
 | `const` | number | 譜面定数 |
 | `level` | number | 表記レベル（.5区切り、例: 13+ → 13.5） |
 | `diff` | string | 難易度（"BAS", "ADV", "EXP", "MAS", "ULT"） |

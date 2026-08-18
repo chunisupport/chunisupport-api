@@ -123,7 +123,7 @@ func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map
 			IsFullCombo:    isFullCombo(record.ComboLamp),
 			IsAllJustice:   isAllJustice(record.ComboLamp),
 			IsFullChain:    record.FullChain != nil,
-			Genre:          genresBySongID[record.ID],
+			Genre:          compatibleGenreName(genresBySongID[record.ID]),
 			UpdatedAt:      record.UpdatedAt.In(location).Format("2006-01-02T15:04:05-0700"),
 			IsPlayed:       true,
 		})
@@ -176,6 +176,7 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 	// Nullable fields handling
 	if s.GenreID != nil {
 		if genreName, ok := genres[*s.GenreID]; ok {
+			genreName = compatibleGenreName(genreName)
 			item.Meta.Genre = &genreName
 		}
 	}
@@ -216,6 +217,13 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 	}
 
 	return item
+}
+
+func compatibleGenreName(name string) string {
+	if name == masterGenrePOPSAndAnime {
+		return compatibleGenrePOPSAndAnime
+	}
+	return name
 }
 
 // calculateLevel は定数から表記レベルを計算します

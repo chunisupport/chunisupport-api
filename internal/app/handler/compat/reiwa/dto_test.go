@@ -150,13 +150,13 @@ func TestToChunithmRecordOriginalResponse_GenrePOPSANIME(t *testing.T) {
 	}
 
 	cache := &masterdata.Cache{
-		GenreNamesByID: map[int]string{1: "POPS&ANIME"},
+		GenreNamesByID: map[int]string{1: "POPS & ANIME"},
 		VersionsByID:   map[int]masterdata.Version{},
 	}
 
 	result := ToChunithmRecordOriginalResponse([]*entity.Song{song}, cache)
 	assert.Len(t, result, 1)
-	assert.Equal(t, "POPS & ANIME", result[0].Genre)
+	assert.Equal(t, "POPS&ANIME", result[0].Genre)
 }
 
 func TestToChunithmRecordOriginalResponse_ExcludesWorldsend(t *testing.T) {
@@ -323,7 +323,7 @@ func TestResolveGenreName_NilGenreID(t *testing.T) {
 func TestResolveGenreName_UnknownID(t *testing.T) {
 	genreID := 999
 	cache := &masterdata.Cache{
-		GenreNamesByID: map[int]string{1: "POPS&ANIME"},
+		GenreNamesByID: map[int]string{1: "POPS & ANIME"},
 	}
 	assert.Equal(t, "", resolveGenreName(&genreID, cache))
 }

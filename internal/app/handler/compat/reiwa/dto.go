@@ -74,7 +74,7 @@ func ToChunithmRecordOriginalResponse(songs []*entity.Song, masterCache *masterd
 	return records
 }
 
-// resolveGenreName はGenreIDからジャンル名を解決します。POPS&ANIMEはPOPS & ANIMEに変換します
+// resolveGenreName は互換元APIの表記に合わせてGenreIDからジャンル名を解決します。
 func resolveGenreName(genreID *int, cache *masterdata.Cache) string {
 	if genreID == nil || cache == nil {
 		return ""
@@ -83,8 +83,8 @@ func resolveGenreName(genreID *int, cache *masterdata.Cache) string {
 	if !ok {
 		return ""
 	}
-	if name == "POPS&ANIME" {
-		return "POPS & ANIME"
+	if name == masterGenrePOPSAndAnime {
+		return compatibleGenrePOPSAndAnime
 	}
 	return name
 }
