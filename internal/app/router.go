@@ -591,8 +591,8 @@ func registerRoutes(
 		info.APIRateLimitAdminRequests,
 		info.APIRateLimitWindow,
 	))
-	optionalHistoryV1.GET("/songs/:displayid/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
-	optionalHistoryV1.GET("/worldsend-songs/:displayid/score-history", handlers.ScoreHistory.GetWorldsend)
+	optionalHistoryV1.GET("/songs/:id/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
+	optionalHistoryV1.GET("/worldsend-songs/:id/score-history", handlers.ScoreHistory.GetWorldsend)
 	optionalHistoryV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
 
 	apiV1 := e.Group("/v1")
@@ -609,14 +609,14 @@ func registerRoutes(
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
 		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
 		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireEditor)
-		apiV1.GET("/songs/:displayid", handlers.V1Song.GetSong)
-		apiV1.GET("/songs/:displayid/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
+		apiV1.GET("/songs/:id", handlers.V1Song.GetSong)
+		apiV1.GET("/songs/:id/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)
-		apiV1.GET("/worldsend-songs/:displayid", handlers.V1Worldsend.GetWorldsendSong)
+		apiV1.GET("/worldsend-songs/:id", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
 		apiV1.GET("/users/:username/records/courses", handlers.V1Course.GetUserRecords)
 		apiV1.GET("/courses", handlers.V1Course.List)
-		apiV1.GET("/courses/:displayid", handlers.V1Course.Get)
+		apiV1.GET("/courses/:id", handlers.V1Course.Get)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 

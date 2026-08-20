@@ -283,16 +283,16 @@ Content-Type: application/json
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
 | `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
 | `/v1/songs/chart-constant` | PATCH | APIトークン (EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
-| `/v1/songs/:displayid` | GET | APIトークン | 楽曲詳細取得 |
-| `/v1/songs/:displayid/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
-| `/v1/songs/:displayid/score-history/:difficulty` | GET | APIトークン（任意） | 通常譜面スコア履歴取得 |
+| `/v1/songs/:id` | GET | APIトークン | 楽曲詳細取得 |
+| `/v1/songs/:id/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
+| `/v1/songs/:id/score-history/:difficulty` | GET | APIトークン（任意） | 通常譜面スコア履歴取得 |
 | `/v1/worldsend-songs` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
-| `/v1/worldsend-songs/:displayid` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
-| `/v1/worldsend-songs/:displayid/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
+| `/v1/worldsend-songs/:id` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
+| `/v1/worldsend-songs/:id/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
-| `/v1/courses/:displayid` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
@@ -3155,7 +3155,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - `username`: 対象ユーザー名
   - `displayid`: 楽曲の表示用ID
   - `difficulty`: `expert`, `master`, `ultima`
-- **レスポンス**: 200 OK。形式は GET `/v1/songs/:displayid/score-history/:difficulty` と同一です。
+- **レスポンス**: 200 OK。形式は GET `/v1/songs/:id/score-history/:difficulty` と同一です。
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` が不正
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
@@ -3419,7 +3419,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **パスパラメータ**:
   - `username`: 対象ユーザー名
   - `displayid`: WORLD'S END楽曲の表示用ID
-- **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:displayid/score-history` と同一です。
+- **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:id/score-history` と同一です。
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` が不正
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
@@ -4138,7 +4138,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲ID |
 | `title` | string | 楽曲名 |
 | `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
@@ -4163,10 +4163,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/worldsend-songs/:displayid`
+### GET `/v1/worldsend-songs/:id`
 - **認証**: APIトークン必須
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
-- **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。
+- **パスパラメータ**: `id` - 楽曲ID
+- **概要**: 指定されたIDの WORLD'S END 楽曲を譜面情報付きで取得します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -4195,13 +4195,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:displayid`
+### GET `/v1/songs/:id`
 - **認証**: APIトークン必須
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲ID |
 
 - **概要**: 指定楽曲の詳細を取得します。
 - **レスポンス**: 200 OK
@@ -4234,14 +4234,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:displayid/stats/:difficulty`
+### GET `/v1/songs/:id/stats/:difficulty`
 - **認証**: APIトークン必須
 - **概要**: 指定楽曲の特定難易度のレーティング帯別統計を取得します。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲ID |
 | `difficulty` | string | 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend` |
 
 - **レスポンス**: 200 OK
@@ -4256,7 +4256,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/v1/songs/:displayid/score-history/:difficulty`
+### GET `/v1/songs/:id/score-history/:difficulty`
 - **認証**: APIトークン（任意）
 - **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
@@ -4264,7 +4264,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲ID |
 | `difficulty` | string | 難易度名（小文字）: `expert`, `master`, `ultima` |
 
 - **クエリパラメータ**:
@@ -4304,7 +4304,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
-### GET `/v1/worldsend-songs/:displayid/score-history`
+### GET `/v1/worldsend-songs/:id/score-history`
 - **認証**: APIトークン（任意）
 - **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
@@ -4312,7 +4312,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | WORLD'S END楽曲の表示用ID |
+| `id` | string | WORLD'S END楽曲ID |
 
 - **クエリパラメータ**:
 

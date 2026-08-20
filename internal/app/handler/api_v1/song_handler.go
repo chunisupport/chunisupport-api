@@ -50,9 +50,9 @@ func (h *V1SongHandler) GetSongs(c *echo.Context) error {
 	})
 }
 
-// GetSong は指定された displayid の楽曲を取得します。
+// GetSong は指定された外部向けIDの楽曲を取得します。
 func (h *V1SongHandler) GetSong(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -71,7 +71,7 @@ func (h *V1SongHandler) GetSong(c *echo.Context) error {
 
 // GetChartStatsByDifficulty は指定されたDisplayIDと難易度の譜面統計を取得します。
 func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
