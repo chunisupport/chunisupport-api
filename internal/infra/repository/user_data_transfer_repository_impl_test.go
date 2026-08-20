@@ -36,6 +36,88 @@ func TestUserDataTransferRepositoryImportSnapshotCommitsAtomically(t *testing.T)
 	assert.Equal(t, 1, playerCount)
 }
 
+func TestUserDataTransferRepositoryImportSnapshotCreatesUnregisteredHonor(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO honor_types (id, name) VALUES (1, 'normal'), (2, 'sp')")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	imageURL := "https://example.com/honors/transfer.png"
+	snapshot.Honors = []entity.UserDataTransferHonor{
+		{
+			Slot:       1,
+			Name:       "移行元だけにある通常称号",
+			TypeName:   "normal",
+			EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			Slot:       2,
+			ImageURL:   &imageURL,
+			Name:       "移行元だけにあるSP称号",
+			TypeName:   "sp",
+			EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	playerID, err := repo.ImportSnapshot(context.Background(), 1, snapshot)
+
+	require.NoError(t, err)
+	var stored []struct {
+		PlayerID int     `db:"player_id"`
+		Slot     int     `db:"slot"`
+		Name     string  `db:"name"`
+		TypeName string  `db:"type_name"`
+		ImageURL *string `db:"image_url"`
+	}
+	require.NoError(t, db.Select(&stored, `SELECT ph.player_id, ph.slot, h.name, ht.name AS type_name, h.image_url
+		FROM player_honors ph
+		INNER JOIN honors h ON h.id = ph.honor_id
+		INNER JOIN honor_types ht ON ht.id = h.honor_type_id
+		ORDER BY ph.slot`))
+	require.Len(t, stored, 2)
+	assert.Equal(t, playerID, stored[0].PlayerID)
+	assert.Equal(t, 1, stored[0].Slot)
+	assert.Equal(t, "移行元だけにある通常称号", stored[0].Name)
+	assert.Equal(t, "normal", stored[0].TypeName)
+	assert.Nil(t, stored[0].ImageURL)
+	assert.Equal(t, playerID, stored[1].PlayerID)
+	assert.Equal(t, 2, stored[1].Slot)
+	assert.Equal(t, "移行元だけにあるSP称号", stored[1].Name)
+	assert.Equal(t, "sp", stored[1].TypeName)
+	require.NotNil(t, stored[1].ImageURL)
+	assert.Equal(t, imageURL, *stored[1].ImageURL)
+}
+
+func TestUserDataTransferRepositoryImportSnapshotReusesExistingHonor(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO honor_types (id, name) VALUES (1, 'normal')")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO honors (id, name, honor_type_id, image_url) VALUES (10, '登録済み称号', 1, NULL)")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	snapshot.Honors = []entity.UserDataTransferHonor{{
+		Slot:       1,
+		Name:       "登録済み称号",
+		TypeName:   "normal",
+		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
+
+	_, err = repo.ImportSnapshot(context.Background(), 1, snapshot)
+
+	require.NoError(t, err)
+	var honorCount int
+	require.NoError(t, db.Get(&honorCount, "SELECT COUNT(*) FROM honors"))
+	assert.Equal(t, 1, honorCount)
+	var assignedHonorID int
+	require.NoError(t, db.Get(&assignedHonorID, "SELECT honor_id FROM player_honors"))
+	assert.Equal(t, 10, assignedHonorID)
+}
+
 func TestUserDataTransferRepositoryImportSnapshotRollsBackWhenDestinationUserDisappears(t *testing.T) {
 	db := newTransferRepositoryTestDB(t)
 	repo := NewUserDataTransferRepository(db)
@@ -53,8 +135,16 @@ func TestUserDataTransferRepositoryImportSnapshotRollsBackAfterChildSaveFailure(
 	db := newTransferRepositoryTestDB(t)
 	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
 	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO honor_types (id, name) VALUES (1, 'normal')")
+	require.NoError(t, err)
 	repo := NewUserDataTransferRepository(db)
 	snapshot := emptyTransferRepositorySnapshot(t)
+	snapshot.Honors = []entity.UserDataTransferHonor{{
+		Slot:       1,
+		Name:       "ロールバック対象称号",
+		TypeName:   "normal",
+		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
 	snapshot.RecordFilters = []entity.UserDataTransferRecordFilter{{
 		Name:          "失敗確認",
 		FilterType:    "normal",
@@ -73,6 +163,9 @@ func TestUserDataTransferRepositoryImportSnapshotRollsBackAfterChildSaveFailure(
 	var linkedCount int
 	require.NoError(t, db.Get(&linkedCount, "SELECT COUNT(player_id) FROM users WHERE id = 1"))
 	assert.Zero(t, linkedCount)
+	var honorCount int
+	require.NoError(t, db.Get(&honorCount, "SELECT COUNT(*) FROM honors"))
+	assert.Zero(t, honorCount)
 }
 
 func TestUserDataTransferRepositoryExportAuxiliaryPlayerDataTreatsEmptyHonorImageURLAsUnset(t *testing.T) {
@@ -120,7 +213,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE honor_types (id INTEGER PRIMARY KEY, name TEXT)",
-		"CREATE TABLE honors (id INTEGER PRIMARY KEY, name TEXT, honor_type_id INTEGER, image_url TEXT NULL)",
+		"CREATE TABLE honors (id INTEGER PRIMARY KEY, name TEXT, honor_type_id INTEGER, image_url TEXT NULL, UNIQUE(name, honor_type_id), UNIQUE(image_url))",
 		"CREATE TABLE player_metric_histories (player_id INTEGER, official_rating REAL, official_overpower REAL, data_collected_at DATETIME)",
 		"CREATE TABLE player_course_records (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_honors (player_id INTEGER, honor_id INTEGER, slot INTEGER, created_at DATETIME)",

@@ -75,8 +75,8 @@ func findTransferUnresolvedReferences(snapshot *entity.UserDataTransferSnapshot,
 		add("combo_lamp", course.ComboLampName, ok)
 	}
 	for _, honor := range snapshot.Honors {
-		_, ok := masters.resolveHonor(honor.ImageURL, honor.Name, honor.TypeName)
-		add("honor", honor.Name+"/"+honor.TypeName, ok)
+		_, ok := masters.honorTypeIDs[honor.TypeName]
+		add("honor_type", honor.TypeName, ok)
 	}
 	for _, favorite := range snapshot.FavoriteSongs {
 		_, ok := masters.songIDs[favorite.SongOfficialIdx]
@@ -215,7 +215,7 @@ func (r *userDataTransferRepository) importSnapshot(ctx context.Context, exec do
 	if err := saveTransferRecords(ctx, exec, playerID, snapshot, masters); err != nil {
 		return 0, err
 	}
-	if err := saveTransferAuxiliaryData(ctx, exec, playerID, snapshot, masters); err != nil {
+	if err := saveTransferAuxiliaryData(ctx, exec, playerID, snapshot, masters, &honorRepository{db: r.db}); err != nil {
 		return 0, err
 	}
 	if err := saveTransferGoals(ctx, exec, userID, snapshot, masters); err != nil {
@@ -326,7 +326,7 @@ func saveTransferRecords(ctx context.Context, exec domainrepo.Executor, playerID
 	return bulkTransferNamedExec(ctx, exec, `INSERT INTO player_worldsend_record_histories (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at) VALUES (:player_id,:worldsend_chart_id,:score,:clear_lamp_id,:combo_lamp_id,:full_chain_id,:updated_at)`, worldsendHistories)
 }
 
-func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, playerID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData) error {
+func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, playerID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData, honorRepo domainrepo.HonorRepository) error {
 	type metricRow struct {
 		PlayerID          int       `db:"player_id"`
 		OfficialRating    float64   `db:"official_rating"`
@@ -363,7 +363,15 @@ func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, pl
 	}
 	honors := make([]honorRow, 0, len(snapshot.Honors))
 	for _, item := range snapshot.Honors {
-		id, _ := masters.resolveHonor(item.ImageURL, item.Name, item.TypeName)
+		id, exists := masters.resolveHonor(item.ImageURL, item.Name, item.TypeName)
+		if !exists {
+			result, err := honorRepo.EnsureHonor(ctx, exec, item.Name, masters.honorTypeIDs[item.TypeName], item.ImageURL)
+			if err != nil {
+				return err
+			}
+			id = result.ID
+			masters.rememberHonor(id, item.ImageURL, item.Name, item.TypeName)
+		}
 		honors = append(honors, honorRow{playerID, id, item.Slot, item.EquippedAt})
 	}
 	if err := bulkTransferNamedExec(ctx, exec, `INSERT INTO player_honors (player_id,honor_id,slot,created_at) VALUES (:player_id,:honor_id,:slot,:created_at)`, honors); err != nil {

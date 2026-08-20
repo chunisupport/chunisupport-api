@@ -91,7 +91,7 @@ func TestToMusicShowResponse(t *testing.T) {
 	assert.Equal(t, "テスト楽曲", result.Meta.Title)
 	assert.Equal(t, "テストアーティスト", result.Meta.Artist)
 	assert.NotNil(t, result.Meta.Genre)
-	assert.Equal(t, "POPS & ANIME", *result.Meta.Genre)
+	assert.Equal(t, "POPS&ANIME", *result.Meta.Genre)
 	assert.NotNil(t, result.Meta.BPM)
 	assert.Equal(t, float64(180), *result.Meta.BPM)
 	assert.NotNil(t, result.Meta.Release)
@@ -150,7 +150,7 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 
 	// When
 	result := ToRecordsShowAllResponse(records, map[string]string{
-		"6a88218b1a936bd3": "VARIETY",
+		"6a88218b1a936bd3": "POPS & ANIME",
 	}, jst)
 
 	// Then
@@ -169,7 +169,7 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 	assert.True(t, record.IsFullCombo)
 	assert.True(t, record.IsAllJustice)
 	assert.True(t, record.IsFullChain)
-	assert.Equal(t, "VARIETY", record.Genre)
+	assert.Equal(t, "POPS&ANIME", record.Genre)
 	assert.Equal(t, "1970-01-01T09:00:00+0900", record.UpdatedAt)
 	assert.True(t, record.IsPlayed)
 }
@@ -225,6 +225,36 @@ func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
 			require.Len(t, result.Records, 1)
 			assert.Equal(t, tt.wantFullCombo, result.Records[0].IsFullCombo)
 			assert.Equal(t, tt.wantAllJustice, result.Records[0].IsAllJustice)
+		})
+	}
+}
+
+func TestCompatibleGenreName(t *testing.T) {
+	tests := []struct {
+		name     string
+		genre    string
+		expected string
+	}{
+		{
+			name:     "POPSとANIMEは互換元APIの表記に変換する",
+			genre:    "POPS & ANIME",
+			expected: "POPS&ANIME",
+		},
+		{
+			name:     "対象外のジャンルは変更しない",
+			genre:    "VARIETY",
+			expected: "VARIETY",
+		},
+		{
+			name:     "空文字は変更しない",
+			genre:    "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, compatibleGenreName(tt.genre))
 		})
 	}
 }

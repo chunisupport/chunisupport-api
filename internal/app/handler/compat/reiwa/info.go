@@ -1,7 +1,6 @@
-package chunirec
+package reiwa
 
 const (
-	undisclosedUserID           = 0
 	masterGenrePOPSAndAnime     = "POPS & ANIME"
 	compatibleGenrePOPSAndAnime = "POPS&ANIME"
 )

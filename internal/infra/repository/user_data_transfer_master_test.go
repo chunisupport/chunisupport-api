@@ -55,7 +55,7 @@ func TestFindTransferUnresolvedReferencesCollectsAndSorts(t *testing.T) {
 	masters := &transferMasterData{
 		songIDs: map[string]int{}, charts: map[string]transferChartMaster{}, worldsendChartIDs: map[string]int{}, courseIDs: map[string]int{},
 		clearLampIDs: map[string]int{"NONE": 1}, comboLampIDs: map[string]int{"NONE": 1}, fullChainIDs: map[string]int{"NONE": 1}, slotIDs: map[string]int{"none": 1},
-		classEmblemIDs: map[string]int{}, classEmblemBaseIDs: map[string]int{}, honorIDsByImage: map[string]int{}, honorIDsByNameAndType: map[string]int{},
+		classEmblemIDs: map[string]int{}, classEmblemBaseIDs: map[string]int{}, honorTypeIDs: map[string]int{}, honorIDsByImage: map[string]int{}, honorIDsByNameAndType: map[string]int{},
 		achievementTypeIDs: map[string]int{}, difficultyIDs: map[string]int{"MASTER": 4}, difficultyNames: map[int]string{4: "MASTER"},
 		genreIDs: map[string]int{}, genreNames: map[int]string{}, versionIDs: map[string]int{}, versionNames: map[int]string{},
 	}
@@ -63,6 +63,44 @@ func TestFindTransferUnresolvedReferencesCollectsAndSorts(t *testing.T) {
 	got := findTransferUnresolvedReferences(snapshot, masters)
 
 	assert.Equal(t, []string{"chart:999/MASTER"}, got)
+}
+
+func TestFindTransferUnresolvedReferencesAllowsUnregisteredHonor(t *testing.T) {
+	snapshot := emptyTransferRepositorySnapshot(t)
+	snapshot.Honors = []entity.UserDataTransferHonor{{
+		Slot:       1,
+		Name:       "移行元だけにある称号",
+		TypeName:   "gold",
+		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
+	masters := &transferMasterData{
+		honorTypeIDs:          map[string]int{"gold": 2},
+		honorIDsByImage:       map[string]int{},
+		honorIDsByNameAndType: map[string]int{},
+	}
+
+	got := findTransferUnresolvedReferences(snapshot, masters)
+
+	assert.Empty(t, got)
+}
+
+func TestFindTransferUnresolvedReferencesRejectsUnknownHonorType(t *testing.T) {
+	snapshot := emptyTransferRepositorySnapshot(t)
+	snapshot.Honors = []entity.UserDataTransferHonor{{
+		Slot:       1,
+		Name:       "未知の種類を持つ称号",
+		TypeName:   "unknown",
+		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
+	masters := &transferMasterData{
+		honorTypeIDs:          map[string]int{"gold": 2},
+		honorIDsByImage:       map[string]int{},
+		honorIDsByNameAndType: map[string]int{},
+	}
+
+	got := findTransferUnresolvedReferences(snapshot, masters)
+
+	assert.Equal(t, []string{"honor_type:unknown"}, got)
 }
 func TestCalculateTransferDerivedMetricsExcludesLockedAndDeletedSongsFromOverpower(t *testing.T) {
 	name, err := playername.NewPlayerName("テスト")

@@ -29,6 +29,7 @@ type transferMasterData struct {
 	slotIDs               map[string]int
 	classEmblemIDs        map[string]int
 	classEmblemBaseIDs    map[string]int
+	honorTypeIDs          map[string]int
 	honorIDsByImage       map[string]int
 	honorIDsByNameAndType map[string]int
 	achievementTypeIDs    map[string]int
@@ -76,6 +77,9 @@ func loadTransferMasterData(ctx context.Context, exec domainrepo.Executor) (*tra
 		return nil, err
 	}
 	if masters.classEmblemBaseIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT name, id FROM class_emblem_bases`); err != nil {
+		return nil, err
+	}
+	if masters.honorTypeIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT name, id FROM honor_types`); err != nil {
 		return nil, err
 	}
 	if masters.achievementTypeIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT code AS name, id FROM achievement_types`); err != nil {
@@ -148,6 +152,13 @@ func (m *transferMasterData) resolveHonor(imageURL *string, name, typeName strin
 	}
 	id, ok := m.honorIDsByNameAndType[name+"\x00"+typeName]
 	return id, ok
+}
+
+func (m *transferMasterData) rememberHonor(id int, imageURL *string, name, typeName string) {
+	if imageURL != nil {
+		m.honorIDsByImage[*imageURL] = id
+	}
+	m.honorIDsByNameAndType[name+"\x00"+typeName] = id
 }
 
 func transformTransferGoalAttributes(raw json.RawMessage, maps map[string]map[string]int, reverseMaps map[string]map[int]string, toExternal bool) (json.RawMessage, error) {

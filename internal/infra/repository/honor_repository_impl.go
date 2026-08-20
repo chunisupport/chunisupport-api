@@ -153,7 +153,7 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 		}
 	}
 	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
-	if storedImageURL == nil {
+	if storedImageURL == nil && (r.db == nil || r.db.DriverName() != "sqlite") {
 		query += ` ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`
 	}
 	result, err := exec.ExecContext(ctx, query, storedTitle, honorTypeID, storedImageURL)
