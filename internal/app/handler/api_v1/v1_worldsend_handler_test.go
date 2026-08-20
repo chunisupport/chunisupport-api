@@ -27,7 +27,7 @@ func TestV1WorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T
 	req := httptest.NewRequest(http.MethodGet, "/v1/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	err := handler.GetWorldsendSong(c)
 
@@ -36,4 +36,26 @@ func TestV1WorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T
 		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	}
 	assert.False(t, called)
+}
+
+func TestV1WorldsendHandler_GetWorldsendSongはidパスパラメータを使用する(t *testing.T) {
+	// Given
+	const id = "0123456789abcdef"
+	var actualID string
+	handler := NewV1WorldsendHandler(&testutil.MockWorldsendUsecase{
+		GetWorldsendSongByDisplayIDFunc: func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error) {
+			actualID = displayID
+			return &entity.WorldsendSongWithChart{Song: &entity.Song{DisplayID: displayID}}, nil
+		},
+	}, &masterdata.Cache{})
+	e := echo.New()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/v1/worldsend-songs/"+id, nil), httptest.NewRecorder())
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: id}})
+
+	// When
+	err := handler.GetWorldsendSong(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, id, actualID)
 }

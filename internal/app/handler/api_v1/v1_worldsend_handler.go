@@ -44,7 +44,7 @@ func (h *V1WorldsendHandler) GetWorldsendSongs(c *echo.Context) error {
 
 // GetWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を取得します（公開 API）。
 func (h *V1WorldsendHandler) GetWorldsendSong(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

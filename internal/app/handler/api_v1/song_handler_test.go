@@ -365,7 +365,7 @@ func TestV1SongHandler_GetSongRejectsInvalidDisplayID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	err := handler.GetSong(c)
 
@@ -374,6 +374,28 @@ func TestV1SongHandler_GetSongRejectsInvalidDisplayID(t *testing.T) {
 		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	}
 	assert.False(t, called)
+}
+
+func TestV1SongHandler_GetSongはidパスパラメータを使用する(t *testing.T) {
+	// Given
+	const id = "0123456789abcdef"
+	var actualID string
+	handler := NewV1SongHandler(&testutil.MockSongUsecase{
+		GetSongByDisplayIDFunc: func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error) {
+			actualID = displayID
+			return &entity.Song{DisplayID: displayID}, nil
+		},
+	}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+	e := echo.New()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/v1/songs/"+id, nil), httptest.NewRecorder())
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: id}})
+
+	// When
+	err := handler.GetSong(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, id, actualID)
 }
 
 func stringPtr(value string) *string {

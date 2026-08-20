@@ -61,7 +61,7 @@ func newScoreHistoryContext(target, displayID, difficulty, username string) *ech
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: displayID}, {Name: "difficulty", Value: difficulty}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: displayID}, {Name: "difficulty", Value: difficulty}})
 	if username != "" {
 		query := req.URL.Query()
 		query.Set("username", username)

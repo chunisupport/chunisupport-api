@@ -33,7 +33,7 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 		return apiErr
 	}
 	entries, err := h.usecase.GetStandard(
-		c.Request().Context(), username, requester, c.Param("displayid"), difficulty,
+		c.Request().Context(), username, requester, c.Param("id"), difficulty,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -48,7 +48,7 @@ func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 		return apiErr
 	}
 	entries, err := h.usecase.GetWorldsend(
-		c.Request().Context(), username, requester, c.Param("displayid"),
+		c.Request().Context(), username, requester, c.Param("id"),
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)

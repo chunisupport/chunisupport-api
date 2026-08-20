@@ -1,6 +1,7 @@
 package api_v1
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,4 +107,19 @@ func TestToV1WorldsendRecordDTO_JusticeCount(t *testing.T) {
 	// Then
 	require.NotNil(t, actual)
 	assert.Equal(t, &justiceCount, actual.JusticeCount)
+}
+
+func TestToV1UserRecordResponseDTO_コースIDをidとして返す(t *testing.T) {
+	// Given
+	records := &dto.UserRecordResponseDTO{
+		Courses: []*dto.CourseRecordDTO{{DisplayID: "0123456789abcdef"}},
+	}
+
+	// When
+	actual, err := json.Marshal(ToV1UserRecordResponseDTO(records))
+
+	// Then
+	require.NoError(t, err)
+	assert.Contains(t, string(actual), `"course":[{"id":"0123456789abcdef"`)
+	assert.NotContains(t, string(actual), "display_id")
 }
