@@ -837,7 +837,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
 		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
-		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
@@ -1054,7 +1054,7 @@ func TestUserUsecase_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 		&stubWorldsendRecordRepository{},
 		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
 		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
-		&stubSongMasterProvider{masters: &masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
+		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)
@@ -1279,9 +1279,7 @@ func TestUserUsecase_GetUserSongRecord_指定難易度を未プレイ補完し�
 		},
 	}
 	masters := &masterdata.SongMasters{
-		CommonMasters: masterdata.CommonMasters{
-			DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
-		},
+		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
 		Difficulties: map[string]master.ChartDifficulty{
 			"BASIC":  {ID: 1, Name: "BASIC", SortOrder: 1},
 			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
@@ -1319,9 +1317,7 @@ func TestUserUsecase_GetUserSongRecord_曲に存在しない難易度はエラ�
 		Charts:    []*entity.Chart{{ID: 101, SongID: 20, DifficultyID: 1}},
 	}
 	masters := &masterdata.SongMasters{
-		CommonMasters: masterdata.CommonMasters{
-			DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
-		},
+		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
 	}
 	service := NewUserUsecase(
 		nil,

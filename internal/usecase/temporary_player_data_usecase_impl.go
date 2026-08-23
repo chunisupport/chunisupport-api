@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
-	"github.com/google/uuid"
 )
 
 type temporaryPlayerDataUsecase struct {
@@ -38,7 +38,7 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 		return nil, &PlayerDataValidationError{Field: "ip_address", Message: "is required"}
 	}
 
-	token := uuid.NewString()
+	token := uuid.NewV4().String()
 	now := time.Now().UTC()
 	entry, err := entity.NewTemporaryPlayerData(
 		token,

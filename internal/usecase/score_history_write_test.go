@@ -16,10 +16,8 @@ func TestBuildStandardHistories(t *testing.T) {
 	now := time.Date(2026, 6, 28, 0, 0, 0, 0, time.UTC)
 	masters := &playerDataMaster{
 		PlayerDataMasters: &masterdata.PlayerDataMasters{
-			CommonMasters: masterdata.CommonMasters{
-				DifficultyNamesByID: map[int]string{1: "BASIC", 3: "EXPERT"},
-			},
-			Difficulties: map[string]master.ChartDifficulty{},
+			DifficultyNamesByID: map[int]string{1: "BASIC", 3: "EXPERT"},
+			Difficulties:        map[string]master.ChartDifficulty{},
 		},
 		chartsByID: map[int]entity.PlayerDataChart{
 			10: {ID: 10, DifficultyID: 3},

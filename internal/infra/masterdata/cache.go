@@ -273,21 +273,19 @@ func (c *Cache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
 	}
 
 	return &domainmasterdata.PlayerDataMasters{
-		CommonMasters: domainmasterdata.CommonMasters{
-			DifficultyNamesByID: maps.Clone(c.DifficultyNamesByID),
-		},
-		ClassEmblems:       maps.Clone(c.ClassEmblems),
-		ClassEmblemBases:   maps.Clone(c.ClassEmblemBases),
-		ClearLamps:         maps.Clone(c.ClearLamps),
-		ClearLampNamesByID: maps.Clone(c.ClearLampNamesByID),
-		ComboLamps:         maps.Clone(c.ComboLamps),
-		ComboLampNamesByID: maps.Clone(c.ComboLampNamesByID),
-		FullChains:         maps.Clone(c.FullChains),
-		FullChainNamesByID: maps.Clone(c.FullChainNamesByID),
-		Slots:              maps.Clone(c.Slots),
-		SlotNamesByID:      maps.Clone(c.SlotNamesByID),
-		HonorTypes:         maps.Clone(c.HonorTypes),
-		Difficulties:       maps.Clone(c.Difficulties),
+		DifficultyNamesByID: maps.Clone(c.DifficultyNamesByID),
+		ClassEmblems:        maps.Clone(c.ClassEmblems),
+		ClassEmblemBases:    maps.Clone(c.ClassEmblemBases),
+		ClearLamps:          maps.Clone(c.ClearLamps),
+		ClearLampNamesByID:  maps.Clone(c.ClearLampNamesByID),
+		ComboLamps:          maps.Clone(c.ComboLamps),
+		ComboLampNamesByID:  maps.Clone(c.ComboLampNamesByID),
+		FullChains:          maps.Clone(c.FullChains),
+		FullChainNamesByID:  maps.Clone(c.FullChainNamesByID),
+		Slots:               maps.Clone(c.Slots),
+		SlotNamesByID:       maps.Clone(c.SlotNamesByID),
+		HonorTypes:          maps.Clone(c.HonorTypes),
+		Difficulties:        maps.Clone(c.Difficulties),
 	}
 }
 
@@ -298,12 +296,10 @@ func (c *Cache) SongMasters() *domainmasterdata.SongMasters {
 	}
 
 	return &domainmasterdata.SongMasters{
-		CommonMasters: domainmasterdata.CommonMasters{
-			DifficultyNamesByID: maps.Clone(c.DifficultyNamesByID),
-		},
-		GenreNamesByID: maps.Clone(c.GenreNamesByID),
-		Genres:         maps.Clone(c.Genres),
-		Difficulties:   maps.Clone(c.Difficulties),
+		DifficultyNamesByID: maps.Clone(c.DifficultyNamesByID),
+		GenreNamesByID:      maps.Clone(c.GenreNamesByID),
+		Genres:              maps.Clone(c.Genres),
+		Difficulties:        maps.Clone(c.Difficulties),
 	}
 }
 

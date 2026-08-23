@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/google/uuid"
 )
 
 const (
@@ -112,16 +112,9 @@ func (u *recordFilterUsecase) Create(ctx context.Context, userID int, input *Rec
 		return nil, ErrRecordFilterLimitExceeded
 	}
 
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return nil, ErrInternalError
-	}
-	idBytes, err := id.MarshalBinary()
-	if err != nil {
-		return nil, ErrInternalError
-	}
+	id := uuid.NewV4()
 
-	filter, err := entity.NewRecordFilter(idBytes, userID, validated.name, validated.filterValueGzip, validated.isWorldsend)
+	filter, err := entity.NewRecordFilter(id[:], userID, validated.name, validated.filterValueGzip, validated.isWorldsend)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +122,7 @@ func (u *recordFilterUsecase) Create(ctx context.Context, userID int, input *Rec
 		return nil, err
 	}
 
-	saved, err := u.repo.FindByIDAndUserID(ctx, idBytes, userID)
+	saved, err := u.repo.FindByIDAndUserID(ctx, id[:], userID)
 	if err != nil {
 		return nil, err
 	}
@@ -264,18 +257,15 @@ func parseRecordFilterID(id string) ([]byte, error) {
 	if err != nil {
 		return nil, ErrInvalidRecordFilterID
 	}
-	idBytes, err := parsed.MarshalBinary()
-	if err != nil {
-		return nil, ErrInvalidRecordFilterID
-	}
-	return idBytes, nil
+	return parsed[:], nil
 }
 
 func toRecordFilterOutput(filter *entity.RecordFilter) (*RecordFilterOutput, error) {
-	id, err := uuid.FromBytes(filter.ID())
-	if err != nil {
+	idBytes := filter.ID()
+	if len(idBytes) != len(uuid.UUID{}) {
 		return nil, ErrInvalidRecordFilterID
 	}
+	id := uuid.UUID(idBytes)
 	payloadBytes, err := gunzipBytes(filter.FilterValueGzip(), info.RecordFilterMaxPayloadBytes)
 	if err != nil {
 		return nil, err

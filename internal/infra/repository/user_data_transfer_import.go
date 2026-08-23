@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"time"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -16,7 +17,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/google/uuid"
 )
 
 func (r *userDataTransferRepository) FindUnresolvedReferences(ctx context.Context, snapshot *entity.UserDataTransferSnapshot) ([]string, error) {
@@ -459,14 +459,7 @@ func saveTransferRecordFilters(ctx context.Context, exec domainrepo.Executor, us
 	}
 	rows := make([]row, 0, len(snapshot.RecordFilters))
 	for _, item := range snapshot.RecordFilters {
-		id, err := uuid.NewRandom()
-		if err != nil {
-			return err
-		}
-		idBytes, err := id.MarshalBinary()
-		if err != nil {
-			return err
-		}
+		id := uuid.NewV4()
 		payload, err := json.Marshal(struct {
 			SchemaVersion int             `json:"schema_version"`
 			Filter        json.RawMessage `json:"filter"`
@@ -478,7 +471,7 @@ func saveTransferRecordFilters(ctx context.Context, exec domainrepo.Executor, us
 		if err != nil {
 			return err
 		}
-		rows = append(rows, row{idBytes, userID, item.Name, compressed, item.FilterType == usecase.RecordFilterTypeWorldsend, item.CreatedAt, item.UpdatedAt})
+		rows = append(rows, row{id[:], userID, item.Name, compressed, item.FilterType == usecase.RecordFilterTypeWorldsend, item.CreatedAt, item.UpdatedAt})
 	}
 	return bulkTransferNamedExec(ctx, exec, `INSERT INTO record_filters (id,user_id,name,filter_value_gzip,is_worldsend,created_at,updated_at) VALUES (:id,:user_id,:name,:filter_value_gzip,:is_worldsend,:created_at,:updated_at)`, rows)
 }

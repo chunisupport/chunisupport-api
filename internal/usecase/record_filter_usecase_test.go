@@ -6,11 +6,11 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -194,14 +194,12 @@ func TestRecordFilterUsecase_CreateRejectsWhenLimitExceeded(t *testing.T) {
 	ctx := context.Background()
 	repo := newStubRecordFilterRepository()
 	for i := 0; i < info.RecordFilterMaxPerUser; i++ {
-		id := uuid.New()
-		idBytes, err := id.MarshalBinary()
-		require.NoError(t, err)
+		id := uuid.NewV4()
 		payload, err := gzipBytes([]byte(`{"schema_version":3,"filter":{"title":""}}`))
 		require.NoError(t, err)
-		filter, err := entity.RestoreRecordFilter(idBytes, 10, "条件", payload, false, time.Now(), time.Now())
+		filter, err := entity.RestoreRecordFilter(id[:], 10, "条件", payload, false, time.Now(), time.Now())
 		require.NoError(t, err)
-		repo.filters[string(idBytes)] = filter
+		repo.filters[string(id[:])] = filter
 	}
 
 	uc := NewRecordFilterUsecase(repo)
