@@ -58,7 +58,7 @@ func TestGetChartBestSlotStatsByDisplayIDAndDifficulty_レート帯順で取得�
 	u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, provider, mockExec)
 	song := &entity.Song{DisplayID: "0000000000000001", Charts: []*entity.Chart{{ID: 101, DifficultyID: 4}}}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, song.DisplayID).Return(song, nil).Once()
-	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
+	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}).Once()
 	mockStatsRepo.On("FindChartBestSlotStatsByChartIDs", ctx, mockExec, []int{101}).Return([]*entity.ChartBestSlotStatsByRatingBand{
 		{ChartID: 101, RatingBandID: 10},
 		{ChartID: 101, RatingBandID: 20},
@@ -95,7 +95,7 @@ func TestGetSongStatsByDisplayID_SortByRatingBandOrder(t *testing.T) {
 
 	song := &entity.Song{DisplayID: "S001", Charts: []*entity.Chart{{ID: 101, DifficultyID: 3}}}
 	mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S001").Return(song, nil)
-	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{3: "EXPERT"}}})
+	mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT"}})
 	mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{101}).Return([]*entity.ChartStatsByRatingBand{{ChartID: 101, RatingBandID: 10}, {ChartID: 101, RatingBandID: 20}}, nil)
 
 	result, err := u.GetSongStatsByDisplayID(ctx, "S001", nil)
@@ -160,7 +160,7 @@ func TestGetSongStatsByDisplayID_DeletedSongPermissionBranch(t *testing.T) {
 			setupMocks: func(ctx context.Context, songRepo *MockSongRepository, statsRepo *MockChartStatsRepository, songMasterProvider *MockSongMasterProvider, exec *MockExecutor) {
 				deletedSong := &entity.Song{DisplayID: "S002", IsDeleted: true, Charts: []*entity.Chart{{ID: 201, DifficultyID: 4}}}
 				songRepo.On("FindByDisplayID", ctx, exec, "S002").Return(deletedSong, nil).Once()
-				songMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
+				songMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}).Once()
 				statsRepo.On("FindChartStatsByChartIDs", ctx, exec, []int{201}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
 			},
 			assertResult: func(t *testing.T, result *entity.SongChartStats) {
@@ -291,7 +291,7 @@ func TestGetChartStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.
 			mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S002").Return(deletedSong, nil).Once()
 
 			if tt.shouldSucceed {
-				mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{CommonMasters: masterdata.CommonMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}}).Once()
+				mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}).Once()
 				mockStatsRepo.On("FindChartStatsByChartIDs", ctx, mockExec, []int{201}).Return([]*entity.ChartStatsByRatingBand{}, nil).Once()
 			}
 
