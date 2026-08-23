@@ -314,10 +314,10 @@ func encodeCodecTestFile(t *testing.T, codec usecase.UserDataTransferCodec) []by
 
 func mutateBase64URL(value string) string {
 	replacement := byte('A')
-	if value[len(value)-1] == replacement {
+	if value[0] == replacement {
 		replacement = 'B'
 	}
-	return value[:len(value)-1] + string(replacement)
+	return string(replacement) + value[1:]
 }
 
 func mutateProtectedJSON(t *testing.T, encoded []byte, mutate func(map[string]any)) []byte {

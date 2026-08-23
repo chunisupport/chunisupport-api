@@ -337,7 +337,7 @@ Content-Type: application/json
   "app_name": "chunisupport-api",
   "build_date": "20240528",
   "commit_hash": "a1b2c3d",
-  "go_version": "go1.26.4"
+  "go_version": "go1.27.0"
 }
 ```
 
@@ -456,7 +456,7 @@ Content-Type: application/json
   "app_name": "chunisupport-api",
   "build_date": "20240528",
   "commit_hash": "a1b2c3d",
-  "go_version": "go1.26.4"
+  "go_version": "go1.27.0"
 }
 ```
 
