@@ -1,8 +1,8 @@
-# リファクタリング指摘書 (2026-07-10時点 / セキュリティ再確認 2026-07-23)
+# リファクタリング指摘書 (2026-08-24時点)
 
 本ドキュメントは、現行コードベースを再確認したうえで、**未解決の改善点のみ**を整理したものです。
 解消済みの項目、現行実装では成立しない項目、他項目と重複する指摘は削除または統合しています。
-2026-07-23 に前日のセキュリティ追記を現行仕様・実装と再照合し、実害の根拠がある未解決項目だけに整理しました。
+2026-08-24 に、前回確認後に追加されたデータ移行、プレイヤーメトリック履歴、楽曲スナップショット、システムメンテナンスの各機能を含めて再棚卸ししました。
 
 ## 優先度定義
 
@@ -59,10 +59,11 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **DATA-001** | **High** | 古いプレイヤーデータで新しい状態を巻き戻せる | `internal/usecase/player_data_usecase_impl.go:257,480-530` はペイロードの `updated_at` を `DataCollectedAt` / `UpdatedAt` へ無条件設定し、既存値との前後関係を比較しません。`internal/infra/repository/player_data_repository_impl.go:357-397` のレコードUPSERTもスコア・ランプ・枠を無条件に置換します。古い一時データの遅延commitや並行登録の順序逆転で、プロフィールと現行ベストを古いスナップショットへ戻せます。トランザクション冒頭で対象Playerをロックし、収集時刻が既存値以下なら冪等扱いまたは競合として拒否し、SQL側にも条件を持たせるべきです。 |
+| **DATA-001** | **High** | 同一取得時刻の異なるプレイヤーデータで状態を上書きできる | `internal/usecase/player_data_usecase_impl.go:637` はPlayer行をロックし、`internal/domain/entity/player.go:51-70` も既存より古い取得時刻と、同一時刻で公式指標だけが異なる入力を拒否するよう改善されています。一方、同一 `updated_at` で公式RATING・公式OVER POWERが同じなら、本文ハッシュ、プロフィール、スコアの差異を確認せず処理を継続します。`internal/infra/repository/player_data_repository_impl.go:435-476` のUPSERTはスコア・ランプ・枠を無条件に置換するため、同一取得時刻の異なる本文で現行レコードを上書きできます。`player_latest_updates.body_hash` を同じトランザクションで比較し、時刻と本文が同じ場合だけ冪等扱い、時刻が同じで本文が異なる場合は競合として拒否すべきです。 |
 | **DATA-002** | **High** | 譜面定数PATCHが未ロックの集約全体を上書き | `internal/usecase/song_usecase_impl.go:228-242` は非ロックの `FindByOfficialIdx` 後に、`internal/infra/repository/song_repository_impl.go:423-466` の全列・全譜面 `Save` を実行します。読み取り後に削除や別編集がcommitされると、古い `IsDeleted`・タイトル・他譜面で再上書きできます。また `Song.ChangeChartConstant` は `MaxChartConst` / `IsMaxOPUnknown` / `OpTargetDifficultyID` を再集約しないため、直後の200レスポンスも変更譜面とトップレベル値が矛盾します。集約を `FOR UPDATE` で復元し、変更メソッド内で派生値まで再計算してから保存すべきです。 |
 | **DATA-003** | **High** | 未解禁曲更新が古いPlayer集約を保存して並行更新を失う | `internal/usecase/player_locked_song_usecase_impl.go` の `Lock` / `Unlock` / `Batch` はPlayerをトランザクション外で読み、子行変更とOP再計算後にその古いPlayerを `Save` します。`PlayerRepository.Save` はOPだけでなく名前・レベル・公式値・`data_collected_at` 等も更新するため、並行するデータ登録を巻き戻せます。複数のLock/Unlock同士でも、各トランザクションが片側変更しか見ないOP値を後勝ち保存する可能性があります。トランザクション冒頭でPlayer行をロック・再読込し、全経路のロック順をPlayer→子行へ統一すべきです。 |
 | **DATA-004** | **Medium** | 再計算バッチのマスタ「スナップショット」が原子的でない | `internal/infra/repository/player_data_batch_repository_impl.go:23-69` はversion、songs、charts、slots、Player上限を5本のautocommit SELECTで取得します。途中で編集がcommitされると、旧楽曲属性と新譜面定数が混在したrun全体スナップショットになります。`REPEATABLE READ` または明示的なconsistent snapshotを使うread-only transactionでまとめて取得し、そのトランザクションから構築した値だけをrun中に使用すべきです。 |
+| **DATA-005** | **Medium** | 楽曲スナップショットが取得時・公開時とも単一世代にならない | `internal/app/songexport/exporter.go:68-127` は通常楽曲とWORLD'S END楽曲を別々のautocommit読み取りで取得し、4種類の固定キーへ順次PUTします。途中のマスタ更新で生成物の基準時点がずれるほか、後続PUTの失敗時は先に成功したオブジェクトだけが新世代となります。この部分更新は `docs/song_snapshot_export.md` に明記されていますが、利用者が4形式を同一世代として扱う契約を保証できません。DB取得をconsistent snapshotへまとめ、世代付きキーへ全成果物を保存してからmanifestまたは公開ポインタを最後に切り替えるべきです。 |
 
 ### 信頼性・運用 (OPS)
 
@@ -70,6 +71,7 @@
 |---|---|---|---|
 | **OPS-001** | **Low** | リクエストIDがない | `X-Request-ID` の受理・生成とログへの相関ID付与がなく、複数ログを1リクエスト単位で追跡できません。共通ミドルウェアで設定し、アプリケーションログとアクセスログへ同じ値を渡すべきです。 |
 | **OPS-002** | **Low** | 通常DBクエリにアプリケーション側タイムアウトがない | `context.Context` は伝播されていますが、`context.WithTimeout` はDB起動再試行などに限られ、通常リクエストのDBアクセス上限はありません。クライアント接続が維持された長時間クエリを抑止できるよう、ユースケースまたはトランザクション境界で設定可能な期限を設けるべきです。 |
+| **OPS-003** | **Medium** | メンテナンス状態がAPIプロセス間で同期されない | `internal/usecase/system_maintenance_usecase.go:29-105` は起動時にDB状態を1回読み込み、以後はプロセス内の `atomic.Pointer` だけを参照・更新します。状態更新を受けたプロセス以外はDB変更を再読込しないため、複数プロセスまたは複数インスタンス構成では、再起動まで通常運用とメンテナンス中の判定が分裂します。単一プロセス運用を必須条件として文書化するか、DBのversionを短周期で確認する共有キャッシュ、通知、または各リクエストで一貫した共有状態を参照する方式へ変更すべきです。 |
 
 ### 実装品質・保守性 (QUAL)
 
@@ -104,12 +106,12 @@
 | **HDL-011** | **Low** | クエリパラメータの不正値を既定値へ黙ってフォールバック | `include_noplay` は5箇所で `strconv.ParseBool` のエラーを破棄し、楽曲一覧の `include_deleted` は文字列が厳密に `"true"` の場合だけtrue、Userの未知 `view` は全件表示へフォールバックします。不正値を400系で返す共通parserへ統一すべきです。 |
 | **HDL-012** | **Low** | 厳格JSONデコードの適用が不統一 | `BindStrictJSON` 導入後も本番コードに `c.Bind` が12箇所残り、`player_locked_song_handler.go` 内でも両方式が混在します。未知フィールド、Content-Type、複数JSON値の扱いを全JSONエンドポイントで統一すべきです。 |
 | **HDL-013** | **Medium** | 互換APIの専用エラー変換が認証・入力エラーを503化 | chunirec/reiwaの専用switchは400/404/405/429/503だけを扱うため、APIトークンの401、通常バリデーションの422、内部エラーの500を503へ変換します。さらにGroup middlewareはルート不一致の404/405では実行されず、同じprefix内でレスポンス形式が変わります。`docs/API.md` の401/500および標準エラーコード記載とも不一致です。互換APIのstatus・body変換を共通化し、認証ミドルウェアを含むcontract testを追加すべきです。 |
-| **HDL-014** | **Medium** | スコア履歴APIがDisplay IDと削除済み楽曲を検証しない | internal/v1の両ScoreHistoryHandlerは `displayid` を `ValidateDisplayID` に通さずUsecaseへ渡します。Usecaseは削除済みも返す `SongRepository.FindByDisplayID` / WORLD'S END queryを使いながら `IsDeleted` を確認しないため、他の公開レコードAPIでは隠れる削除済み楽曲の履歴を取得できます。境界で形式検証し、Usecaseで楽曲種別と公開状態を404へ正規化すべきです。 |
+| **HDL-014** | **Medium** | スコア履歴APIが楽曲IDと削除済み楽曲を検証しない | internal/v1の両ScoreHistoryHandlerはパスの `id` を、internal版は `displayid` を `ValidateDisplayID` に通さずUsecaseへ渡します。Usecaseは削除済みも返す `SongRepository.FindByDisplayID` / WORLD'S END queryを使いながら `IsDeleted` を確認しないため、他の公開レコードAPIでは隠れる削除済み楽曲の履歴を取得できます。境界で形式検証し、Usecaseで楽曲種別と公開状態を404へ正規化すべきです。 |
 | **HDL-015** | **Medium** | chunirec互換の `is_clear` がFAILEDでもtrue | `internal/app/handler/compat/chunirec/dto.go:121` は `record.ClearLamp != nil` だけでクリア判定します。`FAILED` は有効な非nilマスタ値なので、FAILEDレコードも `is_clear: true` になります。ランプ名またはドメインのクリア判定メソッドを使い、FAILEDケースのテストを追加すべきです。 |
 
 ## まとめ
 
-- 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**古いプレイヤーデータによる巻き戻し (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
-- 2026-07-23 の再レビューでは Critical な認証バイパスや SQL インジェクションは見つかりませんでした。前日の追記からは、**非公開ユーザー名の存在オラクルと申請濫用 (`SEC-09`)**、**APIトークンの無期限・無スコープ (`SEC-10`)**、**管理者削除の監査主体欠落 (`SEC-15`)**だけを未解決事項として残しました。`SEC-09` は `SEC-08` および `PERF-008` とあわせて対応するのが効率的です。
+- 最優先は、**フレンド申請経由の非公開情報開示 (`SEC-08`)**、**同一取得時刻の異なるプレイヤーデータによる上書き (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
+- 2026-08-24 の再レビューでは、既存の未解決項目に加えて、**楽曲スナップショットの世代混在 (`DATA-005`)**と**メンテナンス状態のプロセス間不整合 (`OPS-003`)**を追加しました。データ移行機能はサイズ制限、署名、全体検証、参照再検証、トランザクションを備えており、今回の確認範囲では独立した追加指摘はありません。
 - 直近追加の互換APIでは、不要な全件取得、401/422/500の503化、FAILEDのクリア誤判定が見つかりました。機能単位の正常系テストだけでなく、認証・入力不正・非公開・削除済み・並行更新を含む境界テストが必要です。
 - プレイヤーデータの真正性（クライアント申告スコア）はプロダクト前提として本リストの脆弱性対象外とします。管理用の `is_suspicious` は別途運用で扱う想定です。
