@@ -58,7 +58,7 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
 					Value:      &rating,
-					Percentage: 0.0,
+					Percentage: float64Pointer(0.0),
 				},
 				ClassEmblem: PlayerDataClassPayload{
 					MedalClass: "none",
@@ -82,9 +82,10 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 	}
 }
 
-func TestValidatePlayerDataPayload_公式指標は両方必須(t *testing.T) {
+func TestValidatePlayerDataPayload_公式指標はすべて必須(t *testing.T) {
 	rating := 17.25
 	overpower := 12345.67
+	overpowerPercent := 98.76
 	tests := []struct {
 		name    string
 		payload *PlayerDataPayload
@@ -93,9 +94,17 @@ func TestValidatePlayerDataPayload_公式指標は両方必須(t *testing.T) {
 		{
 			name: "公式RATINGがない場合はエラー",
 			payload: &PlayerDataPayload{
-				Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower, Percentage: &overpowerPercent},
 			},
 			field: "rating",
+		},
+		{
+			name: "公式OPパーセントがない場合はエラー",
+			payload: &PlayerDataPayload{
+				Rating:    &rating,
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower},
+			},
+			field: "overpower.percentage",
 		},
 		{
 			name: "公式OPがない場合はエラー",
@@ -113,6 +122,31 @@ func TestValidatePlayerDataPayload_公式指標は両方必須(t *testing.T) {
 			var validationErr *PlayerDataValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.field, validationErr.Field)
+		})
+	}
+}
+
+func TestValidatePlayerDataPayload_公式OPパーセントの範囲外と小数第3位を拒否する(t *testing.T) {
+	rating := 17.25
+	overpower := 12345.67
+	tests := []struct {
+		name       string
+		percentage float64
+	}{
+		{name: "100パーセント超過", percentage: 100.01},
+		{name: "小数第3位", percentage: 98.761},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePlayerDataPayload(&PlayerDataPayload{
+				Rating:    &rating,
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower, Percentage: &tt.percentage},
+			})
+
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, "overpower.percentage", validationErr.Field)
 		})
 	}
 }

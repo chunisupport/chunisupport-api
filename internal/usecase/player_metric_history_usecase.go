@@ -11,7 +11,7 @@ import (
 // ErrPlayerMetricHistoryNotFound は公式指標履歴を取得できない場合に返されます。
 var ErrPlayerMetricHistoryNotFound = errors.New("player metric history not found")
 
-// PlayerMetricHistoryUsecase はプレイヤー単位の公式RATING・公式OVER POWER履歴を提供します。
+// PlayerMetricHistoryUsecase はプレイヤー単位の公式RATING・公式OVER POWER・公式OP%履歴を提供します。
 type PlayerMetricHistoryUsecase interface {
 	Get(ctx context.Context, username string, requester *entity.User) ([]entity.PlayerMetricHistoryEntry, error)
 }

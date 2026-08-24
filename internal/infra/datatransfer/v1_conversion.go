@@ -15,15 +15,16 @@ import (
 func newPayloadV1(snapshot *entity.UserDataTransferSnapshot) payloadV1 {
 	payload := payloadV1{
 		Player: playerV1{
-			Name:                snapshot.Player.Name.String(),
-			Level:               snapshot.Player.Level,
-			OfficialRating:      snapshot.Player.OfficialRating,
-			OfficialOverpower:   snapshot.Player.OfficialOverpower,
-			ClassEmblemName:     cloneStringPointer(snapshot.Player.ClassEmblemName),
-			ClassEmblemBaseName: cloneStringPointer(snapshot.Player.ClassEmblemBaseName),
-			LastPlayedAt:        newOptionalUTCDateTime(snapshot.Player.LastPlayedAt),
-			DataCollectedAt:     newOptionalUTCDateTime(snapshot.Player.DataCollectedAt),
-			CreatedAt:           newUTCDateTime(snapshot.Player.CreatedAt),
+			Name:                     snapshot.Player.Name.String(),
+			Level:                    snapshot.Player.Level,
+			OfficialRating:           snapshot.Player.OfficialRating,
+			OfficialOverpower:        snapshot.Player.OfficialOverpower,
+			OfficialOverpowerPercent: cloneFloat64Pointer(snapshot.Player.OfficialOverpowerPercent),
+			ClassEmblemName:          cloneStringPointer(snapshot.Player.ClassEmblemName),
+			ClassEmblemBaseName:      cloneStringPointer(snapshot.Player.ClassEmblemBaseName),
+			LastPlayedAt:             newOptionalUTCDateTime(snapshot.Player.LastPlayedAt),
+			DataCollectedAt:          newOptionalUTCDateTime(snapshot.Player.DataCollectedAt),
+			CreatedAt:                newUTCDateTime(snapshot.Player.CreatedAt),
 		},
 		Records:                  make([]recordV1, len(snapshot.Records)),
 		RecordHistories:          make([]recordHistoryV1, len(snapshot.RecordHistories)),
@@ -87,9 +88,10 @@ func newPayloadV1(snapshot *entity.UserDataTransferSnapshot) payloadV1 {
 	}
 	for i, history := range snapshot.MetricHistories {
 		payload.MetricHistories[i] = metricHistoryV1{
-			OfficialRating:    history.OfficialRating,
-			OfficialOverpower: history.OfficialOverpower,
-			DataCollectedAt:   newUTCDateTime(history.DataCollectedAt),
+			OfficialRating:           history.OfficialRating,
+			OfficialOverpower:        history.OfficialOverpower,
+			OfficialOverpowerPercent: cloneFloat64Pointer(history.OfficialOverpowerPercent),
+			DataCollectedAt:          newUTCDateTime(history.DataCollectedAt),
 		}
 	}
 	for i, record := range snapshot.CourseRecords {
@@ -195,15 +197,16 @@ func (payload payloadV1) toSnapshot() (*entity.UserDataTransferSnapshot, error) 
 
 	return &entity.UserDataTransferSnapshot{
 		Player: entity.UserDataTransferPlayer{
-			Name:                name,
-			Level:               payload.Player.Level,
-			OfficialRating:      payload.Player.OfficialRating,
-			OfficialOverpower:   payload.Player.OfficialOverpower,
-			ClassEmblemName:     cloneStringPointer(payload.Player.ClassEmblemName),
-			ClassEmblemBaseName: cloneStringPointer(payload.Player.ClassEmblemBaseName),
-			LastPlayedAt:        optionalTime(payload.Player.LastPlayedAt),
-			DataCollectedAt:     optionalTime(payload.Player.DataCollectedAt),
-			CreatedAt:           payload.Player.CreatedAt.Time,
+			Name:                     name,
+			Level:                    payload.Player.Level,
+			OfficialRating:           payload.Player.OfficialRating,
+			OfficialOverpower:        payload.Player.OfficialOverpower,
+			OfficialOverpowerPercent: cloneFloat64Pointer(payload.Player.OfficialOverpowerPercent),
+			ClassEmblemName:          cloneStringPointer(payload.Player.ClassEmblemName),
+			ClassEmblemBaseName:      cloneStringPointer(payload.Player.ClassEmblemBaseName),
+			LastPlayedAt:             optionalTime(payload.Player.LastPlayedAt),
+			DataCollectedAt:          optionalTime(payload.Player.DataCollectedAt),
+			CreatedAt:                payload.Player.CreatedAt.Time,
 		},
 		Records:                  records,
 		RecordHistories:          recordHistories,
@@ -211,9 +214,10 @@ func (payload payloadV1) toSnapshot() (*entity.UserDataTransferSnapshot, error) 
 		WorldsendRecordHistories: worldsendHistories,
 		MetricHistories: mapSlice(payload.MetricHistories, func(history metricHistoryV1) entity.UserDataTransferMetricHistory {
 			return entity.UserDataTransferMetricHistory{
-				OfficialRating:    history.OfficialRating,
-				OfficialOverpower: history.OfficialOverpower,
-				DataCollectedAt:   history.DataCollectedAt.Time,
+				OfficialRating:           history.OfficialRating,
+				OfficialOverpower:        history.OfficialOverpower,
+				OfficialOverpowerPercent: cloneFloat64Pointer(history.OfficialOverpowerPercent),
+				DataCollectedAt:          history.DataCollectedAt.Time,
 			}
 		}),
 		CourseRecords: courseRecords,
@@ -402,6 +406,14 @@ func cloneStringPointer(value *string) *string {
 }
 
 func cloneIntPointer(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	result := *value
+	return &result
+}
+
+func cloneFloat64Pointer(value *float64) *float64 {
 	if value == nil {
 		return nil
 	}

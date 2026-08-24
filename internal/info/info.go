@@ -31,6 +31,7 @@ const (
 	MaxScoreHistoryEntriesPerChart              = constants.MaxScoreHistoryEntriesPerChart
 	MaxOfficialRating                           = constants.MaxOfficialRating
 	MaxOfficialOverpower                        = constants.MaxOfficialOverpower
+	MaxOfficialOverpowerPercent                 = constants.MaxOfficialOverpowerPercent
 	OfficialMetricDecimalScale                  = constants.OfficialMetricDecimalScale
 	OfficialMetricDecimalTolerance              = constants.OfficialMetricDecimalTolerance
 	ChartConstMin                               = constants.ChartConstMin
@@ -96,7 +97,8 @@ const (
 	// リクエストボディサイズ上限
 	RequestBodyLimit                      = 5 * 1024 * 1024
 	DataTransferFormat                    = "chunisupport-user-transfer"
-	DataTransferSchemaVersion             = 1
+	DataTransferSchemaVersion             = 2
+	DataTransferMinSupportedSchemaVersion = 1
 	DataTransferHMACSecretMinBytes        = 32
 	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024
 	DataTransferCompressedPayloadMaxBytes = 24 * 1024 * 1024

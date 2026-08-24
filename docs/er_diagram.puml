@@ -49,6 +49,7 @@ entity "players" as players {
   last_played_at: DATETIME
   overpower_value: DECIMAL(9, 3)
   official_overpower: DECIMAL(8, 2) NOT NULL
+  official_overpower_percent: DECIMAL(5, 2)
   data_collected_at: TIMESTAMP
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
@@ -60,6 +61,7 @@ entity "player_metric_histories" as player_metric_histories {
   --
   official_rating: DECIMAL(4, 2) NOT NULL
   official_overpower: DECIMAL(8, 2) NOT NULL
+  official_overpower_percent: DECIMAL(5, 2)
 }
 
 players ||--o{ player_metric_histories

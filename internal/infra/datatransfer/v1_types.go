@@ -33,15 +33,16 @@ type payloadV1 struct {
 }
 
 type playerV1 struct {
-	Name                string       `json:"name"`
-	Level               int          `json:"level"`
-	OfficialRating      float64      `json:"official_rating"`
-	OfficialOverpower   float64      `json:"official_overpower"`
-	ClassEmblemName     *string      `json:"class_emblem_name"`
-	ClassEmblemBaseName *string      `json:"class_emblem_base_name"`
-	LastPlayedAt        *utcDateTime `json:"last_played_at"`
-	DataCollectedAt     *utcDateTime `json:"data_collected_at"`
-	CreatedAt           utcDateTime  `json:"created_at"`
+	Name                     string       `json:"name"`
+	Level                    int          `json:"level"`
+	OfficialRating           float64      `json:"official_rating"`
+	OfficialOverpower        float64      `json:"official_overpower"`
+	OfficialOverpowerPercent *float64     `json:"official_overpower_percent"`
+	ClassEmblemName          *string      `json:"class_emblem_name"`
+	ClassEmblemBaseName      *string      `json:"class_emblem_base_name"`
+	LastPlayedAt             *utcDateTime `json:"last_played_at"`
+	DataCollectedAt          *utcDateTime `json:"data_collected_at"`
+	CreatedAt                utcDateTime  `json:"created_at"`
 }
 
 type recordV1 struct {
@@ -85,9 +86,10 @@ type worldsendRecordHistoryV1 struct {
 }
 
 type metricHistoryV1 struct {
-	OfficialRating    float64     `json:"official_rating"`
-	OfficialOverpower float64     `json:"official_overpower"`
-	DataCollectedAt   utcDateTime `json:"data_collected_at"`
+	OfficialRating           float64     `json:"official_rating"`
+	OfficialOverpower        float64     `json:"official_overpower"`
+	OfficialOverpowerPercent *float64    `json:"official_overpower_percent"`
+	DataCollectedAt          utcDateTime `json:"data_collected_at"`
 }
 
 type courseRecordV1 struct {

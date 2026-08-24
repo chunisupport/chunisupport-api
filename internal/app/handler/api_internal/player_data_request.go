@@ -17,7 +17,7 @@ type playerDataRequest struct {
 }
 type playerDataOverpowerRequest struct {
 	Value      *float64 `json:"value"`
-	Percentage float64  `json:"percentage"`
+	Percentage *float64 `json:"percentage"`
 }
 type playerDataClassRequest struct {
 	MedalClass string `json:"medal_class"`

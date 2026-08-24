@@ -288,3 +288,7 @@ WHERE official_player_rating IS NULL;
 該当行が残っている場合、`ALTER TABLE`は失敗して移行を停止する。履歴は変更時のみ保存し、保持件数に上限を設けない。
 
 デプロイ順は「プレイヤーデータ登録を停止 → NULL監査と公式データ再取得 → `000041` up → 新バイナリへ切替 → 登録再開」とする。旧バイナリは`rating: null`を受理し得る一方、新バイナリは履歴テーブルを必要とするため、登録を継続したままのローリング移行は行わない。
+
+### 000043 公式OP%履歴
+
+`players`と`player_metric_histories`に`official_overpower_percent DECIMAL(5,2) NULL`を追加する。既存の取得時点には公式OP%の原本がないためバックフィルせず、記録開始前の値は`NULL`のまま保持する。新バイナリへの切替後はプレイヤーデータ登録の`overpower.percentage`を必須とし、RATING・公式OVER POWER・公式OP%のいずれかが変化した場合に更新前の組を履歴化する。

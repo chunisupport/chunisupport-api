@@ -134,22 +134,24 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 
 ### PlayerMetricHistoryEntry（プレイヤー公式指標履歴）
 
-CHUNITHM-NETから同時に取得した公式RATINGと公式OVER POWERのスナップショットを表します。両値は常にセットで保持し、どちらか一方でも変化した場合だけ更新前の組を履歴へ保存します。最新値は`Player`に保持します。
+CHUNITHM-NETから同時に取得した公式RATING・公式OVER POWER・公式OP%のスナップショットを表します。新規取得では3値を常にセットで保持し、いずれかが変化した場合だけ更新前の組を履歴へ保存します。最新値は`Player`に保持します。公式OP%の記録開始前に作成された履歴では公式OP%だけを`null`とします。
 
 | フィールド名 | 型 | 必須 | 説明 |
 |------------|-----|-----|------|
 | PlayerID | int | ✓ | プレイヤーID |
 | OfficialRating | float64 | ✓ | 公式RATING |
 | OfficialOverpower | float64 | ✓ | 公式OVER POWER |
+| OfficialOverpowerPercent | *float64 | | 公式OP%。記録開始前は`nil` |
 | DataCollectedAt | time.Time | ✓ | CHUNITHM-NETからのデータ取得完了日時 |
 
 #### 不変条件
 
-- 公式RATINGと公式OVER POWERの欠落・`null`は許可しない
-- 公式RATINGと公式OVER POWERはDB精度に合わせて小数第2位までとする
+- 新規取得では公式RATING・公式OVER POWER・公式OP%の欠落・`null`は許可しない
+- 公式RATING・公式OVER POWER・公式OP%はDB精度に合わせて小数第2位までとする
+- 公式OP%は0以上100以下とする
 - 初回登録では履歴を作らず、現在値のみを`players`へ保存する
 - `DataCollectedAt`のない既存プレイヤーは公式値の取得履歴がないため、最初のデータ登録時に更新前状態を履歴化しない
-- 現在より古い取得日時への更新、および同一取得日時で異なる公式指標への更新は拒否する
+- 現在より古い取得日時への更新、および同一取得日時で3値のいずれかが異なる公式指標への更新は拒否する
 - 履歴の保持件数に上限は設けない
 
 ---

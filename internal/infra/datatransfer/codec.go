@@ -137,7 +137,9 @@ func (codec *Codec) Decode(encoded []byte) (*entity.UserDataTransferSnapshot, er
 	if header.Format == "" || header.SchemaVersion == 0 {
 		return nil, fmt.Errorf("%w: header format and schema version are required", usecase.ErrDataTransferInvalidFile)
 	}
-	if header.Format != info.DataTransferFormat || header.SchemaVersion != info.DataTransferSchemaVersion {
+	if header.Format != info.DataTransferFormat ||
+		header.SchemaVersion < info.DataTransferMinSupportedSchemaVersion ||
+		header.SchemaVersion > info.DataTransferSchemaVersion {
 		return nil, usecase.ErrDataTransferUnsupportedSchema
 	}
 

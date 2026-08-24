@@ -43,6 +43,8 @@ func TestCodecEncodeDecode(t *testing.T) {
 	decoded, err := codec.Decode(encoded)
 	require.NoError(t, err)
 	assert.Equal(t, snapshot.Player.Name.String(), decoded.Player.Name.String())
+	require.NotNil(t, decoded.Player.OfficialOverpowerPercent)
+	assert.Equal(t, 0.0, *decoded.Player.OfficialOverpowerPercent)
 	assert.NotNil(t, decoded.Records)
 	assert.NotNil(t, decoded.Goals.Groups)
 	assert.NotNil(t, decoded.Goals.Ungrouped)
@@ -120,6 +122,30 @@ func TestCodecDecodeValidatesHeader(t *testing.T) {
 		_, err := codec.Decode(mutated)
 		assert.ErrorIs(t, err, usecase.ErrDataTransferInvalidFile)
 	})
+}
+
+func TestCodecDecodeAcceptsVersion1WithoutOfficialOverpowerPercent(t *testing.T) {
+	codec, err := NewCodec(codecTestSecret)
+	require.NoError(t, err)
+	encoded := encodeCodecTestFile(t, codec)
+	withoutPercent := mutatePayloadJSON(t, encoded, func(payload map[string]any) {
+		player := payload["player"].(map[string]any)
+		delete(player, "official_overpower_percent")
+		for _, rawHistory := range payload["metric_histories"].([]any) {
+			delete(rawHistory.(map[string]any), "official_overpower_percent")
+		}
+	})
+	version1 := mutateProtectedJSON(t, withoutPercent, func(header map[string]any) {
+		header["schema_version"] = float64(1)
+	})
+
+	decoded, err := codec.Decode(version1)
+
+	require.NoError(t, err)
+	assert.Nil(t, decoded.Player.OfficialOverpowerPercent)
+	for _, history := range decoded.MetricHistories {
+		assert.Nil(t, history.OfficialOverpowerPercent)
+	}
 }
 
 func TestCodecDecodeRejectsInvalidEnvelopeAndPayload(t *testing.T) {
@@ -280,13 +306,15 @@ func codecTestSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 	t.Helper()
 	name, err := playername.NewPlayerName("テスト")
 	require.NoError(t, err)
+	officialOverpowerPercent := 0.0
 	return &entity.UserDataTransferSnapshot{
 		Player: entity.UserDataTransferPlayer{
-			Name:              name,
-			Level:             1,
-			OfficialRating:    0,
-			OfficialOverpower: 0,
-			CreatedAt:         time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			Name:                     name,
+			Level:                    1,
+			OfficialRating:           0,
+			OfficialOverpower:        0,
+			OfficialOverpowerPercent: &officialOverpowerPercent,
+			CreatedAt:                time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
 		},
 		Records:                  []entity.UserDataTransferRecord{},
 		RecordHistories:          []entity.UserDataTransferRecordHistory{},
