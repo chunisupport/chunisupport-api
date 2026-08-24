@@ -200,10 +200,10 @@ func (r *userDataTransferRepository) importSnapshot(ctx context.Context, exec do
 	}
 	result, err := exec.ExecContext(ctx, `INSERT INTO players
 		(user_id, player_name, player_level, official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
-		 class_emblem_id, class_emblem_base_id, last_played_at, overpower_value, official_overpower, data_collected_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		 class_emblem_id, class_emblem_base_id, last_played_at, overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 		userID, snapshot.Player.Name.String(), snapshot.Player.Level, snapshot.Player.OfficialRating, calculatedRating, newAverage, bestAverage,
-		classEmblemID, classEmblemBaseID, snapshot.Player.LastPlayedAt, overpowerValue, snapshot.Player.OfficialOverpower, snapshot.Player.DataCollectedAt, snapshot.Player.CreatedAt)
+		classEmblemID, classEmblemBaseID, snapshot.Player.LastPlayedAt, overpowerValue, snapshot.Player.OfficialOverpower, snapshot.Player.OfficialOverpowerPercent, snapshot.Player.DataCollectedAt, snapshot.Player.CreatedAt)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert transfer player: %w", err)
 	}
@@ -328,16 +328,17 @@ func saveTransferRecords(ctx context.Context, exec domainrepo.Executor, playerID
 
 func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, playerID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData, honorRepo domainrepo.HonorRepository) error {
 	type metricRow struct {
-		PlayerID          int       `db:"player_id"`
-		OfficialRating    float64   `db:"official_rating"`
-		OfficialOverpower float64   `db:"official_overpower"`
-		DataCollectedAt   time.Time `db:"data_collected_at"`
+		PlayerID                 int       `db:"player_id"`
+		OfficialRating           float64   `db:"official_rating"`
+		OfficialOverpower        float64   `db:"official_overpower"`
+		OfficialOverpowerPercent *float64  `db:"official_overpower_percent"`
+		DataCollectedAt          time.Time `db:"data_collected_at"`
 	}
 	metrics := make([]metricRow, 0, len(snapshot.MetricHistories))
 	for _, item := range snapshot.MetricHistories {
-		metrics = append(metrics, metricRow{playerID, item.OfficialRating, item.OfficialOverpower, item.DataCollectedAt})
+		metrics = append(metrics, metricRow{playerID, item.OfficialRating, item.OfficialOverpower, item.OfficialOverpowerPercent, item.DataCollectedAt})
 	}
-	if err := bulkTransferNamedExec(ctx, exec, `INSERT INTO player_metric_histories (player_id,official_rating,official_overpower,data_collected_at) VALUES (:player_id,:official_rating,:official_overpower,:data_collected_at)`, metrics); err != nil {
+	if err := bulkTransferNamedExec(ctx, exec, `INSERT INTO player_metric_histories (player_id,official_rating,official_overpower,official_overpower_percent,data_collected_at) VALUES (:player_id,:official_rating,:official_overpower,:official_overpower_percent,:data_collected_at)`, metrics); err != nil {
 		return err
 	}
 	type courseRow struct {

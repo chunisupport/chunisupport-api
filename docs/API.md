@@ -231,7 +231,7 @@ Content-Type: application/json
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
-| `/internal/users/:username/rating-op-history` | GET | Firebase Bearer (任意) | 公式RATING・公式OVER POWER履歴取得 |
+| `/internal/users/:username/rating-op-history` | GET | Firebase Bearer (任意) | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
 | `/internal/users/:username/record/songs/:displayid` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
 | `/internal/users/:username/record/songs/:displayid/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
@@ -290,7 +290,7 @@ Content-Type: application/json
 | `/v1/worldsend-songs/:id` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/worldsend-songs/:id/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
-| `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER履歴取得 |
+| `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -1370,7 +1370,7 @@ curl -X POST \
 | `rating` | number | ✓ | レーティング |
 | `last_played` | string | ✓ | 最終プレイ日時 (`YYYY/MM/DD HH:mm` 形式) |
 | `overpower.value` | number | ✓ | 公式オーバーパワー値（`players.official_overpower` に保存。通常譜面スコアから再計算する `overpower_value` とは別管理） |
-| `overpower.percentage` | number | ✓ | オーバーパワー割合（互換入力用。登録時は受け取るが保存値には使わず、未解禁設定を除外した通常楽曲の最大OP合計を分母として再計算） |
+| `overpower.percentage` | number | ✓ | CHUNITHM-NETに表示された公式OP%（`players.official_overpower_percent` に保存。通常譜面スコアから再計算する `overpower_percent` とは別管理） |
 | `class_emblem.medal_class` | string | ✓ | クラスエンブレム（0埋め2桁） |
 | `class_emblem.base_class` | string | ✓ | クラスエンブレムベース（0埋め2桁） |
 | `team.name` | string | | チーム名 |
@@ -1381,7 +1381,7 @@ curl -X POST \
 | `scores.course` | array | | コーススコア配列。省略時は空配列として扱う |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
-`rating`と`overpower.value`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。既存の`data_collected_at`より古い`updated_at`、または同一`updated_at`で異なる公式指標を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。
+`rating`、`overpower.value`、`overpower.percentage`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。`overpower.percentage`は0以上100以下です。既存の`data_collected_at`より古い`updated_at`、または同一`updated_at`で異なる公式指標を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。
 
 **スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
 
@@ -2510,7 +2510,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/users/:username/rating-op-history`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: CHUNITHM-NETから取得した公式RATINGと公式OVER POWERの履歴を、現在値を先頭に新しい順で返します。計算RATING・計算OVER POWERは含みません。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。
+- **概要**: CHUNITHM-NETから取得した公式RATING・公式OVER POWER・公式OP%の履歴を、現在値を先頭に新しい順で返します。計算RATING・計算OVER POWER・計算OP%は含みません。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: 200 OK
 
@@ -2520,6 +2520,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "rating": 17.25,
       "overpower": 12345.67,
+      "overpower_percent": 98.76,
       "data_collected_at": "2026-08-08T12:00:00Z"
     }
   ]
@@ -2531,6 +2532,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `entries` | array | 公式指標のスナップショット配列（現在値を先頭に新しい順） |
 | `entries[].rating` | number | 公式RATING |
 | `entries[].overpower` | number | 公式OVER POWER |
+| `entries[].overpower_percent` | number \| null | 公式OP%。記録開始前の履歴は `null` |
 | `entries[].data_collected_at` | string | CHUNITHM-NETからのデータ取得完了日時（ISO8601） |
 
 - **主なエラー**:
@@ -4332,14 +4334,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/users/:username/rating-op-history`
 - **認証**: APIトークン（任意）
-- **概要**: CHUNITHM-NETから取得した公式RATINGと公式OVER POWERの履歴を、現在値を先頭に新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **概要**: CHUNITHM-NETから取得した公式RATING・公式OVER POWER・公式OP%の履歴を、現在値を先頭に新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | 対象ユーザー名 |
 
-- **レスポンス**: 200 OK（スキーマはinternal APIの公式RATING・公式OVER POWER履歴と同一）
+- **レスポンス**: 200 OK（スキーマはinternal APIの公式RATING・公式OVER POWER・公式OP%履歴と同一）
 - **主なエラー**:
   - 404 Not Found (`player_metric_history_not_found`): プレイヤー未連携などにより履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
@@ -4989,7 +4991,7 @@ interface SkippedRecord {
 
 ### POST /internal/me/data-transfer/export
 
-認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。移行元にプレイヤーがない場合は400を返します。
+認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。現在のスキーマバージョンは2で、プレイヤー現在値と公式指標履歴に`official_overpower_percent`（記録開始前は`null`）を含みます。移行元にプレイヤーがない場合は400を返します。
 
 ### POST /internal/me/data-transfer/validate
 

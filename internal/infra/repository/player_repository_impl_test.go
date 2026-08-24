@@ -198,6 +198,7 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
 			official_overpower REAL NULL,
+			official_overpower_percent REAL NULL,
 			data_collected_at DATETIME NULL,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
@@ -206,6 +207,7 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 			player_id INTEGER NOT NULL,
 			official_rating REAL NOT NULL,
 			official_overpower REAL NOT NULL,
+			official_overpower_percent REAL NULL,
 			data_collected_at DATETIME NOT NULL,
 			PRIMARY KEY (player_id, data_collected_at)
 		)`,
@@ -240,7 +242,7 @@ func TestPlayerRepository_Save_公式指標履歴と現在値を同一トラン�
 	repo := &playerRepository{db: db}
 	player, err := repo.FindByID(context.Background(), db, 1)
 	require.NoError(t, err)
-	require.NoError(t, player.ChangeOfficialMetrics(16.26, 1240.12, now.Add(time.Hour)))
+	require.NoError(t, player.ChangeOfficialMetrics(16.26, 1240.12, 98.76, now.Add(time.Hour)))
 	tx, err := db.Beginx()
 	require.NoError(t, err)
 
@@ -267,9 +269,9 @@ func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, official_overpower, data_collected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, 1234.567, now, now, now)
+			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, 1234.567, 98.75, now, now, now)
 	require.NoError(t, err)
 
 	if !withHonors {

@@ -31,15 +31,16 @@ type UserDataTransferSnapshot struct {
 }
 
 type UserDataTransferPlayer struct {
-	Name                playername.PlayerName
-	Level               int
-	OfficialRating      float64
-	OfficialOverpower   float64
-	ClassEmblemName     *string
-	ClassEmblemBaseName *string
-	LastPlayedAt        *time.Time
-	DataCollectedAt     *time.Time
-	CreatedAt           time.Time
+	Name                     playername.PlayerName
+	Level                    int
+	OfficialRating           float64
+	OfficialOverpower        float64
+	OfficialOverpowerPercent *float64
+	ClassEmblemName          *string
+	ClassEmblemBaseName      *string
+	LastPlayedAt             *time.Time
+	DataCollectedAt          *time.Time
+	CreatedAt                time.Time
 }
 
 type UserDataTransferRecord struct {
@@ -83,9 +84,10 @@ type UserDataTransferWorldsendRecordHistory struct {
 }
 
 type UserDataTransferMetricHistory struct {
-	OfficialRating    float64
-	OfficialOverpower float64
-	DataCollectedAt   time.Time
+	OfficialRating           float64
+	OfficialOverpower        float64
+	OfficialOverpowerPercent *float64
+	DataCollectedAt          time.Time
 }
 
 type UserDataTransferCourseRecord struct {

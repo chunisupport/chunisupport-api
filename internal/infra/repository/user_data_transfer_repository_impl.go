@@ -44,18 +44,19 @@ func (r *userDataTransferRepository) ExportSnapshot(ctx context.Context, userID 
 
 func (r *userDataTransferRepository) exportSnapshot(ctx context.Context, exec domainrepo.Executor, userID int) (*entity.UserDataTransferSnapshot, error) {
 	var playerRow struct {
-		ID                  int        `db:"id"`
-		Name                string     `db:"player_name"`
-		Level               int        `db:"player_level"`
-		OfficialRating      float64    `db:"official_player_rating"`
-		OfficialOverpower   float64    `db:"official_overpower"`
-		ClassEmblemName     *string    `db:"class_emblem_name"`
-		ClassEmblemBaseName *string    `db:"class_emblem_base_name"`
-		LastPlayedAt        *time.Time `db:"last_played_at"`
-		DataCollectedAt     *time.Time `db:"data_collected_at"`
-		CreatedAt           time.Time  `db:"created_at"`
+		ID                       int        `db:"id"`
+		Name                     string     `db:"player_name"`
+		Level                    int        `db:"player_level"`
+		OfficialRating           float64    `db:"official_player_rating"`
+		OfficialOverpower        float64    `db:"official_overpower"`
+		OfficialOverpowerPercent *float64   `db:"official_overpower_percent"`
+		ClassEmblemName          *string    `db:"class_emblem_name"`
+		ClassEmblemBaseName      *string    `db:"class_emblem_base_name"`
+		LastPlayedAt             *time.Time `db:"last_played_at"`
+		DataCollectedAt          *time.Time `db:"data_collected_at"`
+		CreatedAt                time.Time  `db:"created_at"`
 	}
-	const playerQuery = `SELECT p.id, p.player_name, p.player_level, p.official_player_rating, p.official_overpower,
+	const playerQuery = `SELECT p.id, p.player_name, p.player_level, p.official_player_rating, p.official_overpower, p.official_overpower_percent,
 		ce.name AS class_emblem_name, ceb.name AS class_emblem_base_name, p.last_played_at, p.data_collected_at, p.created_at
 		FROM players p INNER JOIN users u ON u.id = p.user_id AND u.player_id = p.id
 		LEFT JOIN class_emblems ce ON ce.id = p.class_emblem_id
@@ -71,7 +72,7 @@ func (r *userDataTransferRepository) exportSnapshot(ctx context.Context, exec do
 		return nil, fmt.Errorf("invalid transfer player name: %w", err)
 	}
 	snapshot := &entity.UserDataTransferSnapshot{
-		Player: entity.UserDataTransferPlayer{Name: name, Level: playerRow.Level, OfficialRating: playerRow.OfficialRating, OfficialOverpower: playerRow.OfficialOverpower,
+		Player: entity.UserDataTransferPlayer{Name: name, Level: playerRow.Level, OfficialRating: playerRow.OfficialRating, OfficialOverpower: playerRow.OfficialOverpower, OfficialOverpowerPercent: playerRow.OfficialOverpowerPercent,
 			ClassEmblemName: playerRow.ClassEmblemName, ClassEmblemBaseName: playerRow.ClassEmblemBaseName,
 			LastPlayedAt: transferUTCOptional(playerRow.LastPlayedAt), DataCollectedAt: transferUTCOptional(playerRow.DataCollectedAt), CreatedAt: transferUTC(playerRow.CreatedAt)},
 		Records: []entity.UserDataTransferRecord{}, RecordHistories: []entity.UserDataTransferRecordHistory{},
@@ -210,15 +211,16 @@ func (r *userDataTransferRepository) exportWorldsendRecords(ctx context.Context,
 
 func (r *userDataTransferRepository) exportAuxiliaryPlayerData(ctx context.Context, exec domainrepo.Executor, playerID int, snapshot *entity.UserDataTransferSnapshot) error {
 	var metrics []struct {
-		OfficialRating    float64   `db:"official_rating"`
-		OfficialOverpower float64   `db:"official_overpower"`
-		DataCollectedAt   time.Time `db:"data_collected_at"`
+		OfficialRating           float64   `db:"official_rating"`
+		OfficialOverpower        float64   `db:"official_overpower"`
+		OfficialOverpowerPercent *float64  `db:"official_overpower_percent"`
+		DataCollectedAt          time.Time `db:"data_collected_at"`
 	}
-	if err := exec.SelectContext(ctx, &metrics, `SELECT official_rating, official_overpower, data_collected_at FROM player_metric_histories WHERE player_id = ? ORDER BY data_collected_at`, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &metrics, `SELECT official_rating, official_overpower, official_overpower_percent, data_collected_at FROM player_metric_histories WHERE player_id = ? ORDER BY data_collected_at`, playerID); err != nil {
 		return err
 	}
 	for _, row := range metrics {
-		snapshot.MetricHistories = append(snapshot.MetricHistories, entity.UserDataTransferMetricHistory{OfficialRating: row.OfficialRating, OfficialOverpower: row.OfficialOverpower, DataCollectedAt: transferUTC(row.DataCollectedAt)})
+		snapshot.MetricHistories = append(snapshot.MetricHistories, entity.UserDataTransferMetricHistory{OfficialRating: row.OfficialRating, OfficialOverpower: row.OfficialOverpower, OfficialOverpowerPercent: row.OfficialOverpowerPercent, DataCollectedAt: transferUTC(row.DataCollectedAt)})
 	}
 	var courses []struct {
 		OfficialIdx   string    `db:"official_idx"`

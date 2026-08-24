@@ -36,6 +36,35 @@ func TestUserDataTransferRepositoryImportSnapshotCommitsAtomically(t *testing.T)
 	assert.Equal(t, 1, playerCount)
 }
 
+func TestUserDataTransferRepositoryImportSnapshotPersistsOfficialOverpowerPercent(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	currentPercent := 98.76
+	historyPercent := 98.12
+	currentCollectedAt := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	snapshot.Player.OfficialOverpowerPercent = &currentPercent
+	snapshot.Player.DataCollectedAt = &currentCollectedAt
+	snapshot.MetricHistories = []entity.UserDataTransferMetricHistory{{
+		OfficialRating:           17.20,
+		OfficialOverpower:        12300.00,
+		OfficialOverpowerPercent: &historyPercent,
+		DataCollectedAt:          time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+	}}
+
+	playerID, err := repo.ImportSnapshot(context.Background(), 1, snapshot)
+
+	require.NoError(t, err)
+	var storedCurrent float64
+	require.NoError(t, db.Get(&storedCurrent, "SELECT official_overpower_percent FROM players WHERE id = ?", playerID))
+	assert.Equal(t, currentPercent, storedCurrent)
+	var storedHistory float64
+	require.NoError(t, db.Get(&storedHistory, "SELECT official_overpower_percent FROM player_metric_histories WHERE player_id = ?", playerID))
+	assert.Equal(t, historyPercent, storedHistory)
+}
+
 func TestUserDataTransferRepositoryImportSnapshotCreatesUnregisteredHonor(t *testing.T) {
 	db := newTransferRepositoryTestDB(t)
 	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
@@ -187,6 +216,23 @@ func TestUserDataTransferRepositoryExportAuxiliaryPlayerDataTreatsEmptyHonorImag
 	assert.NoError(t, snapshot.Validate())
 }
 
+func TestUserDataTransferRepositoryExportAuxiliaryPlayerDataPreservesOfficialOverpowerPercent(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec(`INSERT INTO player_metric_histories
+		(player_id, official_rating, official_overpower, official_overpower_percent, data_collected_at)
+		VALUES (10, 17.20, 12300.00, 98.12, '2026-07-01 00:00:00')`)
+	require.NoError(t, err)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	repo := &userDataTransferRepository{db: db}
+
+	err = repo.exportAuxiliaryPlayerData(context.Background(), db, 10, snapshot)
+
+	require.NoError(t, err)
+	require.Len(t, snapshot.MetricHistories, 1)
+	require.NotNil(t, snapshot.MetricHistories[0].OfficialOverpowerPercent)
+	assert.Equal(t, 98.12, *snapshot.MetricHistories[0].OfficialOverpowerPercent)
+}
+
 func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 	db, err := sqlx.Open("sqlite", ":memory:")
@@ -194,7 +240,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 	t.Cleanup(func() { _ = db.Close() })
 	statements := []string{
 		"CREATE TABLE users (id INTEGER PRIMARY KEY, player_id INTEGER NULL, updated_at DATETIME)",
-		"CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, player_name TEXT, player_level INTEGER, official_player_rating REAL, calculated_player_rating REAL, new_average_rating REAL, best_average_rating REAL, class_emblem_id INTEGER NULL, class_emblem_base_id INTEGER NULL, last_played_at DATETIME NULL, overpower_value REAL, official_overpower REAL, data_collected_at DATETIME NULL, created_at DATETIME, updated_at DATETIME)",
+		"CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, player_name TEXT, player_level INTEGER, official_player_rating REAL, calculated_player_rating REAL, new_average_rating REAL, best_average_rating REAL, class_emblem_id INTEGER NULL, class_emblem_base_id INTEGER NULL, last_played_at DATETIME NULL, overpower_value REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME NULL, created_at DATETIME, updated_at DATETIME)",
 		"CREATE TABLE goals (id INTEGER PRIMARY KEY, user_id INTEGER, group_id INTEGER)",
 		"CREATE TABLE goal_groups (id INTEGER PRIMARY KEY, user_id INTEGER)",
 		"CREATE TABLE record_filters (id BLOB PRIMARY KEY, user_id INTEGER)",
@@ -214,7 +260,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE honor_types (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE honors (id INTEGER PRIMARY KEY, name TEXT, honor_type_id INTEGER, image_url TEXT NULL, UNIQUE(name, honor_type_id), UNIQUE(image_url))",
-		"CREATE TABLE player_metric_histories (player_id INTEGER, official_rating REAL, official_overpower REAL, data_collected_at DATETIME)",
+		"CREATE TABLE player_metric_histories (player_id INTEGER, official_rating REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME)",
 		"CREATE TABLE player_course_records (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_honors (player_id INTEGER, honor_id INTEGER, slot INTEGER, created_at DATETIME)",
 		"CREATE TABLE player_favorite_songs (player_id INTEGER, song_id INTEGER, created_at DATETIME)",

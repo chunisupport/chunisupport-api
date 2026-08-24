@@ -84,6 +84,15 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 	if !hasOfficialMetricPrecision(*payload.Overpower.Value) {
 		return &PlayerDataValidationError{Field: "overpower.value", Message: "overpower.value must have at most 2 decimal places"}
 	}
+	if payload.Overpower.Percentage == nil {
+		return &PlayerDataValidationError{Field: "overpower.percentage", Message: "overpower.percentage is required"}
+	}
+	if *payload.Overpower.Percentage < 0 || *payload.Overpower.Percentage > info.MaxOfficialOverpowerPercent || math.IsNaN(*payload.Overpower.Percentage) || math.IsInf(*payload.Overpower.Percentage, 0) {
+		return &PlayerDataValidationError{Field: "overpower.percentage", Message: "overpower.percentage is out of range"}
+	}
+	if !hasOfficialMetricPrecision(*payload.Overpower.Percentage) {
+		return &PlayerDataValidationError{Field: "overpower.percentage", Message: "overpower.percentage must have at most 2 decimal places"}
+	}
 
 	// スコアデータの整合性検証
 	errorCount := 0
@@ -334,11 +343,12 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	summaryInput := &PlayerDataSummaryInput{
-		Name:              nameVO.String(),
-		Level:             payload.Level,
-		OfficialRating:    normalizeOfficialMetric(*payload.Rating),
-		OfficialOverpower: normalizeOfficialMetric(*payload.Overpower.Value),
-		LastPlayedAt:      lastPlayedAt,
+		Name:                     nameVO.String(),
+		Level:                    payload.Level,
+		OfficialRating:           normalizeOfficialMetric(*payload.Rating),
+		OfficialOverpower:        normalizeOfficialMetric(*payload.Overpower.Value),
+		OfficialOverpowerPercent: normalizeOfficialMetric(*payload.Overpower.Percentage),
+		LastPlayedAt:             lastPlayedAt,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -668,12 +678,13 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		player.BestAverageRating = existingPlayer.BestAverageRating
 		player.OfficialRating = existingPlayer.OfficialRating
 		player.OfficialOverpower = existingPlayer.OfficialOverpower
+		player.OfficialOverpowerPercent = existingPlayer.OfficialOverpowerPercent
 		player.DataCollectedAt = existingPlayer.DataCollectedAt
 	} else {
 		player.CreatedAt = time.Now().UTC()
 	}
 
-	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, updatedAt); err != nil {
+	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {
 		return 0, nil, &PlayerDataConflictError{Reason: err.Error()}
 	}
 

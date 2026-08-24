@@ -36,7 +36,7 @@ func (h *PlayerMetricHistoryHandler) Get(c *echo.Context) error {
 	for _, entry := range entries {
 		result = append(result, internaldto.PlayerMetricHistoryEntry{
 			Rating: entry.OfficialRating, Overpower: entry.OfficialOverpower,
-			DataCollectedAt: entry.DataCollectedAt,
+			OverpowerPercent: entry.OfficialOverpowerPercent, DataCollectedAt: entry.DataCollectedAt,
 		})
 	}
 	return c.JSON(http.StatusOK, &internaldto.PlayerMetricHistoryResponse{Entries: result})

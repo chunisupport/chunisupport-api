@@ -24,8 +24,8 @@ func NewPlayerMetricHistoryQueryService(db *sqlx.DB) domainrepo.PlayerMetricHist
 func insertPlayerMetricHistory(ctx context.Context, exec domainrepo.Executor, entry entity.PlayerMetricHistoryEntry) error {
 	model := models.PlayerMetricHistoryModelFromEntity(entry)
 	const query = `INSERT INTO player_metric_histories
-		(player_id, official_rating, official_overpower, data_collected_at)
-		VALUES (:player_id, :official_rating, :official_overpower, :data_collected_at)`
+		(player_id, official_rating, official_overpower, official_overpower_percent, data_collected_at)
+		VALUES (:player_id, :official_rating, :official_overpower, :official_overpower_percent, :data_collected_at)`
 	if _, err := exec.NamedExecContext(ctx, query, model); err != nil {
 		return wrapPlayerMetricHistoryInsertError(err)
 	}
@@ -41,14 +41,14 @@ func wrapPlayerMetricHistoryInsertError(err error) error {
 }
 
 func (r *playerMetricHistoryQueryService) FindTimeline(ctx context.Context, playerID int) ([]entity.PlayerMetricHistoryEntry, error) {
-	const query = `SELECT player_id, official_rating, official_overpower, data_collected_at
+	const query = `SELECT player_id, official_rating, official_overpower, official_overpower_percent, data_collected_at
 		FROM (
 			SELECT id AS player_id, official_player_rating AS official_rating,
-				official_overpower, data_collected_at, 1 AS is_current
+				official_overpower, official_overpower_percent, data_collected_at, 1 AS is_current
 			FROM players
 			WHERE id = ? AND data_collected_at IS NOT NULL
 			UNION ALL
-			SELECT history.player_id, history.official_rating, history.official_overpower,
+			SELECT history.player_id, history.official_rating, history.official_overpower, history.official_overpower_percent,
 				history.data_collected_at, 0 AS is_current
 			FROM player_metric_histories AS history
 			WHERE history.player_id = ?

@@ -35,7 +35,7 @@
 | `invalid_difficulty` | 難易度指定不正 |
 | `score_history_not_found` | 指定譜面の現行スコア履歴が存在しない |
 | `score_history_unsupported_difficulty` | スコア履歴対象外のBASIC / ADVANCEDを指定 |
-| `player_metric_history_not_found` | プレイヤー未連携などにより公式RATING・公式OVER POWER履歴が存在しない |
+| `player_metric_history_not_found` | プレイヤー未連携などにより公式RATING・公式OVER POWER・公式OP%履歴が存在しない |
 | data_transfer_player_not_found | 移行元にプレイヤーデータが存在しない |
 | data_transfer_invalid_file | 移行ファイルのJSON、Base64URL、gzip、必須項目が不正 |
 | data_transfer_invalid_signature | 移行ファイルのHMAC署名が一致しない |

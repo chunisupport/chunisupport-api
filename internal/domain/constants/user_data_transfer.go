@@ -9,6 +9,7 @@ const (
 	MaxScoreHistoryEntriesPerChart = 50
 	MaxOfficialRating              = 99.99
 	MaxOfficialOverpower           = 999999.99
+	MaxOfficialOverpowerPercent    = 100.00
 	OfficialMetricDecimalScale     = 100
 	OfficialMetricDecimalTolerance = 1e-7
 	PlayerFavoriteSongMaxCount     = 100

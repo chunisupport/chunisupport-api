@@ -25,6 +25,9 @@ func validateUserDataTransferPlayer(player UserDataTransferPlayer, metricHistori
 	if !validOfficialMetric(player.OfficialOverpower, constants.MaxOfficialOverpower) {
 		return invalidUserDataTransfer("player.official_overpower is invalid")
 	}
+	if player.OfficialOverpowerPercent != nil && !validOfficialMetric(*player.OfficialOverpowerPercent, constants.MaxOfficialOverpowerPercent) {
+		return invalidUserDataTransfer("player.official_overpower_percent is invalid")
+	}
 	if !validOptionalName(player.ClassEmblemName) {
 		return invalidUserDataTransfer("player.class_emblem_name is invalid")
 	}
@@ -187,6 +190,9 @@ func validateUserDataTransferMetricHistories(histories []UserDataTransferMetricH
 		}
 		if !validOfficialMetric(history.OfficialOverpower, constants.MaxOfficialOverpower) {
 			return invalidUserDataTransfer(path + ".official_overpower is invalid")
+		}
+		if history.OfficialOverpowerPercent != nil && !validOfficialMetric(*history.OfficialOverpowerPercent, constants.MaxOfficialOverpowerPercent) {
+			return invalidUserDataTransfer(path + ".official_overpower_percent is invalid")
 		}
 		if err := validateUTCDateTime(path+".data_collected_at", history.DataCollectedAt); err != nil {
 			return err

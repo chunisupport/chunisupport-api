@@ -28,7 +28,7 @@ func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executo
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, official_overpower,
+			overpower_value, official_overpower, official_overpower_percent,
 			data_collected_at,
 			created_at, updated_at
 		FROM players
@@ -50,7 +50,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 			p.id, p.user_id, p.player_name, p.player_level,
 			p.official_player_rating, p.calculated_player_rating, p.new_average_rating, p.best_average_rating,
 			p.class_emblem_id, p.class_emblem_base_id, p.last_played_at,
-			p.overpower_value, p.official_overpower,
+			p.overpower_value, p.official_overpower, p.official_overpower_percent,
 			p.data_collected_at,
 			p.created_at, p.updated_at,
 			ph.slot AS honor_slot,
@@ -191,7 +191,7 @@ func (r *playerRepository) findByUserID(ctx context.Context, exec repository.Exe
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, official_overpower,
+			overpower_value, official_overpower, official_overpower_percent,
 			data_collected_at,
 			created_at, updated_at
 		FROM players
@@ -227,13 +227,13 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 		INSERT INTO players (
 			user_id, player_name, player_level, official_player_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
-			overpower_value, official_overpower, data_collected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	result, err := exec.ExecContext(ctx, query,
 		player.UserID, player.Name.String(), player.Level, player.OfficialRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
-		player.OverpowerValue, player.OfficialOverpower, player.DataCollectedAt, player.CreatedAt, player.UpdatedAt,
+		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.CreatedAt, player.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -264,6 +264,7 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		    last_played_at = ?,
 		    overpower_value = ?,
 		    official_overpower = ?,
+		    official_overpower_percent = ?,
 		    data_collected_at = ?,
 		    updated_at = ?
 		WHERE id = ?
@@ -271,7 +272,7 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 	_, err := exec.ExecContext(ctx, query,
 		player.Name.String(), player.Level, player.OfficialRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
-		player.OverpowerValue, player.OfficialOverpower, player.DataCollectedAt, player.UpdatedAt,
+		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.UpdatedAt,
 		player.ID,
 	)
 	return err
