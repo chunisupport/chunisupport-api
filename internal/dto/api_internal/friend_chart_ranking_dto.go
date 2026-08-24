@@ -26,7 +26,6 @@ type FriendChartRankingChartDTO struct {
 // FriendChartRankingEntryDTO は譜面単位フレンドランキングの1件です。
 type FriendChartRankingEntryDTO struct {
 	Rank             int       `json:"rank"`
-	UserID           int       `json:"user_id"`
 	Username         string    `json:"username"`
 	PlayerName       string    `json:"player_name"`
 	Score            uint32    `json:"score"`

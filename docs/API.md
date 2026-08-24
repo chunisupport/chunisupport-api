@@ -202,13 +202,13 @@ Content-Type: application/json
 | `/internal/me/favorite-songs` | POST | Firebase Bearer | 自分のお気に入り楽曲を登録 |
 | `/internal/me/favorite-songs/:displayid` | DELETE | Firebase Bearer | 自分のお気に入り楽曲を解除 |
 | `/internal/friends` | GET | Firebase Bearer | フレンド一覧取得 |
-| `/internal/friends/:user_id` | DELETE | Firebase Bearer | フレンド解除 |
+| `/internal/friends/:username` | DELETE | Firebase Bearer | フレンド解除 |
 | `/internal/friends/requests` | POST | Firebase Bearer | username完全一致でフレンド申請 |
 | `/internal/friends/requests/received` | GET | Firebase Bearer | 自分宛てのフレンド申請一覧取得 |
 | `/internal/friends/requests/sent` | GET | Firebase Bearer | 自分が送ったフレンド申請一覧取得 |
-| `/internal/friends/requests/:user_id/accept` | POST | Firebase Bearer | フレンド申請承認 |
-| `/internal/friends/requests/:user_id/reject` | POST | Firebase Bearer | フレンド申請拒否 |
-| `/internal/friends/requests/:user_id` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
+| `/internal/friends/requests/:username/accept` | POST | Firebase Bearer | フレンド申請承認 |
+| `/internal/friends/requests/:username/reject` | POST | Firebase Bearer | フレンド申請拒否 |
+| `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/friend-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/friend-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
@@ -839,15 +839,17 @@ Firebase Bearer Token（必須）
 
 ```json
 {
-  "user_id": 2,
   "username": "frienduser",
   "player_level": 42,
   "player_name": "PLAYER",
   "rating": 15.25,
+  "is_private": false,
   "requested_at": "2026-07-08T12:00:00Z",
   "accepted_at": "2026-07-08T12:05:00Z"
 }
 ```
+
+`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。未承認の送受信申請では、非公開ユーザーの `player_level`、`player_name`、`rating` をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
 
 ### GET `/internal/friends`
 
@@ -880,7 +882,7 @@ Firebase Bearer Token（必須）
 
 自分が送った申請一覧を申請日時降順で取得します。
 
-### POST `/internal/friends/requests/:user_id/accept`
+### POST `/internal/friends/requests/:username/accept`
 
 指定ユーザーからの申請を承認し、双方向の `accepted` レコードを作成します。承認時に自分の外向き `pending` / `accepted` が100件に達している場合は失敗します。
 
@@ -888,38 +890,42 @@ Firebase Bearer Token（必須）
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `validation_failed` | 400 | 自分自身を指定 |
+| `username_too_short` / `username_too_long` / `username_invalid_char` | 400 | `username` の形式不正 |
 | `user_not_found` | 404 | ロック対象ユーザーが存在しない |
 | `friend_request_not_found` | 404 | 指定ユーザーからの `pending` 申請が存在しない |
 | `friendship_limit_exceeded` | 400 | 自分の外向き `pending` / `accepted` が100件に達している |
 
-### POST `/internal/friends/requests/:user_id/reject`
+### POST `/internal/friends/requests/:username/reject`
 
 指定ユーザーからの `pending` 申請を削除します。成功時は `204 No Content` です。
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `validation_failed` | 400 | 自分自身を指定 |
+| `username_too_short` / `username_too_long` / `username_invalid_char` | 400 | `username` の形式不正 |
 | `user_not_found` | 404 | ロック対象ユーザーが存在しない |
 | `friend_request_not_found` | 404 | 指定ユーザーからの `pending` 申請が存在しない |
 
-### DELETE `/internal/friends/requests/:user_id`
+### DELETE `/internal/friends/requests/:username`
 
 指定ユーザーへの自分からの `pending` 申請を取り消します。成功時は `204 No Content` です。
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `validation_failed` | 400 | 自分自身を指定 |
+| `username_too_short` / `username_too_long` / `username_invalid_char` | 400 | `username` の形式不正 |
 | `user_not_found` | 404 | ロック対象ユーザーが存在しない |
 | `friend_request_not_found` | 404 | 指定ユーザーへの自分からの `pending` 申請が存在しない |
 
-### DELETE `/internal/friends/:user_id`
+### DELETE `/internal/friends/:username`
 
 指定ユーザーとの双方向フレンド関係を削除します。成功時は `204 No Content` です。
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 400 | 自分自身の `user_id` を指定 |
+| `validation_failed` | 400 | 自分自身を指定 |
+| `username_too_short` / `username_too_long` / `username_invalid_char` | 400 | `username` の形式不正 |
 
 ## `/internal/friend-rankings` グループ
 
@@ -938,7 +944,7 @@ Firebase Bearer Token（必須）
 
 - **ソート・順位**:
   - `score` 降順
-  - 同点内の表示順は `updated_at` 降順、`user_id` 昇順
+  - 同点内の表示順は `updated_at` 降順、`username` 昇順
   - 同点は同順位とし、次順位は件数分進めます（例: `1, 1, 3`）
 
 - **レスポンス**: 200 OK
@@ -959,7 +965,6 @@ Firebase Bearer Token（必須）
   "ranking": [
     {
       "rank": 1,
-      "user_id": 2,
       "username": "frienduser",
       "player_name": "PLAYER",
       "score": 1009500,
@@ -998,7 +1003,7 @@ Firebase Bearer Token（必須）
 
 - **ソート・順位**:
   - `score` 降順
-  - 同点内の表示順は `updated_at` 降順、`user_id` 昇順
+  - 同点内の表示順は `updated_at` 降順、`username` 昇順
   - 同点は同順位とし、次順位は件数分進めます（例: `1, 1, 3`）
 
 - **レスポンス**: 200 OK
@@ -1019,7 +1024,6 @@ Firebase Bearer Token（必須）
   "ranking": [
     {
       "rank": 1,
-      "user_id": 2,
       "username": "frienduser",
       "player_name": "PLAYER",
       "score": 1009500,

@@ -9,11 +9,11 @@ type FriendRequestCreateRequest struct {
 
 // FriendshipUserResponse はフレンド・申請一覧の相手ユーザー概要です。
 type FriendshipUserResponse struct {
-	UserID      int        `json:"user_id"`
 	Username    string     `json:"username"`
 	PlayerLevel *int       `json:"player_level"`
 	PlayerName  *string    `json:"player_name"`
 	Rating      *float64   `json:"rating"`
+	IsPrivate   bool       `json:"is_private"`
 	RequestedAt time.Time  `json:"requested_at"`
 	AcceptedAt  *time.Time `json:"accepted_at,omitempty"`
 }

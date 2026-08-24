@@ -100,7 +100,7 @@ func (r *FriendshipRepository) ListFriends(ctx context.Context, exec domainrepo.
 	const q = `
 		SELECT
 			f.user_id, f.friend_user_id, f.status_id, f.requested_at, f.accepted_at, f.created_at, f.updated_at,
-			u.id AS summary_user_id, u.username AS summary_username,
+			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating
@@ -118,13 +118,13 @@ func (r *FriendshipRepository) ListReceivedRequests(ctx context.Context, exec do
 	const q = `
 		SELECT
 			f.user_id, f.friend_user_id, f.status_id, f.requested_at, f.accepted_at, f.created_at, f.updated_at,
-			u.id AS summary_user_id, u.username AS summary_username,
+			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.user_id
-		LEFT JOIN players p ON p.id = u.player_id
+		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
 		WHERE f.friend_user_id = ?
 		  AND f.status_id = ?
 		ORDER BY f.requested_at DESC, f.user_id ASC
@@ -136,13 +136,13 @@ func (r *FriendshipRepository) ListSentRequests(ctx context.Context, exec domain
 	const q = `
 		SELECT
 			f.user_id, f.friend_user_id, f.status_id, f.requested_at, f.accepted_at, f.created_at, f.updated_at,
-			u.id AS summary_user_id, u.username AS summary_username,
+			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.friend_user_id
-		LEFT JOIN players p ON p.id = u.player_id
+		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
 		WHERE f.user_id = ?
 		  AND f.status_id = ?
 		ORDER BY f.requested_at DESC, f.friend_user_id ASC
@@ -171,6 +171,7 @@ type friendshipSummaryRow struct {
 	SummaryPlayerLevel *int     `db:"summary_player_level"`
 	SummaryPlayerName  *string  `db:"summary_player_name"`
 	SummaryRating      *float64 `db:"summary_rating"`
+	SummaryIsPrivate   bool     `db:"summary_is_private"`
 }
 
 func selectFriendshipSummaries(ctx context.Context, exec domainrepo.Executor, query string, args ...any) ([]*domainrepo.FriendshipWithUserSummary, error) {
@@ -188,6 +189,7 @@ func selectFriendshipSummaries(ctx context.Context, exec domainrepo.Executor, qu
 				PlayerLevel: row.SummaryPlayerLevel,
 				PlayerName:  row.SummaryPlayerName,
 				Rating:      row.SummaryRating,
+				IsPrivate:   row.SummaryIsPrivate,
 			},
 		})
 	}

@@ -272,13 +272,13 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		u := &friendshipUsecase{
 			db:             &MockExecutor{},
 			tm:             &spyTransactionManager{executor: &MockExecutor{}},
-			userRepo:       &stubUserRepoForFriendship{locked: testUser(t, 1, "selfuser")},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "requester"), locked: testUser(t, 1, "selfuser")},
 			friendshipRepo: repo,
 			now:            func() time.Time { return now },
 		}
 
 		// When
-		err = u.AcceptRequest(context.Background(), 1, 2)
+		err = u.AcceptRequest(context.Background(), 1, "requester")
 
 		// Then
 		require.NoError(t, err)
@@ -296,13 +296,13 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		u := &friendshipUsecase{
 			db:             &MockExecutor{},
 			tm:             &spyTransactionManager{executor: &MockExecutor{}},
-			userRepo:       &stubUserRepoForFriendship{},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "requester")},
 			friendshipRepo: repo,
 			now:            func() time.Time { return now },
 		}
 
 		// When
-		err = u.AcceptRequest(context.Background(), 1, 2)
+		err = u.AcceptRequest(context.Background(), 1, "requester")
 
 		// Then
 		require.ErrorIs(t, err, ErrFriendshipLimitExceeded)
@@ -317,12 +317,12 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		u := &friendshipUsecase{
 			db:             &MockExecutor{},
 			tm:             &spyTransactionManager{executor: &MockExecutor{}},
-			userRepo:       &stubUserRepoForFriendship{},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "requester")},
 			friendshipRepo: repo,
 		}
 
 		// When
-		err = u.RejectRequest(context.Background(), 1, 2)
+		err = u.RejectRequest(context.Background(), 1, "requester")
 
 		// Then
 		require.NoError(t, err)
@@ -339,12 +339,12 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		u := &friendshipUsecase{
 			db:             &MockExecutor{},
 			tm:             &spyTransactionManager{executor: &MockExecutor{}},
-			userRepo:       &stubUserRepoForFriendship{},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "targetuser")},
 			friendshipRepo: repo,
 		}
 
 		// When
-		err = u.CancelRequest(context.Background(), 1, 2)
+		err = u.CancelRequest(context.Background(), 1, "targetuser")
 
 		// Then
 		require.NoError(t, err)
@@ -358,12 +358,12 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		u := &friendshipUsecase{
 			db:             &MockExecutor{},
 			tm:             &spyTransactionManager{executor: &MockExecutor{}},
-			userRepo:       &stubUserRepoForFriendship{},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "targetuser")},
 			friendshipRepo: repo,
 		}
 
 		// When
-		err := u.CancelRequest(context.Background(), 1, 2)
+		err := u.CancelRequest(context.Background(), 1, "targetuser")
 
 		// Then
 		require.ErrorIs(t, err, ErrFriendRequestNotFound)

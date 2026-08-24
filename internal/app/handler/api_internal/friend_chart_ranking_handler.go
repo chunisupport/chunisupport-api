@@ -84,7 +84,6 @@ func toFriendChartRankingResponse(result *usecase.FriendChartRankingResult) *int
 	for _, entry := range result.Ranking {
 		item := internaldto.FriendChartRankingEntryDTO{
 			Rank:       entry.Rank,
-			UserID:     entry.UserID,
 			Username:   entry.Username,
 			PlayerName: entry.PlayerName,
 			Score:      entry.Score,

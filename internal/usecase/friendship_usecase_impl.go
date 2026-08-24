@@ -134,13 +134,17 @@ func (u *friendshipUsecase) ListSentRequests(ctx context.Context, userID int) ([
 	return toFriendshipUserOutputs(rows), nil
 }
 
-func (u *friendshipUsecase) AcceptRequest(ctx context.Context, userID int, requesterID int) error {
-	if userID == requesterID {
+func (u *friendshipUsecase) AcceptRequest(ctx context.Context, userID int, requesterUsername string) error {
+	requester, err := u.findUserByUsername(ctx, requesterUsername)
+	if err != nil {
+		return err
+	}
+	if userID == requester.ID {
 		return ErrInvalidFriendRequest
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		if err := u.lockUsers(ctx, tx, userID, requesterID); err != nil {
+		if err := u.lockUsers(ctx, tx, userID, requester.ID); err != nil {
 			return err
 		}
 
@@ -148,7 +152,7 @@ func (u *friendshipUsecase) AcceptRequest(ctx context.Context, userID int, reque
 			return err
 		}
 
-		incoming, err := u.friendshipRepo.Find(ctx, tx, requesterID, userID)
+		incoming, err := u.friendshipRepo.Find(ctx, tx, requester.ID, userID)
 		if err != nil {
 			return err
 		}
@@ -157,57 +161,83 @@ func (u *friendshipUsecase) AcceptRequest(ctx context.Context, userID int, reque
 		}
 
 		now := u.now()
-		return u.acceptMutual(ctx, tx, incoming, userID, requesterID, now)
+		return u.acceptMutual(ctx, tx, incoming, userID, requester.ID, now)
 	})
 }
 
-func (u *friendshipUsecase) RejectRequest(ctx context.Context, userID int, requesterID int) error {
-	if userID == requesterID {
+func (u *friendshipUsecase) RejectRequest(ctx context.Context, userID int, requesterUsername string) error {
+	requester, err := u.findUserByUsername(ctx, requesterUsername)
+	if err != nil {
+		return err
+	}
+	if userID == requester.ID {
 		return ErrInvalidFriendRequest
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		if err := u.lockUsers(ctx, tx, userID, requesterID); err != nil {
+		if err := u.lockUsers(ctx, tx, userID, requester.ID); err != nil {
 			return err
 		}
 
-		incoming, err := u.friendshipRepo.Find(ctx, tx, requesterID, userID)
+		incoming, err := u.friendshipRepo.Find(ctx, tx, requester.ID, userID)
 		if err != nil {
 			return err
 		}
 		if incoming == nil || !incoming.IsPending() {
 			return ErrFriendRequestNotFound
 		}
-		return u.friendshipRepo.DeletePending(ctx, tx, requesterID, userID)
+		return u.friendshipRepo.DeletePending(ctx, tx, requester.ID, userID)
 	})
 }
 
-func (u *friendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUserID int) error {
-	if userID == targetUserID {
+func (u *friendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUsername string) error {
+	target, err := u.findUserByUsername(ctx, targetUsername)
+	if err != nil {
+		return err
+	}
+	if userID == target.ID {
 		return ErrInvalidFriendRequest
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		if err := u.lockUsers(ctx, tx, userID, targetUserID); err != nil {
+		if err := u.lockUsers(ctx, tx, userID, target.ID); err != nil {
 			return err
 		}
 
-		outgoing, err := u.friendshipRepo.Find(ctx, tx, userID, targetUserID)
+		outgoing, err := u.friendshipRepo.Find(ctx, tx, userID, target.ID)
 		if err != nil {
 			return err
 		}
 		if outgoing == nil || !outgoing.IsPending() {
 			return ErrFriendRequestNotFound
 		}
-		return u.friendshipRepo.DeletePending(ctx, tx, userID, targetUserID)
+		return u.friendshipRepo.DeletePending(ctx, tx, userID, target.ID)
 	})
 }
 
-func (u *friendshipUsecase) Remove(ctx context.Context, userID int, friendUserID int) error {
-	if userID == friendUserID {
+func (u *friendshipUsecase) Remove(ctx context.Context, userID int, friendUsername string) error {
+	friend, err := u.findUserByUsername(ctx, friendUsername)
+	if err != nil {
+		return err
+	}
+	if userID == friend.ID {
 		return ErrInvalidFriendRequest
 	}
-	return u.friendshipRepo.DeletePair(ctx, u.db, userID, friendUserID)
+	return u.friendshipRepo.DeletePair(ctx, u.db, userID, friend.ID)
+}
+
+func (u *friendshipUsecase) findUserByUsername(ctx context.Context, username string) (*entity.User, error) {
+	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+	return user, nil
 }
 
 func (u *friendshipUsecase) ensureOutgoingSlot(ctx context.Context, exec repository.Executor, userID int) error {
@@ -269,11 +299,11 @@ func toFriendshipUserOutputs(rows []*repository.FriendshipWithUserSummary) []*Fr
 			continue
 		}
 		items = append(items, &FriendshipUserOutput{
-			UserID:      row.User.UserID,
 			Username:    row.User.Username,
 			PlayerLevel: row.User.PlayerLevel,
 			PlayerName:  row.User.PlayerName,
 			Rating:      row.User.Rating,
+			IsPrivate:   row.User.IsPrivate,
 			RequestedAt: row.Friendship.RequestedAt,
 			AcceptedAt:  row.Friendship.AcceptedAt,
 		})
