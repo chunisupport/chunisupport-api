@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -115,6 +116,9 @@ type Handlers struct {
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
 func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, error) {
 	e := echo.New()
+	if err := configureIPExtractor(e, cfg.ClientIP); err != nil {
+		return nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
+	}
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
 
@@ -301,6 +305,28 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
 	return e, nil
+}
+
+func configureIPExtractor(e *echo.Echo, cfg config.ClientIP) error {
+	if len(cfg.TrustedProxyCIDRs) == 0 {
+		e.IPExtractor = echo.ExtractIPDirect()
+		return nil
+	}
+
+	trustOptions := []echo.TrustOption{
+		echo.TrustLoopback(false),
+		echo.TrustLinkLocal(false),
+		echo.TrustPrivateNet(false),
+	}
+	for _, cidr := range cfg.TrustedProxyCIDRs {
+		_, trustedRange, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("invalid trusted proxy CIDR %q: %w", cidr, err)
+		}
+		trustOptions = append(trustOptions, echo.TrustIPRange(trustedRange))
+	}
+	e.IPExtractor = echo.ExtractIPFromXFFHeader(trustOptions...)
+	return nil
 }
 
 func requireRecentSignInVerifier(firebaseTokenVerifier usecase.TokenVerifier) usecase.RecentSignInVerifier {

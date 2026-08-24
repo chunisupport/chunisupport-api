@@ -31,6 +31,7 @@
 - `logging.app_file`（任意。空文字ならアプリログのファイル出力なし）
 - `logging.access_file`（任意。空文字ならアクセスログのファイル出力なし）
 - `shutdown_timeout_seconds` (1以上)
+- `client_ip.trusted_proxy_cidrs`（任意。設定時は、指定CIDRのプロキシから受信した`X-Forwarded-For`だけを`RealIP()`へ反映）
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
@@ -50,6 +51,8 @@
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
 
 MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
+
+`client_ip.trusted_proxy_cidrs` が未設定の場合、クライアントIPにはTCP接続元を使用します。リバースプロキシ配下では、アプリケーションへ接続するプロキシのCIDRをすべて指定してください。指定されたCIDR以外のアドレスや、プロキシが付加したと確認できないIPは信頼しません。外側のプロキシでは、クライアントから持ち込まれた`X-Forwarded-For`を上書きまたは破棄してから付加する設定が必要です。
 
 `logging` は必須です。旧 `log_level` / `log_paths` 形式にはフォールバックしません。
 `logging.stdout=false` の場合は `logging.app_file` と `logging.access_file` の両方が必須です。

@@ -7,6 +7,11 @@
     "stdout": true
   },
   "shutdown_timeout_seconds": 20,
+  "client_ip": {
+    "trusted_proxy_cidrs": [
+      "127.0.0.1/32"
+    ]
+  },
   "cors": {
     "allow_origins": [
       "http://localhost:3000"
