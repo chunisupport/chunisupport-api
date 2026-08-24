@@ -26,6 +26,34 @@ func TestNormalizeAndValidateDatabasePoolConfig_ValidValues(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateClientIPConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		cidrs   []string
+		wantErr bool
+	}{
+		{name: "未設定は直接接続として有効", cidrs: nil},
+		{name: "CIDRを正規化する", cidrs: []string{" 10.0.0.0/8 "}},
+		{name: "不正なCIDRはエラー", cidrs: []string{"not-a-cidr"}, wantErr: true},
+		{name: "空のCIDRはエラー", cidrs: []string{""}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientIP := ClientIP{TrustedProxyCIDRs: tt.cidrs}
+			err := normalizeAndValidateClientIPConfig(&clientIP)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if len(tt.cidrs) > 0 {
+				assert.Equal(t, "10.0.0.0/8", clientIP.TrustedProxyCIDRs[0])
+			}
+		})
+	}
+}
+
 func TestNormalizeAndValidateTimezone(t *testing.T) {
 	tests := []struct {
 		name       string

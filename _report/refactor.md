@@ -99,7 +99,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **HDL-001** | **Medium** | リバースプロキシ時のクライアントIP抽出が未設定 | Echo v5.2.1は `IPExtractor` 未設定時にヘッダーを信頼せず `RemoteAddr` を返すため、旧記述の「ヘッダー偽装」ではなく、プロキシ配下で全利用者がプロキシIPとして記録・制限される問題です。`RealIP()` はログ、ログイン、匿名・一時データのレート制限に使われます。直接公開なら `ExtractIPDirect`、プロキシ配下なら信頼するproxy範囲を限定したXFF/X-Real-IP extractorを明示すべきです。 |
 | **HDL-010** | **Low** | `knownFields` が入力構造体と手動同期 | `internal/app/handler/api_internal/me_handler.go:89-114` の未知フィールド検出は `PlayerDataPayload` のJSONタグ一覧を手書きしています。現在は一致していますが、項目追加時に警告だけがずれるため、厳格decoderまたはリフレクションで単一の定義から導出すべきです。 |
 | **HDL-011** | **Low** | クエリパラメータの不正値を既定値へ黙ってフォールバック | `include_noplay` は5箇所で `strconv.ParseBool` のエラーを破棄し、楽曲一覧の `include_deleted` は文字列が厳密に `"true"` の場合だけtrue、Userの未知 `view` は全件表示へフォールバックします。不正値を400系で返す共通parserへ統一すべきです。 |
 | **HDL-012** | **Low** | 厳格JSONデコードの適用が不統一 | `BindStrictJSON` 導入後も本番コードに `c.Bind` が12箇所残り、`player_locked_song_handler.go` 内でも両方式が混在します。未知フィールド、Content-Type、複数JSON値の扱いを全JSONエンドポイントで統一すべきです。 |

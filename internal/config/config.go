@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -63,6 +64,12 @@ type TempData struct {
 	MaxTotalMB int `json:"max_total_mb"`
 }
 
+// ClientIP はプロキシ経由のクライアントIP取得設定です。
+type ClientIP struct {
+	// TrustedProxyCIDRs が空の場合は、HTTP接続元のIPを使用します。
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+}
+
 type Config struct {
 	AppPort  int     `json:"app_port"`
 	Logging  Logging `json:"logging"`
@@ -72,6 +79,7 @@ type Config struct {
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
 	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
 	CORS                   CORS           `json:"cors"`
+	ClientIP               ClientIP       `json:"client_ip"`
 	TempData               TempData       `json:"temp_data"`
 	UsernamePolicy         UsernamePolicy `json:"-"`
 	DataTransferHMACSecret []byte         `json:"-"`
@@ -88,6 +96,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		Timezone               string   `json:"timezone"`
 		ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`
 		CORS                   CORS     `json:"cors"`
+		ClientIP               ClientIP `json:"client_ip"`
 		TempData               TempData `json:"temp_data"`
 		Database               Database `json:"database"`
 	}
@@ -103,6 +112,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	c.ShutdownTimeoutSeconds = raw.ShutdownTimeoutSeconds
 	c.CORS = raw.CORS
+	c.ClientIP = raw.ClientIP
 	c.TempData = raw.TempData
 	c.Database = raw.Database
 
@@ -196,6 +206,10 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	}
 
 	if err := normalizeAndValidateTimezone(&config); err != nil {
+		errors = append(errors, err.Error())
+	}
+
+	if err := normalizeAndValidateClientIPConfig(&config.ClientIP); err != nil {
 		errors = append(errors, err.Error())
 	}
 
@@ -311,6 +325,20 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	}
 
 	return config, nil
+}
+
+func normalizeAndValidateClientIPConfig(clientIP *ClientIP) error {
+	for index, cidr := range clientIP.TrustedProxyCIDRs {
+		cidr = strings.TrimSpace(cidr)
+		if cidr == "" {
+			return fmt.Errorf("client_ip.trusted_proxy_cidrs[%d] must not be empty", index)
+		}
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			return fmt.Errorf("client_ip.trusted_proxy_cidrs[%d] must be a valid CIDR: %w", index, err)
+		}
+		clientIP.TrustedProxyCIDRs[index] = cidr
+	}
+	return nil
 }
 
 // normalizeAndValidateTimezone はAPI出力用のIANAタイムゾーンを起動時に解決します。
