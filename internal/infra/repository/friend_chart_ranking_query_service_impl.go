@@ -165,7 +165,7 @@ func (q *FriendChartRankingQueryService) ListRecords(ctx context.Context, exec d
 				  AND f.status_id = ?
 			)
 		  )
-		ORDER BY pr.score DESC, pr.updated_at DESC, u.id ASC
+		ORDER BY pr.score DESC, pr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
 	if err := sqlx.SelectContext(ctx, exec, &rows, query, chartID, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted); err != nil {
@@ -219,7 +219,7 @@ func (q *FriendChartRankingQueryService) ListWorldsendRecords(ctx context.Contex
 				  AND f.status_id = ?
 			)
 		  )
-		ORDER BY pwr.score DESC, pwr.updated_at DESC, u.id ASC
+		ORDER BY pwr.score DESC, pwr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
 	if err := sqlx.SelectContext(ctx, exec, &rows, query, worldsendChartID, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted); err != nil {

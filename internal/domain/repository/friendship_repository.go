@@ -13,6 +13,7 @@ type FriendshipUserSummary struct {
 	PlayerLevel *int
 	PlayerName  *string
 	Rating      *float64
+	IsPrivate   bool
 }
 
 // FriendshipWithUserSummary は片方向フレンド関係と相手ユーザー概要をまとめた読み取りモデルです。

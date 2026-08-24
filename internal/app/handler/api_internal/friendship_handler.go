@@ -2,7 +2,6 @@ package api_internal
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -75,59 +74,59 @@ func (h *FriendshipHandler) ListSentRequests(c *echo.Context) error {
 }
 
 func (h *FriendshipHandler) AcceptRequest(c *echo.Context) error {
-	user, requesterID, err := h.authenticatedUserAndPathUserID(c)
+	user, requesterUsername, err := h.authenticatedUserAndPathUsername(c)
 	if err != nil {
 		return err
 	}
-	if err := h.usecase.AcceptRequest(c.Request().Context(), user.ID, requesterID); err != nil {
+	if err := h.usecase.AcceptRequest(c.Request().Context(), user.ID, requesterUsername); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *FriendshipHandler) RejectRequest(c *echo.Context) error {
-	user, requesterID, err := h.authenticatedUserAndPathUserID(c)
+	user, requesterUsername, err := h.authenticatedUserAndPathUsername(c)
 	if err != nil {
 		return err
 	}
-	if err := h.usecase.RejectRequest(c.Request().Context(), user.ID, requesterID); err != nil {
+	if err := h.usecase.RejectRequest(c.Request().Context(), user.ID, requesterUsername); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *FriendshipHandler) CancelRequest(c *echo.Context) error {
-	user, targetUserID, err := h.authenticatedUserAndPathUserID(c)
+	user, targetUsername, err := h.authenticatedUserAndPathUsername(c)
 	if err != nil {
 		return err
 	}
-	if err := h.usecase.CancelRequest(c.Request().Context(), user.ID, targetUserID); err != nil {
+	if err := h.usecase.CancelRequest(c.Request().Context(), user.ID, targetUsername); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *FriendshipHandler) Remove(c *echo.Context) error {
-	user, friendUserID, err := h.authenticatedUserAndPathUserID(c)
+	user, friendUsername, err := h.authenticatedUserAndPathUsername(c)
 	if err != nil {
 		return err
 	}
-	if err := h.usecase.Remove(c.Request().Context(), user.ID, friendUserID); err != nil {
+	if err := h.usecase.Remove(c.Request().Context(), user.ID, friendUsername); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *FriendshipHandler) authenticatedUserAndPathUserID(c *echo.Context) (*entity.User, int, error) {
+func (h *FriendshipHandler) authenticatedUserAndPathUsername(c *echo.Context) (*entity.User, string, error) {
 	user, err := getUserEntityFromContext(c)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
-	userID, err := strconv.Atoi(c.Param("user_id"))
-	if err != nil || userID <= 0 {
-		return nil, 0, apierror.ErrValidationFailedBadRequest.WithInternal(err)
+	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return nil, "", apiErr
 	}
-	return user, userID, nil
+	return user, username, nil
 }
 
 func toFriendshipListResponse(items []*usecase.FriendshipUserOutput) *internaldto.FriendshipListResponse {
@@ -136,11 +135,11 @@ func toFriendshipListResponse(items []*usecase.FriendshipUserOutput) *internaldt
 	}
 	for _, item := range items {
 		res.Items = append(res.Items, &internaldto.FriendshipUserResponse{
-			UserID:      item.UserID,
 			Username:    item.Username,
 			PlayerLevel: item.PlayerLevel,
 			PlayerName:  item.PlayerName,
 			Rating:      item.Rating,
+			IsPrivate:   item.IsPrivate,
 			RequestedAt: item.RequestedAt,
 			AcceptedAt:  item.AcceptedAt,
 		})

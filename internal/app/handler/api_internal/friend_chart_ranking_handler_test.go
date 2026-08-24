@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type stubFriendChartRankingUsecase struct{}
@@ -41,4 +43,24 @@ func TestFriendChartRankingHandler_不正なDisplayIDはHTTP422を返す(t *test
 
 func (stubFriendChartRankingUsecase) GetWorldsend(context.Context, int, string) (*usecase.FriendChartRankingResult, error) {
 	return nil, nil
+}
+
+func TestFriendChartRankingResponse_内部ユーザーIDを公開しない(t *testing.T) {
+	// Given
+	result := &usecase.FriendChartRankingResult{
+		Chart: usecase.FriendChartRankingChart{Difficulty: "MASTER"},
+		Ranking: []usecase.FriendChartRankingEntry{{
+			UserID:   123,
+			Username: "frienduser",
+		}},
+		Total: 1,
+	}
+
+	// When
+	body, err := json.Marshal(toFriendChartRankingResponse(result))
+
+	// Then
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), "user_id")
+	assert.Contains(t, string(body), `"username":"frienduser"`)
 }

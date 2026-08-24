@@ -6,7 +6,7 @@
 
 フレンド関係は相互承認型です。片方が申請し、相手が承認した時点でフレンド成立とします。
 
-ユーザー検索は、ユーザー列挙を避けるため `username` の完全一致のみを許可します。存在しないユーザー、非公開ユーザー、将来のブロック状態などはレスポンス上で詳細に区別しません。
+ユーザー検索は `username` の完全一致のみを許可します。`username` とアカウントの存在は公開情報として扱い、数値の内部ユーザーIDはAPIへ公開しません。
 
 非公開ユーザーの情報は、本人または承認済みフレンドからのみ閲覧できます。フレンドから見える範囲は公開ユーザーと同じです。現時点では `friends_only` のような追加公開範囲は持ちません。
 
@@ -102,10 +102,10 @@ A が B に申請済みの状態で B が A に申請した場合、新しい `p
 | POST | `/internal/friends/requests` | フレンド申請 |
 | GET | `/internal/friends/requests/received` | 自分宛ての申請一覧 |
 | GET | `/internal/friends/requests/sent` | 自分が送った申請一覧 |
-| POST | `/internal/friends/requests/:user_id/accept` | 申請承認 |
-| POST | `/internal/friends/requests/:user_id/reject` | 申請拒否 |
-| DELETE | `/internal/friends/requests/:user_id` | 自分が送った申請の取り消し |
-| DELETE | `/internal/friends/:user_id` | フレンド解除 |
+| POST | `/internal/friends/requests/:username/accept` | 申請承認 |
+| POST | `/internal/friends/requests/:username/reject` | 申請拒否 |
+| DELETE | `/internal/friends/requests/:username` | 自分が送った申請の取り消し |
+| DELETE | `/internal/friends/:username` | フレンド解除 |
 
 申請作成だけは、ユーザーが入力する表向きIDとして `username` を使用します。
 
@@ -115,17 +115,18 @@ A が B に申請済みの状態で B が A に申請した場合、新しい `p
 }
 ```
 
-その他の操作は内部ユーザーIDをパスパラメータで指定します。
+その他の操作も公開識別子である `username` をパスパラメータで指定します。
 
 一覧レスポンスの相手ユーザー概要は次の情報を含みます。
 
-- ユーザーID
 - username
 - プレイヤーレベル
 - プレイヤー名
 - レーティング
 - 申請日時
 - 承認日時
+
+未承認の送受信申請では、公開ユーザーのプレイヤー概要だけを返します。非公開ユーザーは `username`、公開設定、申請日時だけを返し、プレイヤーレベル・プレイヤー名・レーティングは `null` とします。承認済みフレンドは非公開設定でも従来どおり概要を返します。
 
 ## 競合対策
 

@@ -415,10 +415,10 @@ func registerRoutes(
 		friendshipGroup.POST("/requests", handlers.Friendship.SendRequest)
 		friendshipGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
 		friendshipGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
-		friendshipGroup.POST("/requests/:user_id/accept", handlers.Friendship.AcceptRequest)
-		friendshipGroup.POST("/requests/:user_id/reject", handlers.Friendship.RejectRequest)
-		friendshipGroup.DELETE("/requests/:user_id", handlers.Friendship.CancelRequest)
-		friendshipGroup.DELETE("/:user_id", handlers.Friendship.Remove)
+		friendshipGroup.POST("/requests/:username/accept", handlers.Friendship.AcceptRequest)
+		friendshipGroup.POST("/requests/:username/reject", handlers.Friendship.RejectRequest)
+		friendshipGroup.DELETE("/requests/:username", handlers.Friendship.CancelRequest)
+		friendshipGroup.DELETE("/:username", handlers.Friendship.Remove)
 	}
 
 	friendRankingGroup := internal.Group("/friend-rankings")

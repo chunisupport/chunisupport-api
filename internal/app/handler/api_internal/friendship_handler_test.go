@@ -22,10 +22,10 @@ import (
 type mockFriendshipUsecase struct {
 	sendFunc         func(ctx context.Context, userID int, username string) error
 	listFriendsFunc  func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
-	acceptFunc       func(ctx context.Context, userID int, requesterID int) error
-	rejectFunc       func(ctx context.Context, userID int, requesterID int) error
-	cancelFunc       func(ctx context.Context, userID int, targetUserID int) error
-	removeFunc       func(ctx context.Context, userID int, friendUserID int) error
+	acceptFunc       func(ctx context.Context, userID int, requesterUsername string) error
+	rejectFunc       func(ctx context.Context, userID int, requesterUsername string) error
+	cancelFunc       func(ctx context.Context, userID int, targetUsername string) error
+	removeFunc       func(ctx context.Context, userID int, friendUsername string) error
 	listReceivedFunc func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 	listSentFunc     func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 }
@@ -79,30 +79,30 @@ func (m *mockFriendshipUsecase) ListSentRequests(ctx context.Context, userID int
 	return []*usecase.FriendshipUserOutput{}, nil
 }
 
-func (m *mockFriendshipUsecase) AcceptRequest(ctx context.Context, userID int, requesterID int) error {
+func (m *mockFriendshipUsecase) AcceptRequest(ctx context.Context, userID int, requesterUsername string) error {
 	if m.acceptFunc != nil {
-		return m.acceptFunc(ctx, userID, requesterID)
+		return m.acceptFunc(ctx, userID, requesterUsername)
 	}
 	return nil
 }
 
-func (m *mockFriendshipUsecase) RejectRequest(ctx context.Context, userID int, requesterID int) error {
+func (m *mockFriendshipUsecase) RejectRequest(ctx context.Context, userID int, requesterUsername string) error {
 	if m.rejectFunc != nil {
-		return m.rejectFunc(ctx, userID, requesterID)
+		return m.rejectFunc(ctx, userID, requesterUsername)
 	}
 	return nil
 }
 
-func (m *mockFriendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUserID int) error {
+func (m *mockFriendshipUsecase) CancelRequest(ctx context.Context, userID int, targetUsername string) error {
 	if m.cancelFunc != nil {
-		return m.cancelFunc(ctx, userID, targetUserID)
+		return m.cancelFunc(ctx, userID, targetUsername)
 	}
 	return nil
 }
 
-func (m *mockFriendshipUsecase) Remove(ctx context.Context, userID int, friendUserID int) error {
+func (m *mockFriendshipUsecase) Remove(ctx context.Context, userID int, friendUsername string) error {
 	if m.removeFunc != nil {
-		return m.removeFunc(ctx, userID, friendUserID)
+		return m.removeFunc(ctx, userID, friendUsername)
 	}
 	return nil
 }
@@ -192,7 +192,7 @@ func TestFriendshipHandler_ListFriends(t *testing.T) {
 			listFriendsFunc: func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error) {
 				assert.Equal(t, 1, userID)
 				return []*usecase.FriendshipUserOutput{{
-					UserID: 2, Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
+					Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
 					RequestedAt: now.Add(-time.Hour), AcceptedAt: &now,
 				}}, nil
 			},
@@ -208,28 +208,75 @@ func TestFriendshipHandler_ListFriends(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"items":[{"user_id":2,"username":"frienduser","player_level":42,"player_name":"PLAYER","rating":15.25,"requested_at":"`+now.Add(-time.Hour).Format(time.RFC3339Nano)+`","accepted_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
+		assert.JSONEq(t, `{"items":[{"username":"frienduser","player_level":42,"player_name":"PLAYER","rating":15.25,"is_private":false,"requested_at":"`+now.Add(-time.Hour).Format(time.RFC3339Nano)+`","accepted_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
 	})
 }
 
+func TestFriendshipHandler_ListSentRequests_非公開ユーザーはUsernameだけ識別情報として返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	handler := NewFriendshipHandler(&mockFriendshipUsecase{
+		listSentFunc: func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error) {
+			return []*usecase.FriendshipUserOutput{{
+				Username:    "privateuser",
+				IsPrivate:   true,
+				RequestedAt: now,
+			}}, nil
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/internal/friends/requests/sent", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	// When
+	err := handler.ListSentRequests(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"items":[{"username":"privateuser","player_level":null,"player_name":null,"rating":null,"is_private":true,"requested_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "user_id")
+}
+
 func TestFriendshipHandler_AcceptRejectRemove(t *testing.T) {
-	t.Run("承認はpathのuser_idを渡す", func(t *testing.T) {
+	t.Run("不正なpath usernameは詳細なusernameエラーを返す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		handler := NewFriendshipHandler(&mockFriendshipUsecase{})
+		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests/InvalidUser/accept", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 1})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "InvalidUser"}})
+
+		// When
+		err := handler.AcceptRequest(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, apierror.CodeUsernameInvalidChar, apiErr.Code)
+		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	})
+
+	t.Run("承認はpathのusernameを渡す", func(t *testing.T) {
 		// Given
 		e := echo.New()
 		called := false
 		handler := NewFriendshipHandler(&mockFriendshipUsecase{
-			acceptFunc: func(ctx context.Context, userID int, requesterID int) error {
+			acceptFunc: func(ctx context.Context, userID int, requesterUsername string) error {
 				called = true
 				assert.Equal(t, 1, userID)
-				assert.Equal(t, 2, requesterID)
+				assert.Equal(t, "frienduser", requesterUsername)
 				return nil
 			},
 		})
-		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests/2/accept", nil)
+		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests/frienduser/accept", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "user_id", Value: "2"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
 
 		// When
 		err := handler.AcceptRequest(c)
@@ -240,23 +287,23 @@ func TestFriendshipHandler_AcceptRejectRemove(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 	})
 
-	t.Run("拒否はpathのuser_idを渡す", func(t *testing.T) {
+	t.Run("拒否はpathのusernameを渡す", func(t *testing.T) {
 		// Given
 		e := echo.New()
 		called := false
 		handler := NewFriendshipHandler(&mockFriendshipUsecase{
-			rejectFunc: func(ctx context.Context, userID int, requesterID int) error {
+			rejectFunc: func(ctx context.Context, userID int, requesterUsername string) error {
 				called = true
 				assert.Equal(t, 1, userID)
-				assert.Equal(t, 2, requesterID)
+				assert.Equal(t, "frienduser", requesterUsername)
 				return nil
 			},
 		})
-		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests/2/reject", nil)
+		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests/frienduser/reject", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "user_id", Value: "2"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
 
 		// When
 		err := handler.RejectRequest(c)
@@ -267,23 +314,23 @@ func TestFriendshipHandler_AcceptRejectRemove(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 	})
 
-	t.Run("取り消しはpathのuser_idを送信先として渡す", func(t *testing.T) {
+	t.Run("取り消しはpathのusernameを送信先として渡す", func(t *testing.T) {
 		// Given
 		e := echo.New()
 		called := false
 		handler := NewFriendshipHandler(&mockFriendshipUsecase{
-			cancelFunc: func(ctx context.Context, userID int, targetUserID int) error {
+			cancelFunc: func(ctx context.Context, userID int, targetUsername string) error {
 				called = true
 				assert.Equal(t, 1, userID)
-				assert.Equal(t, 2, targetUserID)
+				assert.Equal(t, "frienduser", targetUsername)
 				return nil
 			},
 		})
-		req := httptest.NewRequest(http.MethodDelete, "/internal/friends/requests/2", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/friends/requests/frienduser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "user_id", Value: "2"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
 
 		// When
 		err := handler.CancelRequest(c)
@@ -294,23 +341,23 @@ func TestFriendshipHandler_AcceptRejectRemove(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 	})
 
-	t.Run("解除はpathのuser_idを渡す", func(t *testing.T) {
+	t.Run("解除はpathのusernameを渡す", func(t *testing.T) {
 		// Given
 		e := echo.New()
 		called := false
 		handler := NewFriendshipHandler(&mockFriendshipUsecase{
-			removeFunc: func(ctx context.Context, userID int, friendUserID int) error {
+			removeFunc: func(ctx context.Context, userID int, friendUsername string) error {
 				called = true
 				assert.Equal(t, 1, userID)
-				assert.Equal(t, 2, friendUserID)
+				assert.Equal(t, "frienduser", friendUsername)
 				return nil
 			},
 		})
-		req := httptest.NewRequest(http.MethodDelete, "/internal/friends/2", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/internal/friends/frienduser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "user_id", Value: "2"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
 
 		// When
 		err := handler.Remove(c)
