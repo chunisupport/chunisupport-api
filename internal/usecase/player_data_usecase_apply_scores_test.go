@@ -472,17 +472,58 @@ func TestResolveFullChainID_fchLvの値に応じてフルチェインIDを解決
 	}
 }
 
+func TestValidatePlayerDataIdentity_同一取得日時の本文だけを許可する(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 8, 25, 1, 2, 3, 0, time.UTC)
+	latestUpdate, err := entity.NewPlayerLatestUpdate(10, 1, []byte("gzip-payload"), updatedAt, updatedAt.Add(time.Minute), "same-hash")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		bodyHash     string
+		latest       *entity.PlayerLatestUpdate
+		latestErr    error
+		wantConflict bool
+	}{
+		{name: "同一本文は冪等として許可する", bodyHash: "same-hash", latest: latestUpdate},
+		{name: "異なる本文は競合として拒否する", bodyHash: "different-hash", latest: latestUpdate, wantConflict: true},
+		{name: "初回登録は許可する", bodyHash: "new-hash", latestErr: repository.ErrPlayerLatestUpdateNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: tt.latest, latestUpdateErr: tt.latestErr}
+			uc := &playerDataUsecase{playerDataRepo: repo}
+
+			// When
+			err := uc.validatePlayerDataIdentity(context.Background(), nil, 10, updatedAt, tt.bodyHash)
+
+			// Then
+			if tt.wantConflict {
+				var conflictErr *PlayerDataConflictError
+				assert.ErrorAs(t, err, &conflictErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 type stubPlayerDataRepositoryForApplyScoresTest struct {
-	savedInput      repository.PlayerDataSaveInput
-	receivedFilter  repository.OverpowerTargetFilter
-	overpowerStats  *repository.OverpowerTargetStats
-	saveCalls       int
-	saveErr         error
-	overpowerErr    error
-	fullBefore      map[int]repository.PlayerRecordState
-	worldsendBefore map[int]repository.WorldsendRecordState
-	latestUpdate    *entity.PlayerLatestUpdate
-	latestUpdateErr error
+	savedInput                     repository.PlayerDataSaveInput
+	receivedFilter                 repository.OverpowerTargetFilter
+	overpowerStats                 *repository.OverpowerTargetStats
+	saveCalls                      int
+	saveErr                        error
+	overpowerErr                   error
+	fullBefore                     map[int]repository.PlayerRecordState
+	worldsendBefore                map[int]repository.WorldsendRecordState
+	latestUpdate                   *entity.PlayerLatestUpdate
+	latestUpdateErr                error
+	latestUpdateExec               repository.Executor
+	findLatestUpdateForUpdateCalls int
+	latestUpdateSaveCalls          int
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
@@ -530,10 +571,17 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStatsWith
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) SaveLatestUpdate(_ context.Context, _ repository.Executor, _ *entity.PlayerLatestUpdate) error {
+	s.latestUpdateSaveCalls++
 	return nil
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerID(_ context.Context, _ int) (*entity.PlayerLatestUpdate, error) {
+	return s.latestUpdate, s.latestUpdateErr
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerIDForUpdate(_ context.Context, exec repository.Executor, _ int) (*entity.PlayerLatestUpdate, error) {
+	s.findLatestUpdateForUpdateCalls++
+	s.latestUpdateExec = exec
 	return s.latestUpdate, s.latestUpdateErr
 }
 

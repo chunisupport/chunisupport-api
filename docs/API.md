@@ -1381,7 +1381,7 @@ curl -X POST \
 | `scores.course` | array | | コーススコア配列。省略時は空配列として扱う |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
-`rating`、`overpower.value`、`overpower.percentage`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。`overpower.percentage`は0以上100以下です。既存の`data_collected_at`より古い`updated_at`、または同一`updated_at`で異なる公式指標を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。
+`rating`、`overpower.value`、`overpower.percentage`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。`overpower.percentage`は0以上100以下です。既存の`data_collected_at`より古い`updated_at`、同一`updated_at`で異なる公式指標を送信した場合、または同一`updated_at`で保存済み本文と異なる本文を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。同一`updated_at`の再送は、本文のSHA-256ハッシュも一致する場合のみ冪等な入力として受け付けます。
 
 **スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
 

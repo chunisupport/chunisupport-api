@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -28,6 +29,34 @@ func TestNewPlayerLatestUpdate(t *testing.T) {
 
 	payload[0] = 'X'
 	assert.Equal(t, []byte("gzip-payload"), update.ResultGzip())
+}
+
+func TestPlayerLatestUpdate_同一取得日時の本文競合を判定する(t *testing.T) {
+	// Given
+	sourceUpdatedAt := time.Date(2026, 8, 25, 1, 2, 3, 0, time.UTC)
+	update, err := NewPlayerLatestUpdate(10, 1, []byte("gzip-payload"), sourceUpdatedAt, sourceUpdatedAt.Add(time.Minute), "same-hash")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		sourceAt time.Time
+		bodyHash string
+		wantErr  error
+	}{
+		{name: "同一取得日時かつ同一本文は冪等", sourceAt: sourceUpdatedAt, bodyHash: "same-hash"},
+		{name: "同一取得日時かつ異なる本文は競合", sourceAt: sourceUpdatedAt, bodyHash: "different-hash", wantErr: ErrConflictingPlayerDataBody},
+		{name: "異なる取得日時は本文が異なっても競合しない", sourceAt: sourceUpdatedAt.Add(time.Minute), bodyHash: "different-hash"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			err := update.ValidateInputIdentity(tt.sourceAt, tt.bodyHash)
+
+			// Then
+			assert.True(t, errors.Is(err, tt.wantErr))
+		})
+	}
 }
 
 func TestNewPlayerLatestUpdate_不正な値を拒否する(t *testing.T) {

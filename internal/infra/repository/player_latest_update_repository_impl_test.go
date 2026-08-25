@@ -91,6 +91,12 @@ func TestPlayerDataRepository_SaveLatestUpdate_新しい収集結果だけを保
 	assert.Equal(t, baseTime.Add(3*time.Minute), found.ImportedAt())
 	assert.Equal(t, "hash-3", found.BodyHash())
 
+	foundForUpdate, err := repo.FindLatestUpdateByPlayerIDForUpdate(context.Background(), db, 10)
+	require.NoError(t, err)
+	assert.Equal(t, found.BodyHash(), foundForUpdate.BodyHash())
+
 	_, err = repo.FindLatestUpdateByPlayerID(context.Background(), 999)
+	assert.True(t, errors.Is(err, domainrepo.ErrPlayerLatestUpdateNotFound))
+	_, err = repo.FindLatestUpdateByPlayerIDForUpdate(context.Background(), db, 999)
 	assert.True(t, errors.Is(err, domainrepo.ErrPlayerLatestUpdateNotFound))
 }

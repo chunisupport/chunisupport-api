@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,6 +19,23 @@ import (
 type stubPlayerRepositoryForPlayerData struct {
 	foundPlayer *entity.Player
 	savedPlayer *entity.Player
+	saveCalls   int
+}
+
+type passthroughTransactionManagerForPlayerDataIdentity struct {
+	exec repository.Executor
+	err  error
+}
+
+func (m *passthroughTransactionManagerForPlayerDataIdentity) Transactional(_ context.Context, fn func(repository.Executor) error) error {
+	m.err = fn(m.exec)
+	return m.err
+}
+
+type stubPlayerDataMasterProviderForIdentity struct{}
+
+func (stubPlayerDataMasterProviderForIdentity) PlayerDataMasters() *masterdata.PlayerDataMasters {
+	return &masterdata.PlayerDataMasters{}
 }
 
 func (s *stubPlayerRepositoryForPlayerData) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
@@ -89,6 +108,7 @@ func (s *stubPlayerRepositoryForPlayerData) UpdateCalculatedRatings(ctx context.
 }
 
 func (s *stubPlayerRepositoryForPlayerData) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
+	s.saveCalls++
 	copied := *player
 	if copied.ID == 0 {
 		copied.ID = 99
@@ -96,6 +116,48 @@ func (s *stubPlayerRepositoryForPlayerData) Save(ctx context.Context, exec repos
 	}
 	s.savedPlayer = &copied
 	return nil
+}
+
+func TestRegister_同一取得日時の異なる本文は後続保存前に競合として拒否する(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, 8, 25, 1, 2, 3, 0, time.UTC)
+	officialOverpowerPercent := 98.76
+	playerID := 10
+	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
+		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("登録済み"), Level: 50,
+		OfficialRating: 17.25, OfficialOverpower: 12345.67, OfficialOverpowerPercent: &officialOverpowerPercent,
+		DataCollectedAt: &updatedAt, CreatedAt: updatedAt.Add(-24 * time.Hour), UpdatedAt: updatedAt,
+	}}
+	latestUpdate, err := entity.NewPlayerLatestUpdate(10, 1, []byte("gzip-payload"), updatedAt, updatedAt.Add(time.Minute), "saved-hash")
+	require.NoError(t, err)
+	playerDataRepo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: latestUpdate}
+	txExecutor := &sqlx.DB{}
+	tm := &passthroughTransactionManagerForPlayerDataIdentity{exec: txExecutor}
+	uc := &playerDataUsecase{
+		tm: tm, userRepo: new(MockUserRepository), playerRepo: playerRepo,
+		playerDataRepo: playerDataRepo, masterCache: stubPlayerDataMasterProviderForIdentity{},
+	}
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	rating := 17.25
+	overpower := 12345.67
+	payload := &PlayerDataPayload{
+		AppVersion: "0.1.0", Name: "登録済み", Level: 50, Rating: &rating,
+		Overpower: PlayerDataOverpowerPayload{Value: &overpower, Percentage: &officialOverpowerPercent},
+		UpdatedAt: updatedAt.Format(time.RFC3339),
+	}
+
+	// When
+	_, err = uc.Register(context.Background(), user, payload, "different-hash")
+
+	// Then
+	var conflictErr *PlayerDataConflictError
+	assert.ErrorAs(t, err, &conflictErr)
+	assert.Same(t, txExecutor, playerDataRepo.latestUpdateExec)
+	assert.Equal(t, 1, playerDataRepo.findLatestUpdateForUpdateCalls)
+	assert.Equal(t, 1, playerRepo.saveCalls)
+	assert.Equal(t, 0, playerDataRepo.saveCalls)
+	assert.Equal(t, 0, playerDataRepo.latestUpdateSaveCalls)
+	assert.Same(t, err, tm.err)
 }
 
 func (s *stubPlayerRepositoryForPlayerData) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {

@@ -12,6 +12,7 @@ var (
 	ErrPlayerLatestUpdateSourceTimeRequired   = errors.New("player latest update source_updated_at is required")
 	ErrPlayerLatestUpdateImportedTimeRequired = errors.New("player latest update imported_at is required")
 	ErrPlayerLatestUpdateBodyHashRequired     = errors.New("player latest update body_hash is required")
+	ErrConflictingPlayerDataBody              = errors.New("conflicting player data body")
 )
 
 // PlayerLatestUpdate はプレイヤーの最新データ登録結果を表します。
@@ -72,3 +73,11 @@ func (u *PlayerLatestUpdate) ImportedAt() time.Time { return u.importedAt }
 
 // BodyHash は入力本文のSHA-256ハッシュを返します。
 func (u *PlayerLatestUpdate) BodyHash() string { return u.bodyHash }
+
+// ValidateInputIdentity は同一取得日時の別本文による状態上書きを防ぐため、保存済み入力との同一性を検証します。
+func (u *PlayerLatestUpdate) ValidateInputIdentity(sourceUpdatedAt time.Time, bodyHash string) error {
+	if u.sourceUpdatedAt.Equal(sourceUpdatedAt) && u.bodyHash != bodyHash {
+		return ErrConflictingPlayerDataBody
+	}
+	return nil
+}
