@@ -57,7 +57,6 @@
 
 | ID | 優先度 | 概要 | 詳細・対応方針 |
 |---|---|---|---|
-| **DATA-001** | **High** | 同一取得時刻の異なるプレイヤーデータで状態を上書きできる | `internal/usecase/player_data_usecase_impl.go:637` はPlayer行をロックし、`internal/domain/entity/player.go:51-70` も既存より古い取得時刻と、同一時刻で公式指標だけが異なる入力を拒否するよう改善されています。一方、同一 `updated_at` で公式RATING・公式OVER POWERが同じなら、本文ハッシュ、プロフィール、スコアの差異を確認せず処理を継続します。`internal/infra/repository/player_data_repository_impl.go:435-476` のUPSERTはスコア・ランプ・枠を無条件に置換するため、同一取得時刻の異なる本文で現行レコードを上書きできます。`player_latest_updates.body_hash` を同じトランザクションで比較し、時刻と本文が同じ場合だけ冪等扱い、時刻が同じで本文が異なる場合は競合として拒否すべきです。 |
 | **DATA-002** | **High** | 譜面定数PATCHが未ロックの集約全体を上書き | `internal/usecase/song_usecase_impl.go:228-242` は非ロックの `FindByOfficialIdx` 後に、`internal/infra/repository/song_repository_impl.go:423-466` の全列・全譜面 `Save` を実行します。読み取り後に削除や別編集がcommitされると、古い `IsDeleted`・タイトル・他譜面で再上書きできます。また `Song.ChangeChartConstant` は `MaxChartConst` / `IsMaxOPUnknown` / `OpTargetDifficultyID` を再集約しないため、直後の200レスポンスも変更譜面とトップレベル値が矛盾します。集約を `FOR UPDATE` で復元し、変更メソッド内で派生値まで再計算してから保存すべきです。 |
 | **DATA-003** | **High** | 未解禁曲更新が古いPlayer集約を保存して並行更新を失う | `internal/usecase/player_locked_song_usecase_impl.go` の `Lock` / `Unlock` / `Batch` はPlayerをトランザクション外で読み、子行変更とOP再計算後にその古いPlayerを `Save` します。`PlayerRepository.Save` はOPだけでなく名前・レベル・公式値・`data_collected_at` 等も更新するため、並行するデータ登録を巻き戻せます。複数のLock/Unlock同士でも、各トランザクションが片側変更しか見ないOP値を後勝ち保存する可能性があります。トランザクション冒頭でPlayer行をロック・再読込し、全経路のロック順をPlayer→子行へ統一すべきです。 |
 | **DATA-004** | **Medium** | 再計算バッチのマスタ「スナップショット」が原子的でない | `internal/infra/repository/player_data_batch_repository_impl.go:23-69` はversion、songs、charts、slots、Player上限を5本のautocommit SELECTで取得します。途中で編集がcommitされると、旧楽曲属性と新譜面定数が混在したrun全体スナップショットになります。`REPEATABLE READ` または明示的なconsistent snapshotを使うread-only transactionでまとめて取得し、そのトランザクションから構築した値だけをrun中に使用すべきです。 |
@@ -108,7 +107,7 @@
 
 ## まとめ
 
-- 最優先は、**同一取得時刻の異なるプレイヤーデータによる上書き (`DATA-001`)**、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
+- 最優先は、**譜面定数PATCHと未解禁曲更新のlost update (`DATA-002`, `DATA-003`)**です。
 - 2026-08-24 の再レビューでは、既存の未解決項目に加えて、**楽曲スナップショットの世代混在 (`DATA-005`)**と**メンテナンス状態のプロセス間不整合 (`OPS-003`)**を追加しました。データ移行機能はサイズ制限、署名、全体検証、参照再検証、トランザクションを備えており、今回の確認範囲では独立した追加指摘はありません。
 - 直近追加の互換APIでは、不要な全件取得、401/422/500の503化、FAILEDのクリア誤判定が見つかりました。機能単位の正常系テストだけでなく、認証・入力不正・非公開・削除済み・並行更新を含む境界テストが必要です。
 - プレイヤーデータの真正性（クライアント申告スコア）はプロダクト前提として本リストの脆弱性対象外とします。管理用の `is_suspicious` は別途運用で扱う想定です。

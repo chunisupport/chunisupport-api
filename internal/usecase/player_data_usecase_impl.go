@@ -377,6 +377,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return ensureErr
 		}
 		result.PlayerID = playerID
+		if identityErr := us.validatePlayerDataIdentity(ctx, tx, playerID, updatedAt, bodyHash); identityErr != nil {
+			return identityErr
+		}
 
 		beforeRecords, beforeRecordsErr := us.playerRecRepo.FindByPlayerID(ctx, tx, playerID)
 		if beforeRecordsErr != nil {
@@ -474,6 +477,20 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
+}
+
+func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx repository.Executor, playerID int, updatedAt time.Time, bodyHash string) error {
+	latestUpdate, err := us.playerDataRepo.FindLatestUpdateByPlayerIDForUpdate(ctx, tx, playerID)
+	if err != nil {
+		if errors.Is(err, repository.ErrPlayerLatestUpdateNotFound) {
+			return nil
+		}
+		return fmt.Errorf("failed to validate player data identity: %w", err)
+	}
+	if err := latestUpdate.ValidateInputIdentity(updatedAt, bodyHash); err != nil {
+		return &PlayerDataConflictError{Reason: err.Error()}
+	}
+	return nil
 }
 
 // logRegisteredSPHonors はトランザクションのコミット後に、手動対応が必要な新規SP称号を通知用ログへ出力します。

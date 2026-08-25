@@ -193,13 +193,28 @@ func (r *playerDataRepository) SaveLatestUpdate(ctx context.Context, exec reposi
 
 // FindLatestUpdateByPlayerID はプレイヤーIDに対応する最新データ登録結果を取得します。
 func (r *playerDataRepository) FindLatestUpdateByPlayerID(ctx context.Context, playerID int) (*entity.PlayerLatestUpdate, error) {
+	return r.findLatestUpdateByPlayerID(ctx, r.db, playerID, false)
+}
+
+// FindLatestUpdateByPlayerIDForUpdate はプレイヤーIDに対応する最新データ登録結果をロックして取得します。
+func (r *playerDataRepository) FindLatestUpdateByPlayerIDForUpdate(ctx context.Context, exec repository.Executor, playerID int) (*entity.PlayerLatestUpdate, error) {
+	if exec == nil {
+		return nil, fmt.Errorf("FindLatestUpdateByPlayerIDForUpdate requires a non-nil executor")
+	}
+	return r.findLatestUpdateByPlayerID(ctx, exec, playerID, true)
+}
+
+func (r *playerDataRepository) findLatestUpdateByPlayerID(ctx context.Context, exec repository.Executor, playerID int, forUpdate bool) (*entity.PlayerLatestUpdate, error) {
 	var model models.PlayerLatestUpdateModel
 	query := `
 		SELECT player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
 		FROM player_latest_updates
 		WHERE player_id = ?
 	`
-	if err := r.db.GetContext(ctx, &model, query, playerID); err != nil {
+	if forUpdate && r.db.DriverName() == "mysql" {
+		query += " FOR UPDATE"
+	}
+	if err := exec.GetContext(ctx, &model, query, playerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrPlayerLatestUpdateNotFound
 		}
