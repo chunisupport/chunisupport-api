@@ -163,6 +163,9 @@ func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDAndSongDisplayID
 func (s *stubPlayerRecordRepositoryForLockedSong) FindByPlayerIDForRating(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
 	return nil, nil
 }
+func (s *stubPlayerRecordRepositoryForLockedSong) FindOPTargetCandidatesByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]repository.PlayerRecordOPTargetCandidate, error) {
+	return nil, nil
+}
 func (s *stubPlayerRecordRepositoryForLockedSong) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
 	return nil, nil
 }
