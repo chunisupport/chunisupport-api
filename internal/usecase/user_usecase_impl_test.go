@@ -164,10 +164,12 @@ func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testin
 }
 
 type stubPlayerRecordRepository struct {
-	records         []*entity.PlayerRecord
-	ratingRecords   []*entity.PlayerRecord
-	lastScoreUpdate *time.Time
-	err             error
+	records               []*entity.PlayerRecord
+	ratingRecords         []*entity.PlayerRecord
+	opTargetCandidates    []repository.PlayerRecordOPTargetCandidate
+	opTargetCandidatesErr error
+	lastScoreUpdate       *time.Time
+	err                   error
 }
 
 func (s *stubPlayerRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
@@ -189,6 +191,13 @@ func (s *stubPlayerRecordRepository) FindByPlayerIDForRating(ctx context.Context
 		return s.ratingRecords, nil
 	}
 	return s.records, nil
+}
+
+func (s *stubPlayerRecordRepository) FindOPTargetCandidatesByPlayerID(_ context.Context, _ repository.Executor, _ int) ([]repository.PlayerRecordOPTargetCandidate, error) {
+	if s.opTargetCandidatesErr != nil {
+		return nil, s.opTargetCandidatesErr
+	}
+	return s.opTargetCandidates, nil
 }
 
 func (s *stubPlayerRecordRepository) GetLastScoreUpdate(ctx context.Context, exec repository.Executor, playerID int) (*time.Time, error) {
@@ -1010,6 +1019,48 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 	assert.False(t, result.Records.All[3].IsOPTarget, "同一曲内でOPが低い譜面を対象にしない")
 }
 
+func TestCalculateOPTargetChartIDsFromCandidates(t *testing.T) {
+	chartConst, err := chartconstant.NewChartConstant(12.4)
+	require.NoError(t, err)
+	sameOPScore, err := score.NewScore(1009000)
+	require.NoError(t, err)
+	higherOPScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+	zeroOPScore, err := score.NewScore(0)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		candidates []repository.PlayerRecordOPTargetCandidate
+		expected   map[int]struct{}
+	}{
+		{
+			name: "同値の場合は高い難易度を対象にする",
+			candidates: []repository.PlayerRecordOPTargetCandidate{
+				{ChartID: 1001, SongID: 10, DifficultyID: 3, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
+				{ChartID: 1002, SongID: 10, DifficultyID: 4, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
+			},
+			expected: map[int]struct{}{1002: {}},
+		},
+		{
+			name: "同一楽曲内で最大OPの譜面を対象にする",
+			candidates: []repository.PlayerRecordOPTargetCandidate{
+				{ChartID: 2001, SongID: 20, DifficultyID: 3, Score: higherOPScore, ComboLampID: 3, ChartConstant: chartConst},
+				{ChartID: 2002, SongID: 20, DifficultyID: 4, Score: zeroOPScore, ComboLampID: 1, ChartConstant: chartConst},
+			},
+			expected: map[int]struct{}{2001: {}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := calculateOPTargetChartIDsFromCandidates(tt.candidates)
+
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
 func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
@@ -1084,7 +1135,11 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	playerUpdatedAt := now.Add(-time.Hour)
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 100, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records, ratingRecords: records}, nil, nil, nil, nil)
+	opTargetCandidates := []repository.PlayerRecordOPTargetCandidate{
+		{ChartID: 101, SongID: 1001, DifficultyID: 2, Score: score1, ComboLampID: 1, ChartConstant: chartConst},
+		{ChartID: 102, SongID: 1002, DifficultyID: 3, Score: score2, ComboLampID: 2, ChartConstant: chartConst},
+	}
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records, ratingRecords: records, opTargetCandidates: opTargetCandidates}, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -1096,6 +1151,75 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	assert.Empty(t, result.Records.New)
 	assert.True(t, result.Records.Best[0].IsOPTarget)
 	assert.True(t, result.Records.NewCandidate[0].IsOPTarget)
+}
+
+func TestUserUsecase_GetUserProfileRatingView_OP対象は全譜面候補から判定する(t *testing.T) {
+	// Given
+	now := time.Now()
+	chartConst, err := chartconstant.NewChartConstant(12.4)
+	require.NoError(t, err)
+	ratingRecordScore, err := score.NewScore(1000000)
+	require.NoError(t, err)
+	higherOPScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), UpdatedAt: now}
+	ratingRecord := &entity.PlayerRecord{
+		ChartID:     101,
+		Score:       ratingRecordScore,
+		ComboLampID: 1,
+		UpdatedAt:   now,
+		Chart:       &entity.Chart{ID: 101, SongID: 10, DifficultyID: 3, Const: chartConst},
+		Slot:        &master.Slot{ID: 1, Name: "best"},
+	}
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{
+			ratingRecords: []*entity.PlayerRecord{ratingRecord},
+			opTargetCandidates: []repository.PlayerRecordOPTargetCandidate{
+				{ChartID: 101, SongID: 10, DifficultyID: 3, Score: ratingRecordScore, ComboLampID: 1, ChartConstant: chartConst},
+				{ChartID: 102, SongID: 10, DifficultyID: 4, Score: higherOPScore, ComboLampID: 3, ChartConstant: chartConst},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, result.Records.Best, 1)
+	assert.False(t, result.Records.Best[0].IsOPTarget)
+}
+
+func TestUserUsecase_GetUserProfileRatingView_OP対象候補の取得失敗を返す(t *testing.T) {
+	// Given
+	expectedErr := errors.New("OP対象候補の取得失敗")
+	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー")}
+	service := NewUserUsecase(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{opTargetCandidatesErr: expectedErr},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
+
+	// Then
+	require.ErrorIs(t, err, expectedErr)
+	assert.Nil(t, result)
 }
 
 func TestUserUsecase_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {

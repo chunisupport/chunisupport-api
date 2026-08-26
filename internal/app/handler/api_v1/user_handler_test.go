@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -125,6 +126,7 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 		rating := 17.1234
 		bestAverage := 17.2345
 		newAverage := 16.9567
+		updatedAt := time.Date(2026, time.August, 27, 12, 34, 56, 0, time.UTC)
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
 			getUserProfileRatingViewFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
@@ -136,7 +138,14 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 						BestAverageRating: &bestAverage,
 						NewAverageRating:  &newAverage,
 					}},
-					Records: &usecase.UserRatingRecordOutput{},
+					Records: &usecase.UserRatingRecordOutput{
+						UpdatedAt: updatedAt,
+						Best: []*usecase.PlayerRecordOutput{{
+							PlayerRecord: &entity.PlayerRecord{},
+							IsPlayed:     true,
+							Difficulty:   "MASTER",
+						}},
+					},
 				}, nil
 			},
 		}
@@ -156,9 +165,63 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 		assert.Equal(t, rating, response["rating"])
 		assert.Equal(t, bestAverage, response["best_average"])
 		assert.Equal(t, newAverage, response["new_average"])
+		assert.Len(t, response["best"], 1)
+		assert.Empty(t, response["best_candidate"])
+		assert.Empty(t, response["new"])
+		assert.Empty(t, response["new_candidate"])
+		assert.Equal(t, updatedAt.Format(time.RFC3339), response["meta"].(map[string]any)["updated_at"])
 		assert.NotContains(t, response, "standard")
 		assert.NotContains(t, response, "worldsend")
 		assert.NotContains(t, response, "course")
+	})
+
+	t.Run("認証ユーザーを閲覧者として渡す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		requester := &entity.User{ID: 10}
+		mockUsecase := &mockV1UserUsecase{
+			getUserProfileRatingViewFunc: func(ctx context.Context, username string, actualRequester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
+				assert.Same(t, requester, actualRequester)
+				return &usecase.UserProfileRatingViewOutput{}, nil
+			},
+		}
+		handler := NewV1UserHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/testuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+		c.Set("userEntity", requester)
+
+		// When
+		err := handler.GetUserRating(c)
+
+		// Then
+		require.NoError(t, err)
+	})
+
+	t.Run("非公開ユーザーはuser_not_foundを返す", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		mockUsecase := &mockV1UserUsecase{
+			getUserProfileRatingViewFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
+				return nil, usecase.ErrUserPrivate
+			},
+		}
+		handler := NewV1UserHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "privateuser"}})
+
+		// When
+		err := handler.GetUserRating(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeUserNotFound, apiErr.Code)
+			assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+		}
 	})
 }
 

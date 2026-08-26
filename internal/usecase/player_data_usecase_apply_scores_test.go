@@ -697,6 +697,10 @@ func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindByPlayerIDForRating(_
 	return nil, nil
 }
 
+func (s *stubPlayerRecordRepositoryForApplyScoresTest) FindOPTargetCandidatesByPlayerID(_ context.Context, _ repository.Executor, _ int) ([]repository.PlayerRecordOPTargetCandidate, error) {
+	return nil, nil
+}
+
 func (s *stubPlayerRecordRepositoryForApplyScoresTest) GetLastScoreUpdate(_ context.Context, _ repository.Executor, _ int) (*time.Time, error) {
 	return nil, nil
 }
