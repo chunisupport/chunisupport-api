@@ -176,6 +176,11 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
 	if configurable, ok := userUsecase.(interface {
+		SetPhysicalDeletionDependencies(usecase.TransactionManager, repository.GoalRepository)
+	}); ok {
+		configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
+	}
+	if configurable, ok := userUsecase.(interface {
 		SetFriendshipRepository(repository.FriendshipRepository)
 	}); ok {
 		configurable.SetFriendshipRepository(friendshipRepo)
