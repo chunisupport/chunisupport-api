@@ -17,6 +17,8 @@ type GoalRepository interface {
 	Save(ctx context.Context, exec Executor, goal *entity.Goal) error
 	// DeleteByIDAndUserID は対象が存在しない場合に ErrGoalNotFound を返します。
 	DeleteByIDAndUserID(ctx context.Context, exec Executor, id uint32, userID int) error
+	// DeleteByUserID はユーザー物理削除に先立ち、そのユーザーが所有する全目標を削除します。
+	DeleteByUserID(ctx context.Context, exec Executor, userID int) error
 	// SaveGoalArrangement はユーザーの全目標についてグループ所属とグループ内表示順を保存します。
 	SaveGoalArrangement(ctx context.Context, exec Executor, arrangement *entity.GoalArrangement) error
 	CountByUserID(ctx context.Context, exec Executor, userID int) (int, error)

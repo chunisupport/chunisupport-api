@@ -104,6 +104,27 @@ func TestGoalRepository_ListByUserIDOrdersByGroupAndPutsUnclassifiedLast(t *test
 	assert.Equal(t, []uint32{4, 3, 2, 1}, []uint32{goals[0].ID, goals[1].ID, goals[2].ID, goals[3].ID})
 }
 
+func TestGoalRepository_DeleteByUserIDDeletesOnlyOwnedGoals(t *testing.T) {
+	// Given
+	db := setupGoalRepositorySQLite(t)
+	_, err := db.Exec(`INSERT INTO goals
+		(id, user_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order)
+		VALUES
+		(1, 10, '削除対象', 1, '{}', '{}', 0, 0, 1),
+		(2, 20, '別ユーザー', 1, '{}', '{}', 0, 0, 1)`)
+	require.NoError(t, err)
+	repo := &goalRepository{db: db}
+
+	// When
+	err = repo.DeleteByUserID(context.Background(), db, 10)
+
+	// Then
+	require.NoError(t, err)
+	var userIDs []int
+	require.NoError(t, db.Select(&userIDs, `SELECT user_id FROM goals ORDER BY id`))
+	assert.Equal(t, []int{20}, userIDs)
+}
+
 func TestGoalRepository_ListByUserIDReturnsSortOrder(t *testing.T) {
 	// Given
 	db := setupGoalRepositorySQLite(t)

@@ -108,6 +108,12 @@ func (r *goalRepository) DeleteByIDAndUserID(ctx context.Context, exec repositor
 	return nil
 }
 
+// DeleteByUserID はユーザー物理削除時の外部キー制約を満たすため、所有する全目標を削除します。
+func (r *goalRepository) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	_, err := exec.ExecContext(ctx, `DELETE FROM goals WHERE user_id = ?`, userID)
+	return err
+}
+
 // SaveGoalArrangement は最大100件の全状態を単一UPDATEで保存し、グループ間移動も原子的に反映します。
 func (r *goalRepository) SaveGoalArrangement(ctx context.Context, exec repository.Executor, arrangement *entity.GoalArrangement) error {
 	goals := arrangement.Goals()

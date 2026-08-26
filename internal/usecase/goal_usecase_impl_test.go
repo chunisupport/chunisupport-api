@@ -23,6 +23,14 @@ type stubGoalRepo struct {
 	savedOrder      []uint32
 	savedSorts      []uint16
 	statsBatchCalls int
+	deleteByUserID  func(context.Context, repository.Executor, int) error
+}
+
+func (s *stubGoalRepo) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
+	if s.deleteByUserID != nil {
+		return s.deleteByUserID(ctx, exec, userID)
+	}
+	return nil
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {

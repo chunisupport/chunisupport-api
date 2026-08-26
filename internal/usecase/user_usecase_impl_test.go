@@ -29,6 +29,7 @@ type stubUserRepository struct {
 	saveErr         error
 	savedUser       *entity.User
 	deletedUserID   int
+	deleteByID      func(context.Context, repository.Executor, int) error
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -77,11 +78,89 @@ func (s *stubUserRepository) FindByFirebaseUID(_ context.Context, _ repository.E
 }
 
 func (s *stubUserRepository) DeleteByID(ctx context.Context, exec repository.Executor, id int) error {
+	if s.deleteByID != nil {
+		return s.deleteByID(ctx, exec, id)
+	}
 	if s.err != nil {
 		return s.err
 	}
 	s.deletedUserID = id
 	return nil
+}
+
+type userDeletionTransactionManagerStub struct {
+	exec          repository.Executor
+	transactional bool
+	rolledBack    bool
+}
+
+func (s *userDeletionTransactionManagerStub) Transactional(ctx context.Context, fn func(repository.Executor) error) error {
+	s.transactional = true
+	err := fn(s.exec)
+	s.rolledBack = err != nil
+	return err
+}
+
+func TestUserUsecase_DeleteUser_RollsBackWhenUserDeletionFails(t *testing.T) {
+	// Given
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	deleteErr := errors.New("ユーザー削除失敗")
+	tm := &userDeletionTransactionManagerStub{exec: &MockExecutor{}}
+	goalDeleted := false
+	goalRepo := &stubGoalRepo{deleteByUserID: func(context.Context, repository.Executor, int) error {
+		goalDeleted = true
+		return nil
+	}}
+	userRepo := &stubUserRepository{
+		user: &entity.User{ID: 1, Username: un},
+		deleteByID: func(context.Context, repository.Executor, int) error {
+			return deleteErr
+		},
+	}
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service.(interface {
+		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
+	}).SetPhysicalDeletionDependencies(tm, goalRepo)
+
+	// When
+	err = service.DeleteUser(context.Background(), &entity.User{AccountTypeID: info.AccountTypeAdmin}, "testuser")
+
+	// Then
+	require.ErrorIs(t, err, deleteErr)
+	assert.True(t, goalDeleted)
+	assert.True(t, tm.rolledBack)
+}
+
+func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testing.T) {
+	// Given
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	deleteErr := errors.New("目標削除失敗")
+	tm := &userDeletionTransactionManagerStub{exec: &MockExecutor{}}
+	goalRepo := &stubGoalRepo{deleteByUserID: func(context.Context, repository.Executor, int) error {
+		return deleteErr
+	}}
+	userDeletionCalled := false
+	userRepo := &stubUserRepository{
+		user: &entity.User{ID: 1, Username: un},
+		deleteByID: func(context.Context, repository.Executor, int) error {
+			userDeletionCalled = true
+			return nil
+		},
+	}
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service.(interface {
+		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
+	}).SetPhysicalDeletionDependencies(tm, goalRepo)
+
+	// When
+	err = service.DeleteUser(context.Background(), &entity.User{AccountTypeID: info.AccountTypeAdmin}, "testuser")
+
+	// Then
+	require.ErrorIs(t, err, deleteErr)
+	assert.False(t, userDeletionCalled)
+	assert.True(t, tm.rolledBack)
 }
 
 type stubPlayerRecordRepository struct {
@@ -1387,6 +1466,42 @@ func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
 	require.NoError(t, err)
 	assert.Equal(t, 1, repo.deletedUserID)
+}
+
+func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T) {
+	// Given
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	user := &entity.User{ID: 1, Username: un}
+	adminRequester := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	exec := &MockExecutor{}
+	tm := &userDeletionTransactionManagerStub{exec: exec}
+	callOrder := make([]string, 0, 2)
+	goalRepo := &stubGoalRepo{deleteByUserID: func(_ context.Context, actualExec repository.Executor, userID int) error {
+		assert.Same(t, exec, actualExec)
+		assert.Equal(t, 1, userID)
+		callOrder = append(callOrder, "goals")
+		return nil
+	}}
+	userRepo := &stubUserRepository{user: user, deleteByID: func(_ context.Context, actualExec repository.Executor, userID int) error {
+		assert.Same(t, exec, actualExec)
+		assert.Equal(t, 1, userID)
+		callOrder = append(callOrder, "user")
+		return nil
+	}}
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	configurable := service.(interface {
+		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
+	})
+	configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
+
+	// When
+	err = service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+	// Then
+	require.NoError(t, err)
+	assert.True(t, tm.transactional)
+	assert.Equal(t, []string{"goals", "user"}, callOrder)
 }
 
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
