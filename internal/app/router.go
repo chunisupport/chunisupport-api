@@ -382,7 +382,7 @@ func registerRoutes(
 	// ADMIN以上の権限を要求するミドルウェア
 	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
 
-	internal.GET("/system/status", handlers.SystemMaintenance.Status)
+	internal.GET("/system/status", handlers.SystemMaintenance.Status, echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg)))
 
 	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
@@ -712,7 +712,7 @@ func newTemporaryPlayerDataCORSConfig(cfg config.Config) echoMiddleware.CORSConf
 }
 
 func isExternalCORSPath(path string) bool {
-	return path == "/healthz" || path == "/internal/player-data/temp"
+	return path == "/healthz" || path == "/internal/player-data/temp" || path == "/internal/system/status"
 }
 
 func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddleware.Skipper) echoMiddleware.CORSConfig {
