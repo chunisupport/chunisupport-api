@@ -121,7 +121,7 @@ func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, er
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) error {
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := s.songRepo.FindByDisplayIDForUpdate(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) erro
 // RestoreSong は指定されたDisplayIDの楽曲を復活させます。
 func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) error {
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := s.songRepo.FindByDisplayID(ctx, tx, displayID)
+		song, err := s.songRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
@@ -225,7 +225,7 @@ func (s *songUsecaseImpl) UpdateChartConstant(ctx context.Context, input UpdateC
 
 	var updatedSong *entity.Song
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := s.songRepo.FindByOfficialIdx(ctx, tx, input.OfficialIdx)
+		song, err := s.songRepo.FindByOfficialIdxForChange(ctx, tx, input.OfficialIdx)
 		if err != nil {
 			return err
 		}

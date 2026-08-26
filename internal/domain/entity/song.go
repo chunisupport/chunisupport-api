@@ -61,10 +61,34 @@ func (s *Song) ChangeChartConstant(difficultyID int, constant chartconstant.Char
 	for _, chart := range s.Charts {
 		if chart.DifficultyID == difficultyID {
 			chart.ChangeConstant(constant)
+			s.RecalculateChartAggregation()
 			return nil
 		}
 	}
 	return ErrChartNotFound
+}
+
+// RecalculateChartAggregation は譜面の現在値から楽曲の派生値を再計算します。
+func (s *Song) RecalculateChartAggregation() {
+	var maxConst float64
+	var opTargetDifficultyID int
+	isMaxOPUnknown := false
+
+	for _, chart := range s.Charts {
+		constVal := chart.Const.Float64()
+		if constVal > maxConst || (constVal == maxConst && chart.DifficultyID > opTargetDifficultyID) {
+			maxConst = constVal
+			opTargetDifficultyID = chart.DifficultyID
+		}
+
+		if (chart.DifficultyID == DifficultyIDMaster || chart.DifficultyID == DifficultyIDUltima) && chart.IsConstUnknown {
+			isMaxOPUnknown = true
+		}
+	}
+
+	s.MaxChartConst = maxConst
+	s.IsMaxOPUnknown = isMaxOPUnknown
+	s.OpTargetDifficultyID = opTargetDifficultyID
 }
 
 // Delete は楽曲を論理削除します。

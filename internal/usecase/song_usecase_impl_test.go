@@ -39,7 +39,7 @@ func TestUpdateChartConstant_公式IDと難易度接頭辞で譜面定数を更�
 			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
 		},
 	})
-	mockRepo.On("FindByOfficialIdx", mock.Anything, mockExec, "123").Return(song, nil)
+	mockRepo.On("FindByOfficialIdxForChange", mock.Anything, mockExec, "123").Return(song, nil)
 	mockRepo.On("Save", mock.Anything, mockExec, song).Return(nil)
 	uc := NewSongUsecase(mockRepo, mockMasterCache, &passthroughTransactionManager{tx: mockExec}, mockExec)
 
@@ -79,7 +79,7 @@ func (m *MockSongRepository) FindByDisplayID(ctx context.Context, exec repositor
 	return args.Get(0).(*entity.Song), args.Error(1)
 }
 
-func (m *MockSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+func (m *MockSongRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	args := m.Called(ctx, exec, displayID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -88,6 +88,14 @@ func (m *MockSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec 
 }
 
 func (m *MockSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	args := m.Called(ctx, exec, officialIdx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Song), args.Error(1)
+}
+
+func (m *MockSongRepository) FindByOfficialIdxForChange(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
 	args := m.Called(ctx, exec, officialIdx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -421,7 +429,7 @@ func TestDeleteSong_DeletesFavoritesWhenFavoriteRepoIsSet(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S010").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()
@@ -450,7 +458,7 @@ func TestDeleteSong_DeletesLockedSongsWhenLockedRepoIsSet(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S020").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S020").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()
@@ -480,7 +488,7 @@ func TestDeleteSong_DeletesBothFavoritesAndLockedSongs(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S030").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S030").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()
@@ -511,7 +519,7 @@ func TestDeleteSong_SavesDeletedState(t *testing.T) {
 		IsDeleted: false,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayIDForUpdate", ctx, mockExec, "S010").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S010").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && saved.IsDeleted
 	})).Return(nil).Once()
@@ -540,7 +548,7 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 		IsDeleted: true,
 		Charts:    []*entity.Chart{},
 	}
-	mockRepo.On("FindByDisplayID", ctx, mockExec, "S011").Return(song, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S011").Return(song, nil).Once()
 	mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
 		return saved == song && !saved.IsDeleted
 	})).Return(nil).Once()

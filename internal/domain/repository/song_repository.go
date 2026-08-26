@@ -25,6 +25,10 @@ type SongRepository interface {
 	// 削除済み楽曲も取得します。
 	FindByOfficialIdx(ctx context.Context, exec Executor, officialIdx string) (*entity.Song, error)
 
+	// FindByOfficialIdxForChange は指定された公式IDの通常楽曲を変更用に排他的に取得します。
+	// 論理削除済みの楽曲も含め、関連する譜面とともに取得します。
+	FindByOfficialIdxForChange(ctx context.Context, exec Executor, officialIdx string) (*entity.Song, error)
+
 	// FindByDisplayIDs は指定されたDisplayIDのリストに該当する通常楽曲（WORLD'S END除く）を取得します。
 	// 存在しないDisplayIDがある場合でもエラーにはせず、存在する楽曲のみを返します。
 	// 各楽曲には関連する譜面情報が含まれます。
@@ -44,11 +48,11 @@ type SongRepository interface {
 	// 存在しない楽曲・譜面がある場合はエラーを返します。
 	UpdateSongs(ctx context.Context, exec Executor, songs []*entity.Song) error
 
-	// FindByDisplayIDForUpdate は指定されたDisplayIDの通常楽曲をFOR UPDATEロック付きで取得します。
+	// FindByDisplayIDForChange は指定されたDisplayIDの通常楽曲を変更用に排他的に取得します。
 	// 論理削除済みの楽曲も含めて取得します。
 	// 各楽曲には関連する譜面情報が含まれます。
 	// 対象が存在しない場合は ErrSongNotFound を返します。
-	FindByDisplayIDForUpdate(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
+	FindByDisplayIDForChange(ctx context.Context, exec Executor, displayID string) (*entity.Song, error)
 
 	// Create は新規楽曲を songs および charts テーブルに追加します。
 	// display_id 重複時は ErrDuplicateDisplayID を、official_idx 重複時は ErrDuplicateOfficialIdx を返します。
