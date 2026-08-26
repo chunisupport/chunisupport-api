@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 	"uuid"
@@ -438,7 +439,10 @@ func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int
 		if err != nil {
 			return err
 		}
-		groupID := uint32(id)
+		groupID, err := transferGoalGroupID(id)
+		if err != nil {
+			return err
+		}
 		for _, item := range group.Goals {
 			if err := appendGoal(item, &groupID); err != nil {
 				return err
@@ -446,6 +450,14 @@ func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int
 		}
 	}
 	return bulkTransferNamedExec(ctx, exec, `INSERT INTO goals (user_id,group_id,title,achievement_type_id,achievement_params,attributes,invert_value,invert_percentage,sort_order,created_at) VALUES (:user_id,:group_id,:title,:achievement_type_id,:achievement_params,:attributes,:invert_value,:invert_percentage,:sort_order,:created_at)`, rows)
+}
+
+// transferGoalGroupID はDBが返すIDを値域検証し、安全にドメインのID型へ変換します。
+func transferGoalGroupID(id int64) (uint32, error) {
+	if id < 0 || id > math.MaxUint32 {
+		return 0, fmt.Errorf("goal_groups.id out of range: %d", id)
+	}
+	return uint32(id), nil
 }
 
 func saveTransferRecordFilters(ctx context.Context, exec domainrepo.Executor, userID int, snapshot *entity.UserDataTransferSnapshot) error {
