@@ -2,6 +2,7 @@ package api_v1
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,10 +12,12 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockV1UserUsecase struct {
 	getUserProfileWithRecordsFunc func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error)
+	getUserProfileRatingViewFunc  func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error)
 }
 
 func (m *mockV1UserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileOutput, error) {
@@ -33,6 +36,9 @@ func (m *mockV1UserUsecase) GetUserProfileWithRecords(ctx context.Context, usern
 }
 
 func (m *mockV1UserUsecase) GetUserProfileRatingView(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
+	if m.getUserProfileRatingViewFunc != nil {
+		return m.getUserProfileRatingViewFunc(ctx, username, requester)
+	}
 	return nil, nil
 }
 
@@ -110,6 +116,49 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 		}
 		assert.False(t, called)
+	})
+}
+
+func TestV1UserHandler_GetUserRating(t *testing.T) {
+	t.Run("レーティング情報だけを返す", func(t *testing.T) {
+		// Given
+		rating := 17.1234
+		bestAverage := 17.2345
+		newAverage := 16.9567
+		e := echo.New()
+		mockUsecase := &mockV1UserUsecase{
+			getUserProfileRatingViewFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
+				assert.Equal(t, "testuser", username)
+				assert.Nil(t, requester)
+				return &usecase.UserProfileRatingViewOutput{
+					Player: &usecase.UserPlayerOutput{Player: &entity.Player{
+						CalculatedRating:  &rating,
+						BestAverageRating: &bestAverage,
+						NewAverageRating:  &newAverage,
+					}},
+					Records: &usecase.UserRatingRecordOutput{},
+				}, nil
+			},
+		}
+		handler := NewV1UserHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/testuser/rating", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+
+		// When
+		err := handler.GetUserRating(c)
+
+		// Then
+		require.NoError(t, err)
+		var response map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+		assert.Equal(t, rating, response["rating"])
+		assert.Equal(t, bestAverage, response["best_average"])
+		assert.Equal(t, newAverage, response["new_average"])
+		assert.NotContains(t, response, "standard")
+		assert.NotContains(t, response, "worldsend")
+		assert.NotContains(t, response, "course")
 	})
 }
 

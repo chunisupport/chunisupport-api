@@ -290,6 +290,7 @@ Content-Type: application/json
 | `/v1/worldsend-songs/:id` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
 | `/v1/worldsend-songs/:id/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
+| `/v1/users/:username/rating` | GET | APIトークン | レーティング枠のみ取得 |
 | `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
@@ -4344,6 +4345,50 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レスポンス**: 200 OK（スキーマはinternal APIの公式RATING・公式OVER POWER・公式OP%履歴と同一）
 - **主なエラー**:
   - 404 Not Found (`player_metric_history_not_found`): プレイヤー未連携などにより履歴が存在しない
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
+### GET `/v1/users/:username/rating`
+- **認証**: APIトークン必須
+- **概要**: 指定されたユーザーの計算RATINGとレーティング枠だけを返す軽量APIです。レスポンスに `standard`、`worldsend`、`course` は含みません。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "rating": 17.1234,
+  "best_average": 17.2345,
+  "new_average": 16.9567,
+  "best": [],
+  "best_candidate": [],
+  "new": [],
+  "new_candidate": [],
+  "meta": {
+    "updated_at": "2026-08-27T12:34:56+09:00"
+  }
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `rating` | number \| null | BEST枠とNEW枠から計算したプレイヤーRATING |
+| `best_average` | number \| null | BEST枠の平均RATING |
+| `new_average` | number \| null | NEW枠の平均RATING |
+| `best` | array | ベスト枠レコード |
+| `best_candidate` | array | ベスト候補枠レコード |
+| `new` | array | 新曲枠レコード |
+| `new_candidate` | array | 新曲候補枠レコード |
+| `meta.updated_at` | string \| null | レーティング枠レコードの最終更新日時。対象レコードがなければプレイヤー更新日時、プレイヤー未連携なら `null` |
+
+各レコード要素は GET `/v1/users/:username` の `best` / `best_candidate` / `new` / `new_candidate` と同じ形式です。プレイヤー未連携時はRATINGと平均値が `null`、各配列が空になります。
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username`

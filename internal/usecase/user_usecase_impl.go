@@ -296,16 +296,16 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		}
 		return nil, err
 	}
-	opTargetSourceRecords, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, *user.PlayerID)
+	opTargetCandidates, err := s.playerRecordRepo.FindOPTargetCandidatesByPlayerID(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player records for OP target due to context canceled", "player_id", *user.PlayerID, "error", err)
+			slog.Warn("failed to find player record OP target candidates due to context canceled", "player_id", *user.PlayerID, "error", err)
 		} else {
-			slog.Error("failed to find player records for OP target", "player_id", *user.PlayerID, "error", err)
+			slog.Error("failed to find player record OP target candidates", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
-	applyOPTargetFlags(records, calculateOPTargetChartIDs(opTargetSourceRecords))
+	applyOPTargetFlags(records, calculateOPTargetChartIDsFromCandidates(opTargetCandidates))
 
 	slotMap := initializeRatingSlotMap()
 	var latestRecordUpdatedAt time.Time
@@ -724,6 +724,37 @@ func calculateOPTargetChartIDs(records []*entity.PlayerRecord) map[int]struct{} 
 		if chartID := playerRecordChartID(candidate.record); chartID != 0 {
 			targetChartIDs[chartID] = struct{}{}
 		}
+	}
+	return targetChartIDs
+}
+
+func calculateOPTargetChartIDsFromCandidates(candidates []repository.PlayerRecordOPTargetCandidate) map[int]struct{} {
+	type candidate struct {
+		chartID      int
+		overpower    float64
+		difficultyID int
+	}
+
+	bestBySongID := make(map[int]candidate, len(candidates))
+	for _, value := range candidates {
+		if value.ChartID == 0 || value.SongID == 0 {
+			continue
+		}
+		currentCandidate := candidate{
+			chartID:      value.ChartID,
+			overpower:    service.CalcSingleOverpower(uint32(value.Score), value.ChartConstant.Float64(), value.ComboLampID),
+			difficultyID: value.DifficultyID,
+		}
+		current, exists := bestBySongID[value.SongID]
+		if !exists || currentCandidate.overpower > current.overpower ||
+			(currentCandidate.overpower == current.overpower && currentCandidate.difficultyID > current.difficultyID) {
+			bestBySongID[value.SongID] = currentCandidate
+		}
+	}
+
+	targetChartIDs := make(map[int]struct{}, len(bestBySongID))
+	for _, value := range bestBySongID {
+		targetChartIDs[value.chartID] = struct{}{}
 	}
 	return targetChartIDs
 }

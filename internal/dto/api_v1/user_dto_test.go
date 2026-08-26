@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
@@ -122,4 +123,28 @@ func TestToV1UserRecordResponseDTO_コースIDをidとして返す(t *testing.T)
 	require.NoError(t, err)
 	assert.Contains(t, string(actual), `"course":[{"id":"0123456789abcdef"`)
 	assert.NotContains(t, string(actual), "display_id")
+}
+
+func TestToV1UserRatingDTO_プレイヤー未連携時は空配列とnullを返す(t *testing.T) {
+	// Given
+	input := &usecase.UserProfileRatingViewOutput{}
+
+	// When
+	actual, err := json.Marshal(ToV1UserRatingDTO(input))
+
+	// Then
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"rating": null,
+		"best_average": null,
+		"new_average": null,
+		"best": [],
+		"best_candidate": [],
+		"new": [],
+		"new_candidate": [],
+		"meta": {"updated_at": null}
+	}`, string(actual))
+	assert.NotContains(t, string(actual), `"standard"`)
+	assert.NotContains(t, string(actual), `"worldsend"`)
+	assert.NotContains(t, string(actual), `"course"`)
 }

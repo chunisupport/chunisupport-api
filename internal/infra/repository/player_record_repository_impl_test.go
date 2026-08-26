@@ -157,3 +157,38 @@ func TestPlayerRecordRepository_FindByPlayerIDAndSongDisplayID_指定楽曲だ�
 	require.Len(t, records, 1)
 	assert.Equal(t, "SONG001", records[0].Song.DisplayID)
 }
+
+func TestPlayerRecordRepository_FindOPTargetCandidatesByPlayerID_判定に必要な列だけを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupPlayerRecordRepositoryDB(t, db)
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, is_deleted) VALUES
+			(1, 'SONG001', '曲1', 'artist', 1, 'IDX001', 0),
+			(2, 'SONG002', '曲2', 'artist', 1, 'IDX002', 1);
+		INSERT INTO charts (id, song_id, difficulty_id, const) VALUES
+			(101, 1, 4, 14.0),
+			(102, 2, 3, 13.5);
+		INSERT INTO player_records
+			(player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, updated_at)
+		VALUES
+			(10, 101, 1000000, 1, 2, 1, 1, CURRENT_TIMESTAMP),
+			(10, 102, 1005000, 1, 3, 1, 1, CURRENT_TIMESTAMP),
+			(20, 101, 1009000, 1, 4, 1, 1, CURRENT_TIMESTAMP);
+	`)
+	require.NoError(t, err)
+
+	// When
+	candidates, err := (&playerRecordRepository{db: db}).FindOPTargetCandidatesByPlayerID(context.Background(), db, 10)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	assert.Equal(t, 101, candidates[0].ChartID)
+	assert.Equal(t, 1, candidates[0].SongID)
+	assert.Equal(t, 4, candidates[0].DifficultyID)
+	assert.Equal(t, 2, candidates[0].ComboLampID)
+	assert.Equal(t, uint32(1000000), uint32(candidates[0].Score))
+	assert.Equal(t, 14.0, candidates[0].ChartConstant.Float64())
+}

@@ -645,6 +645,7 @@ func registerRoutes(
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)
 		apiV1.GET("/worldsend-songs/:id", handlers.V1Worldsend.GetWorldsendSong)
 		apiV1.GET("/users/:username", handlers.V1User.GetUser)
+		apiV1.GET("/users/:username/rating", handlers.V1User.GetUserRating)
 		apiV1.GET("/users/:username/records/courses", handlers.V1Course.GetUserRecords)
 		apiV1.GET("/courses", handlers.V1Course.List)
 		apiV1.GET("/courses/:id", handlers.V1Course.Get)

@@ -240,6 +240,22 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 	}
 }
 
+func TestRegisterRoutes_V1ユーザーレーティングはAPIトークンを要求する(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/users/testuser/rating", nil)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"code":"missing_token"`)
+}
+
 func TestRegisterRoutes_外部譜面定数更新はEDITOR以上のAPIトークンを要求する(t *testing.T) {
 	tests := []struct {
 		name       string

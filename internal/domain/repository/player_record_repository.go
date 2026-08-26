@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 )
 
 // PlayerRecordState はプレイヤーレコードの状態を表す構造体です。
@@ -25,6 +27,16 @@ type PlayerRecordForUpsert struct {
 	State    PlayerRecordState
 }
 
+// PlayerRecordOPTargetCandidate はOVER POWER対象譜面の判定に必要な値だけを保持します。
+type PlayerRecordOPTargetCandidate struct {
+	ChartID       int
+	SongID        int
+	DifficultyID  int
+	Score         score.Score
+	ComboLampID   int
+	ChartConstant chartconstant.ChartConstant
+}
+
 // PlayerRecordRepository はプレイヤーレコードに関する永続化を扱うリポジトリです。
 type PlayerRecordRepository interface {
 	// FindByPlayerID はプレイヤーIDをキーにレコード一覧を取得します。
@@ -35,6 +47,9 @@ type PlayerRecordRepository interface {
 
 	// FindByPlayerIDForRating はレーティング対象のレコードのみを取得します。
 	FindByPlayerIDForRating(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerRecord, error)
+
+	// FindOPTargetCandidatesByPlayerID はOVER POWER対象譜面の判定に必要な値だけを取得します。
+	FindOPTargetCandidatesByPlayerID(ctx context.Context, exec Executor, playerID int) ([]PlayerRecordOPTargetCandidate, error)
 
 	// GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。
 	// player_records と player_worldsend_records の両テーブルから最新の updated_at を返します。
