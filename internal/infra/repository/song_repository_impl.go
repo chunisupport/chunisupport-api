@@ -236,7 +236,6 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		return []*entity.Song{}, nil
 	}
 
-	// 1. 楽曲を取得
 	query, args, err := sqlx.In(`
 		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
@@ -323,17 +322,30 @@ func (r *songRepository) FindByOfficialIdx(ctx context.Context, exec repository.
 	return r.findByIdentifier(ctx, exec, "official_idx", officialIdx)
 }
 
-// FindByDisplayIDForUpdate は指定されたDisplayIDの通常楽曲をFOR UPDATEロック付きで取得します。
-func (r *songRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
-	// 1. 楽曲をFOR UPDATEで取得
-	songQuery := `
+// FindByOfficialIdxForChange は指定された公式IDの通常楽曲を変更用にロックして取得します。
+func (r *songRepository) FindByOfficialIdxForChange(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return r.findByIdentifierForUpdate(ctx, exec, "official_idx", officialIdx)
+}
+
+// FindByDisplayIDForChange は指定されたDisplayIDの通常楽曲を変更用にロックして取得します。
+func (r *songRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+	return r.findByIdentifierForUpdate(ctx, exec, "display_id", displayID)
+}
+
+// findByIdentifierForUpdate は許可済みの識別カラムで通常楽曲集約をロックして取得します。
+func (r *songRepository) findByIdentifierForUpdate(ctx context.Context, exec repository.Executor, column, value string) (*entity.Song, error) {
+	if column != "display_id" && column != "official_idx" {
+		return nil, fmt.Errorf("unsupported song identifier column: %s", column)
+	}
+
+	songQuery := fmt.Sprintf(`
 		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
-		WHERE display_id = ? AND is_worldsend = 0
+		WHERE %s = ? AND is_worldsend = 0
 		FOR UPDATE
-	`
+	`, column)
 	var songRow songRow
-	if err := exec.GetContext(ctx, &songRow, songQuery, displayID); err != nil {
+	if err := exec.GetContext(ctx, &songRow, songQuery, value); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -342,12 +354,12 @@ func (r *songRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repo
 
 	song := r.toSongEntity(&songRow)
 
-	// 2. 譜面を取得（FOR UPDATE不要）
 	chartsQuery := `
 		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
 		FROM charts
 		WHERE song_id = ?
 		ORDER BY difficulty_id
+		FOR UPDATE
 	`
 	var chartRows []chartRow
 	if err := exec.SelectContext(ctx, &chartRows, chartsQuery, songRow.ID); err != nil {

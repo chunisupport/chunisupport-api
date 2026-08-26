@@ -116,7 +116,7 @@ func (u *playerFavoriteSongUsecase) Add(ctx context.Context, userID int, display
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		song, err := u.songRepo.FindByDisplayIDForUpdate(ctx, tx, displayID.String())
+		song, err := u.songRepo.FindByDisplayIDForChange(ctx, tx, displayID.String())
 		if err != nil {
 			if errors.Is(err, repository.ErrSongNotFound) {
 				return repository.ErrSongNotFound

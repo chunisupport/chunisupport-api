@@ -1,16 +1,18 @@
 package service
 
+import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
+
 const (
 	// DifficultyIDBasic はBASIC難易度のマスターIDです。
-	DifficultyIDBasic = 1
+	DifficultyIDBasic = entity.DifficultyIDBasic
 	// DifficultyIDAdvanced はADVANCED難易度のマスターIDです。
-	DifficultyIDAdvanced = 2
+	DifficultyIDAdvanced = entity.DifficultyIDAdvanced
 	// DifficultyIDExpert はEXPERT難易度のマスターIDです。
-	DifficultyIDExpert = 3
+	DifficultyIDExpert = entity.DifficultyIDExpert
 	// DifficultyIDMaster はMASTER難易度のマスターIDです。
-	DifficultyIDMaster = 4
+	DifficultyIDMaster = entity.DifficultyIDMaster
 	// DifficultyIDUltima はULTIMA難易度のマスターIDです。
-	DifficultyIDUltima = 5
+	DifficultyIDUltima = entity.DifficultyIDUltima
 )
 
 const (

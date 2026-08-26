@@ -335,11 +335,15 @@ func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repositor
 	return s.song, nil
 }
 
-func (s *stubSongRepository) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+func (s *stubSongRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	return nil, errors.New("not implemented")
 }
 
 func (s *stubSongRepository) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepository) FindByOfficialIdxForChange(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
 	return nil, errors.New("not implemented")
 }
 

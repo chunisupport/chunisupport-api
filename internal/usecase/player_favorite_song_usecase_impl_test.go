@@ -151,7 +151,7 @@ type stubSongRepoForFavAdd struct {
 	err  error
 }
 
-func (s *stubSongRepoForFavAdd) FindByDisplayIDForUpdate(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
+func (s *stubSongRepoForFavAdd) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
 	return s.song, s.err
 }
 
@@ -164,6 +164,10 @@ func (s *stubSongRepoForFavAdd) FindByDisplayID(ctx context.Context, exec reposi
 }
 
 func (s *stubSongRepoForFavAdd) FindByOfficialIdx(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubSongRepoForFavAdd) FindByOfficialIdxForChange(ctx context.Context, exec repository.Executor, officialIdx string) (*entity.Song, error) {
 	return nil, errors.New("not implemented")
 }
 
