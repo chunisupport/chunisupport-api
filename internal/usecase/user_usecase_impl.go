@@ -30,6 +30,8 @@ type userUsecase struct {
 	recordCompletionSvc          *service.RecordCompletionService
 	masterProvider               userMasterProvider
 	firebaseDeleter              FirebaseUserDeleter
+	transactionManager           TransactionManager
+	goalRepo                     repository.GoalRepository
 }
 
 type userMasterProvider interface {
@@ -79,6 +81,12 @@ func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.Friendsh
 // SetCourseRepository はユーザーレコードレスポンスへコースを統合します。
 func (s *userUsecase) SetCourseRepository(courseRepo repository.CourseRepository) {
 	s.courseRepo = courseRepo
+}
+
+// SetPhysicalDeletionDependencies はユーザー物理削除を原子的に実行するための依存を設定します。
+func (s *userUsecase) SetPhysicalDeletionDependencies(transactionManager TransactionManager, goalRepo repository.GoalRepository) {
+	s.transactionManager = transactionManager
+	s.goalRepo = goalRepo
 }
 
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
@@ -419,7 +427,22 @@ func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
 }
 
 func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID int, username string) error {
-	if err := s.userRepo.DeleteByID(ctx, s.db, userID); err != nil {
+	deleteUser := func(exec repository.Executor) error {
+		if s.goalRepo != nil {
+			if err := s.goalRepo.DeleteByUserID(ctx, exec, userID); err != nil {
+				return err
+			}
+		}
+		return s.userRepo.DeleteByID(ctx, exec, userID)
+	}
+
+	var err error
+	if s.transactionManager != nil {
+		err = s.transactionManager.Transactional(ctx, deleteUser)
+	} else {
+		err = deleteUser(s.db)
+	}
+	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
