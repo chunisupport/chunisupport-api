@@ -7,6 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 // V1HonorDTO は外部API v1 用の称号情報DTOです。
@@ -91,6 +92,23 @@ type V1UserProfileDTO struct {
 	Player    *V1PlayerDTO             `json:"player"`
 	Records   *V1UserRecordResponseDTO `json:"records"`
 	UpdatedAt *time.Time               `json:"updated_at"`
+}
+
+// V1UserRatingMetaDTO は外部API v1 のレーティング更新情報です。
+type V1UserRatingMetaDTO struct {
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// V1UserRatingDTO は外部API v1 のレーティング枠レスポンスです。
+type V1UserRatingDTO struct {
+	Rating        *float64             `json:"rating"`
+	BestAverage   *float64             `json:"best_average"`
+	NewAverage    *float64             `json:"new_average"`
+	Best          []*V1PlayerRecordDTO `json:"best"`
+	BestCandidate []*V1PlayerRecordDTO `json:"best_candidate"`
+	New           []*V1PlayerRecordDTO `json:"new"`
+	NewCandidate  []*V1PlayerRecordDTO `json:"new_candidate"`
+	Meta          *V1UserRatingMetaDTO `json:"meta"`
 }
 
 // ToV1PlayerDTO はエンティティから V1PlayerDTO へ変換します。
@@ -219,6 +237,57 @@ func ToV1UserRecordResponseDTO(records *dto.UserRecordResponseDTO) *V1UserRecord
 		WorldsEnd:     convertWorldsendSlice(records.WorldsEnd),
 		Courses:       convertCourseSlice(records.Courses),
 	}
+}
+
+// ToV1UserRatingDTO はユースケース出力から外部API v1 のレーティング枠DTOへ変換します。
+func ToV1UserRatingDTO(output *usecase.UserProfileRatingViewOutput) *V1UserRatingDTO {
+	if output == nil {
+		return nil
+	}
+
+	convertSlice := func(src []*usecase.PlayerRecordOutput) []*V1PlayerRecordDTO {
+		result := make([]*V1PlayerRecordDTO, len(src))
+		for i, recordOutput := range src {
+			if recordOutput == nil || recordOutput.PlayerRecord == nil {
+				continue
+			}
+			record := dto.ToPlayerRecordDTO(recordOutput.PlayerRecord)
+			record.UpdatedAt = recordOutput.UpdatedAt
+			record.IsPlayed = recordOutput.IsPlayed
+			record.IsOPTarget = recordOutput.IsOPTarget
+			record.Difficulty = recordOutput.Difficulty
+			record.Const = recordOutput.Const
+			record.ClearLamp = recordOutput.ClearLamp
+			record.ComboLamp = recordOutput.ComboLamp
+			record.FullChain = recordOutput.FullChain
+			record.Slot = recordOutput.Slot
+			result[i] = ToV1PlayerRecordDTO(record)
+		}
+		return result
+	}
+
+	rating := &V1UserRatingDTO{
+		Best:          []*V1PlayerRecordDTO{},
+		BestCandidate: []*V1PlayerRecordDTO{},
+		New:           []*V1PlayerRecordDTO{},
+		NewCandidate:  []*V1PlayerRecordDTO{},
+		Meta:          &V1UserRatingMetaDTO{UpdatedAt: output.UpdatedAt},
+	}
+	if output.Player != nil && output.Player.Player != nil {
+		rating.Rating = output.Player.Player.CalculatedRating
+		rating.BestAverage = output.Player.Player.BestAverageRating
+		rating.NewAverage = output.Player.Player.NewAverageRating
+	}
+	if output.Records == nil {
+		return rating
+	}
+
+	rating.Best = convertSlice(output.Records.Best)
+	rating.BestCandidate = convertSlice(output.Records.BestCandidate)
+	rating.New = convertSlice(output.Records.New)
+	rating.NewCandidate = convertSlice(output.Records.NewCandidate)
+	rating.Meta.UpdatedAt = &output.Records.UpdatedAt
+	return rating
 }
 
 // ToV1UserProfileDTO は既存の UserProfileWithRecordsDTO から V1UserProfileDTO へ変換します。

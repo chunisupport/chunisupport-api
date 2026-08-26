@@ -168,6 +168,29 @@ WHERE pr.player_id = ? AND s.is_deleted = 0
 ORDER BY sl.id, pr.slot_order IS NULL, pr.slot_order, pr.updated_at DESC
 `
 
+type playerRecordOPTargetCandidateRow struct {
+	ChartID       int                         `db:"chart_id"`
+	SongID        int                         `db:"song_id"`
+	DifficultyID  int                         `db:"difficulty_id"`
+	Score         score.Score                 `db:"score"`
+	ComboLampID   int                         `db:"combo_lamp_id"`
+	ChartConstant chartconstant.ChartConstant `db:"chart_const"`
+}
+
+const playerRecordOPTargetCandidateQuery = `
+SELECT
+    pr.chart_id,
+    c.song_id,
+    c.difficulty_id,
+    pr.score,
+    pr.combo_lamp_id,
+    c.const AS chart_const
+FROM player_records pr
+INNER JOIN charts c ON pr.chart_id = c.id
+INNER JOIN songs s ON c.song_id = s.id
+WHERE pr.player_id = ? AND s.is_deleted = 0
+`
+
 // FindByPlayerID はプレイヤーIDでレコードを検索し、関連する譜面・楽曲・ランプ情報を含むエンティティを返します。
 func (r *playerRecordRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]*entity.PlayerRecord, error) {
 	var rows []playerRecordRow
@@ -195,6 +218,27 @@ func (r *playerRecordRepository) FindByPlayerIDForRating(ctx context.Context, ex
 	}
 
 	return buildPlayerRecords(rows), nil
+}
+
+// FindOPTargetCandidatesByPlayerID はOVER POWER対象判定用の最小限の列だけを取得します。
+func (r *playerRecordRepository) FindOPTargetCandidatesByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]repository.PlayerRecordOPTargetCandidate, error) {
+	var rows []playerRecordOPTargetCandidateRow
+	if err := exec.SelectContext(ctx, &rows, playerRecordOPTargetCandidateQuery, playerID); err != nil {
+		return nil, err
+	}
+
+	candidates := make([]repository.PlayerRecordOPTargetCandidate, len(rows))
+	for i, row := range rows {
+		candidates[i] = repository.PlayerRecordOPTargetCandidate{
+			ChartID:       row.ChartID,
+			SongID:        row.SongID,
+			DifficultyID:  row.DifficultyID,
+			Score:         row.Score,
+			ComboLampID:   row.ComboLampID,
+			ChartConstant: row.ChartConstant,
+		}
+	}
+	return candidates, nil
 }
 
 // GetLastScoreUpdate はプレイヤーのスコア最終更新日時を取得します。

@@ -42,3 +42,22 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	// 既存DTOから V1DTO へ変換
 	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(internalhandler.ToUserProfileWithRecordsDTO(result)))
 }
+
+// GetUserRating は指定された username のレーティング情報だけを取得します。
+func (h *V1UserHandler) GetUserRating(c *echo.Context) error {
+	username, apiErr := handler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
+	var requester *entity.User
+	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
+		requester = userEntity
+	}
+
+	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+
+	return c.JSON(http.StatusOK, api_v1.ToV1UserRatingDTO(result))
+}
