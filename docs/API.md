@@ -38,7 +38,7 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- `/v1/*/score-history*` のスコア履歴取得と `/v1/users/:username/rating-op-history` の公式指標履歴取得はAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
+- `/v1/users/:username/rating-op-history` の公式指標履歴取得のみAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
 
 ## レートリミット（現行実装値）
@@ -285,10 +285,10 @@ Content-Type: application/json
 | `/v1/songs/chart-constant` | PATCH | APIトークン (EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
 | `/v1/songs/:id` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:id/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
-| `/v1/songs/:id/score-history/:difficulty` | GET | APIトークン（任意） | 通常譜面スコア履歴取得 |
+| `/v1/songs/:id/score-history/:difficulty` | GET | APIトークン | 通常譜面スコア履歴取得 |
 | `/v1/worldsend-songs` | GET | APIトークン | WORLD'S END楽曲一覧取得 |
 | `/v1/worldsend-songs/:id` | GET | APIトークン | WORLD'S END楽曲詳細取得 |
-| `/v1/worldsend-songs/:id/score-history` | GET | APIトークン（任意） | WORLD'S ENDスコア履歴取得 |
+| `/v1/worldsend-songs/:id/score-history` | GET | APIトークン | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/users/:username/rating` | GET | APIトークン | レーティング枠のみ取得 |
 | `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
@@ -4264,8 +4264,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/v1/songs/:id/score-history/:difficulty`
-- **認証**: APIトークン（任意）
-- **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **認証**: APIトークン必須
+- **概要**: 指定楽曲の指定難易度のスコア履歴を取得します。各譜面の現行ベストと過去のベストを新しい順で返します。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
 - **パスパラメータ**:
 
@@ -4306,14 +4306,16 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `entries[].updated_at` | string | 更新日時（ISO8601） |
 
 - **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 400 Bad Request (`validation_failed`): `username` 未指定
   - 400 Bad Request (`score_history_unsupported_difficulty`): 指定された難易度が `expert`, `master`, `ultima` 以外
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/worldsend-songs/:id/score-history`
-- **認証**: APIトークン（任意）
-- **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **認証**: APIトークン必須
+- **概要**: 指定WORLD'S END楽曲のスコア履歴を取得します。非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **制限**: 履歴は譜面ごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。
 - **パスパラメータ**:
 
@@ -4329,6 +4331,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **レスポンス**: 200 OK（スキーマは通常譜面のスコア履歴と同一）
 - **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 400 Bad Request (`validation_failed`): `username` 未指定
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
