@@ -38,7 +38,6 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- `/v1/users/:username/rating-op-history` の公式指標履歴取得のみAPIトークンが任意です。非公開ユーザーを参照する場合は、本人または承認済みフレンドのAPIトークンを送信します。
 - トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
 
 ## レートリミット（現行実装値）
@@ -291,7 +290,7 @@ Content-Type: application/json
 | `/v1/worldsend-songs/:id/score-history` | GET | APIトークン | WORLD'S ENDスコア履歴取得 |
 | `/v1/users/:username` | GET | APIトークン | ユーザープロファイルとレコード取得 |
 | `/v1/users/:username/rating` | GET | APIトークン | レーティング枠のみ取得 |
-| `/v1/users/:username/rating-op-history` | GET | APIトークン（任意） | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
+| `/v1/users/:username/rating-op-history` | GET | APIトークン | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -4338,8 +4337,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username/rating-op-history`
-- **認証**: APIトークン（任意）
-- **概要**: CHUNITHM-NETから取得した公式RATING・公式OVER POWER・公式OP%の履歴を、現在値を先頭に新しい順で返します。公開ユーザーは未認証で参照できます。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **認証**: APIトークン必須
+- **概要**: CHUNITHM-NETから取得した公式RATING・公式OVER POWER・公式OP%の履歴を、現在値を先頭に新しい順で返します。公開ユーザーは有効なAPIトークンで参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
@@ -4348,6 +4347,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **レスポンス**: 200 OK（スキーマはinternal APIの公式RATING・公式OVER POWER・公式OP%履歴と同一）
 - **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`player_metric_history_not_found`): プレイヤー未連携などにより履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 

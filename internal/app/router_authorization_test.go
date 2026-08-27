@@ -284,6 +284,22 @@ func TestRegisterRoutes_外部スコア履歴はAPIトークンを要求する(t
 	}
 }
 
+func TestRegisterRoutes_外部公式指標履歴はAPIトークンを要求する(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/users/testuser/rating-op-history", nil)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"code":"missing_token"`)
+}
+
 func TestRegisterRoutes_外部譜面定数更新はEDITOR以上のAPIトークンを要求する(t *testing.T) {
 	tests := []struct {
 		name       string
