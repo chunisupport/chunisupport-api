@@ -256,6 +256,50 @@ func TestRegisterRoutes_V1ユーザーレーティングはAPIトークンを要
 	assert.Contains(t, rec.Body.String(), `"code":"missing_token"`)
 }
 
+func TestRegisterRoutes_外部スコア履歴はAPIトークンを要求する(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "通常譜面", path: "/v1/songs/song-id/score-history/MASTER?username=testuser"},
+		{name: "WORLD'S END譜面", path: "/v1/worldsend-songs/song-id/score-history?username=testuser"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, tt.path, nil)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			assert.Contains(t, rec.Body.String(), `"code":"missing_token"`)
+		})
+	}
+}
+
+func TestRegisterRoutes_外部公式指標履歴はAPIトークンを要求する(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	registerRoutes(e, newAuthorizationTestHandlers(), stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/users/testuser/rating-op-history", nil)
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, req)
+
+	// Then
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"code":"missing_token"`)
+}
+
 func TestRegisterRoutes_外部譜面定数更新はEDITOR以上のAPIトークンを要求する(t *testing.T) {
 	tests := []struct {
 		name       string

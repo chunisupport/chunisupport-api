@@ -174,41 +174,6 @@ func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window tim
 	}
 }
 
-// OptionalAPIRateLimitMiddleware は未認証ユーザーをIP、認証済みユーザーをユーザーIDで識別します。
-func OptionalAPIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window time.Duration) echo.MiddlewareFunc {
-	store := newFixedWindowStoreWithCleanup(window)
-
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			identifier := "ip:" + c.RealIP()
-			limit := normalLimit
-
-			if userObj := c.Get("userEntity"); userObj != nil {
-				user, ok := userObj.(*entity.User)
-				if !ok {
-					return apierror.ErrUnauthorized
-				}
-				identifier = "user:" + strconv.Itoa(user.ID)
-				switch user.AccountTypeID {
-				case info.AccountTypeAdmin:
-					limit = adminLimit
-				case info.AccountTypeEditor, info.AccountTypeExtDev:
-					limit = editorLimit
-				}
-			}
-
-			allowed, remaining, resetTime := store.Allow(identifier, limit)
-			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
-			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
-			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
-			if !allowed {
-				return apierror.ErrTooManyRequests
-			}
-			return next(c)
-		}
-	}
-}
-
 // IPRateLimitMiddleware はIPアドレスベースのレートリミットミドルウェアを提供します。
 // 未認証ユーザーのエンドポイント保護などに使用します。
 // このミドルウェアはヘッダーを追加しません（外部APIのみヘッダー追加）。
