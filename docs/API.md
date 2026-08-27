@@ -2,11 +2,10 @@
 
 このドキュメントは `chunisupport-api` が提供する内部API(`/internal` プレフィックス)、公開API(`/v1` プレフィックス)、chunirec互換API(`/compat/chunirec/2.0` プレフィックス)、reiwa互換API(`/compat/reiwa/1` プレフィックス)の仕様をまとめたものです。
 
-**最終更新日**: 2026年07月27日
 
 ## ベースURLと環境
 
-アプリケーションは `.config/<APP_ENV>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run main.go` で環境を切り替えます。APIレスポンスの日時は同設定の `timezone` で指定したIANAタイムゾーンへ変換され、内部処理とDB保存ではUTCを使用します。日時はRFC3339で返され、UTC固定の`Z`ではなく設定に応じたオフセット（例: `+09:00`）になります。
+アプリケーションは `.config/<APP_ENV>.settings.json` の `app_port` で待ち受けポートを決定します。`APP_ENV=<name> go run ./cmd/api` で環境を切り替えます。APIレスポンスの日時は同設定の `timezone` で指定したIANAタイムゾーンへ変換され、内部処理とDB保存ではUTCを使用します。日時はRFC3339で返され、UTC固定の`Z`ではなく設定に応じたオフセット（例: `+09:00`）になります。
 
 ローカル開発の例: `.config/<APP_ENV>.settings.json` で `app_port: 3002` を指定している場合、`http://localhost:3002`
 
