@@ -613,19 +613,6 @@ func registerRoutes(
 
 	// 外部APIルートの登録
 	// api.chunisupport.net/v1
-	optionalHistoryV1 := e.Group("/v1")
-	optionalHistoryV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
-	optionalHistoryV1.Use(middleware.OptionalAPITokenMiddleware(apiTokenUsecase))
-	optionalHistoryV1.Use(middleware.OptionalAPIRateLimitMiddleware(
-		info.APIRateLimitRequests,
-		info.APIRateLimitEditorRequests,
-		info.APIRateLimitAdminRequests,
-		info.APIRateLimitWindow,
-	))
-	optionalHistoryV1.GET("/songs/:id/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
-	optionalHistoryV1.GET("/worldsend-songs/:id/score-history", handlers.ScoreHistory.GetWorldsend)
-	optionalHistoryV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
-
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
@@ -637,6 +624,9 @@ func registerRoutes(
 		info.APIRateLimitWindow,
 	))
 	{
+		apiV1.GET("/songs/:id/score-history/:difficulty", handlers.ScoreHistory.GetStandard)
+		apiV1.GET("/worldsend-songs/:id/score-history", handlers.ScoreHistory.GetWorldsend)
+		apiV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
 		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
 		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireEditor)
