@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/go-playground/validator/v10"
@@ -106,7 +110,7 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testi
 	e := echo.New()
 	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
 
-	tooLarge := bytes.Repeat([]byte("a"), 512001)
+	tooLarge := bytes.Repeat([]byte("a"), info.TempDataMaxCompressedBytes+1)
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(tooLarge))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -117,6 +121,59 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testi
 	require.Error(t, err)
 	apiErr := err.(*apierror.APIError)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, apiErr.HTTPStatus)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_圧縮後サイズが旧上限を超えても受け付ける(t *testing.T) {
+	e := echo.New()
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	randomBytes := make([]byte, 700*1024)
+	_, err := rand.New(rand.NewSource(1)).Read(randomBytes)
+	require.NoError(t, err)
+	body := gzipJSON(t, map[string]string{"unknown": base64.StdEncoding.EncodeToString(randomBytes)})
+	require.Greater(t, len(body), 512000)
+	require.LessOrEqual(t, len(body), info.TempDataMaxCompressedBytes)
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	mockUC.On("Create", mock.Anything, mock.Anything).Return(&usecase.CreateTemporaryPlayerDataOutput{
+		UploadToken: "token",
+		ExpiresAt:   time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC),
+	}, nil).Once()
+
+	err = h.CreateTemporaryData(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後サイズが1MBを超えても受け付ける(t *testing.T) {
+	e := echo.New()
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	body := gzipJSON(t, map[string]string{"unknown": strings.Repeat("a", 1024*1024)})
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	mockUC.On("Create", mock.Anything, mock.Anything).Return(&usecase.CreateTemporaryPlayerDataOutput{
+		UploadToken: "token",
+		ExpiresAt:   time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC),
+	}, nil).Once()
+
+	err := h.CreateTemporaryData(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	mockUC.AssertExpectations(t)
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_ContentType不正(t *testing.T) {

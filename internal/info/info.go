@@ -79,14 +79,13 @@ const (
 	RecentSignInMaxAge              = 5 * time.Minute
 	RecentSignInFutureAllowance     = 1 * time.Minute
 
-	TempDataTTL                  = 5 * time.Minute
-	TempDataMaxCompressedBytes   = 512000
-	TempDataMaxUncompressedBytes = 512000
-	TempDataMaxEntriesPerIP      = 3
-	DefaultTempDataMaxTotalMB    = 64
-	TempDataRateLimitPerMin      = 30
-	TempDataRateLimitWindow      = 1 * time.Minute
-	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
+	TempDataTTL                = 5 * time.Minute
+	TempDataMaxCompressedBytes = 1 * 1024 * 1024
+	TempDataMaxEntriesPerIP    = 3
+	DefaultTempDataMaxTotalMB  = 64
+	TempDataRateLimitPerMin    = 30
+	TempDataRateLimitWindow    = 1 * time.Minute
+	ExternalCORSAllowOrigin    = "https://new.chunithm-net.com"
 
 	// アカウントタイプ定数
 	AccountTypePlayer = 1 // 一般ユーザー
