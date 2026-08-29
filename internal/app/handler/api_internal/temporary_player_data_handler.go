@@ -65,9 +65,12 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 	}
 	defer gzipReader.Close()
 
-	jsonBody, err := io.ReadAll(gzipReader)
+	jsonBody, exceeded, err := readAllWithMaxBytes(gzipReader, info.TempDataMaxUncompressedBytes)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if exceeded {
+		return apierror.ErrPayloadTooLarge
 	}
 
 	hash := sha256.Sum256(jsonBody)

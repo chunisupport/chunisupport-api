@@ -152,12 +152,14 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_圧縮後サイズが旧
 	mockUC.AssertExpectations(t)
 }
 
-func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後サイズが1MBを超えても受け付ける(t *testing.T) {
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後サイズが5MiBちょうどなら受け付ける(t *testing.T) {
 	e := echo.New()
 	mockUC := new(mockTemporaryPlayerDataUsecase)
 	h := NewTemporaryPlayerDataHandler(mockUC)
 
-	body := gzipJSON(t, map[string]string{"unknown": strings.Repeat("a", 1024*1024)})
+	jsonBody := []byte(`{"unknown":"` + strings.Repeat("a", info.TempDataMaxUncompressedBytes-len(`{"unknown":""}`)) + `"}`)
+	require.Len(t, jsonBody, info.TempDataMaxUncompressedBytes)
+	body := gzipJSON(t, json.RawMessage(jsonBody))
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -174,6 +176,25 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後サイズが1MB
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後サイズが5MiBを1byte超えると拒否する(t *testing.T) {
+	e := echo.New()
+	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
+
+	jsonBody := []byte(`{"unknown":"` + strings.Repeat("a", info.TempDataMaxUncompressedBytes-len(`{"unknown":""}`)+1) + `"}`)
+	require.Len(t, jsonBody, info.TempDataMaxUncompressedBytes+1)
+	body := gzipJSON(t, json.RawMessage(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.CreateTemporaryData(c)
+	require.Error(t, err)
+	apiErr := err.(*apierror.APIError)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, apiErr.HTTPStatus)
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_ContentType不正(t *testing.T) {

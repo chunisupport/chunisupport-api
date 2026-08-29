@@ -1633,10 +1633,10 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
   - `Content-Type: application/json`
 - **制限**:
   - gzip後サイズ: 1MiB以下
-  - 解凍後JSONサイズ: 制限なし
+  - 解凍後JSONサイズ: 5MiB以下
   - 同時保持件数: 1IPあたり最大3件
 - **検証内容**:
-  - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびgzip後のサイズ制限のみを検証します。
+  - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびgzip前後のサイズ制限を検証します。
   - 展開後の本文は生のバイト列のまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
   - そのため、JSON構文が壊れている本文や、`PlayerDataPayload` として解釈できない本文でも一時保存される場合があります。
   - 厳密な検証および実際の登録処理は `/internal/player-data/commit` 実行時に初めて行われます。
