@@ -35,6 +35,17 @@ func TestFromUsecaseError_公式指標履歴なしを404へ変換する(t *testi
 	assert.Equal(t, CodePlayerMetricHistoryNotFound, apiErr.Code)
 }
 
+func TestFromUsecaseError_プレイヤーデータ検証エラーを422へ変換する(t *testing.T) {
+	validationErr := &usecase.PlayerDataValidationError{Field: "updated_at", Message: "must be RFC3339"}
+
+	apiErr := FromUsecaseError(validationErr)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, CodeValidationFailed, apiErr.Code)
+	assert.ErrorIs(t, apiErr, validationErr)
+}
+
 func TestFromUsecaseError_認証失敗は汎用認証エラーに丸める(t *testing.T) {
 	got := FromUsecaseError(usecase.ErrInvalidCredentials)
 

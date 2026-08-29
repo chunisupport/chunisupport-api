@@ -327,12 +327,12 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 	nameVO, err := playername.NewPlayerName(payload.Name)
 	if err != nil {
-		return nil, errors.New("invalid player data")
+		return nil, &PlayerDataValidationError{Field: "name", Message: err.Error()}
 	}
 
 	lastPlayedAt, updatedAt, err := parsePlayerDataTimes(payload.LastPlayed, payload.UpdatedAt)
 	if err != nil {
-		return nil, errors.New("invalid player data")
+		return nil, err
 	}
 
 	// トランザクション開始前にペイロードの事前検証を実行
@@ -470,13 +470,23 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, withPlayerDataRegistrationContext(user.ID, result.PlayerID, err)
 	}
 
 	logRegisteredSPHonors(registeredSPHonors)
 
 	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
+}
+
+func withPlayerDataRegistrationContext(userID, playerID int, err error) error {
+	var validationErr *PlayerDataValidationError
+	var notFoundErr *PlayerDataNotFoundError
+	var conflictErr *PlayerDataConflictError
+	if errors.As(err, &validationErr) || errors.As(err, &notFoundErr) || errors.As(err, &conflictErr) {
+		return err
+	}
+	return fmt.Errorf("player data registration failed (user_id=%d, player_id=%d): %w", userID, playerID, err)
 }
 
 func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx repository.Executor, playerID int, updatedAt time.Time, bodyHash string) error {
@@ -518,7 +528,10 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 	if strings.TrimSpace(lastPlayed) != "" {
 		parsed, err := time.ParseInLocation(tokyoLayout, lastPlayed, loc)
 		if err != nil {
-			return nil, time.Time{}, err
+			return nil, time.Time{}, &PlayerDataValidationError{
+				Field:   "last_played",
+				Message: fmt.Sprintf("must match %s: %v", tokyoLayout, err),
+			}
 		}
 		utc := parsed.UTC()
 		lastPlayedAt = &utc
@@ -526,7 +539,10 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 
 	updatedAt, err := time.Parse(time.RFC3339, updatedAtRaw)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, &PlayerDataValidationError{
+			Field:   "updated_at",
+			Message: fmt.Sprintf("must be RFC3339: %v", err),
+		}
 	}
 
 	return lastPlayedAt, updatedAt.UTC(), nil
