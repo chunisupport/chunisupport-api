@@ -1632,8 +1632,8 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
   - `Content-Encoding: gzip`
   - `Content-Type: application/json`
 - **制限**:
-  - gzip後サイズ: 500KB以下
-  - 解凍後JSONサイズ: 500KB以下
+  - gzip後サイズ: 500KiB以下
+  - 解凍後JSONサイズ: 5MiB以下
   - 同時保持件数: 1IPあたり最大3件
 - **検証内容**:
   - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびサイズ制限のみを検証します。
