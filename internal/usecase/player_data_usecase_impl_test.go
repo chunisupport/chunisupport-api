@@ -3,6 +3,7 @@ package usecase
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -28,6 +29,57 @@ func TestParsePlayerDataTimes_UTCへ正規化する(t *testing.T) {
 	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), *lastPlayedAt)
 	assert.Equal(t, time.UTC, updatedAt.Location())
 	assert.Equal(t, time.Date(2023, 12, 31, 15, 0, 0, 0, time.UTC), updatedAt)
+}
+
+func TestParsePlayerDataTimes_不正な日時はフィールド付き検証エラーになる(t *testing.T) {
+	tests := []struct {
+		name       string
+		lastPlayed string
+		updatedAt  string
+		field      string
+	}{
+		{
+			name:       "最終プレイ日時が不正",
+			lastPlayed: "invalid",
+			updatedAt:  "2024-01-01T00:00:00Z",
+			field:      "last_played",
+		},
+		{
+			name:       "更新日時が不正",
+			lastPlayed: "2024/01/01 00:00",
+			updatedAt:  "invalid",
+			field:      "updated_at",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := parsePlayerDataTimes(tt.lastPlayed, tt.updatedAt)
+
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, tt.field, validationErr.Field)
+		})
+	}
+}
+
+func TestPlayerDataUsecase_Register_不正な名前はフィールド付き検証エラーになる(t *testing.T) {
+	uc := &playerDataUsecase{}
+
+	_, err := uc.Register(context.Background(), &entity.User{ID: 123}, &PlayerDataPayload{Name: "PLAYER"}, "hash")
+
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "name", validationErr.Field)
+}
+
+func TestWithPlayerDataRegistrationContext_識別情報を付加して原因を保持する(t *testing.T) {
+	sentinel := errors.New("database failure")
+
+	err := withPlayerDataRegistrationContext(123, 456, sentinel)
+
+	require.ErrorIs(t, err, sentinel)
+	assert.Equal(t, "player data registration failed (user_id=123, player_id=456): database failure", err.Error())
 }
 
 // TestValidatePlayerDataPayload_AppVersion は、app_verに関係なく登録できることをテストします。

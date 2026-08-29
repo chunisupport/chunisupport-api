@@ -1683,15 +1683,15 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - `401 Unauthorized`: 未認証
 - `400 Bad Request`: 保存済み本文がJSONとして解釈できない、または対応していない `app_ver`
 - `404 Not Found`: token期限切れ / 未存在
-- `422 Unprocessable Entity`: `uploadToken` の形式不正、またはスコア整合性など `PlayerDataPayload` のバリデーション不正
-- `500 Internal Server Error`: DB保存失敗、またはプレイヤー名・日時形式など一部の入力不正を含む想定外エラー（tokenは消費済みのため再アップロードが必要）
+- `422 Unprocessable Entity`: `uploadToken` の形式不正、プレイヤー名・日時形式・スコア整合性など `PlayerDataPayload` のバリデーション不正
+- `500 Internal Server Error`: DB保存失敗などの想定外エラー（tokenは消費済みのため再アップロードが必要）
 
 #### バリデーションの補足
 
 - `uploadToken` は UUID v4 を要求します。
 - 一時保存時点では厳密な妥当性検証を行わないため、`commit` 時に初めて不正データとして弾かれることがあります。
 - 一時保存時点では JSON デコードすら行わないため、構文破損や型不一致も `commit` 時まで遅延します。
-- すべての入力不正が `422` になるわけではありません。実装上、`app_ver` は `400`、一部のプレイヤー名・日時形式の不正は `500` として扱われます。
+- `app_ver` が対応外の場合は `400`、プレイヤー名・日時形式を含むプレイヤーデータの入力不正は `422` として扱われます。
 
 ---
 
