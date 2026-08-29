@@ -87,13 +87,16 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 }
 
 func TestVerifier_VerifyTurnstile_検証失敗をログに出力しない(t *testing.T) {
-	// Given
+	// 前提
+	responseBody, err := json.Marshal(siteverifyResponse{
+		Success:    false,
+		ErrorCodes: []string{"invalid-input-response"},
+	})
+	require.NoError(t, err)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		require.NoError(t, json.NewEncoder(w).Encode(siteverifyResponse{
-			Success:    false,
-			ErrorCodes: []string{"invalid-input-response"},
-		}))
+		_, _ = w.Write(responseBody)
 	}))
 	defer server.Close()
 
@@ -110,10 +113,10 @@ func TestVerifier_VerifyTurnstile_検証失敗をログに出力しない(t *tes
 		client:    server.Client(),
 	}
 
-	// When
-	err := verifier.VerifyTurnstile(context.Background(), "invalid-token", "")
+	// 実行
+	err = verifier.VerifyTurnstile(context.Background(), "invalid-token", "")
 
-	// Then
+	// 検証
 	assert.ErrorIs(t, err, usecase.ErrInvalidTurnstileToken)
 	assert.Empty(t, logOutput.String())
 }
