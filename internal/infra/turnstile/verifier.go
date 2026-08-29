@@ -81,7 +81,6 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 		return errors.Join(usecase.ErrInternalError, err)
 	}
 	if !result.Success {
-		slog.Warn("turnstile verification failed", "error_codes", result.ErrorCodes)
 		return usecase.ErrInvalidTurnstileToken
 	}
 

@@ -1,8 +1,10 @@
 package turnstile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -82,4 +84,36 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 			assert.Equal(t, tt.remoteIP, receivedRemoteIP)
 		})
 	}
+}
+
+func TestVerifier_VerifyTurnstile_検証失敗をログに出力しない(t *testing.T) {
+	// Given
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		require.NoError(t, json.NewEncoder(w).Encode(siteverifyResponse{
+			Success:    false,
+			ErrorCodes: []string{"invalid-input-response"},
+		}))
+	}))
+	defer server.Close()
+
+	var logOutput bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logOutput, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
+	verifier := &verifier{
+		secretKey: "secret",
+		endpoint:  server.URL,
+		client:    server.Client(),
+	}
+
+	// When
+	err := verifier.VerifyTurnstile(context.Background(), "invalid-token", "")
+
+	// Then
+	assert.ErrorIs(t, err, usecase.ErrInvalidTurnstileToken)
+	assert.Empty(t, logOutput.String())
 }
