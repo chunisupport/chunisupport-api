@@ -24,11 +24,22 @@ go run ./cmd/export-song-snapshots
 | `OBJECT_STORAGE_ACCESS_KEY_ID` | 対象バケットへ書き込み可能な認証情報のAccess Key ID | `...` |
 | `OBJECT_STORAGE_SECRET_ACCESS_KEY` | 同じ認証情報のSecret Access Key | `...` |
 | `OBJECT_STORAGE_BUCKET_NAME` | 公開用オブジェクトを保存する既存バケット名 | `chunisupport-public` |
+| `CLOUDFLARE_API_TOKEN` | 対象Zoneの`Cache Purge`権限だけを持つAPIトークン | `...` |
+| `CLOUDFLARE_ZONE_ID` | 公開カスタムドメインが属するCloudflare Zone ID | 下表参照 |
+| `SONG_SNAPSHOT_PUBLIC_BASE_URL` | オブジェクトを配信するHTTPSカスタムドメイン。パスは指定しない | 下表参照 |
+
+環境ごとの公開先は次のとおりです。開発とステージングは同じ公開先を使用します。
+
+| 環境 | `CLOUDFLARE_ZONE_ID` | `SONG_SNAPSHOT_PUBLIC_BASE_URL` |
+| --- | --- | --- |
+| 開発・ステージング | `575f883bc4eb7c2d89c56ee987c73873` | `https://static.chunisup-dev.f5.si` |
+| beta | `6ef634111241a2dc524992ed7cfcf20f` | `https://static.beta-chunisup.f5.si` |
+| 本番 | `c7e970656a686c79cce6fad84c888d2c` | `https://static.chunisupport.net` |
 
 バッチは既存のログ、タイムゾーン、DB接続設定も使用するため、`APP_ENV`、`DB_NAME`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`も必要です。
 HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`.config/username_forbidden_words.json`は使用しません。
 
-カスタムドメインのURL、CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します。バッチは公開URLを参照しません。
+CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します。
 
 ## 保存するオブジェクト
 
@@ -47,11 +58,14 @@ HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、
 4種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、各オブジェクトのPUTは単一トランザクションではありません。
 途中のPUTが失敗した場合、それより前のオブジェクトだけが新しい内容になります。次回の正常実行ですべて揃います。
 
+4オブジェクトのPUTがすべて成功した後、対応する公開URLを1回のCloudflare APIリクエストでパージします。
+途中のPUTが失敗した場合はパージしません。パージAPIの通信失敗、`429`、`5xx`は最大3回まで再試行し、それでも失敗した場合はバッチを失敗させます。
+
 ## スケジュールと監視
 
 - 実行間隔: 6時間
 - 正常終了: 終了コード `0`
-- 設定、DB取得、JSON生成、オブジェクトストレージへのアップロードの失敗: 終了コード `1`
+- 設定、DB取得、JSON生成、オブジェクトストレージへのアップロード、Cloudflareキャッシュパージの失敗: 終了コード `1`
 - 既に別プロセスが実行中: 何も変更せず終了コード `1`
 
 スケジューラー側で終了コード `1` を検知し、最後の正常終了から12時間を超えた場合に通知してください。

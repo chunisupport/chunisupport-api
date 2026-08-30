@@ -44,6 +44,16 @@ type recordingWriter struct {
 	putKeys   []string
 }
 
+type recordingCachePurger struct {
+	objectKeys []string
+	err        error
+}
+
+func (p *recordingCachePurger) Purge(_ context.Context, objectKeys []string) error {
+	p.objectKeys = append([]string(nil), objectKeys...)
+	return p.err
+}
+
 func (w *recordingWriter) PutJSON(_ context.Context, objectKey string, body []byte) error {
 	w.putKeys = append(w.putKeys, objectKey)
 	if objectKey == w.failOnKey {
@@ -92,6 +102,7 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 		Chart: &entity.WorldsendChart{},
 	}
 	writer := &recordingWriter{}
+	cachePurger := &recordingCachePurger{}
 	exporter := NewExporter(
 		&stubSongSource{songs: []*entity.Song{song}},
 		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
@@ -100,6 +111,7 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
 		writer,
+		cachePurger,
 	)
 
 	// When
@@ -141,6 +153,12 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 	require.Len(t, reiwaResponse, 1)
 	assert.Equal(t, "通常楽曲", reiwaResponse[0].Title)
 	assert.Equal(t, "MAS", reiwaResponse[0].Diff)
+	assert.Equal(t, []string{
+		info.SongSnapshotObjectKey,
+		info.WorldsendSongSnapshotObjectKey,
+		info.ChunirecSongSnapshotObjectKey,
+		info.ReiwaSongSnapshotObjectKey,
+	}, cachePurger.objectKeys)
 }
 
 func TestExporterExport_取得または検証失敗時はアップロードしない(t *testing.T) {
@@ -187,6 +205,7 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 				buildTestChunirecSnapshot,
 				buildTestReiwaSnapshot,
 				writer,
+				&recordingCachePurger{},
 			)
 
 			// When
@@ -202,6 +221,7 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 	// Given
 	writer := &recordingWriter{failOnKey: info.WorldsendSongSnapshotObjectKey}
+	cachePurger := &recordingCachePurger{}
 	exporter := NewExporter(
 		&stubSongSource{songs: []*entity.Song{{
 			DisplayID: "0123456789abcdef",
@@ -216,6 +236,7 @@ func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
 		writer,
+		cachePurger,
 	)
 
 	// When
@@ -225,6 +246,7 @@ func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), info.WorldsendSongSnapshotObjectKey)
 	assert.Contains(t, writer.objects, info.SongSnapshotObjectKey)
+	assert.Empty(t, cachePurger.objectKeys)
 }
 
 func TestExporterExport_互換APIのアップロード失敗を返す(t *testing.T) {
@@ -240,6 +262,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			writer := &recordingWriter{failOnKey: tt.failOnKey}
+			cachePurger := &recordingCachePurger{}
 			exporter := NewExporter(
 				&stubSongSource{songs: []*entity.Song{{
 					DisplayID: "0123456789abcdef",
@@ -254,6 +277,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 				buildTestChunirecSnapshot,
 				buildTestReiwaSnapshot,
 				writer,
+				cachePurger,
 			)
 
 			// When
@@ -263,6 +287,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.failOnKey)
 			assert.NotContains(t, writer.objects, tt.failOnKey)
+			assert.Empty(t, cachePurger.objectKeys)
 			if tt.failOnKey == info.ChunirecSongSnapshotObjectKey {
 				assert.Equal(t, []string{
 					info.SongSnapshotObjectKey,
@@ -281,4 +306,33 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 			}
 		})
 	}
+}
+
+func TestExporterExport_キャッシュパージ失敗を返す(t *testing.T) {
+	// Given
+	cachePurger := &recordingCachePurger{err: errors.New("purge failed")}
+	exporter := NewExporter(
+		&stubSongSource{songs: []*entity.Song{{
+			DisplayID: "0123456789abcdef",
+			Charts:    []*entity.Chart{{DifficultyID: 4}},
+		}}},
+		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{{
+			Song:  &entity.Song{DisplayID: "fedcba9876543210"},
+			Chart: &entity.WorldsendChart{},
+		}}},
+		nil,
+		nil,
+		buildTestChunirecSnapshot,
+		buildTestReiwaSnapshot,
+		&recordingWriter{},
+		cachePurger,
+	)
+
+	// When
+	_, err := exporter.Export(context.Background())
+
+	// Then
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to purge song snapshot cache")
+	assert.Len(t, cachePurger.objectKeys, 4)
 }

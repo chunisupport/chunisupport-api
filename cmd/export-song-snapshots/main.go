@@ -14,6 +14,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/cloudflare"
 	"github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -54,6 +55,12 @@ func run() int {
 		slog.Error("オブジェクトストレージクライアントの初期化に失敗しました", "error", err)
 		return 1
 	}
+	cloudflareCacheConfig, err := config.LoadCloudflareCacheConfigFromEnv()
+	if err != nil {
+		slog.Error("Cloudflareキャッシュ設定の読み込みに失敗しました", "error", err)
+		return 1
+	}
+	cachePurger := cloudflare.NewCachePurger(cloudflareCacheConfig)
 
 	database, err := db.ConnectWithRetry(ctx, cfg.Database.DbConfig)
 	if err != nil {
@@ -111,6 +118,7 @@ func run() int {
 			return response, len(response)
 		},
 		objectStorageWriter,
+		cachePurger,
 	)
 
 	startedAt := time.Now()
