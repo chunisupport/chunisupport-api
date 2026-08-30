@@ -24,6 +24,11 @@ type JSONWriter interface {
 	PutJSON(ctx context.Context, objectKey string, body []byte) error
 }
 
+// CachePurger はCDN固有の型をアプリケーション層へ漏らさず、公開完了後の無効化だけを要求します。
+type CachePurger interface {
+	Purge(ctx context.Context, objectKeys []string) error
+}
+
 // CompatibilitySnapshotBuilder は通常楽曲から互換API用レスポンスと件数を構築します。
 type CompatibilitySnapshotBuilder func(songs []*entity.Song) (response any, count int)
 
@@ -44,6 +49,7 @@ type Exporter struct {
 	buildChunirecSnapshot CompatibilitySnapshotBuilder
 	buildReiwaSnapshot    CompatibilitySnapshotBuilder
 	objectStorageJSONSink JSONWriter
+	cachePurger           CachePurger
 }
 
 // NewExporter は楽曲スナップショットのエクスポーターを生成します。
@@ -55,6 +61,7 @@ func NewExporter(
 	buildChunirecSnapshot CompatibilitySnapshotBuilder,
 	buildReiwaSnapshot CompatibilitySnapshotBuilder,
 	objectStorageJSONSink JSONWriter,
+	cachePurger CachePurger,
 ) *Exporter {
 	return &Exporter{
 		songs:                 songs,
@@ -64,6 +71,7 @@ func NewExporter(
 		buildChunirecSnapshot: buildChunirecSnapshot,
 		buildReiwaSnapshot:    buildReiwaSnapshot,
 		objectStorageJSONSink: objectStorageJSONSink,
+		cachePurger:           cachePurger,
 	}
 }
 
@@ -124,6 +132,16 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	}
 	if err := e.objectStorageJSONSink.PutJSON(ctx, info.ReiwaSongSnapshotObjectKey, reiwaRecordsJSON); err != nil {
 		return Result{}, fmt.Errorf("failed to upload %s: %w", info.ReiwaSongSnapshotObjectKey, err)
+	}
+
+	objectKeys := []string{
+		info.SongSnapshotObjectKey,
+		info.WorldsendSongSnapshotObjectKey,
+		info.ChunirecSongSnapshotObjectKey,
+		info.ReiwaSongSnapshotObjectKey,
+	}
+	if err := e.cachePurger.Purge(ctx, objectKeys); err != nil {
+		return Result{}, fmt.Errorf("failed to purge song snapshot cache: %w", err)
 	}
 
 	return Result{
