@@ -16,6 +16,7 @@ const (
 	BulkSelectChunkSize                         = 1000 // IN句のプレースホルダ上限を避けるための分割数
 	DefaultUserListLimit                        = 100
 	AdminUserStatisticsActivePeriod             = 30 * 24 * time.Hour
+	AdminChartRankingLimit                      = 100
 	DefaultSongListLimit                        = 100
 	DefaultBestSlotRankingLimit                 = 50
 	MaxBestSlotRankingLimit                     = 100

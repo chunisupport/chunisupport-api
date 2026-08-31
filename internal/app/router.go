@@ -78,6 +78,7 @@ type Handlers struct {
 	User                  *api_internal.UserHandler
 	AdminUser             *api_internal.AdminUserHandler
 	AdminUserStatistics   *api_internal.AdminUserStatisticsHandler
+	AdminChartRanking     *api_internal.AdminChartRankingHandler
 	Song                  *api_internal.SongHandler
 	Honor                 *api_internal.HonorHandler
 	Worldsend             *api_internal.WorldsendHandler
@@ -160,6 +161,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
+	adminChartRankingQueryService := infra.NewAdminChartRankingQueryService(db)
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
@@ -234,6 +236,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		panic(fmt.Sprintf("failed to create friendship usecase: %v", err))
 	}
 	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
+	adminChartRankingUsecase := usecase.NewAdminChartRankingUsecase(adminChartRankingQueryService)
 	bestSlotRankingUsecase := usecase.NewBestSlotRankingUsecase(bestSlotRankingQueryService, chartStatsMasterProvider)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 	dataTransferCodec, err := datatransfer.NewCodec(cfg.DataTransferHMACSecret)
@@ -261,6 +264,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		User:                  api_internal.NewUserHandler(userUsecase),
 		AdminUser:             api_internal.NewAdminUserHandler(userUsecase),
 		AdminUserStatistics:   api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
+		AdminChartRanking:     api_internal.NewAdminChartRankingHandler(adminChartRankingUsecase),
 		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		Honor:                 api_internal.NewHonorHandler(honorUsecase),
 		Worldsend:             api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
@@ -507,6 +511,8 @@ func registerRoutes(
 	{
 		adminGroup.GET("/build-info", handleAdminBuildInfo)
 		adminGroup.GET("/user-stats", handlers.AdminUserStatistics.Get)
+		adminGroup.GET("/chart-rankings/songs/:displayid/charts/:difficulty", handlers.AdminChartRanking.GetStandard)
+		adminGroup.GET("/chart-rankings/worldsend-songs/:displayid", handlers.AdminChartRanking.GetWorldsend)
 		adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
 	}
 
