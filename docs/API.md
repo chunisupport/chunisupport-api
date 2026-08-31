@@ -304,6 +304,7 @@ Content-Type: application/json
 | `/compat/chunirec/2.0/records/showall` | GET | APIトークン | chunirec互換：通常譜面全レコード取得 |
 | `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
 | `/compat/reiwa/1/chunithm_record/original` | GET | APIトークン | reiwa互換：通常譜面全楽曲一覧取得 |
+| `/compat/reiwa/1/chunithm_versions.json` | GET | APIトークン | reiwa互換：CHUNITHMバージョン一覧取得 |
 
 ---
 
@@ -4876,6 +4877,36 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 reiwa互換APIは外部ツールとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
 
 メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
+
+### GET `/compat/reiwa/1/chunithm_versions.json`
+
+- **認証**: APIトークン必須
+- **概要**: 起動日時点でリリース済みのCHUNITHMバージョン一覧をreiwa互換形式で取得します。
+- **レスポンス**: 200 OK
+
+```json
+[
+  {
+    "version": "CHUNITHM",
+    "release": "2015-07-16"
+  },
+  {
+    "version": "CHUNITHM PLUS",
+    "release": "2016-02-04"
+  }
+]
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `version` | string | CHUNITHMのバージョン名 |
+| `release` | string | リリース日（`YYYY-MM-DD`） |
+
+- **ソート順**: リリース日昇順
+- **主なエラー**:
+  - 401 Unauthorized: APIトークン未指定または無効
+
+---
 
 ### GET `/compat/reiwa/1/chunithm_record/original`
 

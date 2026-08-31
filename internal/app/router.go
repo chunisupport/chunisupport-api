@@ -292,7 +292,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		// chunirec互換APIハンドラ
 		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache, cfg.Location),
 		// reiwa互換APIハンドラ
-		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterCache),
+		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterDataUsecase, masterCache),
 	}
 
 	// ルートの設定
@@ -676,6 +676,7 @@ func registerRoutes(
 	))
 	{
 		reiwaGroup.GET("/chunithm_record/original", handlers.Reiwa.GetChunithmRecordOriginal)
+		reiwaGroup.GET("/chunithm_versions.json", handlers.Reiwa.GetChunithmVersions)
 	}
 }
 
