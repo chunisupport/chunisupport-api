@@ -3142,7 +3142,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `song_id` | string | 楽曲の識別ID（16桁） |
 | `stats` | array | レーティング帯別の統計配列。**先頭要素は必ず `rating_band: "ALL"`（全プレイヤー統計）** |
-| `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.6+"） |
+| `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.7+"） |
 | `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
 | `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj, ajc）。`aj` は AJC を除く ALL JUSTICE、`ajc` は ALL JUSTICE かつ 1,010,000 点の人数で、両者は排他的です |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
@@ -3165,7 +3165,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レートリミット**: 認証なしは1分60回/IP
 - **概要**: 指定したベスト枠平均レート帯について、各譜面がベスト枠に採用されているプレイヤーの割合を降順で取得します。削除済み楽曲、WORLD'S END譜面、採用人数0人の譜面は返しません。
 - **クエリパラメータ**:
-  - `rating_band` (必須): `/internal/master` の `rating_bands[].label`（例: `17.0`, `17.6+`）。`17.6+` を直接URLへ記述する場合、`+` は `%2B` にエンコードしてください。
+  - `rating_band` (必須): `/internal/master` の `rating_bands[].label`（例: `17.0`, `17.7+`）。`17.7+` を直接URLへ記述する場合、`+` は `%2B` にエンコードしてください。
   - `limit` (任意): 1～100。デフォルト50
   - `cursor` (任意): 前回レスポンスの `next_cursor`
 - **ソート順**: `best_player_percentage` 降順 → `best_player_count` 降順 → 楽曲識別ID昇順 → 難易度名昇順
@@ -3915,7 +3915,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "rating_bands": [
     { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
     { "id": 2, "label": "15.0", "min_inclusive": 15.0, "max_exclusive": 15.1, "sort_order": 2 },
-    { "id": 28, "label": "17.6+", "min_inclusive": 17.6, "max_exclusive": null, "sort_order": 28 }
+    { "id": 28, "label": "17.6", "min_inclusive": 17.6, "max_exclusive": 17.7, "sort_order": 28 },
+    { "id": 29, "label": "17.7+", "min_inclusive": 17.7, "max_exclusive": null, "sort_order": 29 }
   ],
   "achievement_types": [
     { "id": 1, "name": "rank_count" },
@@ -4012,7 +4013,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `id` | int | レーティング帯ID |
-| `label` | string | 表示ラベル（例: "15.0", "17.6+"） |
+| `label` | string | 表示ラベル（例: "15.0", "17.7+"） |
 | `min_inclusive` | number\|null | 下限（未設定の場合は下限なし） |
 | `max_exclusive` | number\|null | 上限（未設定の場合は上限なし） |
 | `sort_order` | int | 表示順 |

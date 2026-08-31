@@ -189,6 +189,48 @@ func TestCreateChartStatisticsDown_依存順に統計テーブルを削除する
 	assert.Less(t, worldsendIndex, ratingBandIndex)
 }
 
+func TestSplitTopRatingBandUp_17_6と17_7以上に分割する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000044_split_top_rating_band.up.sql")
+	bestSlotDeleteIndex := strings.Index(upSQL, "DELETE FROM chart_best_slot_stats_by_rating_band")
+	chartDeleteIndex := strings.Index(upSQL, "DELETE FROM chart_stats_by_rating_band")
+	worldsendDeleteIndex := strings.Index(upSQL, "DELETE FROM worldsend_chart_stats_by_rating_band")
+	updateIndex := strings.Index(upSQL, "UPDATE rating_bands SET label = '17.6', max_exclusive = 17.7 WHERE id = 28")
+	insertIndex := strings.Index(upSQL, "INSERT INTO rating_bands (id, label, min_inclusive, max_exclusive, sort_order) VALUES (29, '17.7+', 17.7, NULL, 29)")
+
+	// Then
+	require.NotEqual(t, -1, bestSlotDeleteIndex)
+	require.NotEqual(t, -1, chartDeleteIndex)
+	require.NotEqual(t, -1, worldsendDeleteIndex)
+	require.NotEqual(t, -1, updateIndex)
+	require.NotEqual(t, -1, insertIndex)
+	for _, deleteIndex := range []int{bestSlotDeleteIndex, chartDeleteIndex, worldsendDeleteIndex} {
+		assert.Less(t, deleteIndex, updateIndex)
+		assert.Less(t, deleteIndex, insertIndex)
+	}
+}
+
+func TestSplitTopRatingBandDown_17_6以上の帯へ戻す(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000044_split_top_rating_band.down.sql")
+	bestSlotDeleteIndex := strings.Index(downSQL, "DELETE FROM chart_best_slot_stats_by_rating_band")
+	chartDeleteIndex := strings.Index(downSQL, "DELETE FROM chart_stats_by_rating_band")
+	worldsendDeleteIndex := strings.Index(downSQL, "DELETE FROM worldsend_chart_stats_by_rating_band")
+	bandDeleteIndex := strings.Index(downSQL, "DELETE FROM rating_bands WHERE id = 29")
+	updateIndex := strings.Index(downSQL, "UPDATE rating_bands SET label = '17.6+', max_exclusive = NULL WHERE id = 28")
+
+	// Then
+	require.NotEqual(t, -1, bestSlotDeleteIndex)
+	require.NotEqual(t, -1, chartDeleteIndex)
+	require.NotEqual(t, -1, worldsendDeleteIndex)
+	require.NotEqual(t, -1, bandDeleteIndex)
+	require.NotEqual(t, -1, updateIndex)
+	for _, deleteIndex := range []int{bestSlotDeleteIndex, chartDeleteIndex, worldsendDeleteIndex} {
+		assert.Less(t, deleteIndex, bandDeleteIndex)
+	}
+	assert.Less(t, bandDeleteIndex, updateIndex)
+}
+
 func TestCreatePlayerMetricHistoriesUp_公式指標を必須の組として保存する(t *testing.T) {
 	upSQL := readNormalizedMigrationSQL(t, "000041_create_player_metric_histories.up.sql")
 
