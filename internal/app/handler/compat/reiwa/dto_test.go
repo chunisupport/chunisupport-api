@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
@@ -270,6 +271,29 @@ func TestToChunithmRecordOriginalResponse_SongWithNoCharts(t *testing.T) {
 
 	result := ToChunithmRecordOriginalResponse([]*entity.Song{song}, nil)
 	assert.Len(t, result, 0)
+}
+
+func TestToChunithmVersionsResponse(t *testing.T) {
+	// Given
+	versions := []domainmasterdata.Version{
+		{ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
+		{ID: 2, Name: "CHUNITHM PLUS", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
+		{ID: 3, Name: "CHUNITHM AIR", ReleasedAt: time.Date(2016, 8, 25, 0, 0, 0, 0, time.UTC)},
+	}
+
+	// When
+	result := ToChunithmVersionsResponse(versions)
+
+	// Then
+	assert.Equal(t, ChunithmVersionList{
+		{Version: "CHUNITHM", Release: "2015-07-16"},
+		{Version: "CHUNITHM PLUS", Release: "2016-02-04"},
+		{Version: "CHUNITHM AIR", Release: "2016-08-25"},
+	}, result)
+}
+
+func TestToChunithmVersionsResponse_EmptyList(t *testing.T) {
+	assert.Empty(t, ToChunithmVersionsResponse(nil))
 }
 
 func TestResolveVersionName_EmptyForOriginal(t *testing.T) {

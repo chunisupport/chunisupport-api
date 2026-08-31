@@ -12,15 +12,17 @@ import (
 
 // ReiwaHandler はreiwa互換APIのハンドラです
 type ReiwaHandler struct {
-	songUsecase usecase.SongUsecase
-	masterCache *masterdata.Cache
+	songUsecase       usecase.SongUsecase
+	masterDataUsecase usecase.MasterDataUsecase
+	masterCache       *masterdata.Cache
 }
 
 // NewReiwaHandler はReiwaHandlerの新しいインスタンスを返します
-func NewReiwaHandler(songUsecase usecase.SongUsecase, masterCache *masterdata.Cache) *ReiwaHandler {
+func NewReiwaHandler(songUsecase usecase.SongUsecase, masterDataUsecase usecase.MasterDataUsecase, masterCache *masterdata.Cache) *ReiwaHandler {
 	return &ReiwaHandler{
-		songUsecase: songUsecase,
-		masterCache: masterCache,
+		songUsecase:       songUsecase,
+		masterDataUsecase: masterDataUsecase,
+		masterCache:       masterCache,
 	}
 }
 
@@ -38,4 +40,11 @@ func (h *ReiwaHandler) GetChunithmRecordOriginal(c *echo.Context) error {
 	response := ToChunithmRecordOriginalResponse(songs, h.masterCache)
 
 	return c.JSON(http.StatusOK, response)
+}
+
+// GetChunithmVersions は元APIと同じトップレベル配列を維持してCHUNITHMのバージョン一覧を返します。
+// GET /compat/reiwa/1/chunithm_versions.json
+func (h *ReiwaHandler) GetChunithmVersions(c *echo.Context) error {
+	versions := h.masterDataUsecase.GetVersions(c.Request().Context())
+	return c.JSON(http.StatusOK, ToChunithmVersionsResponse(versions))
 }

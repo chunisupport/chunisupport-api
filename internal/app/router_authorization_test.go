@@ -597,6 +597,7 @@ func TestRegisterRoutes_メンテナンス中のcompatは既存503形式を維�
 	paths := []string{
 		"/compat/chunirec/2.0/music/showall",
 		"/compat/reiwa/1/chunithm_record/original",
+		"/compat/reiwa/1/chunithm_versions.json",
 	}
 
 	for _, path := range paths {

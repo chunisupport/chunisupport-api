@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 )
@@ -33,6 +34,25 @@ type ChunithmRecordDTO struct {
 
 // ChunithmRecordList はレコードの配列です
 type ChunithmRecordList []*ChunithmRecordDTO
+
+type ChunithmVersionDTO struct {
+	Version string `json:"version"`
+	Release string `json:"release"`
+}
+
+type ChunithmVersionList []*ChunithmVersionDTO
+
+// ToChunithmVersionsResponse は元APIと同じトップレベル配列を維持するために専用DTOへ変換します。
+func ToChunithmVersionsResponse(items []domainmasterdata.Version) ChunithmVersionList {
+	versions := make(ChunithmVersionList, len(items))
+	for i, version := range items {
+		versions[i] = &ChunithmVersionDTO{
+			Version: version.Name,
+			Release: version.ReleasedAt.Format(time.DateOnly),
+		}
+	}
+	return versions
+}
 
 // ToChunithmRecordOriginalResponse はWORLD'S END以外の全楽曲をフラットな譜面単位のDTO配列に変換します
 func ToChunithmRecordOriginalResponse(songs []*entity.Song, masterCache *masterdata.Cache) ChunithmRecordList {
