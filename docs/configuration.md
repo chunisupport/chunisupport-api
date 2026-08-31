@@ -172,9 +172,9 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
-## オブジェクトストレージ楽曲スナップショット
+## オブジェクトストレージ静的データ
 
-`cmd/export-song-snapshots` を実行する場合に限り、以下の環境変数が追加で必要です。
+`cmd/export-static-data` を実行する場合に限り、以下の環境変数が追加で必要です。
 
 - `OBJECT_STORAGE_ENDPOINT_URL`
 - `OBJECT_STORAGE_ACCESS_KEY_ID`
@@ -182,11 +182,11 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `OBJECT_STORAGE_BUCKET_NAME`
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ZONE_ID`
-- `SONG_SNAPSHOT_PUBLIC_BASE_URL`
+- `STATIC_DATA_PUBLIC_BASE_URL`
 
 APIサーバーの起動にはこれらの環境変数は不要です。本番の秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
 
-出力するオブジェクトキーや実行方法は [楽曲スナップショットのオブジェクトストレージエクスポート](song_snapshot_export.md) を参照してください。
+出力するオブジェクトキーや実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
 
 ## 起動失敗時の終了コード
 

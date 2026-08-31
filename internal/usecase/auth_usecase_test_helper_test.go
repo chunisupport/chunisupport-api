@@ -147,6 +147,7 @@ func newTestUserCredentialUsecase(userRepo repository.UserRepository, playerReco
 		&mockTransactionManager{},
 		userRepo,
 		playerRecordRepo,
+		&stubGoalRepo{},
 		newMockMasterCache(),
 	)
 }
@@ -161,7 +162,7 @@ func newTestUserCredentialUsecaseWithDeleteDependencies(
 	if playerRecordRepo == nil {
 		playerRecordRepo = &stubPlayerRecordRepository{}
 	}
-	userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, tm, userRepo, playerRecordRepo, recentSignInVerifier, nil, newMockMasterCache())
+	userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, tm, userRepo, playerRecordRepo, &stubGoalRepo{}, recentSignInVerifier, nil, newMockMasterCache())
 	impl, ok := userCredentialUsecase.(*userCredentialUsecaseImpl)
 	if ok && !currentTime.IsZero() {
 		impl.clock = fixedClock{now: currentTime}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -94,6 +95,73 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 
 		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
 		assert.NoError(t, err)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("目標をユーザーより先に削除する", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		operations := make([]string, 0, 2)
+		goalRepo := &stubGoalRepo{deleteByUserID: func(_ context.Context, _ repository.Executor, userID int) error {
+			assert.Equal(t, 1, userID)
+			operations = append(operations, "goals")
+			return nil
+		}}
+		userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(
+			&MockExecutor{},
+			&mockTransactionManager{},
+			mockUserRepo,
+			&stubPlayerRecordRepository{},
+			goalRepo,
+			recentSignInVerifier,
+			nil,
+			newMockMasterCache(),
+		)
+		userCredentialUsecase.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+
+		user := &entity.User{ID: 1, Username: un, FirebaseUID: ptrString("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 1).Run(func(mock.Arguments) {
+			operations = append(operations, "user")
+		}).Return(nil).Once()
+
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"goals", "user"}, operations)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("目標削除に失敗した場合はユーザーを削除しない", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		goalDeleteErr := errors.New("goal delete error")
+		goalRepo := &stubGoalRepo{deleteByUserID: func(context.Context, repository.Executor, int) error {
+			return goalDeleteErr
+		}}
+		userCredentialUsecase := NewUserCredentialUsecaseWithFirebaseServices(
+			&MockExecutor{},
+			&mockTransactionManager{},
+			mockUserRepo,
+			&stubPlayerRecordRepository{},
+			goalRepo,
+			recentSignInVerifier,
+			nil,
+			newMockMasterCache(),
+		)
+		userCredentialUsecase.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+
+		user := &entity.User{ID: 1, Username: un, FirebaseUID: ptrString("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtoken.MustNew("reauth-token"))
+
+		assert.ErrorIs(t, err, goalDeleteErr)
+		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
 	})
@@ -291,6 +359,7 @@ func ptrString(value string) *string {
 func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *testing.T) {
 	userRepo := new(MockUserRepository)
 	playerRecordRepo := &stubPlayerRecordRepository{}
+	goalRepo := &stubGoalRepo{}
 	masterCache := newMockMasterCache()
 	exec := &MockExecutor{}
 
@@ -302,35 +371,42 @@ func TestNewUserCredentialUsecase_必須依存がnilの場合はpanicする(t *t
 		{
 			name: "executorがnil",
 			build: func() {
-				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, masterCache)
+				NewUserCredentialUsecase(nil, &mockTransactionManager{}, userRepo, playerRecordRepo, goalRepo, masterCache)
 			},
 			message: "executor is nil",
 		},
 		{
 			name: "transaction managerがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, masterCache)
+				NewUserCredentialUsecase(exec, nil, userRepo, playerRecordRepo, goalRepo, masterCache)
 			},
 			message: "transaction manager is nil",
 		},
 		{
 			name: "user repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, nil, playerRecordRepo, goalRepo, masterCache)
 			},
 			message: "user repository is nil",
 		},
 		{
 			name: "player record repositoryがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, masterCache)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, nil, goalRepo, masterCache)
 			},
 			message: "player record repository is nil",
 		},
 		{
+			name: "goal repositoryがnil",
+			build: func() {
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, nil, masterCache)
+			},
+			message: "goal repository is nil",
+		},
+		{
 			name: "master cacheがnil",
 			build: func() {
-				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, nil)
+				NewUserCredentialUsecase(exec, &mockTransactionManager{}, userRepo, playerRecordRepo, goalRepo, nil)
 			},
 			message: "master cache is nil",
 		},

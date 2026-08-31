@@ -35,6 +35,7 @@ type userCredentialUsecaseImpl struct {
 	tm                   TransactionManager
 	userRepo             repository.UserRepository
 	playerRecordRepo     repository.PlayerRecordRepository
+	goalRepo             repository.GoalRepository
 	recentSignInVerifier RecentSignInVerifier
 	firebaseDeleter      FirebaseUserDeleter
 	masterCache          AccountTypeProvider
@@ -46,6 +47,7 @@ func NewUserCredentialUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
+	goalRepo repository.GoalRepository,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
 	if db == nil {
@@ -60,6 +62,9 @@ func NewUserCredentialUsecase(
 	if playerRecordRepo == nil {
 		panic("player record repository is nil")
 	}
+	if goalRepo == nil {
+		panic("goal repository is nil")
+	}
 	if masterCache == nil {
 		panic("master cache is nil")
 	}
@@ -69,6 +74,7 @@ func NewUserCredentialUsecase(
 		tm:                   tm,
 		userRepo:             userRepo,
 		playerRecordRepo:     playerRecordRepo,
+		goalRepo:             goalRepo,
 		recentSignInVerifier: nil,
 		firebaseDeleter:      noopFirebaseUserDeleter{},
 		masterCache:          masterCache,
@@ -82,10 +88,11 @@ func NewUserCredentialUsecaseWithFirebaseDeleter(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
+	goalRepo repository.GoalRepository,
 	firebaseDeleter FirebaseUserDeleter,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
-	return NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, nil, firebaseDeleter, masterCache)
+	return NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, goalRepo, nil, firebaseDeleter, masterCache)
 }
 
 // NewUserCredentialUsecaseWithFirebaseServices は recent sign-in 検証と Firebase 削除連携付きの UserCredentialUsecase を生成します。
@@ -94,11 +101,12 @@ func NewUserCredentialUsecaseWithFirebaseServices(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRecordRepo repository.PlayerRecordRepository,
+	goalRepo repository.GoalRepository,
 	recentSignInVerifier RecentSignInVerifier,
 	firebaseDeleter FirebaseUserDeleter,
 	masterCache AccountTypeProvider,
 ) UserCredentialUsecase {
-	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, masterCache)
+	usecase := NewUserCredentialUsecase(db, tm, userRepo, playerRecordRepo, goalRepo, masterCache)
 	impl, ok := usecase.(*userCredentialUsecaseImpl)
 	if !ok {
 		return usecase
@@ -168,6 +176,9 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 		deletedUsername = user.Username.String()
 		deletedFirebaseUID = firebaseUID
 
+		if err := s.goalRepo.DeleteByUserID(ctx, tx, userID); err != nil {
+			return err
+		}
 		return s.userRepo.DeleteByID(ctx, tx, userID)
 	}); err != nil {
 		return err

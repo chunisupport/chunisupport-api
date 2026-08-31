@@ -44,7 +44,7 @@ const (
 	RandomFavoriteHonorTitle                    = "お気に入りからランダム"
 	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
-	SongSnapshotExportBatchLockName             = "chunisupport:export-song-snapshots"
+	StaticDataExportBatchLockName               = "chunisupport:export-static-data"
 	SongSnapshotObjectKey                       = "v1/songs.json"
 	WorldsendSongSnapshotObjectKey              = "v1/worldsend-songs.json"
 	ChunirecSongSnapshotObjectKey               = "compat/chunirec/2.0/music/showall.json"
@@ -55,11 +55,11 @@ const (
 	CloudflareAPITimeout                        = 15 * time.Second
 	CloudflareAPIResponseMaxBytes               = 1024 * 1024
 	DevelopCloudflareZoneID                     = "575f883bc4eb7c2d89c56ee987c73873"
-	DevelopSongSnapshotPublicBaseURL            = "https://static.chunisup-dev.f5.si"
+	DevelopStaticDataPublicBaseURL              = "https://static.chunisup-dev.f5.si"
 	BetaCloudflareZoneID                        = "6ef634111241a2dc524992ed7cfcf20f"
-	BetaSongSnapshotPublicBaseURL               = "https://static.beta-chunisup.f5.si"
+	BetaStaticDataPublicBaseURL                 = "https://static.beta-chunisup.f5.si"
 	ProductionCloudflareZoneID                  = "c7e970656a686c79cce6fad84c888d2c"
-	ProductionSongSnapshotPublicBaseURL         = "https://static.chunisupport.net"
+	ProductionStaticDataPublicBaseURL           = "https://static.chunisupport.net"
 	PlayerLatestUpdateSchemaVersion             = 3
 	PlayerLatestUpdateMinSupportedSchemaVersion = 1
 	PlayerLatestUpdateMetricDiffSchemaVersion   = 2
