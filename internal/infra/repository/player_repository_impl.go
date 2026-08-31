@@ -253,6 +253,9 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		if err := insertPlayerMetricHistory(ctx, exec, *history); err != nil {
 			return err
 		}
+		if err := prunePlayerMetricHistories(ctx, exec, r.db.DriverName(), player.ID); err != nil {
+			return err
+		}
 	}
 	query := `
 		UPDATE players

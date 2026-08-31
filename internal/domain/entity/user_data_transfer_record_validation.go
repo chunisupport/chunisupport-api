@@ -181,6 +181,9 @@ func validateUserDataTransferWorldsendRecordHistories(histories []UserDataTransf
 }
 
 func validateUserDataTransferMetricHistories(histories []UserDataTransferMetricHistory, currentCollectedAt *time.Time) error {
+	if len(histories) > constants.MaxMetricHistoryEntriesPerPlayer {
+		return invalidUserDataTransfer("metric_histories exceeds the per-player history limit")
+	}
 	var previous time.Time
 	seen := make(map[time.Time]struct{}, len(histories))
 	for i, history := range histories {

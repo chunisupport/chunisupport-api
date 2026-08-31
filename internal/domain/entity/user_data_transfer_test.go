@@ -115,6 +115,28 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "metric_histories[1]")
 	})
 
+	t.Run("公式指標履歴が上限を超えたら拒否する", func(t *testing.T) {
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.MetricHistories = validMetricHistories(info.MaxMetricHistoryEntriesPerPlayer + 1)
+		current := snapshot.MetricHistories[len(snapshot.MetricHistories)-1].DataCollectedAt.Add(time.Second)
+		snapshot.Player.DataCollectedAt = &current
+
+		err := snapshot.Validate()
+
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "metric_histories exceeds the per-player history limit")
+	})
+
+	t.Run("公式指標履歴が上限ちょうどなら受理する", func(t *testing.T) {
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.MetricHistories = validMetricHistories(info.MaxMetricHistoryEntriesPerPlayer)
+		current := snapshot.MetricHistories[len(snapshot.MetricHistories)-1].DataCollectedAt.Add(time.Second)
+		snapshot.Player.DataCollectedAt = &current
+
+		err := snapshot.Validate()
+
+		assert.NoError(t, err)
+	})
 	t.Run("現在値と同時刻以降の公式指標履歴を拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.MetricHistories[0].DataCollectedAt = *snapshot.Player.DataCollectedAt
@@ -334,5 +356,17 @@ func validRecordHistory(updatedAt time.Time) UserDataTransferRecordHistory {
 	}
 }
 
+func validMetricHistories(count int) []UserDataTransferMetricHistory {
+	histories := make([]UserDataTransferMetricHistory, count)
+	oldest := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := range histories {
+		histories[i] = UserDataTransferMetricHistory{
+			OfficialRating:    17.00,
+			OfficialOverpower: 12_000.00,
+			DataCollectedAt:   oldest.Add(time.Duration(i) * time.Second),
+		}
+	}
+	return histories
+}
 func intPointer(value int) *int          { return &value }
 func stringPointer(value string) *string { return &value }

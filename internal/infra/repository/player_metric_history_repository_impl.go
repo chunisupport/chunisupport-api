@@ -7,6 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -28,6 +29,46 @@ func insertPlayerMetricHistory(ctx context.Context, exec domainrepo.Executor, en
 		VALUES (:player_id, :official_rating, :official_overpower, :official_overpower_percent, :data_collected_at)`
 	if _, err := exec.NamedExecContext(ctx, query, model); err != nil {
 		return wrapPlayerMetricHistoryInsertError(err)
+	}
+	return nil
+}
+
+func prunePlayerMetricHistories(ctx context.Context, exec domainrepo.Executor, driverName string, playerID int) error {
+	query := `DELETE history
+		FROM player_metric_histories AS history
+		INNER JOIN (
+			SELECT player_id, data_collected_at
+			FROM (
+				SELECT player_id, data_collected_at,
+					ROW_NUMBER() OVER (
+						PARTITION BY player_id
+						ORDER BY data_collected_at DESC
+					) AS history_rank
+				FROM player_metric_histories
+				WHERE player_id = ?
+			) AS ranked
+			WHERE history_rank > ?
+		) AS expired
+			ON expired.player_id = history.player_id
+			AND expired.data_collected_at = history.data_collected_at`
+	if driverName == "sqlite" {
+		query = `DELETE FROM player_metric_histories
+			WHERE (player_id, data_collected_at) IN (
+				SELECT player_id, data_collected_at
+				FROM (
+					SELECT player_id, data_collected_at,
+						ROW_NUMBER() OVER (
+							PARTITION BY player_id
+							ORDER BY data_collected_at DESC
+						) AS history_rank
+					FROM player_metric_histories
+					WHERE player_id = ?
+				) AS ranked
+				WHERE history_rank > ?
+			)`
+	}
+	if _, err := exec.ExecContext(ctx, query, playerID, info.MaxMetricHistoryEntriesPerPlayer); err != nil {
+		return fmt.Errorf("failed to prune player metric histories: %w", err)
 	}
 	return nil
 }
@@ -54,9 +95,10 @@ func (r *playerMetricHistoryQueryService) FindTimeline(ctx context.Context, play
 			WHERE history.player_id = ?
 				AND EXISTS (SELECT 1 FROM players AS current WHERE current.id = ?)
 		) AS timeline
-		ORDER BY is_current DESC, data_collected_at DESC`
-	rows := make([]models.PlayerMetricHistoryModel, 0)
-	if err := r.db.SelectContext(ctx, &rows, query, playerID, playerID, playerID); err != nil {
+		ORDER BY is_current DESC, data_collected_at DESC
+		LIMIT ?`
+	rows := make([]models.PlayerMetricHistoryModel, 0, info.MaxMetricHistoryEntriesPerPlayer+1)
+	if err := r.db.SelectContext(ctx, &rows, query, playerID, playerID, playerID, info.MaxMetricHistoryEntriesPerPlayer+1); err != nil {
 		return nil, fmt.Errorf("failed to find player metric history timeline: %w", err)
 	}
 	entries := make([]entity.PlayerMetricHistoryEntry, 0, len(rows))
