@@ -1,11 +1,13 @@
 # goals API 現行仕様書
 
-この文書は、`chunisupport-api` の現行実装から読み取れる `goals` API の仕様を整理したものです。
-設計案や将来仕様ではなく、以下のコードを根拠にしています。
+HTTP契約の正本は `docs/API.md` の Goal / GoalGroup 節です。この文書はバリデーションと実装内部の補足です。
+根拠コード:
 
 - `internal/app/router.go`
 - `internal/app/handler/api_internal/goal_handler.go`
+- `internal/app/handler/api_internal/goal_group_handler.go`
 - `internal/dto/api_internal/goal_dto.go`
+- `internal/dto/api_internal/goal_group_dto.go`
 - `internal/usecase/goal_usecase.go`
 - `internal/usecase/goal_usecase_impl.go`
 - `internal/infra/repository/goal_repository_impl.go`
@@ -23,43 +25,32 @@
 
 - `GET /internal/me/goals`
 - `POST /internal/me/goals`
+- `PUT /internal/me/goals/order`
 - `PUT /internal/me/goals/:id`
 - `DELETE /internal/me/goals/:id`
+- `GET /internal/me/goal-groups`
+- `POST /internal/me/goal-groups`
+- `PUT /internal/me/goal-groups/order`
+- `PUT /internal/me/goal-groups/:id`
+- `DELETE /internal/me/goal-groups/:id`
 
 全エンドポイントで Firebase ID トークンによる Bearer 認証が必須です。
-ルーティング上は `/internal/me` グループ配下にあり、`firebaseAuth` ミドルウェアが適用されています。
+ルーティング上は `/internal/me` グループ配下にあり、`firebaseAuthStrict` ミドルウェアが適用されています。
 
 ## 2. データモデル
 
 DB上の `goals` テーブルは以下の構造です。
 
-```sql
-CREATE TABLE goals (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id INT UNSIGNED NOT NULL,
-  title VARCHAR(30) NOT NULL,
-  achievement_type_id TINYINT UNSIGNED NOT NULL,
-  achievement_params JSON NOT NULL,
-  attributes JSON NOT NULL,
-  invert_value BOOLEAN NOT NULL DEFAULT FALSE,
-  invert_percentage BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY fk_goals_achievement_type_id (achievement_type_id),
-  KEY idx_goals_user_created_id (user_id, created_at, id),
-  CONSTRAINT fk_goals_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-  CONSTRAINT fk_goals_achievement_type_id FOREIGN KEY (achievement_type_id) REFERENCES achievement_types (id) ON DELETE RESTRICT
-);
-```
+現行の `goals` テーブルは `group_id` と `sort_order` を持ちます。詳細なDDLは `migration/schema_mysql.sql` を参照してください。
 
 補足:
 
 - `updated_at` はありません。更新後も返却される日時は `created_at` のみです。
-- 一覧取得順のために `idx_goals_user_created_id(user_id, created_at, id)` が追加されています。
-- 初期マイグレーションにあった `idx_goals_user_id(user_id)` は、`idx_goals_user_created_id` に包含されるため `000013` で削除されています。
+- 一覧はグループの `sort_order` 昇順、未分類は末尾、その中で Goal の `sort_order` 昇順です。同順位の不整合時のみ `id` 昇順です。
 - `achievement_type` はDBに文字列では保存されず、`achievement_type_id` で保存されます。
 - `achievement_params` と `attributes` は JSON 型で保存されます。
 - `000040` 適用時、旧 `invert` の値は `invert_value` と `invert_percentage` の両方へ引き継がれます。
+- 作成時はユーザー行ロック後に件数を確認し、指定グループ（未指定時は未分類）の末尾へ `sort_order = グループ内件数+1` で追加します。
 
 ## 3. 認証と対象範囲
 
@@ -85,6 +76,7 @@ CREATE TABLE goals (
   "goals": [
     {
       "id": 1,
+      "group_id": 3,
       "title": "MASTER 14.0以上を1譜面AJ",
       "achievement_type": "combolamp_count",
       "achievement_params": {
@@ -100,6 +92,7 @@ CREATE TABLE goals (
       },
       "invert_value": false,
       "invert_percentage": true,
+      "sort_order": 1,
       "created_at": "2026-04-12T10:00:00+09:00"
     }
   ]
@@ -108,8 +101,9 @@ CREATE TABLE goals (
 
 取得順:
 
-- `created_at ASC`
-- 同一秒内では `id ASC`
+- グループの `sort_order` 昇順（未分類は末尾）
+- 同一グループ内は Goal の `sort_order` 昇順
+- 同順位の不整合時のみ `id` 昇順
 
 ### 4.2 POST `/internal/me/goals`
 
@@ -150,7 +144,7 @@ CREATE TABLE goals (
 - 認証: 必須
 - ステータス: `200 OK`
 - `:id` は `uint32` として解釈可能な10進数のみ有効
-- 更新方法: 部分更新ではなく、`title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` の完全上書きです
+- 更新方法: 部分更新ではなく、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` の完全上書きです。`group_id` 変更時は移動元を詰めて移動先末尾へ追加します
 
 リクエスト形状は `POST` と同じです。
 レスポンスは更新後の単一 goal オブジェクトです。
@@ -165,6 +159,14 @@ CREATE TABLE goals (
 
 レスポンスボディはありません。
 
+### 4.5 PUT `/internal/me/goals/order`
+
+指定グループ内の目標を並び替えます。HTTP契約は `docs/API.md` を参照してください。
+
+### 4.6 GoalGroup API
+
+`/internal/me/goal-groups` の CRUD と並び替えがあります。HTTP契約は `docs/API.md` の GoalGroup API 節を参照してください。
+
 ## 5. JSON形状の詳細
 
 ### 5.1 GoalRequest
@@ -173,6 +175,7 @@ CREATE TABLE goals (
 
 ```json
 {
+  "group_id": 3,
   "title": "string",
   "achievement_type": "string",
   "achievement_params": {},
@@ -186,6 +189,7 @@ CREATE TABLE goals (
 
 | フィールド | 型 | 必須 | 説明 |
 | --- | --- | --- | --- |
+| `group_id` | number \| null | 任意 | 所属グループ。省略または `null` は未分類 |
 | `title` | string | 必須 | 目標タイトル |
 | `achievement_type` | string | 必須 | 達成条件の種別コード |
 | `achievement_params` | object | 必須 | `achievement_type` ごとの可変JSON |
@@ -207,6 +211,7 @@ CREATE TABLE goals (
 ```json
 {
   "id": 1,
+  "group_id": 3,
   "title": "MASTER 14.0以上を1譜面AJ",
   "achievement_type": "combolamp_count",
   "achievement_params": {
@@ -222,6 +227,7 @@ CREATE TABLE goals (
   },
   "invert_value": false,
   "invert_percentage": true,
+  "sort_order": 1,
   "created_at": "2026-04-12T10:00:00+09:00"
 }
 ```
@@ -231,12 +237,14 @@ CREATE TABLE goals (
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `id` | number | goal ID |
+| `group_id` | number \| null | 所属グループ。未分類は `null` |
 | `title` | string | タイトル。保存時に trim 済み |
 | `achievement_type` | string | マスタ逆引きしたコード |
 | `achievement_params` | object | 保存済みJSONをデコードしたもの |
 | `attributes` | object | 保存済みJSONをデコードしたもの |
 | `invert_value` | boolean | 実数値表示用の保存値そのまま |
 | `invert_percentage` | boolean | パーセンテージ表示用の保存値そのまま |
+| `sort_order` | number | グループ内の表示順 |
 | `created_at` | string | RFC3339形式文字列 |
 
 補足:
@@ -247,13 +255,14 @@ CREATE TABLE goals (
 
 ## 6. `achievement_type` 仕様
 
-現行実装で有効なのは以下の8種類です。
+現行実装で有効なのは以下の9種類です。
 
 - `rank_count`
 - `score_count`
 - `avg_score`
 - `hardlamp_count`
 - `combolamp_count`
+- `rainbow_count`
 - `total_score`
 - `overpower_value`
 - `overpower_percent`
@@ -424,6 +433,25 @@ CREATE TABLE goals (
 - 小数第3位まで許可
 - `total` は省略不可で、`null` も不可です。
 
+### 7.9 `rainbow_count`
+
+BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
+
+```json
+{
+  "count": 10
+}
+```
+
+条件:
+
+- キーは `count` / `remaining` / `percent` のいずれか1つのみ。`lamp` は指定できません
+- `count` は整数または `null`、整数の場合は `count >= 1`
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- 動的上限は譜面数ではなく対象楽曲数です
+- `rainbow_count` では `diff` / `const` / `chart_target` を指定できません
+
 ## 8. `attributes` 仕様
 
 `attributes` は対象譜面の絞り込み条件です。
@@ -433,6 +461,7 @@ CREATE TABLE goals (
 - `const`
 - `genre`
 - `ver`
+- `chart_target`
 
 未知キーが1つでもあると `goal_invalid_attributes` です。
 
@@ -451,6 +480,8 @@ CREATE TABLE goals (
 ```
 
 空オブジェクト `{}` は有効です。
+
+`chart_target` は `"OP_TARGET"` のみ許可します。指定時は OP 対象譜面だけに絞り込み、`diff` との併用はできません。
 
 ### 8.2 `diff`
 

@@ -20,7 +20,7 @@
 ## CORS
 
 すべてのエンドポイントでCORSが有効です。基本設定は `cors.*` を参照してください（設定方法は `docs/configuration.md` を参照）。
-ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
+ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp`、`GET /internal/system/status` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 メンテナンス中の待機時間をブラウザから参照できるよう、CORSの公開レスポンスヘッダーには `Retry-After` を含みます。
 
@@ -43,11 +43,13 @@
 
 ルーター実装（`internal/app/router.go`）および定数定義（`internal/info/info.go`）に基づく主要なレートリミットは以下です。
 
+- `/internal/auth/login`: **1分あたり10回/IP**
 - `/internal/auth/signup`: **1分あたり5回/IP**
 - `/internal/me/register-data`: **30秒あたり1回/ユーザー**
+- `/internal/me/data-transfer/*`: **1分あたり5回/ユーザー**
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
-- `/internal/users/*`、`/internal/songs/*` および `/internal/worldsend-songs/*` の公開参照系（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
+- `/internal/users/*`、`/internal/songs/*`、`/internal/worldsend-songs/*`、`/internal/courses` の公開参照系、および `/internal/best-slot-rankings`（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
 - `/v1/*`: **15分あたり150回（PLAYER） / 3,000回（EDITOR/EXTDEV） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 - `/compat/reiwa/1/*`: **`/v1` と同一**
@@ -180,7 +182,7 @@ Content-Type: application/json
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
-| `/internal/auth/signup` | POST | Firebase Bearer | Firebase IDトークンで初回ユーザー登録 |
+| `/internal/auth/signup` | POST | Firebase Bearer + Turnstile | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン一覧取得 |
 | `/internal/auth/api-tokens` | POST | Firebase Bearer | 名前付きAPIトークン発行 |
 | `/internal/auth/api-tokens/:id` | PATCH | Firebase Bearer | APIトークン名変更 |
@@ -194,6 +196,9 @@ Content-Type: application/json
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data/latest-update` | GET | Firebase Bearer | 自分の最新プレイヤーデータ登録結果を取得 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
+| `/internal/me/data-transfer/export` | POST | Firebase Bearer | ユーザーデータを移行ファイルとしてエクスポート |
+| `/internal/me/data-transfer/validate` | POST | Firebase Bearer | 移行ファイルを検証 |
+| `/internal/me/data-transfer/import` | POST | Firebase Bearer | 移行ファイルをインポート |
 | `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
 | `/internal/me/locked-songs/batch` | POST | Firebase Bearer | 自分の未解禁曲をまとめて登録・解除 |
 | `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
@@ -719,7 +724,7 @@ Firebase Bearer Token（任意）
 
 | パラメータ | 型 | 必須 | 説明 |
 | --- | --- | --- | --- |
-| `username` | パス | 必須 | 対象ユーザー名（半角英数字4〜16文字） |
+| `username` | パス | 必須 | 対象ユーザー名（半角英数字5〜50文字） |
 
 #### レスポンス（200 OK）
 
@@ -834,17 +839,21 @@ Firebase Bearer Token（必須）
 
 非公開ユーザーのプロフィール、レーティング、レコード、スコア履歴、未解禁曲、お気に入り楽曲は、承認済みフレンドからは公開ユーザーと同じように閲覧できます。未認証または非フレンドからの参照では、ユーザー列挙を避けるため従来通り `user_not_found` 相当になります。
 
-一覧で返す相手ユーザー概要は以下です。
+一覧レスポンスは `items` 配列で相手ユーザー概要を返します。
 
 ```json
 {
-  "username": "frienduser",
-  "player_level": 42,
-  "player_name": "PLAYER",
-  "rating": 15.25,
-  "is_private": false,
-  "requested_at": "2026-07-08T12:00:00Z",
-  "accepted_at": "2026-07-08T12:05:00Z"
+  "items": [
+    {
+      "username": "frienduser",
+      "player_level": 42,
+      "player_name": "PLAYER",
+      "rating": 15.25,
+      "is_private": false,
+      "requested_at": "2026-07-08T12:00:00Z",
+      "accepted_at": "2026-07-08T12:05:00Z"
+    }
+  ]
 }
 ```
 
@@ -868,7 +877,8 @@ Firebase Bearer Token（必須）
 
 | コード | HTTP | 条件 |
 | --- | --- | --- |
-| `validation_failed` | 422 | 自分自身への申請、または不正な `username` |
+| `validation_failed` | 400 | 自分自身への申請 |
+| `validation_failed` | 422 | 不正な `username` |
 | `user_not_found` | 404 | 対象ユーザーが存在しない |
 | `friendship_limit_exceeded` | 400 | 自分の外向き `pending` / `accepted` が100件に達している |
 | `friendship_conflict` | 409 | 既に申請中、承認済み、または相手から承認済み関係がある |
@@ -1111,7 +1121,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正
-  - 400 Bad Request (`validation_failed`): `display_id` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `display_id` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 404 Not Found (`song_not_found`): 楽曲が見つからない、または登録対象外
@@ -1137,7 +1147,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): `is_ultima` がboolとして解釈できない
-  - 400 Bad Request (`validation_failed`): `displayid` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
@@ -1170,7 +1180,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正
-  - 400 Bad Request (`validation_failed`): `display_id` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `display_id` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 404 Not Found (`song_not_found`): 追加対象の楽曲が見つからない、または登録対象外
@@ -1363,7 +1373,7 @@ curl -X POST \
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| `app_ver` | string | ✓ | インポートアプリのバージョン。対応バージョン: `0.1.0` |
+| `app_ver` | string | - | インポートアプリのバージョン。互換性確認用の情報として保存するだけで、未指定・任意文字列を許容します |
 | `name` | string | ✓ | プレイヤー名（全角8文字以内、半角英数字・半角カタカナ不可） |
 | `level` | number | ✓ | プレイヤーレベル |
 | `rating` | number | ✓ | レーティング |
@@ -1508,7 +1518,7 @@ curl -X POST \
       "after": {
         "score": 1002345,
         "clear_lamp": "BRAVE",
-        "combo_lamp": "full combo",
+        "combo_lamp": "FULL COMBO",
         "full_chain": null
       }
     },
@@ -1680,7 +1690,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 #### 主なエラー
 
 - `401 Unauthorized`: 未認証
-- `400 Bad Request`: 保存済み本文がJSONとして解釈できない、または対応していない `app_ver`
+- `400 Bad Request`: 保存済み本文がJSONとして解釈できない
 - `404 Not Found`: token期限切れ / 未存在
 - `422 Unprocessable Entity`: `uploadToken` の形式不正、プレイヤー名・日時形式・スコア整合性など `PlayerDataPayload` のバリデーション不正
 - `500 Internal Server Error`: DB保存失敗などの想定外エラー（tokenは消費済みのため再アップロードが必要）
@@ -1690,7 +1700,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - `uploadToken` は UUID v4 を要求します。
 - 一時保存時点では厳密な妥当性検証を行わないため、`commit` 時に初めて不正データとして弾かれることがあります。
 - 一時保存時点では JSON デコードすら行わないため、構文破損や型不一致も `commit` 時まで遅延します。
-- `app_ver` が対応外の場合は `400`、プレイヤー名・日時形式を含むプレイヤーデータの入力不正は `422` として扱われます。
+- `app_ver` は検証せず、未指定・任意文字列を許容します。プレイヤー名・日時形式を含むプレイヤーデータの入力不正は `422` として扱われます。
 
 ---
 
@@ -2266,8 +2276,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
-    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend` のみを返します。
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
+    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend`/`course` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend`/`course` のみを返します。
+    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
@@ -2321,7 +2331,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
         "full_chain": null,
         "slot": null
       }
-    ]
+    ],
+    "worldsend": [],
+    "course": []
   },
   "updated_at": "2025-11-28T22:23:32+09:00"
 }
@@ -2604,6 +2616,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `standard` | PlayerRecordDTO[] | 通常譜面の全レコード |
 | `worldsend` | WorldsendRecordDTO[] | WORLD'S END の全レコード |
+| `course` | CourseRecordDTO[] | コースの全レコード |
 | `meta` | UserRecordMetaDTO | メタ情報 |
 
 #### UserRecordMetaDTO スキーマ
@@ -2709,6 +2722,89 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `updated_at` | string \| null | `courses.updated_at` の最大値 (ISO8601)。コースが0件の場合は `null` |
 
+### GET `/internal/courses`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: 有効なコースマスタ一覧を取得します。削除済みコースは含みません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "courses": [
+    {
+      "display_id": "0123456789abcdef",
+      "idx": "50020",
+      "name": "CLASS I COURSE",
+      "class": "1"
+    }
+  ]
+}
+```
+
+### GET `/internal/courses/:displayid`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: 有効なコースマスタ単件を取得します。
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+
+### POST `/internal/courses`
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
+- **リクエストボディ**:
+
+```json
+{
+  "idx": "50020",
+  "name": "CLASS I COURSE",
+  "class": "1"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `idx` | string | ✓ | 公式インデックス。最大32文字。前後空白除去後に空不可。既存値と重複不可 |
+| `name` | string | ✓ | コース名。最大255文字。前後空白除去後に空不可 |
+| `class` | string | ✓ | コースクラス。`1`〜`5` / `inf` / `extra`。最大16文字 |
+
+- **レスポンス**: 201 Created。編集者向けフィールド（`id` / `is_deleted` / `updated_at`）を含むコースオブジェクト
+- **主なエラー**:
+  - 409 Conflict (`duplicate_official_idx`): `idx` 重複
+  - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
+
+### PUT `/internal/courses/:displayid`
+- **認証**: Firebase Bearer (EDITOR+)
+- **概要**: コース名称とクラスを更新します。`idx` は変更できません。
+- **リクエストボディ**: `{ "name": "...", "class": "..." }`
+- **レスポンス**: 200 OK
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない
+  - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
+
+### DELETE `/internal/courses/:displayid`
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: コースを論理削除します。
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない
+
+### POST `/internal/courses/:displayid/restore`
+- **認証**: Firebase Bearer (EDITOR+)
+- **概要**: 論理削除したコースを復元します。
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない
+
+### GET `/internal/editor/courses`
+- **認証**: Firebase Bearer (EDITOR+)
+- **概要**: 削除済みを含むコース一覧を取得します。各要素に `id` / `is_deleted` / `updated_at` を含みます。
+
+### GET `/internal/editor/courses/:displayid`
+- **認証**: Firebase Bearer (EDITOR+)
+- **概要**: 削除済みを含むコース詳細を取得します。
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない
+
 ### GET `/internal/users/:username/record/courses`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
@@ -2752,6 +2848,15 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 各要素の `courses[i].updated_at` は当該プレイ済みレコードの更新日時であり、`meta.updated_at` とは独立する。未プレイ補完データでは `null`。
 
+### GET `/internal/users/:username/record/courses/:displayid`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしで1分間60回/IP
+- **概要**: 指定したコースのユーザーレコード単件を返します。未プレイの場合も `is_played=false` のオブジェクトを返します。
+- **レスポンス**: `CourseRecordDTO`
+- **主なエラー**:
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開で閲覧できない
+  - 404 Not Found (`not_found`): コースが存在しない
+
 #### UserRecordResponseDTO スキーマ
 
 | フィールド | 型 | 説明 |
@@ -2762,6 +2867,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `new` | PlayerRecordDTO[] | 新曲枠レコード |
 | `new_candidate` | PlayerRecordDTO[] | 新曲候補枠レコード |
 | `standard` | PlayerRecordDTO[] | 通常譜面の全レコード |
+| `worldsend` | WorldsendRecordDTO[] | WORLD'S END の全レコード |
+| `course` | CourseRecordDTO[] | コースの全レコード |
 
 #### PlayerRecordDTO スキーマ
 
@@ -2807,7 +2914,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `full_chain` | string \| null | フルチェイン名称（マスタ値が「NONE」の場合は `null`） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開/プレイヤー未紐付含む）
 
 ### DELETE `/internal/users/:username`
@@ -2819,7 +2926,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 **説明**: 指定されたユーザー名のユーザーを物理削除します。関連する目標を同一トランザクション内で先に削除し、目標グループ・プレイヤー・レコード・APIトークンなどの関連データも外部キー制約により削除されます。Firebase UID が連携されている場合は Firebase ユーザー削除も試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): Bearerトークン欠如または無効
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 403 Forbidden (`forbidden`): ADMIN権限が不足
   - 404 Not Found (`user_not_found`): ユーザーが存在しない
   - 400 Bad Request (`operation_failed`): 操作失敗（詳細隠蔽）
@@ -2908,7 +3015,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `notes_designer` | string \| null | 譜面製作者名（未設定の場合null/省略） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/songs/:displayid`
@@ -2949,8 +3056,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 レスポンスフィールドの詳細は GET `/internal/songs` と同様です。
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
-  - 500 Internal Server Error (`internal_error`): 楽曲が存在しない、またはサーバー内部エラー
+  - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
+  - 404 Not Found (`song_not_found`): 楽曲が見つからない
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/songs/:displayid/stats/:difficulty`
 - **認証**: Firebase Bearer (任意)
@@ -3382,7 +3490,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `notes_designer` | string \| null | 譜面製作者名 |
 
 - **主なエラー**:
-  - 401 Unauthorized (`unauthorized`): 認証が必要
+  - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/worldsend-songs/:displayid`
@@ -4397,7 +4505,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/users/:username`
 - **認証**: APIトークン必須
-- **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+- **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
 - **パスパラメータ**:
 
@@ -4406,7 +4514,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `username` | string | ユーザー名 |
 
 - **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
+    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 - **レスポンス**: 200 OK
 
@@ -4459,7 +4567,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "new": [],
     "new_candidate": [],
     "standard": [],
-    "worldsend": []
+    "worldsend": [],
+    "course": []
   },
   "updated_at": "2024-12-20T10:00:00Z"
 }
@@ -4481,6 +4590,55 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/v1/courses`
+- **認証**: APIトークン必須
+- **概要**: 有効なコースマスタ一覧を取得します。識別子は `id`（内部APIの `display_id` と同じ値）です。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "courses": [
+    {
+      "id": "0123456789abcdef",
+      "idx": "50020",
+      "name": "CLASS I COURSE",
+      "class": "1"
+    }
+  ]
+}
+```
+
+### GET `/v1/courses/:id`
+- **認証**: APIトークン必須
+- **概要**: 有効なコースマスタ単件を取得します。
+- **主なエラー**:
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+
+### GET `/v1/users/:username/records/courses`
+- **認証**: APIトークン必須
+- **概要**: 対象ユーザーのコースレコード一覧を取得します。非公開ユーザーは本人または承認済みフレンド以外 404 です。
+- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
+- **レスポンス**: 200 OK
+
+```json
+{
+  "updated_at": "2026-07-14T10:00:00Z",
+  "courses": [
+    {
+      "id": "0123456789abcdef",
+      "idx": "50020",
+      "name": "CLASS I COURSE",
+      "class": "1",
+      "is_played": true,
+      "score": 3029000,
+      "is_clear": true,
+      "combo_lamp": "FULL COMBO",
+      "updated_at": "2026-07-10T08:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -4773,7 +4931,9 @@ reiwa互換APIは外部ツールとの互換性を持つエンドポイントで
 // ユーザー関連
 interface UserDTO {
   username: string;
-  player: PlayerDTO | null;
+  account_type: string;
+  is_private: boolean;
+  last_score_update: string | null;
 }
 
 // ユーザー一覧レスポンス（ADMIN用）
@@ -4881,6 +5041,7 @@ interface UserRecordResponseDTO {
   new_candidate: PlayerRecordDTO[];
   standard: PlayerRecordDTO[];
   worldsend: WorldsendRecordDTO[];  // WORLD'S END レコード（レーティング計算対象外）
+  course: CourseRecordDTO[];
 }
 
 // WORLD'S END レコード（スロット分類なし、レーティング計算なし）
@@ -4899,6 +5060,18 @@ interface WorldsendRecordDTO {
   clear_lamp: string | null;
   combo_lamp: string | null;      // マスタ値が「NONE」の場合はnull
   full_chain: string | null;      // マスタ値が「NONE」の場合はnull
+}
+
+interface CourseRecordDTO {
+  display_id: string;
+  idx: string;
+  name: string;
+  class: string;
+  is_played: boolean;
+  score: number;
+  is_clear: boolean;
+  combo_lamp: string | null;
+  updated_at: string | null;
 }
 
 // システム状態・メンテナンス
@@ -4974,7 +5147,7 @@ interface PlayerDataSummary {
 
 interface PlayerDataStatistics {
   overall: PlayerDataStatisticsGroup;
-  by_difficulty: Record<'BASIC' | 'ADVANCED' | 'EXPERT' | 'MASTER' | 'ULTIMA', PlayerDataStatisticsGroup>;
+  by_difficulty: Record<'BASIC' | 'ADVANCED' | 'EXPERT' | 'MASTER' | 'ULTIMA' | 'WE', PlayerDataStatisticsGroup>;
 }
 
 interface PlayerDataStatisticsGroup {

@@ -85,8 +85,12 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `GET /internal/songs`
 - `GET /internal/songs/:displayid`
 - `GET /internal/songs/:displayid/stats/:difficulty`
-- `GET /internal/songs/worldsend`
-- `GET /internal/songs/worldsend/:displayid`
+- `GET /internal/songs/:displayid/best-slot-stats/:difficulty`
+- `GET /internal/best-slot-rankings`
+- `GET /internal/worldsend-songs`
+- `GET /internal/worldsend-songs/:displayid`
+- `GET /internal/courses`
+- `GET /internal/courses/:displayid`
 
 これらは Firebase Bearer 任意の公開参照エンドポイントです。Bearer トークンがある場合のみ失効確認なしで UID を検証し、未認証時は匿名として処理します。未認証時には匿名 IP レートリミットが適用されます。
 
@@ -96,8 +100,16 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 - `GET /internal/users/:username/profile`
 - `GET /internal/users/:username/rating`
+- `GET /internal/users/:username/rating-op-history`
 - `GET /internal/users/:username/record`
+- `GET /internal/users/:username/record/songs/:displayid`
+- `GET /internal/users/:username/record/songs/:displayid/:difficulty/history`
+- `GET /internal/users/:username/record/worldsend-songs/:displayid`
+- `GET /internal/users/:username/record/worldsend-songs/:displayid/history`
+- `GET /internal/users/:username/record/courses`
+- `GET /internal/users/:username/record/courses/:displayid`
 - `GET /internal/users/:username/locked-songs`
+- `GET /internal/users/:username/favorite-songs`
 - `GET /internal/users/:username`
 
 これらも Firebase Bearer 任意の公開参照エンドポイントですが、現在の実装では `optionalFirebaseAuthStrict` を利用しているため、Bearer トークンがある場合は失効・無効化確認まで行います。
@@ -111,8 +123,17 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `POST /internal/player-data/commit`
 - `/internal/users` の管理系操作
 - `/internal/songs` の編集系操作
+- `/internal/worldsend-songs` の編集系操作
+- `/internal/courses` の編集系操作
 - `/internal/editor/songs` 配下
-- `/internal/master` 配下
+- `/internal/editor/worldsend-songs` 配下
+- `/internal/editor/courses` 配下
+- `/internal/honors` 配下
+- `/internal/admin` 配下
+- `/internal/friends` 配下
+- `/internal/friend-rankings` 配下
+
+`/internal/master` 配下と `GET /internal/system/status` は認証不要です。
 
 退会処理では通常の strict Bearer 認証に加えて、`X-Reauth-Token` の recent sign-in 検証も行います。
 

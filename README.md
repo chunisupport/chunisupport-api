@@ -43,19 +43,21 @@
    ```
    ```bash
    # .env
-   APP_ENV=develop
-   FIREBASE_CREDENTIALS_FILE=path/to/service-account.json
-   DATA_TRANSFER_HMAC_SECRET=<Base64で表現した32バイト以上のランダム値>
-   DB_NAME=chunisupport
+    APP_ENV=develop
+    FIREBASE_CREDENTIALS_FILE=path/to/service-account.json
+    TURNSTILE_SECRET_KEY=<Cloudflare Turnstileのシークレットキー>
+    DATA_TRANSFER_HMAC_SECRET=<Base64で表現した32バイト以上のランダム値>
+    DB_NAME=chunisupport
    DB_HOST=localhost
    DB_PORT=3306
    DB_USER=your_user
    DB_PASS=your_password
    ```
    ```json
-   {
-      "app_port": 3000,
-      "logging": {
+    {
+       "app_port": 3000,
+       "timezone": "Asia/Tokyo",
+       "logging": {
          "level": "debug",
          "app_file": ".log/app.log",
          "access_file": ".log/access.log",
@@ -67,10 +69,18 @@
                "http://localhost:3000",
                "http://localhost:5173"
          ],
-         "allow_credentials": true,
-         "max_age": 3600
-      }
-   }
+          "allow_credentials": true,
+          "max_age": 3600
+       },
+       "database": {
+          "pool": {
+             "max_open_conns": 25,
+             "max_idle_conns": 25,
+             "conn_max_lifetime_sec": 300,
+             "conn_max_idle_time_sec": 60
+          }
+       }
+    }
    ```
 4. データベースを作成してマイグレーションする。
    ```bash
@@ -92,7 +102,9 @@
 cmd/
 ├── api/          # APIサーバー用エントリポイント
 │   └── main.go
-└── recalculate-player-data/ # プレイヤーデータ再計算バッチ
+├── recalculate-player-data/ # プレイヤーデータ再計算バッチ
+│   └── main.go
+└── export-song-snapshots/ # 楽曲スナップショット出力バッチ
     └── main.go
 internal/         # 共通のドメインロジック・ユースケース・インフラ
 └── ...
@@ -105,6 +117,7 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 |---|---|---|
 | APIサーバー | `go build -o _chunisupport-api ./cmd/api` | `go run ./cmd/api` |
 | プレイヤーデータ再計算バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-recalculate-player-data-linux-amd64 ./cmd/recalculate-player-data` | `go run ./cmd/recalculate-player-data` |
+| 楽曲スナップショット出力バッチ | `go build -o _chunisupport-export-song-snapshots ./cmd/export-song-snapshots` | `go run ./cmd/export-song-snapshots` |
 
 ## プレイヤーデータ再計算バッチ
 

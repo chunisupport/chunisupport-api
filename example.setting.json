@@ -1,5 +1,6 @@
 {
   "app_port": 3002,
+  "timezone": "Asia/Tokyo",
   "logging": {
     "level": "debug",
     "app_file": ".log/app.log",

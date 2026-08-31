@@ -160,6 +160,9 @@ type PlayerLockedSongRepository interface {
     ListByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerLockedSong, error)
     Create(ctx context.Context, exec Executor, lockedSong *entity.PlayerLockedSong) error
     Delete(ctx context.Context, exec Executor, playerID int, songID int, isUltima bool) error
+    DeleteBySongID(ctx context.Context, exec Executor, songID int) error
+    BulkCreate(ctx context.Context, exec Executor, lockedSongs []*entity.PlayerLockedSong) error
+    BulkDelete(ctx context.Context, exec Executor, playerID int, songIDs []int, isUltimaFlags []bool) error
 }
 ```
 
@@ -233,6 +236,7 @@ type PlayerLockedSongUsecase interface {
     List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error)
     Lock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
     Unlock(ctx context.Context, userID int, input *PlayerLockedSongInput) error
+    Batch(ctx context.Context, userID int, input *PlayerLockedSongBatchInput) error
 }
 ```
 
@@ -299,10 +303,11 @@ Unlockは指定された `is_ultima` のレコードだけを削除する。削�
 ```text
 GET    /internal/users/:username/locked-songs
 POST   /internal/me/locked-songs
+POST   /internal/me/locked-songs/batch
 DELETE /internal/me/locked-songs/:displayid[?is_ultima={true|false}]
 ```
 
-一覧は `GET /internal/users/:username/locked-songs` とし、任意認証で他人の未解禁曲を参照できるようにする。登録は `POST /internal/me/locked-songs`、解除は `DELETE /internal/me/locked-songs/:displayid` + query とする。DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
+一覧は `GET /internal/users/:username/locked-songs` とし、任意認証で他人の未解禁曲を参照できるようにする。登録は `POST /internal/me/locked-songs`、一括登録・解除は `POST /internal/me/locked-songs/batch`、解除は `DELETE /internal/me/locked-songs/:displayid` + query とする。DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
 
 DELETEの `is_ultima` queryは任意とし、未指定時は `false` として扱う。空文字や `true` / `false` 以外の値は `bad_request` とする。
 
@@ -364,6 +369,7 @@ DTOはAPI境界の責務として、Usecase入出力と分離する。
 | --- | --- | --- |
 | `GET /internal/users/:username/locked-songs` | 200 | 一覧JSON |
 | `POST /internal/me/locked-songs` | 204 | なし |
+| `POST /internal/me/locked-songs/batch` | 204 | なし |
 | `DELETE /internal/me/locked-songs/:displayid?is_ultima=false` | 204 | なし |
 
 登録・解除は冪等操作のため、既に登録済みの曲を登録しても204、未登録の曲を解除しても204を返す。
