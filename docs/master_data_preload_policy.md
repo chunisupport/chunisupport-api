@@ -40,7 +40,7 @@
 
 | テーブル | 説明 |
 | --- | --- |
-| `rating_bands` | レーティング帯マスタ（ID 0〜28 の29件。ALL含む固定値）。起動時にメモリへ読み込まれます。 |
+| `rating_bands` | レーティング帯マスタ（ID 0〜29 の30件。ALL含む固定値）。起動時にメモリへ読み込まれます。 |
 | `chart_stats_by_rating_band` | 譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `chart_best_slot_stats_by_rating_band` | 通常譜面×レーティング帯別のベスト枠採用統計。定期バッチで更新されます。 |
