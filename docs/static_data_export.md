@@ -1,15 +1,15 @@
-# 楽曲スナップショットのオブジェクトストレージエクスポート
+# 静的データのオブジェクトストレージエクスポート
 
-外部利用者向けの楽曲・譜面一覧JSONをS3互換オブジェクトストレージへ保存するワンショットバッチです。
+外部利用者向けの静的JSONをS3互換オブジェクトストレージへ保存するワンショットバッチです。現在は楽曲・譜面一覧を出力します。
 スケジュール機能はAPIプロセスに持たせず、systemd timerやcronなどから6時間ごとに起動します。
 
 ## 実行コマンド
 
 ```shell
-go run ./cmd/export-song-snapshots
+go run ./cmd/export-static-data
 ```
 
-本番環境では通常、ビルド済みの `export-song-snapshots` バイナリを実行します。
+本番環境では通常、ビルド済みの `export-static-data` バイナリを実行します。
 同時に複数起動された場合はMySQLのAdvisory Lockにより、先にロックを取得した1プロセスだけがエクスポートします。
 
 ## オブジェクトストレージ接続設定
@@ -26,11 +26,11 @@ go run ./cmd/export-song-snapshots
 | `OBJECT_STORAGE_BUCKET_NAME` | 公開用オブジェクトを保存する既存バケット名 | `chunisupport-public` |
 | `CLOUDFLARE_API_TOKEN` | 対象Zoneの`Cache Purge`権限だけを持つAPIトークン | `...` |
 | `CLOUDFLARE_ZONE_ID` | 公開カスタムドメインが属するCloudflare Zone ID | 下表参照 |
-| `SONG_SNAPSHOT_PUBLIC_BASE_URL` | オブジェクトを配信するHTTPSカスタムドメイン。パスは指定しない | 下表参照 |
+| `STATIC_DATA_PUBLIC_BASE_URL` | オブジェクトを配信するHTTPSカスタムドメイン。パスは指定しない | 下表参照 |
 
 環境ごとの公開先は次のとおりです。開発とステージングは同じ公開先を使用します。
 
-| 環境 | `CLOUDFLARE_ZONE_ID` | `SONG_SNAPSHOT_PUBLIC_BASE_URL` |
+| 環境 | `CLOUDFLARE_ZONE_ID` | `STATIC_DATA_PUBLIC_BASE_URL` |
 | --- | --- | --- |
 | 開発・ステージング | `575f883bc4eb7c2d89c56ee987c73873` | `https://static.chunisup-dev.f5.si` |
 | beta | `6ef634111241a2dc524992ed7cfcf20f` | `https://static.beta-chunisup.f5.si` |

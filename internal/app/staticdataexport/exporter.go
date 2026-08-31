@@ -1,4 +1,4 @@
-package songexport
+package staticdataexport
 
 import (
 	"context"
@@ -40,7 +40,7 @@ type Result struct {
 	ReiwaRecordCount   int
 }
 
-// Exporter は公開用の楽曲一覧JSONを生成してオブジェクトストレージへ保存します。
+// Exporter は公開用の静的JSONを生成してオブジェクトストレージへ保存します。
 type Exporter struct {
 	songs                 songSource
 	worldsendSongs        worldsendSource
@@ -52,7 +52,7 @@ type Exporter struct {
 	cachePurger           CachePurger
 }
 
-// NewExporter は楽曲スナップショットのエクスポーターを生成します。
+// NewExporter は静的データのエクスポーターを生成します。
 func NewExporter(
 	songs songSource,
 	worldsendSongs worldsendSource,
@@ -141,7 +141,7 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 		info.ReiwaSongSnapshotObjectKey,
 	}
 	if err := e.cachePurger.Purge(ctx, objectKeys); err != nil {
-		return Result{}, fmt.Errorf("failed to purge song snapshot cache: %w", err)
+		return Result{}, fmt.Errorf("failed to purge static data cache: %w", err)
 	}
 
 	return Result{

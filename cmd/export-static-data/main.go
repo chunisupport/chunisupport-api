@@ -10,7 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
-	"github.com/chunisupport/chunisupport-api/internal/app/songexport"
+	"github.com/chunisupport/chunisupport-api/internal/app/staticdataexport"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -69,13 +69,13 @@ func run() int {
 	}
 	defer database.Close()
 
-	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.SongSnapshotExportBatchLockName)
+	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.StaticDataExportBatchLockName)
 	if err != nil {
 		slog.Error("バッチロックの取得に失敗しました", "error", err)
 		return 1
 	}
 	if !acquired {
-		slog.Error("別の楽曲スナップショットエクスポートが実行中のため開始できません")
+		slog.Error("別の静的データエクスポートが実行中のため開始できません")
 		return 1
 	}
 	defer func() {
@@ -104,7 +104,7 @@ func run() int {
 		transactionManager,
 		database,
 	)
-	exporter := songexport.NewExporter(
+	exporter := staticdataexport.NewExporter(
 		songUsecase,
 		worldsendUsecase,
 		masterCache.GenreNamesByID,
@@ -124,11 +124,11 @@ func run() int {
 	startedAt := time.Now()
 	result, err := exporter.Export(ctx)
 	if err != nil {
-		slog.Error("楽曲スナップショットのエクスポートに失敗しました", "error", err, "duration", time.Since(startedAt))
+		slog.Error("静的データのエクスポートに失敗しました", "error", err, "duration", time.Since(startedAt))
 		return 1
 	}
 	slog.Info(
-		"楽曲スナップショットのエクスポートが完了しました",
+		"静的データのエクスポートが完了しました",
 		"songs", result.SongCount,
 		"worldsend_songs", result.WorldsendSongCount,
 		"chunirec_songs", result.ChunirecSongCount,

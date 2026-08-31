@@ -104,7 +104,7 @@ cmd/
 │   └── main.go
 ├── recalculate-player-data/ # プレイヤーデータ再計算バッチ
 │   └── main.go
-└── export-song-snapshots/ # 楽曲スナップショット出力バッチ
+└── export-static-data/ # 静的データ出力バッチ
     └── main.go
 internal/         # 共通のドメインロジック・ユースケース・インフラ
 └── ...
@@ -117,7 +117,7 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 |---|---|---|
 | APIサーバー | `go build -o _chunisupport-api ./cmd/api` | `go run ./cmd/api` |
 | プレイヤーデータ再計算バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-recalculate-player-data-linux-amd64 ./cmd/recalculate-player-data` | `go run ./cmd/recalculate-player-data` |
-| 楽曲スナップショット出力バッチ | `go build -o _chunisupport-export-song-snapshots ./cmd/export-song-snapshots` | `go run ./cmd/export-song-snapshots` |
+| 静的データ出力バッチ | `go build -o _chunisupport-export-static-data ./cmd/export-static-data` | `go run ./cmd/export-static-data` |
 
 ## プレイヤーデータ再計算バッチ
 

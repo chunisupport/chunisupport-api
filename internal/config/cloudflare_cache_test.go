@@ -10,7 +10,7 @@ import (
 func TestLoadCloudflareCacheConfigFromEnv(t *testing.T) {
 	t.Setenv("CLOUDFLARE_API_TOKEN", "token")
 	t.Setenv("CLOUDFLARE_ZONE_ID", "575f883bc4eb7c2d89c56ee987c73873")
-	t.Setenv("SONG_SNAPSHOT_PUBLIC_BASE_URL", " https://static.chunisup-dev.f5.si/ ")
+	t.Setenv("STATIC_DATA_PUBLIC_BASE_URL", " https://static.chunisup-dev.f5.si/ ")
 
 	got, err := LoadCloudflareCacheConfigFromEnv()
 
@@ -37,7 +37,7 @@ func TestLoadCloudflareCacheConfigFromEnv_環境ごとの公開先を許可す�
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("CLOUDFLARE_API_TOKEN", "token")
 			t.Setenv("CLOUDFLARE_ZONE_ID", tt.zoneID)
-			t.Setenv("SONG_SNAPSHOT_PUBLIC_BASE_URL", tt.baseURL)
+			t.Setenv("STATIC_DATA_PUBLIC_BASE_URL", tt.baseURL)
 
 			got, err := LoadCloudflareCacheConfigFromEnv()
 
@@ -67,7 +67,7 @@ func TestLoadCloudflareCacheConfigFromEnv_不正な設定を拒否する(t *test
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("CLOUDFLARE_API_TOKEN", tt.token)
 			t.Setenv("CLOUDFLARE_ZONE_ID", tt.zoneID)
-			t.Setenv("SONG_SNAPSHOT_PUBLIC_BASE_URL", tt.baseURL)
+			t.Setenv("STATIC_DATA_PUBLIC_BASE_URL", tt.baseURL)
 
 			_, err := LoadCloudflareCacheConfigFromEnv()
 

@@ -1,4 +1,4 @@
-package songexport
+package staticdataexport
 
 import (
 	"context"
@@ -333,6 +333,6 @@ func TestExporterExport_キャッシュパージ失敗を返す(t *testing.T) {
 
 	// Then
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to purge song snapshot cache")
+	assert.Contains(t, err.Error(), "failed to purge static data cache")
 	assert.Len(t, cachePurger.objectKeys, 4)
 }
