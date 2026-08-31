@@ -16,6 +16,7 @@ func TestNewTemporaryPlayerData(t *testing.T) {
 	data, err := NewTemporaryPlayerData("token", "192.0.2.1", payload, "hash", createdAt, expiresAt)
 
 	require.NoError(t, err)
+	require.NotNil(t, data)
 	assert.Equal(t, "token", data.Token)
 	assert.Equal(t, "192.0.2.1", data.IPAddress)
 	assert.Equal(t, []byte("payload"), data.Payload)

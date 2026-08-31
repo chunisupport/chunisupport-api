@@ -21,10 +21,10 @@ func TestEscapeLike(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// When
+			// 実行
 			actual := EscapeLike(tt.value)
 
-			// Then
+			// 検証
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
