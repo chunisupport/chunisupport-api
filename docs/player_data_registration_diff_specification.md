@@ -120,7 +120,7 @@
 
 ## 5. 集計差分 (`statistics`)
 
-`statistics` は保存済みの通常譜面全件を登録前後に集計した結果である。WORLD'S ENDは含めない。`overall` は全難易度の合計、`by_difficulty` は難易度別の集計を返す。
+`statistics.overall` は保存済みの通常譜面全件を登録前後に集計した結果である。WORLD'S ENDは `overall` に含めない。`by_difficulty` は通常難易度別および WORLD'S END（キー `WE`）の集計を返す。
 
 ```json
 {
@@ -145,12 +145,13 @@
     "ADVANCED": {},
     "EXPERT": {},
     "MASTER": {},
-    "ULTIMA": {}
+    "ULTIMA": {},
+    "WE": {}
   }
 }
 ```
 
-`by_difficulty` はレコードの有無にかかわらず、`BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA` の5キーを必ず返す。各集計値は `before`、`after`、`delta` を持ち、`delta = after - before` で計算する。登録によって達成状態が下がった場合、`delta` は負数になる。
+`by_difficulty` はレコードの有無にかかわらず、`BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA`、`WE` の6キーを必ず返す。`WE` は WORLD'S END を表し、`overall` には含まれない。各集計値は `before`、`after`、`delta` を持ち、`delta = after - before` で計算する。登録によって達成状態が下がった場合、`delta` は負数になる。
 
 ### 5.1 集計項目
 
@@ -181,7 +182,10 @@
   "worldsend_records_skipped": 1,
   "honors_skipped": 0,
   "standard_records_actually_changed": 12,
-  "worldsend_records_actually_changed": 3
+  "worldsend_records_actually_changed": 3,
+  "course_records_upserted": 8,
+  "course_records_skipped": 0,
+  "course_records_actually_changed": 1
 }
 ```
 
@@ -194,6 +198,9 @@
 | `honors_skipped` | 保存対象外になった称号の件数 |
 | `standard_records_actually_changed` | 重複正規化後の通常譜面で `new` または `updated` と判定された全件数 |
 | `worldsend_records_actually_changed` | 重複正規化後のWORLD'S ENDで `new` または `updated` と判定された全件数 |
+| `course_records_upserted` | `scores.course` で処理を開始した要素数。名称にかかわらず、後続処理でスキップされた要素も含む |
+| `course_records_skipped` | コースでマスタ解決、スコア範囲、ランプ解決のいずれかに失敗して保存対象外になった件数 |
+| `course_records_actually_changed` | 重複正規化後のコースで `new` または `updated` と判定された全件数 |
 
 `*_actually_changed` は100件制限前の件数であるため、`changes` の要素数と一致しない場合がある。また、`*_upserted` は入力要素ごとに加算してから検証するため、スキップや同一譜面の重複がある場合は、実際にDBへ渡すupsert行数より大きくなる。
 

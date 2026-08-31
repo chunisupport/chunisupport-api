@@ -113,19 +113,20 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
 | OfficialOverpower | float64 | ✓ | 公式オーバーパワー値 |
+| OfficialOverpowerPercent | *float64 | - | 公式オーバーパワー割合 |
 | OverpowerPercent | *float64 | - | オーバーパワー割合（%） |
 | DataCollectedAt | *time.Time | - | CHUNITHM-NETからのデータ取得完了日時 |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
-| Users | *User | - | 紐づくユーザー（関連エンティティ） |
-
 #### 振る舞い（メソッド）
 
-現在、クエリメソッドのみ。将来的にレーティング再計算などのコマンドメソッドを追加予定。
+- **HasOfficialMetricsChanged(rating, overpower, overpowerPercent float64) bool**: 公式RATING・公式OVER POWER・公式OP%の組が変化するかを判定する
+- **ChangeOfficialMetrics(...)**: 取得日時の単調性を守りつつ公式指標を更新し、必要なら更新前状態を履歴化する
+- **PendingMetricHistory() *PlayerMetricHistoryEntry**: 次回の集約保存で追記する公式指標履歴を返す
 
 #### 不変条件
 
-- `Name` は1文字以上20文字以内
+- `Name` は1文字以上全角8文字以内（半角英数字・半角カタカナ不可）
 - `Level` は0以上
 - `OfficialRating`, `CalculatedRating` は0.0以上
 - `OverpowerPercent` は0.0～100.0の範囲
@@ -212,8 +213,9 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | フィールド名 | 型 | 必須 | 説明 |
 |------------|-----|-----|------|
 | ID | int | ✓ | 楽曲ID（主キー） |
-| DisplayID | string | ✓ | 表示用ID（例: "song001"） |
+| DisplayID | string | ✓ | 表示用ID（小文字16進16文字） |
 | Title | string | ✓ | 楽曲タイトル |
+| Reading | *string | - | 読み |
 | Artist | string | ✓ | アーティスト名 |
 | GenreID | *int | - | ジャンルID |
 | BPM | *int | - | BPM（テンポ） |
@@ -223,8 +225,11 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | Charts | []*Chart | - | この楽曲に紐づく譜面リスト |
 | MaxChartConst | float64 | - | 全譜面のうち最大の譜面定数（ドメインサービスで算出） |
 | IsMaxOPUnknown | bool | ✓ | MASTER/ULTIMAに未判明定数が含まれる場合true（ドメインサービスで算出） |
+| OpTargetDifficultyID | int | ✓ | OP対象難易度ID |
 | IsWorldsend | bool | ✓ | WORLD'S END楽曲フラグ |
+| IsNew | bool | ✓ | 新曲枠対象フラグ |
 | IsDeleted | bool | ✓ | 削除フラグ |
+| UpdatedAt | *time.Time | - | 最終更新日時 |
 
 #### 振る舞い（メソッド）
 
@@ -267,10 +272,12 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | Const | chartconstant.ChartConstant | ✓ | 譜面定数（値オブジェクト） |
 | IsConstUnknown | bool | ✓ | 譜面定数が未確定かどうか |
 | Notes | *notes.Notes | - | ノーツ数（値オブジェクト） |
+| NotesDesigner | *string | - | 譜面製作者名 |
+| UpdatedAt | *time.Time | - | 最終更新日時 |
 
 #### 振る舞い（メソッド）
 
-現在、振る舞いメソッドなし（データ保持のみ）。
+- **ChangeConstant(constant chartconstant.ChartConstant)**: 譜面定数を変更し、定数不明状態を解除する
 
 #### 不変条件
 
@@ -313,11 +320,11 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 
 - **AccountType**: アカウント種別（一般、管理者など）
 - **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）
-- **ClearLampType**: クリアランプ種別（FAILED, CLEAR, HARD, AB, AJなど）
-- **ComboLampType**: コンボランプ種別（NONE, FC, AJ）
-- **FullChainType**: フルチェーン種別（NONE, FULL CHAIN, FULL CHAIN PLATINUM）
+- **ClearLampType**: クリアランプ種別（FAILED, CLEAR, HARD, BRAVE, ABSOLUTE, CATASTROPHY）
+- **ComboLampType**: コンボランプ種別（NONE, FULL COMBO, ALL JUSTICE）
+- **FullChainType**: フルチェーン種別（NONE, FULL CHAIN GOLD, FULL CHAIN PLATINUM）
 - **Genre**: 楽曲ジャンル
-- **Slot**: レーティング枠種別（best, new, none）
+- **Slot**: レーティング枠種別（none, best, best_candidate, new, new_candidate）
 - **ClassEmblem**: クラスエンブレム（称号）
 - **ClassEmblemBase**: クラスエンブレムベース（称号の基礎デザイン）
 - **APIToken**: API認証トークン
@@ -660,7 +667,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 
 #### 制約
 
-- 形式: 英数字とハイフン（例: "song-001", "worldsend-xyz"）
+- 形式: 小文字16進16文字（`^[0-9a-f]{16}$`）
 - 空文字列は不可
 
 #### ファクトリメソッド
@@ -677,7 +684,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 
 ## ドメインサービス
 
-### domain/rating パッケージ
+### domain/service パッケージ
 
 #### 概要
 CHUNITHMのレーティングおよびオーバーパワー計算ロジックを提供するドメインサービス。
@@ -751,19 +758,12 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 **コンボランプ補正**:
 
-- `comboLampID == 2` (FULL COMBO): +0.5
-- `comboLampID == 3` (ALL JUSTICE): +1.0
-- `score == 1,010,000` (理論値): +1.25
+- AJC（スコア = 1,010,000）: +1.25（ALL JUSTICE ボーナスの代わり。同時加算しない）
+- ALL JUSTICE（AJC以外）: +1.0
+- FULL COMBO: +0.5
+- なし: +0
 
-**計算式**:
-
-| ランク | スコア範囲 | 計算式 |
-|-------|-----------|--------|
-| S以上 | 975,000～1,007,500 | レーティング値 × 5 + 補正1 |
-| SSS以上 | 1,007,501～ | (譜面定数 + 2) × 5 + 補正1 + 補正2 |
-| AJC | 1,010,000 | (譜面定数 + 3) × 5 |
-
-補正2 = (スコア - 1,007,500) × 0.0015（最大3.75）
+詳細なランク別計算式は [OVER POWER計算](overpower_calculation.md) を参照してください。
 
 **精度**:
 - S以上: 0.005単位（小数点以下3桁目を切り捨て）

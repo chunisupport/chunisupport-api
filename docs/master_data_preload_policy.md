@@ -8,7 +8,6 @@
 | `genres` | 7件のみの楽曲ジャンルマスタで固定値。表示順は `sort_order` で管理する。 |
 | `difficulties` | 5件のみの難易度マスタで固定値。 |
 | `class_emblems` / `class_emblem_bases` | クラスエンブレム種別で件数少、定義済みマスタ。 |
-| `course_classes` | 7種類で固定されたコースクラス。 |
 | `clear_lamp_types` / `combo_lamp_types` | クリア・コンボランプ種別で件数少、定義済みマスタ。 |
 | `slots` | 称号スロット種別、5件の固定マスタ。 |
 | `full_chain_types` | フルチェインランプ種別、3件の固定マスタ。 |
@@ -24,6 +23,7 @@
 | `songs` | 楽曲の基本情報。件数が多く、検索・絞り込みが必要なためオンデマンドで取得。 |
 | `charts` | 譜面情報。楽曲ごとに複数行がありデータ量が大きいため除外。 |
 | `worldsend_charts` | WORLD'S END譜面情報。件数は多く、曲データと同様に除外。 |
+| `course_classes` | 7種類の固定マスタだが、コースリポジトリが都度参照する。 |
 | `courses` | `song_batch`の直接DB更新を再起動なしで反映するため、必要なidxだけを随時参照する。 |
 | `users` / `players` / `player_honors` | ユーザーやプレイヤープロフィールの動的データで更新が入るためキャッシュしない。 |
 | `api_tokens` | 認証系の動的データで更新が入るため除外。 |
@@ -40,7 +40,7 @@
 
 | テーブル | 説明 |
 | --- | --- |
-| `rating_bands` | レーティング帯マスタ（28件の固定値）。起動時にメモリへ読み込まれます。 |
+| `rating_bands` | レーティング帯マスタ（ID 0〜28 の29件。ALL含む固定値）。起動時にメモリへ読み込まれます。 |
 | `chart_stats_by_rating_band` | 譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `chart_best_slot_stats_by_rating_band` | 通常譜面×レーティング帯別のベスト枠採用統計。定期バッチで更新されます。 |

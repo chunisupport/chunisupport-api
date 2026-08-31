@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-07-26
+最終更新: 2026-08-31
 
 ## 更新ルール
 
@@ -33,16 +33,17 @@
 | `invalid_genre_id` | ジャンルID不正 |
 | `invalid_difficulty_id` | 難易度ID不正 |
 | `invalid_difficulty` | 難易度指定不正 |
+| `duplicate_official_idx` | 公式インデックス重複 |
 | `score_history_not_found` | 指定譜面の現行スコア履歴が存在しない |
 | `score_history_unsupported_difficulty` | スコア履歴対象外のBASIC / ADVANCEDを指定 |
 | `player_metric_history_not_found` | プレイヤー未連携などにより公式RATING・公式OVER POWER・公式OP%履歴が存在しない |
-| data_transfer_player_not_found | 移行元にプレイヤーデータが存在しない |
-| data_transfer_invalid_file | 移行ファイルのJSON、Base64URL、gzip、必須項目が不正 |
-| data_transfer_invalid_signature | 移行ファイルのHMAC署名が一致しない |
-| data_transfer_unsupported_schema | 移行ファイル形式またはスキーマバージョンが未対応 |
-| data_transfer_invalid_data | 移行データの値域、件数、重複、順序が不正 |
-| data_transfer_unresolved_reference | 移行先マスターへ参照を解決できない |
-| data_transfer_destination_not_empty | 移行先アカウントに移行対象データが存在する |
+| `data_transfer_player_not_found` | 移行元にプレイヤーデータが存在しない |
+| `data_transfer_invalid_file` | 移行ファイルのJSON、Base64URL、gzip、必須項目が不正 |
+| `data_transfer_invalid_signature` | 移行ファイルのHMAC署名が一致しない |
+| `data_transfer_unsupported_schema` | 移行ファイル形式またはスキーマバージョンが未対応 |
+| `data_transfer_invalid_data` | 移行データの値域、件数、重複、順序が不正 |
+| `data_transfer_unresolved_reference` | 移行先マスターへ参照を解決できない |
+| `data_transfer_destination_not_empty` | 移行先アカウントに移行対象データが存在する |
 | `validation_failed` | バリデーション失敗 |
 | `resource_not_found` | リソース未検出 |
 | `conflict` | 競合 |
@@ -76,6 +77,13 @@
 | `goal_group_conflict` | 目標グループ名重複 |
 | `goal_group_invalid_order` | 目標グループ並び順不正 |
 | `favorite_song_limit_exceeded` | お気に入り楽曲上限超過（最大100件） |
+| `record_filter_not_found` | 保存済みレコードフィルタ未検出 |
+| `record_filter_limit_exceeded` | 保存済みレコードフィルタ上限超過 |
+| `invalid_record_filter_input` | 保存済みレコードフィルタ入力不正 |
+| `invalid_record_filter_id` | 保存済みレコードフィルタID不正 |
+| `friendship_limit_exceeded` | フレンド枠の上限超過 |
+| `friendship_conflict` | 既に申請中またはフレンド成立済み |
+| `friend_request_not_found` | 対象のフレンド申請が見つからない |
 
 `maintenance_mode` は、互換API以外でメンテナンスゲートまたはログイン時のロール制御が利用を遮断した場合にHTTP 503で返します。レスポンス本文にはメンテナンスコメントを含めません。状態とコメントは `GET /internal/system/status` から取得してください。`/compat/chunirec/2.0` と `/compat/reiwa/1` は既存の互換形式を維持するため、本文のコードは数値の `503` になります。
 
@@ -85,9 +93,12 @@
 
 | reason | 発生条件 |
 | --- | --- |
-| `count_over_dynamic_max` | `count` が属性絞り込み後の譜面数上限を超過 |
+| `count_over_dynamic_max` | `count` が属性絞り込み後の譜面数（`rainbow_count` は楽曲数）上限を超過 |
+| `remaining_over_dynamic_max` | `remaining` が属性絞り込み後の譜面数（`rainbow_count` は楽曲数）上限を超過 |
 | `total_score_over_dynamic_max` | `total_score.total` が理論上限超過 |
+| `total_score_remaining_over_dynamic_max` | `total_score.remaining` が理論上限超過 |
 | `overpower_value_over_dynamic_max` | `overpower_value.total` が理論上限超過 |
+| `overpower_value_remaining_over_dynamic_max` | `overpower_value.remaining` が理論上限超過 |
 
 ### 退会処理の認証監視ログ（`slog`）
 
@@ -111,4 +122,5 @@
 | `failed to resolve full_chain` | フルチェイン解決失敗 |
 | `failed to resolve slot` | スロット解決失敗 |
 | `failed to resolve worldsend chart` | WORLD'S END譜面解決失敗 |
+| `failed to resolve course` | コース解決失敗 |
 | `score out of range: {score}` | WORLD'S ENDスコア範囲外 |

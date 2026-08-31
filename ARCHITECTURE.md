@@ -15,7 +15,9 @@ internal/
 ├── app/         # アプリケーション層: ルーティング、ミドルウェア、DIコンテナ
 ├── config/      # 設定情報の読み込み
 ├── domain/      # ドメインモデルとリポジトリインターフェース
+│   ├── constants/ # ドメイン定数
 │   ├── entity/  # エンティティ（純粋なドメインモデル、db/jsonタグなし）
+│   ├── masterdata/ # マスタデータ型
 │   ├── vo/      # 値オブジェクト
 │   ├── service/  # レーティング計算ドメインサービス
 │   └── repository/ # リポジトリインターフェース
@@ -23,6 +25,7 @@ internal/
 ├── info/        # アプリケーションの基本情報
 ├── infra/       # インフラストラクチャ層
 │   ├── db/      # データベース接続管理
+│   ├── firebaseauth/ # Firebase IDトークン検証
 │   ├── models/  # データベース永続化用モデル（db/jsonタグあり）
 │   ├── repository/ # リポジトリ実装
 │   ├── logger/  # ロギング実装
@@ -151,4 +154,3 @@ repo.Save(ctx, user)
 
 - [docs/domain_model_specification.md](docs/domain_model_specification.md): エンティティ、値オブジェクト、ドメインサービスの詳細仕様
 - [docs/API.md](docs/API.md): APIエンドポイント仕様
-- [_report/refactoring_instructions.md](_report/refactoring_instructions.md): リファクタリング履歴と未対応項目
