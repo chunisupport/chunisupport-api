@@ -29,6 +29,7 @@ const (
 	APITokenPrefixLength                        = 5
 	APITokenLastUsedUpdateInterval              = time.Hour
 	MaxScoreHistoryEntriesPerChart              = constants.MaxScoreHistoryEntriesPerChart
+	MaxMetricHistoryEntriesPerPlayer            = constants.MaxMetricHistoryEntriesPerPlayer
 	MaxOfficialRating                           = constants.MaxOfficialRating
 	MaxOfficialOverpower                        = constants.MaxOfficialOverpower
 	MaxOfficialOverpowerPercent                 = constants.MaxOfficialOverpowerPercent
