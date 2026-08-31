@@ -181,6 +181,57 @@ func TestRegisterRoutes_ユーザー集計はADMINだけが取得できる(t *te
 	}
 }
 
+func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t *testing.T) {
+	roles := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{name: "ADMINは取得できる", token: "admin-token", wantStatus: http.StatusOK},
+		{name: "EDITORは拒否される", token: "editor-token", wantStatus: http.StatusForbidden},
+		{name: "PLAYERは拒否される", token: "player-token", wantStatus: http.StatusForbidden},
+	}
+	paths := []struct {
+		name string
+		path string
+	}{
+		{name: "通常譜面", path: "/internal/admin/chart-rankings/songs/0000000000000001/charts/MASTER"},
+		{name: "WORLD'S END", path: "/internal/admin/chart-rankings/worldsend-songs/0000000000000002"},
+	}
+
+	for _, path := range paths {
+		for _, role := range roles {
+			t.Run(path.name+"/"+role.name, func(t *testing.T) {
+				// Given
+				handlers := newAuthorizationTestHandlers()
+				handlers.AdminChartRanking = internalhandler.NewAdminChartRankingHandler(stubAdminChartRankingUsecase{})
+				e := echo.New()
+				e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+				registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+				req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path.path, nil)
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+role.token)
+				rec := httptest.NewRecorder()
+
+				// When
+				e.ServeHTTP(rec, req)
+
+				// Then
+				assert.Equal(t, role.wantStatus, rec.Code)
+			})
+		}
+	}
+}
+
+type stubAdminChartRankingUsecase struct{}
+
+func (stubAdminChartRankingUsecase) GetStandard(context.Context, string, string) (*usecase.AdminChartRankingResult, error) {
+	return &usecase.AdminChartRankingResult{}, nil
+}
+
+func (stubAdminChartRankingUsecase) GetWorldsend(context.Context, string) (*usecase.AdminChartRankingResult, error) {
+	return &usecase.AdminChartRankingResult{}, nil
+}
+
 func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを要求する(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -682,6 +733,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		User:                new(internalhandler.UserHandler),
 		AdminUser:           new(internalhandler.AdminUserHandler),
 		AdminUserStatistics: new(internalhandler.AdminUserStatisticsHandler),
+		AdminChartRanking:   new(internalhandler.AdminChartRankingHandler),
 		Song:                new(internalhandler.SongHandler),
 		BestSlotStats:       new(internalhandler.BestSlotStatsHandler),
 		Honor:               new(internalhandler.HonorHandler),

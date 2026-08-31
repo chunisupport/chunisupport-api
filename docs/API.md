@@ -189,6 +189,8 @@ Content-Type: application/json
 | `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
 | `/internal/admin/user-stats` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けユーザー集計取得 |
+| `/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
+| `/internal/admin/chart-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
@@ -450,6 +452,83 @@ Content-Type: application/json
 | `total_users` | integer | 全ユーザー数 |
 | `users_with_player_data` | integer | プレイヤーデータが紐付けられているユーザー数 |
 | `active_player_data_last_30_days` | integer | `players.data_collected_at` が取得時点から30日前以降のプレイヤーデータ数（境界日時を含む） |
+
+### GET `/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty`
+
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: 通常譜面1つについて、対象譜面をプレイ済みの全ユーザーから現在スコア上位100件を返します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | 楽曲の16桁表示用ID |
+| `difficulty` | string | 難易度（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`。短縮形は既存のパス難易度変換に従う） |
+
+- **ソート・順位**:
+  - `score` 降順
+  - 同点内の表示順は `updated_at` 降順、`username` 昇順
+  - 同点は同順位とし、次順位は件数分進めます（例: `1, 1, 3`）
+  - 最大100レコードを返し、100件目と同点のレコードが後続しても101件目以降は返しません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "song": {
+    "id": "0000000000000001",
+    "title": "楽曲名",
+    "artist": "アーティスト名"
+  },
+  "chart": {
+    "difficulty": "MASTER",
+    "const": 14.5,
+    "is_const_unknown": false,
+    "is_worldsend": false
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "username": "rankinguser",
+      "player_name": "PLAYER",
+      "score": 1010000,
+      "rating": 16.9,
+      "overpower": 89.1,
+      "overpower_percent": 100.0,
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "ALL JUSTICE",
+      "full_chain": null,
+      "updated_at": "2026-08-31T12:00:00Z"
+    }
+  ],
+  "total": 234
+}
+```
+
+`total` は上位100件への制限前の全プレイ人数です。`combo_lamp` と `full_chain` はマスタ値が `NONE` の場合 `null` です。
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_difficulty`): 難易度が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN以外によるアクセス
+  - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
+
+### GET `/internal/admin/chart-rankings/worldsend-songs/:displayid`
+
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: WORLD'S END譜面1つについて、対象譜面をプレイ済みの全ユーザーから現在スコア上位100件を返します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `displayid` | string | WORLD'S END楽曲の16桁表示用ID |
+
+ソート、順位、100件制限、`total` の定義は通常譜面と同じです。WORLD'S END はレーティング・OVER POWER計算の対象外のため、`const` / `is_const_unknown` / `rating` / `overpower` / `overpower_percent` は返しません。`chart` には `level_star` と `attribute` を返します。
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN以外によるアクセス
+  - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
 
 ### GET `/internal/admin/build-info`
 - **認証**: Firebase Bearer (ADMIN)
