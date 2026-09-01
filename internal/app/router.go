@@ -174,7 +174,11 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		return nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
 	}
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
-	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache)
+	usernamePolicy, err := service.NewForbiddenUsernamePolicy(cfg.UsernamePolicy.Exact, cfg.UsernamePolicy.Contains)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create username policy: %v", err))
+	}
+	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
 	if configurable, ok := userUsecase.(interface {
@@ -251,10 +255,6 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)
-	usernamePolicy, err := service.NewForbiddenUsernamePolicy(cfg.UsernamePolicy.Exact, cfg.UsernamePolicy.Contains)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create username policy: %v", err))
-	}
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	handlers := &Handlers{
@@ -415,6 +415,7 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/validate", handlers.DataTransfer.Validate, dataTransferRateLimit)
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
+		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,

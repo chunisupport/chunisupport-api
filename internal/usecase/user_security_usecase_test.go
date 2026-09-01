@@ -10,12 +10,131 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+func TestUserCredentialUsecase_UpdateUsername(t *testing.T) {
+	currentTime := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	uid := "firebase-uid"
+	policy, err := service.NewForbiddenUsernamePolicy(nil, []string{"admin"})
+	require.NoError(t, err)
+
+	t.Run("再認証後にユーザー名を変更できる", func(t *testing.T) {
+		// Given
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: uid, AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), FirebaseUID: &uid, AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		repo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(saved *entity.User) bool { return saved.Username.String() == "newname" })).Return(nil).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+
+		// When
+		got, err := uc.UpdateUsername(context.Background(), 1, "newname", reauthtoken.MustNew("reauth-token"))
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, "newname", got)
+		repo.AssertExpectations(t)
+		verifier.AssertExpectations(t)
+	})
+
+	t.Run("禁止語は永続化せず拒否する", func(t *testing.T) {
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: uid, AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), FirebaseUID: &uid, AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+		_, err := uc.UpdateUsername(context.Background(), 1, "adminuser", reauthtoken.MustNew("reauth-token"))
+		assert.ErrorIs(t, err, ErrUsernameChangeForbidden)
+		repo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("現在名が禁止語になっていても再認証後は冪等に成功する", func(t *testing.T) {
+		// Given
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: uid, AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("adminuser"), FirebaseUID: &uid, AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+
+		// When
+		got, err := uc.UpdateUsername(context.Background(), 1, "adminuser", reauthtoken.MustNew("reauth-token"))
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, "adminuser", got)
+		repo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+		repo.AssertExpectations(t)
+		verifier.AssertExpectations(t)
+	})
+
+	t.Run("UID不一致をユーザー名変更の認証失敗として記録する", func(t *testing.T) {
+		// Given
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "other-uid", AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), FirebaseUID: &uid, AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+		logBuffer := captureDefaultSlog(t)
+
+		// When
+		_, err := uc.UpdateUsername(context.Background(), 1, "newname", reauthtoken.MustNew("reauth-token"))
+
+		// Then
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+		assert.Contains(t, logBuffer.String(), "suspicious update_username authentication failure")
+		assert.Contains(t, logBuffer.String(), "update_username_reauth_uid_mismatch")
+		assert.NotContains(t, logBuffer.String(), "account deletion")
+	})
+
+	t.Run("Firebase UID未連携をユーザー名変更の認証失敗として記録する", func(t *testing.T) {
+		// Given
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: uid, AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+		logBuffer := captureDefaultSlog(t)
+
+		// When
+		_, err := uc.UpdateUsername(context.Background(), 1, "newname", reauthtoken.MustNew("reauth-token"))
+
+		// Then
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+		assert.Contains(t, logBuffer.String(), "suspicious update_username authentication failure")
+		assert.Contains(t, logBuffer.String(), "update_username_firebase_uid_not_linked")
+		assert.NotContains(t, logBuffer.String(), "account deletion")
+	})
+
+	t.Run("重複ユーザー名を競合エラーへ変換する", func(t *testing.T) {
+		repo := new(MockUserRepository)
+		verifier := new(mockRecentSignInVerifier)
+		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: uid, AuthTime: currentTime.Add(-time.Minute)}, nil).Once()
+		user := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), FirebaseUID: &uid, AccountTypeID: 1}
+		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		repo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(repository.ErrDuplicateUsername).Once()
+		uc := NewUserCredentialUsecaseWithUsernamePolicy(&MockExecutor{}, &mockTransactionManager{}, repo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, nil, newMockMasterCache(), policy)
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+		_, err := uc.UpdateUsername(context.Background(), 1, "takenname", reauthtoken.MustNew("reauth-token"))
+		assert.ErrorIs(t, err, ErrUsernameChangeConflict)
+	})
+}
 
 func TestUserSecurityUsecase_GetUser(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)

@@ -67,6 +67,12 @@ func (u *User) ChangePrivacy(isPrivate bool) {
 	u.UpdatedAt = time.Now().UTC()
 }
 
+// ChangeUsername は検証済みのユーザー名へ変更し、更新日時を更新します。
+func (u *User) ChangeUsername(userName username.UserName) {
+	u.Username = userName
+	u.UpdatedAt = time.Now().UTC()
+}
+
 // LinkFirebaseUID はユーザーに Firebase UID を紐付けます。
 func (u *User) LinkFirebaseUID(uid string) {
 	normalizedUID := strings.TrimSpace(uid)

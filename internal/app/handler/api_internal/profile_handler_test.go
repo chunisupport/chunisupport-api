@@ -91,6 +91,40 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 	})
 }
 
+func TestProfileHandler_UpdateUsername(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	h, userCredentialMock := newProfileHandlerWithMocks()
+	userCredentialMock.On("UpdateUsername", mock.Anything, 10, "newname", reauthtoken.MustNew("reauth-token")).Return("newname", nil).Once()
+	req := httptest.NewRequest(http.MethodPut, "/internal/me/username", bytes.NewBufferString(`{"username":"newname"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("X-Reauth-Token", "reauth-token")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 10})
+
+	// When
+	err := h.UpdateUsername(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"username":"newname"}`, rec.Body.String())
+	userCredentialMock.AssertExpectations(t)
+
+	t.Run("再認証トークンがなければユースケースを呼ばない", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/username", bytes.NewBufferString(`{"username":"newname"}`))
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 10})
+
+		err := h.UpdateUsername(c)
+
+		assert.ErrorIs(t, err, apierror.ErrRecentSignInRequired)
+		userCredentialMock.AssertNumberOfCalls(t, "UpdateUsername", 1)
+	})
+}
+
 func TestProfileHandler_DeleteAccount(t *testing.T) {
 	e := newTestEcho()
 

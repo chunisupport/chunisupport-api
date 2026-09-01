@@ -133,11 +133,13 @@ func TestRegister_同一取得日時の異なる本文は後続保存前に競�
 	playerDataRepo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: latestUpdate}
 	txExecutor := &sqlx.DB{}
 	tm := &passthroughTransactionManagerForPlayerDataIdentity{exec: txExecutor}
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	userRepo := new(MockUserRepository)
+	userRepo.On("FindByIDForUpdate", mock.Anything, txExecutor, 1).Return(user, nil).Once()
 	uc := &playerDataUsecase{
-		tm: tm, userRepo: new(MockUserRepository), playerRepo: playerRepo,
+		tm: tm, userRepo: userRepo, playerRepo: playerRepo,
 		playerDataRepo: playerDataRepo, masterCache: stubPlayerDataMasterProviderForIdentity{},
 	}
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
 	rating := 17.25
 	overpower := 12345.67
 	payload := &PlayerDataPayload{
@@ -158,10 +160,38 @@ func TestRegister_同一取得日時の異なる本文は後続保存前に競�
 	assert.Equal(t, 0, playerDataRepo.saveCalls)
 	assert.Equal(t, 0, playerDataRepo.latestUpdateSaveCalls)
 	assert.Same(t, err, tm.err)
+	userRepo.AssertExpectations(t)
 }
 
 func (s *stubPlayerRepositoryForPlayerData) DeleteByUserID(ctx context.Context, exec repository.Executor, userID int) error {
 	return nil
+}
+
+func TestPlayerDataUsecaseDelete_ロック後の最新ユーザーを保存する(t *testing.T) {
+	// Given
+	txExecutor := &sqlx.DB{}
+	tm := &passthroughTransactionManagerForPlayerDataIdentity{exec: txExecutor}
+	playerID := 10
+	staleUser := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), PlayerID: &playerID}
+	lockedUser := &entity.User{ID: 1, Username: username.MustNewUserName("newname"), PlayerID: &playerID}
+	userRepo := new(MockUserRepository)
+	userRepo.On("FindByIDForUpdate", mock.Anything, txExecutor, 1).Return(lockedUser, nil).Once()
+	userRepo.On("Save", mock.Anything, txExecutor, mock.MatchedBy(func(savedUser *entity.User) bool {
+		return savedUser.Username.String() == "newname" && !savedUser.HasLinkedPlayer()
+	})).Return(nil).Once()
+	uc := &playerDataUsecase{
+		tm:         tm,
+		userRepo:   userRepo,
+		playerRepo: &stubPlayerRepositoryForPlayerData{},
+	}
+
+	// When
+	err := uc.Delete(context.Background(), staleUser)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, "oldname", staleUser.Username.String())
+	userRepo.AssertExpectations(t)
 }
 
 func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値にしない(t *testing.T) {

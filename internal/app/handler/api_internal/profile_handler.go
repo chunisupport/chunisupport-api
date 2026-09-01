@@ -44,6 +44,32 @@ type updatePrivacyRequest struct {
 	IsPrivate bool `json:"is_private"`
 }
 
+type updateUsernameRequest struct {
+	Username string `json:"username"`
+}
+
+// UpdateUsername は再認証済みユーザーのユーザー名変更を処理します。
+func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	reauthToken, err := reauthtoken.New(c.Request().Header.Get(reauthTokenHeader))
+	if err != nil {
+		return apierror.ErrRecentSignInRequired
+	}
+	req := new(updateUsernameRequest)
+	if err := c.Bind(req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	updatedUsername, err := h.userCredentialUsecase.UpdateUsername(c.Request().Context(), user.ID, req.Username, reauthToken)
+	if err != nil {
+		slog.Error("Failed to update username", "user_id", user.ID, "error", err)
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]string{"username": updatedUsername})
+}
+
 // UpdatePrivacy は認証済みユーザーの非公開設定を更新するリクエストを処理します。
 func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
