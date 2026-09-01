@@ -304,8 +304,8 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 
 	// 更新。部分取得エンティティで取りこぼし得る不変項目は更新前提としてのみ扱います。
 	whereClause, whereArgs := userFirebaseUIDWhereClause(userModel.FirebaseUID)
-	query := "UPDATE users SET username = ?, player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND account_type_id = ? AND " + whereClause
-	args := []any{userModel.Username, userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, userModel.AccountTypeID}
+	query := "UPDATE users SET username = ?, player_id = ?, is_suspicious = ?, is_private = ?, updated_at = ? WHERE id = ? AND username = ? AND account_type_id = ? AND " + whereClause
+	args := []any{userModel.Username, userModel.PlayerID, userModel.IsSuspicious, userModel.IsPrivate, userModel.UpdatedAt, userModel.ID, user.PersistedUsername().String(), userModel.AccountTypeID}
 	args = append(args, whereArgs...)
 
 	result, err := exec.ExecContext(ctx, query, args...)
@@ -313,7 +313,12 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 		return wrapUsernameDuplicateError(err)
 	}
 
-	return r.validateSingleUserUpdate(ctx, exec, userModel.ID, result)
+	if err := r.validateSingleUserUpdate(ctx, exec, userModel.ID, result); err != nil {
+		return err
+	}
+
+	user.MarkUsernameAsPersisted()
+	return nil
 }
 
 // DeleteByID はユーザーを物理削除します。

@@ -9,6 +9,7 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,6 +88,41 @@ func TestUserRepositorySaveUpdatesMutableFieldsWhenFirebaseUIDMatches(t *testing
 	assert.Equal(t, existingUID, *saved.FirebaseUID)
 	assert.True(t, saved.IsPrivate)
 	assert.True(t, saved.IsSuspicious)
+}
+
+func TestUserRepositorySaveReturnsConflictWhenUsernameChangedAfterLoad(t *testing.T) {
+	// Given
+	db := setupUserRepositoryTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', NULL, 1, 0, 0)
+	`)
+	require.NoError(t, err)
+
+	user, err := (&models.UserModel{
+		ID:            1,
+		Username:      "user01",
+		AccountTypeID: 1,
+	}).ToEntity()
+	require.NoError(t, err)
+
+	_, err = db.Exec(`UPDATE users SET username = ? WHERE id = ?`, "latestuser", 1)
+	require.NoError(t, err)
+	user.ChangeUsername(username.MustNewUserName("newuser"))
+
+	// When
+	err = (&userRepository{db: db}).Save(ctx, db, user)
+
+	// Then
+	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
+
+	var savedUsername string
+	err = db.Get(&savedUsername, `SELECT username FROM users WHERE id = ?`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "latestuser", savedUsername)
 }
 
 func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) {
