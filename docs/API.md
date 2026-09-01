@@ -765,6 +765,33 @@ Content-Type: application/json
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
 
+### PUT `/internal/me/username`
+- **認証**: Firebase Bearer 必須
+- **必須ヘッダ**: `X-Reauth-Token: <再認証直後の Firebase ID トークン>`
+- **リクエストボディ**:
+
+```json
+{"username": "newusername"}
+```
+
+ユーザー名は5〜50文字の小文字英数字で、登録時と同じ禁止語設定が適用されます。変更前と同じ名前の指定は冪等に成功します。変更前の名前は直ちに無効・解放されます。
+
+- **レスポンス**: 200 OK
+
+```json
+{"username": "newusername"}
+```
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): ユーザー名の形式不正
+  - 422 Unprocessable Entity (`username_forbidden`): 禁止語に該当
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 通常認証が必要
+  - 401 Unauthorized (`recent_sign_in_required`): 再認証トークン未指定・不正・期限切れ
+  - 401 Unauthorized (`invalid_credentials`): 再認証UIDと連携済みFirebase UIDが一致しない
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない
+  - 409 Conflict (`username_taken`): ユーザー名が使用済み
+
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
 - **必須ヘッダ**: `X-Reauth-Token: <再認証直後の Firebase ID トークン>`

@@ -360,6 +360,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	registeredSPHonors := make([]registeredSPHonor, 0, 1)
 
 	err = us.tm.Transactional(ctx, func(tx repository.Executor) error {
+		lockedUser, lockErr := us.userRepo.FindByIDForUpdate(ctx, tx, user.ID)
+		if lockErr != nil {
+			return fmt.Errorf("failed to lock user before player data registration: %w", lockErr)
+		}
+
 		masters, loadErr := us.loadMasterData(ctx, payload)
 		if loadErr != nil {
 			return loadErr
@@ -372,7 +377,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.ClassEmblemID = classID
 		summaryInput.ClassBaseID = baseID
 
-		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, lockedUser, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -411,7 +416,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.OverpowerValue = overpowerSummary.Value
 		summaryInput.OverpowerPercent = overpowerSummary.Percent
 
-		playerID, _, ensureErr = us.ensurePlayer(ctx, tx, user, summaryInput, updatedAt)
+		playerID, _, ensureErr = us.ensurePlayer(ctx, tx, lockedUser, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -1895,16 +1900,21 @@ func (us *playerDataUsecase) Delete(ctx context.Context, user *entity.User) erro
 	}
 
 	return us.tm.Transactional(ctx, func(tx repository.Executor) error {
+		lockedUser, err := us.userRepo.FindByIDForUpdate(ctx, tx, user.ID)
+		if err != nil {
+			return fmt.Errorf("failed to lock user before deleting player data: %w", err)
+		}
+
 		if err := us.playerRepo.DeleteByUserID(ctx, tx, user.ID); err != nil {
 			return fmt.Errorf("failed to delete player data: %w", err)
 		}
 
-		if !user.HasLinkedPlayer() {
+		if !lockedUser.HasLinkedPlayer() {
 			return nil
 		}
 
-		user.UnlinkPlayer()
-		if err := us.userRepo.Save(ctx, tx, user); err != nil {
+		lockedUser.UnlinkPlayer()
+		if err := us.userRepo.Save(ctx, tx, lockedUser); err != nil {
 			return fmt.Errorf("failed to unlink player from user: %w", err)
 		}
 

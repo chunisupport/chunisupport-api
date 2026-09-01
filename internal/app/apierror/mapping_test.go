@@ -79,6 +79,25 @@ func TestFromUsecaseError_禁止ユーザー名は登録失敗に丸める(t *te
 	assert.Equal(t, http.StatusBadRequest, got.HTTPStatus)
 }
 
+func TestFromUsecaseError_ユーザー名変更エラーを専用レスポンスへ変換する(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		code       string
+		httpStatus int
+	}{
+		{name: "禁止語", err: usecase.ErrUsernameChangeForbidden, code: CodeUsernameForbidden, httpStatus: 422},
+		{name: "使用済み", err: usecase.ErrUsernameChangeConflict, code: CodeUsernameTaken, httpStatus: 409},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FromUsecaseError(tt.err)
+			assert.Equal(t, tt.code, got.Code)
+			assert.Equal(t, tt.httpStatus, got.HTTPStatus)
+		})
+	}
+}
+
 func TestFromUsecaseError_お気に入り上限エラーを400に変換する(t *testing.T) {
 	apiErr := FromUsecaseError(usecase.ErrPlayerFavoriteSongLimitExceeded)
 

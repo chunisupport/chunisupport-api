@@ -118,6 +118,8 @@ var (
 	ErrUsernameTooShort    = New(CodeUsernameTooShort, http.StatusBadRequest)
 	ErrUsernameTooLong     = New(CodeUsernameTooLong, http.StatusBadRequest)
 	ErrUsernameInvalidChar = New(CodeUsernameInvalidChar, http.StatusBadRequest)
+	ErrUsernameForbidden   = New(CodeUsernameForbidden, http.StatusUnprocessableEntity)
+	ErrUsernameTaken       = New(CodeUsernameTaken, http.StatusConflict)
 
 	ErrGoalNotFound                 = New(CodeGoalNotFound, http.StatusNotFound)
 	ErrGoalLimitExceeded            = New(CodeGoalLimitExceeded, http.StatusBadRequest)

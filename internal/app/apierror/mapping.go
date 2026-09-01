@@ -16,6 +16,10 @@ func FromUsecaseError(err error) *APIError {
 	// usecase層の既知エラーをマッピング
 	// セキュリティ上の理由により、詳細なエラーは汎用的なエラーにマッピングされます
 	switch {
+	case errors.Is(err, usecase.ErrUsernameChangeConflict):
+		return ErrUsernameTaken.WithInternal(err)
+	case errors.Is(err, usecase.ErrUsernameChangeForbidden):
+		return ErrUsernameForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameTaken):
 		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
 	case errors.Is(err, usecase.ErrUsernameForbidden):

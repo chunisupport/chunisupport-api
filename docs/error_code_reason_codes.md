@@ -63,6 +63,8 @@
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名の文字種不正 |
+| `username_forbidden` | ユーザー名が禁止語に該当 |
+| `username_taken` | ユーザー名が使用済み |
 | `goal_not_found` | goal未検出 |
 | `goal_limit_exceeded` | goal上限超過 |
 | `goal_invalid_title` | goalタイトル不正 |
@@ -106,6 +108,13 @@
 | --- | --- |
 | `delete_account_firebase_uid_not_linked` | 退会対象ユーザーに Firebase UID が連携されていない |
 | `delete_account_reauth_uid_mismatch` | 再認証トークンの UID と退会対象ユーザーの Firebase UID が一致しない |
+
+### ユーザー名変更の認証監視ログ（`slog`）
+
+| reason | 発生条件 |
+| --- | --- |
+| `update_username_firebase_uid_not_linked` | ユーザー名変更対象ユーザーに Firebase UID が連携されていない |
+| `update_username_reauth_uid_mismatch` | 再認証トークンの UID とユーザー名変更対象ユーザーの Firebase UID が一致しない |
 
 ### PlayerData `skipped_records[].reason`
 

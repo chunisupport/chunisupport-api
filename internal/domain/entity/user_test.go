@@ -72,6 +72,21 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 	}
 }
 
+func TestUser_ChangeUsername(t *testing.T) {
+	// Given
+	oldName := username.MustNewUserName("oldname")
+	newName := username.MustNewUserName("newname")
+	user := &User{Username: oldName, UpdatedAt: time.Now().Add(-time.Hour)}
+	oldUpdatedAt := user.UpdatedAt
+
+	// When
+	user.ChangeUsername(newName)
+
+	// Then
+	assert.Equal(t, newName, user.Username)
+	assert.True(t, user.UpdatedAt.After(oldUpdatedAt))
+}
+
 func ptr(value string) *string {
 	return &value
 }
