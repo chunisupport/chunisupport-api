@@ -12,6 +12,7 @@
 ## ドキュメント
 
 - [API仕様書（内部/公開）](docs/API.md)
+- [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
 

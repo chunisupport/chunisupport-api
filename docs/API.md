@@ -3184,7 +3184,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "rating_band": "ALL",
       "rank": {
-        "aaal": 45,
+        "aaal": 40,
         "s": 28,
         "sp": 15,
         "ss": 8,
@@ -3214,7 +3214,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "rating_band": "15.0",
       "rank": {
-        "aaal": 12,
+        "aaal": 9,
         "s": 5,
         "sp": 2,
         "ss": 1,
@@ -3231,11 +3231,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       },
       "clear": {
         "failed": 1,
-        "clear": 10,
+        "clear": 12,
         "hard": 3,
         "brave": 1,
         "absolute": 0,
-        "catastrophy": 0
+        "catastrophy": 1
       },
       "average_score": 1007500.5,
       "median_score": 1008000,
@@ -3250,12 +3250,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `song_id` | string | 楽曲の識別ID（16桁） |
 | `stats` | array | レーティング帯別の統計配列。**先頭要素は必ず `rating_band: "ALL"`（全プレイヤー統計）** |
 | `stats[].rating_band` | string | レーティング帯ラベル。`"ALL"`（全体）または個別帯（例: "15.0", "17.7+"） |
-| `stats[].rank` | object | ランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
+| `stats[].rank` | object | クリア済み記録のランク別人数統計（aaal, s, sp, ss, ssp, sss, sssp, max） |
 | `stats[].combo` | object | コンボランプ別人数統計（none, fc, aj, ajc）。`aj` は AJC を除く ALL JUSTICE、`ajc` は ALL JUSTICE かつ 1,010,000 点の人数で、両者は排他的です |
 | `stats[].clear` | object | クリアランプ別人数統計（failed, clear, hard, brave, absolute, catastrophy） |
-| `stats[].average_score` | number\|null | レーティング帯別平均スコア（レコード数が0件の場合はnull） |
-| `stats[].median_score` | number\|null | レーティング帯別中央スコア（レコード数が0件の場合はnull） |
-| `stats[].player_count` | number | レーティング帯別プレイヤー数 |
+| `stats[].average_score` | number\|null | レーティング帯別のクリア済み記録の平均スコア（クリア済み記録が0件の場合はnull） |
+| `stats[].median_score` | number\|null | レーティング帯別のクリア済み記録の中央スコア（クリア済み記録が0件の場合はnull） |
+| `stats[].player_count` | number | FAILEDを含むレーティング帯別の全プレイヤー数 |
 
 **難易度パラメータについて**:
 - パス内では小文字で指定: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
@@ -3316,7 +3316,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `ranking[].chart.is_const_unknown` | boolean | 譜面定数が推定値の場合true |
 | `ranking[].best_player_count` | number | 指定レート帯でこの譜面をベスト枠に持つプレイヤー数 |
 | `ranking[].best_player_percentage` | number | `best_player_count / eligible_player_count * 100`（小数点以下4桁まで） |
-| `ranking[].average_score` | number\|null | 指定レート帯でこの譜面をプレイした全プレイヤーの平均スコア（レコード数が0件の場合はnull） |
+| `ranking[].average_score` | number\|null | 指定レート帯でこの譜面をクリアしたプレイヤーの平均スコア（クリア済み記録が0件の場合はnull） |
 | `next_cursor` | string\|null | 次ページがある場合の不透明カーソル |
 
 - **主なエラー**:
