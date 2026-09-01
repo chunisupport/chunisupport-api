@@ -69,6 +69,8 @@ const (
 	CodeUsernameTooShort    = "username_too_short"
 	CodeUsernameTooLong     = "username_too_long"
 	CodeUsernameInvalidChar = "username_invalid_char"
+	CodeUsernameForbidden   = "username_forbidden"
+	CodeUsernameTaken       = "username_taken"
 
 	// 目標関連エラー
 	CodeGoalNotFound                 = "goal_not_found"

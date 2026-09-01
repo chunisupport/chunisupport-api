@@ -63,6 +63,8 @@
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名の文字種不正 |
+| `username_forbidden` | ユーザー名が禁止語に該当 |
+| `username_taken` | ユーザー名が使用済み |
 | `goal_not_found` | goal未検出 |
 | `goal_limit_exceeded` | goal上限超過 |
 | `goal_invalid_title` | goalタイトル不正 |

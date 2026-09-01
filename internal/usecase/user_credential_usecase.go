@@ -9,7 +9,9 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -17,6 +19,7 @@ import (
 type UserCredentialUsecase interface {
 	GetUser(ctx context.Context, id int) (*UserOutput, error)
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
+	UpdateUsername(ctx context.Context, userID int, username string, reauthToken reauthtoken.ReauthToken) (string, error)
 	DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error
 }
 
@@ -40,6 +43,7 @@ type userCredentialUsecaseImpl struct {
 	firebaseDeleter      FirebaseUserDeleter
 	masterCache          AccountTypeProvider
 	clock                clock
+	usernamePolicy       service.UsernamePolicy
 }
 
 func NewUserCredentialUsecase(
@@ -120,6 +124,26 @@ func NewUserCredentialUsecaseWithFirebaseServices(
 	return impl
 }
 
+// NewUserCredentialUsecaseWithUsernamePolicy は再認証を伴うユーザー名変更を利用可能なユースケースを生成します。
+func NewUserCredentialUsecaseWithUsernamePolicy(
+	db repository.Executor,
+	tm TransactionManager,
+	userRepo repository.UserRepository,
+	playerRecordRepo repository.PlayerRecordRepository,
+	goalRepo repository.GoalRepository,
+	recentSignInVerifier RecentSignInVerifier,
+	firebaseDeleter FirebaseUserDeleter,
+	masterCache AccountTypeProvider,
+	usernamePolicy service.UsernamePolicy,
+) UserCredentialUsecase {
+	if usernamePolicy == nil {
+		panic("username policy is nil")
+	}
+	usecase := NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseDeleter, masterCache)
+	usecase.(*userCredentialUsecaseImpl).usernamePolicy = usernamePolicy
+	return usecase
+}
+
 func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*UserOutput, error) {
 	user, err := s.userRepo.FindByID(ctx, s.db, id)
 	if err != nil {
@@ -137,15 +161,65 @@ func (s *userCredentialUsecaseImpl) GetUser(ctx context.Context, id int) (*UserO
 }
 
 func (s *userCredentialUsecaseImpl) UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error {
-	user, err := s.userRepo.FindByID(ctx, s.db, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
+	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
 		}
-		return err
+		user.ChangePrivacy(isPrivate)
+		return s.userRepo.Save(ctx, tx, user)
+	})
+}
+
+func (s *userCredentialUsecaseImpl) UpdateUsername(ctx context.Context, userID int, usernameString string, reauthToken reauthtoken.ReauthToken) (string, error) {
+	newUsername, err := username.NewUserName(usernameString)
+	if err != nil {
+		return "", convertUsernameError(err)
 	}
-	user.ChangePrivacy(isPrivate)
-	return s.userRepo.Save(ctx, s.db, user)
+	if s.usernamePolicy == nil {
+		return "", errors.Join(ErrInternalError, errors.New("username policy is nil"))
+	}
+	if err := s.usernamePolicy.Validate(newUsername); err != nil {
+		if errors.Is(err, service.ErrUsernameForbidden) {
+			return "", ErrUsernameChangeForbidden
+		}
+		return "", errors.Join(ErrInternalError, err)
+	}
+	reauthInfo, err := s.verifyRecentSignIn(ctx, reauthToken)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
+		}
+		if _, err := s.validateReauthenticatedUser(user, reauthInfo, "update_username"); err != nil {
+			return err
+		}
+		if user.Username == newUsername {
+			return nil
+		}
+		user.ChangeUsername(newUsername)
+		if err := s.userRepo.Save(ctx, tx, user); err != nil {
+			if errors.Is(err, repository.ErrDuplicateUsername) {
+				return ErrUsernameChangeConflict
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return newUsername.String(), nil
 }
 
 func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error {
@@ -167,7 +241,7 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			return err
 		}
 
-		firebaseUID, err := s.validateDeleteOwnAccountPreconditions(user, reauthInfo)
+		firebaseUID, err := s.validateReauthenticatedUser(user, reauthInfo, "delete_account")
 		if err != nil {
 			return err
 		}
@@ -193,13 +267,13 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 	return nil
 }
 
-func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *entity.User, reauthInfo *RecentSignInInfo) (string, error) {
+func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(user *entity.User, reauthInfo *RecentSignInInfo, operation string) (string, error) {
 	firebaseUID := normalizeFirebaseUID(user.FirebaseUID)
 	if firebaseUID == "" {
 		slog.Warn(
 			"suspicious account deletion authentication failure",
 			"reason",
-			"delete_account_firebase_uid_not_linked",
+			operation+"_firebase_uid_not_linked",
 			"user_id",
 			user.ID,
 			"reauth_uid",
@@ -211,7 +285,7 @@ func (s *userCredentialUsecaseImpl) validateDeleteOwnAccountPreconditions(user *
 		slog.Warn(
 			"suspicious account deletion authentication failure",
 			"reason",
-			"delete_account_reauth_uid_mismatch",
+			operation+"_reauth_uid_mismatch",
 			"user_id",
 			user.ID,
 			"reauth_uid",
