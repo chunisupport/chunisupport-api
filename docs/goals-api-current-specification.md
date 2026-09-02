@@ -255,13 +255,14 @@ DB上の `goals` テーブルは以下の構造です。
 
 ## 6. `achievement_type` 仕様
 
-現行実装で有効なのは以下の9種類です。
+現行実装で有効なのは以下の10種類です。
 
 - `rank_count`
 - `score_count`
 - `avg_score`
 - `hardlamp_count`
 - `combolamp_count`
+- `fullchain_count`
 - `rainbow_count`
 - `total_score`
 - `overpower_value`
@@ -379,7 +380,29 @@ DB上の `goals` テーブルは以下の構造です。
 - キーは `lamp` / `count` / `remaining` / `percent` のみ
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
-### 7.6 `total_score`
+### 7.6 `fullchain_count`
+
+```json
+{
+  "lamp": "GOLD",
+  "count": 3
+}
+```
+
+条件:
+
+- キーは `lamp` が必須、`count` / `remaining` / `percent` はいずれか1つのみ任意
+- `count` は整数または `null`、整数の場合は `count >= 1`
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `count` / `remaining` / `percent` は相互排他（2つ以上指定不可）
+- `lamp` は以下のいずれか
+  - `GOLD`（マスタ名 `FULL CHAIN GOLD`）
+  - `PLATINUM`（マスタ名 `FULL CHAIN PLATINUM`）
+- キーは `lamp` / `count` / `remaining` / `percent` のみ
+- `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
+
+### 7.7 `total_score`
 
 ```json
 {
@@ -399,7 +422,7 @@ DB上の `goals` テーブルは以下の構造です。
 
 実装上、Go側では `int64` として受けています。
 
-### 7.7 `overpower_value`
+### 7.8 `overpower_value`
 
 ```json
 {
@@ -418,7 +441,7 @@ DB上の `goals` テーブルは以下の構造です。
 - `percent` は数値、`0 <= percent <= 100`、小数第3位まで許可
 - `total` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面の理論値OverPower合計を目標値として扱う想定です。
 
-### 7.8 `overpower_percent`
+### 7.9 `overpower_percent`
 
 ```json
 {
@@ -433,7 +456,7 @@ DB上の `goals` テーブルは以下の構造です。
 - 小数第3位まで許可
 - `total` は省略不可で、`null` も不可です。
 
-### 7.9 `rainbow_count`
+### 7.10 `rainbow_count`
 
 BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
@@ -645,6 +668,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `score_count`
 - `hardlamp_count`
 - `combolamp_count`
+- `fullchain_count`
 
 条件:
 
@@ -765,6 +789,8 @@ type GoalAchievementType =
   | 'avg_score'
   | 'hardlamp_count'
   | 'combolamp_count'
+  | 'fullchain_count'
+  | 'rainbow_count'
   | 'total_score'
   | 'overpower_value'
   | 'overpower_percent';

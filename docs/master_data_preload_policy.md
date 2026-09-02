@@ -14,7 +14,7 @@
 | `honor_types` | 称号の種類マスタで固定値が事前投入されている。 |
 | `account_types` | ユーザー権限区分。4件の固定マスタ（PLAYER/EDITOR/ADMIN/EXTDEV）。 |
 | `versions` | CHUNITHMバージョン名マスタで固定値。起動日時点でリリース済みのバージョンのみをプリロードする（`released_at <= 起動日の日本時間`）。日付跨ぎ後に新バージョンを反映するには再起動が必要。 |
-| `achievement_types` | 目標機能の成果種別マスタ（9件の固定値）。`goals.achievement_type_id` の外部キー参照元で、実体は `code` 列の固定値です。 |
+| `achievement_types` | 目標機能の成果種別マスタ（10件の固定値）。`goals.achievement_type_id` の外部キー参照元で、実体は `code` 列の固定値です。 |
 
 ## 読み込まない（随時参照）
 | テーブル | 理由 |
