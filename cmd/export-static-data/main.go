@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -28,7 +31,43 @@ func main() {
 	os.Exit(run())
 }
 
+type exportMode uint8
+
+const (
+	exportModeStaticData exportMode = iota
+	exportModeChartStats
+)
+
+func parseExportMode(args []string) (exportMode, error) {
+	flags := flag.NewFlagSet("export-static-data", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	chartStats := flags.Bool("chart-stats", false, "難易度別譜面統計JSONを更新する")
+	if err := flags.Parse(args); err != nil {
+		return exportModeStaticData, err
+	}
+	if flags.NArg() != 0 {
+		return exportModeStaticData, fmt.Errorf("unexpected arguments: %v", flags.Args())
+	}
+	if *chartStats {
+		return exportModeChartStats, nil
+	}
+	return exportModeStaticData, nil
+}
+
+func lockNameForMode(mode exportMode) string {
+	if mode == exportModeChartStats {
+		return info.ChartStatsExportBatchLockName
+	}
+	return info.StaticDataExportBatchLockName
+}
+
 func run() int {
+	mode, err := parseExportMode(os.Args[1:])
+	if err != nil {
+		slog.Error("引数が不正です", "error", err)
+		return 2
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -69,13 +108,13 @@ func run() int {
 	}
 	defer database.Close()
 
-	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.StaticDataExportBatchLockName)
+	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, lockNameForMode(mode))
 	if err != nil {
 		slog.Error("バッチロックの取得に失敗しました", "error", err)
 		return 1
 	}
 	if !acquired {
-		slog.Error("別の静的データエクスポートが実行中のため開始できません")
+		slog.Error("同じ種類の静的データエクスポートが実行中のため開始できません")
 		return 1
 	}
 	defer func() {
@@ -85,6 +124,28 @@ func run() int {
 			slog.Error("バッチロックの解放に失敗しました", "error", err)
 		}
 	}()
+
+	if mode == exportModeChartStats {
+		exporter := staticdataexport.NewChartStatsExporter(
+			infrarepo.NewChartStatsExportQueryService(database),
+			objectStorageWriter,
+			cachePurger,
+			cfg.Location,
+		)
+		startedAt := time.Now()
+		result, err := exporter.Export(ctx)
+		if err != nil {
+			slog.Error("譜面統計データのエクスポートに失敗しました", "error", err, "duration", time.Since(startedAt))
+			return 1
+		}
+		slog.Info(
+			"譜面統計データのエクスポートが完了しました",
+			"charts", result.ChartCount,
+			"worldsend_charts", result.WorldsendChartCount,
+			"duration", time.Since(startedAt),
+		)
+		return 0
+	}
 
 	masterCache, err := masterdata.Preload(ctx, database)
 	if err != nil {
