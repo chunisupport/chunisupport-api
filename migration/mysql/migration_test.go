@@ -565,3 +565,21 @@ func TestSchemaMySQL_目標の反転フラグを実数値と割合で分ける(t
 	assert.Contains(t, schemaSQL, "`invert_percentage` tinyint(1) NOT NULL DEFAULT '0'")
 	assert.NotContains(t, schemaSQL, "`invert` tinyint(1)")
 }
+
+func TestAddFullChainCountGoalUp_成果種別を追加する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000045_add_fullchain_count_goal.up.sql")
+
+	// Then
+	assert.Equal(t, "INSERT INTO achievement_types (code) VALUES ('fullchain_count');", upSQL)
+}
+
+func TestAddFullChainCountGoalDown_目標を暗黙に削除しない(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000045_add_fullchain_count_goal.down.sql")
+
+	// Then
+	assert.Equal(t, "DELETE FROM achievement_types WHERE code = 'fullchain_count';", downSQL)
+	assert.NotContains(t, downSQL, "DELETE FROM goals")
+	assert.NotContains(t, downSQL, "DELETE g FROM goals")
+}

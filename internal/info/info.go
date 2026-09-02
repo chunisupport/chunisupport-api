@@ -214,6 +214,12 @@ var ComboLampNameToAbbrev = map[string]string{
 	"ALL JUSTICE": "AJ",
 }
 
+// FullChainAbbrevToName はAPI略称→マスタ名（full_chain_types.name）への変換テーブルです。
+var FullChainAbbrevToName = map[string]string{
+	"GOLD":     "FULL CHAIN GOLD",
+	"PLATINUM": "FULL CHAIN PLATINUM",
+}
+
 // CalcTheoreticalOverpowerTotal は対象譜面群の理論値OVER POWER合計を計算します。
 func CalcTheoreticalOverpowerTotal(totalChartConst float64, chartCount int) float64 {
 	return (totalChartConst+float64(chartCount)*TheoreticalOverpowerBaseAdd)*TheoreticalOverpowerScale + float64(chartCount)*TheoreticalOverpowerBonus

@@ -1883,6 +1883,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
+| `fullchain_count` | 指定FULL CHAIN種別の達成数 |
 | `rainbow_count` | BASIC〜MASTERと、存在する場合はULTIMAがすべてALL JUSTICEの楽曲数 |
 | `total_score` | 全譜面のスコア合計 |
 | `overpower_value` | 全譜面のOverPower値合計 |
@@ -1895,14 +1896,14 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `achievement_type` | 省略可能なパラメータ | 省略/null時の扱い |
 |---|---|---|
 | `rank_count` / `score_count` | `count` | 対象譜面数（動的上限） |
-| `hardlamp_count` / `combolamp_count` | `count` | 対象譜面数（動的上限） |
+| `hardlamp_count` / `combolamp_count` / `fullchain_count` | `count` | 対象譜面数（動的上限） |
 | `rainbow_count` | `count` | 対象楽曲数（動的上限） |
 | `total_score` | `total` | 対象譜面数 × 1,010,000（動的上限） |
 | `overpower_value` | `total` | 対象譜面の理論値OP合計（動的上限） |
 
 上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
-`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
+`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
 
 - `remaining`: 動的上限から差し引く残数
 - `percent`: 動的上限に対する目標割合（%）
@@ -1979,6 +1980,28 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 |---|---|
 | `FC` | `FULL COMBO` |
 | `AJ` | `ALL JUSTICE` |
+
+#### `fullchain_count`
+
+```json
+{ "lamp": "GOLD", "count": 100 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `lamp` | `string` | `GOLD` または `PLATINUM`（完全一致） | FULL CHAIN種別 |
+| `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
+| `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+**FULL CHAIN略称**:
+
+| 略称 | マスタ名（`full_chain_types.name`） |
+|---|---|
+| `GOLD` | `FULL CHAIN GOLD` |
+| `PLATINUM` | `FULL CHAIN PLATINUM` |
+
+指定したFULL CHAIN種別と完全一致する譜面を達成数として扱います。
 
 #### `rainbow_count`
 
@@ -2091,7 +2114,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
-   - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` の `count` ≤ 対象譜面数
+   - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` の `count` ≤ 対象譜面数
    - `rainbow_count.count` ≤ 対象楽曲数
    - 譜面件数系成果種別の `remaining` ≤ 対象譜面数
    - `rainbow_count.remaining` ≤ 対象楽曲数

@@ -197,6 +197,20 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000041**: プレイヤーの公式RATING・公式OVER POWER履歴を追加し、取得日時をマイクロ秒精度へ変更。
 - **000042**: プレイヤー現在値と公式指標履歴の取得日時を秒精度へ変更。
 - **000044**: 最上位のレーティング帯を `17.6`（17.6以上17.7未満）と `17.7+`に分割。up/downとも旧区分で集計した統計3表を全削除するため、適用後は統計バッチで再生成する。
+- **000045**: 目標成果種別に `fullchain_count` を追加し、`GOLD` / `PLATINUM` のFULL CHAIN達成譜面数を目標に設定できるようにする。downはユーザー目標を暗黙に削除せず、参照が残る場合は外部キー制約により中止する。
+
+#### 000045のロールバック前確認
+
+`000045` のdownは `fullchain_count` を使用する目標を自動削除しません。次のSQLで参照中の目標がないことを確認してからdownを実行してください。
+
+```sql
+SELECT g.id, g.user_id, g.title
+FROM goals AS g
+INNER JOIN achievement_types AS at ON at.id = g.achievement_type_id
+WHERE at.code = 'fullchain_count';
+```
+
+1件以上返る場合、対象目標をバックアップしたうえでAPIから削除してからdownを実行してください。参照が残った状態でdownを実行すると、`fk_goals_achievement_type_id` の外部キー制約により中止されます。
 
 #### 000028の失敗時復旧
 

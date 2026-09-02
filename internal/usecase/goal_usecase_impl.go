@@ -605,7 +605,7 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			return nil, nil, ErrInvalidAchievementParam
 		}
 		result.Score = &score
-	case achievementType == "hardlamp_count" || achievementType == "combolamp_count" || achievementType == "rainbow_count":
+	case achievementType == "hardlamp_count" || achievementType == "combolamp_count" || achievementType == "fullchain_count" || achievementType == "rainbow_count":
 		if !hasOnlyKeys(m, "lamp", "count", "remaining", "percent") {
 			return nil, nil, ErrInvalidAchievementParam
 		}
@@ -647,6 +647,10 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			}
 		case "combolamp_count":
 			if _, ok := info.ComboLampAbbrevToName[lamp]; !ok {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+		case "fullchain_count":
+			if _, ok := info.FullChainAbbrevToName[lamp]; !ok {
 				return nil, nil, ErrInvalidAchievementParam
 			}
 		}
@@ -786,7 +790,7 @@ func goalTargetFilter(attrs *goalAttributeFilter) repository.GoalTargetFilter {
 
 func validateDynamicUpperBoundWithStats(achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
 	switch achievementType {
-	case "rank_count", "score_count", "hardlamp_count", "combolamp_count":
+	case "rank_count", "score_count", "hardlamp_count", "combolamp_count", "fullchain_count":
 		if params.Count != nil && *params.Count > stats.ChartCount {
 			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam

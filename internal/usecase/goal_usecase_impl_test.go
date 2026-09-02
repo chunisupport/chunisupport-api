@@ -160,11 +160,12 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 			"score_count":       {ID: 2, Name: "score_count"},
 			"rank_count":        {ID: 1, Name: "rank_count"},
 			"rainbow_count":     {ID: 9, Name: "rainbow_count"},
+			"fullchain_count":   {ID: 10, Name: "fullchain_count"},
 			"total_score":       {ID: 6, Name: "total_score"},
 			"overpower_value":   {ID: 7, Name: "overpower_value"},
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
-		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count"},
+		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count", 10: "fullchain_count"},
 		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
 		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
 		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
@@ -650,6 +651,77 @@ func TestGoalUsecase_CreateRejectsCountOverDynamicUpperBound(t *testing.T) {
 		Attributes:        []byte(`{}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
+}
+
+func TestGoalUsecase_CreateFullChainCount(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  []byte
+		wantErr bool
+	}{
+		{name: "GOLDとcountを受理する", params: []byte(`{"lamp":"GOLD","count":1}`)},
+		{name: "PLATINUMとremainingを受理する", params: []byte(`{"lamp":"PLATINUM","remaining":1}`)},
+		{name: "count省略を受理する", params: []byte(`{"lamp":"GOLD"}`)},
+		{name: "countのnullを受理する", params: []byte(`{"lamp":"GOLD","count":null}`)},
+		{name: "percentを受理する", params: []byte(`{"lamp":"PLATINUM","percent":50.5}`)},
+		{name: "未知のランプを拒否する", params: []byte(`{"lamp":"SILVER","count":1}`), wantErr: true},
+		{name: "小文字のランプを拒否する", params: []byte(`{"lamp":"gold","count":1}`), wantErr: true},
+		{name: "未知キーを拒否する", params: []byte(`{"lamp":"GOLD","count":1,"unknown":true}`), wantErr: true},
+		{name: "countとremainingの同時指定を拒否する", params: []byte(`{"lamp":"GOLD","count":1,"remaining":1}`), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2}}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "FULL CHAIN",
+				AchievementType:   "fullchain_count",
+				AchievementParams: tt.params,
+				Attributes:        []byte(`{}`),
+			})
+
+			// Then
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrInvalidAchievementParam)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, out)
+		})
+	}
+}
+
+func TestGoalUsecase_CreateRejectsFullChainCountOverDynamicUpperBound(t *testing.T) {
+	tests := []struct {
+		name   string
+		params []byte
+	}{
+		{name: "countが対象譜面数を超える", params: []byte(`{"lamp":"GOLD","count":3}`)},
+		{name: "remainingが対象譜面数を超える", params: []byte(`{"lamp":"PLATINUM","remaining":3}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2}}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			_, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "FULL CHAIN",
+				AchievementType:   "fullchain_count",
+				AchievementParams: tt.params,
+				Attributes:        []byte(`{}`),
+			})
+
+			// Then
+			assert.ErrorIs(t, err, ErrInvalidAchievementParam)
+		})
+	}
 }
 
 func TestGoalUsecase_CreateRejectsRainbowCountOverSongUpperBound(t *testing.T) {
