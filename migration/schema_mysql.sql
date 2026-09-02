@@ -1,4 +1,4 @@
-CREATE TABLE `account_types` (
+﻿CREATE TABLE `account_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
@@ -283,6 +283,15 @@ CREATE TABLE `player_locked_songs` (
   CONSTRAINT `fk_player_locked_songs_player_id` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_player_locked_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_metric_histories` (
+  `player_id` mediumint unsigned NOT NULL,
+  `official_rating` decimal(4,2) NOT NULL,
+  `official_overpower` decimal(8,2) NOT NULL,
+  `official_overpower_percent` decimal(5,2) DEFAULT NULL,
+  `data_collected_at` timestamp NOT NULL,
+  PRIMARY KEY (`player_id`,`data_collected_at`),
+  CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_record_histories` (
   `player_id` mediumint unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,
@@ -385,15 +394,6 @@ CREATE TABLE `players` (
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `player_metric_histories` (
-  `player_id` mediumint unsigned NOT NULL,
-  `official_rating` decimal(4,2) NOT NULL,
-  `official_overpower` decimal(8,2) NOT NULL,
-  `official_overpower_percent` decimal(5,2) DEFAULT NULL,
-  `data_collected_at` timestamp NOT NULL,
-  PRIMARY KEY (`player_id`,`data_collected_at`),
-  CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (
   `id` tinyint unsigned NOT NULL,
