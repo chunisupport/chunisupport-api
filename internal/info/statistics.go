@@ -12,6 +12,35 @@ const (
 	StatsDifficultyWorldsend = "WORLD'S END"
 )
 
+var chartStatsDifficulties = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
+
+var chartStatsSnapshotObjectKeys = map[string]string{
+	"BASIC":    BasicChartStatsSnapshotObjectKey,
+	"ADVANCED": AdvancedChartStatsSnapshotObjectKey,
+	"EXPERT":   ExpertChartStatsSnapshotObjectKey,
+	"MASTER":   MasterChartStatsSnapshotObjectKey,
+	"ULTIMA":   UltimaChartStatsSnapshotObjectKey,
+}
+
+// ChartStatsSnapshotObjectKey は難易度名と公開キーの対応を生成処理へ集約します。
+func ChartStatsSnapshotObjectKey(difficulty string) string {
+	return chartStatsSnapshotObjectKeys[difficulty]
+}
+
+// ChartStatsDifficulties は呼び出し側の変更で固定順が壊れないよう複製して返します。
+func ChartStatsDifficulties() []string {
+	return append([]string(nil), chartStatsDifficulties[:]...)
+}
+
+// ChartStatsSnapshotObjectKeys はPUT順とパージ対象のずれを防ぐため固定順で返します。
+func ChartStatsSnapshotObjectKeys() []string {
+	keys := make([]string, 0, len(chartStatsDifficulties)+1)
+	for _, difficulty := range chartStatsDifficulties {
+		keys = append(keys, chartStatsSnapshotObjectKeys[difficulty])
+	}
+	return append(keys, WorldsendChartStatsSnapshotObjectKey)
+}
+
 // DifficultyPathParam はパスパラメータ用の難易度名です。
 // すべて小文字で、WORLD'S ENDは"worldsend"として扱います。
 type DifficultyPathParam string
