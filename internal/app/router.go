@@ -81,6 +81,7 @@ type Handlers struct {
 	AdminChartRanking     *api_internal.AdminChartRankingHandler
 	Song                  *api_internal.SongHandler
 	Honor                 *api_internal.HonorHandler
+	Version               *api_internal.VersionHandler
 	Worldsend             *api_internal.WorldsendHandler
 	APIToken              *api_internal.APITokenHandler
 	Me                    *api_internal.MeHandler
@@ -155,6 +156,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	goalGroupRepo := infra.NewGoalGroupRepository()
 	recordFilterRepo := infra.NewRecordFilterRepository(db)
 	honorRepo := infra.NewHonorRepository(db)
+	versionRepo := infra.NewVersionRepository()
 	playerLockedSongRepo := infra.NewPlayerLockedSongRepository()
 	playerFavoriteSongRepo := infra.NewPlayerFavoriteSongRepository()
 	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
@@ -209,6 +211,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
+	versionUsecase := usecase.NewVersionUsecase(versionRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
@@ -267,6 +270,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		AdminChartRanking:     api_internal.NewAdminChartRankingHandler(adminChartRankingUsecase),
 		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		Honor:                 api_internal.NewHonorHandler(honorUsecase),
+		Version:               api_internal.NewVersionHandler(versionUsecase),
 		Worldsend:             api_internal.NewWorldsendHandler(worldsendUsecase, masterCache),
 		APIToken:              api_internal.NewAPITokenHandler(apiTokenUsecase),
 		Me:                    api_internal.NewMeHandler(playerDataUsecase),
@@ -515,6 +519,10 @@ func registerRoutes(
 		adminGroup.GET("/chart-rankings/songs/:displayid/charts/:difficulty", handlers.AdminChartRanking.GetStandard)
 		adminGroup.GET("/chart-rankings/worldsend-songs/:displayid", handlers.AdminChartRanking.GetWorldsend)
 		adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
+		adminGroup.GET("/versions", handlers.Version.List)
+		adminGroup.POST("/versions", handlers.Version.Create)
+		adminGroup.PUT("/versions/:id", handlers.Version.Rename)
+		adminGroup.DELETE("/versions/:id", handlers.Version.Delete)
 	}
 
 	// api.chunisupport.net/internal/honors

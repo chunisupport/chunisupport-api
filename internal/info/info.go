@@ -76,6 +76,7 @@ const (
 	PlayerLatestUpdateOPPercentSchemaVersion    = 3
 	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
 	MaintenanceRetryAfterSeconds                = 60
+	VersionCacheReloadTimeout                   = 5 * time.Second
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

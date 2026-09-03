@@ -100,4 +100,11 @@ const (
 	CodeFriendshipLimitExceeded = "friendship_limit_exceeded"
 	CodeFriendshipConflict      = "friendship_conflict"
 	CodeFriendRequestNotFound   = "friend_request_not_found"
+
+	// バージョン管理関連エラー
+	CodeInvalidVersionInput = "invalid_version_input"
+	CodeVersionNotFound     = "version_not_found"
+	CodeVersionNameConflict = "version_name_conflict"
+	CodeVersionNotLatest    = "version_not_latest"
+	CodeVersionInUse        = "version_in_use"
 )

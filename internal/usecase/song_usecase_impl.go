@@ -183,6 +183,9 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 		return fmt.Errorf("failed to convert requests to entities: %w", err)
 	}
 
+	versionRangeMutationMu.Lock()
+	defer versionRangeMutationMu.Unlock()
+
 	// トランザクション内でリポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
@@ -415,6 +418,9 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.Jacket = input.Jacket
 	song.IsNew = input.IsNew
 	song.Charts = charts
+
+	versionRangeMutationMu.Lock()
+	defer versionRangeMutationMu.Unlock()
 
 	var created *entity.Song
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {

@@ -98,6 +98,16 @@ func FromUsecaseError(err error) *APIError {
 		return ErrNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorConflict):
 		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrVersionNotFound):
+		return ErrVersionNotFound.WithInternal(err)
+	case errors.Is(err, repository.ErrVersionConflict):
+		return ErrVersionNameConflict.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidVersionInput):
+		return ErrInvalidVersionInput.WithInternal(err)
+	case errors.Is(err, usecase.ErrVersionNotLatest):
+		return ErrVersionNotLatest.WithInternal(err)
+	case errors.Is(err, usecase.ErrVersionInUse):
+		return ErrVersionInUse.WithInternal(err)
 	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
 		return ErrConflict.WithInternal(err)
 	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):

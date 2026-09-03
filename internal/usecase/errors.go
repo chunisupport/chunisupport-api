@@ -11,6 +11,9 @@ var (
 	ErrChartNotFound                = errors.New("chart not found")
 	ErrInvalidWorldsendInput        = errors.New("invalid worldsend input")
 	ErrInvalidHonorInput            = errors.New("invalid honor input")
+	ErrInvalidVersionInput          = errors.New("invalid version input")
+	ErrVersionNotLatest             = errors.New("version not latest")
+	ErrVersionInUse                 = errors.New("version in use")
 
 	ErrAdminRequired = errors.New("admin permission required")
 	// ErrMaintenanceMode はメンテナンス中にスタッフ以外の利用を拒否した場合に返します。

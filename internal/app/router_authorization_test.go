@@ -126,6 +126,10 @@ func TestRegisterRoutes_楽曲追加削除はEDITORを拒否する(t *testing.T)
 		{name: "WORLDS END楽曲削除はEDITOR拒否", method: http.MethodDelete, path: "/internal/worldsend-songs/abcd1234"},
 		{name: "称号一覧はEDITOR拒否", method: http.MethodGet, path: "/internal/honors"},
 		{name: "称号追加はEDITOR拒否", method: http.MethodPost, path: "/internal/honors"},
+		{name: "バージョン一覧はEDITOR拒否", method: http.MethodGet, path: "/internal/admin/versions"},
+		{name: "バージョン追加はEDITOR拒否", method: http.MethodPost, path: "/internal/admin/versions"},
+		{name: "バージョン改名はEDITOR拒否", method: http.MethodPut, path: "/internal/admin/versions/1"},
+		{name: "バージョン削除はEDITOR拒否", method: http.MethodDelete, path: "/internal/admin/versions/1"},
 	}
 
 	for _, tt := range tests {

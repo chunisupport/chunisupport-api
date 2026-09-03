@@ -2,18 +2,28 @@ package masterdata
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
+	"sync"
 	"time"
 
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 )
 
 // Cache は起動時にプリロードされるマスタのセットです。
 type Cache struct {
+	versionsMu           sync.RWMutex
+	versionsReloadMu     sync.Mutex
+	db                   *sqlx.DB
+	now                  func() time.Time
+	allVersions          map[string]Version
+	allVersionsByID      map[int]Version
+	versionsStale        bool
 	ClassEmblems         map[string]master.ClassEmblem
 	ClassEmblemBases     map[string]master.ClassEmblemBase
 	ClearLamps           map[string]master.ClearLampType
@@ -160,25 +170,16 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		accountTypes[row.Name] = master.AccountType{ID: row.ID, Name: row.Name}
 	}
 
-	// 日本時間の当日を基準日として、未リリース版を除外する
-	japanLoc, err := time.LoadLocation("Asia/Tokyo")
-	if err != nil {
-		japanLoc = time.FixedZone("Asia/Tokyo", 9*60*60)
-	}
-	releaseDate := time.Now().In(japanLoc).Format(time.DateOnly)
-
-	// released_at は MySQL の DATE NOT NULL であるため、日付単位で判定する。
-	// SQL へ CURRENT_DATE を直接記述すると DB セッションのタイムゾーン設定に判定が依存するため、
-	// 起動時に一度だけ取得した日本時間の当日をプレースホルダー経由で渡す。
-	const versionQuery = `SELECT id, name, released_at FROM versions WHERE released_at <= ?`
-	versions, err := loadVersionMasters(ctx, db, versionQuery, releaseDate)
+	const versionQuery = `SELECT id, name, released_at FROM versions`
+	allVersions, err := loadVersionMasters(ctx, db, versionQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
 	}
-	versionsByID := make(map[int]Version, len(versions))
-	for _, item := range versions {
-		versionsByID[int(item.ID)] = item
+	allVersionsByID := make(map[int]Version, len(allVersions))
+	for _, item := range allVersions {
+		allVersionsByID[int(item.ID)] = item
 	}
+	versions, versionsByID := filterReleasedVersions(allVersions, time.Now())
 
 	achievementTypeRows, err := loadAchievementTypeRows(ctx, db)
 	if err != nil {
@@ -192,6 +193,10 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	}
 
 	return &Cache{
+		db:                   db,
+		now:                  time.Now,
+		allVersions:          allVersions,
+		allVersionsByID:      allVersionsByID,
 		ClassEmblems:         classEmblems,
 		ClassEmblemBases:     classEmblemBases,
 		ClearLamps:           clearLamps,
@@ -213,6 +218,105 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		AchievementTypes:     achievementTypes,
 		AchievementTypesByID: achievementTypesByID,
 	}, nil
+}
+
+// ReloadVersions はDBの全バージョンを読み込み、完成したスナップショットを一括で公開します。
+func (c *Cache) ReloadVersions(ctx context.Context) error {
+	if c == nil || c.db == nil {
+		return errors.New("version cache database is not initialized")
+	}
+	c.versionsReloadMu.Lock()
+	defer c.versionsReloadMu.Unlock()
+
+	const query = `SELECT id, name, released_at FROM versions`
+	allVersions, err := loadVersionMasters(ctx, c.db, query)
+	if err != nil {
+		c.versionsMu.Lock()
+		c.versionsStale = true
+		c.versionsMu.Unlock()
+		return err
+	}
+	allVersionsByID := make(map[int]Version, len(allVersions))
+	for _, item := range allVersions {
+		allVersionsByID[int(item.ID)] = item
+	}
+	versions, versionsByID := filterReleasedVersions(allVersions, c.currentTime())
+	c.versionsMu.Lock()
+	c.allVersions = allVersions
+	c.allVersionsByID = allVersionsByID
+	c.Versions = versions
+	c.VersionsByID = versionsByID
+	c.versionsStale = false
+	c.versionsMu.Unlock()
+	return nil
+}
+
+// AdminVersions は未来版を含む全バージョンのスナップショットを返します。
+func (c *Cache) AdminVersions() map[int]Version {
+	if c == nil {
+		return nil
+	}
+	c.reloadVersionsIfStale()
+	c.versionsMu.RLock()
+	defer c.versionsMu.RUnlock()
+	if c.allVersionsByID == nil {
+		return maps.Clone(c.VersionsByID)
+	}
+	return maps.Clone(c.allVersionsByID)
+}
+
+// PublicVersionsByID はJST当日までにリリースされたバージョンを返します。
+func (c *Cache) PublicVersionsByID() map[int]Version {
+	if c == nil {
+		return nil
+	}
+	c.reloadVersionsIfStale()
+	c.versionsMu.RLock()
+	defer c.versionsMu.RUnlock()
+	allVersions := maps.Clone(c.allVersions)
+	if allVersions == nil {
+		return maps.Clone(c.VersionsByID)
+	}
+	now := c.currentTime()
+	_, versionsByID := filterReleasedVersions(allVersions, now)
+	return versionsByID
+}
+
+func (c *Cache) reloadVersionsIfStale() {
+	c.versionsMu.RLock()
+	stale := c.versionsStale
+	c.versionsMu.RUnlock()
+	if !stale {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), info.VersionCacheReloadTimeout)
+	defer cancel()
+	_ = c.ReloadVersions(ctx)
+}
+
+func (c *Cache) currentTime() time.Time {
+	if c.now != nil {
+		return c.now()
+	}
+	return time.Now()
+}
+
+func filterReleasedVersions(allVersions map[string]Version, now time.Time) (map[string]Version, map[int]Version) {
+	japanLoc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		japanLoc = time.FixedZone("Asia/Tokyo", 9*60*60)
+	}
+	releaseDate := now.In(japanLoc).Format(time.DateOnly)
+	versions := make(map[string]Version, len(allVersions))
+	versionsByID := make(map[int]Version, len(allVersions))
+	for name, item := range allVersions {
+		if item.ReleasedAt.Format(time.DateOnly) > releaseDate {
+			continue
+		}
+		versions[name] = item
+		versionsByID[int(item.ID)] = item
+	}
+	return versions, versionsByID
 }
 
 // loadNamedRows は name カラムをそのまま使うマスタに限定して使用します。
@@ -351,8 +455,9 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 		return nil
 	}
 
-	versionsByID := make(map[int]domainmasterdata.Version, len(c.VersionsByID))
-	for k, v := range c.VersionsByID {
+	publicVersions := c.PublicVersionsByID()
+	versionsByID := make(map[int]domainmasterdata.Version, len(publicVersions))
+	for k, v := range publicVersions {
 		versionsByID[k] = domainmasterdata.Version{
 			ID:         v.ID,
 			Name:       v.Name,
@@ -377,8 +482,9 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 		return nil
 	}
 
-	versionsByID := make(map[int]domainmasterdata.Version, len(c.VersionsByID))
-	for k, v := range c.VersionsByID {
+	publicVersions := c.PublicVersionsByID()
+	versionsByID := make(map[int]domainmasterdata.Version, len(publicVersions))
+	for k, v := range publicVersions {
 		versionsByID[k] = domainmasterdata.Version{
 			ID:         v.ID,
 			Name:       v.Name,

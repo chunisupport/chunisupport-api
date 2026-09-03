@@ -187,6 +187,9 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
 	}
 
+	versionRangeMutationMu.Lock()
+	defer versionRangeMutationMu.Unlock()
+
 	// リポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.worldsendChartRepo.UpdateSongs(ctx, tx, updates)
@@ -363,6 +366,9 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 			NotesDesigner: input.Chart.NotesDesigner,
 		}
 	}
+
+	versionRangeMutationMu.Lock()
+	defer versionRangeMutationMu.Unlock()
 
 	var created *entity.WorldsendSongWithChart
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
