@@ -693,34 +693,16 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		return 0, nil, fmt.Errorf("invalid player name: %w", err)
 	}
 
-	// エンティティを作成または更新
-	player := &entity.Player{
-		UserID:            user.ID,
-		Name:              playerName,
-		Level:             summary.Level,
-		ClassEmblemID:     summary.ClassEmblemID,
-		ClassEmblemBaseID: summary.ClassBaseID,
-		LastPlayedAt:      summary.LastPlayedAt,
-		OverpowerValue:    summary.OverpowerValue,
-		OverpowerPercent:  summary.OverpowerPercent,
-		UpdatedAt:         updatedAt,
-	}
-
-	if existingPlayer != nil {
-		// 既存のプレイヤーを更新
-		player.ID = existingPlayer.ID
-		player.CreatedAt = existingPlayer.CreatedAt
-		// 計算レーティング等は既存の値を維持
-		player.CalculatedRating = existingPlayer.CalculatedRating
-		player.NewAverageRating = existingPlayer.NewAverageRating
-		player.BestAverageRating = existingPlayer.BestAverageRating
-		player.OfficialRating = existingPlayer.OfficialRating
-		player.OfficialOverpower = existingPlayer.OfficialOverpower
-		player.OfficialOverpowerPercent = existingPlayer.OfficialOverpowerPercent
-		player.DataCollectedAt = existingPlayer.DataCollectedAt
+	player := existingPlayer
+	var previousPlayer *entity.Player
+	if player == nil {
+		player = entity.NewPlayer(user.ID, playerName)
 	} else {
-		player.CreatedAt = time.Now().UTC()
+		previous := *player
+		previousPlayer = &previous
 	}
+	player.ChangeProfile(playerName, summary.Level, summary.ClassEmblemID, summary.ClassBaseID, summary.LastPlayedAt)
+	player.ChangeOverpower(summary.OverpowerValue, summary.OverpowerPercent)
 
 	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {
 		return 0, nil, &PlayerDataConflictError{Reason: err.Error()}
@@ -739,7 +721,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		}
 	}
 
-	return player.ID, existingPlayer, nil
+	return player.ID, previousPlayer, nil
 }
 
 // applyHonors はプレイヤーの称号情報を更新します。
@@ -1863,6 +1845,11 @@ func resolveSlotID(slot *string, masters *playerDataMaster) (int, error) {
 // calculateAndUpdateRatings はプレイヤーのレーティングを再計算してDBに保存します。
 // ベスト枠30曲 + 新曲枠20曲から計算したレーティングを保存します。
 func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx repository.Executor, playerID int) (service.RatingStats, error) {
+	player, err := us.playerRepo.FindByIDForUpdate(ctx, tx, playerID)
+	if err != nil {
+		return service.RatingStats{}, err
+	}
+
 	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
 	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
@@ -1886,8 +1873,8 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 
 	stats := service.AggregateOfficialRating(bestRecords, newRecords)
 
-	// データベースに保存
-	if err := us.playerRepo.UpdateCalculatedRatings(ctx, tx, playerID, stats.PlayerRating, stats.BestAverage, stats.NewAverage); err != nil {
+	player.ChangeCalculatedRatings(stats.PlayerRating, stats.BestAverage, stats.NewAverage)
+	if err := us.playerRepo.Save(ctx, tx, player); err != nil {
 		return service.RatingStats{}, err
 	}
 

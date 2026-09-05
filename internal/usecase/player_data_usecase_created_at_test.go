@@ -103,8 +103,8 @@ func (s *stubPlayerRepositoryForPlayerData) FindHonorsByPlayerID(ctx context.Con
 	return nil, nil
 }
 
-func (s *stubPlayerRepositoryForPlayerData) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
-	return nil
+func (s *stubPlayerRepositoryForPlayerData) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return s.FindByID(ctx, exec, id)
 }
 
 func (s *stubPlayerRepositoryForPlayerData) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {

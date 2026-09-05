@@ -23,6 +23,14 @@ func NewPlayerRepository(db *sqlx.DB) repository.PlayerRepository {
 
 // FindByID はIDでプレイヤーを検索します。関連する全てのフィールドを含むエンティティを返します。
 func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return r.findByID(ctx, exec, id, false)
+}
+
+func (r *playerRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return r.findByID(ctx, exec, id, true)
+}
+
+func (r *playerRepository) findByID(ctx context.Context, exec repository.Executor, id int, forUpdate bool) (*entity.Player, error) {
 	query := `
 		SELECT
 			id, user_id, player_name, player_level,
@@ -34,6 +42,9 @@ func (r *playerRepository) FindByID(ctx context.Context, exec repository.Executo
 		FROM players
 		WHERE id = ?
 	`
+	if forUpdate && r.db.DriverName() != "sqlite" {
+		query += " FOR UPDATE"
+	}
 	var playerModel models.PlayerModel
 	if err := exec.GetContext(ctx, &playerModel, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -162,19 +173,6 @@ func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec reposi
 	return honors, nil
 }
 
-// UpdateCalculatedRatings はプレイヤーの計算されたレーティング情報を更新します。
-func (r *playerRepository) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
-	query := `
-		UPDATE players
-		SET calculated_player_rating = ?,
-		    best_average_rating = ?,
-		    new_average_rating = ?
-		WHERE id = ?
-	`
-	_, err := exec.ExecContext(ctx, query, calculatedRating, bestAverage, newAverage, playerID)
-	return err
-}
-
 // FindByUserID はユーザーIDでプレイヤーを検索します。見つからない場合は(nil, nil)を返します。
 func (r *playerRepository) FindByUserID(ctx context.Context, exec repository.Executor, userID int) (*entity.Player, error) {
 	return r.findByUserID(ctx, exec, userID, false)
@@ -226,12 +224,14 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 	query := `
 		INSERT INTO players (
 			user_id, player_name, player_level, official_player_rating,
+			calculated_player_rating, best_average_rating, new_average_rating,
 			class_emblem_id, class_emblem_base_id, last_played_at,
 			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	result, err := exec.ExecContext(ctx, query,
 		player.UserID, player.Name.String(), player.Level, player.OfficialRating,
+		player.CalculatedRating, player.BestAverageRating, player.NewAverageRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
 		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.CreatedAt, player.UpdatedAt,
 	)
@@ -262,6 +262,9 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		SET player_name = ?,
 		    player_level = ?,
 		    official_player_rating = ?,
+		    calculated_player_rating = ?,
+		    best_average_rating = ?,
+		    new_average_rating = ?,
 		    class_emblem_id = ?,
 		    class_emblem_base_id = ?,
 		    last_played_at = ?,
@@ -274,6 +277,7 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 	`
 	_, err := exec.ExecContext(ctx, query,
 		player.Name.String(), player.Level, player.OfficialRating,
+		player.CalculatedRating, player.BestAverageRating, player.NewAverageRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.LastPlayedAt,
 		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.UpdatedAt,
 		player.ID,

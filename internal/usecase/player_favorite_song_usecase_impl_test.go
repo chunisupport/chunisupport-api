@@ -83,8 +83,8 @@ func (s *stubPlayerRepoForFav) FindHonorsByPlayerID(ctx context.Context, exec re
 	return nil, errors.New("not implemented")
 }
 
-func (s *stubPlayerRepoForFav) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
-	return errors.New("not implemented")
+func (s *stubPlayerRepoForFav) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return s.FindByID(ctx, exec, id)
 }
 
 func (s *stubPlayerRepoForFav) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {

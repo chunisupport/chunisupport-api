@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -89,37 +88,31 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 	if err != nil {
 		return status, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
 
-	var playerRow playerBatchDataRow
-	if err = tx.GetContext(ctx, &playerRow, `
-		SELECT id, last_played_at, data_collected_at
-		FROM players
-		WHERE id = ?
-		FOR UPDATE`, key.ID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			_ = tx.Rollback()
+	playerRepo := NewPlayerRepository(r.db)
+	player, err := playerRepo.FindByIDForUpdate(ctx, tx, key.ID)
+	if err != nil {
+		if errors.Is(err, domainrepo.ErrPlayerNotFound) {
 			return domainrepo.PlayerBatchDeleted, nil
 		}
 		return status, err
 	}
-	data := domainrepo.PlayerBatchData{ID: playerRow.ID, LastPlayedAt: playerRow.LastPlayedAt, DataCollectedAt: playerRow.DataCollectedAt}
+	data := domainrepo.PlayerBatchData{ID: player.ID, LastPlayedAt: player.LastPlayedAt, DataCollectedAt: player.DataCollectedAt}
 	if !equalNullableTime(data.DataCollectedAt, key.DataCollectedAt) {
-		_ = tx.Rollback()
 		return domainrepo.PlayerBatchConflict, nil
 	}
 	var recordRows []playerBatchRecordRow
-	if err = tx.SelectContext(ctx, &recordRows, `
+	recordQuery := `
 		SELECT pr.chart_id, pr.score, pr.combo_lamp_id, sl.name AS slot_name, pr.slot_order
 		FROM player_records pr
 		INNER JOIN slots sl ON sl.id = pr.slot_id
 		WHERE pr.player_id = ?
-		ORDER BY pr.chart_id
-		FOR UPDATE`, key.ID); err != nil {
+		ORDER BY pr.chart_id`
+	if r.db.DriverName() != "sqlite" {
+		recordQuery += " FOR UPDATE"
+	}
+	if err = tx.SelectContext(ctx, &recordRows, recordQuery, key.ID); err != nil {
 		return status, err
 	}
 	for _, row := range recordRows {
@@ -151,23 +144,11 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 			return status, err
 		}
 	}
-	result, err := tx.ExecContext(ctx, `
-		UPDATE players
-		SET calculated_player_rating = ?, best_average_rating = ?,
-		    new_average_rating = ?, overpower_value = ?
-		WHERE id = ? AND data_collected_at <=> ?`,
-		update.PlayerRating, update.BestAverage, update.NewAverage, update.Overpower,
-		key.ID, key.DataCollectedAt)
-	if err != nil {
+	// Playerのロック取得後は取得日時も関連レコードも通常更新と直列化されるため、再度の条件付きUPDATEは不要です。
+	player.ChangeCalculatedRatings(update.PlayerRating, update.BestAverage, update.NewAverage)
+	player.ChangeOverpower(&update.Overpower, player.OverpowerPercent)
+	if err = playerRepo.Save(ctx, tx, player); err != nil {
 		return status, err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return status, err
-	}
-	if affected == 0 {
-		_ = tx.Rollback()
-		return domainrepo.PlayerBatchConflict, nil
 	}
 	if err = tx.Commit(); err != nil {
 		return status, err
@@ -200,12 +181,6 @@ type batchChartRow struct {
 
 type playerBatchKeyRow struct {
 	ID              int        `db:"id"`
-	DataCollectedAt *time.Time `db:"data_collected_at"`
-}
-
-type playerBatchDataRow struct {
-	ID              int        `db:"id"`
-	LastPlayedAt    *time.Time `db:"last_played_at"`
 	DataCollectedAt *time.Time `db:"data_collected_at"`
 }
 

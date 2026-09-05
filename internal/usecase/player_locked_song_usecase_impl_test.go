@@ -57,8 +57,8 @@ func (s *stubPlayerLockedSongPlayerRepository) FindHonorsByPlayerID(ctx context.
 	return nil, nil
 }
 
-func (s *stubPlayerLockedSongPlayerRepository) UpdateCalculatedRatings(ctx context.Context, exec repository.Executor, playerID int, calculatedRating, bestAverage, newAverage float64) error {
-	return nil
+func (s *stubPlayerLockedSongPlayerRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
+	return s.FindByID(ctx, exec, id)
 }
 
 func (s *stubPlayerLockedSongPlayerRepository) Save(ctx context.Context, exec repository.Executor, player *entity.Player) error {
