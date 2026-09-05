@@ -174,6 +174,81 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 	assert.True(t, record.IsPlayed)
 }
 
+func TestToRecordsShowAllResponse_ClearLampFlags(t *testing.T) {
+	tests := []struct {
+		name      string
+		clearLamp *string
+		wantClear bool
+	}{
+		{
+			name:      "クリアランプなしは未クリア",
+			clearLamp: nil,
+			wantClear: false,
+		},
+		{
+			name:      "FAILEDは未クリア",
+			clearLamp: stringPtr("FAILED"),
+			wantClear: false,
+		},
+		{
+			name:      "CLEARはクリア",
+			clearLamp: stringPtr("CLEAR"),
+			wantClear: true,
+		},
+		{
+			name:      "HARDはクリア",
+			clearLamp: stringPtr("HARD"),
+			wantClear: true,
+		},
+		{
+			name:      "BRAVEはクリア",
+			clearLamp: stringPtr("BRAVE"),
+			wantClear: true,
+		},
+		{
+			name:      "ABSOLUTEはクリア",
+			clearLamp: stringPtr("ABSOLUTE"),
+			wantClear: true,
+		},
+		{
+			name:      "CATASTROPHYはクリア",
+			clearLamp: stringPtr("CATASTROPHY"),
+			wantClear: true,
+		},
+		{
+			name:      "未知の値は未クリア",
+			clearLamp: stringPtr("UNKNOWN"),
+			wantClear: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			updatedAt := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+			chartConst, err := chartconstant.NewChartConstant(14.0)
+			require.NoError(t, err)
+			records := []*dto.PlayerRecordDTO{
+				{
+					UpdatedAt:  &updatedAt,
+					IsPlayed:   true,
+					Difficulty: "MAS",
+					ID:         "song001",
+					Const:      chartConst,
+					ClearLamp:  tt.clearLamp,
+				},
+			}
+
+			// When
+			result := ToRecordsShowAllResponse(records, nil, time.UTC)
+
+			// Then
+			require.Len(t, result.Records, 1)
+			assert.Equal(t, tt.wantClear, result.Records[0].IsClear)
+		})
+	}
+}
+
 func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
 	tests := []struct {
 		name           string
