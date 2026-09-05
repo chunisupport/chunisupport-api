@@ -71,6 +71,9 @@ func (us *scoreHistoryUsecase) GetStandard(ctx context.Context, username string,
 	if err != nil {
 		return nil, err
 	}
+	if song == nil || song.IsWorldsend || !song.IsActive() {
+		return nil, repository.ErrSongNotFound
+	}
 	masters := us.masterProvider.PlayerDataMasters()
 	difficultyMaster, exists := masters.Difficulties[difficulty]
 	if !exists {
@@ -101,6 +104,9 @@ func (us *scoreHistoryUsecase) GetWorldsend(ctx context.Context, username string
 	song, err := us.worldsendRepo.FindByDisplayID(ctx, us.exec, displayID)
 	if err != nil {
 		return nil, err
+	}
+	if song == nil || song.Song == nil || !song.Song.IsWorldsend || !song.Song.IsActive() {
+		return nil, repository.ErrSongNotFound
 	}
 	if song.Chart == nil {
 		return nil, ErrChartNotFound
