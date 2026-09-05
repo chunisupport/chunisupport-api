@@ -64,8 +64,9 @@ func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 	}
 	updatedUsername, err := h.userCredentialUsecase.UpdateUsername(c.Request().Context(), user.ID, req.Username, reauthToken)
 	if err != nil {
-		slog.Error("Failed to update username", "user_id", user.ID, "error", err)
-		return apierror.FromUsecaseError(err)
+		apiErr := apierror.FromUsecaseError(err)
+		logProfileUpdateFailure("Failed to update username", user.ID, apiErr)
+		return apiErr
 	}
 	return c.JSON(http.StatusOK, map[string]string{"username": updatedUsername})
 }
@@ -83,8 +84,9 @@ func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 	}
 
 	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
-		slog.Error("Failed to update privacy setting", "user_id", user.ID, "error", err)
-		return apierror.FromUsecaseError(err)
+		apiErr := apierror.FromUsecaseError(err)
+		logProfileUpdateFailure("Failed to update privacy setting", user.ID, apiErr)
+		return apiErr
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"is_private": req.IsPrivate})
@@ -103,9 +105,22 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 	}
 
 	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID, reauthToken); err != nil {
-		slog.Error("Failed to delete user", "user_id", user.ID, "error", err)
-		return apierror.FromUsecaseError(err)
+		apiErr := apierror.FromUsecaseError(err)
+		logProfileUpdateFailure("Failed to delete user", user.ID, apiErr)
+		return apiErr
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+// logProfileUpdateFailure はプロフィール更新系の失敗をログに出力します。
+// 禁止語・使用済み・バリデーションなどの想定内クライアントエラー（4xx系）は
+// Error通知の対象にしないためInfoに落とし、想定外のサーバーエラー（5xx系）のみErrorとします。
+// 4xx系の詳細は共通エラーハンドラー側でもWarnログとして記録されます。
+func logProfileUpdateFailure(message string, userID int, apiErr *apierror.APIError) {
+	if apiErr.HTTPStatus >= http.StatusInternalServerError {
+		slog.Error(message, "user_id", userID, "code", apiErr.Code, "error", apiErr.Internal)
+		return
+	}
+	slog.Info(message, "user_id", userID, "code", apiErr.Code, "status", apiErr.HTTPStatus)
 }
