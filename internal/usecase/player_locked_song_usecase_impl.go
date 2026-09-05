@@ -279,8 +279,7 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 		return err
 	}
 	value, percent := domainservice.CalcOverpowerSummary(overpowerRecords, stats.MaxOverpowerTotal)
-	player.OverpowerValue = &value
-	player.OverpowerPercent = &percent
+	player.ChangeOverpower(&value, &percent)
 	return u.playerRepo.Save(ctx, exec, player)
 }
 

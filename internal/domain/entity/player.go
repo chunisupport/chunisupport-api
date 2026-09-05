@@ -73,10 +73,31 @@ func (p *Player) ChangeOfficialMetrics(rating, overpower, overpowerPercent float
 	p.OfficialOverpower = overpower
 	p.OfficialOverpowerPercent = &overpowerPercent
 	p.DataCollectedAt = &collectedAt
+	p.UpdatedAt = collectedAt
 	return nil
 }
 
 // PendingMetricHistory は次回の集約保存で追記する公式指標履歴を返します。
 func (p *Player) PendingMetricHistory() *PlayerMetricHistoryEntry {
 	return p.metricHistoryToAppend
+}
+
+func (p *Player) ChangeProfile(name playername.PlayerName, level int, classEmblemID, classEmblemBaseID *int, lastPlayedAt *time.Time) {
+	p.Name = name
+	p.Level = level
+	p.ClassEmblemID = classEmblemID
+	p.ClassEmblemBaseID = classEmblemBaseID
+	p.LastPlayedAt = lastPlayedAt
+}
+
+// ChangeCalculatedRatings は公式指標と取得日時を維持して、再計算した指標だけを反映します。
+func (p *Player) ChangeCalculatedRatings(rating, bestAverage, newAverage float64) {
+	p.CalculatedRating = &rating
+	p.BestAverageRating = &bestAverage
+	p.NewAverageRating = &newAverage
+}
+
+func (p *Player) ChangeOverpower(value, percent *float64) {
+	p.OverpowerValue = value
+	p.OverpowerPercent = percent
 }

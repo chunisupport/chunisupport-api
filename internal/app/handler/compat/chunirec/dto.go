@@ -119,7 +119,7 @@ func ToRecordsShowAllResponse(records []*dto.PlayerRecordDTO, genresBySongID map
 			Score:          record.Score,
 			Rating:         record.Rating,
 			IsConstUnknown: record.IsConstUnknown,
-			IsClear:        record.ClearLamp != nil,
+			IsClear:        isClearLamp(record.ClearLamp),
 			IsFullCombo:    isFullCombo(record.ComboLamp),
 			IsAllJustice:   isAllJustice(record.ComboLamp),
 			IsFullChain:    record.FullChain != nil,
@@ -158,6 +158,22 @@ func isFullCombo(comboLamp *string) bool {
 
 func isAllJustice(comboLamp *string) bool {
 	return comboLamp != nil && *comboLamp == "ALL JUSTICE"
+}
+
+// isClearLamp はFAILEDとクリア系ランプを区別して互換APIのis_clearを判定します。
+func isClearLamp(clearLamp *string) bool {
+	if clearLamp == nil {
+		return false
+	}
+
+	switch *clearLamp {
+	case "FAILED":
+		return false
+	case "CLEAR", "HARD", "BRAVE", "ABSOLUTE", "CATASTROPHY":
+		return true
+	default:
+		return false
+	}
 }
 
 // toMusicItemDTO は1曲のSongをMusicItemDTOに変換する内部ヘルパー関数です

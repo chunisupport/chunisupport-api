@@ -145,6 +145,12 @@ var (
 	ErrFriendshipLimitExceeded = New(CodeFriendshipLimitExceeded, http.StatusBadRequest)
 	ErrFriendshipConflict      = New(CodeFriendshipConflict, http.StatusConflict)
 	ErrFriendRequestNotFound   = New(CodeFriendRequestNotFound, http.StatusNotFound)
+
+	ErrInvalidVersionInput = New(CodeInvalidVersionInput, http.StatusUnprocessableEntity)
+	ErrVersionNotFound     = New(CodeVersionNotFound, http.StatusNotFound)
+	ErrVersionNameConflict = New(CodeVersionNameConflict, http.StatusConflict)
+	ErrVersionNotLatest    = New(CodeVersionNotLatest, http.StatusConflict)
+	ErrVersionInUse        = New(CodeVersionInUse, http.StatusConflict)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

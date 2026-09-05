@@ -189,6 +189,8 @@ Content-Type: application/json
 | `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
 | `/internal/admin/user-stats` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けユーザー集計取得 |
+| `/internal/admin/versions` | GET / POST | Firebase Bearer (ADMIN+) | バージョン全件一覧・追加 |
+| `/internal/admin/versions/:id` | PUT / DELETE | Firebase Bearer (ADMIN+) | バージョン改名・削除 |
 | `/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/chart-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
@@ -432,6 +434,33 @@ Content-Type: application/json
 ---
 
 ## 管理者向け情報エンドポイント
+
+### バージョン管理 `/internal/admin/versions`
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **GET**: 未来版を含む全件を `released_at` 昇順、同日はID昇順で返します。レスポンスは `VersionDTO` の配列です。
+- **POST**: バージョンを追加し、201 Createdで作成した `VersionDTO` を返します。未来日を指定できます。
+
+```json
+{
+  "name": "CHUNITHM Mate",
+  "released_at": "2026-07-02"
+}
+```
+
+`name` は前後空白除去後1〜50文字かつ `CHUNITHM ` 接頭辞が必要です。`released_at` は `YYYY-MM-DD` 形式で、既存版と同日は指定できません。
+
+### バージョン改名・削除 `/internal/admin/versions/:id`
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **PUT**: `{"name":"CHUNITHM VERSE"}` の形式で名前だけを変更し、200 OKで変更後の `VersionDTO` を返します。`released_at` を含む要求は拒否します。
+- **DELETE**: 対象が最新版で、そのリリース日以降にリリースされた曲が1件もない場合だけ物理削除し、204 No Contentを返します。`songs.is_deleted` にかかわらず曲ありと判定し、`songs.released_at IS NULL` は対象外です。
+
+主なエラーは `validation_failed`（400、JSONまたはID形式不正）、`invalid_version_input`（422）、`version_not_found`（404）、`version_name_conflict`・`version_not_latest`・`version_in_use`（409）です。
+
+`released_at` を誤登録した場合は、対象区間の曲を既存の楽曲更新APIで正しい日付範囲へ移し、最新版が曲なしになってから削除し、正しい日付で作成し直してください。中間版は削除できません。
+
+バージョン管理APIは単一APIプロセスでの運用を前提とし、バージョン書込の直列化、削除と楽曲書込の排他、キャッシュのホットリロードを同一プロセス内で保証します。
 
 ### GET `/internal/admin/user-stats`
 
@@ -4112,7 +4141,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `genres` | MasterItemDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
-| `versions` | VersionDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
+| `versions` | VersionDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
 | `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`PlayerDTO.class_emblem_id` の解決に使用 |
@@ -4154,7 +4183,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/master/versions`
 
 - **認証**: 不要
-- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを段階的に分離取得するためのエンドポイントです。起動日時点でリリース済みのバージョンのみを返します。
+- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを分離取得するためのエンドポイントです。読取時のJST当日までにリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
 - **主なエラー**:
@@ -4191,7 +4220,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
-- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。起動日時点でリリース済みのバージョンのみを返します。
+- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。読取時のJST当日までにリリース済みのバージョンのみを返します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -4206,7 +4235,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `versions` | VersionSummaryDTO[] | バージョン一覧（起動日時点でリリース済みのバージョンをリリース日昇順） |
+| `versions` | VersionSummaryDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定
@@ -5010,7 +5039,7 @@ reiwa互換APIは外部ツールとの互換性を持つエンドポイントで
 ### GET `/compat/reiwa/1/chunithm_versions.json`
 
 - **認証**: APIトークン必須
-- **概要**: 起動日時点でリリース済みのCHUNITHMバージョン一覧をreiwa互換形式で取得します。
+- **概要**: 読取時のJST当日までにリリース済みのCHUNITHMバージョン一覧をreiwa互換形式で取得します。
 - **レスポンス**: 200 OK
 
 ```json

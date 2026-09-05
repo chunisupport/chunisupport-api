@@ -375,6 +375,42 @@ func TestPreload_ExcludesFutureVersions(t *testing.T) {
 	assert.False(t, goalFutureOK, "未リリース版は GoalMasters.VersionsByID に含まれるべき")
 }
 
+func TestCache_PublicVersionsByID_読取時のJST日付で未来版を切り替える(t *testing.T) {
+	future := Version{ID: 2, Name: "CHUNITHM FUTURE", ReleasedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}
+	now := time.Date(2026, 1, 1, 14, 59, 59, 0, time.UTC)
+	cache := &Cache{
+		now: func() time.Time { return now },
+		allVersions: map[string]Version{
+			future.Name: future,
+		},
+		allVersionsByID: map[int]Version{int(future.ID): future},
+	}
+
+	assert.NotContains(t, cache.PublicVersionsByID(), 2)
+	assert.Contains(t, cache.AdminVersions(), 2)
+
+	now = now.Add(time.Second)
+	assert.Contains(t, cache.PublicVersionsByID(), 2)
+}
+
+func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *testing.T) {
+	db, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO versions (id, name, released_at) VALUES (?, ?, ?)`, 1, "CHUNITHM VERSE", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	cache := &Cache{db: db, now: time.Now, allVersions: map[string]Version{}, allVersionsByID: map[int]Version{}, versionsStale: true}
+
+	versions := cache.PublicVersionsByID()
+
+	require.Contains(t, versions, 1)
+	assert.Equal(t, "CHUNITHM VERSE", versions[1].Name)
+	assert.False(t, cache.versionsStale)
+}
+
 func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate time.Time) {
 	t.Helper()
 

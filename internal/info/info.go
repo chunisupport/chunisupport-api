@@ -53,6 +53,7 @@ const (
 	WorldsendSongSnapshotObjectKey              = "v1/worldsend-songs.json"
 	ChunirecSongSnapshotObjectKey               = "compat/chunirec/2.0/music/showall.json"
 	ReiwaSongSnapshotObjectKey                  = "compat/reiwa/1/chunithm_record/original.json"
+	ReiwaVersionSnapshotObjectKey               = "compat/reiwa/1/chunithm_versions.json"
 	BasicChartStatsSnapshotObjectKey            = "v1/chart-stats/BASIC.json"
 	AdvancedChartStatsSnapshotObjectKey         = "v1/chart-stats/ADVANCED.json"
 	ExpertChartStatsSnapshotObjectKey           = "v1/chart-stats/EXPERT.json"
@@ -76,6 +77,7 @@ const (
 	PlayerLatestUpdateOPPercentSchemaVersion    = 3
 	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
 	MaintenanceRetryAfterSeconds                = 60
+	VersionCacheReloadTimeout                   = 5 * time.Second
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

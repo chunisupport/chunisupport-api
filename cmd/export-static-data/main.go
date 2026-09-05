@@ -165,6 +165,7 @@ func run() int {
 		transactionManager,
 		database,
 	)
+	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, nil)
 	exporter := staticdataexport.NewExporter(
 		songUsecase,
 		worldsendUsecase,
@@ -176,6 +177,10 @@ func run() int {
 		},
 		func(songs []*entity.Song) (any, int) {
 			response := reiwa.ToChunithmRecordOriginalResponse(songs, masterCache)
+			return response, len(response)
+		},
+		func(ctx context.Context) (any, int) {
+			response := reiwa.ToChunithmVersionsResponse(masterDataUsecase.GetVersions(ctx))
 			return response, len(response)
 		},
 		objectStorageWriter,
@@ -194,6 +199,7 @@ func run() int {
 		"worldsend_songs", result.WorldsendSongCount,
 		"chunirec_songs", result.ChunirecSongCount,
 		"reiwa_records", result.ReiwaRecordCount,
+		"reiwa_versions", result.ReiwaVersionCount,
 		"duration", time.Since(startedAt),
 	)
 	return 0

@@ -10,6 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
@@ -183,6 +184,13 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 		require.NoError(t, db.Close())
 	})
 
+	setupPlayerRepositorySchema(t, db)
+	return db
+}
+
+func setupPlayerRepositorySchema(t *testing.T, db *sqlx.DB) {
+	t.Helper()
+
 	schema := []string{
 		`CREATE TABLE players (
 			id INTEGER PRIMARY KEY,
@@ -233,7 +241,6 @@ func setupPlayerRepositorySQLite(t *testing.T) *sqlx.DB {
 		require.NoError(t, err)
 	}
 
-	return db
 }
 
 func TestPlayerRepository_Save_公式指標履歴と現在値を同一トランザクションで保存する(t *testing.T) {
@@ -341,4 +348,38 @@ func TestFindByIDWithHonors_ReturnsNoRowsWhenPlayerMissing(t *testing.T) {
 	result, err := repo.FindByIDWithHonors(context.Background(), db, 999)
 	require.ErrorIs(t, err, domainrepo.ErrPlayerNotFound)
 	require.Nil(t, result)
+}
+
+func TestPlayerRepository_Save_Aggregate(t *testing.T) {
+	for _, insert := range []bool{true, false} {
+		name := "更新"
+		if insert {
+			name = "新規"
+		}
+		t.Run(name, func(t *testing.T) {
+			db := setupPlayerRepositorySQLite(t)
+			seedPlayerWithHonors(t, db, 1, false)
+			repo := &playerRepository{db: db}
+			ctx := context.Background()
+			tx, err := db.Beginx()
+			require.NoError(t, err)
+			defer tx.Rollback()
+			player, err := repo.FindByUserIDForUpdate(ctx, tx, 20)
+			require.NoError(t, err)
+			require.NotNil(t, player)
+			if insert {
+				player.ID = 0
+				player.UserID = 21
+			}
+			rating, best, newRating, overpower := 16.5, 16.7, 16.2, 12345.0
+			player.CalculatedRating = &rating
+			player.BestAverageRating = &best
+			player.NewAverageRating = &newRating
+			player.OverpowerValue = &overpower
+			require.NoError(t, repo.Save(ctx, tx, player))
+			saved, err := repo.FindByID(ctx, tx, player.ID)
+			require.NoError(t, err)
+			assert.Equal(t, player, saved)
+		})
+	}
 }

@@ -116,7 +116,7 @@ func resolveVersionName(releasedAt *time.Time, cache *masterdata.Cache) string {
 	}
 
 	var targetVersion *masterdata.Version
-	for _, v := range cache.VersionsByID {
+	for _, v := range cache.PublicVersionsByID() {
 		if !v.ReleasedAt.After(*releasedAt) {
 			if targetVersion == nil || v.ReleasedAt.After(targetVersion.ReleasedAt) {
 				vCopy := v
