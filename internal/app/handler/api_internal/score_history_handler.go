@@ -23,6 +23,10 @@ func NewScoreHistoryHandler(scoreHistoryUsecase usecase.ScoreHistoryUsecase) *Sc
 
 // GetStandard は通常譜面のスコア履歴を返します。
 func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	difficulty, ok := apphandler.ParseDifficultyPath(c.Param("difficulty"))
 	if !ok || difficulty == "WORLD'S END" {
 		return apierror.ErrInvalidDifficulty
@@ -32,7 +36,7 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 		return apiErr
 	}
 	entries, err := h.usecase.GetStandard(
-		c.Request().Context(), username, requester, c.Param("displayid"), difficulty,
+		c.Request().Context(), username, requester, displayID, difficulty,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -42,12 +46,16 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 
 // GetWorldsend はWORLD'S END譜面のスコア履歴を返します。
 func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	if apiErr != nil {
+		return apiErr
+	}
 	username, requester, apiErr := internalScoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetWorldsend(
-		c.Request().Context(), username, requester, c.Param("displayid"),
+		c.Request().Context(), username, requester, displayID,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)

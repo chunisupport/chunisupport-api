@@ -3433,6 +3433,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 400 Bad Request (`validation_failed`): `username` が不正
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 400 Bad Request (`score_history_unsupported_difficulty`): 履歴対象外の難易度
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式が不正
+  - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、または通常楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
@@ -3695,6 +3697,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:id/score-history` と同一です。
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` が不正
+  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式が不正
+  - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、またはWORLD'S END楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
@@ -4577,6 +4581,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 400 Bad Request (`validation_failed`): `username` 未指定
   - 400 Bad Request (`score_history_unsupported_difficulty`): 指定された難易度が `expert`, `master`, `ultima` 以外
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、または通常楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
@@ -4601,6 +4607,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、またはWORLD'S END楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
