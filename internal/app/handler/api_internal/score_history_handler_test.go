@@ -34,7 +34,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 			getStandard: func(_ context.Context, username string, gotRequester *entity.User, displayID, difficulty string) ([]usecase.ScoreHistoryEntry, error) {
 				assert.Equal(t, "testuser", username)
 				assert.Same(t, requester, gotRequester)
-				assert.Equal(t, "song", displayID)
+				assert.Equal(t, "0123456789abcdef", displayID)
 				assert.Equal(t, "MASTER", difficulty)
 				return []usecase.ScoreHistoryEntry{}, nil
 			},
@@ -44,7 +44,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetPath("/internal/users/:username/record/songs/:displayid/:difficulty/history")
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "song"}, {Name: "difficulty", Value: "master"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
 		c.Set("userEntity", requester)
 
 		err := h.GetStandard(c)
@@ -59,7 +59,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/-/record/songs/song/master/history", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "song"}, {Name: "difficulty", Value: "master"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
 
 		err := h.GetStandard(c)
 
@@ -74,7 +74,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/song/invalid/history", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "song"}, {Name: "difficulty", Value: "invalid"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "invalid"}})
 
 		err := h.GetStandard(c)
 
@@ -91,7 +91,7 @@ func TestInternalScoreHistoryHandler_GetWorldsend(t *testing.T) {
 		getWorldsend: func(_ context.Context, username string, gotRequester *entity.User, displayID string) ([]usecase.ScoreHistoryEntry, error) {
 			assert.Equal(t, "testuser", username)
 			assert.Same(t, requester, gotRequester)
-			assert.Equal(t, "song", displayID)
+			assert.Equal(t, "0123456789abcdef", displayID)
 			return []usecase.ScoreHistoryEntry{}, nil
 		},
 	})
@@ -100,7 +100,7 @@ func TestInternalScoreHistoryHandler_GetWorldsend(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPath("/internal/users/:username/record/worldsend-songs/:displayid/history")
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "song"}})
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}})
 	c.Set("userEntity", requester)
 
 	err := h.GetWorldsend(c)
@@ -109,13 +109,45 @@ func TestInternalScoreHistoryHandler_GetWorldsend(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestInternalScoreHistoryHandler_GetStandard_不正な楽曲IDはUsecaseへ渡さず400系エラーを返す(t *testing.T) {
+	h := NewScoreHistoryHandler(&stubInternalScoreHistoryUsecase{})
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/invalid/master/history", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "invalid"}, {Name: "difficulty", Value: "master"}})
+
+	err := h.GetStandard(c)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+}
+
+func TestInternalScoreHistoryHandler_GetWorldsend_不正な楽曲IDはUsecaseへ渡さず400系エラーを返す(t *testing.T) {
+	h := NewScoreHistoryHandler(&stubInternalScoreHistoryUsecase{})
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/invalid/history", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "invalid"}})
+
+	err := h.GetWorldsend(c)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+}
+
 func TestInternalScoreHistoryHandler_GetWorldsend_不正なユーザー名は400を返す(t *testing.T) {
 	h := NewScoreHistoryHandler(&stubInternalScoreHistoryUsecase{})
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/-/record/worldsend-songs/song/history", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "song"}})
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "0123456789abcdef"}})
 
 	err := h.GetWorldsend(c)
 

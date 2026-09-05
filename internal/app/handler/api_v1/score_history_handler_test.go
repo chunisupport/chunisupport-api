@@ -29,7 +29,7 @@ func (s *stubScoreHistoryUsecase) GetWorldsend(context.Context, string, *entity.
 func TestScoreHistoryHandler_GetStandard(t *testing.T) {
 	t.Run("username未指定は400のvalidation_failed", func(t *testing.T) {
 		h := NewScoreHistoryHandler(&stubScoreHistoryUsecase{})
-		c := newScoreHistoryContext("/v1/songs/song/score-history/master", "song", "master", "")
+		c := newScoreHistoryContext("/v1/songs/0123456789abcdef/score-history/master", "0123456789abcdef", "master", "")
 
 		err := h.GetStandard(c)
 
@@ -45,7 +45,7 @@ func TestScoreHistoryHandler_GetStandard(t *testing.T) {
 				return nil, usecase.ErrScoreHistoryUnsupportedDifficulty
 			},
 		})
-		c := newScoreHistoryContext("/v1/songs/song/score-history/basic?username=testuser", "song", "basic", "testuser")
+		c := newScoreHistoryContext("/v1/songs/0123456789abcdef/score-history/basic?username=testuser", "0123456789abcdef", "basic", "testuser")
 
 		err := h.GetStandard(c)
 
@@ -54,6 +54,30 @@ func TestScoreHistoryHandler_GetStandard(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 		assert.Equal(t, apierror.CodeScoreHistoryUnsupportedDifficulty, apiErr.Code)
 	})
+}
+
+func TestScoreHistoryHandler_GetStandard_不正な楽曲IDはUsecaseへ渡さず400系エラーを返す(t *testing.T) {
+	h := NewScoreHistoryHandler(&stubScoreHistoryUsecase{})
+	c := newScoreHistoryContext("/v1/songs/invalid/score-history/master?username=testuser", "invalid", "master", "testuser")
+
+	err := h.GetStandard(c)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+}
+
+func TestScoreHistoryHandler_GetWorldsend_不正な楽曲IDはUsecaseへ渡さず400系エラーを返す(t *testing.T) {
+	h := NewScoreHistoryHandler(&stubScoreHistoryUsecase{})
+	c := newScoreHistoryContext("/v1/worldsend-songs/invalid/score-history?username=testuser", "invalid", "", "testuser")
+
+	err := h.GetWorldsend(c)
+
+	apiErr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 }
 
 func newScoreHistoryContext(target, displayID, difficulty, username string) *echo.Context {
