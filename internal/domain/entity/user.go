@@ -1,10 +1,17 @@
 package entity
 
 import (
+	"errors"
 	"strings"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+)
+
+var (
+	ErrInvalidAccountType   = errors.New("invalid account type")
+	ErrCannotDemoteOwnAdmin = errors.New("cannot demote own admin account")
 )
 
 // User はユーザーのエンティティを表します。
@@ -18,6 +25,10 @@ type User struct {
 	AccountTypeID int
 	IsSuspicious  bool
 	IsPrivate     bool
+
+	// persistedAccountTypeID は保存済み集約から復元した権限IDです。
+	// Save時に変更前の値で競合を検出するため、外部へは公開しません。
+	persistedAccountTypeID int
 }
 
 // NewUser は必須項目が設定された新規ユーザーを生成します。
@@ -59,6 +70,36 @@ func (u *User) HasLinkedPlayer() bool {
 // HasLinkedFirebase はユーザーに Firebase UID が紐づいているかを判定します。
 func (u *User) HasLinkedFirebase() bool {
 	return u.FirebaseUID != nil && *u.FirebaseUID != ""
+}
+
+// ChangeAccountType は管理者による権限変更を適用します。
+// 自分自身がADMINである状態からADMIN未満へ変更すると、管理者が不在になる事故を防ぐため拒否します。
+func (u *User) ChangeAccountType(requesterID int, accountTypeID int) error {
+	if !constants.IsKnownAccountType(accountTypeID) {
+		return ErrInvalidAccountType
+	}
+	if u.ID == requesterID && u.AccountTypeID == constants.AccountTypeAdmin && accountTypeID != constants.AccountTypeAdmin {
+		return ErrCannotDemoteOwnAdmin
+	}
+
+	u.AccountTypeID = accountTypeID
+	u.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// MarkPersisted はリポジトリが復元または保存した権限IDを記録します。
+// 権限変更後も更新前の値で競合検出できるよう、永続化境界でだけ呼び出します。
+func (u *User) MarkPersisted() {
+	u.persistedAccountTypeID = u.AccountTypeID
+}
+
+// PersistedAccountTypeID は最後に永続化された権限IDを返します。
+// テストなどで直接構築された既存集約は、現在の値を保存済み値として扱います。
+func (u *User) PersistedAccountTypeID() int {
+	if u.persistedAccountTypeID == 0 {
+		return u.AccountTypeID
+	}
+	return u.persistedAccountTypeID
 }
 
 // ChangePrivacy はユーザーの公開/非公開設定を変更します。
