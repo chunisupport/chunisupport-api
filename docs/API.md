@@ -247,6 +247,7 @@ Content-Type: application/json
 | `/internal/users/:username/locked-songs` | GET | Firebase Bearer (任意) | ユーザーの未解禁曲一覧を取得 |
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
+| `/internal/users/:username/permission` | PATCH | Firebase Bearer (ADMIN) | ユーザーの権限変更 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
@@ -285,6 +286,7 @@ Content-Type: application/json
 | `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
 | `/internal/users/:username/record/courses/:displayid` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
+| `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
@@ -3077,6 +3079,30 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開/プレイヤー未紐付含む）
 
+### PATCH `/internal/users/:username/permission`
+
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN
+- **パスパラメータ**: `username` - 変更対象ユーザーのユーザー名
+- **概要**: 対象ユーザーの権限を変更します。他ユーザーのADMINへの昇格、他のADMINの降格も可能です。自分自身を `EDITOR` / `EXTDEV` / `PLAYER` に降格することはできません。同じ権限の指定は成功します。
+- **リクエストボディ**: `Content-Type: application/json`
+
+```json
+{
+  "permission": "EDITOR"
+}
+```
+
+`permission` は必須で、`PLAYER` / `EDITOR` / `ADMIN` / `EXTDEV` のいずれかを大文字で指定します。入力候補は `GET /internal/master/permissions` で取得できます。
+
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式、または権限名が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN権限が不足、または自分自身の降格
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない
+  - 409 Conflict (`conflict`): 保存時に権限などの更新前提が一致しない
+
 ### DELETE `/internal/users/:username`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
@@ -4183,6 +4209,23 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **主なエラー**:
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/master/permissions`
+
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN
+- **概要**: アカウントタイプマスタの権限名をマスタのID昇順で返します。数値IDは含みません。権限変更APIの `permission` の入力候補として利用します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "permissions": ["PLAYER", "EDITOR", "ADMIN", "EXTDEV"]
+}
+```
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN権限が不足
 
 ### GET `/internal/master/versions`
 

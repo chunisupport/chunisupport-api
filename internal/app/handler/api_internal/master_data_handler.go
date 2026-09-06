@@ -79,3 +79,10 @@ func (h *MasterDataHandler) GetHonorTypes(c *echo.Context) error {
 		HonorTypes: itemsToDTOs(h.masterDataUsecase.GetHonorTypes(c.Request().Context())),
 	})
 }
+
+// GetPermissions は管理画面が権限の入力候補だけを取得できるようにします。
+func (h *MasterDataHandler) GetPermissions(c *echo.Context) error {
+	return c.JSON(http.StatusOK, &dto.PermissionsResponse{
+		Permissions: h.masterDataUsecase.GetPermissions(c.Request().Context()),
+	})
+}

@@ -313,3 +313,22 @@ func TestMasterDataUsecase_GetHonorTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestMasterDataUsecase_GetPermissions(t *testing.T) {
+	tests := []struct {
+		name    string
+		masters *masterdata.MasterDataMasters
+		want    []string
+	}{
+		{name: "マスタの権限名をID順に返す", masters: &masterdata.MasterDataMasters{AccountTypes: map[string]master.AccountType{
+			"EXTDEV": {ID: 4, Name: "EXTDEV"}, "ADMIN": {ID: 3, Name: "ADMIN"}, "PLAYER": {ID: 1, Name: "PLAYER"}, "EDITOR": {ID: 2, Name: "EDITOR"},
+		}}, want: []string{"PLAYER", "EDITOR", "ADMIN", "EXTDEV"}},
+		{name: "マスタがない場合は空配列", want: []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := usecase.NewMasterDataUsecase(&masterDataMasterProviderMock{masters: tt.masters}, nil)
+			assert.Equal(t, tt.want, uc.GetPermissions(context.Background()))
+		})
+	}
+}
