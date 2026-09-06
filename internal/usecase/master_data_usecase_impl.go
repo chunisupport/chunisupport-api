@@ -157,3 +157,19 @@ func sortedVersionsByReleasedAt(versions map[int]masterdata.Version) []masterdat
 	})
 	return items
 }
+
+// GetPermissions は権限変更の入力候補として、内部IDを公開せずマスタ順の権限名を返します。
+func (u *masterDataUsecase) GetPermissions(_ context.Context) []string {
+	masters := u.masterProvider.MasterDataMasters()
+	if masters == nil {
+		return []string{}
+	}
+	items := sortedByID(masters.AccountTypes, func(a master.AccountType) masterdata.Item {
+		return masterdata.Item{ID: a.ID, Name: a.Name}
+	})
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.Name
+	}
+	return names
+}

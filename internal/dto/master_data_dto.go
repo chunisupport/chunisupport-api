@@ -85,3 +85,8 @@ type RatingBandDTO struct {
 	MaxExclusive *float64 `json:"max_exclusive"`
 	SortOrder    int      `json:"sort_order"`
 }
+
+// PermissionsResponse は数値IDを公開せず、権限変更にそのまま利用できる名前を返します。
+type PermissionsResponse struct {
+	Permissions []string `json:"permissions"`
+}

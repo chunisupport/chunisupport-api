@@ -35,7 +35,7 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		}
 	}
 
-	return &entity.User{
+	user := &entity.User{
 		ID:            m.ID,
 		Username:      uname,
 		FirebaseUID:   firebaseUID,
@@ -45,7 +45,9 @@ func (m *UserModel) ToEntity() (*entity.User, error) {
 		AccountTypeID: m.AccountTypeID,
 		IsSuspicious:  m.IsSuspicious,
 		IsPrivate:     m.IsPrivate,
-	}, nil
+	}
+	user.MarkPersisted()
+	return user, nil
 }
 
 // FromEntity はentity.UserをUserModelに変換します。

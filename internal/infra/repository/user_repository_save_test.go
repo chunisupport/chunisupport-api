@@ -122,6 +122,36 @@ func TestUserRepositorySaveProtectsAccountTypeIDFromPartialEntity(t *testing.T) 
 	assert.False(t, saved.IsPrivate)
 }
 
+func TestUserRepositorySaveUpdatesAccountTypeFromPersistedAggregate(t *testing.T) {
+	// Given
+	db := setupUserRepositoryTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.Exec(`INSERT INTO account_types (id, name) VALUES (2, 'EDITOR')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, firebase_uid, account_type_id, is_private, is_suspicious)
+		VALUES (1, 'user01', NULL, 1, 0, 0)
+	`)
+	require.NoError(t, err)
+	repo := &userRepository{db: db}
+	user := newUserForRepositorySaveTest(t, 1, "user01")
+	user.MarkPersisted()
+
+	// When
+	err = user.ChangeAccountType(99, info.AccountTypeEditor)
+	require.NoError(t, err)
+	err = repo.Save(ctx, db, user)
+
+	// Then
+	require.NoError(t, err)
+	var savedAccountTypeID int
+	err = db.Get(&savedAccountTypeID, `SELECT account_type_id FROM users WHERE id = ?`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, info.AccountTypeEditor, savedAccountTypeID)
+}
+
 func TestUserRepositorySaveReturnsErrUserNotFoundWhenTargetMissing(t *testing.T) {
 	// Given
 	db := setupUserRepositoryTestDB(t)
@@ -295,4 +325,21 @@ func newUserForRepositorySaveTest(t *testing.T, id int, name string) *entity.Use
 
 func stringPtrForUserSaveTest(v string) *string {
 	return &v
+}
+
+func TestUserRepositorySaveRejectsStalePermission(t *testing.T) {
+	db := setupUserRepositoryTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+	_, err := db.Exec(`INSERT INTO users (id, username, account_type_id) VALUES (1, 'user01', 3)`)
+	require.NoError(t, err)
+	user := newUserForRepositorySaveTest(t, 1, "user01")
+	user.MarkPersisted()
+	require.NoError(t, user.ChangeAccountType(99, info.AccountTypeEditor))
+	repo := &userRepository{db: db}
+	err = repo.Save(ctx, db, user)
+	require.ErrorIs(t, err, domainrepo.ErrUserConflict)
+	var saved int
+	require.NoError(t, db.Get(&saved, `SELECT account_type_id FROM users WHERE id = ?`, 1))
+	assert.Equal(t, info.AccountTypeAdmin, saved)
 }

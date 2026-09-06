@@ -71,3 +71,7 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 	assert.Equal(t, "2026-02-05", response.Versions[0].ReleasedAt)
 	usecaseMock.AssertExpectations(t)
 }
+
+func (m *mockV1MasterDataUsecase) GetPermissions(context.Context) []string {
+	return nil
+}

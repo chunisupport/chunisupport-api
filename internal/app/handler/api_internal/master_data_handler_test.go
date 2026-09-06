@@ -135,3 +135,20 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"released_at\":\"2015-07-16\"}]")
 	usecaseMock.AssertExpectations(t)
 }
+
+func (m *mockMasterDataUsecase) GetPermissions(ctx context.Context) []string {
+	return m.Called(ctx).Get(0).([]string)
+}
+
+func TestMasterDataHandler_GetPermissions(t *testing.T) {
+	e := newTestEcho()
+	uc := new(mockMasterDataUsecase)
+	uc.On("GetPermissions", mock.Anything).Return([]string{"PLAYER", "EDITOR", "ADMIN", "EXTDEV"}).Once()
+	handler := api_internal.NewMasterDataHandler(uc)
+	rec := httptest.NewRecorder()
+	err := handler.GetPermissions(e.NewContext(httptest.NewRequest(http.MethodGet, "/internal/master/permissions", nil), rec))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"permissions":["PLAYER","EDITOR","ADMIN","EXTDEV"]}`, rec.Body.String())
+	uc.AssertExpectations(t)
+}

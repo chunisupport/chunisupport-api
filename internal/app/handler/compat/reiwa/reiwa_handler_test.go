@@ -55,3 +55,7 @@ func TestReiwaHandler_GetChunithmVersions(t *testing.T) {
 		}
 	]`, rec.Body.String())
 }
+
+func (s stubReiwaMasterDataUsecase) GetPermissions(context.Context) []string {
+	return nil
+}
