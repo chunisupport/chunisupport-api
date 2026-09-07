@@ -39,7 +39,6 @@ go run ./cmd/export-static-data --chart-stats
 | 環境 | `CLOUDFLARE_ZONE_ID` | `STATIC_DATA_PUBLIC_BASE_URL` |
 | --- | --- | --- |
 | 開発・ステージング | `575f883bc4eb7c2d89c56ee987c73873` | `https://static.chunisup-dev.f5.si` |
-| beta | `6ef634111241a2dc524992ed7cfcf20f` | `https://static.beta-chunisup.f5.si` |
 | 本番 | `c7e970656a686c79cce6fad84c888d2c` | `https://static.chunisupport.net` |
 
 バッチは既存のログ、タイムゾーン、DB接続設定も使用するため、`APP_ENV`、`DB_NAME`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`も必要です。

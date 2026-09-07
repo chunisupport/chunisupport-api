@@ -59,7 +59,6 @@ func LoadCloudflareCacheConfigFromEnv() (CloudflareCacheConfig, error) {
 	}
 	allowedDestinations := map[string]string{
 		info.DevelopStaticDataPublicBaseURL:    info.DevelopCloudflareZoneID,
-		info.BetaStaticDataPublicBaseURL:       info.BetaCloudflareZoneID,
 		info.ProductionStaticDataPublicBaseURL: info.ProductionCloudflareZoneID,
 	}
 	if expectedZoneID, ok := allowedDestinations[normalizedBaseURL]; !ok || expectedZoneID != zoneID {
