@@ -30,12 +30,13 @@ type GoalRepository interface {
 
 // GoalTargetFilter は目標対象譜面の絞り込み条件です。
 type GoalTargetFilter struct {
-	DifficultyIDs []int
-	GenreIDs      []int
-	VersionRanges []VersionRange
-	ConstMin      *float64
-	ConstMax      *float64
-	OPTargetOnly  bool
+	DifficultyIDs                  []int
+	GenreIDs                       []int
+	VersionRanges                  []VersionRange
+	ConstMin                       *float64
+	ConstMax                       *float64
+	MinTheoreticalRatingHundredths *int64
+	OPTargetOnly                   bool
 }
 
 type VersionRange struct {

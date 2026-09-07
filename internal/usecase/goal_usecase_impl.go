@@ -271,6 +271,7 @@ type goalAttributeFilter struct {
 
 type goalAchievementParam struct {
 	Score          *int
+	Rating         *float64
 	Count          *int
 	Total          *float64
 	RemainingInt   *int64
@@ -599,6 +600,49 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 			}
 			result.Percent = &percent
 		}
+	case achievementType == "rating_count":
+		if !hasOnlyKeys(m, "rating", "count", "remaining", "percent") {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		rating, ratingOK, err := parseOptional[float64](m["rating"])
+		if err != nil || !ratingOK || rating < 0.01 || !isScale(rating, 2) {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		result.Rating = &rating
+
+		count, countOK, err := parseOptional[int](m["count"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		remaining, remOK, err := parseOptional[int64](m["remaining"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		percent, pctOK, err := parseOptional[float64](m["percent"])
+		if err != nil {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if countBoolToInt(countOK)+countBoolToInt(remOK)+countBoolToInt(pctOK) > 1 {
+			return nil, nil, ErrInvalidAchievementParam
+		}
+		if countOK {
+			if count < 1 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Count = &count
+		}
+		if remOK {
+			if remaining < 0 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.RemainingInt = &remaining
+		}
+		if pctOK {
+			if percent < 0 || percent > 100 {
+				return nil, nil, ErrInvalidAchievementParam
+			}
+			result.Percent = &percent
+		}
 	case achievementType == "avg_score":
 		var score int
 		if len(m) != 1 || !hasOnlyKeys(m, "score") || json.Unmarshal(m["score"], &score) != nil || score < 0 || score > info.TheoreticalScore {
@@ -770,15 +814,15 @@ func validateAchievementParams(achievementType string, raw []byte) ([]byte, *goa
 }
 
 func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievementType string, attrs *goalAttributeFilter, params *goalAchievementParam) error {
-	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, goalTargetFilter(attrs))
+	stats, err := u.goalRepo.GetTargetStats(ctx, u.db, goalTargetFilter(attrs, achievementType, params))
 	if err != nil {
 		return err
 	}
 	return validateDynamicUpperBoundWithStats(achievementType, params, stats)
 }
 
-func goalTargetFilter(attrs *goalAttributeFilter) repository.GoalTargetFilter {
-	return repository.GoalTargetFilter{
+func goalTargetFilter(attrs *goalAttributeFilter, achievementType string, params *goalAchievementParam) repository.GoalTargetFilter {
+	filter := repository.GoalTargetFilter{
 		DifficultyIDs: attrs.DifficultyIDs,
 		GenreIDs:      attrs.GenreIDs,
 		VersionRanges: attrs.VersionRanges,
@@ -786,11 +830,29 @@ func goalTargetFilter(attrs *goalAttributeFilter) repository.GoalTargetFilter {
 		ConstMax:      attrs.ConstMax,
 		OPTargetOnly:  attrs.OPTargetOnly,
 	}
+	if achievementType == "rating_count" && params.Rating != nil {
+		ratingHundredths := int64(math.Round(*params.Rating * 100))
+		filter.MinTheoreticalRatingHundredths = &ratingHundredths
+	}
+	return filter
 }
 
 func validateDynamicUpperBoundWithStats(achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
 	switch achievementType {
 	case "rank_count", "score_count", "hardlamp_count", "combolamp_count", "fullchain_count":
+		if params.Count != nil && *params.Count > stats.ChartCount {
+			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
+		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
+			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			return ErrInvalidAchievementParam
+		}
+	case "rating_count":
+		if stats.ChartCount == 0 {
+			slog.Info("goal validation failed", "reason", "rating_count_no_reachable_charts", "achievement_type", achievementType)
+			return ErrInvalidAchievementParam
+		}
 		if params.Count != nil && *params.Count > stats.ChartCount {
 			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam

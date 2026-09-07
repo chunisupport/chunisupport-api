@@ -55,21 +55,22 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY,
 			song_id INTEGER NOT NULL,
 			difficulty_id INTEGER NOT NULL,
-			const REAL NOT NULL
+			const REAL NOT NULL,
+			is_const_unknown INTEGER NOT NULL DEFAULT 0
 		)`,
 		`INSERT INTO songs (id, genre_id, released_at, is_deleted) VALUES
 			(1, 10, '2024-01-01', 0),
 			(2, 10, '2024-01-01', 0),
 			(3, 10, '2024-01-01', 1)`,
-		`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES
-			(97, 1, 1, 3.0),
-			(98, 1, 2, 6.0),
-			(99, 1, 3, 10.0),
-			(101, 1, 4, 14.0),
-			(102, 1, 5, 15.0),
-			(201, 2, 4, 14.5),
-			(202, 2, 5, 14.5),
-			(301, 3, 5, 16.0)`,
+		`INSERT INTO charts (id, song_id, difficulty_id, const, is_const_unknown) VALUES
+			(97, 1, 1, 3.0, 0),
+			(98, 1, 2, 6.0, 0),
+			(99, 1, 3, 10.0, 0),
+			(101, 1, 4, 14.0, 0),
+			(102, 1, 5, 15.0, 0),
+			(201, 2, 4, 14.5, 0),
+			(202, 2, 5, 14.5, 0),
+			(301, 3, 5, 16.0, 0)`,
 	}
 	for _, stmt := range schema {
 		_, err := db.Exec(stmt)
@@ -271,4 +272,48 @@ func TestGoalRepository_GetTargetStatsOPTargetOnlyWithConstFilter(t *testing.T) 
 	assert.Equal(t, 1, stats.ChartCount)
 	assert.Equal(t, 0, stats.SongCount)
 	assert.InDelta(t, 14.5, stats.TotalChartConst, 0.0001)
+}
+
+func TestGoalRepository_GetTargetStatsFiltersChartsByTheoreticalSingleRating(t *testing.T) {
+	tests := []struct {
+		name                    string
+		minRatingHundredths     int64
+		expectedChartCount      int
+		expectedTotalChartConst float64
+	}{
+		{name: "18.00では15.8を除外して15.9を含む", minRatingHundredths: 1800, expectedChartCount: 1, expectedTotalChartConst: 15.9},
+		{name: "17.45では15.3を含む", minRatingHundredths: 1745, expectedChartCount: 3, expectedTotalChartConst: 47.0},
+		{name: "17.46では15.3を除外する", minRatingHundredths: 1746, expectedChartCount: 2, expectedTotalChartConst: 31.7},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupGoalRepositorySQLite(t)
+			repo := &goalRepository{db: db}
+			_, err := db.Exec(`INSERT INTO songs (id, genre_id, released_at, is_deleted) VALUES
+				(10, 99, '2024-01-01', 0),
+				(11, 99, '2024-01-01', 0),
+				(12, 99, '2024-01-01', 0),
+				(13, 99, '2024-01-01', 0)`)
+			require.NoError(t, err)
+			_, err = db.Exec(`INSERT INTO charts (id, song_id, difficulty_id, const, is_const_unknown) VALUES
+				(1001, 10, 4, 15.8, 0),
+				(1002, 11, 4, 15.9, 0),
+				(1003, 12, 4, 15.3, 0),
+				(1004, 13, 4, 16.0, 1)`)
+			require.NoError(t, err)
+
+			// When
+			stats, err := repo.GetTargetStats(context.Background(), db, domainrepo.GoalTargetFilter{
+				GenreIDs:                       []int{99},
+				MinTheoreticalRatingHundredths: &tt.minRatingHundredths,
+			})
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedChartCount, stats.ChartCount)
+			assert.InDelta(t, tt.expectedTotalChartConst, stats.TotalChartConst, 0.0001)
+		})
+	}
 }

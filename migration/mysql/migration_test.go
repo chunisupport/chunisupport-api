@@ -583,3 +583,17 @@ func TestAddFullChainCountGoalDown_目標を暗黙に削除しない(t *testing.
 	assert.NotContains(t, downSQL, "DELETE FROM goals")
 	assert.NotContains(t, downSQL, "DELETE g FROM goals")
 }
+
+func TestAddRatingCountGoalUp_成果種別を追加する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000046_add_rating_count_goal.up.sql")
+
+	assert.Equal(t, "INSERT INTO achievement_types (code) VALUES ('rating_count');", upSQL)
+}
+
+func TestAddRatingCountGoalDown_目標を暗黙に削除しない(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000046_add_rating_count_goal.down.sql")
+
+	assert.Equal(t, "DELETE FROM achievement_types WHERE code = 'rating_count';", downSQL)
+	assert.NotContains(t, downSQL, "DELETE FROM goals")
+	assert.NotContains(t, downSQL, "DELETE g FROM goals")
+}

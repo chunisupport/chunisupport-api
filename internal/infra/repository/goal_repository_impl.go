@@ -277,6 +277,10 @@ func buildGoalTargetStatsQuery(filter repository.GoalTargetFilter) (string, []an
 		where = append(where, "c.const <= ?")
 		args = append(args, *filter.ConstMax)
 	}
+	if filter.MinTheoreticalRatingHundredths != nil {
+		where = append(where, "c.is_const_unknown = 0", "ROUND(c.const * 10) * 10 + ? >= ?")
+		args = append(args, info.TheoreticalSingleRatingAdd, *filter.MinTheoreticalRatingHundredths)
+	}
 	if filter.OPTargetOnly {
 		where = append(where, `NOT EXISTS (
 			SELECT 1

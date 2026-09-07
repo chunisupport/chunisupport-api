@@ -255,10 +255,11 @@ DB上の `goals` テーブルは以下の構造です。
 
 ## 6. `achievement_type` 仕様
 
-現行実装で有効なのは以下の10種類です。
+現行実装で有効なのは以下の11種類です。
 
 - `rank_count`
 - `score_count`
+- `rating_count`
 - `avg_score`
 - `hardlamp_count`
 - `combolamp_count`
@@ -321,7 +322,28 @@ DB上の `goals` テーブルは以下の構造です。
 
 - `count` / `remaining` / `percent` はいずれか1つのみ任意
 
-### 7.3 `avg_score`
+### 7.3 `rating_count`
+
+```json
+{
+  "rating": 18.00,
+  "count": 1
+}
+```
+
+条件:
+
+- キーは `rating` が必須、`count` / `remaining` / `percent` はいずれか1つのみ任意
+- `rating` は数値、0.01以上、小数第2位まで。固定上限は設けない
+- `count` は整数または `null`、整数の場合は `count >= 1`
+- `remaining` は整数、`remaining >= 0`
+- `percent` は数値、`0 <= percent <= 100`
+- `count` / `remaining` / `percent` は相互排他（2つ以上指定不可）
+- 動的上限は属性に一致し、譜面定数が既知で、理論単曲レート（譜面定数 + 2.15）が `rating` 以上の通常譜面数
+- 理論単曲レートは0.01単位の整数で比較し、到達可能譜面が0件なら作成・更新を拒否
+- マスタ変更後に到達可能譜面が0件となった既存目標も一覧取得ではそのまま返す
+
+### 7.4 `avg_score`
 
 ```json
 {
@@ -334,7 +356,7 @@ DB上の `goals` テーブルは以下の構造です。
 - キーは `score` のみ
 - `score` は整数、`0 <= score <= 1010000`
 
-### 7.4 `hardlamp_count`
+### 7.5 `hardlamp_count`
 
 ```json
 {
@@ -358,7 +380,7 @@ DB上の `goals` テーブルは以下の構造です。
 - キーは `lamp` / `count` / `remaining` / `percent` のみ
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
-### 7.5 `combolamp_count`
+### 7.6 `combolamp_count`
 
 ```json
 {
@@ -380,7 +402,7 @@ DB上の `goals` テーブルは以下の構造です。
 - キーは `lamp` / `count` / `remaining` / `percent` のみ
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
-### 7.6 `fullchain_count`
+### 7.7 `fullchain_count`
 
 ```json
 {
@@ -402,7 +424,7 @@ DB上の `goals` テーブルは以下の構造です。
 - キーは `lamp` / `count` / `remaining` / `percent` のみ
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 
-### 7.7 `total_score`
+### 7.8 `total_score`
 
 ```json
 {
@@ -422,7 +444,7 @@ DB上の `goals` テーブルは以下の構造です。
 
 実装上、Go側では `int64` として受けています。
 
-### 7.8 `overpower_value`
+### 7.9 `overpower_value`
 
 ```json
 {
@@ -441,7 +463,7 @@ DB上の `goals` テーブルは以下の構造です。
 - `percent` は数値、`0 <= percent <= 100`、小数第3位まで許可
 - `total` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面の理論値OverPower合計を目標値として扱う想定です。
 
-### 7.9 `overpower_percent`
+### 7.10 `overpower_percent`
 
 ```json
 {
@@ -456,7 +478,7 @@ DB上の `goals` テーブルは以下の構造です。
 - 小数第3位まで許可
 - `total` は省略不可で、`null` も不可です。
 
-### 7.10 `rainbow_count`
+### 7.11 `rainbow_count`
 
 BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
@@ -666,14 +688,16 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 - `rank_count`
 - `score_count`
+- `rating_count`
 - `hardlamp_count`
 - `combolamp_count`
 - `fullchain_count`
 
 条件:
 
-- `count` が整数で指定されている場合のみ `count <= 対象譜面数`
-- `remaining` が指定されている場合のみ `remaining <= 対象譜面数`
+- `rating_count` 以外は、`count` が整数で指定されている場合のみ `count <= 対象譜面数`
+- `rating_count` は、譜面定数既知かつ「譜面定数 + 2.15 >= rating」の対象譜面を到達可能譜面とし、1件以上であること、および `count <= 到達可能譜面数` を要求する
+- `remaining` が指定されている場合のみ `remaining <= 対象譜面数`。`rating_count` では到達可能譜面数を上限にする
 - `percent` は固定範囲 `0..100` のみで判定され、動的上限はありません
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は動的上限値そのものを使うため、この上限超過エラーにはなりません。
 
@@ -786,6 +810,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 type GoalAchievementType =
   | 'rank_count'
   | 'score_count'
+  | 'rating_count'
   | 'avg_score'
   | 'hardlamp_count'
   | 'combolamp_count'

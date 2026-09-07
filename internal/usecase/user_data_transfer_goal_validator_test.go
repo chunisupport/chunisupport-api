@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,4 +46,30 @@ func TestValidateTransferredGoalsFetchesDynamicStatsInOneBatch(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, repo.statsBatchCalls)
+}
+
+func TestValidateTransferredRatingCountUsesReachableChartFilter(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 1}}
+	validator := &goalUsecase{goalRepo: repo, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "単曲レート18", AchievementType: "rating_count", AchievementParams: json.RawMessage(`{"rating":18.00,"count":1}`), Attributes: json.RawMessage(`{}`)},
+	}}
+
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	require.NoError(t, err)
+	require.NotNil(t, repo.lastFilter.MinTheoreticalRatingHundredths)
+	assert.Equal(t, int64(1800), *repo.lastFilter.MinTheoreticalRatingHundredths)
+}
+
+func TestValidateTransferredRatingCountRejectsNoReachableCharts(t *testing.T) {
+	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 0}}
+	validator := &goalUsecase{goalRepo: repo, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "単曲レート18", AchievementType: "rating_count", AchievementParams: json.RawMessage(`{"rating":18.00}`), Attributes: json.RawMessage(`{}`)},
+	}}
+
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
 }

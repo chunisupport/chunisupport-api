@@ -81,6 +81,7 @@ const (
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
+	TheoreticalSingleRatingAdd  = int64(215)
 	TheoreticalOverpowerBaseAdd = 2.0
 	TheoreticalOverpowerScale   = 5.0
 	TheoreticalOverpowerBonus   = 5.0

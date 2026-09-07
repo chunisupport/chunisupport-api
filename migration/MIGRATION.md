@@ -1,4 +1,4 @@
-﻿# データベースマイグレーションとスキーマ
+# データベースマイグレーションとスキーマ
 
 ## マイグレーションツール
 
@@ -307,3 +307,7 @@ WHERE official_player_rating IS NULL;
 ### 000043 公式OP%履歴
 
 `players`と`player_metric_histories`に`official_overpower_percent DECIMAL(5,2) NULL`を追加する。既存の取得時点には公式OP%の原本がないためバックフィルせず、記録開始前の値は`NULL`のまま保持する。新バイナリへの切替後はプレイヤーデータ登録の`overpower.percentage`を必須とし、RATING・公式OVER POWER・公式OP%のいずれかが変化した場合に更新前の組を履歴化する。
+
+### 000046 単曲レート達成数目標
+
+`achievement_types`に`rating_count`を追加する。downはこの成果種別を参照する目標が残っている間は外部キー制約で失敗するため、ロールバック前に対象目標の移行または削除を完了する。

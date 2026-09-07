@@ -251,7 +251,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 }
 ```
 
-各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、表示順、作成日時を格納する。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。目標IDと目標グループIDは移行先で新規採番する。
+各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、表示順、作成日時を格納する。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。`rating_count` も移行先の最新マスタから到達可能譜面数を再計算するため、移行元と分母が異なる場合があり、0件または `count` / `remaining` 超過となる目標はインポートを拒否する。目標IDと目標グループIDは移行先で新規採番する。
 
 ### 7.9 保存済みフィルタ
 

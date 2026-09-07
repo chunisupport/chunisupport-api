@@ -328,7 +328,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - **ClassEmblem**: クラスエンブレム（称号）
 - **ClassEmblemBase**: クラスエンブレムベース（称号の基礎デザイン）
 - **APIToken**: API認証トークン
-- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count` 等）
+- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count`, `rating_count` 等）
 
 ---
 
@@ -373,6 +373,8 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 #### `AchievementParams` の型整合ルール
 
 `achievement_type` と `achievement_params` の構造は厳密に対応しなければなりません。不一致は不正入力として4xxエラーを返します。詳細な仕様は `docs/API.md` の「`achievement_params` 仕様」を参照してください。
+
+`rating_count` は0.01以上・小数第2位までの `rating` と、相互排他な `count` / `remaining` / `percent` を持ちます。動的上限は属性一致・譜面定数既知・「譜面定数 + 2.15 >= rating」をすべて満たす通常譜面数です。比較は0.01単位の整数で行い、到達可能譜面が0件の作成・更新を拒否します。
 
 #### `Attributes` の仕様
 

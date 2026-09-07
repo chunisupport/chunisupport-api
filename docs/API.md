@@ -1911,6 +1911,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 |---|---|
 | `rank_count` | 指定ランク（スコア）以上の譜面数 |
 | `score_count` | 指定スコア以上の譜面数 |
+| `rating_count` | 指定単曲レート以上の譜面数 |
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
@@ -1927,14 +1928,15 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `achievement_type` | 省略可能なパラメータ | 省略/null時の扱い |
 |---|---|---|
 | `rank_count` / `score_count` | `count` | 対象譜面数（動的上限） |
+| `rating_count` | `count` | 指定単曲レートへ理論上到達可能な対象譜面数（動的上限） |
 | `hardlamp_count` / `combolamp_count` / `fullchain_count` | `count` | 対象譜面数（動的上限） |
 | `rainbow_count` | `count` | 対象楽曲数（動的上限） |
 | `total_score` | `total` | 対象譜面数 × 1,010,000（動的上限） |
 | `overpower_value` | `total` | 対象譜面の理論値OP合計（動的上限） |
 
-上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
+上記以外のパラメータは必須です。例えば `score_count` の `score`、`rating_count` の `rating`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
-`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
+`rank_count` / `score_count` / `rating_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
 
 - `remaining`: 動的上限から差し引く残数
 - `percent`: 動的上限に対する目標割合（%）
@@ -1957,6 +1959,21 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
 | `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+#### `rating_count`
+
+```json
+{ "rating": 18.00, "count": 1 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `rating` | `number` | 0.01以上、小数第2位まで | 単曲レート閾値。固定上限は設けません |
+| `count` | `integer \| null` | null または 1〜到達可能譜面数 | 目標件数。省略/null時は到達可能譜面数そのものを目標にします |
+| `remaining` | `integer \| null` | null または 0〜到達可能譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+到達可能譜面数は、`attributes` に一致する通常譜面のうち、譜面定数が既知で、理論単曲レート（譜面定数 + 2.15）が `rating` 以上の譜面数です。比較は0.01単位の整数で行います。楽曲追加・削除状態・譜面定数・定数既知状態の変更に追従して動的に変化します。到達可能譜面が0件となる入力は作成・更新できません。既存目標がマスタ変更後に0件となっても、一覧取得では保存済み定義をそのまま返します。
 
 #### `avg_score`
 
@@ -2146,6 +2163,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` の `count` ≤ 対象譜面数
+   - `rating_count` の到達可能譜面数が1件以上で、`count` / `remaining` ≤ 到達可能譜面数
    - `rainbow_count.count` ≤ 対象楽曲数
    - 譜面件数系成果種別の `remaining` ≤ 対象譜面数
    - `rainbow_count.remaining` ≤ 対象楽曲数
