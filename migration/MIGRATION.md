@@ -311,3 +311,9 @@ WHERE official_player_rating IS NULL;
 ### 000046 単曲レート達成数目標
 
 `achievement_types`に`rating_count`を追加する。downはこの成果種別を参照する目標が残っている間は外部キー制約で失敗するため、ロールバック前に対象目標の移行または削除を完了する。
+
+### 000047 プレイヤーIDの拡張
+
+`players.id`を`MEDIUMINT UNSIGNED`から`INT UNSIGNED`へ拡張し、`users.player_id`および全プレイヤー関連テーブルの`player_id`も同じ型へ変更する。MySQLでは外部キーの参照元と参照先の型を一致させる必要があるため、適用中はプレイヤーデータとユーザー紐付けの書き込みを停止し、外部キーをいったん削除して型変更後に同じ削除規則で再作成する。
+
+downはMySQLのstrict SQL modeを前提とし、`MEDIUMINT UNSIGNED`の上限を超えるIDが存在する場合に失敗させる。ロールバック前に`players.id`と全参照カラムの最大値が16,777,215以下であることを必ず確認する。各DDLは暗黙コミットされるため、途中失敗時は型と外部キーの状態を確認し、SQLの記載順に不足分のみ再適用する。

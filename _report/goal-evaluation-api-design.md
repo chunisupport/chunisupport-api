@@ -55,7 +55,7 @@
 - **Method**: `GET`
 - **Path**: `/internal/me/goals/evaluations`
 - **Auth**: Firebase Bearer 必須
-- **説明**: 自分の全Goal（最大100件）を評価し、判定結果を返却する
+- **説明**: 自分の全Goal（最大300件）を評価し、判定結果を返却する
 
 ## 3.2 単体判定
 
@@ -256,7 +256,7 @@ if percent != nil:
 
 ## 8.1 目標
 
-- 100 goals/user を想定
+- 300 goals/user を想定
 - 1リクエストあたりDBクエリ回数: **3回以内**を目標
   - goals一覧
   - 判定用データ一括取得（records + charts + songs必要列）
@@ -266,11 +266,11 @@ if percent != nil:
 
 禁止:
 
-- Goal 1件ごとにDB集計クエリ実行（最大100回）
+- Goal 1件ごとにDB集計クエリ実行（最大300回）
 
 推奨:
 
-- 一括取得してメモリ上で100件評価
+- 一括取得してメモリ上で300件評価
 
 ## 8.3 将来拡張
 
@@ -306,12 +306,12 @@ if percent != nil:
   - remaining計算、progress_rate丸め
 - 準正常系
   - goal 0件
-  - 100件
+  - 300件
 - 異常系
   - `goal_not_found`
   - `goal_evaluation_unavailable`
 - 性能系
-  - goals=100でN+1が発生していないこと（クエリ回数アサート）
+  - goals=300でN+1が発生していないこと（クエリ回数アサート）
 
 ---
 

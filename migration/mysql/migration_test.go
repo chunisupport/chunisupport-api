@@ -597,3 +597,46 @@ func TestAddRatingCountGoalDown_目標を暗黙に削除しない(t *testing.T) 
 	assert.NotContains(t, downSQL, "DELETE FROM goals")
 	assert.NotContains(t, downSQL, "DELETE g FROM goals")
 }
+
+func TestExpandPlayerIDUp_参照先と参照元をINTへ拡張する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.up.sql")
+
+	assert.Contains(t, upSQL, "ALTER TABLE players MODIFY COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, upSQL, "INT")
+}
+
+func TestExpandPlayerIDDown_参照先と参照元をMEDIUMINTへ戻す(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players MODIFY COLUMN id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, downSQL, "MEDIUMINT")
+}
+
+func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
+	t.Helper()
+
+	references := []struct {
+		tableName   string
+		constraint  string
+		nullability string
+		onDelete    string
+	}{
+		{"users", "fk_users_player_id", "NULL", "SET NULL"},
+		{"player_course_records", "fk_player_course_records_player", "NOT NULL", "CASCADE"},
+		{"player_favorite_songs", "fk_player_favorite_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_honors", "player_honors_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_latest_updates", "fk_player_latest_updates_player", "NOT NULL", "CASCADE"},
+		{"player_locked_songs", "fk_player_locked_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_metric_histories", "fk_player_metric_histories_player", "NOT NULL", "CASCADE"},
+		{"player_record_histories", "fk_player_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_records", "player_records_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_worldsend_record_histories", "fk_player_worldsend_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_worldsend_records", "player_worldsend_records_ibfk_1", "NOT NULL", "CASCADE"},
+	}
+
+	for _, ref := range references {
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" DROP FOREIGN KEY "+ref.constraint)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" MODIFY COLUMN player_id "+columnType+" UNSIGNED "+ref.nullability)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" ADD CONSTRAINT "+ref.constraint+" FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE "+ref.onDelete)
+	}
+}

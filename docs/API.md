@@ -1846,7 +1846,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 目標はユーザー個人のデータであり、認証済みユーザーの個人データ操作が集約されている `/internal/me` 配下に配置されます。他ユーザーへの公開は現時点では行いません。
 
-- 1ユーザーあたり目標上限は **100件** です。
+- 1ユーザーあたり目標上限は **300件** です。
 - 1ユーザーあたり目標グループ上限は **20件** です。空グループも保持されます。
 - 目標は「属性（`attributes`）」と「成果（`achievement`）」を持ちます。
 - 外部API（`/v1`）には公開しません。
@@ -2174,7 +2174,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
    - `percent` は 0〜100 の固定範囲
    - `overpower_percent.total` は 0〜100 の固定上限
 
-#### 100件上限の担保
+#### 300件上限の担保
 
 作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。作成・削除・並び替えは同じユーザー行ロックを使用するため、件数と表示順を変更する同一ユーザーのリクエストは直列化されます。
 
@@ -2205,7 +2205,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### POST `/internal/me/goals`
 
-目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
+目標を新規作成します。300件上限を超える場合は `goal_limit_exceeded` エラーを返します。
 
 新しい目標は指定グループ（未指定時は未分類）の末尾へ追加され、レスポンスにはサーバーが採番した `sort_order` が含まれます。
 
@@ -2271,7 +2271,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | エラーコード | HTTP | 説明 |
 |---|---|---|
 | `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
-| `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `goal_limit_exceeded` | 400 | 300件上限を超えて作成しようとした |
 | `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
