@@ -1,4 +1,14 @@
--- strict SQL modeでMEDIUMINTの範囲を超えるIDが存在する場合は縮小せず、ALTER TABLEを失敗させる。
+-- CHECK制約でstrict SQL modeを確認し、範囲外IDの切り詰めが起こり得る接続では型縮小を開始しない。
+DROP TEMPORARY TABLE IF EXISTS migration_require_strict_sql_mode;
+CREATE TEMPORARY TABLE migration_require_strict_sql_mode (
+    enabled BOOLEAN NOT NULL,
+    CONSTRAINT chk_migration_require_strict_sql_mode CHECK (enabled = TRUE)
+);
+INSERT INTO migration_require_strict_sql_mode (enabled)
+SELECT FIND_IN_SET('STRICT_ALL_TABLES', @@SESSION.sql_mode) > 0
+    OR FIND_IN_SET('STRICT_TRANS_TABLES', @@SESSION.sql_mode) > 0;
+DROP TEMPORARY TABLE migration_require_strict_sql_mode;
+
 ALTER TABLE users DROP FOREIGN KEY fk_users_player_id;
 ALTER TABLE player_course_records DROP FOREIGN KEY fk_player_course_records_player;
 ALTER TABLE player_favorite_songs DROP FOREIGN KEY fk_player_favorite_songs_player_id;

@@ -612,6 +612,22 @@ func TestExpandPlayerIDDown_参照先と参照元をMEDIUMINTへ戻す(t *testin
 	assertPlayerIDReferences(t, downSQL, "MEDIUMINT")
 }
 
+func TestExpandPlayerIDDown_StrictSQLModeを型縮小前に検証する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+	cleanupBeforeCheck := "DROP TEMPORARY TABLE IF EXISTS migration_require_strict_sql_mode;"
+	createCheckTable := "CREATE TEMPORARY TABLE migration_require_strict_sql_mode"
+	strictCheck := "INSERT INTO migration_require_strict_sql_mode (enabled) SELECT FIND_IN_SET('STRICT_ALL_TABLES', @@SESSION.sql_mode) > 0 OR FIND_IN_SET('STRICT_TRANS_TABLES', @@SESSION.sql_mode) > 0;"
+	cleanupAfterCheck := "DROP TEMPORARY TABLE migration_require_strict_sql_mode;"
+	firstForeignKeyDrop := "ALTER TABLE users DROP FOREIGN KEY fk_users_player_id;"
+
+	assert.Contains(t, downSQL, "CONSTRAINT chk_migration_require_strict_sql_mode CHECK (enabled = TRUE)")
+	assert.Contains(t, downSQL, strictCheck)
+	assert.Less(t, strings.Index(downSQL, cleanupBeforeCheck), strings.Index(downSQL, createCheckTable))
+	assert.Less(t, strings.Index(downSQL, createCheckTable), strings.Index(downSQL, strictCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, cleanupAfterCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, firstForeignKeyDrop))
+}
+
 func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
 	t.Helper()
 
