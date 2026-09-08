@@ -16,7 +16,7 @@ entity "users" as users {
   username: VARCHAR(50) NOT NULL UNIQUE
   firebase_uid: VARCHAR(128) NULL [UNIQUE]
   account_type_id: TINYINT NOT NULL
-  player_id: INT UNSIGNED [UNIQUE]
+  player_id: INT UNSIGNED NULL [UNIQUE]
   is_private: BOOLEAN NOT NULL
   is_suspicious: BOOLEAN NOT NULL
   created_at: TIMESTAMP
