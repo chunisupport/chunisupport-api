@@ -9,6 +9,17 @@ SELECT FIND_IN_SET('STRICT_ALL_TABLES', @@SESSION.sql_mode) > 0
     OR FIND_IN_SET('STRICT_TRANS_TABLES', @@SESSION.sql_mode) > 0;
 DROP TEMPORARY TABLE migration_require_strict_sql_mode;
 
+-- MEDIUMINT UNSIGNED の上限を超えるプレイヤーIDが存在する場合は、外部キーを外す前に中止する。
+DROP TEMPORARY TABLE IF EXISTS migration_require_player_id_range;
+CREATE TEMPORARY TABLE migration_require_player_id_range (
+    valid BOOLEAN NOT NULL,
+    CONSTRAINT chk_migration_require_player_id_range CHECK (valid = TRUE)
+);
+INSERT INTO migration_require_player_id_range (valid)
+SELECT COALESCE(MAX(id), 0) <= 16777215
+FROM players;
+DROP TEMPORARY TABLE migration_require_player_id_range;
+
 ALTER TABLE users DROP FOREIGN KEY fk_users_player_id;
 ALTER TABLE player_course_records DROP FOREIGN KEY fk_player_course_records_player;
 ALTER TABLE player_favorite_songs DROP FOREIGN KEY fk_player_favorite_songs_player_id;
