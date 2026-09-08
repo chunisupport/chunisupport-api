@@ -16,7 +16,7 @@ entity "users" as users {
   username: VARCHAR(50) NOT NULL UNIQUE
   firebase_uid: VARCHAR(128) NULL [UNIQUE]
   account_type_id: TINYINT NOT NULL
-  player_id: MEDIUMINT UNSIGNED [UNIQUE]
+  player_id: INT UNSIGNED [UNIQUE]
   is_private: BOOLEAN NOT NULL
   is_suspicious: BOOLEAN NOT NULL
   created_at: TIMESTAMP
@@ -35,7 +35,7 @@ entity "api_tokens" as api_tokens {
 }
 
 entity "players" as players {
-  + id: MEDIUMINT UNSIGNED [PK]
+  + id: INT UNSIGNED [PK]
   --
   user_id: INT NOT NULL [UNIQUE]
   player_name: VARCHAR(20) NOT NULL
@@ -56,7 +56,7 @@ entity "players" as players {
 }
 
 entity "player_metric_histories" as player_metric_histories {
-  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + player_id: INT UNSIGNED [PK, FK]
   + data_collected_at: TIMESTAMP [PK]
   --
   official_rating: DECIMAL(4, 2) NOT NULL
@@ -67,7 +67,7 @@ entity "player_metric_histories" as player_metric_histories {
 players ||--o{ player_metric_histories
 
 entity "player_honors" as player_honors {
-  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + player_id: INT UNSIGNED [PK, FK]
   + honor_id: INT [PK, FK]
   --
   slot: TINYINT NOT NULL
@@ -84,7 +84,7 @@ entity "honors" as honors {
 }
 
 entity "player_records" as player_records {
-  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + player_id: INT UNSIGNED [PK, FK]
   + chart_id: MEDIUMINT UNSIGNED [PK, FK]
   --
   score: MEDIUMINT UNSIGNED NOT NULL
@@ -97,7 +97,7 @@ entity "player_records" as player_records {
 }
 
 entity "player_worldsend_records" as player_worldsend_records {
-  + player_id: MEDIUMINT UNSIGNED [PK, FK]
+  + player_id: INT UNSIGNED [PK, FK]
   + worldsend_chart_id: MEDIUMINT UNSIGNED [PK, FK]
   --
   score: MEDIUMINT UNSIGNED NOT NULL
