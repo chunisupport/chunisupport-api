@@ -597,3 +597,62 @@ func TestAddRatingCountGoalDown_目標を暗黙に削除しない(t *testing.T) 
 	assert.NotContains(t, downSQL, "DELETE FROM goals")
 	assert.NotContains(t, downSQL, "DELETE g FROM goals")
 }
+
+func TestExpandPlayerIDUp_参照先と参照元をINTへ拡張する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.up.sql")
+
+	assert.Contains(t, upSQL, "ALTER TABLE players MODIFY COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, upSQL, "INT")
+}
+
+func TestExpandPlayerIDDown_参照先と参照元をMEDIUMINTへ戻す(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players MODIFY COLUMN id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, downSQL, "MEDIUMINT")
+}
+
+func TestExpandPlayerIDDown_StrictSQLModeを型縮小前に検証する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+	cleanupBeforeCheck := "DROP TEMPORARY TABLE IF EXISTS migration_require_strict_sql_mode;"
+	createCheckTable := "CREATE TEMPORARY TABLE migration_require_strict_sql_mode"
+	strictCheck := "INSERT INTO migration_require_strict_sql_mode (enabled) SELECT FIND_IN_SET('STRICT_ALL_TABLES', @@SESSION.sql_mode) > 0 OR FIND_IN_SET('STRICT_TRANS_TABLES', @@SESSION.sql_mode) > 0;"
+	cleanupAfterCheck := "DROP TEMPORARY TABLE migration_require_strict_sql_mode;"
+	firstForeignKeyDrop := "ALTER TABLE users DROP FOREIGN KEY fk_users_player_id;"
+
+	assert.Contains(t, downSQL, "CONSTRAINT chk_migration_require_strict_sql_mode CHECK (enabled = TRUE)")
+	assert.Contains(t, downSQL, strictCheck)
+	assert.Less(t, strings.Index(downSQL, cleanupBeforeCheck), strings.Index(downSQL, createCheckTable))
+	assert.Less(t, strings.Index(downSQL, createCheckTable), strings.Index(downSQL, strictCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, cleanupAfterCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, firstForeignKeyDrop))
+}
+
+func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
+	t.Helper()
+
+	references := []struct {
+		tableName   string
+		constraint  string
+		nullability string
+		onDelete    string
+	}{
+		{"users", "fk_users_player_id", "NULL", "SET NULL"},
+		{"player_course_records", "fk_player_course_records_player", "NOT NULL", "CASCADE"},
+		{"player_favorite_songs", "fk_player_favorite_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_honors", "player_honors_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_latest_updates", "fk_player_latest_updates_player", "NOT NULL", "CASCADE"},
+		{"player_locked_songs", "fk_player_locked_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_metric_histories", "fk_player_metric_histories_player", "NOT NULL", "CASCADE"},
+		{"player_record_histories", "fk_player_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_records", "player_records_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_worldsend_record_histories", "fk_player_worldsend_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_worldsend_records", "player_worldsend_records_ibfk_1", "NOT NULL", "CASCADE"},
+	}
+
+	for _, ref := range references {
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" DROP FOREIGN KEY "+ref.constraint)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" MODIFY COLUMN player_id "+columnType+" UNSIGNED "+ref.nullability)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" ADD CONSTRAINT "+ref.constraint+" FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE "+ref.onDelete)
+	}
+}

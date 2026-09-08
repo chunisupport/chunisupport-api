@@ -114,7 +114,7 @@ func (r *goalRepository) DeleteByUserID(ctx context.Context, exec repository.Exe
 	return err
 }
 
-// SaveGoalArrangement は最大100件の全状態を単一UPDATEで保存し、グループ間移動も原子的に反映します。
+// SaveGoalArrangement は最大300件の全状態を単一UPDATEで保存し、グループ間移動も原子的に反映します。
 func (r *goalRepository) SaveGoalArrangement(ctx context.Context, exec repository.Executor, arrangement *entity.GoalArrangement) error {
 	goals := arrangement.Goals()
 	if err := validateGoalArrangementPersistence(ctx, exec, arrangement.UserID(), goals); err != nil {

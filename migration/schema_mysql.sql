@@ -229,7 +229,7 @@ CREATE TABLE `honors` (
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_course_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `course_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `is_clear` tinyint(1) NOT NULL,
@@ -245,7 +245,7 @@ CREATE TABLE `player_course_records` (
   CONSTRAINT `chk_player_course_records_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_favorite_songs` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `song_id` int unsigned NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`player_id`,`song_id`),
@@ -254,7 +254,7 @@ CREATE TABLE `player_favorite_songs` (
   CONSTRAINT `fk_player_favorite_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_honors` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `honor_id` int unsigned NOT NULL,
   `slot` tinyint NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -265,7 +265,7 @@ CREATE TABLE `player_honors` (
   CONSTRAINT `player_honors_chk_1` CHECK ((`slot` between 1 and 3))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_latest_updates` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `schema_version` int unsigned NOT NULL,
   `result_gzip` mediumblob NOT NULL,
   `source_updated_at` datetime(6) NOT NULL,
@@ -275,7 +275,7 @@ CREATE TABLE `player_latest_updates` (
   CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_locked_songs` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `song_id` int unsigned NOT NULL,
   `is_ultima` tinyint(1) NOT NULL,
   PRIMARY KEY (`player_id`,`song_id`,`is_ultima`),
@@ -284,7 +284,7 @@ CREATE TABLE `player_locked_songs` (
   CONSTRAINT `fk_player_locked_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_metric_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `official_rating` decimal(4,2) NOT NULL,
   `official_overpower` decimal(8,2) NOT NULL,
   `official_overpower_percent` decimal(5,2) DEFAULT NULL,
@@ -293,7 +293,7 @@ CREATE TABLE `player_metric_histories` (
   CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_record_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL,
@@ -307,7 +307,7 @@ CREATE TABLE `player_record_histories` (
   CONSTRAINT `chk_player_record_histories_score` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL DEFAULT '1',
@@ -333,7 +333,7 @@ CREATE TABLE `player_records` (
   CONSTRAINT `player_records_chk_2` CHECK (((`slot_order` is null) or (`slot_order` between 1 and 255)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_worldsend_record_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `worldsend_chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL,
@@ -347,7 +347,7 @@ CREATE TABLE `player_worldsend_record_histories` (
   CONSTRAINT `chk_player_worldsend_record_histories_score` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_worldsend_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `worldsend_chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL DEFAULT '1',
@@ -368,7 +368,7 @@ CREATE TABLE `player_worldsend_records` (
   CONSTRAINT `player_worldsend_records_chk_1` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `players` (
-  `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
   `player_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `player_level` int NOT NULL,
@@ -469,7 +469,7 @@ CREATE TABLE `users` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `account_type_id` tinyint unsigned NOT NULL DEFAULT '1',
-  `player_id` mediumint unsigned DEFAULT NULL,
+  `player_id` int unsigned DEFAULT NULL,
   `is_private` tinyint(1) NOT NULL DEFAULT '0',
   `is_suspicious` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),

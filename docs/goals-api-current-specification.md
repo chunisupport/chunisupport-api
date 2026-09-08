@@ -111,7 +111,7 @@ DB上の `goals` テーブルは以下の構造です。
 
 - 認証: 必須
 - ステータス: `201 Created`
-- 上限: 1ユーザーあたり100件
+- 上限: 1ユーザーあたり300件
 
 リクエスト例:
 
@@ -734,7 +734,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 1. 入力検証
 2. `users` の対象行を `FOR UPDATE` でロック
 3. そのユーザーの goal 件数を数える
-4. 100件未満なら INSERT
+4. 300件未満なら INSERT
 5. 直後に `FindByIDAndUserID` で再読込
 6. レスポンスへ変換
 
@@ -765,7 +765,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 | エラーコード | HTTPステータス | 条件 |
 | --- | --- | --- |
 | `goal_not_found` | 404 | 指定IDの goal が存在しない、または他ユーザー所有 |
-| `goal_limit_exceeded` | 400 | 100件上限超過 |
+| `goal_limit_exceeded` | 400 | 300件上限超過 |
 | `goal_invalid_title` | 400 | `title` が trim 後空、31文字以上、または制御文字含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` がマスタに存在しない |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形状不正、範囲不正、動的上限超過 |
