@@ -19,6 +19,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // mockPlayerUsecase は usecase.PlayerUsecase のモックです。
@@ -128,4 +129,39 @@ func TestPlayerHandler_CreatePlayer(t *testing.T) {
 		assert.True(t, ok, "error should be *apierror.APIError")
 		assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
 	})
+}
+
+func TestPlayerHandler_CreatePlayer_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"name":"太郎"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"name":"太郎","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"name":"太郎"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockUsecase := new(mockPlayerUsecase)
+			h := api_internal.NewPlayerHandler(mockUsecase)
+			e := echo.New()
+			e.Validator = app.NewCustomValidator()
+			req := httptest.NewRequest(http.MethodPost, "/players", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+			c := e.NewContext(req, httptest.NewRecorder())
+			c.Set("userEntity", &entity.User{ID: 1})
+
+			err := h.CreatePlayer(c)
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			mockUsecase.AssertNotCalled(t, "CreatePlayer", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }

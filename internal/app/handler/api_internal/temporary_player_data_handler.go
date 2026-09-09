@@ -40,6 +40,7 @@ type commitTemporaryPlayerDataRequest struct {
 }
 
 // CreateTemporaryData は未ログインユーザーの一時アップロードを受け付けます。
+// gzip圧縮されたプレイヤーデータJSONを受け取るため BindStrictJSON は使わず、未知フィールドは json.Unmarshal により無視されます。
 func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error {
 	if !strings.EqualFold(c.Request().Header.Get(echo.HeaderContentEncoding), "gzip") {
 		return apierror.ErrBadRequest

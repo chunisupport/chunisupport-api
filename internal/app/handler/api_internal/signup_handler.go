@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/app/httpheader"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -28,7 +29,7 @@ func NewSignupHandler(signupUsecase usecase.SignupUsecase) *SignupHandler {
 // Signup は Bearer の Firebase ID トークンでアプリ内ユーザーを作成します。
 func (h *SignupHandler) Signup(c *echo.Context) error {
 	req := new(signupRequest)
-	if err := c.Bind(req); err != nil {
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(req); err != nil {

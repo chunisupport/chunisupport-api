@@ -94,6 +94,54 @@ func TestVersionHandler_Create_不正JSONは400(t *testing.T) {
 	assert.False(t, uc.createCall)
 }
 
+func TestVersionHandler_Create_厳格JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"name":"CHUNITHM VERSE","released_at":"2025-01-01"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"name":"CHUNITHM VERSE","released_at":"2025-01-01","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"name":"CHUNITHM VERSE","released_at":"2025-01-01"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &versionUsecaseMock{}
+			handler := NewVersionHandler(uc)
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/internal/admin/versions", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.Create(e.NewContext(req, httptest.NewRecorder()))
+
+			apiErr := requireVersionAPIError(t, err)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.False(t, uc.createCall)
+		})
+	}
+}
+
+func TestVersionHandler_Rename_厳格JSONは400(t *testing.T) {
+	uc := &versionUsecaseMock{}
+	handler := NewVersionHandler(uc)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/1", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","unknown":1}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+
+	err := handler.Rename(c)
+
+	apiErr := requireVersionAPIError(t, err)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	assert.False(t, uc.renameCall)
+}
+
 func TestVersionHandler_Create_不正日付は422(t *testing.T) {
 	uc := &versionUsecaseMock{}
 	handler := NewVersionHandler(uc)

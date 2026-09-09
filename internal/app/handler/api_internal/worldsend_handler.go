@@ -104,7 +104,7 @@ func (h *WorldsendHandler) DeleteWorldsendSong(c *echo.Context) error {
 // CreateWorldsendSong は新規 WORLD'S END 楽曲を追加します。
 func (h *WorldsendHandler) CreateWorldsendSong(c *echo.Context) error {
 	var req api_internal.CreateWorldsendSongRequest
-	if err := c.Bind(&req); err != nil {
+	if err := handler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
@@ -170,7 +170,7 @@ func (h *WorldsendHandler) RestoreWorldsendSong(c *echo.Context) error {
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
 func (h *WorldsendHandler) UpdateWorldsendSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateWorldsendSongRequest
-	if err := c.Bind(&requests); err != nil {
+	if err := handler.BindStrictJSON(c, &requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if requests == nil {

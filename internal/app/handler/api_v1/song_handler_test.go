@@ -398,6 +398,43 @@ func TestV1SongHandler_GetSongはidパスパラメータを使用する(t *testi
 	assert.Equal(t, id, actualID)
 }
 
+func TestV1SongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `[{"id":"1234567890abcdef","title":"曲","artist":"A"}]`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"曲","artist":"A","unknown":1}]`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"曲","artist":"A"}] []`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewV1SongHandler(&testutil.MockSongUsecase{
+				UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
+					called = true
+					return nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPut, "/v1/songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.UpdateSongs(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

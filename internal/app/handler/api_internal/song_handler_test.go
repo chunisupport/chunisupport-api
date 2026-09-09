@@ -511,6 +511,80 @@ func TestSongHandler_RestoreSong(t *testing.T) {
 	})
 }
 
+func TestSongHandler_CreateSong_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"official_idx":"1","title":"曲","artist":"A","genre":"POPS & ANIME"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"曲","artist":"A","genre":"POPS & ANIME","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"曲","artist":"A","genre":"POPS & ANIME"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewSongHandler(&testutil.MockSongUsecase{
+				CreateSongFunc: func(ctx context.Context, input *usecase.CreateSongInput) (*entity.Song, error) {
+					called = true
+					return nil, nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPost, "/internal/songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.CreateSong(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
+func TestSongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `[{"id":"1234567890123456","title":"曲","artist":"A"}]`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890123456","title":"曲","artist":"A","unknown":1}]`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890123456","title":"曲","artist":"A"}] []`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewSongHandler(&testutil.MockSongUsecase{
+				UpdateSongsFunc: func(ctx context.Context, requests []*usecase.UpdateSongInput) error {
+					called = true
+					return nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPut, "/internal/songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.UpdateSongs(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

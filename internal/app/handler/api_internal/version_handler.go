@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -32,7 +33,7 @@ func (h *VersionHandler) List(c *echo.Context) error {
 
 func (h *VersionHandler) Create(c *echo.Context) error {
 	var req internaldto.CreateVersionRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrValidationFailedBadRequest.WithInternal(err)
 	}
 	releasedAt, err := time.Parse(time.DateOnly, req.ReleasedAt)
@@ -52,7 +53,7 @@ func (h *VersionHandler) Rename(c *echo.Context) error {
 		return apierror.ErrValidationFailedBadRequest.WithInternal(err)
 	}
 	var req internaldto.RenameVersionRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrValidationFailedBadRequest.WithInternal(err)
 	}
 	if req.ReleasedAt != nil {

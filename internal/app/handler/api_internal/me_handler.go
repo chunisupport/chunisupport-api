@@ -57,6 +57,7 @@ func NewMeHandler(playerDataUsecase usecase.PlayerDataUsecase) *MeHandler {
 
 // RegisterData はプレイヤーデータの登録を受け付けます。
 // デフォルトではbase64+gzip圧縮形式を受け入れ、クエリパラメータformat=jsonの場合は生JSONを受け入れます。
+// 公式エクスポートJSONの前方互換のため BindStrictJSON は使わず、未知フィールドは無視して警告ログのみ出力します。
 func (h *MeHandler) RegisterData(c *echo.Context) error {
 	user, ok := c.Get("userEntity").(*entity.User)
 	if !ok || user == nil {

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/app/httpheader"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -27,7 +28,7 @@ func NewLoginHandler(loginUsecase usecase.LoginUsecase) *LoginHandler {
 // Login はBearerのFirebase IDトークンとTurnstileトークンでログインを検証します。
 func (h *LoginHandler) Login(c *echo.Context) error {
 	req := new(loginRequest)
-	if err := c.Bind(req); err != nil {
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(req); err != nil {

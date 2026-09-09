@@ -86,6 +86,8 @@ func (handler *DataTransferHandler) Import(context *echo.Context) error {
 	return context.JSON(http.StatusOK, &dto_internal.DataTransferImportResponse{PlayerID: output.PlayerID, Counts: toDataTransferCountsResponse(output.Counts)})
 }
 
+// readDataTransferBody は移行ファイル本体を読み取ります。
+// JSON DTOではなくファイルバイト列を扱うため BindStrictJSON は使わず、未知フィールドの拒否は専用コーデック側で行います。
 func readDataTransferBody(context *echo.Context) ([]byte, error) {
 	reader := io.LimitReader(context.Request().Body, int64(info.DataTransferEnvelopeMaxBytes)+1)
 	encoded, err := io.ReadAll(reader)

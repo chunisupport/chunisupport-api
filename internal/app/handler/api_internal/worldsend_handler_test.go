@@ -198,6 +198,80 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	}
 }
 
+func TestWorldsendHandler_CreateWorldsendSong_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewWorldsendHandler(&testutil.MockWorldsendUsecase{
+				CreateWorldsendSongFunc: func(ctx context.Context, input *usecase.CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error) {
+					called = true
+					return nil, nil
+				},
+			}, &masterdata.Cache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPost, "/internal/worldsend-songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.CreateWorldsendSong(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
+func TestWorldsendHandler_UpdateWorldsendSongs_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A"}]`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A","unknown":1}]`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A"}] []`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewWorldsendHandler(&testutil.MockWorldsendUsecase{
+				UpdateWorldsendSongsFunc: func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error {
+					called = true
+					return nil
+				},
+			}, &masterdata.Cache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPut, "/internal/worldsend-songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.UpdateWorldsendSongs(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
 func TestWorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T) {
 	e := echo.New()
 	called := false

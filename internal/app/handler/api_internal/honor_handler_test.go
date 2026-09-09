@@ -128,6 +128,49 @@ func TestHonorHandler_CreateHonor_必須項目不足はUsecaseを呼ばずValida
 	assert.False(t, uc.createCalled)
 }
 
+func TestHonorHandler_CreateHonor_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"name":"称号A","type_name":"gold"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"name":"称号A","type_name":"gold","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"name":"称号A","type_name":"gold"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newHonorHandlerTestEcho()
+			uc := &mockHonorUsecase{}
+			handler := NewHonorHandler(uc)
+			req := httptest.NewRequest(http.MethodPost, "/internal/honors", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.CreateHonor(e.NewContext(req, httptest.NewRecorder()))
+
+			assertHonorHandlerAPIError(t, err, apierror.CodeBadRequest)
+			assert.False(t, uc.createCalled)
+		})
+	}
+}
+
+func TestHonorHandler_UpdateHonor_不正JSONは400(t *testing.T) {
+	e := newHonorHandlerTestEcho()
+	uc := &mockHonorUsecase{}
+	handler := NewHonorHandler(uc)
+	req := httptest.NewRequest(http.MethodPut, "/internal/honors/1", bytes.NewBufferString(`{"name":"称号A","type_name":"gold","unknown":1}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+
+	err := handler.UpdateHonor(c)
+
+	assertHonorHandlerAPIError(t, err, apierror.CodeBadRequest)
+}
+
 func TestHonorHandler_DeleteHonor_参照中はConflictを返す(t *testing.T) {
 	// Given
 	e := newHonorHandlerTestEcho()

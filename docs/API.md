@@ -56,6 +56,21 @@
 
 実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
 
+## 共通リクエスト仕様
+
+JSONボディを受け取るエンドポイントは、原則として `BindStrictJSON` でデコードします。
+
+- `Content-Type` は `application/json` が必須です（`; charset=utf-8` などのパラメータ付きも可）。欠落や不一致は 400 です。
+- 未知フィールドは拒否します。
+- 先頭のJSON値の後に別のJSON値が続く場合は拒否します。
+- 構文不正なJSONは 400 です。
+
+例外:
+
+- `POST /internal/me/register-data` と `POST /internal/player-data/temp`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/me/data-transfer/validate` と `POST /internal/me/data-transfer/import`: 移行ファイル本体を受け取り、未知フィールドの拒否は専用コーデック側で行います。
+- `DELETE /internal/me/locked-songs/:displayid`: JSONボディではなく path / query をバインドします。
+
 ## 共通レスポンス仕様
 
 - コンテンツタイプは `application/json`。
