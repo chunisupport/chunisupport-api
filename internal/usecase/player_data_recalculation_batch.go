@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -16,18 +17,19 @@ import (
 const playerDataBatchPageSize = 100
 
 type PlayerDataBatchResult struct {
-	StartedAt          time.Time
-	OperationalDate    time.Time
-	CurrentVersion     string
-	UpperBoundPlayerID int
-	Processed          int
-	Success            int
-	CurrentPreserved   int
-	LegacyRebuilt      int
-	ConflictSkipped    int
-	DeletedSkipped     int
-	Failed             int
-	LastPlayerID       int
+	StartedAt            time.Time
+	OperationalDate      time.Time
+	CurrentVersion       string
+	UpperBoundPlayerID   int
+	Processed            int
+	Success              int
+	CurrentPreserved     int
+	CurrentBrokenRebuilt int
+	LegacyRebuilt        int
+	ConflictSkipped      int
+	DeletedSkipped       int
+	Failed               int
+	LastPlayerID         int
 }
 
 type PlayerDataRecalculationBatchUsecase struct {
@@ -77,16 +79,19 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 			result.Processed++
 			result.LastPlayerID = key.ID
 			isCurrent := false
+			currentBroken := false
 			var lastPlayedAt *time.Time
 			status, processErr := u.repository.ProcessPlayer(ctx, key, func(data repository.PlayerBatchData) (repository.PlayerBatchUpdate, error) {
 				lastPlayedAt = data.LastPlayedAt
 				isCurrent = data.LastPlayedAt != nil && !databaseWallClockInJST(*data.LastPlayedAt, prepared.versionStartedAt.Location()).Before(prepared.versionStartedAt)
-				return prepared.buildUpdate(data, isCurrent)
+				update, broken, err := prepared.buildUpdate(data, isCurrent)
+				currentBroken = broken
+				return update, err
 			})
 			if processErr != nil {
 				slog.ErrorContext(ctx, "プレイヤーデータの再計算に失敗しました",
 					"player_id", key.ID,
-					"rebuild_reason", playerRebuildReason(isCurrent, lastPlayedAt),
+					"rebuild_reason", playerRebuildReason(isCurrent, currentBroken, lastPlayedAt),
 					"error", processErr)
 				result.Failed++
 				continue
@@ -98,7 +103,9 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 				result.ConflictSkipped++
 			default:
 				result.Success++
-				if isCurrent {
+				if currentBroken {
+					result.CurrentBrokenRebuilt++
+				} else if isCurrent {
 					result.CurrentPreserved++
 				} else {
 					result.LegacyRebuilt++
@@ -162,7 +169,20 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 	return prepared, nil
 }
 
-func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, current bool) (repository.PlayerBatchUpdate, error) {
+func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, current bool) (repository.PlayerBatchUpdate, bool, error) {
+	currentBroken := false
+	if current {
+		slotName, err := validateOfficialMainSlots(data.Records)
+		if err != nil {
+			currentBroken = true
+			slog.Warn("現行プレイヤーの本枠が不正なため再構築します",
+				"player_id", data.ID,
+				"slot_name", slotName,
+				"rebuild_reason", "current_broken_slots",
+				"error", err)
+		}
+	}
+	rebuild := !current || currentBroken
 	best := make([]service.RatingSlotRecord, 0)
 	newRecords := make([]service.RatingSlotRecord, 0)
 	opRecords := make([]service.OverpowerRecord, 0)
@@ -173,11 +193,11 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 	for _, record := range data.Records {
 		chart, ok := p.chartsByID[record.ChartID]
 		if !ok {
-			return repository.PlayerBatchUpdate{}, fmt.Errorf("譜面マスタを解決できません: chart_id=%d", record.ChartID)
+			return repository.PlayerBatchUpdate{}, currentBroken, fmt.Errorf("譜面マスタを解決できません: chart_id=%d", record.ChartID)
 		}
 		song, ok := p.songsByID[chart.SongID]
 		if !ok {
-			return repository.PlayerBatchUpdate{}, fmt.Errorf("楽曲マスタを解決できません: song_id=%d", chart.SongID)
+			return repository.PlayerBatchUpdate{}, currentBroken, fmt.Errorf("楽曲マスタを解決できません: song_id=%d", chart.SongID)
 		}
 		if !song.IsDeleted && !song.IsWorldsend {
 			_, songLocked := locked[fmt.Sprintf("%d:false", song.ID)]
@@ -190,17 +210,11 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 			continue
 		}
 		ratingRecord := service.RatingSlotRecord{ChartID: record.ChartID, Score: record.Score, ChartConst: chart.ChartConst, OfficialIndex: p.officialIndex[song.ID]}
-		if current {
+		if !rebuild {
 			switch record.SlotName {
 			case "best":
-				if err := validateOfficialSlot(record.SlotOrder, 30); err != nil {
-					return repository.PlayerBatchUpdate{}, fmt.Errorf("best枠の公式順が不正です: chart_id=%d: %w", record.ChartID, err)
-				}
 				best = append(best, ratingRecord)
 			case "new":
-				if err := validateOfficialSlot(record.SlotOrder, 20); err != nil {
-					return repository.PlayerBatchUpdate{}, fmt.Errorf("new枠の公式順が不正です: chart_id=%d: %w", record.ChartID, err)
-				}
 				newRecords = append(newRecords, ratingRecord)
 			}
 			continue
@@ -211,25 +225,19 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 			best = append(best, ratingRecord)
 		}
 	}
-	if current {
+	if !rebuild {
 		for _, candidateSlot := range []string{"best_candidate", "new_candidate"} {
-			if err := validateOfficialSlotSet(data.Records, candidateSlot, 10); err != nil {
+			if err := validateOfficialSlotSet(data.Records, candidateSlot, constants.CandidateSlotMaxCount); err != nil {
 				slog.Warn("候補枠の公式順が不正です",
 					"player_id", data.ID, "slot_name", candidateSlot, "error", err)
 			}
 		}
-		if err := validateOfficialSlotSet(data.Records, "best", 30); err != nil {
-			return repository.PlayerBatchUpdate{}, err
-		}
-		if err := validateOfficialSlotSet(data.Records, "new", 20); err != nil {
-			return repository.PlayerBatchUpdate{}, err
-		}
 		stats := service.AggregateOfficialRating(best, newRecords)
 		op, _ := service.CalcOverpowerSummary(opRecords, 0)
-		return repository.PlayerBatchUpdate{PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, nil
+		return repository.PlayerBatchUpdate{PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, currentBroken, nil
 	}
-	bestSlots := service.BuildRatingSlots(best, 30, 10)
-	newSlots := service.BuildRatingSlots(newRecords, 20, 10)
+	bestSlots := service.BuildRatingSlots(best, constants.BestSlotMaxCount, constants.CandidateSlotMaxCount)
+	newSlots := service.BuildRatingSlots(newRecords, constants.NewSlotMaxCount, constants.CandidateSlotMaxCount)
 	assignments := make([]repository.PlayerBatchSlotAssignment, 0, len(bestSlots.Main)+len(bestSlots.Candidates)+len(newSlots.Main)+len(newSlots.Candidates))
 	assignments = appendAssignments(assignments, bestSlots.Main, p.snapshot.SlotIDs["best"])
 	assignments = appendAssignments(assignments, bestSlots.Candidates, p.snapshot.SlotIDs["best_candidate"])
@@ -237,7 +245,7 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 	assignments = appendAssignments(assignments, newSlots.Candidates, p.snapshot.SlotIDs["new_candidate"])
 	stats := service.AggregateOfficialRating(bestSlots.Main, newSlots.Main)
 	op, _ := service.CalcOverpowerSummary(opRecords, 0)
-	return repository.PlayerBatchUpdate{ResetSlots: true, Assignments: assignments, PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, nil
+	return repository.PlayerBatchUpdate{ResetSlots: true, Assignments: assignments, PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, currentBroken, nil
 }
 
 func databaseDateInLocation(value time.Time, location *time.Location) time.Time {
@@ -248,7 +256,10 @@ func databaseWallClockInJST(value time.Time, jst *time.Location) time.Time {
 	return time.Date(value.Year(), value.Month(), value.Day(), value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), jst)
 }
 
-func playerRebuildReason(current bool, lastPlayedAt *time.Time) string {
+func playerRebuildReason(current, currentBroken bool, lastPlayedAt *time.Time) string {
+	if currentBroken {
+		return "current_broken_slots"
+	}
 	if current {
 		return "current_preserved"
 	}
@@ -256,6 +267,22 @@ func playerRebuildReason(current bool, lastPlayedAt *time.Time) string {
 		return "legacy_null_last_played"
 	}
 	return "legacy_old_last_played"
+}
+
+func validateOfficialMainSlots(records []repository.PlayerBatchRecord) (string, error) {
+	mainSlots := []struct {
+		name  string
+		limit int
+	}{
+		{name: "best", limit: constants.BestSlotMaxCount},
+		{name: "new", limit: constants.NewSlotMaxCount},
+	}
+	for _, slot := range mainSlots {
+		if err := validateOfficialSlotSet(records, slot.name, slot.limit); err != nil {
+			return slot.name, err
+		}
+	}
+	return "", nil
 }
 
 func appendAssignments(target []repository.PlayerBatchSlotAssignment, records []service.RatingSlotRecord, slotID int) []repository.PlayerBatchSlotAssignment {
@@ -280,6 +307,9 @@ func validateOfficialSlotSet(records []repository.PlayerBatchRecord, name string
 			continue
 		}
 		count++
+		if count > limit {
+			return fmt.Errorf("%s枠が%d件を超えています", name, limit)
+		}
 		if err := validateOfficialSlot(record.SlotOrder, limit); err != nil {
 			return err
 		}
@@ -287,9 +317,6 @@ func validateOfficialSlotSet(records []repository.PlayerBatchRecord, name string
 			return fmt.Errorf("%s枠のslot_orderが重複しています: %d", name, *record.SlotOrder)
 		}
 		seen[*record.SlotOrder] = struct{}{}
-	}
-	if count > limit {
-		return fmt.Errorf("%s枠が%d件を超えています", name, limit)
 	}
 	return nil
 }
