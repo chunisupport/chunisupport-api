@@ -25,9 +25,9 @@ func setupPlayerBatchSchema(t *testing.T, db *sqlx.DB) {
 	for _, stmt := range []string{
 		`CREATE TABLE slots (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
 		`INSERT INTO slots VALUES (1, 'none'), (2, 'best')`,
-		`CREATE TABLE player_records (player_id INTEGER NOT NULL, chart_id INTEGER NOT NULL, score INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, slot_id INTEGER NOT NULL, slot_order INTEGER NULL)`,
+		`CREATE TABLE player_records (player_id INTEGER NOT NULL, chart_id INTEGER NOT NULL, score INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, slot_id INTEGER NOT NULL, slot_order INTEGER NULL, updated_at TEXT NOT NULL)`,
 		`CREATE TABLE player_locked_songs (player_id INTEGER NOT NULL, song_id INTEGER NOT NULL, is_ultima BOOLEAN NOT NULL)`,
-		`INSERT INTO player_records VALUES (1, 10, 1000000, 1, 2, 1)`,
+		`INSERT INTO player_records VALUES (1, 10, 1000000, 1, 2, 1, '2026-09-01 10:00:00')`,
 	} {
 		_, err := db.Exec(stmt)
 		require.NoError(t, err)

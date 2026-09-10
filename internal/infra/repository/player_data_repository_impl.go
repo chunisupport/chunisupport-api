@@ -137,6 +137,7 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 }
 
 // ClearRankedSlots は指定プレイヤーの通常譜面からレーティング枠をすべて解除します。
+// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
 func (r *playerDataRepository) ClearRankedSlots(ctx context.Context, exec repository.Executor, playerID int) error {
 	if exec == nil {
 		return fmt.Errorf("ClearRankedSlots requires a non-nil executor: must be called within a transaction")
@@ -144,7 +145,8 @@ func (r *playerDataRepository) ClearRankedSlots(ctx context.Context, exec reposi
 	if _, err := exec.ExecContext(ctx, `
 		UPDATE player_records
 		SET slot_id = (SELECT id FROM slots WHERE name = 'none'),
-			slot_order = NULL
+			slot_order = NULL,
+			updated_at = updated_at
 		WHERE player_id = ?
 		  AND (
 			slot_id <> (SELECT id FROM slots WHERE name = 'none')

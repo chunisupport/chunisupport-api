@@ -134,9 +134,10 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 		return status, err
 	}
 	if update.ResetSlots {
+		// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
 		if _, err = tx.ExecContext(ctx, `
 			UPDATE player_records
-			SET slot_id = (SELECT id FROM slots WHERE name = 'none'), slot_order = NULL
+			SET slot_id = (SELECT id FROM slots WHERE name = 'none'), slot_order = NULL, updated_at = updated_at
 			WHERE player_id = ?`, key.ID); err != nil {
 			return status, err
 		}
@@ -201,6 +202,7 @@ func assignSlots(ctx context.Context, tx *sqlx.Tx, playerID int, assignments []d
 	if len(assignments) == 0 {
 		return nil
 	}
+	// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
 	var slotCase, orderCase, placeholders strings.Builder
 	slotArgs := make([]any, 0, len(assignments)*2)
 	orderArgs := make([]any, 0, len(assignments)*2)
@@ -222,7 +224,8 @@ func assignSlots(ctx context.Context, tx *sqlx.Tx, playerID int, assignments []d
 	query := fmt.Sprintf(`
 		UPDATE player_records
 		SET slot_id = CASE chart_id%s END,
-		    slot_order = CASE chart_id%s END
+		    slot_order = CASE chart_id%s END,
+		    updated_at = updated_at
 		WHERE player_id = ? AND chart_id IN (%s)`, slotCase.String(), orderCase.String(), placeholders.String())
 	_, err := tx.ExecContext(ctx, query, args...)
 	return err
