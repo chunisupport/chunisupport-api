@@ -64,7 +64,8 @@ func run() int {
 		"started_at", result.StartedAt, "operational_date", result.OperationalDate.Format(time.DateOnly),
 		"current_version", result.CurrentVersion, "upper_bound_player_id", result.UpperBoundPlayerID,
 		"processed", result.Processed, "success", result.Success, "current_preserved", result.CurrentPreserved,
-		"legacy_rebuilt", result.LegacyRebuilt, "conflict_skipped", result.ConflictSkipped,
+		"current_broken_rebuilt", result.CurrentBrokenRebuilt, "legacy_rebuilt", result.LegacyRebuilt,
+		"conflict_skipped", result.ConflictSkipped,
 		"deleted_skipped", result.DeletedSkipped, "failed", result.Failed,
 		"last_player_id", result.LastPlayerID, "duration", time.Since(start))
 	if ctx.Err() != nil {
