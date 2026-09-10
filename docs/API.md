@@ -1543,6 +1543,10 @@ curl -X POST \
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
 
+`scores.standard` は登録時点の公式レーティング枠の完全な写しとして扱います。登録時に既存の通常譜面からレーティング枠をすべて解除したうえで、保存対象になった各要素の `slot` / `order` を設定します。配列に含まれない譜面やマスタ解決などでスキップされた譜面は、スコア行を残したまま `slot=none`、`order=null` になります。空配列の場合も既存枠をすべて解除します。WORLD'S ENDとコースはこの処理の対象外です。
+
+同一譜面が複数ある場合は最後の要素へ正規化してから枠を検証します。`none` の `order` は `null`、`best` は1〜30で最大30件、`new` は1〜20で最大20件、`best_candidate` / `new_candidate` は1〜10でそれぞれ最大10件とし、同じ枠内の `order` は一意でなければなりません。違反時は `422 validation_failed` となり、既存枠を含む登録内容は更新しません。
+
 **コースエントリスキーマ (`scores.course` の各要素)**:
 
 | フィールド | 型 | 必須 | 説明 |

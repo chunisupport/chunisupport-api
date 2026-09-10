@@ -510,6 +510,183 @@ func TestValidatePlayerDataIdentity_同一取得日時の本文だけを許可�
 	}
 }
 
+func TestValidateFullRecordSlots_枠順と件数を検証する(t *testing.T) {
+	bestOrder1 := 1
+	bestOrder2 := 2
+	bestOrder31 := 31
+	newOrder20 := 20
+	candidateOrder10 := 10
+	noneOrder := 1
+	masters := newApplyScoresTestMasters()
+	masters.SlotNamesByID = map[int]string{1: "none", 2: "best", 3: "new", 4: "best_candidate", 5: "new_candidate"}
+
+	tests := []struct {
+		name    string
+		records []repository.PlayerRecordForUpsert
+		wantErr string
+	}{
+		{
+			name: "有効な枠は許可する",
+			records: []repository.PlayerRecordForUpsert{
+				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder1}},
+				{ChartID: 102, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder2}},
+				{ChartID: 103, State: repository.PlayerRecordState{SlotID: 1}},
+				{ChartID: 104, State: repository.PlayerRecordState{SlotID: 3, SlotOrder: &newOrder20}},
+				{ChartID: 105, State: repository.PlayerRecordState{SlotID: 4, SlotOrder: &candidateOrder10}},
+				{ChartID: 106, State: repository.PlayerRecordState{SlotID: 5, SlotOrder: &candidateOrder10}},
+			},
+		},
+		{
+			name: "noneに順位があれば拒否する",
+			records: []repository.PlayerRecordForUpsert{
+				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 1, SlotOrder: &noneOrder}},
+			},
+			wantErr: "slot_order must be null for none slot",
+		},
+		{
+			name: "本枠の順位範囲外を拒否する",
+			records: []repository.PlayerRecordForUpsert{
+				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder31}},
+			},
+			wantErr: "slot_order is out of range",
+		},
+		{
+			name: "ranked枠に順位がなければ拒否する",
+			records: []repository.PlayerRecordForUpsert{
+				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2}},
+			},
+			wantErr: "slot_order is out of range",
+		},
+		{
+			name: "同じ枠の順位重複を拒否する",
+			records: []repository.PlayerRecordForUpsert{
+				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder1}},
+				{ChartID: 102, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder1}},
+			},
+			wantErr: "slot_order is duplicated",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			err := validateFullRecordSlots(tt.records, masters)
+
+			// Then
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, "scores.standard", validationErr.Field)
+			assert.Contains(t, validationErr.Message, tt.wantErr)
+		})
+	}
+}
+
+func TestPlayerDataSlotLimit_枠ごとの上限を返す(t *testing.T) {
+	tests := []struct {
+		name     string
+		slotName string
+		want     int
+		wantOK   bool
+	}{
+		{name: "best", slotName: "best", want: 30, wantOK: true},
+		{name: "new", slotName: "new", want: 20, wantOK: true},
+		{name: "best candidate", slotName: "best_candidate", want: 10, wantOK: true},
+		{name: "new candidate", slotName: "new_candidate", want: 10, wantOK: true},
+		{name: "none", slotName: "none", wantOK: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got, ok := playerDataSlotLimit(tt.slotName)
+
+			// Then
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestValidateFullRecordSlots_best枠が上限を超えたら拒否する(t *testing.T) {
+	// Given
+	masters := newApplyScoresTestMasters()
+	masters.SlotNamesByID = map[int]string{2: "best"}
+	records := make([]repository.PlayerRecordForUpsert, 0, 31)
+	for i := 1; i <= 31; i++ {
+		order := i
+		records = append(records, repository.PlayerRecordForUpsert{ChartID: 100 + i, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &order}})
+	}
+
+	// When
+	err := validateFullRecordSlots(records, masters)
+
+	// Then
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Contains(t, validationErr.Message, "slot exceeds its limit")
+}
+
+func TestApplyScores_枠を解除してからpayloadを保存する(t *testing.T) {
+	// Given
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{overpowerStats: &repository.OverpowerTargetStats{}}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
+
+	// When
+	_, _, _, _, _, err := uc.applyScores(context.Background(), nil, 77, PlayerDataScorePayload{}, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC), service.PlayerRecordStatisticsSnapshot{})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, 1, repo.clearRankedSlotsCalls)
+	assert.Equal(t, 77, repo.clearRankedSlotsPlayerID)
+	assert.Equal(t, []string{"clear", "save"}, repo.writeCallOrder)
+}
+
+func TestApplyScores_枠検証失敗時は枠解除も保存もしない(t *testing.T) {
+	// Given
+	masters := newApplyScoresTestMasters()
+	masters.Slots["new"] = mastervo.Slot{ID: 3, Name: "new"}
+	masters.SlotNamesByID = map[int]string{1: "none", 2: "best", 3: "new"}
+	masters.songs["second-song"] = entity.PlayerDataSong{ID: 2, OfficialIdx: "second-song", Title: "Second Song"}
+	masters.chartsByKey["2:4"] = entity.PlayerDataChart{ID: 102, SongID: 2, DifficultyID: 4, Const: chartconstant.ChartConstant(14.0)}
+	masters.chartsByID[102] = masters.chartsByKey["2:4"]
+	order := 1
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{overpowerStats: &repository.OverpowerTargetStats{}}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
+	payload := PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{
+		{Idx: "full-song", Diff: "MAS", Score: 1_000_000, Slot: stringPtrForApplyScoresTest("best"), Order: &order},
+		{Idx: "second-song", Diff: "MAS", Score: 1_000_000, Slot: stringPtrForApplyScoresTest("best"), Order: &order},
+	}}
+
+	// When
+	_, _, _, _, _, err := uc.applyScores(context.Background(), nil, 77, payload, masters, time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC), service.PlayerRecordStatisticsSnapshot{})
+
+	// Then
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Zero(t, repo.clearRankedSlotsCalls)
+	assert.Zero(t, repo.saveCalls)
+}
+
+func TestApplyScores_枠解除失敗時は保存しない(t *testing.T) {
+	// Given
+	repo := &stubPlayerDataRepositoryForApplyScoresTest{
+		overpowerStats:      &repository.OverpowerTargetStats{},
+		clearRankedSlotsErr: context.DeadlineExceeded,
+	}
+	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
+
+	// When
+	_, _, _, _, _, err := uc.applyScores(context.Background(), nil, 77, PlayerDataScorePayload{}, newApplyScoresTestMasters(), time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC), service.PlayerRecordStatisticsSnapshot{})
+
+	// Then
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, 1, repo.clearRankedSlotsCalls)
+	assert.Zero(t, repo.saveCalls)
+}
+
 type stubPlayerDataRepositoryForApplyScoresTest struct {
 	savedInput                     repository.PlayerDataSaveInput
 	receivedFilter                 repository.OverpowerTargetFilter
@@ -524,6 +701,10 @@ type stubPlayerDataRepositoryForApplyScoresTest struct {
 	latestUpdateExec               repository.Executor
 	findLatestUpdateForUpdateCalls int
 	latestUpdateSaveCalls          int
+	clearRankedSlotsCalls          int
+	clearRankedSlotsPlayerID       int
+	clearRankedSlotsErr            error
+	writeCallOrder                 []string
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayerRecordStatesByChartIDs(_ context.Context, _ repository.Executor, _ int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
@@ -554,8 +735,16 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) LoadMasterData(_ context.Co
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) SavePlayerData(_ context.Context, _ repository.Executor, input repository.PlayerDataSaveInput) error {
 	s.saveCalls++
+	s.writeCallOrder = append(s.writeCallOrder, "save")
 	s.savedInput = input
 	return s.saveErr
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) ClearRankedSlots(_ context.Context, _ repository.Executor, playerID int) error {
+	s.clearRankedSlotsCalls++
+	s.clearRankedSlotsPlayerID = playerID
+	s.writeCallOrder = append(s.writeCallOrder, "clear")
+	return s.clearRankedSlotsErr
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) GetOverpowerTargetStats(_ context.Context, filter repository.OverpowerTargetFilter) (*repository.OverpowerTargetStats, error) {
@@ -638,9 +827,13 @@ func newApplyScoresTestMasters() *playerDataMaster {
 				"full chain platinum": {ID: 3, Name: "full chain platinum"},
 			},
 			Slots: map[string]mastervo.Slot{
-				"none": {ID: 1, Name: "none"},
-				"best": {ID: 2, Name: "best"},
+				"none":           {ID: 1, Name: "none"},
+				"best":           {ID: 2, Name: "best"},
+				"new":            {ID: 3, Name: "new"},
+				"best_candidate": {ID: 4, Name: "best_candidate"},
+				"new_candidate":  {ID: 5, Name: "new_candidate"},
 			},
+			SlotNamesByID: map[int]string{1: "none", 2: "best", 3: "new", 4: "best_candidate", 5: "new_candidate"},
 			Difficulties: map[string]mastervo.ChartDifficulty{
 				"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
 			},
@@ -743,7 +936,7 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 		{
 			name:       "scoreとランプが同じでslotだけ違う場合は差分なし",
 			fullBefore: map[int]repository.PlayerRecordState{101: {Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1}},
-			payload:    PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1000000, Slot: stringPtrForApplyScoresTest("best")}}},
+			payload:    PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1000000, Slot: stringPtrForApplyScoresTest("best"), Order: intPtrForApplyScoresTest(1)}}},
 			wantCounts: api_internal.PlayerDataCounts{FullRecordsUpserted: 1},
 		},
 		{

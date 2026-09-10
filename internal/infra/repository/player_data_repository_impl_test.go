@@ -301,6 +301,86 @@ func TestSavePlayerData_execがnilならエラーを返す(t *testing.T) {
 	assert.ErrorContains(t, err, "executor")
 }
 
+func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	_, err := db.Exec(`
+		CREATE TABLE slots (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+		INSERT INTO slots (id, name) VALUES
+			(1, 'none'),
+			(2, 'best'),
+			(3, 'new');
+		CREATE TABLE player_records (
+			player_id INTEGER NOT NULL,
+			chart_id INTEGER NOT NULL,
+			slot_id INTEGER NOT NULL,
+			slot_order INTEGER,
+			PRIMARY KEY (player_id, chart_id)
+		);
+		CREATE TABLE player_worldsend_records (
+			player_id INTEGER NOT NULL,
+			worldsend_chart_id INTEGER NOT NULL,
+			score INTEGER NOT NULL,
+			PRIMARY KEY (player_id, worldsend_chart_id)
+		);
+		INSERT INTO player_records (player_id, chart_id, slot_id, slot_order) VALUES
+			(10, 101, 2, 1),
+			(10, 102, 3, 2),
+			(10, 103, 1, NULL),
+			(10, 104, 1, 4),
+			(20, 201, 2, 1);
+		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score) VALUES
+			(10, 301, 1000000);
+	`)
+	require.NoError(t, err)
+	tx, err := db.BeginTxx(context.Background(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	err = repo.ClearRankedSlots(context.Background(), tx, 10)
+
+	// Then
+	require.NoError(t, err)
+	var rows []struct {
+		PlayerID  int  `db:"player_id"`
+		ChartID   int  `db:"chart_id"`
+		SlotID    int  `db:"slot_id"`
+		SlotOrder *int `db:"slot_order"`
+	}
+	require.NoError(t, tx.Select(&rows, `SELECT player_id, chart_id, slot_id, slot_order FROM player_records ORDER BY player_id, chart_id`))
+	require.Len(t, rows, 5)
+	assert.Equal(t, 1, rows[0].SlotID)
+	assert.Nil(t, rows[0].SlotOrder)
+	assert.Equal(t, 1, rows[1].SlotID)
+	assert.Nil(t, rows[1].SlotOrder)
+	assert.Equal(t, 1, rows[2].SlotID)
+	assert.Nil(t, rows[2].SlotOrder)
+	assert.Equal(t, 1, rows[3].SlotID)
+	assert.Nil(t, rows[3].SlotOrder)
+	assert.Equal(t, 2, rows[4].SlotID)
+	assert.Equal(t, 1, *rows[4].SlotOrder)
+	var worldsendScore int
+	require.NoError(t, tx.Get(&worldsendScore, `SELECT score FROM player_worldsend_records WHERE player_id = ? AND worldsend_chart_id = ?`, 10, 301))
+	assert.Equal(t, 1000000, worldsendScore)
+}
+
+func TestClearRankedSlots_execがnilならエラーを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	repo := NewPlayerDataRepository(db)
+
+	// When
+	err := repo.ClearRankedSlots(context.Background(), nil, 10)
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "executor")
+}
+
 func TestFullRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
 	// Given
 	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
