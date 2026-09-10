@@ -316,6 +316,7 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 			chart_id INTEGER NOT NULL,
 			slot_id INTEGER NOT NULL,
 			slot_order INTEGER,
+			updated_at TEXT NOT NULL,
 			PRIMARY KEY (player_id, chart_id)
 		);
 		CREATE TABLE player_worldsend_records (
@@ -324,12 +325,12 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 			score INTEGER NOT NULL,
 			PRIMARY KEY (player_id, worldsend_chart_id)
 		);
-		INSERT INTO player_records (player_id, chart_id, slot_id, slot_order) VALUES
-			(10, 101, 2, 1),
-			(10, 102, 3, 2),
-			(10, 103, 1, NULL),
-			(10, 104, 1, 4),
-			(20, 201, 2, 1);
+		INSERT INTO player_records (player_id, chart_id, slot_id, slot_order, updated_at) VALUES
+			(10, 101, 2, 1, '2026-09-01 10:00:00'),
+			(10, 102, 3, 2, '2026-09-02 10:00:00'),
+			(10, 103, 1, NULL, '2026-09-03 10:00:00'),
+			(10, 104, 1, 4, '2026-09-04 10:00:00'),
+			(20, 201, 2, 1, '2026-09-05 10:00:00');
 		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score) VALUES
 			(10, 301, 1000000);
 	`)
@@ -345,12 +346,13 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 	// Then
 	require.NoError(t, err)
 	var rows []struct {
-		PlayerID  int  `db:"player_id"`
-		ChartID   int  `db:"chart_id"`
-		SlotID    int  `db:"slot_id"`
-		SlotOrder *int `db:"slot_order"`
+		PlayerID  int    `db:"player_id"`
+		ChartID   int    `db:"chart_id"`
+		SlotID    int    `db:"slot_id"`
+		SlotOrder *int   `db:"slot_order"`
+		UpdatedAt string `db:"updated_at"`
 	}
-	require.NoError(t, tx.Select(&rows, `SELECT player_id, chart_id, slot_id, slot_order FROM player_records ORDER BY player_id, chart_id`))
+	require.NoError(t, tx.Select(&rows, `SELECT player_id, chart_id, slot_id, slot_order, updated_at FROM player_records ORDER BY player_id, chart_id`))
 	require.Len(t, rows, 5)
 	assert.Equal(t, 1, rows[0].SlotID)
 	assert.Nil(t, rows[0].SlotOrder)
@@ -362,6 +364,12 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 	assert.Nil(t, rows[3].SlotOrder)
 	assert.Equal(t, 2, rows[4].SlotID)
 	assert.Equal(t, 1, *rows[4].SlotOrder)
+	// 枠リセットだけで最終更新日は進まないこと。
+	assert.Equal(t, "2026-09-01 10:00:00", rows[0].UpdatedAt)
+	assert.Equal(t, "2026-09-02 10:00:00", rows[1].UpdatedAt)
+	assert.Equal(t, "2026-09-03 10:00:00", rows[2].UpdatedAt)
+	assert.Equal(t, "2026-09-04 10:00:00", rows[3].UpdatedAt)
+	assert.Equal(t, "2026-09-05 10:00:00", rows[4].UpdatedAt)
 	var worldsendScore int
 	require.NoError(t, tx.Get(&worldsendScore, `SELECT score FROM player_worldsend_records WHERE player_id = ? AND worldsend_chart_id = ?`, 10, 301))
 	assert.Equal(t, 1000000, worldsendScore)
