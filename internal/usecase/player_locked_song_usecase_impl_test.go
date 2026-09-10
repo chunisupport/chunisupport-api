@@ -181,6 +181,9 @@ func (s *stubPlayerDataRepositoryForLockedSong) LoadMasterData(ctx context.Conte
 func (s *stubPlayerDataRepositoryForLockedSong) SavePlayerData(ctx context.Context, exec repository.Executor, input repository.PlayerDataSaveInput) error {
 	return nil
 }
+func (s *stubPlayerDataRepositoryForLockedSong) ClearRankedSlots(ctx context.Context, exec repository.Executor, playerID int) error {
+	return nil
+}
 
 func (s *stubPlayerDataRepositoryForLockedSong) FindPlayerRecordStatesByChartIDs(ctx context.Context, exec repository.Executor, playerID int, chartIDs []int) (map[int]repository.PlayerRecordState, error) {
 	return map[int]repository.PlayerRecordState{}, nil

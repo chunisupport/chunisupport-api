@@ -43,6 +43,10 @@ type PlayerDataRepository interface {
 	// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。
 	SavePlayerData(ctx context.Context, exec Executor, input PlayerDataSaveInput) error
 
+	// ClearRankedSlots は指定プレイヤーの通常譜面からレーティング枠をすべて解除します。
+	// SavePlayerData と同じトランザクション内で公式枠を全置換するため、exec が nil の場合はエラーを返します。
+	ClearRankedSlots(ctx context.Context, exec Executor, playerID int) error
+
 	// FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
 	FindPlayerRecordStatesByChartIDs(ctx context.Context, exec Executor, playerID int, chartIDs []int) (map[int]PlayerRecordState, error)
 

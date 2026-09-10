@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -878,6 +879,9 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	fullRecordsToUpsert = normalizeFullRecordsForUpsert(fullRecordsToUpsert)
 	worldsendRecordsToUpsert = normalizeWorldsendRecordsForUpsert(worldsendRecordsToUpsert)
 	courseRecordsToUpsert = normalizeCourseRecordsForUpsert(courseRecordsToUpsert)
+	if err := validateFullRecordSlots(fullRecordsToUpsert, masters); err != nil {
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
 
 	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))
 	if err != nil {
@@ -924,6 +928,9 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		}
 	}
 
+	if err := us.playerDataRepo.ClearRankedSlots(ctx, tx, playerID); err != nil {
+		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
 	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
 		FullRecords:      fullRecordsToUpsert,
 		WorldsendRecords: worldsendRecordsToUpsert,
@@ -1310,6 +1317,62 @@ func normalizeFullRecordsForUpsert(records []repository.PlayerRecordForUpsert) [
 		normalized = append(normalized, record)
 	}
 	return normalized
+}
+
+func validateFullRecordSlots(records []repository.PlayerRecordForUpsert, masters *playerDataMaster) error {
+	seenOrders := make(map[string]map[int]struct{})
+	counts := make(map[string]int)
+	for _, record := range records {
+		slotName, ok := masters.SlotNamesByID[record.State.SlotID]
+		if !ok {
+			return fmt.Errorf("failed to resolve slot name by id: %d", record.State.SlotID)
+		}
+		if slotName == defaultSlotName {
+			if record.State.SlotOrder != nil {
+				return newPlayerDataSlotValidationError("slot_order must be null for none slot")
+			}
+			continue
+		}
+
+		limit, ok := playerDataSlotLimit(slotName)
+		if !ok {
+			return fmt.Errorf("unsupported resolved slot name: %s", slotName)
+		}
+		counts[slotName]++
+		if counts[slotName] > limit {
+			return newPlayerDataSlotValidationError(fmt.Sprintf("%s slot exceeds its limit: max %d", slotName, limit))
+		}
+		if record.State.SlotOrder == nil || *record.State.SlotOrder < 1 || *record.State.SlotOrder > limit {
+			return newPlayerDataSlotValidationError(fmt.Sprintf("%s slot_order is out of range: must be between 1 and %d", slotName, limit))
+		}
+		orders := seenOrders[slotName]
+		if orders == nil {
+			orders = make(map[int]struct{}, limit)
+			seenOrders[slotName] = orders
+		}
+		if _, exists := orders[*record.State.SlotOrder]; exists {
+			return newPlayerDataSlotValidationError(fmt.Sprintf("%s slot_order is duplicated: %d", slotName, *record.State.SlotOrder))
+		}
+		orders[*record.State.SlotOrder] = struct{}{}
+	}
+	return nil
+}
+
+func playerDataSlotLimit(slotName string) (int, bool) {
+	switch slotName {
+	case "best":
+		return constants.BestSlotMaxCount, true
+	case "new":
+		return constants.NewSlotMaxCount, true
+	case "best_candidate", "new_candidate":
+		return constants.CandidateSlotMaxCount, true
+	default:
+		return 0, false
+	}
+}
+
+func newPlayerDataSlotValidationError(message string) error {
+	return &PlayerDataValidationError{Field: "scores.standard", Message: message}
 }
 
 func normalizeWorldsendRecordsForUpsert(records []repository.WorldsendRecordForUpsert) []repository.WorldsendRecordForUpsert {
