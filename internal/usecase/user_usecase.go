@@ -18,7 +18,7 @@ type UserUsecase interface {
 
 	// GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
-	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileWithRecordsOutput, error)
+	GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*UserProfileWithRecordsOutput, error)
 
 	// GetUserProfileRatingView はユーザー名をキーにレーティング表示向けのプロファイルとレコードを取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
@@ -26,13 +26,13 @@ type UserUsecase interface {
 
 	// GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
-	GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileRecordViewOutput, error)
+	GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User) (*UserProfileRecordViewOutput, error)
 
 	// GetUserSongRecord は通常楽曲1曲分のユーザーレコードを取得します。
-	GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*UserSongRecordOutput, error)
+	GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, difficulty string) (*UserSongRecordOutput, error)
 
 	// GetUserWorldsendSongRecord は WORLD'S END 楽曲1曲分のユーザーレコードを取得します。
-	GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*UserWorldsendSongRecordOutput, error)
+	GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*UserWorldsendSongRecordOutput, error)
 
 	// GetAllUsersForAdmin はADMIN用にすべてのユーザー一覧を取得します。
 	GetAllUsersForAdmin(ctx context.Context, page int, limit int, name string) ([]AdminUserOutput, error)

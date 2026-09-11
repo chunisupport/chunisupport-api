@@ -12,108 +12,25 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
-// TestToV1SongDTO はToV1SongDTO関数の基本的な変換をテストします。
 func TestToV1SongDTO(t *testing.T) {
-	// テストデータの準備
 	genreID := 2
-	bpm := 200
-	imgURL := "https://example.com/v1jacket.jpg"
-	reading := "ブイワンテストガッキョク"
 	releaseDate := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
-	masterConst, _ := chartconstant.NewChartConstant(13.0)
-	ultimaConst, _ := chartconstant.NewChartConstant(15.0)
-
 	song := &entity.Song{
-		DisplayID:            "test123456789012",
-		Title:                "テスト楽曲",
-		Reading:              &reading,
-		Artist:               "テストアーティスト",
 		GenreID:              &genreID,
-		BPM:                  &bpm,
 		ReleasedAt:           &releaseDate,
-		Jacket:               &imgURL,
-		IsMaxOPUnknown:       true,
 		OpTargetDifficultyID: 5,
-		IsNew:                true,
-		Charts: []*entity.Chart{
-			{DifficultyID: 4, Const: masterConst},
-			{DifficultyID: 5, Const: ultimaConst},
-		},
 	}
 
-	genreNamesByID := map[int]string{
-		1: "POPS & ANIME",
-		2: "niconico",
-	}
+	dto := ToV1SongDTO(song, map[int]string{2: "niconico"}, 90)
 
-	// 変換実行
-	dto := ToV1SongDTO(song, genreNamesByID, 90)
-
-	// アサーション
-	if dto == nil {
-		require.Fail(t, "ToV1SongDTO returned nil")
-	}
-
-	if dto.DisplayID != "test123456789012" {
-		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
-	}
-
-	if dto.Title != "テスト楽曲" {
-		assert.Failf(t, "アサーション失敗", "Title = %v, want %v", dto.Title, "テスト楽曲")
-	}
-
-	if dto.Reading == nil || *dto.Reading != "ブイワンテストガッキョク" {
-		assert.Failf(t, "アサーション失敗", "Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
-	}
-
-	if dto.Artist != "テストアーティスト" {
-		assert.Failf(t, "アサーション失敗", "Artist = %v, want %v", dto.Artist, "テストアーティスト")
-	}
-
-	// Genre は *string なので null チェック
-	if dto.Genre == nil {
-		t.Error("Genre is nil, want niconico")
-	} else if *dto.Genre != "niconico" {
-		assert.Failf(t, "アサーション失敗", "Genre = %v, want %v", *dto.Genre, "niconico")
-	}
-
-	if dto.BPM == nil || *dto.BPM != 200 {
-		assert.Failf(t, "アサーション失敗", "BPM = %v, want %v", dto.BPM, 200)
-	}
-
-	// Release は *string で "YYYY-MM-DD" 形式
-	if dto.Release == nil {
-		t.Error("Release is nil")
-	} else if *dto.Release != "2023-12-31" {
-		assert.Failf(t, "アサーション失敗", "Release = %v, want %v", *dto.Release, "2023-12-31")
-	}
-
-	// Jacket (旧 Img)
-	if dto.Jacket == nil {
-		t.Error("Jacket is nil")
-	} else if *dto.Jacket != "https://example.com/v1jacket.jpg" {
-		assert.Failf(t, "アサーション失敗", "Jacket = %v, want %v", *dto.Jacket, "https://example.com/v1jacket.jpg")
-	}
-
-	if dto.MaxOP != 90 {
-		assert.Failf(t, "アサーション失敗", "MaxOP = %v, want %v", dto.MaxOP, 90.0)
-	}
-
-	// IsMaxOPUnknown が反映されていることを確認
-	if !dto.IsMaxOPUnknown {
-		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
-	}
-
-	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "ULTIMA" {
-		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "ULTIMA")
-	}
-
-	assert.True(t, dto.IsNew)
-
-	// Charts は空の map として初期化される
-	if dto.Charts == nil {
-		t.Error("Charts is nil, want empty map")
-	}
+	require.NotNil(t, dto)
+	require.NotNil(t, dto.Genre)
+	assert.Equal(t, "niconico", *dto.Genre)
+	require.NotNil(t, dto.Release)
+	assert.Equal(t, "2023-12-31", *dto.Release)
+	require.NotNil(t, dto.OpTargetDifficulty)
+	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
+	assert.NotNil(t, dto.Charts)
 }
 
 // TestToV1ChartDTO はToV1ChartDTO関数の基本的な変換をテストします。

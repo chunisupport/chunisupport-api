@@ -55,7 +55,7 @@ func (s *courseRepositoryStub) Save(_ context.Context, _ repository.Executor, co
 	s.saved = course
 	return nil
 }
-func (s *courseRepositoryStub) FindRecordsByPlayerID(context.Context, repository.Executor, int, bool, bool) ([]*entity.PlayerCourseRecord, error) {
+func (s *courseRepositoryStub) FindRecordsByPlayerID(context.Context, repository.Executor, int, bool) ([]*entity.PlayerCourseRecord, error) {
 	return s.records, nil
 }
 
@@ -273,7 +273,7 @@ func TestCourseUsecase_GetUserRecords_metaUpdatedAtがマスタとレコード�
 			uc := NewCourseUsecase(nil, repo, userRepo, nil)
 
 			// When
-			result, err := uc.GetUserRecords(context.Background(), "player", nil, true)
+			result, err := uc.GetUserRecords(context.Background(), "player", nil)
 
 			// Then
 			require.NoError(t, err)

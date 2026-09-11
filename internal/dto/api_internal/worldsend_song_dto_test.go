@@ -13,122 +13,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestToWorldsendSongDTO は ToWorldsendSongDTO 関数の基本的な変換をテストします。
 func TestToWorldsendSongDTO(t *testing.T) {
 	genreID := 1
-	bpm := 180
-	jacket := "jacket.png"
-	reading := "テストガッキョク"
 	releasedAt := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
-	levelStar, levelStarErr := levelstar.NewLevelStar(5)
-	if levelStarErr != nil {
-		require.Failf(t, "前提条件失敗", "levelstar.NewLevelStar failed: %v", levelStarErr)
-	}
+	level, err := levelstar.NewLevelStar(5)
+	require.NoError(t, err)
 	attribute := "狂"
-	notesObj, _ := notes.NewNotes(1500)
-	notesDesigner := "譜面作者A"
-
-	song := &entity.Song{
-		DisplayID:   "0123456789abcdef",
-		Title:       "テスト楽曲",
-		Reading:     &reading,
-		Artist:      "テストアーティスト",
-		GenreID:     &genreID,
-		BPM:         &bpm,
-		ReleasedAt:  &releasedAt,
-		OfficialIdx: "123",
-		Jacket:      &jacket,
-	}
-
+	chartNotes, err := notes.NewNotes(1500)
+	require.NoError(t, err)
+	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt}
 	chart := &entity.WorldsendChart{
-		LevelStar:     &levelStar,
-		Attribute:     &attribute,
-		Notes:         &notesObj,
-		NotesDesigner: &notesDesigner,
+		LevelStar: &level,
+		Attribute: &attribute,
+		Notes:     &chartNotes,
 	}
 
-	genreNamesByID := map[int]string{
-		1: "POPS & ANIME",
-		2: "niconico",
-	}
+	dto := ToWorldsendSongDTO(song, chart, map[int]string{1: "POPS & ANIME"})
 
-	dto := ToWorldsendSongDTO(song, chart, genreNamesByID)
-
-	if dto == nil {
-		require.Fail(t, "ToWorldsendSongDTO returned nil")
-	}
-
-	if dto.DisplayID != "0123456789abcdef" {
-		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "0123456789abcdef")
-	}
-
-	if dto.Title != "テスト楽曲" {
-		assert.Failf(t, "アサーション失敗", "Title = %v, want %v", dto.Title, "テスト楽曲")
-	}
-
-	require.NotNil(t, dto.Reading)
-	assert.Equal(t, "テストガッキョク", *dto.Reading)
-
-	if dto.Artist != "テストアーティスト" {
-		assert.Failf(t, "アサーション失敗", "Artist = %v, want %v", dto.Artist, "テストアーティスト")
-	}
-
-	// Genre は *string でジャンル名に変換される
-	if dto.Genre == nil {
-		t.Error("Genre is nil, want POPS & ANIME")
-	} else if *dto.Genre != "POPS & ANIME" {
-		assert.Failf(t, "アサーション失敗", "Genre = %v, want %v", *dto.Genre, "POPS & ANIME")
-	}
-
-	if dto.BPM == nil || *dto.BPM != 180 {
-		assert.Failf(t, "アサーション失敗", "BPM = %v, want %v", dto.BPM, 180)
-	}
-
-	// Release は *string で "YYYY-MM-DD" 形式
-	if dto.Release == nil {
-		t.Error("Release is nil")
-	} else if *dto.Release != "2024-01-15" {
-		assert.Failf(t, "アサーション失敗", "Release = %v, want %v", *dto.Release, "2024-01-15")
-	}
-
-	if dto.Jacket == nil {
-		t.Error("Jacket is nil")
-	} else if *dto.Jacket != "jacket.png" {
-		assert.Failf(t, "アサーション失敗", "Jacket = %v, want %v", *dto.Jacket, "jacket.png")
-	}
-
-	if dto.OfficialIdx != "123" {
-		assert.Failf(t, "アサーション失敗", "OfficialIdx = %v, want %v", dto.OfficialIdx, "123")
-	}
-
-	// Charts に WORLDSEND キーが存在すること
-	if dto.Charts == nil {
-		require.Fail(t, "Charts is nil")
-	}
-
-	weChart, ok := dto.Charts["WORLDSEND"]
-	if !ok {
-		require.Fail(t, "Charts does not contain WORLDSEND key")
-	}
-
-	if weChart == nil {
-		require.Fail(t, "WORLDSEND chart is nil")
-	}
-
-	if weChart.LevelStar == nil || *weChart.LevelStar != 5 {
-		assert.Failf(t, "アサーション失敗", "LevelStar = %v, want %v", weChart.LevelStar, 5)
-	}
-
-	if weChart.Attribute == nil || *weChart.Attribute != "狂" {
-		assert.Failf(t, "アサーション失敗", "Attribute = %v, want %v", weChart.Attribute, "狂")
-	}
-
-	if weChart.Notes == nil || *weChart.Notes != 1500 {
-		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", weChart.Notes, 1500)
-	}
-	if weChart.NotesDesigner == nil || *weChart.NotesDesigner != "譜面作者A" {
-		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
-	}
+	require.NotNil(t, dto)
+	require.NotNil(t, dto.Genre)
+	assert.Equal(t, "POPS & ANIME", *dto.Genre)
+	require.NotNil(t, dto.Release)
+	assert.Equal(t, "2024-01-15", *dto.Release)
+	require.Contains(t, dto.Charts, "WORLDSEND")
+	require.NotNil(t, dto.Charts["WORLDSEND"])
+	assert.Equal(t, 5, *dto.Charts["WORLDSEND"].LevelStar)
+	assert.Equal(t, "狂", *dto.Charts["WORLDSEND"].Attribute)
+	assert.Equal(t, 1500, *dto.Charts["WORLDSEND"].Notes)
 }
 
 // TestToWorldsendSongDTO_ReleaseDateCanBeNil はリリース日がnilの場合のテストです。

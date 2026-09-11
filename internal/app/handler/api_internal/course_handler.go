@@ -2,7 +2,6 @@ package api_internal
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -121,8 +120,7 @@ func (h *CourseHandler) GetUserRecords(c *echo.Context) error {
 	if v, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = v
 	}
-	include, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
-	result, err := h.usecase.GetUserRecords(c.Request().Context(), c.Param("username"), requester, include)
+	result, err := h.usecase.GetUserRecords(c.Request().Context(), c.Param("username"), requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

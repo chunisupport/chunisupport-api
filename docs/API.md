@@ -2478,8 +2478,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend`/`course` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend`/`course` のみを返します。
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
-- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。`view=rating` 以外では、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
 
@@ -2762,10 +2761,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 
-- **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`standard` と `worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
-
-- **レスポンス**: `UserRecordDTO`
+- **レスポンス**: `standard` と `worldsend` に未プレイ譜面を、`course` に未プレイコースを常に補完した `UserRecordDTO` を返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 ```json
 {
@@ -2843,9 +2839,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: 指定した通常楽曲に属するユーザーレコードだけを返します。
+- **概要**: 指定した通常楽曲に属するユーザーレコードを、未プレイ譜面を含めて返します。
 - **クエリパラメータ**:
-  - `include_noplay` (任意): `true` の場合は未プレイ譜面も補完します。
   - `difficulty` (任意): `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`。大文字小文字は区別しません。指定した難易度の譜面が曲に存在しない場合は `400 invalid_difficulty` を返します。
 - **レスポンス**: `standard` は最大5件です。`meta.updated_at` は返却したプレイ済みレコードの最終更新日時で、該当レコードがなければ `null` です。
 
@@ -2871,9 +2866,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 指定した WORLD'S END 楽曲のユーザーレコードを返します。
-- **クエリパラメータ**:
-  - `include_noplay` (任意): `true` の場合は未プレイレコードを補完します。
-- **レスポンス**: レコードがなければ `worldsend` は `null` です。`include_noplay=true` の場合は未プレイオブジェクトを返します。
+- **レスポンス**: プレイヤー連携済みの場合は、未プレイでも `is_played=false` の `worldsend` オブジェクトを返します。プレイヤー未連携の場合は `worldsend` が `null` です。
+
+プレイヤー未連携時のレスポンス例:
 
 ```json
 {
@@ -3011,8 +3006,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
-- **レスポンス**: 対象ユーザーのコースレコード一覧を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `courses` が空配列です。
+- **レスポンス**: 未プレイコースを常に補完した対象ユーザーのコースレコード一覧を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `courses` が空配列です。
 
 #### レスポンス例
 
@@ -4766,10 +4760,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 
-- **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
-
-- **レスポンス**: 200 OK
+- **レスポンス**: `records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完して 200 OK を返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 ```json
 {
@@ -4870,8 +4861,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/users/:username/records/courses`
 - **認証**: APIトークン必須
-- **概要**: 対象ユーザーのコースレコード一覧を取得します。非公開ユーザーは本人または承認済みフレンド以外 404 です。
-- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
+- **概要**: 未プレイコースを常に補完した対象ユーザーのコースレコード一覧を取得します。非公開ユーザーは本人または承認済みフレンド以外 404 です。
 - **レスポンス**: 200 OK
 
 ```json

@@ -2,7 +2,6 @@ package api_v1
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
@@ -33,8 +32,7 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
-	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
-	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
+	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

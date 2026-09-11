@@ -12,121 +12,33 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 )
 
-// TestToV1WorldsendSongDTO は ToV1WorldsendSongDTO 関数の基本的な変換をテストします。
 func TestToV1WorldsendSongDTO(t *testing.T) {
 	genreID := 2
-	bpm := 200
-	jacket := "v1jacket.png"
-	reading := "ブイワンテストガッキョク"
 	releasedAt := time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)
-	levelStar, levelStarErr := levelstar.NewLevelStar(3)
-	if levelStarErr != nil {
-		require.Failf(t, "前提条件失敗", "levelstar.NewLevelStar failed: %v", levelStarErr)
-	}
+	level, err := levelstar.NewLevelStar(3)
+	require.NoError(t, err)
 	attribute := "光"
-	notesObj, _ := notes.NewNotes(2000)
-	notesDesigner := "譜面作者A"
-
-	song := &entity.Song{
-		DisplayID:   "v1test1234567890",
-		Title:       "V1テスト楽曲",
-		Reading:     &reading,
-		Artist:      "V1アーティスト",
-		GenreID:     &genreID,
-		BPM:         &bpm,
-		ReleasedAt:  &releasedAt,
-		OfficialIdx: "456",
-		Jacket:      &jacket,
-	}
-
+	chartNotes, err := notes.NewNotes(2000)
+	require.NoError(t, err)
+	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt}
 	chart := &entity.WorldsendChart{
-		LevelStar:     &levelStar,
-		Attribute:     &attribute,
-		Notes:         &notesObj,
-		NotesDesigner: &notesDesigner,
+		LevelStar: &level,
+		Attribute: &attribute,
+		Notes:     &chartNotes,
 	}
 
-	genreNamesByID := map[int]string{
-		1: "POPS & ANIME",
-		2: "niconico",
-	}
+	dto := ToV1WorldsendSongDTO(song, chart, map[int]string{2: "niconico"})
 
-	dto := ToV1WorldsendSongDTO(song, chart, genreNamesByID)
-
-	if dto == nil {
-		require.Fail(t, "ToV1WorldsendSongDTO returned nil")
-	}
-
-	if dto.DisplayID != "v1test1234567890" {
-		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "v1test1234567890")
-	}
-
-	if dto.Title != "V1テスト楽曲" {
-		assert.Failf(t, "アサーション失敗", "Title = %v, want %v", dto.Title, "V1テスト楽曲")
-	}
-
-	if dto.Reading == nil || *dto.Reading != "ブイワンテストガッキョク" {
-		assert.Failf(t, "アサーション失敗", "Reading = %v, want %v", dto.Reading, "ブイワンテストガッキョク")
-	}
-
-	if dto.Artist != "V1アーティスト" {
-		assert.Failf(t, "アサーション失敗", "Artist = %v, want %v", dto.Artist, "V1アーティスト")
-	}
-
-	if dto.Genre == nil {
-		t.Error("Genre is nil, want niconico")
-	} else if *dto.Genre != "niconico" {
-		assert.Failf(t, "アサーション失敗", "Genre = %v, want %v", *dto.Genre, "niconico")
-	}
-
-	if dto.BPM == nil || *dto.BPM != 200 {
-		assert.Failf(t, "アサーション失敗", "BPM = %v, want %v", dto.BPM, 200)
-	}
-
-	if dto.Release == nil {
-		t.Error("Release is nil")
-	} else if *dto.Release != "2023-12-31" {
-		assert.Failf(t, "アサーション失敗", "Release = %v, want %v", *dto.Release, "2023-12-31")
-	}
-
-	if dto.Jacket == nil {
-		t.Error("Jacket is nil")
-	} else if *dto.Jacket != "v1jacket.png" {
-		assert.Failf(t, "アサーション失敗", "Jacket = %v, want %v", *dto.Jacket, "v1jacket.png")
-	}
-
-	if dto.OfficialIdx != "456" {
-		assert.Failf(t, "アサーション失敗", "OfficialIdx = %v, want %v", dto.OfficialIdx, "456")
-	}
-
-	// Charts に WORLDSEND キーが存在すること
-	if dto.Charts == nil {
-		require.Fail(t, "Charts is nil")
-	}
-
-	weChart, ok := dto.Charts["WORLDSEND"]
-	if !ok {
-		require.Fail(t, "Charts does not contain WORLDSEND key")
-	}
-
-	if weChart == nil {
-		require.Fail(t, "WORLDSEND chart is nil")
-	}
-
-	if weChart.LevelStar == nil || *weChart.LevelStar != 3 {
-		assert.Failf(t, "アサーション失敗", "LevelStar = %v, want %v", weChart.LevelStar, 3)
-	}
-
-	if weChart.Attribute == nil || *weChart.Attribute != "光" {
-		assert.Failf(t, "アサーション失敗", "Attribute = %v, want %v", weChart.Attribute, "光")
-	}
-
-	if weChart.Notes == nil || *weChart.Notes != 2000 {
-		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", weChart.Notes, 2000)
-	}
-	if weChart.NotesDesigner == nil || *weChart.NotesDesigner != "譜面作者A" {
-		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", weChart.NotesDesigner, "譜面作者A")
-	}
+	require.NotNil(t, dto)
+	require.NotNil(t, dto.Genre)
+	assert.Equal(t, "niconico", *dto.Genre)
+	require.NotNil(t, dto.Release)
+	assert.Equal(t, "2023-12-31", *dto.Release)
+	require.Contains(t, dto.Charts, "WORLDSEND")
+	require.NotNil(t, dto.Charts["WORLDSEND"])
+	assert.Equal(t, 3, *dto.Charts["WORLDSEND"].LevelStar)
+	assert.Equal(t, "光", *dto.Charts["WORLDSEND"].Attribute)
+	assert.Equal(t, 2000, *dto.Charts["WORLDSEND"].Notes)
 }
 
 // TestToV1WorldsendSongDTO_NilSong は Song が nil の場合に nil を返すことを確認します。

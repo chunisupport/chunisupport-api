@@ -44,7 +44,7 @@ func (s *courseUsecaseStub) Update(context.Context, string, usecase.UpdateCourse
 }
 func (s *courseUsecaseStub) Delete(context.Context, string) error  { return nil }
 func (s *courseUsecaseStub) Restore(context.Context, string) error { return nil }
-func (s *courseUsecaseStub) GetUserRecords(context.Context, string, *entity.User, bool) (*usecase.CourseRecordResult, error) {
+func (s *courseUsecaseStub) GetUserRecords(context.Context, string, *entity.User) (*usecase.CourseRecordResult, error) {
 	return nil, nil
 }
 func (s *courseUsecaseStub) GetUserRecord(context.Context, string, *entity.User, string) (*usecase.CourseRecordOutput, error) {

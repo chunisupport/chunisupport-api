@@ -432,7 +432,7 @@ func (s *stubWorldsendChartRepository) CreateSong(ctx context.Context, exec repo
 func TestUserUsecase_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
 	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil, false)
+	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil)
 	require.ErrorIs(t, err, ErrUserNotFound)
 }
 
@@ -440,7 +440,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PlayerNotLinkedReturnsNilPlayerAn
 	user := &entity.User{ID: 1}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil, false)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, 1, result.UserID)
@@ -466,7 +466,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 	}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1}, false)
+	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1})
 	require.NoError(t, err)
 }
 
@@ -479,7 +479,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilP
 	}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Nil(t, result.Player)
@@ -726,7 +726,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.UserID)
 
@@ -753,7 +753,7 @@ func TestUserUsecase_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t 
 	player := &entity.Player{ID: 1, Name: playername.MustNewPlayerName("テストプレイヤー"), Level: 10, UpdatedAt: now}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
 	require.NotNil(t, result.Player)
 	require.NotNil(t, result.Player.Honors)
@@ -902,7 +902,7 @@ func TestUserUsecase_GetUserProfile_同一楽曲の通常譜面とUltimaロッ�
 	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 70), *result.Player.OverpowerPercent)
 }
 
-func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
+func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する(t *testing.T) {
 	now := time.Now()
 	scorePlayed, _ := score.NewScore(1000000)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
@@ -932,7 +932,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, true)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
 
 	require.Len(t, result.Records.All, 2)
@@ -951,7 +951,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IncludeNoPlay(t *testing.T) {
 	require.Len(t, result.Records.WorldsEnd, 1)
 	assert.False(t, result.Records.WorldsEnd[0].IsPlayed, "expected worldsend completion record is unplayed")
 
-	// include_noplay=true でも slot ベースの並びは補完前レコードに依存する
+	// slot ベースの並びは補完前レコードに依存する
 	assert.Nil(t, result.Records.All[0].Slot, "expected all record slot nil")
 }
 
@@ -1009,7 +1009,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 		nil,
 	)
 
-	result, err := usecase.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	result, err := usecase.GetUserProfileWithRecords(context.Background(), "tester", nil)
 
 	require.NoError(t, err)
 	require.Len(t, result.Records.All, 4)
@@ -1234,7 +1234,7 @@ func TestUserUsecase_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAnd
 	assert.Nil(t, result.UpdatedAt)
 }
 
-func TestUserUsecase_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
+func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(t *testing.T) {
 	now := time.Now()
 	scorePlayed, _ := score.NewScore(1000000)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
@@ -1264,7 +1264,7 @@ func TestUserUsecase_GetUserProfileRecordView_IncludeNoPlay(t *testing.T) {
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
 	)
 
-	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, true)
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)
 	require.NoError(t, err)
 
 	require.NotNil(t, result)
@@ -1285,7 +1285,7 @@ func TestUserUsecase_GetUserProfileRecordView_PlayerNotLinkedReturnsNilPlayerAnd
 	user := &entity.User{ID: 1}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
-	result, err := service.GetUserProfileRecordView(context.Background(), "no-player", nil, false)
+	result, err := service.GetUserProfileRecordView(context.Background(), "no-player", nil)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Nil(t, result.Player)
@@ -1310,7 +1310,7 @@ func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerU
 		nil,
 	)
 
-	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)
 	require.NoError(t, err)
 
 	assert.True(t, result.Records.UpdatedAt.Equal(now))
@@ -1344,7 +1344,7 @@ func TestUserUsecase_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLate
 		nil,
 	)
 
-	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
 	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
 }
@@ -1377,7 +1377,7 @@ func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLates
 		nil,
 	)
 
-	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil, false)
+	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)
 	require.NoError(t, err)
 	assert.True(t, result.Records.UpdatedAt.Equal(worldsendUpdatedAt))
 }
@@ -1504,7 +1504,7 @@ func TestUserUsecase_GetUserSongRecord_指定難易度を未プレイ補完し�
 	)
 
 	// When
-	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", true, "MASTER")
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "MASTER")
 
 	// Then
 	require.NoError(t, err)
@@ -1538,7 +1538,7 @@ func TestUserUsecase_GetUserSongRecord_曲に存在しない難易度はエラ�
 	)
 
 	// When
-	_, err = service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", false, "MASTER")
+	_, err = service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "MASTER")
 
 	// Then
 	assert.ErrorIs(t, err, ErrInvalidDifficulty)
@@ -1571,7 +1571,7 @@ func TestUserUsecase_GetUserWorldsendSongRecord_未プレイ補完を返す(t *t
 	)
 
 	// When
-	result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001", true)
+	result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001")
 
 	// Then
 	require.NoError(t, err)

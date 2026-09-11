@@ -6,11 +6,11 @@
 
 現行APIには以下が存在します。
 
-- `GET /internal/users/:username/record?include_noplay=true`: 指定ユーザーの未プレイ補完を含む全レコード取得
+- `GET /internal/users/:username/record`: 指定ユーザーの未プレイ補完を含む全レコード取得
 - `GET /internal/friend-rankings/songs/:displayid/charts/:difficulty`: 通常譜面1件のフレンドランキング取得
 - `GET /internal/friend-rankings/worldsend-songs/:displayid`: WORLD'S END譜面1件のフレンドランキング取得
 
-既存の全レコードAPIを `include_noplay=true` で自分とフレンドの2人分取得し、クライアント側で比較することは可能です。ただし、全難易度と比較に不要なレーティング・OVER POWER・スロット等も転送・展開します。また、譜面単位ランキングAPIを全譜面分呼び出す方式はNリクエストになるため採用しません。
+既存の全レコードAPIを自分とフレンドの2人分取得し、クライアント側で比較することは可能です。ただし、全難易度と比較に不要なレーティング・OVER POWER・スロット等も転送・展開します。また、譜面単位ランキングAPIを全譜面分呼び出す方式はNリクエストになるため採用しません。
 
 本設計では、1人の承認済みフレンドと、指定した1難易度の全通常譜面を比較する専用APIを新設します。
 

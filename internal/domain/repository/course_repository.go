@@ -32,7 +32,7 @@ type CourseRepository interface {
 	FindLatestUpdatedAt(ctx context.Context, exec Executor) (*time.Time, error)
 	Create(ctx context.Context, exec Executor, course *entity.Course) error
 	Save(ctx context.Context, exec Executor, course *entity.Course) error
-	FindRecordsByPlayerID(ctx context.Context, exec Executor, playerID int, includeDeleted, includeNoPlay bool) ([]*entity.PlayerCourseRecord, error)
+	FindRecordsByPlayerID(ctx context.Context, exec Executor, playerID int, includeDeleted bool) ([]*entity.PlayerCourseRecord, error)
 	FindRecordStatesByCourseIDs(ctx context.Context, exec Executor, playerID int, courseIDs []int) (map[int]CourseRecordState, error)
 	UpsertRecords(ctx context.Context, exec Executor, records []CourseRecordForUpsert) error
 }

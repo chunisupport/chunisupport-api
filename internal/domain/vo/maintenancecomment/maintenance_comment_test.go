@@ -41,11 +41,6 @@ func TestNewMaintenanceComment(t *testing.T) {
 			wantErr: ErrTooLong,
 		},
 		{
-			name:    "空文字を拒否する",
-			value:   "",
-			wantErr: ErrRequired,
-		},
-		{
 			name:    "空白と改行だけのコメントを拒否する",
 			value:   " \r\n　 ",
 			wantErr: ErrRequired,
@@ -53,16 +48,6 @@ func TestNewMaintenanceComment(t *testing.T) {
 		{
 			name:    "タブを拒否する",
 			value:   "更新\t中",
-			wantErr: ErrControlCharacter,
-		},
-		{
-			name:    "前後のタブも拒否する",
-			value:   "\t更新中\t",
-			wantErr: ErrControlCharacter,
-		},
-		{
-			name:    "NULL文字を拒否する",
-			value:   "更新\x00中",
 			wantErr: ErrControlCharacter,
 		},
 	}

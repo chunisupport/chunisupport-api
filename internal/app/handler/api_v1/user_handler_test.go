@@ -17,7 +17,7 @@ import (
 )
 
 type mockV1UserUsecase struct {
-	getUserProfileWithRecordsFunc func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error)
+	getUserProfileWithRecordsFunc func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error)
 	getUserProfileRatingViewFunc  func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error)
 }
 
@@ -29,9 +29,9 @@ func (m *mockV1UserUsecase) GetUserUpdatedAt(ctx context.Context, username strin
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
+func (m *mockV1UserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
 	if m.getUserProfileWithRecordsFunc != nil {
-		return m.getUserProfileWithRecordsFunc(ctx, username, requester, includeNoPlay)
+		return m.getUserProfileWithRecordsFunc(ctx, username, requester)
 	}
 	return nil, nil
 }
@@ -43,15 +43,15 @@ func (m *mockV1UserUsecase) GetUserProfileRatingView(ctx context.Context, userna
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileRecordViewOutput, error) {
+func (m *mockV1UserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRecordViewOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*usecase.UserSongRecordOutput, error) {
+func (m *mockV1UserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, difficulty string) (*usecase.UserSongRecordOutput, error) {
 	return nil, nil
 }
 
-func (m *mockV1UserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*usecase.UserWorldsendSongRecordOutput, error) {
+func (m *mockV1UserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*usecase.UserWorldsendSongRecordOutput, error) {
 	return nil, nil
 }
 
@@ -68,14 +68,13 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		// Given
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
-			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
 				assert.Equal(t, "privateuser", username)
-				assert.True(t, includeNoPlay)
 				return nil, usecase.ErrUserPrivate
 			},
 		}
 		handler := NewV1UserHandler(mockUsecase)
-		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser?include_noplay=true", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/privateuser", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetPathValues(echo.PathValues{{Name: "username", Value: "privateuser"}})
@@ -96,7 +95,7 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		called := false
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
-			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
 				called = true
 				return nil, nil
 			},

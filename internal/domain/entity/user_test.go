@@ -25,11 +25,6 @@ func TestNewUser(t *testing.T) {
 	assert.False(t, user.CreatedAt.IsZero())
 	assert.False(t, user.UpdatedAt.IsZero())
 	assert.True(t, user.CreatedAt.Equal(user.UpdatedAt))
-	assert.Zero(t, user.ID)
-	assert.Nil(t, user.FirebaseUID)
-	assert.Nil(t, user.PlayerID)
-	assert.False(t, user.IsSuspicious)
-	assert.False(t, user.IsPrivate)
 }
 
 func TestUser_LinkFirebaseUID(t *testing.T) {

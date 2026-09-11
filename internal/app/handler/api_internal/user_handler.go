@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
@@ -90,13 +89,12 @@ func (h *UserHandler) GetUserRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
 
-	result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester, includeNoPlay)
+	result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 	if err != nil {
 		return h.handleUserProfileError(err, username, "user record")
 	}
@@ -114,14 +112,13 @@ func (h *UserHandler) GetUserSongRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	difficulty := strings.ToUpper(c.QueryParam("difficulty"))
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
 
-	result, err := h.userUsecase.GetUserSongRecord(c.Request().Context(), username, requester, displayID, includeNoPlay, difficulty)
+	result, err := h.userUsecase.GetUserSongRecord(c.Request().Context(), username, requester, displayID, difficulty)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -138,13 +135,12 @@ func (h *UserHandler) GetUserWorldsendSongRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
 
-	result, err := h.userUsecase.GetUserWorldsendSongRecord(c.Request().Context(), username, requester, displayID, includeNoPlay)
+	result, err := h.userUsecase.GetUserWorldsendSongRecord(c.Request().Context(), username, requester, displayID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -170,16 +166,15 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 		return c.JSON(http.StatusOK, toUserProfileRatingViewDTO(result))
 	}
 
-	includeNoPlay, _ := strconv.ParseBool(c.QueryParam("include_noplay"))
 	if view == "record" {
-		result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester, includeNoPlay)
+		result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 		if err != nil {
 			return h.handleUserProfileError(err, username, "user profile record view")
 		}
 		return c.JSON(http.StatusOK, toUserProfileRecordViewDTO(result))
 	}
 
-	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester, includeNoPlay)
+	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
 		return h.handleUserProfileError(err, username, "user profile with records")
 	}

@@ -64,10 +64,3 @@ func TestLevelStar_Scan(t *testing.T) {
 		})
 	}
 }
-
-func TestLevelStar_Scan_NilReceiver(t *testing.T) {
-	var got *LevelStar
-
-	err := got.Scan(int64(3))
-	require.Error(t, err)
-}

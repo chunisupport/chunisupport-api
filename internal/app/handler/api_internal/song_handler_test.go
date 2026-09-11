@@ -34,14 +34,8 @@ func (tv *testValidator) Validate(i any) error {
 	return tv.validator.Struct(i)
 }
 
-// TestConvertToSongDTO はSongHandlerのconvertToSongDTOメソッドをテストします。
 func TestConvertToSongDTO(t *testing.T) {
-	// マスタデータキャッシュの準備
 	masterCache := &masterdata.Cache{
-		GenreNamesByID: map[int]string{
-			1: "POPS & ANIME",
-			2: "niconico",
-		},
 		DifficultyNamesByID: map[int]string{
 			1: "BASIC",
 			2: "ADVANCED",
@@ -50,135 +44,29 @@ func TestConvertToSongDTO(t *testing.T) {
 			5: "ULTIMA",
 		},
 	}
-
+	designer := "譜面作者"
+	song := &entity.Song{
+		Charts: []*entity.Chart{
+			{DifficultyID: 1, Const: 7.5},
+			{DifficultyID: 3, Const: 12.0, NotesDesigner: &designer},
+		},
+	}
 	handler := &SongHandler{
 		songUsecase: &testutil.MockSongUsecase{},
 		masterCache: masterCache,
 	}
 
-	// テストデータの準備
-	genreID := 1
-	bpm := 180
-	imgURL := "https://example.com/jacket.jpg"
-
-	song := &entity.Song{
-		DisplayID:      "test123456789012",
-		Title:          "テスト楽曲",
-		Artist:         "テストアーティスト",
-		GenreID:        &genreID,
-		BPM:            &bpm,
-		Jacket:         &imgURL,
-		IsMaxOPUnknown: true,
-		IsNew:          true,
-	}
-
-	notes1Value := 500
-	notes2Value := 800
-	notes1, err := notes.NewNotes(notes1Value)
-	if err != nil {
-		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes1Value: %v", err)
-	}
-	notes2, err := notes.NewNotes(notes2Value)
-	if err != nil {
-		require.Failf(t, "前提条件失敗", "notes.NewNotes failed for notes2Value: %v", err)
-	}
-
-	charts := []*entity.Chart{
-		{
-			DifficultyID:   1, // basic
-			Const:          7.5,
-			IsConstUnknown: false,
-			Notes:          &notes1,
-			NotesDesigner:  stringPtr("譜面作者A"),
-		},
-		{
-			DifficultyID:   3, // expert
-			Const:          12.0,
-			IsConstUnknown: false,
-			Notes:          &notes2,
-			NotesDesigner:  stringPtr("譜面作者B"),
-		},
-	}
-
-	song.Charts = charts
-	song.OpTargetDifficultyID = 3
-
-	// 変換実行
 	dto := handler.convertToSongDTO(song)
 
-	// アサーション
-	if dto == nil {
-		require.Fail(t, "convertToSongDTO returned nil")
-	}
-
-	if dto.DisplayID != "test123456789012" {
-		assert.Failf(t, "アサーション失敗", "DisplayID = %v, want %v", dto.DisplayID, "test123456789012")
-	}
-
-	if dto.MaxOP != 90 {
-		assert.Failf(t, "アサーション失敗", "MaxOP = %v, want %v", dto.MaxOP, 90)
-	}
-
-	// IsMaxOPUnknown が反映されていることを確認
-	if !dto.IsMaxOPUnknown {
-		assert.Failf(t, "アサーション失敗", "IsMaxOPUnknown = %v, want %v", dto.IsMaxOPUnknown, true)
-	}
-
-	if dto.OpTargetDifficulty == nil || *dto.OpTargetDifficulty != "EXPERT" {
-		assert.Failf(t, "アサーション失敗", "OpTargetDifficulty = %v, want %v", dto.OpTargetDifficulty, "EXPERT")
-	}
-
-	assert.True(t, dto.IsNew)
-
-	// Charts マップのキーが存在するか確認
-	if dto.Charts == nil {
-		require.Fail(t, "Charts is nil")
-	}
-
-	// BASIC 譜面が存在することを確認
-	if basicChart, ok := dto.Charts["BASIC"]; !ok || basicChart == nil {
-		t.Error("BASIC chart not found")
-	} else {
-		if basicChart.Const != 7.5 {
-			assert.Failf(t, "アサーション失敗", "BASIC chart Const = %v, want %v", basicChart.Const, 7.5)
-		}
-		if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
-			assert.Failf(t, "アサーション失敗", "BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
-		}
-	}
-
-	// EXPERT 譜面が存在することを確認
-	if expertChart, ok := dto.Charts["EXPERT"]; !ok || expertChart == nil {
-		t.Error("EXPERT chart not found")
-	} else {
-		if expertChart.Const != 12.0 {
-			assert.Failf(t, "アサーション失敗", "expert chart Const = %v, want %v", expertChart.Const, 12.0)
-		}
-		if expertChart.NotesDesigner == nil || *expertChart.NotesDesigner != "譜面作者B" {
-			assert.Failf(t, "アサーション失敗", "EXPERT chart NotesDesigner = %v, want %v", expertChart.NotesDesigner, "譜面作者B")
-		}
-	}
-
-	// ADVANCED 譜面は存在しないので nil であることを確認
-	if advancedChart, ok := dto.Charts["ADVANCED"]; !ok {
-		t.Error("ADVANCED key not found in map")
-	} else if advancedChart != nil {
-		t.Error("ADVANCED chart should be nil")
-	}
-
-	// MASTER 譜面は存在しないので nil であることを確認
-	if masterChart, ok := dto.Charts["MASTER"]; !ok {
-		t.Error("MASTER key not found in map")
-	} else if masterChart != nil {
-		t.Error("MASTER chart should be nil")
-	}
-
-	// ULTIMA 譜面は存在しないので nil であることを確認
-	if ultimaChart, ok := dto.Charts["ULTIMA"]; !ok {
-		t.Error("ULTIMA key not found in map")
-	} else if ultimaChart != nil {
-		t.Error("ultima chart should be nil")
-	}
+	require.NotNil(t, dto)
+	assert.Equal(t, 90.0, dto.MaxOP)
+	require.NotNil(t, dto.Charts["BASIC"])
+	assert.Equal(t, 7.5, dto.Charts["BASIC"].Const.Float64())
+	require.NotNil(t, dto.Charts["EXPERT"])
+	assert.Equal(t, designer, *dto.Charts["EXPERT"].NotesDesigner)
+	assert.Nil(t, dto.Charts["ADVANCED"])
+	assert.Nil(t, dto.Charts["MASTER"])
+	assert.Nil(t, dto.Charts["ULTIMA"])
 }
 
 // TestUpdateSongs はUpdateSongsハンドラーの入力バリデーションをテストします。

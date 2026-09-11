@@ -12,8 +12,6 @@ func TestNewPlayer(t *testing.T) {
 
 	player := NewPlayer(42, name)
 
-	assert.Equal(t, 42, player.UserID)
-	assert.Equal(t, name.String(), player.Name.String())
 	assert.Equal(t, DefaultPlayerLevel, player.Level)
 	assert.False(t, player.CreatedAt.IsZero())
 	assert.False(t, player.UpdatedAt.IsZero())

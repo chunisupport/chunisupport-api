@@ -211,7 +211,7 @@ func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username stri
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
 // 対象ユーザーが非公開設定の場合は、本人または承認済みフレンド以外は ErrUserPrivate を返します。
-func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileWithRecordsOutput, error) {
+func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*UserProfileWithRecordsOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -230,16 +230,16 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		}, nil
 	}
 
-	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
+	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
 
-	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID, includeNoPlay)
+	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
-	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +453,7 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID in
 }
 
 // GetUserProfileRecordView はユーザー名をキーにレコード表示向けのプロファイルとレコードを取得します。
-func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*UserProfileRecordViewOutput, error) {
+func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User) (*UserProfileRecordViewOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -471,16 +471,16 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		}, nil
 	}
 
-	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID, includeNoPlay)
+	playerRecords, err := s.getUserProfilePlayerRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
 
-	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID, includeNoPlay)
+	worldsendRecords, err := s.getUserProfileWorldsendRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
-	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, includeNoPlay)
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 }
 
 // GetUserSongRecord は指定した通常楽曲に属するレコードだけを返します。
-func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*UserSongRecordOutput, error) {
+func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, difficulty string) (*UserSongRecordOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -537,11 +537,8 @@ func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, re
 	}
 	markOPTargetPlayerRecords(records)
 
-	allRecords := records
-	if includeNoPlay {
-		difficultyNames, difficultySortOrders := s.songDifficultyMasters()
-		allRecords = s.recordCompletionSvc.CompletePlayerRecords(records, []*entity.Song{song}, difficultyNames, difficultySortOrders)
-	}
+	difficultyNames, difficultySortOrders := s.songDifficultyMasters()
+	allRecords := s.recordCompletionSvc.CompletePlayerRecords(records, []*entity.Song{song}, difficultyNames, difficultySortOrders)
 	if difficultyID != nil {
 		allRecords = filterPlayerRecordsByDifficultyID(allRecords, *difficultyID)
 	}
@@ -555,7 +552,7 @@ func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, re
 }
 
 // GetUserWorldsendSongRecord は指定した WORLD'S END 楽曲のレコードを返します。
-func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*UserWorldsendSongRecordOutput, error) {
+func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*UserWorldsendSongRecordOutput, error) {
 	user, err := s.getAccessibleUser(ctx, username, requester)
 	if err != nil {
 		return nil, err
@@ -582,9 +579,7 @@ func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username s
 	if err != nil {
 		return nil, err
 	}
-	if includeNoPlay {
-		records = s.recordCompletionSvc.CompleteWorldsendRecords(records, []*entity.WorldsendSongWithChart{songChart})
-	}
+	records = s.recordCompletionSvc.CompleteWorldsendRecords(records, []*entity.WorldsendSongWithChart{songChart})
 	if len(records) == 0 {
 		return response, nil
 	}
@@ -636,7 +631,7 @@ func filterPlayerRecordsByDifficultyID(records []*entity.PlayerRecord, difficult
 	return filtered
 }
 
-func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int, includeNoPlay bool) (*userProfilePlayerRecords, error) {
+func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int) (*userProfilePlayerRecords, error) {
 	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, playerID)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -647,13 +642,10 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 		return nil, err
 	}
 
-	allRecords := records
 	markOPTargetPlayerRecords(records)
-	if includeNoPlay {
-		allRecords, err = s.completePlayerRecords(ctx, playerID, records)
-		if err != nil {
-			return nil, err
-		}
+	allRecords, err := s.completePlayerRecords(ctx, playerID, records)
+	if err != nil {
+		return nil, err
 	}
 
 	slotMap := initializeSlotMap()
@@ -796,7 +788,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	return s.recordCompletionSvc.CompletePlayerRecords(records, songs, difficultyNamesByID, difficultySortOrderByID), nil
 }
 
-func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*entity.PlayerWorldsendRecord, error) {
+func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, playerID int) ([]*entity.PlayerWorldsendRecord, error) {
 	if s.worldsendRecordRepo == nil {
 		return []*entity.PlayerWorldsendRecord{}, nil
 	}
@@ -811,11 +803,9 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 		return nil, err
 	}
 
-	if includeNoPlay {
-		records, err = s.completeWorldsendRecords(ctx, playerID, records)
-		if err != nil {
-			return nil, err
-		}
+	records, err = s.completeWorldsendRecords(ctx, playerID, records)
+	if err != nil {
+		return nil, err
 	}
 
 	return records, nil
@@ -868,11 +858,11 @@ func latestUserRecordUpdatedAt(values ...time.Time) time.Time {
 	return latest
 }
 
-func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int, includeNoPlay bool) ([]*CourseRecordOutput, time.Time, error) {
+func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int) ([]*CourseRecordOutput, time.Time, error) {
 	if s.courseRepo == nil {
 		return []*CourseRecordOutput{}, time.Time{}, nil
 	}
-	records, err := s.courseRepo.FindRecordsByPlayerID(ctx, s.db, playerID, false, includeNoPlay)
+	records, err := s.courseRepo.FindRecordsByPlayerID(ctx, s.db, playerID, false)
 	if err != nil {
 		return nil, time.Time{}, err
 	}

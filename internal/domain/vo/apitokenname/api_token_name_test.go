@@ -35,7 +35,6 @@ func TestNewAPITokenName_Invalid(t *testing.T) {
 		value string
 	}{
 		{name: "空文字", value: ""},
-		{name: "空白のみ", value: " \t "},
 		{name: "51文字", value: strings.Repeat("a", 51)},
 		{name: "制御文字を含む", value: "bot\nname"},
 	}

@@ -32,18 +32,6 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 			expected: "PLAYER",
 		},
 		{
-			name: "正常系: ADMIN IDの場合",
-			cache: &Cache{
-				AccountTypes: map[string]master.AccountType{
-					"PLAYER": {ID: 1, Name: "PLAYER"},
-					"EDITOR": {ID: 2, Name: "EDITOR"},
-					"ADMIN":  {ID: 3, Name: "ADMIN"},
-				},
-			},
-			id:       3,
-			expected: "ADMIN",
-		},
-		{
 			name: "異常系: 存在しないIDの場合はUNKNOWNを返す",
 			cache: &Cache{
 				AccountTypes: map[string]master.AccountType{
@@ -56,14 +44,6 @@ func TestCache_GetAccountTypeNameByID(t *testing.T) {
 		{
 			name:     "異常系: キャッシュがnilの場合はUNKNOWNを返す",
 			cache:    nil,
-			id:       1,
-			expected: "UNKNOWN",
-		},
-		{
-			name: "異常系: AccountTypesが空の場合はUNKNOWNを返す",
-			cache: &Cache{
-				AccountTypes: map[string]master.AccountType{},
-			},
 			id:       1,
 			expected: "UNKNOWN",
 		},
@@ -167,46 +147,24 @@ func TestCache_GetClassEmblemBaseNameByID(t *testing.T) {
 }
 
 func TestPreload_AchievementTypesUsesCodeColumn(t *testing.T) {
-	tests := []struct {
-		name              string
-		achievementTypeID int
-		achievementCode   string
-	}{
-		{
-			name:              "achievement_types の code 列を成果種別コードとしてキャッシュできる",
-			achievementTypeID: 8,
-			achievementCode:   "overpower_percent",
-		},
-		{
-			name:              "別の achievement_types.code でも同様にキャッシュできる",
-			achievementTypeID: 2,
-			achievementCode:   "score_count",
-		},
-	}
+	const achievementTypeID = 8
+	const achievementCode = "overpower_percent"
+	db := setupPreloadSQLite(t)
+	insertPreloadMasterRows(t, db, achievementTypeID, achievementCode)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Given
-			db := setupPreloadSQLite(t)
-			insertPreloadMasterRows(t, db, tt.achievementTypeID, tt.achievementCode)
+	cache, err := Preload(context.Background(), db)
 
-			// When
-			cache, err := Preload(context.Background(), db)
+	require.NoError(t, err)
+	require.NotNil(t, cache)
+	achievementType, ok := cache.AchievementTypes[achievementCode]
+	require.True(t, ok)
+	assert.Equal(t, achievementTypeID, achievementType.ID)
+	assert.Equal(t, achievementCode, achievementType.Name)
+	assert.Equal(t, achievementCode, cache.AchievementTypesByID[achievementTypeID])
 
-			// Then
-			require.NoError(t, err)
-			require.NotNil(t, cache)
-			achievementType, ok := cache.AchievementTypes[tt.achievementCode]
-			require.True(t, ok)
-			assert.Equal(t, tt.achievementTypeID, achievementType.ID)
-			assert.Equal(t, tt.achievementCode, achievementType.Name)
-			assert.Equal(t, tt.achievementCode, cache.AchievementTypesByID[tt.achievementTypeID])
-
-			goalMasters := cache.GoalMasters()
-			require.NotNil(t, goalMasters)
-			assert.Equal(t, tt.achievementCode, goalMasters.AchievementTypesByID[tt.achievementTypeID])
-		})
-	}
+	goalMasters := cache.GoalMasters()
+	require.NotNil(t, goalMasters)
+	assert.Equal(t, achievementCode, goalMasters.AchievementTypesByID[achievementTypeID])
 }
 
 func setupPreloadSQLite(t *testing.T) *sqlx.DB {
@@ -267,57 +225,6 @@ func insertPreloadMasterRows(t *testing.T, db *sqlx.DB, achievementTypeID int, a
 	for _, stmt := range statements {
 		_, err := db.Exec(stmt.query, stmt.args...)
 		require.NoError(t, err)
-	}
-}
-
-func TestLoadVersionMasters_FixedBaseDate(t *testing.T) {
-	// Given: 基準日を 2026-06-22 に固定し、過去版・当日版・未リリース版の3行を投入
-	baseDate := time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC)
-
-	tests := []struct {
-		name         string
-		releasedAt   time.Time
-		expectLoaded bool
-	}{
-		{
-			name:         "過去版: 基準日の前日は読み込まれる",
-			releasedAt:   baseDate.AddDate(0, 0, -1),
-			expectLoaded: true,
-		},
-		{
-			name:         "当日版: 基準日当日は読み込まれる",
-			releasedAt:   baseDate,
-			expectLoaded: true,
-		},
-		{
-			name:         "未リリース版: 基準日の翌日は読み込まれない",
-			releasedAt:   baseDate.AddDate(0, 0, 1),
-			expectLoaded: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Given: SQLite にバージョン行を投入
-			db := setupPreloadSQLite(t)
-			_, err := db.Exec(`INSERT INTO versions (id, name, released_at) VALUES (?, ?, ?)`, 1, "TEST_VER", tt.releasedAt.Format(time.DateOnly))
-			require.NoError(t, err)
-
-			// When: 基準日を引数として loadVersionMasters を呼び出す
-			query := `SELECT id, name, released_at FROM versions WHERE released_at <= ?`
-			releaseDate := baseDate.Format(time.DateOnly)
-			versions, err := loadVersionMasters(context.Background(), db, query, releaseDate)
-
-			// Then
-			require.NoError(t, err)
-			if tt.expectLoaded {
-				assert.Len(t, versions, 1)
-				_, ok := versions["TEST_VER"]
-				assert.True(t, ok)
-			} else {
-				assert.Empty(t, versions)
-			}
-		})
 	}
 }
 

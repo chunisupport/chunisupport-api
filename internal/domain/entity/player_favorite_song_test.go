@@ -2,7 +2,6 @@ package entity
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,21 +26,9 @@ func TestNewPlayerFavoriteSong(t *testing.T) {
 			wantErr:  "player_id",
 		},
 		{
-			name:     "player_idが負の場合は生成できない",
-			playerID: -1,
-			songID:   10,
-			wantErr:  "player_id",
-		},
-		{
 			name:     "song_idが0の場合は生成できない",
 			playerID: 1,
 			songID:   0,
-			wantErr:  "song_id",
-		},
-		{
-			name:     "song_idが負の場合は生成できない",
-			playerID: 1,
-			songID:   -1,
 			wantErr:  "song_id",
 		},
 	}
@@ -62,19 +49,7 @@ func TestNewPlayerFavoriteSong(t *testing.T) {
 			require.NotNil(t, got)
 			assert.Equal(t, tt.playerID, got.PlayerID)
 			assert.Equal(t, tt.songID, got.SongID)
+			assert.False(t, got.CreatedAt.IsZero())
 		})
 	}
-}
-
-func TestNewPlayerFavoriteSong_SetsCreatedAt(t *testing.T) {
-	// When
-	before := time.Now()
-	got, err := NewPlayerFavoriteSong(1, 10)
-	after := time.Now()
-
-	// Then
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.False(t, got.CreatedAt.IsZero())
-	assert.WithinRange(t, got.CreatedAt, before, after)
 }

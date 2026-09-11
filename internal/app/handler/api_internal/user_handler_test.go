@@ -44,8 +44,8 @@ func testWorldsendRecordOutput(id string) *usecase.WorldsendRecordOutput {
 	return &usecase.WorldsendRecordOutput{PlayerWorldsendRecord: &entity.PlayerWorldsendRecord{Song: &entity.Song{DisplayID: id}}, ID: id}
 }
 
-func (m *mockUserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileWithRecordsOutput, error) {
-	args := m.Called(ctx, username, requester, includeNoPlay)
+func (m *mockUserUsecase) GetUserProfileWithRecords(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
+	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -68,24 +68,24 @@ func (m *mockUserUsecase) GetUserProfileRatingView(ctx context.Context, username
 	return args.Get(0).(*usecase.UserProfileRatingViewOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*usecase.UserProfileRecordViewOutput, error) {
-	args := m.Called(ctx, username, requester, includeNoPlay)
+func (m *mockUserUsecase) GetUserProfileRecordView(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRecordViewOutput, error) {
+	args := m.Called(ctx, username, requester)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*usecase.UserProfileRecordViewOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool, difficulty string) (*usecase.UserSongRecordOutput, error) {
-	args := m.Called(ctx, username, requester, displayID, includeNoPlay, difficulty)
+func (m *mockUserUsecase) GetUserSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, difficulty string) (*usecase.UserSongRecordOutput, error) {
+	args := m.Called(ctx, username, requester, displayID, difficulty)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*usecase.UserSongRecordOutput), args.Error(1)
 }
 
-func (m *mockUserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string, includeNoPlay bool) (*usecase.UserWorldsendSongRecordOutput, error) {
-	args := m.Called(ctx, username, requester, displayID, includeNoPlay)
+func (m *mockUserUsecase) GetUserWorldsendSongRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*usecase.UserWorldsendSongRecordOutput, error) {
+	args := m.Called(ctx, username, requester, displayID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -120,10 +120,9 @@ func TestUserHandler_GetUserSongRecord(t *testing.T) {
 		"testuser",
 		(*entity.User)(nil),
 		"0000000000000001",
-		true,
 		"MASTER",
 	).Return(expected, nil).Once()
-	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/0000000000000001?include_noplay=true&difficulty=master", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/0000000000000001?difficulty=master", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPathValues(echo.PathValues{
@@ -151,7 +150,6 @@ func TestUserHandler_GetUserWorldsendSongRecord_楽曲不存在(t *testing.T) {
 		"testuser",
 		(*entity.User)(nil),
 		"0000000000000002",
-		false,
 	).Return((*usecase.UserWorldsendSongRecordOutput)(nil), repository.ErrSongNotFound).Once()
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/0000000000000002", nil)
 	rec := httptest.NewRecorder()
@@ -270,7 +268,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 	}
 
 	t.Run("viewなしは全レコードを返す", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(result, nil).Once()
+		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(result, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -299,7 +297,7 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 			Records:   nil,
 			UpdatedAt: nil,
 		}
-		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil), false).Return(noPlayerResult, nil).Once()
+		mockUsecase.On("GetUserProfileWithRecords", mock.Anything, "testuser", (*entity.User)(nil)).Return(noPlayerResult, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser", nil)
 		rec := httptest.NewRecorder()
@@ -497,9 +495,9 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	}
 
 	t.Run("正常系: レコード枠とメタ情報を返す", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordResult, nil).Once()
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil)).Return(recordResult, nil).Once()
 
-		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record?include_noplay=true", nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
@@ -523,7 +521,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	})
 
 	t.Run("プレイヤー未連携時は空配列とnullのupdated_atを返す", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return(&usecase.UserProfileRecordViewOutput{
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserProfileRecordViewOutput{
 			Username:  "testuser",
 			Player:    nil,
 			Records:   nil,
@@ -550,7 +548,7 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 	})
 
 	t.Run("異常系: ユースケースエラーを変換する", func(t *testing.T) {
-		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), false).Return((*usecase.UserProfileRecordViewOutput)(nil), usecase.ErrUserNotFound).Once()
+		mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil)).Return((*usecase.UserProfileRecordViewOutput)(nil), usecase.ErrUserNotFound).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/record", nil)
 		rec := httptest.NewRecorder()
@@ -581,9 +579,9 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 		UpdatedAt: &now,
 	}
 
-	mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil), true).Return(recordViewResult, nil).Once()
+	mockUsecase.On("GetUserProfileRecordView", mock.Anything, "testuser", (*entity.User)(nil)).Return(recordViewResult, nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record&include_noplay=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=record", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})

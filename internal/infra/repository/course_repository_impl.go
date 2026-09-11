@@ -170,17 +170,13 @@ func (r *courseRepository) Save(ctx context.Context, exec domainrepo.Executor, c
 	return nil
 }
 
-func (r *courseRepository) FindRecordsByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int, includeDeleted, includeNoPlay bool) ([]*entity.PlayerCourseRecord, error) {
+func (r *courseRepository) FindRecordsByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int, includeDeleted bool) ([]*entity.PlayerCourseRecord, error) {
 	if exec == nil {
 		exec = r.db
 	}
-	join := `INNER JOIN player_course_records pcr ON pcr.course_id=c.id AND pcr.player_id=?`
-	if includeNoPlay {
-		join = `LEFT JOIN player_course_records pcr ON pcr.course_id=c.id AND pcr.player_id=?`
-	}
 	query := `SELECT COALESCE(pcr.player_id, ?) player_id, c.id course_id, COALESCE(pcr.score,0) score, COALESCE(pcr.is_clear,FALSE) is_clear, COALESCE(pcr.combo_lamp_id,1) combo_lamp_id, pcr.updated_at,
 	c.display_id, c.official_idx, c.name course_name, c.course_class_id, cc.name course_class_name, cc.sort_order course_class_sort_order, cl.name combo_lamp_name
-	FROM courses c INNER JOIN course_classes cc ON cc.id=c.course_class_id ` + join + ` LEFT JOIN combo_lamp_types cl ON cl.id=pcr.combo_lamp_id`
+	FROM courses c INNER JOIN course_classes cc ON cc.id=c.course_class_id LEFT JOIN player_course_records pcr ON pcr.course_id=c.id AND pcr.player_id=? LEFT JOIN combo_lamp_types cl ON cl.id=pcr.combo_lamp_id`
 	if !includeDeleted {
 		query += ` WHERE c.is_deleted=FALSE`
 	}
