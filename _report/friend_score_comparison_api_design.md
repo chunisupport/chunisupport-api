@@ -109,7 +109,7 @@ score_difference = self.score - friend.score
 
 ## 4. エンドポイント
 
-### GET `/internal/friend-comparisons/:friend_user_id/charts/:difficulty`
+### GET `/internal/friend-comparisons/:username/charts/:difficulty`
 
 - **認証**: Firebase Bearer必須
 - **概要**: 自分と指定した承認済みフレンドについて、指定難易度の全通常譜面のスコア比較と集計を返す
@@ -119,10 +119,12 @@ score_difference = self.score - friend.score
 
 | パラメータ | 型 | 必須 | 説明 |
 | --- | --- | --- | --- |
-| `friend_user_id` | positive integer | 必須 | フレンド一覧APIで返される内部ユーザーID |
+| `username` | string | 必須 | フレンド一覧APIが返す `username`。既存フレンド操作APIと同じ公開識別子 |
 | `difficulty` | string | 必須 | `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` |
 
-`difficulty` はAPI境界でも大文字の正規形だけを受け付けます。小文字、大小文字混在、3文字短縮形は `invalid_difficulty` とし、暗黙の大文字変換は行いません。既存の `ParseDifficultyPath` は小文字・短縮形を受け付けるため、本エンドポイントの検証には再利用しません。Usecaseでも同じ許可値を防御的に再検証し、レスポンスでは必ず大文字を返します。
+数値の内部ユーザーIDはパスに使いません。フレンド一覧・フレンド操作・フレンドランキングはいずれも `username` だけを公開識別子としており、本APIもそれに合わせます。Handlerは既存フレンドAPIと同じ `ValidateUsername` で検証します。
+
+`difficulty` はAPI境界でも大文字の正規形だけを受け付けます。小文字、大小文字混在、3文字短縮形は `invalid_difficulty` とし、暗黙の大文字変換は行いません。既存の `ParseDifficultyPath` はパス値を `ToLower` したうえで `basic` / `advanced` / `expert` / `master` / `ultima` のフルネームだけを内部名（`BASIC` 等）へ変換します。3文字短縮形は受け付けません。本エンドポイントは大文字正規形のみを許可するため、この変換関数は再利用しません。Usecaseでも同じ許可値を防御的に再検証し、変換はせず、レスポンスでは必ず大文字を返します。
 
 ### 4.2 ページングを設けない理由
 
@@ -140,12 +142,10 @@ score_difference = self.score - friend.score
 {
   "difficulty": "MASTER",
   "self": {
-    "user_id": 1,
     "username": "myuser",
     "player_name": "MY PLAYER"
   },
   "friend": {
-    "user_id": 2,
     "username": "frienduser",
     "player_name": "FRIEND"
   },
@@ -230,9 +230,10 @@ score_difference = self.score - friend.score
 
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
-| `user_id` | integer | 内部ユーザーID |
 | `username` | string | ユーザー名 |
 | `player_name` | string | プレイヤー名 |
+
+数値の内部ユーザーIDはレスポンスに含めません。フレンドランキングのエントリDTOと同じく、公開識別子は `username` と `player_name` です。
 
 ### `FriendScoreComparisonSummaryDTO`
 
@@ -273,7 +274,7 @@ friend_played = both_played + friend_only_played
 
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
-| `song` | object | `id`、`title`、`artist` を持つ楽曲概要 |
+| `song` | object | `id`（楽曲 `display_id`）、`title`、`artist` を持つ楽曲概要。内部の `songs.id` は出さない |
 | `chart` | object | `const`、`is_const_unknown` を持つ譜面概要 |
 | `self` | `FriendScoreComparisonRecordDTO` | 自分のレコード |
 | `friend` | `FriendScoreComparisonRecordDTO` | フレンドのレコード |
@@ -297,7 +298,7 @@ friend_played = both_played + friend_only_played
 次の条件をすべて満たす場合だけ比較結果を返します。
 
 1. リクエスト元ユーザーがFirebase認証済み
-2. `friend_user_id` が自分自身ではない
+2. パスの `username` が自分自身ではない
 3. 自分から相手への `accepted` が存在する
 4. 相手から自分への `accepted` が存在する
 5. 自分と相手の両方がプレイヤーデータ連携済み
@@ -316,14 +317,14 @@ friend_played = both_played + friend_only_played
 
 | HTTP | エラーコード | 条件 |
 | --- | --- | --- |
-| 400 | `validation_failed` | `friend_user_id` が正の整数でない |
+| 400 | `username_too_short` / `username_too_long` / `username_invalid_char` | `username` の形式不正。既存フレンド操作APIと同じ |
 | 400 | `invalid_difficulty` | 難易度が未指定または許可値でない |
 | 401 | `missing_token` / `invalid_token` | 認証情報がない、または不正 |
 | 404 | `friend_not_found` | 対象が承認済み双方向フレンドではない、自分自身を指定した、または対象ユーザーが存在しない |
 | 409 | `friend_score_comparison_unavailable` | 自分または承認済みフレンドがプレイヤーデータ未連携 |
 | 500 | `internal_error` | DBアクセスなどの予期しない内部エラー |
 
-`friend_not_found` と `friend_score_comparison_unavailable` は新規エラーコードとして `internal/app/apierror`、フロントエンドの `ErrorCode`、`docs/API.md` に追加します。
+`friend_not_found` と `friend_score_comparison_unavailable` は新規エラーコードとして `internal/app/apierror`、`internal/usecase` のエラー、`docs/error_code_reason_codes.md`、`docs/API.md`、フロントエンドの `ErrorCode` に追加します。
 
 対象難易度に有効譜面が0件の場合はエラーにせず、すべての集計値が0で `items: []` の正常レスポンスを返します。
 
@@ -342,6 +343,7 @@ friend_played = both_played + friend_only_played
 読み取り専用モデル:
 
 - `FriendScoreComparisonUser`
+- `FriendScoreComparisonUsers`
 - `FriendScoreComparisonChartRecord`
 
 インターフェース案:
@@ -352,7 +354,7 @@ type FriendScoreComparisonQueryService interface {
         ctx context.Context,
         exec Executor,
         selfUserID int,
-        friendUserID int,
+        friendUsername string,
     ) (*FriendScoreComparisonUsers, error)
 
     ListChartRecords(
@@ -365,7 +367,7 @@ type FriendScoreComparisonQueryService interface {
 }
 ```
 
-`FindAcceptedFriendPair` は双方向 `accepted` と両ユーザー情報を1回で検証・取得します。プレイヤーIDは未連携を表現できるようポインタで保持します。
+`FindAcceptedFriendPair` は公開識別子 `username` で相手を引き、双方向 `accepted` と両ユーザー情報を1回で検証・取得します。判定条件は既存の `ExistsMutualAccepted`（双方向 `accepted` が2件）と一致させます。プレイヤーIDは未連携を表現できるようポインタで保持します。内部の数値ユーザーIDはQueryServiceの戻り値に持ってよいですが、DTOへは写しません。
 
 ## 8.2 Usecase
 
@@ -380,7 +382,7 @@ type FriendScoreComparisonUsecase interface {
     Get(
         ctx context.Context,
         selfUserID int,
-        friendUserID int,
+        friendUsername string,
         difficulty string,
     ) (*FriendScoreComparisonResult, error)
 }
@@ -388,7 +390,7 @@ type FriendScoreComparisonUsecase interface {
 
 責務:
 
-1. 難易度を大文字へ正規化して検証する
+1. 難易度が許可された大文字正規形であることを検証する。変換はしない
 2. 双方向の承認済みフレンド関係を検証する
 3. 両ユーザーのプレイヤーデータ連携を検証する
 4. 指定難易度の全譜面比較行を一括取得する
@@ -416,6 +418,8 @@ SELECT
     s.artist AS song_artist,
     c.const AS chart_const,
     c.is_const_unknown,
+    self_pr.chart_id AS self_record_chart_id,
+    friend_pr.chart_id AS friend_record_chart_id,
     self_pr.score AS self_score,
     self_cl.name AS self_clear_lamp,
     self_co.name AS self_combo_lamp,
@@ -455,7 +459,7 @@ WHERE s.is_deleted = FALSE
 ORDER BY s.id ASC;
 ```
 
-実装時は `SELECT *` を使用せず、実際に返却する列だけを明示します。
+実装時は `SELECT *` を使用せず、実際に返却する列だけを明示します。レコード有無は `score` を 0 埋めした結果ではなく、LEFT JOIN した `player_records` 行の有無（`self_record_chart_id` / `friend_record_chart_id` のポインタ）で判定します。`song_sort_id`（内部 `songs.id`）は並び順専用で、APIレスポンスの `song.id` には `display_id` を使います。
 
 ## 8.4 Presentation
 
@@ -467,10 +471,10 @@ ORDER BY s.id ASC;
 RouterではFirebase認証必須グループへ次を追加します。
 
 ```text
-GET /internal/friend-comparisons/:friend_user_id/charts/:difficulty
+GET /internal/friend-comparisons/:username/charts/:difficulty
 ```
 
-Handlerの責務はパスパラメータ検証、Usecase呼び出し、DTO変換に限定します。
+Handlerの責務はパスパラメータ検証、Usecase呼び出し、DTO変換に限定します。`username` は `ValidateUsername`、`difficulty` は大文字許可集合との完全一致で検証し、`ParseDifficultyPath` は使いません。
 
 ---
 
@@ -564,8 +568,7 @@ Given-When-Then形式で次を確認します。
 - ランプ差があっても同スコアなら `DRAW`
 - `score_difference` が自分基準の符号になる
 - 全summary項目と不変条件が一致する
-- 難易度が大文字へ正規化される
-- 不正難易度をRepositoryへ渡さない
+- 許可された大文字難易度だけを通し、小文字・混在・短縮形はRepositoryへ渡さない
 - フレンドでない場合は比較行を取得しない
 - 自分またはフレンドがプレイヤーデータ未連携の場合は比較行を取得しない
 - 比較対象譜面0件を正常な空レスポンスとして返す
@@ -588,7 +591,7 @@ SQLiteテストまたは既存のRepositoryテスト方式に合わせて次を�
 ## 11.3 Handlerテスト
 
 - 正常レスポンスのDTO形状
-- `friend_user_id` の形式不正
+- `username` の形式不正
 - 難易度の不足・不正
 - 未認証
 - `friend_not_found` のHTTP 404マッピング
@@ -611,7 +614,7 @@ SQLiteテストまたは既存のRepositoryテスト方式に合わせて次を�
 - フレンドランキング: 1譜面について自分と全フレンドを比較
 - VSフレンド: 1フレンドについて指定難易度の全譜面を比較
 
-取得軸が異なるため、同じエンドポイントやレスポンスへ統合しません。ただし、双方向 `accepted` の判定条件、ランプの `NONE` から `null` への変換など、共通仕様は一致させます。
+取得軸が異なるため、同じエンドポイントやレスポンスへ統合しません。ただし、双方向 `accepted` の判定条件、ランプの空・`NONE`・`none` から `null` への変換、公開識別子に `username` を使うことなど、共通仕様は一致させます。ランプ変換は既存の `rankingLampNamePtr` / `toMasterNamePtr` に合わせます。
 
 ### 12.2 ユーザー全レコードAPI
 
@@ -629,7 +632,11 @@ SQLiteテストまたは既存のRepositoryテスト方式に合わせて次を�
   - リクエスト、レスポンス、比較ルール、エラー仕様
 - `docs/friendship.md`
   - 承認済みフレンドだけが比較対象であること
-- `internal/app/apierror/codes.go`
+  - 比較APIでも数値の内部ユーザーIDは公開しないこと
+- `docs/error_code_reason_codes.md`
+  - `friend_not_found`
+  - `friend_score_comparison_unavailable`
+- `internal/app/apierror`
   - `friend_not_found`
   - `friend_score_comparison_unavailable`
 - フロントエンド `src/types/api.ts`
@@ -667,6 +674,7 @@ SQLiteテストまたは既存のRepositoryテスト方式に合わせて次を�
 - WORLD'S ENDと削除済み楽曲が混入しない
 - DBアクセスにN+1がない
 - 既存のフレンドランキングAPIとユーザーレコードAPIに破壊的変更がない
+- パスおよびレスポンスに数値の内部ユーザーIDを出さない
 
 ---
 
