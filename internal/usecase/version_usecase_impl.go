@@ -55,9 +55,7 @@ func (u *versionUsecaseImpl) Create(ctx context.Context, name string, releasedAt
 	if err != nil {
 		return nil, err
 	}
-	if err := u.reload(ctx); err != nil {
-		return nil, err
-	}
+	u.reload(ctx)
 	return created, nil
 }
 
@@ -87,9 +85,7 @@ func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName string)
 	if err != nil {
 		return nil, err
 	}
-	if err := u.reload(ctx); err != nil {
-		return nil, err
-	}
+	u.reload(ctx)
 	return updated, nil
 }
 
@@ -127,17 +123,18 @@ func (u *versionUsecaseImpl) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
-	return u.reload(ctx)
+	u.reload(ctx)
+	return nil
 }
 
-func (u *versionUsecaseImpl) reload(ctx context.Context) error {
+// reload はコミット済みのDB更新結果をキャッシュへ反映します。
+// 再読込失敗はログで検知し、確定済みの操作をAPI上の失敗として扱わないよう呼び出し元には返しません。
+func (u *versionUsecaseImpl) reload(ctx context.Context) {
 	reloadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.VersionCacheReloadTimeout)
 	defer cancel()
 	if err := u.cacheReloader.ReloadVersions(reloadCtx); err != nil {
-		slog.Error("バージョンキャッシュの再読込に失敗しました", "error", err)
-		return fmt.Errorf("failed to reload versions after commit: %w", err)
+		slog.ErrorContext(reloadCtx, "バージョンキャッシュの再読込に失敗しました", "error", err)
 	}
-	return nil
 }
 
 func sameDate(a, b time.Time) bool {

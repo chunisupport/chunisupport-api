@@ -1,8 +1,11 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -185,14 +188,57 @@ func TestVersionUsecase_Delete(t *testing.T) {
 	}
 }
 
-func TestVersionUsecase_コミット後の再読込失敗を返す(t *testing.T) {
-	reloadErr := errors.New("reload failed")
-	repo := &versionRepositoryStub{versions: []*entity.Version{}}
-	uc := NewVersionUsecase(repo, &versionCacheReloaderStub{err: reloadErr}, transactionManagerStub{}, nil)
+func TestVersionUsecase_コミット後の再読込失敗を操作失敗として返さない(t *testing.T) {
+	var logBuffer bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logBuffer, nil)))
+	t.Cleanup(func() { slog.SetDefault(originalLogger) })
 
-	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", dateForVersionTest(2025, 1, 1))
+	tests := []struct {
+		name      string
+		operation func(VersionUsecase) error
+	}{
+		{
+			name: "作成",
+			operation: func(uc VersionUsecase) error {
+				_, err := uc.Create(context.Background(), "CHUNITHM VERSE", dateForVersionTest(2026, 1, 1))
+				return err
+			},
+		},
+		{
+			name: "名称変更",
+			operation: func(uc VersionUsecase) error {
+				_, err := uc.Rename(context.Background(), 2, "CHUNITHM VERSE PLUS")
+				return err
+			},
+		},
+		{
+			name: "削除",
+			operation: func(uc VersionUsecase) error {
+				return uc.Delete(context.Background(), 2)
+			},
+		},
+	}
 
-	assert.ErrorIs(t, err, reloadErr)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &versionRepositoryStub{versions: []*entity.Version{
+				{ID: 1, Name: "CHUNITHM LUMINOUS", ReleasedAt: dateForVersionTest(2024, 1, 1)},
+				{ID: 2, Name: "CHUNITHM VERSE", ReleasedAt: dateForVersionTest(2025, 1, 1)},
+			}}
+			reloader := &versionCacheReloaderStub{err: errors.New("reload failed")}
+			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
+
+			// When
+			err := tt.operation(uc)
+
+			// Then
+			assert.NoError(t, err)
+			assert.Equal(t, 1, reloader.calls)
+		})
+	}
+	assert.Equal(t, len(tests), strings.Count(logBuffer.String(), "バージョンキャッシュの再読込に失敗しました"))
 }
 
 func TestVersionUsecase_再読込は要求キャンセルから切り離す(t *testing.T) {
