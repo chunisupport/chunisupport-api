@@ -105,6 +105,7 @@ var (
 	ErrAPITokenNameConflict       = New(CodeAPITokenNameConflict, http.StatusConflict)
 	ErrInvalidAPITokenName        = New(CodeInvalidAPITokenName, http.StatusBadRequest)
 	ErrInvalidAPITokenID          = New(CodeInvalidAPITokenID, http.StatusBadRequest)
+	ErrInvalidAPITokenPermission  = New(CodeInvalidAPITokenPermission, http.StatusBadRequest)
 	ErrPayloadTooLarge            = New(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
 	ErrUnsupportedMedia           = New(CodeUnsupportedMedia, http.StatusUnsupportedMediaType)
 	ErrMethodNotAllowed           = New(CodeMethodNotAllowed, http.StatusMethodNotAllowed)

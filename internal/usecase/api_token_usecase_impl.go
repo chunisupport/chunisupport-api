@@ -13,16 +13,18 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenname"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenpermission"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 var (
-	ErrInvalidAPIToken       = errors.New("invalid API token")
-	ErrInvalidAPITokenName   = errors.New("invalid API token name")
-	ErrInvalidAPITokenID     = errors.New("invalid API token id")
-	ErrAPITokenNotFound      = errors.New("API token not found")
-	ErrAPITokenLimitExceeded = errors.New("API token limit exceeded")
-	ErrAPITokenNameConflict  = errors.New("API token name conflict")
+	ErrInvalidAPIToken           = errors.New("invalid API token")
+	ErrInvalidAPITokenName       = errors.New("invalid API token name")
+	ErrInvalidAPITokenPermission = errors.New("invalid API token permission")
+	ErrInvalidAPITokenID         = errors.New("invalid API token id")
+	ErrAPITokenNotFound          = errors.New("API token not found")
+	ErrAPITokenLimitExceeded     = errors.New("API token limit exceeded")
+	ErrAPITokenNameConflict      = errors.New("API token name conflict")
 )
 
 // apiTokenUsecase は APITokenUsecase の実装です。
@@ -49,18 +51,22 @@ func newAPITokenUsecaseWithClock(db repository.Executor, tm TransactionManager, 
 	}
 }
 
-// Generate は既存トークンを維持したまま、名前付きAPIトークンを追加発行します。
-func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string) (*GeneratedAPITokenOutput, error) {
+// Generate は既存トークンを維持したまま、権限付きの名前付きAPIトークンを追加発行します。
+func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error) {
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
 		return nil, ErrInvalidAPITokenName
+	}
+	validatedPermission, err := apitokenpermission.NewAPITokenPermission(permission)
+	if err != nil {
+		return nil, ErrInvalidAPITokenPermission
 	}
 
 	plain, err := generateAPIToken()
 	if err != nil {
 		return nil, err
 	}
-	token, err := entity.NewAPIToken(userID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength])
+	token, err := entity.NewAPIToken(userID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String())
 	if err != nil {
 		return nil, err
 	}
@@ -228,6 +234,7 @@ func toAPITokenOutput(token *entity.APIToken) *APITokenOutput {
 	return &APITokenOutput{
 		ID:          token.ID,
 		Name:        token.Name.String(),
+		Permission:  token.Permission.String(),
 		TokenPrefix: token.TokenPrefix,
 		LastUsedAt:  token.LastUsedAt,
 		CreatedAt:   token.CreatedAt,

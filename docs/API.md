@@ -37,7 +37,8 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
+- トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。権限は `read`（参照系APIのみ）または `read_write`（参照系・更新系API）です。発行済みトークンに有効期限はありません。
+- `read_write` はユーザーのアカウント権限を拡張しません。更新系APIはAPIトークンの権限とユーザーのEDITOR以上のロールの両方が必要です。
 
 ## レートリミット（現行実装値）
 
@@ -110,6 +111,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | 認証情報不正 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `invalid_api_token_permission` | APIトークン権限が不正 |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
@@ -194,7 +196,7 @@ Content-Type: application/json
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 通常時不要 | アプリケーション名とビルド日を返します。メンテナンス中はFirebase認証済みのADMIN / EDITORのみ利用可 |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
-| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
+| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得（`read` / `read_write`いずれも可） |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer + Turnstile | Firebase IDトークンで初回ユーザー登録 |
@@ -305,8 +307,8 @@ Content-Type: application/json
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
-| `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
-| `/v1/songs/chart-constant` | PATCH | APIトークン (EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
+| `/v1/songs` | PUT | APIトークン (`read_write`、EDITOR+) | 楽曲情報と譜面情報の一括更新 |
+| `/v1/songs/chart-constant` | PATCH | APIトークン (`read_write`、EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
 | `/v1/songs/:id` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:id/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
 | `/v1/songs/:id/score-history/:difficulty` | GET | APIトークン | 通常譜面スコア履歴取得 |
@@ -354,7 +356,7 @@ Content-Type: application/json
   - 204 No Content: 空レスポンス。メンテナンス中も同じレスポンスを維持します。
 
 ### GET `/version`
-- **認証**: APIトークン (ADMIN)
+- **認証**: APIトークン (`read` / `read_write`) (ADMIN)
 - **レスポンス**:
   - 200 OK: APIのビルド識別子とGoバージョンを返します。
 
@@ -688,16 +690,18 @@ Content-Type: application/json
 - **リクエスト**:
 
 ```json
-{"name":"Discord Bot"}
+{"name":"Discord Bot","permission":"read"}
 ```
 
 - `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
+- `permission` は必須で、`read` または `read_write` を指定します。発行後に変更できません。権限を変更する場合はトークンを削除して再発行してください。
 - **レスポンス**: 201 Created
 
 ```json
 {
   "id": 42,
   "name": "Discord Bot",
+  "permission": "read",
   "token": "plain-text-api-token",
   "token_prefix": "plain",
   "last_used_at": null,
@@ -709,6 +713,7 @@ Content-Type: application/json
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_name`): 名前が不正
+  - 400 Bad Request (`invalid_api_token_permission`): `permission` が未指定または `read` / `read_write` 以外
   - 400 Bad Request (`api_token_limit_exceeded`): 10個発行済み
   - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 
@@ -722,6 +727,7 @@ Content-Type: application/json
     {
       "id": 42,
       "name": "Discord Bot",
+      "permission": "read",
       "token_prefix": "plain",
       "last_used_at": "2026-07-22T13:00:00+09:00",
       "created_at": "2026-07-22T12:34:56+09:00"
@@ -729,6 +735,7 @@ Content-Type: application/json
     {
       "id": 1,
       "name": "既存のトークン",
+      "permission": "read_write",
       "token_prefix": null,
       "last_used_at": null,
       "created_at": "2026-04-16T12:34:56+09:00"
@@ -739,6 +746,7 @@ Content-Type: application/json
 
 - 未発行の場合は `tokens` が空配列になります。
 - 旧仕様から移行したトークンは平文を復元できないため `token_prefix=null` のままです。認証には引き続き使用できます。
+- 旧仕様から移行したトークンの `permission` は `read_write` です。
 - `last_used_at` は認証成功時に更新されます。DB書き込みを抑えるため、最大1時間の遅延があります。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -746,7 +754,7 @@ Content-Type: application/json
 
 ### PATCH `/internal/auth/api-tokens/:id`
 - **認証**: Firebase Bearer 必須
-- **リクエスト**: `POST` と同じ `name`
+- **リクエスト**: `name` のみ。`permission` は変更できません。
 - **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDまたは名前が不正
@@ -4393,7 +4401,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/v1/songs`
 - **認証**: APIトークン必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
 
@@ -4426,12 +4434,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 400 Bad Request (`validation_failed`): バリデーションエラー
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 403 Forbidden (`forbidden`): 権限不足（`read`トークンまたはPLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### PATCH `/v1/songs/chart-constant`
 - **認証**: APIトークン必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲の既存譜面について、公式ID、難易度名の先頭3文字、譜面定数だけを指定して更新します。更新後は `is_const_unknown` が `false` になります。
 
 ```json

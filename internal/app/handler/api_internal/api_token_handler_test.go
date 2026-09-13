@@ -24,8 +24,8 @@ type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
-	args := m.Called(ctx, userID, name)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name, permission)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -78,16 +78,17 @@ func TestAPITokenHandler_List(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 10})
 	mockUsecase.On("List", mock.Anything, 10).Return([]*usecase.APITokenOutput{{
-		ID:        1,
-		Name:      "既存のトークン",
-		CreatedAt: createdAt,
+		ID:         1,
+		Name:       "既存のトークン",
+		Permission: "read_write",
+		CreatedAt:  createdAt,
 	}}, nil).Once()
 
 	err := h.List(c)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"tokens":[{"id":1,"name":"既存のトークン","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"tokens":[{"id":1,"name":"既存のトークン","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -98,16 +99,17 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 	createdAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
 	prefix := "abcde"
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(`{"name":"Discord Bot"}`))
+	req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(`{"name":"Discord Bot","permission":"read"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 10})
-	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot").Return(&usecase.GeneratedAPITokenOutput{
+	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot", "read").Return(&usecase.GeneratedAPITokenOutput{
 		Token: "abcde-secret",
 		Metadata: &usecase.APITokenOutput{
 			ID:          2,
 			Name:        "Discord Bot",
+			Permission:  "read",
 			TokenPrefix: &prefix,
 			CreatedAt:   createdAt,
 		},
@@ -117,7 +119,7 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
-	assert.JSONEq(t, `{"id":2,"name":"Discord Bot","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":2,"name":"Discord Bot","permission":"read","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -139,6 +141,37 @@ func TestAPITokenHandler_GenerateRejectsUnknownField(t *testing.T) {
 	mockUsecase.AssertNotCalled(t, "Generate")
 }
 
+func TestAPITokenHandler_GenerateRequiresValidPermission(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "未指定", body: `{"name":"CLI"}`},
+		{name: "未知の値", body: `{"name":"CLI","permission":"write"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newAPITokenTestEcho()
+			mockUsecase := new(mockAPITokenUsecase)
+			h := api_internal.NewAPITokenHandler(mockUsecase)
+			req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set("userEntity", &entity.User{ID: 10})
+			mockUsecase.On("Generate", mock.Anything, 10, "CLI", mock.AnythingOfType("string")).Return(nil, usecase.ErrInvalidAPITokenPermission).Once()
+
+			err := h.Generate(c)
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeInvalidAPITokenPermission, apiErr.Code)
+			mockUsecase.AssertExpectations(t)
+		})
+	}
+}
+
 func TestAPITokenHandler_Rename(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockUsecase := new(mockAPITokenUsecase)
@@ -152,13 +185,13 @@ func TestAPITokenHandler_Rename(t *testing.T) {
 	c.SetPath("/internal/auth/api-tokens/:id")
 	c.SetPathValues(echo.PathValues{{Name: "id", Value: "2"}})
 	c.Set("userEntity", &entity.User{ID: 10})
-	mockUsecase.On("Rename", mock.Anything, 10, "2", "Batch").Return(&usecase.APITokenOutput{ID: 2, Name: "Batch", CreatedAt: createdAt}, nil).Once()
+	mockUsecase.On("Rename", mock.Anything, 10, "2", "Batch").Return(&usecase.APITokenOutput{ID: 2, Name: "Batch", Permission: "read_write", CreatedAt: createdAt}, nil).Once()
 
 	err := h.Rename(c)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"id":2,"name":"Batch","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":2,"name":"Batch","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 

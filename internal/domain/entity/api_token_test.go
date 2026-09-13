@@ -10,7 +10,7 @@ import (
 )
 
 func TestAPIToken_Rename(t *testing.T) {
-	token, err := NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde")
+	token, err := NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde", "read_write")
 	require.NoError(t, err)
 
 	err = token.Rename("  Discord Bot  ")
@@ -20,7 +20,7 @@ func TestAPIToken_Rename(t *testing.T) {
 }
 
 func TestAPIToken_RecordUsage(t *testing.T) {
-	token, err := RestoreAPIToken(1, 10, "CLI", strings.Repeat("a", 64), nil, nil, time.Now())
+	token, err := RestoreAPIToken(1, 10, "CLI", strings.Repeat("a", 64), nil, nil, time.Now(), "read_write")
 	require.NoError(t, err)
 	usedAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
 
@@ -34,14 +34,20 @@ func TestAPIToken_RecordUsage(t *testing.T) {
 }
 
 func TestRestoreAPIToken_LegacyTokenAllowsMissingPrefix(t *testing.T) {
-	token, err := RestoreAPIToken(1, 10, "既存のトークン", strings.Repeat("a", 64), nil, nil, time.Now())
+	token, err := RestoreAPIToken(1, 10, "既存のトークン", strings.Repeat("a", 64), nil, nil, time.Now(), "read_write")
 
 	require.NoError(t, err)
 	assert.Nil(t, token.TokenPrefix)
 }
 
 func TestNewAPIToken_RejectsInvalidPrefix(t *testing.T) {
-	_, err := NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcd")
+	_, err := NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcd", "read_write")
 
 	assert.ErrorIs(t, err, ErrAPITokenPrefixInvalid)
+}
+
+func TestNewAPIToken_RejectsInvalidPermission(t *testing.T) {
+	_, err := NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde", "write")
+
+	assert.ErrorIs(t, err, ErrAPITokenPermissionInvalid)
 }

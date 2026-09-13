@@ -38,6 +38,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
     - `name`: ユーザー内で一意の管理用名。
+    - `permission`: `read`または`read_write`。旧仕様から移行したトークンは`read_write`。
     - `hashed_token`: トークンのハッシュ値。
     - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
     - `last_used_at`: 認証に最後に使用した日時。
@@ -317,3 +318,9 @@ WHERE official_player_rating IS NULL;
 `players.id`を`MEDIUMINT UNSIGNED`から`INT UNSIGNED`へ拡張し、`users.player_id`および全プレイヤー関連テーブルの`player_id`も同じ型へ変更する。MySQLでは外部キーの参照元と参照先の型を一致させる必要があるため、適用中はプレイヤーデータとユーザー紐付けの書き込みを停止し、外部キーをいったん削除して型変更後に同じ削除規則で再作成する。
 
 downは型縮小より前に接続の`@@SESSION.sql_mode`をSQLで検証し、`STRICT_ALL_TABLES`と`STRICT_TRANS_TABLES`のどちらも無効な場合は`CHECK`制約違反により明示的に中止する。検証用の一時テーブルを作成するため、マイグレーション実行ユーザーには`CREATE TEMPORARY TABLES`権限が必要となる。strict SQL modeのもとで`MEDIUMINT UNSIGNED`の上限を超えるIDが存在する場合も失敗させる。ロールバック前に`players.id`と全参照カラムの最大値が16,777,215以下であることを必ず確認する。各DDLは暗黙コミットされるため、途中失敗時は型と外部キーの状態を確認し、SQLの記載順に不足分のみ再適用する。
+
+### 000048 APIトークン権限
+
+適用中はAPIトークンの発行・一覧・改名を停止する。既存トークンには`read_write`を設定し、新しいトークンは`read`または`read_write`を明示して発行する。API更新後に管理APIを再開する。
+
+downでは`permission`列と値のCHECK制約を削除する。新バイナリはこの列を必須とするため、ロールバック時は旧バイナリへ切り替えてからdownを実行すること。

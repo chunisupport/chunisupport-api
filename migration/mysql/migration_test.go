@@ -471,6 +471,20 @@ func TestExpandAPITokensDown_1ユーザー1トークンへ戻す(t *testing.T) {
 	assert.Contains(t, downSQL, "DROP COLUMN name")
 }
 
+func TestAddAPITokenPermissionUp_既存トークンをreadWriteへ移行する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000048_add_api_token_permission.up.sql")
+
+	assert.Contains(t, upSQL, "ADD COLUMN permission VARCHAR(10) NOT NULL DEFAULT 'read_write'")
+	assert.Contains(t, upSQL, "ADD CONSTRAINT chk_api_tokens_permission CHECK (permission IN ('read', 'read_write'))")
+}
+
+func TestAddAPITokenPermissionDown_権限列と制約を削除する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000048_add_api_token_permission.down.sql")
+
+	assert.Contains(t, downSQL, "DROP CHECK chk_api_tokens_permission")
+	assert.Contains(t, downSQL, "DROP COLUMN permission")
+}
+
 func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *testing.T) {
 	// Given
 	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
@@ -482,6 +496,9 @@ func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *test
 	assert.Contains(t, schemaSQL, "`last_used_at` datetime DEFAULT NULL")
 	assert.Contains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`)")
 	assert.NotContains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_id` (`user_id`)")
+	assert.Contains(t, schemaSQL, "`permission` varchar(10)")
+	assert.Contains(t, schemaSQL, "NOT NULL DEFAULT 'read_write'")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_api_tokens_permission`")
 }
 
 func TestCreateSystemMaintenanceUp_単一行のメンテナンス状態を作成する(t *testing.T) {

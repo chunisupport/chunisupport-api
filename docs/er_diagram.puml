@@ -28,6 +28,7 @@ entity "api_tokens" as api_tokens {
   --
   user_id: INT NOT NULL
   name: VARCHAR(50) NOT NULL [UNIQUE WITH user_id]
+  permission: VARCHAR(10) NOT NULL [read/read_write]
   hashed_token: CHAR(64) NOT NULL [UNIQUE]
   token_prefix: CHAR(5)
   last_used_at: DATETIME

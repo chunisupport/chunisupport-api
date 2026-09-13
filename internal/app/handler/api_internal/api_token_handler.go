@@ -14,9 +14,15 @@ type apiTokenNameRequest struct {
 	Name string `json:"name"`
 }
 
+type apiTokenGenerateRequest struct {
+	Name       string `json:"name"`
+	Permission string `json:"permission"`
+}
+
 type apiTokenResponse struct {
 	ID          uint64     `json:"id"`
 	Name        string     `json:"name"`
+	Permission  string     `json:"permission"`
 	TokenPrefix *string    `json:"token_prefix"`
 	LastUsedAt  *time.Time `json:"last_used_at"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -67,12 +73,12 @@ func (h *APITokenHandler) Generate(c *echo.Context) error {
 		return err
 	}
 
-	var request apiTokenNameRequest
+	var request apiTokenGenerateRequest
 	if err := apphandler.BindStrictJSON(c, &request); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
-	generated, err := h.usecase.Generate(c.Request().Context(), user.ID, request.Name)
+	generated, err := h.usecase.Generate(c.Request().Context(), user.ID, request.Name, request.Permission)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -119,6 +125,7 @@ func toAPITokenResponse(token *usecase.APITokenOutput) *apiTokenResponse {
 	return &apiTokenResponse{
 		ID:          token.ID,
 		Name:        token.Name,
+		Permission:  token.Permission,
 		TokenPrefix: token.TokenPrefix,
 		LastUsedAt:  token.LastUsedAt,
 		CreatedAt:   token.CreatedAt,

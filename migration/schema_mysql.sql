@@ -14,6 +14,7 @@ CREATE TABLE `api_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '既存のトークン',
+  `permission` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'read_write',
   `hashed_token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `token_prefix` char(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_used_at` datetime DEFAULT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE `api_tokens` (
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
   UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   KEY `idx_api_tokens_user_created_id` (`user_id`,`created_at` DESC,`id` DESC),
+  CONSTRAINT `chk_api_tokens_permission` CHECK ((`permission` in (_utf8mb4'read',_utf8mb4'read_write'))),
   CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `chart_best_slot_stats_by_rating_band` (

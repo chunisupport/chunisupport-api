@@ -388,6 +388,8 @@ func registerRoutes(
 	})
 	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
+	// APIトークンの更新権限を要求するミドルウェア
+	requireAPITokenWrite := middleware.RequireAPITokenWrite()
 
 	// ADMIN以上の権限を要求するミドルウェア
 	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
@@ -647,8 +649,8 @@ func registerRoutes(
 		apiV1.GET("/worldsend-songs/:id/score-history", handlers.ScoreHistory.GetWorldsend)
 		apiV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
-		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
-		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireEditor)
+		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireAPITokenWrite, requireEditor)
+		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireAPITokenWrite, requireEditor)
 		apiV1.GET("/songs/:id", handlers.V1Song.GetSong)
 		apiV1.GET("/songs/:id/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)

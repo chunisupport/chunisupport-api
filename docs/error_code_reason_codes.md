@@ -52,6 +52,7 @@
 | `api_token_name_conflict` | APIトークン名重複 |
 | `invalid_api_token_name` | APIトークン名不正 |
 | `invalid_api_token_id` | APIトークンID不正 |
+| `invalid_api_token_permission` | APIトークン権限不正 |
 | `payload_too_large` | ペイロード過大 |
 | `unsupported_media_type` | Content-Type不正 |
 | `method_not_allowed` | HTTPメソッド不正 |

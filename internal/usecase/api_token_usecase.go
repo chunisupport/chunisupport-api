@@ -11,6 +11,7 @@ import (
 type APITokenOutput struct {
 	ID          uint64
 	Name        string
+	Permission  string
 	TokenPrefix *string
 	LastUsedAt  *time.Time
 	CreatedAt   time.Time
@@ -24,8 +25,8 @@ type GeneratedAPITokenOutput struct {
 
 // APITokenUsecase はAPIトークンに関するユースケースを提供します。
 type APITokenUsecase interface {
-	// Generate は名前付きAPIトークンを追加発行します。
-	Generate(ctx context.Context, userID int, name string) (*GeneratedAPITokenOutput, error)
+	// Generate は権限付きの名前付きAPIトークンを追加発行します。
+	Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error)
 	// List はユーザーが所有するAPIトークンを返します。
 	List(ctx context.Context, userID int) ([]*APITokenOutput, error)
 	// Rename は所有するAPIトークンの名前を変更します。
