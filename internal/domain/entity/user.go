@@ -108,6 +108,12 @@ func (u *User) ChangePrivacy(isPrivate bool) {
 	u.UpdatedAt = time.Now().UTC()
 }
 
+// ChangeSuspicious は管理者による不審アカウントフラグの変更を適用します。
+func (u *User) ChangeSuspicious(isSuspicious bool) {
+	u.IsSuspicious = isSuspicious
+	u.UpdatedAt = time.Now().UTC()
+}
+
 // ChangeUsername は検証済みのユーザー名へ変更し、更新日時を更新します。
 func (u *User) ChangeUsername(userName username.UserName) {
 	u.Username = userName

@@ -78,6 +78,7 @@ type Handlers struct {
 	User                  *api_internal.UserHandler
 	AdminUser             *api_internal.AdminUserHandler
 	UserPermission        *api_internal.UserPermissionHandler
+	UserSuspicious        *api_internal.UserSuspiciousHandler
 	AdminUserStatistics   *api_internal.AdminUserStatisticsHandler
 	AdminChartRanking     *api_internal.AdminChartRankingHandler
 	Song                  *api_internal.SongHandler
@@ -261,6 +262,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
+	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -268,6 +270,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		User:                  api_internal.NewUserHandler(userUsecase),
 		AdminUser:             api_internal.NewAdminUserHandler(userUsecase),
 		UserPermission:        api_internal.NewUserPermissionHandler(usecase.NewUserPermissionUsecase(db, tm, userRepo)),
+		UserSuspicious:        api_internal.NewUserSuspiciousHandler(userSuspiciousUsecase),
 		AdminUserStatistics:   api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
 		AdminChartRanking:     api_internal.NewAdminChartRankingHandler(adminChartRankingUsecase),
 		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -514,6 +517,7 @@ func registerRoutes(
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
 		usersGroup.PATCH("/:username/permission", handlers.UserPermission.UpdatePermission, requireAdmin)
+		usersGroup.PATCH("/:username/suspicious", handlers.UserSuspicious.UpdateSuspicious, requireAdmin)
 	}
 
 	adminGroup := internal.Group("/admin")

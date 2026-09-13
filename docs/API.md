@@ -265,6 +265,7 @@ Content-Type: application/json
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username/permission` | PATCH | Firebase Bearer (ADMIN) | ユーザーの権限変更 |
+| `/internal/users/:username/suspicious` | PATCH | Firebase Bearer (ADMIN) | 不審アカウントフラグの変更 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
@@ -3144,6 +3145,30 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 403 Forbidden (`forbidden`): ADMIN権限が不足、または自分自身の降格
   - 404 Not Found (`user_not_found`): ユーザーが存在しない
   - 409 Conflict (`conflict`): 保存時に権限などの更新前提が一致しない
+
+### PATCH `/internal/users/:username/suspicious`
+
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN
+- **パスパラメータ**: `username` - 変更対象ユーザーのユーザー名
+- **概要**: 対象ユーザーの不審アカウントフラグを変更します。`is_private` はこのAPIでは変更しません。
+- **リクエストボディ**: `Content-Type: application/json`
+
+```json
+{
+  "is_suspicious": true
+}
+```
+
+`is_suspicious` は必須の真偽値です。
+
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN権限が不足
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない
+  - 409 Conflict (`conflict`): 保存時の更新前提が一致しない
 
 ### DELETE `/internal/users/:username`
 - **認証**: Firebase Bearer 必須
