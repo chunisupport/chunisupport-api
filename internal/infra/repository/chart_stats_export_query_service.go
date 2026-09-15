@@ -24,44 +24,56 @@ func NewChartStatsExportQueryService(db *sqlx.DB) *ChartStatsExportQueryService 
 }
 
 type chartStatsExportRow struct {
-	SongDisplayID  string                      `db:"song_display_id"`
-	SongTitle      string                      `db:"song_title"`
-	Difficulty     string                      `db:"difficulty"`
-	ChartConst     chartconstant.ChartConstant `db:"chart_const"`
-	IsConstUnknown bool                        `db:"is_const_unknown"`
-	PlayerCount    int                         `db:"player_count"`
-	RankAAAL       int                         `db:"rank_aaal"`
-	RankS          int                         `db:"rank_s"`
-	RankSP         int                         `db:"rank_sp"`
-	RankSS         int                         `db:"rank_ss"`
-	RankSSP        int                         `db:"rank_ssp"`
-	RankSSS        int                         `db:"rank_sss"`
-	RankSSSP       int                         `db:"rank_sssp"`
-	RankMax        int                         `db:"rank_max"`
-	ComboNone      int                         `db:"combo_none"`
-	ComboFC        int                         `db:"combo_fc"`
-	ComboAJ        int                         `db:"combo_aj"`
-	ComboAJC       int                         `db:"combo_ajc"`
+	SongDisplayID    string                      `db:"song_display_id"`
+	SongTitle        string                      `db:"song_title"`
+	Difficulty       string                      `db:"difficulty"`
+	ChartConst       chartconstant.ChartConstant `db:"chart_const"`
+	IsConstUnknown   bool                        `db:"is_const_unknown"`
+	PlayerCount      int                         `db:"player_count"`
+	RankAAAL         int                         `db:"rank_aaal"`
+	RankS            int                         `db:"rank_s"`
+	RankSP           int                         `db:"rank_sp"`
+	RankSS           int                         `db:"rank_ss"`
+	RankSSP          int                         `db:"rank_ssp"`
+	RankSSS          int                         `db:"rank_sss"`
+	RankSSSP         int                         `db:"rank_sssp"`
+	RankMax          int                         `db:"rank_max"`
+	ComboNone        int                         `db:"combo_none"`
+	ComboFC          int                         `db:"combo_fc"`
+	ComboAJ          int                         `db:"combo_aj"`
+	ComboAJC         int                         `db:"combo_ajc"`
+	ClearFailed      int                         `db:"clear_failed"`
+	ClearClear       int                         `db:"clear_clear"`
+	ClearHard        int                         `db:"clear_hard"`
+	ClearBrave       int                         `db:"clear_brave"`
+	ClearAbsolute    int                         `db:"clear_absolute"`
+	ClearCatastrophy int                         `db:"clear_catastrophy"`
 }
 
 type worldsendChartStatsExportRow struct {
-	SongDisplayID string  `db:"song_display_id"`
-	SongTitle     string  `db:"song_title"`
-	LevelStar     *int    `db:"level_star"`
-	Attribute     *string `db:"attribute"`
-	PlayerCount   int     `db:"player_count"`
-	RankAAAL      int     `db:"rank_aaal"`
-	RankS         int     `db:"rank_s"`
-	RankSP        int     `db:"rank_sp"`
-	RankSS        int     `db:"rank_ss"`
-	RankSSP       int     `db:"rank_ssp"`
-	RankSSS       int     `db:"rank_sss"`
-	RankSSSP      int     `db:"rank_sssp"`
-	RankMax       int     `db:"rank_max"`
-	ComboNone     int     `db:"combo_none"`
-	ComboFC       int     `db:"combo_fc"`
-	ComboAJ       int     `db:"combo_aj"`
-	ComboAJC      int     `db:"combo_ajc"`
+	SongDisplayID    string  `db:"song_display_id"`
+	SongTitle        string  `db:"song_title"`
+	LevelStar        *int    `db:"level_star"`
+	Attribute        *string `db:"attribute"`
+	PlayerCount      int     `db:"player_count"`
+	RankAAAL         int     `db:"rank_aaal"`
+	RankS            int     `db:"rank_s"`
+	RankSP           int     `db:"rank_sp"`
+	RankSS           int     `db:"rank_ss"`
+	RankSSP          int     `db:"rank_ssp"`
+	RankSSS          int     `db:"rank_sss"`
+	RankSSSP         int     `db:"rank_sssp"`
+	RankMax          int     `db:"rank_max"`
+	ComboNone        int     `db:"combo_none"`
+	ComboFC          int     `db:"combo_fc"`
+	ComboAJ          int     `db:"combo_aj"`
+	ComboAJC         int     `db:"combo_ajc"`
+	ClearFailed      int     `db:"clear_failed"`
+	ClearClear       int     `db:"clear_clear"`
+	ClearHard        int     `db:"clear_hard"`
+	ClearBrave       int     `db:"clear_brave"`
+	ClearAbsolute    int     `db:"clear_absolute"`
+	ClearCatastrophy int     `db:"clear_catastrophy"`
 }
 
 // Get は統計行が存在しない譜面も0件として返します。
@@ -106,7 +118,13 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 			COALESCE(stats.combo_none, 0) AS combo_none,
 			COALESCE(stats.combo_fc, 0) AS combo_fc,
 			COALESCE(stats.combo_aj, 0) AS combo_aj,
-			COALESCE(stats.combo_ajc, 0) AS combo_ajc
+			COALESCE(stats.combo_ajc, 0) AS combo_ajc,
+			COALESCE(stats.clear_failed, 0) AS clear_failed,
+			COALESCE(stats.clear_clear, 0) AS clear_clear,
+			COALESCE(stats.clear_hard, 0) AS clear_hard,
+			COALESCE(stats.clear_brave, 0) AS clear_brave,
+			COALESCE(stats.clear_absolute, 0) AS clear_absolute,
+			COALESCE(stats.clear_catastrophy, 0) AS clear_catastrophy
 		FROM charts c
 		INNER JOIN songs s ON s.id = c.song_id
 		INNER JOIN difficulties d ON d.id = c.difficulty_id
@@ -131,6 +149,7 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 			IsConstUnknown: row.IsConstUnknown,
 			PlayerCount:    row.PlayerCount,
 			Rank:           rankFromExportRow(row.RankAAAL, row.RankS, row.RankSP, row.RankSS, row.RankSSP, row.RankSSS, row.RankSSSP, row.RankMax),
+			Clear:          clearFromExportRow(row.ClearFailed, row.ClearClear, row.ClearHard, row.ClearBrave, row.ClearAbsolute, row.ClearCatastrophy),
 			Combo:          comboFromExportRow(row.ComboNone, row.ComboFC, row.ComboAJ, row.ComboAJC),
 		})
 	}
@@ -156,7 +175,13 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 			COALESCE(stats.combo_none, 0) AS combo_none,
 			COALESCE(stats.combo_fc, 0) AS combo_fc,
 			COALESCE(stats.combo_aj, 0) AS combo_aj,
-			COALESCE(stats.combo_ajc, 0) AS combo_ajc
+			COALESCE(stats.combo_ajc, 0) AS combo_ajc,
+			COALESCE(stats.clear_failed, 0) AS clear_failed,
+			COALESCE(stats.clear_clear, 0) AS clear_clear,
+			COALESCE(stats.clear_hard, 0) AS clear_hard,
+			COALESCE(stats.clear_brave, 0) AS clear_brave,
+			COALESCE(stats.clear_absolute, 0) AS clear_absolute,
+			COALESCE(stats.clear_catastrophy, 0) AS clear_catastrophy
 		FROM worldsend_charts wc
 		INNER JOIN songs s ON s.id = wc.song_id
 		LEFT JOIN worldsend_chart_stats_by_rating_band stats
@@ -179,6 +204,7 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 			Attribute:     row.Attribute,
 			PlayerCount:   row.PlayerCount,
 			Rank:          rankFromExportRow(row.RankAAAL, row.RankS, row.RankSP, row.RankSS, row.RankSSP, row.RankSSS, row.RankSSSP, row.RankMax),
+			Clear:         clearFromExportRow(row.ClearFailed, row.ClearClear, row.ClearHard, row.ClearBrave, row.ClearAbsolute, row.ClearCatastrophy),
 			Combo:         comboFromExportRow(row.ComboNone, row.ComboFC, row.ComboAJ, row.ComboAJC),
 		})
 	}
@@ -191,4 +217,11 @@ func rankFromExportRow(aaal, s, sp, ss, ssp, sss, sssp, max int) domainrepo.Char
 
 func comboFromExportRow(none, fc, aj, ajc int) domainrepo.ChartStatsExportCombo {
 	return domainrepo.ChartStatsExportCombo{None: none, FC: fc, AJ: aj, AJC: ajc}
+}
+
+func clearFromExportRow(failed, clear, hard, brave, absolute, catastrophy int) domainrepo.ChartStatsExportClear {
+	return domainrepo.ChartStatsExportClear{
+		Failed: failed, Clear: clear, Hard: hard,
+		Brave: brave, Absolute: absolute, Catastrophy: catastrophy,
+	}
 }

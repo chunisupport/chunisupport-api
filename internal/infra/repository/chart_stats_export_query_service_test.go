@@ -25,12 +25,16 @@ func TestChartStatsExportQueryService_Get_未プレイ譜面を含めて一括�
 		CREATE TABLE chart_stats_by_rating_band (
 			chart_id INTEGER, rating_band_id INTEGER, rank_aaal INTEGER, rank_s INTEGER, rank_sp INTEGER,
 			rank_ss INTEGER, rank_ssp INTEGER, rank_sss INTEGER, rank_sssp INTEGER, rank_max INTEGER,
-			combo_none INTEGER, combo_fc INTEGER, combo_aj INTEGER, combo_ajc INTEGER, player_count INTEGER
+			combo_none INTEGER, combo_fc INTEGER, combo_aj INTEGER, combo_ajc INTEGER,
+			clear_failed INTEGER, clear_clear INTEGER, clear_hard INTEGER, clear_brave INTEGER,
+			clear_absolute INTEGER, clear_catastrophy INTEGER, player_count INTEGER
 		);
 		CREATE TABLE worldsend_chart_stats_by_rating_band (
 			worldsend_chart_id INTEGER, rating_band_id INTEGER, rank_aaal INTEGER, rank_s INTEGER, rank_sp INTEGER,
 			rank_ss INTEGER, rank_ssp INTEGER, rank_sss INTEGER, rank_sssp INTEGER, rank_max INTEGER,
-			combo_none INTEGER, combo_fc INTEGER, combo_aj INTEGER, combo_ajc INTEGER, player_count INTEGER
+			combo_none INTEGER, combo_fc INTEGER, combo_aj INTEGER, combo_ajc INTEGER,
+			clear_failed INTEGER, clear_clear INTEGER, clear_hard INTEGER, clear_brave INTEGER,
+			clear_absolute INTEGER, clear_catastrophy INTEGER, player_count INTEGER
 		);
 		INSERT INTO difficulties VALUES (1, 'BASIC'), (4, 'MASTER');
 		INSERT INTO songs VALUES
@@ -41,10 +45,10 @@ func TestChartStatsExportQueryService_Get_未プレイ譜面を含めて一括�
 		INSERT INTO charts VALUES (11, 1, 4, 12.7, 1), (12, 2, 1, 3.0, 0), (13, 3, 4, 14.0, 0);
 		INSERT INTO worldsend_charts VALUES (21, 4, 5, '狂');
 		INSERT INTO chart_stats_by_rating_band VALUES
-			(11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13),
-			(11, 1, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99);
+			(11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
+			(11, 1, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99);
 		INSERT INTO worldsend_chart_stats_by_rating_band VALUES
-			(21, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+			(21, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
 	`)
 	require.NoError(t, err)
 	service := NewChartStatsExportQueryService(database)
@@ -58,12 +62,14 @@ func TestChartStatsExportQueryService_Get_未プレイ譜面を含めて一括�
 	assert.Equal(t, "BASIC", snapshot.Charts[0].Difficulty)
 	assert.Equal(t, 0, snapshot.Charts[0].PlayerCount)
 	assert.Equal(t, "MASTER", snapshot.Charts[1].Difficulty)
-	assert.Equal(t, 13, snapshot.Charts[1].PlayerCount)
+	assert.Equal(t, 19, snapshot.Charts[1].PlayerCount)
 	assert.Equal(t, 8, snapshot.Charts[1].Rank.Max)
 	assert.Equal(t, 12, snapshot.Charts[1].Combo.AJC)
+	assert.Equal(t, domainrepo.ChartStatsExportClear{Failed: 13, Clear: 14, Hard: 15, Brave: 16, Absolute: 17, Catastrophy: 18}, snapshot.Charts[1].Clear)
 	require.Len(t, snapshot.WorldsendCharts, 1)
 	assert.Equal(t, 5, *snapshot.WorldsendCharts[0].LevelStar)
 	assert.Equal(t, "狂", *snapshot.WorldsendCharts[0].Attribute)
-	assert.Equal(t, 13, snapshot.WorldsendCharts[0].PlayerCount)
+	assert.Equal(t, 19, snapshot.WorldsendCharts[0].PlayerCount)
+	assert.Equal(t, domainrepo.ChartStatsExportClear{Failed: 13, Clear: 14, Hard: 15, Brave: 16, Absolute: 17, Catastrophy: 18}, snapshot.WorldsendCharts[0].Clear)
 	var _ domainrepo.ChartStatsExportQueryService = service
 }

@@ -26,6 +26,16 @@ type ChartStatsExportCombo struct {
 	AJC  int
 }
 
+// ChartStatsExportClear はクリアランプごとの排他的件数を保持します。
+type ChartStatsExportClear struct {
+	Failed      int
+	Clear       int
+	Hard        int
+	Brave       int
+	Absolute    int
+	Catastrophy int
+}
+
 // ChartStatsExportItem はDBの数値IDを公開境界へ持ち出さないため表示用IDを保持します。
 type ChartStatsExportItem struct {
 	SongDisplayID  string
@@ -35,6 +45,7 @@ type ChartStatsExportItem struct {
 	IsConstUnknown bool
 	PlayerCount    int
 	Rank           ChartStatsExportRank
+	Clear          ChartStatsExportClear
 	Combo          ChartStatsExportCombo
 }
 
@@ -46,6 +57,7 @@ type WorldsendChartStatsExportItem struct {
 	Attribute     *string
 	PlayerCount   int
 	Rank          ChartStatsExportRank
+	Clear         ChartStatsExportClear
 	Combo         ChartStatsExportCombo
 }
 
