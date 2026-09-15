@@ -81,7 +81,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `v1/chart-stats/ULTIMA.json` | `ULTIMA` |
 | `v1/chart-stats/WORLDS_END.json` | `WORLD'S END` |
 
-各ファイルは次の形式です。`rating_band`は`ALL`固定で、`rank`と`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。
+各ファイルは次の形式です。`rating_band`は`ALL`固定で、`rank`、`clear`、`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。
 
 ```json
 {
@@ -96,6 +96,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
       "is_const_unknown": true,
       "player_count": 19525,
       "rank": { "max": 914, "sssp": 5512, "sss": 2501, "ssp": 0, "ss": 0, "sp": 0, "s": 0, "aaal": 0 },
+      "clear": { "failed": 0, "clear": 12000, "hard": 5000, "brave": 1500, "absolute": 800, "catastrophy": 225 },
       "combo": { "none": 0, "fc": 2995, "aj": 2140, "ajc": 914 }
     }
   ]
@@ -112,6 +113,11 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | SS+ | SSS以上 + `rank.ssp` |
 | SS | SS+以上 + `rank.ss` |
 | S | SS以上 + `rank.sp + rank.s` |
+| CATASTROPHY | `clear.catastrophy` |
+| ABSOLUTE | CATASTROPHY以上 + `clear.absolute` |
+| BRAVE | ABSOLUTE以上 + `clear.brave` |
+| HARD | BRAVE以上 + `clear.hard` |
+| CLEAR | HARD以上 + `clear.clear` |
 | AJ | `combo.aj + combo.ajc` |
 | FC | `combo.fc + combo.aj + combo.ajc` |
 

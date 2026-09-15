@@ -53,6 +53,15 @@ type chartStatsComboJSON struct {
 	AJC  int `json:"ajc"`
 }
 
+type chartStatsClearJSON struct {
+	Failed      int `json:"failed"`
+	Clear       int `json:"clear"`
+	Hard        int `json:"hard"`
+	Brave       int `json:"brave"`
+	Absolute    int `json:"absolute"`
+	Catastrophy int `json:"catastrophy"`
+}
+
 type chartStatsJSON struct {
 	SongID         string              `json:"song_id"`
 	Title          string              `json:"title"`
@@ -60,6 +69,7 @@ type chartStatsJSON struct {
 	IsConstUnknown bool                `json:"is_const_unknown"`
 	PlayerCount    int                 `json:"player_count"`
 	Rank           chartStatsRankJSON  `json:"rank"`
+	Clear          chartStatsClearJSON `json:"clear"`
 	Combo          chartStatsComboJSON `json:"combo"`
 }
 
@@ -70,6 +80,7 @@ type worldsendChartStatsJSON struct {
 	Attribute   *string             `json:"attribute"`
 	PlayerCount int                 `json:"player_count"`
 	Rank        chartStatsRankJSON  `json:"rank"`
+	Clear       chartStatsClearJSON `json:"clear"`
 	Combo       chartStatsComboJSON `json:"combo"`
 }
 
@@ -107,7 +118,7 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		chartsByDifficulty[chart.Difficulty] = append(charts, chartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, Const: chart.ChartConst.Float64(),
 			IsConstUnknown: chart.IsConstUnknown, PlayerCount: chart.PlayerCount,
-			Rank: rankJSON(chart.Rank), Combo: comboJSON(chart.Combo),
+			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
 		})
 	}
 
@@ -134,7 +145,7 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		worldsendCharts = append(worldsendCharts, worldsendChartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, LevelStar: chart.LevelStar,
 			Attribute: chart.Attribute, PlayerCount: chart.PlayerCount,
-			Rank: rankJSON(chart.Rank), Combo: comboJSON(chart.Combo),
+			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
 		})
 	}
 	worldsendBody, err := json.Marshal(chartStatsPayload[worldsendChartStatsJSON]{
@@ -168,4 +179,11 @@ func rankJSON(rank domainrepo.ChartStatsExportRank) chartStatsRankJSON {
 
 func comboJSON(combo domainrepo.ChartStatsExportCombo) chartStatsComboJSON {
 	return chartStatsComboJSON{None: combo.None, FC: combo.FC, AJ: combo.AJ, AJC: combo.AJC}
+}
+
+func clearJSON(clear domainrepo.ChartStatsExportClear) chartStatsClearJSON {
+	return chartStatsClearJSON{
+		Failed: clear.Failed, Clear: clear.Clear, Hard: clear.Hard,
+		Brave: clear.Brave, Absolute: clear.Absolute, Catastrophy: clear.Catastrophy,
+	}
 }
