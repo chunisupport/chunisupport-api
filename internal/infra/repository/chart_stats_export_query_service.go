@@ -13,7 +13,7 @@ import (
 
 var _ domainrepo.ChartStatsExportQueryService = (*ChartStatsExportQueryService)(nil)
 
-// ChartStatsExportQueryService は譜面マスタとALL帯統計を一括結合します。
+// ChartStatsExportQueryService は譜面マスタとレート帯別統計を一括取得します。
 type ChartStatsExportQueryService struct {
 	db *sqlx.DB
 }
@@ -24,6 +24,7 @@ func NewChartStatsExportQueryService(db *sqlx.DB) *ChartStatsExportQueryService 
 }
 
 type chartStatsExportRow struct {
+	ChartID          int                         `db:"chart_id"`
 	SongDisplayID    string                      `db:"song_display_id"`
 	SongTitle        string                      `db:"song_title"`
 	Difficulty       string                      `db:"difficulty"`
@@ -51,6 +52,7 @@ type chartStatsExportRow struct {
 }
 
 type worldsendChartStatsExportRow struct {
+	ChartID          int     `db:"chart_id"`
 	SongDisplayID    string  `db:"song_display_id"`
 	SongTitle        string  `db:"song_title"`
 	LevelStar        *int    `db:"level_star"`
@@ -74,6 +76,13 @@ type worldsendChartStatsExportRow struct {
 	ClearBrave       int     `db:"clear_brave"`
 	ClearAbsolute    int     `db:"clear_absolute"`
 	ClearCatastrophy int     `db:"clear_catastrophy"`
+}
+
+type chartStatsExportScoreRow struct {
+	ChartID      int      `db:"chart_id"`
+	RatingBand   string   `db:"rating_band"`
+	AverageScore *float64 `db:"average_score"`
+	MedianScore  *float64 `db:"median_score"`
 }
 
 // Get は統計行が存在しない譜面も0件として返します。
@@ -101,6 +110,7 @@ func (q *ChartStatsExportQueryService) Get(ctx context.Context) (*domainrepo.Cha
 func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domainrepo.Executor) ([]domainrepo.ChartStatsExportItem, error) {
 	const query = `
 		SELECT
+			c.id AS chart_id,
 			s.display_id AS song_display_id,
 			s.title AS song_title,
 			d.name AS difficulty,
@@ -140,7 +150,9 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 		return nil, fmt.Errorf("%w: list chart stats export rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	items := make([]domainrepo.ChartStatsExportItem, 0, len(rows))
+	positions := make(map[int]int, len(rows))
 	for _, row := range rows {
+		positions[row.ChartID] = len(items)
 		items = append(items, domainrepo.ChartStatsExportItem{
 			SongDisplayID:  row.SongDisplayID,
 			SongTitle:      row.SongTitle,
@@ -153,12 +165,34 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 			Combo:          comboFromExportRow(row.ComboNone, row.ComboFC, row.ComboAJ, row.ComboAJC),
 		})
 	}
+	const scoreQuery = `
+		SELECT c.id AS chart_id, b.label AS rating_band,
+			stats.average_score, stats.median_score
+		FROM charts c
+		INNER JOIN songs s ON s.id = c.song_id
+		CROSS JOIN rating_bands b
+		LEFT JOIN chart_stats_by_rating_band stats
+		  ON stats.chart_id = c.id AND stats.rating_band_id = b.id
+		WHERE s.is_worldsend = 0 AND s.is_deleted = 0
+		ORDER BY c.id, b.sort_order
+	`
+	var scores []chartStatsExportScoreRow
+	if err := exec.SelectContext(ctx, &scores, scoreQuery); err != nil {
+		return nil, fmt.Errorf("%w: list chart stats score rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+	}
+	for _, score := range scores {
+		position := positions[score.ChartID]
+		items[position].Scores = append(items[position].Scores, domainrepo.ChartStatsExportScore{
+			RatingBand: score.RatingBand, AverageScore: score.AverageScore, MedianScore: score.MedianScore,
+		})
+	}
 	return items, nil
 }
 
 func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, exec domainrepo.Executor) ([]domainrepo.WorldsendChartStatsExportItem, error) {
 	const query = `
 		SELECT
+			wc.id AS chart_id,
 			s.display_id AS song_display_id,
 			s.title AS song_title,
 			wc.level_star,
@@ -196,7 +230,9 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 		return nil, fmt.Errorf("%w: list worldsend chart stats export rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	items := make([]domainrepo.WorldsendChartStatsExportItem, 0, len(rows))
+	positions := make(map[int]int, len(rows))
 	for _, row := range rows {
+		positions[row.ChartID] = len(items)
 		items = append(items, domainrepo.WorldsendChartStatsExportItem{
 			SongDisplayID: row.SongDisplayID,
 			SongTitle:     row.SongTitle,
@@ -206,6 +242,27 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 			Rank:          rankFromExportRow(row.RankAAAL, row.RankS, row.RankSP, row.RankSS, row.RankSSP, row.RankSSS, row.RankSSSP, row.RankMax),
 			Clear:         clearFromExportRow(row.ClearFailed, row.ClearClear, row.ClearHard, row.ClearBrave, row.ClearAbsolute, row.ClearCatastrophy),
 			Combo:         comboFromExportRow(row.ComboNone, row.ComboFC, row.ComboAJ, row.ComboAJC),
+		})
+	}
+	const scoreQuery = `
+		SELECT wc.id AS chart_id, b.label AS rating_band,
+			stats.average_score, stats.median_score
+		FROM worldsend_charts wc
+		INNER JOIN songs s ON s.id = wc.song_id
+		CROSS JOIN rating_bands b
+		LEFT JOIN worldsend_chart_stats_by_rating_band stats
+		  ON stats.worldsend_chart_id = wc.id AND stats.rating_band_id = b.id
+		WHERE s.is_worldsend = 1 AND s.is_deleted = 0
+		ORDER BY wc.id, b.sort_order
+	`
+	var scores []chartStatsExportScoreRow
+	if err := exec.SelectContext(ctx, &scores, scoreQuery); err != nil {
+		return nil, fmt.Errorf("%w: list worldsend chart stats score rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+	}
+	for _, score := range scores {
+		position := positions[score.ChartID]
+		items[position].Scores = append(items[position].Scores, domainrepo.ChartStatsExportScore{
+			RatingBand: score.RatingBand, AverageScore: score.AverageScore, MedianScore: score.MedianScore,
 		})
 	}
 	return items, nil

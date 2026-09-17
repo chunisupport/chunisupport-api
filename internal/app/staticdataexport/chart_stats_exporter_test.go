@@ -29,18 +29,22 @@ func TestChartStatsExporterExport_難易度ごとのJSONをアップロードす
 	require.NoError(t, err)
 	levelStar := 4
 	attribute := "狂"
+	averageScore := 1007000.5
+	medianScore := 1008000.0
 	source := &stubChartStatsSnapshotSource{snapshot: &domainrepo.ChartStatsExportSnapshot{
 		Charts: []domainrepo.ChartStatsExportItem{{
 			SongDisplayID: "0123456789abcdef", SongTitle: "通常楽曲", Difficulty: "MASTER",
 			ChartConst: chartConst, IsConstUnknown: true, PlayerCount: 10,
-			Rank:  domainrepo.ChartStatsExportRank{Max: 1, SSSP: 2},
-			Clear: domainrepo.ChartStatsExportClear{Failed: 4, Clear: 3, Hard: 2, Brave: 1},
-			Combo: domainrepo.ChartStatsExportCombo{FC: 3, AJ: 2, AJC: 1},
+			Scores: []domainrepo.ChartStatsExportScore{{RatingBand: "ALL", AverageScore: &averageScore, MedianScore: &medianScore}, {RatingBand: "15.0"}},
+			Rank:   domainrepo.ChartStatsExportRank{Max: 1, SSSP: 2},
+			Clear:  domainrepo.ChartStatsExportClear{Failed: 4, Clear: 3, Hard: 2, Brave: 1},
+			Combo:  domainrepo.ChartStatsExportCombo{FC: 3, AJ: 2, AJC: 1},
 		}},
 		WorldsendCharts: []domainrepo.WorldsendChartStatsExportItem{{
 			SongDisplayID: "fedcba9876543210", SongTitle: "WE楽曲", LevelStar: &levelStar,
 			Attribute: &attribute, PlayerCount: 5,
-			Clear: domainrepo.ChartStatsExportClear{Absolute: 2, Catastrophy: 1},
+			Scores: []domainrepo.ChartStatsExportScore{{RatingBand: "ALL", AverageScore: &averageScore, MedianScore: &medianScore}},
+			Clear:  domainrepo.ChartStatsExportClear{Absolute: 2, Catastrophy: 1},
 		}},
 	}}
 	writer := &recordingWriter{}
@@ -68,7 +72,12 @@ func TestChartStatsExporterExport_難易度ごとのJSONをアップロードす
 			Const          float64 `json:"const"`
 			IsConstUnknown bool    `json:"is_const_unknown"`
 			PlayerCount    int     `json:"player_count"`
-			Rank           struct {
+			Scores         []struct {
+				RatingBand   string   `json:"rating_band"`
+				AverageScore *float64 `json:"average_score"`
+				MedianScore  *float64 `json:"median_score"`
+			} `json:"scores"`
+			Rank struct {
 				Max  int `json:"max"`
 				SSSP int `json:"sssp"`
 			} `json:"rank"`
@@ -98,12 +107,20 @@ func TestChartStatsExporterExport_難易度ごとのJSONをアップロードす
 	assert.Equal(t, 2, masterPayload.Charts[0].Clear.Hard)
 	assert.Equal(t, 1, masterPayload.Charts[0].Clear.Brave)
 	assert.Equal(t, 3, masterPayload.Charts[0].Combo.FC)
+	require.Len(t, masterPayload.Charts[0].Scores, 2)
+	assert.Equal(t, "ALL", masterPayload.Charts[0].Scores[0].RatingBand)
+	assert.Equal(t, averageScore, *masterPayload.Charts[0].Scores[0].AverageScore)
+	assert.Equal(t, medianScore, *masterPayload.Charts[0].Scores[0].MedianScore)
+	assert.Equal(t, "15.0", masterPayload.Charts[0].Scores[1].RatingBand)
+	assert.Nil(t, masterPayload.Charts[0].Scores[1].AverageScore)
+	assert.Nil(t, masterPayload.Charts[0].Scores[1].MedianScore)
 
 	var masterRaw map[string]any
 	require.NoError(t, json.Unmarshal(writer.objects[info.MasterChartStatsSnapshotObjectKey], &masterRaw))
 	assert.ElementsMatch(t, []string{"generated_at", "difficulty", "rating_band", "charts"}, mapKeys(masterRaw))
 	masterChartRaw := masterRaw["charts"].([]any)[0].(map[string]any)
-	assert.ElementsMatch(t, []string{"song_id", "title", "const", "is_const_unknown", "player_count", "rank", "clear", "combo"}, mapKeys(masterChartRaw))
+	assert.ElementsMatch(t, []string{"song_id", "title", "const", "is_const_unknown", "player_count", "scores", "rank", "clear", "combo"}, mapKeys(masterChartRaw))
+	assert.ElementsMatch(t, []string{"rating_band", "average_score", "median_score"}, mapKeys(masterChartRaw["scores"].([]any)[0].(map[string]any)))
 	assert.ElementsMatch(t, []string{"max", "sssp", "sss", "ssp", "ss", "sp", "s", "aaal"}, mapKeys(masterChartRaw["rank"].(map[string]any)))
 	assert.ElementsMatch(t, []string{"failed", "clear", "hard", "brave", "absolute", "catastrophy"}, mapKeys(masterChartRaw["clear"].(map[string]any)))
 	assert.ElementsMatch(t, []string{"none", "fc", "aj", "ajc"}, mapKeys(masterChartRaw["combo"].(map[string]any)))
@@ -117,7 +134,12 @@ func TestChartStatsExporterExport_難易度ごとのJSONをアップロードす
 		Charts     []struct {
 			LevelStar *int    `json:"level_star"`
 			Attribute *string `json:"attribute"`
-			Clear     struct {
+			Scores    []struct {
+				RatingBand   string   `json:"rating_band"`
+				AverageScore *float64 `json:"average_score"`
+				MedianScore  *float64 `json:"median_score"`
+			} `json:"scores"`
+			Clear struct {
 				Absolute    int `json:"absolute"`
 				Catastrophy int `json:"catastrophy"`
 			} `json:"clear"`
@@ -130,11 +152,13 @@ func TestChartStatsExporterExport_難易度ごとのJSONをアップロードす
 	assert.Equal(t, "狂", *worldsendPayload.Charts[0].Attribute)
 	assert.Equal(t, 2, worldsendPayload.Charts[0].Clear.Absolute)
 	assert.Equal(t, 1, worldsendPayload.Charts[0].Clear.Catastrophy)
+	require.Len(t, worldsendPayload.Charts[0].Scores, 1)
+	assert.Equal(t, averageScore, *worldsendPayload.Charts[0].Scores[0].AverageScore)
 
 	var worldsendRaw map[string]any
 	require.NoError(t, json.Unmarshal(writer.objects[info.WorldsendChartStatsSnapshotObjectKey], &worldsendRaw))
 	worldsendChartRaw := worldsendRaw["charts"].([]any)[0].(map[string]any)
-	assert.ElementsMatch(t, []string{"song_id", "title", "level_star", "attribute", "player_count", "rank", "clear", "combo"}, mapKeys(worldsendChartRaw))
+	assert.ElementsMatch(t, []string{"song_id", "title", "level_star", "attribute", "player_count", "scores", "rank", "clear", "combo"}, mapKeys(worldsendChartRaw))
 }
 
 func TestChartStatsExporterExport_取得失敗または空譜面をアップロードしない(t *testing.T) {

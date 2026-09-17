@@ -36,6 +36,12 @@ type ChartStatsExportClear struct {
 	Catastrophy int
 }
 
+type ChartStatsExportScore struct {
+	RatingBand   string
+	AverageScore *float64
+	MedianScore  *float64
+}
+
 // ChartStatsExportItem はDBの数値IDを公開境界へ持ち出さないため表示用IDを保持します。
 type ChartStatsExportItem struct {
 	SongDisplayID  string
@@ -44,6 +50,7 @@ type ChartStatsExportItem struct {
 	ChartConst     chartconstant.ChartConstant
 	IsConstUnknown bool
 	PlayerCount    int
+	Scores         []ChartStatsExportScore
 	Rank           ChartStatsExportRank
 	Clear          ChartStatsExportClear
 	Combo          ChartStatsExportCombo
@@ -56,6 +63,7 @@ type WorldsendChartStatsExportItem struct {
 	LevelStar     *int
 	Attribute     *string
 	PlayerCount   int
+	Scores        []ChartStatsExportScore
 	Rank          ChartStatsExportRank
 	Clear         ChartStatsExportClear
 	Combo         ChartStatsExportCombo

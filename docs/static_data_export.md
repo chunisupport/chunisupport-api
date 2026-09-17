@@ -80,7 +80,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `v1/chart-stats/ULTIMA.json` | `ULTIMA` |
 | `v1/chart-stats/WORLDS_END.json` | `WORLD'S END` |
 
-各ファイルは次の形式です。`rating_band`は`ALL`固定で、`rank`、`clear`、`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。
+各ファイルは次の形式です。トップレベルの`rating_band`は件数分布の対象を示す`ALL`固定で、`rank`、`clear`、`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。各譜面の`scores`はレート帯マスタの表示順で`ALL`と個別レート帯を含み、各帯のクリア済み記録の平均スコアと中央値スコアを表します。クリア済み記録がない帯は両値を`null`とします。
 
 ```json
 {
@@ -94,6 +94,10 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
       "const": 12.7,
       "is_const_unknown": true,
       "player_count": 19525,
+      "scores": [
+        { "rating_band": "ALL", "average_score": 1007000.5, "median_score": 1008000 },
+        { "rating_band": "15.0", "average_score": null, "median_score": null }
+      ],
       "rank": { "max": 914, "sssp": 5512, "sss": 2501, "ssp": 0, "ss": 0, "sp": 0, "s": 0, "aaal": 0 },
       "clear": { "failed": 0, "clear": 12000, "hard": 5000, "brave": 1500, "absolute": 800, "catastrophy": 225 },
       "combo": { "none": 0, "fc": 2995, "aj": 2140, "ajc": 914 }

@@ -62,26 +62,34 @@ type chartStatsClearJSON struct {
 	Catastrophy int `json:"catastrophy"`
 }
 
+type chartStatsScoreJSON struct {
+	RatingBand   string   `json:"rating_band"`
+	AverageScore *float64 `json:"average_score"`
+	MedianScore  *float64 `json:"median_score"`
+}
+
 type chartStatsJSON struct {
-	SongID         string              `json:"song_id"`
-	Title          string              `json:"title"`
-	Const          float64             `json:"const"`
-	IsConstUnknown bool                `json:"is_const_unknown"`
-	PlayerCount    int                 `json:"player_count"`
-	Rank           chartStatsRankJSON  `json:"rank"`
-	Clear          chartStatsClearJSON `json:"clear"`
-	Combo          chartStatsComboJSON `json:"combo"`
+	SongID         string                `json:"song_id"`
+	Title          string                `json:"title"`
+	Const          float64               `json:"const"`
+	IsConstUnknown bool                  `json:"is_const_unknown"`
+	PlayerCount    int                   `json:"player_count"`
+	Scores         []chartStatsScoreJSON `json:"scores"`
+	Rank           chartStatsRankJSON    `json:"rank"`
+	Clear          chartStatsClearJSON   `json:"clear"`
+	Combo          chartStatsComboJSON   `json:"combo"`
 }
 
 type worldsendChartStatsJSON struct {
-	SongID      string              `json:"song_id"`
-	Title       string              `json:"title"`
-	LevelStar   *int                `json:"level_star"`
-	Attribute   *string             `json:"attribute"`
-	PlayerCount int                 `json:"player_count"`
-	Rank        chartStatsRankJSON  `json:"rank"`
-	Clear       chartStatsClearJSON `json:"clear"`
-	Combo       chartStatsComboJSON `json:"combo"`
+	SongID      string                `json:"song_id"`
+	Title       string                `json:"title"`
+	LevelStar   *int                  `json:"level_star"`
+	Attribute   *string               `json:"attribute"`
+	PlayerCount int                   `json:"player_count"`
+	Scores      []chartStatsScoreJSON `json:"scores"`
+	Rank        chartStatsRankJSON    `json:"rank"`
+	Clear       chartStatsClearJSON   `json:"clear"`
+	Combo       chartStatsComboJSON   `json:"combo"`
 }
 
 type chartStatsPayload[T any] struct {
@@ -118,7 +126,8 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		chartsByDifficulty[chart.Difficulty] = append(charts, chartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, Const: chart.ChartConst.Float64(),
 			IsConstUnknown: chart.IsConstUnknown, PlayerCount: chart.PlayerCount,
-			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+			Scores: scoresJSON(chart.Scores),
+			Rank:   rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
 		})
 	}
 
@@ -145,7 +154,8 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		worldsendCharts = append(worldsendCharts, worldsendChartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, LevelStar: chart.LevelStar,
 			Attribute: chart.Attribute, PlayerCount: chart.PlayerCount,
-			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+			Scores: scoresJSON(chart.Scores),
+			Rank:   rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
 		})
 	}
 	worldsendBody, err := json.Marshal(chartStatsPayload[worldsendChartStatsJSON]{
@@ -186,4 +196,14 @@ func clearJSON(clear domainrepo.ChartStatsExportClear) chartStatsClearJSON {
 		Failed: clear.Failed, Clear: clear.Clear, Hard: clear.Hard,
 		Brave: clear.Brave, Absolute: clear.Absolute, Catastrophy: clear.Catastrophy,
 	}
+}
+
+func scoresJSON(scores []domainrepo.ChartStatsExportScore) []chartStatsScoreJSON {
+	result := make([]chartStatsScoreJSON, 0, len(scores))
+	for _, score := range scores {
+		result = append(result, chartStatsScoreJSON{
+			RatingBand: score.RatingBand, AverageScore: score.AverageScore, MedianScore: score.MedianScore,
+		})
+	}
+	return result
 }
