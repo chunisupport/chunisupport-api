@@ -21,7 +21,7 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	attribute := "狂"
 	chartNotes, err := notes.NewNotes(1500)
 	require.NoError(t, err)
-	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt}
+	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt, IsNew: true}
 	chart := &entity.WorldsendChart{
 		LevelStar: &level,
 		Attribute: &attribute,
@@ -35,6 +35,7 @@ func TestToWorldsendSongDTO(t *testing.T) {
 	assert.Equal(t, "POPS & ANIME", *dto.Genre)
 	require.NotNil(t, dto.Release)
 	assert.Equal(t, "2024-01-15", *dto.Release)
+	assert.True(t, dto.IsNew)
 	require.Contains(t, dto.Charts, "WORLDSEND")
 	require.NotNil(t, dto.Charts["WORLDSEND"])
 	assert.Equal(t, 5, *dto.Charts["WORLDSEND"].LevelStar)

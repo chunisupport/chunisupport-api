@@ -3708,6 +3708,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "release": "2024-01-15",
       "jacket": "img_filename",
       "official_idx": "123",
+      "is_new": true,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -3733,6 +3734,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `official_idx` | string | 公式インデックス |
+| `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -3811,6 +3813,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "bpm": 180,
   "released_at": "2024-01-01",
   "jacket": "ce21ae87308e7599",
+  "is_new": true,
   "chart": {
     "attribute": "red",
     "level_star": 5,
@@ -3830,6 +3833,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `bpm` | int | - | BPM（省略可） |
 | `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
 | `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
+| `is_new` | bool | - | 最新の2週間ごとの更新で追加された楽曲かどうか（省略時はfalse） |
 | `chart` | object | - | 譜面情報（省略可、省略時は空行を挿入） |
 | `chart.attribute` | string | - | アトリビュート（省略可） |
 | `chart.level_star` | int | - | レベル星数（1〜5、省略可） |
@@ -3865,6 +3869,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "bpm": 180,
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
+    "is_new": true,
     "charts": {
       "WORLDSEND": {
         "attribute": "狂",
@@ -3889,6 +3894,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
+| `is_new` | bool | ✓ | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
 
 **UpdateWorldsendChartRequest**:
@@ -4094,7 +4100,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4510,6 +4516,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "release": "2024-01-15",
       "jacket": "https://example.com/jacket.png",
       "official_idx": "123",
+      "is_new": true,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -4535,6 +4542,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像URL |
 | `official_idx` | string | 公式インデックス |
+| `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:

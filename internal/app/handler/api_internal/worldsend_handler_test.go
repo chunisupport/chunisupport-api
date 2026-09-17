@@ -46,7 +46,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	}{
 		{
 			name:             "正常な配列で204が返る",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000,"notes_designer":"譜面作者A"}}}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","is_new":true,"charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000,"notes_designer":"譜面作者A"}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -77,6 +77,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 				if req.Jacket == nil || *req.Jacket != "we_jacket" {
 					require.Failf(t, "前提条件失敗", "Jacket = %v, want we_jacket", req.Jacket)
 				}
+				assert.True(t, req.IsNew)
 				chart, ok := req.Charts["WORLDSEND"]
 				if !ok || chart == nil {
 					require.Failf(t, "前提条件失敗", "Charts[WORLDSEND] = %v, want non-nil", chart)
@@ -108,7 +109,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 		},
 		{
 			name:             "charts省略でも楽曲情報のみ更新できる",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト"}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -123,7 +124,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 		},
 		{
 			name:             "chartsがnullでも楽曲情報のみ更新できる",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","charts":null}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":null}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -137,13 +138,18 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			},
 		},
 		{
+			name:            "is_new省略はvalidation_failedが返る",
+			body:            `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト"}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
 			name:            "不正なdisplayidでvalidation_failedが返る",
-			body:            `[{"id":"short","title":"WE曲","artist":"WEアーティスト","charts":{"WORLDSEND":{}}}]`,
+			body:            `[{"id":"short","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":{"WORLDSEND":{}}}]`,
 			expectedErrCode: apierror.CodeValidationFailed,
 		},
 		{
 			name:             "usecaseで入力エラーならvalidation_failedが返る",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","charts":{"MASTER":{"level_star":5}}}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":{"MASTER":{"level_star":5}}}]`,
 			expectedErrCode:  apierror.CodeValidationFailed,
 			expectUsecaseHit: true,
 			usecaseErr:       usecase.ErrInvalidWorldsendInput,

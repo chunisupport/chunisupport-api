@@ -144,6 +144,7 @@ func (h *WorldsendHandler) CreateWorldsendSong(c *echo.Context) error {
 		BPM:         req.BPM,
 		ReleasedAt:  req.ReleasedAt.TimePtr(),
 		Jacket:      req.Jacket,
+		IsNew:       req.IsNew,
 		Chart:       chartInput,
 	}
 
@@ -215,6 +216,7 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 			Genre:     req.Genre,
 			BPM:       req.BPM,
 			Jacket:    req.Jacket,
+			IsNew:     *req.IsNew,
 		}
 
 		if req.ReleasedAt != nil {
