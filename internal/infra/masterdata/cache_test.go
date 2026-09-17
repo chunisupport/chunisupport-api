@@ -161,6 +161,9 @@ func TestPreload_AchievementTypesUsesCodeColumn(t *testing.T) {
 	assert.Equal(t, achievementTypeID, achievementType.ID)
 	assert.Equal(t, achievementCode, achievementType.Name)
 	assert.Equal(t, achievementCode, cache.AchievementTypesByID[achievementTypeID])
+	possession, ok := cache.Possessions["normal"]
+	require.True(t, ok)
+	assert.Equal(t, 1, possession.ID)
 
 	goalMasters := cache.GoalMasters()
 	require.NotNil(t, goalMasters)
@@ -184,6 +187,7 @@ func setupPreloadSQLite(t *testing.T) *sqlx.DB {
 		`CREATE TABLE full_chain_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE slots (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
 		`CREATE TABLE honor_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
+		`CREATE TABLE possessions (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
 		`CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE account_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
@@ -215,6 +219,7 @@ func insertPreloadMasterRows(t *testing.T, db *sqlx.DB, achievementTypeID int, a
 		{query: `INSERT INTO full_chain_types (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "fullchain", 1}},
 		{query: `INSERT INTO slots (id, name) VALUES (?, ?)`, args: []any{1, "main"}},
 		{query: `INSERT INTO honor_types (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
+		{query: `INSERT INTO possessions (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO difficulties (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "MASTER", 1}},
 		{query: `INSERT INTO genres (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "POPS&ANIME", 1}},
 		{query: `INSERT INTO account_types (id, name) VALUES (?, ?)`, args: []any{1, "PLAYER"}},
@@ -333,6 +338,7 @@ func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate ti
 		{query: `INSERT INTO full_chain_types (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "fullchain", 1}},
 		{query: `INSERT INTO slots (id, name) VALUES (?, ?)`, args: []any{1, "main"}},
 		{query: `INSERT INTO honor_types (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
+		{query: `INSERT INTO possessions (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO difficulties (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "MASTER", 1}},
 		{query: `INSERT INTO genres (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "POPS&ANIME", 1}},
 		{query: `INSERT INTO account_types (id, name) VALUES (?, ?)`, args: []any{1, "PLAYER"}},

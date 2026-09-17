@@ -24,6 +24,7 @@ type PlayerDTO struct {
 	NewAverageRating  *float64    `json:"-"`
 	ClassEmblemID     *int        `json:"class_emblem_id"`
 	ClassEmblemBaseID *int        `json:"class_emblem_base_id"`
+	PossessionID      int         `json:"possession_id"`
 	LastPlayedAt      *time.Time  `json:"last_played_at"`
 	OverpowerValue    *float64    `json:"overpower_value"`
 	OverpowerPercent  *float64    `json:"overpower_percent"`
@@ -48,6 +49,7 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 		NewAverageRating:  player.NewAverageRating,
 		ClassEmblemID:     player.ClassEmblemID,
 		ClassEmblemBaseID: player.ClassEmblemBaseID,
+		PossessionID:      player.PossessionID,
 		LastPlayedAt:      player.LastPlayedAt,
 		OverpowerValue:    player.OverpowerValue,
 		OverpowerPercent:  player.OverpowerPercent,

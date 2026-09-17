@@ -120,7 +120,7 @@ const (
 	// リクエストボディサイズ上限
 	RequestBodyLimit                      = 5 * 1024 * 1024
 	DataTransferFormat                    = "chunisupport-user-transfer"
-	DataTransferSchemaVersion             = 2
+	DataTransferSchemaVersion             = 3
 	DataTransferMinSupportedSchemaVersion = 1
 	DataTransferHMACSecretMinBytes        = 32
 	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024

@@ -47,6 +47,9 @@ func findTransferUnresolvedReferences(snapshot *entity.UserDataTransferSnapshot,
 		_, ok := masters.classEmblemBaseIDs[*snapshot.Player.ClassEmblemBaseName]
 		add("class_emblem_base", *snapshot.Player.ClassEmblemBaseName, ok)
 	}
+	possessionName := *entity.NormalizePossessionName(snapshot.Player.PossessionName)
+	_, ok := masters.possessionIDs[possessionName]
+	add("possession", possessionName, ok)
 	for _, record := range snapshot.Records {
 		_, ok := masters.charts[transferChartKey(record.SongOfficialIdx, record.Difficulty)]
 		add("chart", record.SongOfficialIdx+"/"+record.Difficulty, ok)
@@ -199,12 +202,16 @@ func (r *userDataTransferRepository) importSnapshot(ctx context.Context, exec do
 	if err != nil {
 		return 0, err
 	}
+	possessionID, err := transferPossessionID(snapshot.Player.PossessionName, masters.possessionIDs)
+	if err != nil {
+		return 0, err
+	}
 	result, err := exec.ExecContext(ctx, `INSERT INTO players
 		(user_id, player_name, player_level, official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
-		 class_emblem_id, class_emblem_base_id, last_played_at, overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		 class_emblem_id, class_emblem_base_id, possession_id, last_played_at, overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 		userID, snapshot.Player.Name.String(), snapshot.Player.Level, snapshot.Player.OfficialRating, calculatedRating, newAverage, bestAverage,
-		classEmblemID, classEmblemBaseID, snapshot.Player.LastPlayedAt, overpowerValue, snapshot.Player.OfficialOverpower, snapshot.Player.OfficialOverpowerPercent, snapshot.Player.DataCollectedAt, snapshot.Player.CreatedAt)
+		classEmblemID, classEmblemBaseID, possessionID, snapshot.Player.LastPlayedAt, overpowerValue, snapshot.Player.OfficialOverpower, snapshot.Player.OfficialOverpowerPercent, snapshot.Player.DataCollectedAt, snapshot.Player.CreatedAt)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert transfer player: %w", err)
 	}
@@ -507,6 +514,14 @@ func optionalTransferMasterID(name *string, values map[string]int) (*int, error)
 		return nil, usecase.ErrDataTransferUnresolvedReference
 	}
 	return &id, nil
+}
+
+func transferPossessionID(name *string, values map[string]int) (int, error) {
+	id, err := optionalTransferMasterID(entity.NormalizePossessionName(name), values)
+	if err != nil {
+		return 0, err
+	}
+	return *id, nil
 }
 func gzipTransferFilter(value []byte) ([]byte, error) {
 	var buffer bytes.Buffer

@@ -18,6 +18,7 @@ type PlayerDataPayload struct {
 	LastPlayed  string
 	Overpower   PlayerDataOverpowerPayload
 	ClassEmblem PlayerDataClassPayload
+	Possession  string
 	Team        PlayerDataTeamPayload
 	Honors      map[string]PlayerDataHonorPayload
 	Scores      PlayerDataScorePayload
@@ -129,4 +130,5 @@ type PlayerDataSummaryInput struct {
 	OverpowerPercent         *float64
 	ClassEmblemID            *int
 	ClassBaseID              *int
+	PossessionID             int
 }

@@ -377,6 +377,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		summaryInput.ClassEmblemID = classID
 		summaryInput.ClassBaseID = baseID
+		summaryInput.PossessionID = resolvePossessionID(payload.Possession, masters)
 
 		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, lockedUser, summaryInput, updatedAt)
 		if ensureErr != nil {
@@ -439,6 +440,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			Rating:            &ratingStats.PlayerRating,
 			ClassEmblemID:     summaryInput.ClassEmblemID,
 			ClassEmblemBaseID: summaryInput.ClassBaseID,
+			PossessionID:      summaryInput.PossessionID,
 			LastPlayedAt:      summaryInput.LastPlayedAt,
 			OverpowerValue:    summaryInput.OverpowerValue,
 			OverpowerPercent:  summaryInput.OverpowerPercent,
@@ -656,6 +658,22 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 	return classID, baseID, nil
 }
 
+func resolvePossessionID(raw string, masters *playerDataMaster) int {
+	key := strings.ToLower(strings.TrimSpace(raw))
+	if key == "" {
+		key = entity.PossessionNameNormal
+	}
+	if masters != nil {
+		if item, ok := masters.Possessions[key]; ok {
+			return item.ID
+		}
+		if item, ok := masters.Possessions[entity.PossessionNameNormal]; ok {
+			return item.ID
+		}
+	}
+	return entity.DefaultPossessionID
+}
+
 func normalizeClassEmblemKey(raw string) string {
 	key := strings.TrimSpace(raw)
 	if key == "" {
@@ -702,7 +720,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		previous := *player
 		previousPlayer = &previous
 	}
-	player.ChangeProfile(playerName, summary.Level, summary.ClassEmblemID, summary.ClassBaseID, summary.LastPlayedAt)
+	player.ChangeProfileWithPossession(playerName, summary.Level, summary.ClassEmblemID, summary.ClassBaseID, summary.PossessionID, summary.LastPlayedAt)
 	player.ChangeOverpower(summary.OverpowerValue, summary.OverpowerPercent)
 
 	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {

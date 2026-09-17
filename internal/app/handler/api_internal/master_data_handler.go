@@ -63,6 +63,7 @@ func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 		FullChains:       itemsToDTOs(out.FullChains),
 		Slots:            itemsToDTOs(out.Slots),
 		HonorTypes:       itemsToDTOs(out.HonorTypes),
+		Possessions:      itemsToDTOs(out.Possessions),
 	})
 }
 

@@ -378,6 +378,33 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 	}
 }
 
+func TestResolvePossessionID(t *testing.T) {
+	masters := &playerDataMaster{
+		PlayerDataMasters: &domainmasterdata.PlayerDataMasters{
+			Possessions: map[string]mastervo.Possession{
+				"normal":  {ID: 1, Name: "normal"},
+				"rainbow": {ID: 5, Name: "rainbow"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{name: "値を大文字と空白を正規化して解決する", raw: " Rainbow ", want: 5},
+		{name: "未指定はnormalになる", raw: "", want: 1},
+		{name: "未知の値はnormalになる", raw: "platinum", want: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, resolvePossessionID(tt.raw, masters))
+		})
+	}
+}
+
 func TestApplyHonors_SP称号は画像ファイル名と画像URLで登録する(t *testing.T) {
 	img1 := "https://example.com/sp-%E3%83%86%E3%82%B9%E3%83%88.png?version=1#fragment"
 	img2 := "https://example.com/sp-2.png"

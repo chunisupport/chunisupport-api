@@ -19,6 +19,7 @@ type PlayerModel struct {
 	BestAverageRating        *float64   `db:"best_average_rating"`
 	ClassEmblemID            *int       `db:"class_emblem_id"`
 	ClassEmblemBaseID        *int       `db:"class_emblem_base_id"`
+	PossessionID             int        `db:"possession_id"`
 	LastPlayedAt             *time.Time `db:"last_played_at"`
 	OverpowerValue           *float64   `db:"overpower_value"`
 	OfficialOverpower        float64    `db:"official_overpower"`
@@ -45,6 +46,7 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		BestAverageRating:        m.BestAverageRating,
 		ClassEmblemID:            m.ClassEmblemID,
 		ClassEmblemBaseID:        m.ClassEmblemBaseID,
+		PossessionID:             m.PossessionID,
 		LastPlayedAt:             m.LastPlayedAt,
 		OverpowerValue:           m.OverpowerValue,
 		OfficialOverpower:        m.OfficialOverpower,
@@ -67,6 +69,7 @@ func FromPlayerEntity(e *entity.Player) *PlayerModel {
 		BestAverageRating:        e.BestAverageRating,
 		ClassEmblemID:            e.ClassEmblemID,
 		ClassEmblemBaseID:        e.ClassEmblemBaseID,
+		PossessionID:             e.PossessionID,
 		LastPlayedAt:             e.LastPlayedAt,
 		OverpowerValue:           e.OverpowerValue,
 		OfficialOverpower:        e.OfficialOverpower,

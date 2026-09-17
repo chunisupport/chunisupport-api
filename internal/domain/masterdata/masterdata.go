@@ -39,6 +39,7 @@ type PlayerDataMasters struct {
 	Slots              map[string]master.Slot
 	SlotNamesByID      map[int]string
 	HonorTypes         map[string]master.HonorType
+	Possessions        map[string]master.Possession
 	Difficulties       map[string]master.ChartDifficulty
 }
 
@@ -88,4 +89,5 @@ type MasterDataMasters struct {
 	FullChains       map[string]master.FullChainType
 	Slots            map[string]master.Slot
 	HonorTypes       map[string]master.HonorType
+	Possessions      map[string]master.Possession
 }

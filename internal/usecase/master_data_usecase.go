@@ -44,4 +44,6 @@ type MasterDataOutput struct {
 	Slots []masterdata.Item
 	// HonorTypes はID昇順の称号タイプ一覧です。
 	HonorTypes []masterdata.Item
+	// Possessions はID昇順のポゼッション一覧です。
+	Possessions []masterdata.Item
 }

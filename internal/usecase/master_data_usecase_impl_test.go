@@ -314,6 +314,24 @@ func TestMasterDataUsecase_GetHonorTypes(t *testing.T) {
 	}
 }
 
+func TestMasterDataUsecase_GetMasterData_PossessionsAreSortedByID(t *testing.T) {
+	uc := usecase.NewMasterDataUsecase(
+		&masterDataMasterProviderMock{masters: &masterdata.MasterDataMasters{
+			Possessions: map[string]master.Possession{
+				"rainbow": {ID: 5, Name: "rainbow"},
+				"normal":  {ID: 1, Name: "normal"},
+				"gold":    {ID: 3, Name: "gold"},
+			}},
+		},
+		&chartStatsMasterProviderMock{},
+	)
+
+	out := uc.GetMasterData(context.Background())
+
+	require.Len(t, out.Possessions, 3)
+	assert.Equal(t, []int{1, 3, 5}, []int{out.Possessions[0].ID, out.Possessions[1].ID, out.Possessions[2].ID})
+}
+
 func TestMasterDataUsecase_GetPermissions(t *testing.T) {
 	tests := []struct {
 		name    string

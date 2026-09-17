@@ -1489,6 +1489,7 @@ curl -X POST \
     "medal_class": "06",
     "base_class": "04"
   },
+  "possession": "rainbow",
   "team": {
     "name": "チーム名",
     "color": "green"
@@ -1547,6 +1548,7 @@ curl -X POST \
 | `overpower.percentage` | number | ✓ | CHUNITHM-NETに表示された公式OP%（`players.official_overpower_percent` に保存。通常譜面スコアから再計算する `overpower_percent` とは別管理） |
 | `class_emblem.medal_class` | string | ✓ | クラスエンブレム（0埋め2桁） |
 | `class_emblem.base_class` | string | ✓ | クラスエンブレムベース（0埋め2桁） |
+| `possession` | string | | ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）。省略時は`normal` |
 | `team.name` | string | | チーム名 |
 | `team.color` | string | | チームカラー |
 | `honors` | object | | 称号情報（キー: スロット番号 "1"〜"3"） |
@@ -1602,6 +1604,7 @@ curl -X POST \
     "rating": 17.29,
     "class_emblem_id": 6,
     "class_emblem_base_id": 4,
+    "possession_id": 5,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27011
@@ -1722,7 +1725,7 @@ curl -X POST \
 | `player_id` | number | 登録されたプレイヤーID |
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
-| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
+| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` / `possession_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
 | `metric_diffs` | object | 計算レート、OVER POWER値、OP%の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
 | `statistics` | object | 通常譜面とWORLD'S ENDの登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
@@ -2502,6 +2505,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 17.29,
     "class_emblem_id": 6,
     "class_emblem_base_id": 4,
+    "possession_id": 5,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27,
@@ -2587,6 +2591,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.5,
     "class_emblem_id": 3,
     "class_emblem_base_id": 1,
+    "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
@@ -4145,7 +4150,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/master`
 
 - **認証**: 不要
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ、ポゼッション）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
 
@@ -4233,6 +4238,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     { "id": 4, "name": "gold" },
     { "id": 5, "name": "platina" },
     { "id": 6, "name": "rainbow" }
+  ],
+  "possessions": [
+    { "id": 1, "name": "normal" },
+    { "id": 2, "name": "silver" },
+    { "id": 3, "name": "gold" },
+    { "id": 4, "name": "platina" },
+    { "id": 5, "name": "rainbow" }
   ]
 }
 ```
@@ -4254,6 +4266,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `full_chains` | MasterItemDTO[] | フルチェインランプ一覧（sort_order順）。`PlayerRecordDTO.full_chain` の取りうる値 |
 | `slots` | MasterItemDTO[] | スロット一覧（ID順）。`PlayerRecordDTO.slot` の取りうる値 |
 | `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID順）。`HonorDTO.type_name` の取りうる値 |
+| `possessions` | MasterItemDTO[] | ポゼッション一覧（ID順）。`PlayerDTO.possession_id` の解決に使用 |
 
 **MasterItemDTO**:
 
@@ -4812,6 +4825,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.50,
     "class_emblem_id": 3,
     "class_emblem_base_id": 1,
+    "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
@@ -5309,6 +5323,7 @@ interface PlayerDTO {
   rating: number;
   class_emblem_id: number | null;
   class_emblem_base_id: number | null;
+  possession_id: number;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
@@ -5445,6 +5460,7 @@ interface PlayerDataProfile {
   rating: number | null;
   class_emblem_id: number | null;
   class_emblem_base_id: number | null;
+  possession_id: number;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;

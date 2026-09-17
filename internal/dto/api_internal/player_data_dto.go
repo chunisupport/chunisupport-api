@@ -27,6 +27,7 @@ type PlayerDataProfile struct {
 	Rating            *float64   `json:"rating"`
 	ClassEmblemID     *int       `json:"class_emblem_id"`
 	ClassEmblemBaseID *int       `json:"class_emblem_base_id"`
+	PossessionID      int        `json:"possession_id"`
 	LastPlayedAt      *time.Time `json:"last_played_at"`
 	OverpowerValue    *float64   `json:"overpower_value"`
 	OverpowerPercent  *float64   `json:"overpower_percent"`

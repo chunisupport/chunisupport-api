@@ -38,9 +38,19 @@ type UserDataTransferPlayer struct {
 	OfficialOverpowerPercent *float64
 	ClassEmblemName          *string
 	ClassEmblemBaseName      *string
+	PossessionName           *string
 	LastPlayedAt             *time.Time
 	DataCollectedAt          *time.Time
 	CreatedAt                time.Time
+}
+
+// NormalizePossessionName は移行データにポゼッション名がない場合、normal を補います。
+func NormalizePossessionName(name *string) *string {
+	if name != nil {
+		return name
+	}
+	normalized := PossessionNameNormal
+	return &normalized
 }
 
 type UserDataTransferRecord struct {

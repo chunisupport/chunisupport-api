@@ -70,6 +70,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `new_average_rating`: 新曲枠の平均レーティング（DECIMAL(6,4)）。
     - `best_average_rating`: ベスト枠の平均レーティング（DECIMAL(6,4)）。
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
+    - `possession_id`: ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）への外部キー。未指定時は `normal`（ID=1）。NULL不可。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
@@ -153,6 +154,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM）。
 - `class_emblems`: クラスエンブレムマスタ（1、2、3、4、5、inf）。
 - `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5、inf）。
+- `possessions`: ポゼッションマスタ（normal、silver、gold、platina、rainbow）。IDは固定値で自動採番しない。
 - `genres` / `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
@@ -199,6 +201,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000042**: プレイヤー現在値と公式指標履歴の取得日時を秒精度へ変更。
 - **000044**: 最上位のレーティング帯を `17.6`（17.6以上17.7未満）と `17.7+`に分割。up/downとも旧区分で集計した統計3表を全削除するため、適用後は統計バッチで再生成する。
 - **000045**: 目標成果種別に `fullchain_count` を追加し、`GOLD` / `PLATINUM` のFULL CHAIN達成譜面数を目標に設定できるようにする。downはユーザー目標を暗黙に削除せず、参照が残る場合は外部キー制約により中止する。
+- **000049**: ポゼッションマスタ（`normal`、`silver`、`gold`、`platina`、`rainbow`）を固定IDで追加し、`players.possession_id` から NOT NULL（既定値 `normal`=1）で参照できるようにする。
 
 #### 000045のロールバック前確認
 

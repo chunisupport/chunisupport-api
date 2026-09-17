@@ -369,6 +369,12 @@ CREATE TABLE `player_worldsend_records` (
   CONSTRAINT `player_worldsend_records_ibfk_5` FOREIGN KEY (`full_chain_id`) REFERENCES `full_chain_types` (`id`),
   CONSTRAINT `player_worldsend_records_chk_1` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `possessions` (
+  `id` tinyint unsigned NOT NULL,
+  `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_possessions_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `players` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
@@ -380,6 +386,7 @@ CREATE TABLE `players` (
   `best_average_rating` decimal(6,4) DEFAULT NULL,
   `class_emblem_id` tinyint unsigned DEFAULT NULL,
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
+  `possession_id` tinyint unsigned NOT NULL DEFAULT '1',
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -391,10 +398,12 @@ CREATE TABLE `players` (
   UNIQUE KEY `uq_players_user_id` (`user_id`),
   KEY `class_emblem_id` (`class_emblem_id`),
   KEY `class_emblem_base_id` (`class_emblem_base_id`),
+  KEY `idx_players_possession_id` (`possession_id`),
   KEY `idx_players_player_name` (`player_name`),
   CONSTRAINT `fk_players_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
+  CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (

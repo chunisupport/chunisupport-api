@@ -29,6 +29,7 @@ type transferMasterData struct {
 	slotIDs               map[string]int
 	classEmblemIDs        map[string]int
 	classEmblemBaseIDs    map[string]int
+	possessionIDs         map[string]int
 	honorTypeIDs          map[string]int
 	honorIDsByImage       map[string]int
 	honorIDsByNameAndType map[string]int
@@ -77,6 +78,9 @@ func loadTransferMasterData(ctx context.Context, exec domainrepo.Executor) (*tra
 		return nil, err
 	}
 	if masters.classEmblemBaseIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT name, id FROM class_emblem_bases`); err != nil {
+		return nil, err
+	}
+	if masters.possessionIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT name, id FROM possessions`); err != nil {
 		return nil, err
 	}
 	if masters.honorTypeIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT name, id FROM honor_types`); err != nil {

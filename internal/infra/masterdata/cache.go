@@ -35,6 +35,7 @@ type Cache struct {
 	Slots                map[string]master.Slot
 	SlotNamesByID        map[int]string
 	HonorTypes           map[string]master.HonorType
+	Possessions          map[string]master.Possession
 	Difficulties         map[string]master.ChartDifficulty
 	DifficultyNamesByID  map[int]string
 	Genres               map[string]master.Genre
@@ -138,6 +139,15 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		honorTypes[strings.ToLower(row.Name)] = master.HonorType{ID: row.ID, Name: row.Name}
 	}
 
+	possessionRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM possessions")
+	if err != nil {
+		return nil, fmt.Errorf("failed to preload possessions: %w", err)
+	}
+	possessions := make(map[string]master.Possession, len(possessionRows))
+	for _, row := range possessionRows {
+		possessions[strings.ToLower(row.Name)] = master.Possession{ID: row.ID, Name: row.Name}
+	}
+
 	difficultyRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM difficulties")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload difficulties: %w", err)
@@ -208,6 +218,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		Slots:                slots,
 		SlotNamesByID:        slotNamesByID,
 		HonorTypes:           honorTypes,
+		Possessions:          possessions,
 		Difficulties:         difficulties,
 		DifficultyNamesByID:  difficultyNamesByID,
 		Genres:               genres,
@@ -389,6 +400,7 @@ func (c *Cache) PlayerDataMasters() *domainmasterdata.PlayerDataMasters {
 		Slots:               maps.Clone(c.Slots),
 		SlotNamesByID:       maps.Clone(c.SlotNamesByID),
 		HonorTypes:          maps.Clone(c.HonorTypes),
+		Possessions:         maps.Clone(c.Possessions),
 		Difficulties:        maps.Clone(c.Difficulties),
 	}
 }
@@ -505,5 +517,6 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 		FullChains:       maps.Clone(c.FullChains),
 		Slots:            maps.Clone(c.Slots),
 		HonorTypes:       maps.Clone(c.HonorTypes),
+		Possessions:      maps.Clone(c.Possessions),
 	}
 }

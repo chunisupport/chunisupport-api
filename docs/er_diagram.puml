@@ -47,6 +47,7 @@ entity "players" as players {
   best_average_rating: DECIMAL(6, 4)
   class_emblem_id: TINYINT
   class_emblem_base_id: TINYINT
+  possession_id: TINYINT UNSIGNED NOT NULL
   last_played_at: DATETIME
   overpower_value: DECIMAL(9, 3)
   official_overpower: DECIMAL(8, 2) NOT NULL
@@ -54,6 +55,12 @@ entity "players" as players {
   data_collected_at: TIMESTAMP
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
+}
+
+entity "possessions" as possessions {
+  + id: TINYINT UNSIGNED [PK]
+  --
+  name: VARCHAR(10) NOT NULL UNIQUE
 }
 
 entity "player_metric_histories" as player_metric_histories {
@@ -233,6 +240,7 @@ players ||--o{ player_worldsend_records
 players ||--o{ player_honors
 players }o--|| class_emblems
 players }o--|| class_emblem_bases
+players }|--|| possessions
 
 honors ||--o{ player_honors
 honors }o--|| honor_types

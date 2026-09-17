@@ -120,6 +120,7 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 		"last_played":  true,
 		"overpower":    true,
 		"class_emblem": true,
+		"possession":   true,
 		"team":         true,
 		"honors":       true,
 		"scores":       true,

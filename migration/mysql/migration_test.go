@@ -645,6 +645,40 @@ func TestExpandPlayerIDDown_StrictSQLModeを型縮小前に検証する(t *testi
 	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, firstForeignKeyDrop))
 }
 
+func TestCreatePossessionsAndAddPlayerPossessionUp_固定IDマスタと外部キーを追加する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000049_create_possessions_and_add_player_possession.up.sql")
+
+	assert.Contains(t, upSQL, "CREATE TABLE possessions ( id TINYINT UNSIGNED NOT NULL, name VARCHAR(10) NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (id)")
+	assert.Contains(t, upSQL, "UNIQUE KEY uq_possessions_name (name)")
+	assert.Contains(t, upSQL, "INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold'), (4, 'platina'), (5, 'rainbow')")
+	assert.NotContains(t, upSQL, "AUTO_INCREMENT")
+	assert.Contains(t, upSQL, "ADD COLUMN possession_id TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER class_emblem_base_id")
+	assert.Contains(t, upSQL, "ADD CONSTRAINT fk_players_possession_id FOREIGN KEY (possession_id) REFERENCES possessions(id)")
+	assert.Less(t, strings.Index(upSQL, "CREATE TABLE possessions"), strings.Index(upSQL, "ALTER TABLE players"))
+}
+
+func TestCreatePossessionsAndAddPlayerPossessionDown_外部キーから順に削除する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000049_create_possessions_and_add_player_possession.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players DROP FOREIGN KEY fk_players_possession_id")
+	assert.Contains(t, downSQL, "DROP INDEX idx_players_possession_id")
+	assert.Contains(t, downSQL, "DROP COLUMN possession_id")
+	assert.Contains(t, downSQL, "DROP TABLE possessions")
+	assert.Less(t, strings.Index(downSQL, "DROP COLUMN possession_id"), strings.Index(downSQL, "DROP TABLE possessions"))
+}
+
+func TestSchemaMySQL_ポゼッションマスタと参照列を含む(t *testing.T) {
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	assert.Contains(t, schemaSQL, "CREATE TABLE `possessions`")
+	assert.Contains(t, schemaSQL, "`id` tinyint unsigned NOT NULL")
+	assert.Contains(t, schemaSQL, "`name` varchar(10)")
+	assert.Contains(t, schemaSQL, "`possession_id` tinyint unsigned NOT NULL DEFAULT '1'")
+	assert.Contains(t, schemaSQL, "KEY `idx_players_possession_id` (`possession_id`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`)")
+}
+
 func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
 	t.Helper()
 

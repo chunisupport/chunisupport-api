@@ -44,3 +44,6 @@ type HonorType BaseMasterVO
 
 // Slot はプレイヤーレコードのスロット種別の値オブジェクトです。
 type Slot BaseMasterVO
+
+// Possession はポゼッションマスタの値オブジェクトです。
+type Possession BaseMasterVO

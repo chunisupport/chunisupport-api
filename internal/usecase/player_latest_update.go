@@ -124,6 +124,7 @@ func playerLatestUpdatePayload(result *playerdataresult.Result) map[string]any {
 			"rating":               result.Profile.Rating,
 			"class_emblem_id":      result.Profile.ClassEmblemID,
 			"class_emblem_base_id": result.Profile.ClassEmblemBaseID,
+			"possession_id":        result.Profile.PossessionID,
 			"last_played_at":       result.Profile.LastPlayedAt,
 			"overpower_value":      result.Profile.OverpowerValue,
 			"overpower_percent":    result.Profile.OverpowerPercent,

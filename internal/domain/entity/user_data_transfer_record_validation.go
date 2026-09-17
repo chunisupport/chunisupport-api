@@ -34,6 +34,9 @@ func validateUserDataTransferPlayer(player UserDataTransferPlayer, metricHistori
 	if !validOptionalName(player.ClassEmblemBaseName) {
 		return invalidUserDataTransfer("player.class_emblem_base_name is invalid")
 	}
+	if !validOptionalName(player.PossessionName) {
+		return invalidUserDataTransfer("player.possession_name is invalid")
+	}
 	if err := validateOptionalUTCDateTime("player.last_played_at", player.LastPlayedAt); err != nil {
 		return err
 	}

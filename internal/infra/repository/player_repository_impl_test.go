@@ -203,6 +203,7 @@ func setupPlayerRepositorySchema(t *testing.T, db *sqlx.DB) {
 			best_average_rating REAL NULL,
 			class_emblem_id INTEGER NULL,
 			class_emblem_base_id INTEGER NULL,
+			possession_id INTEGER NOT NULL DEFAULT 1,
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
 			official_overpower REAL NULL,
@@ -267,6 +268,21 @@ func TestPlayerRepository_Save_公式指標履歴と現在値を同一トラン�
 	require.Equal(t, 16.25, rating)
 }
 
+func TestPlayerRepository_Save_ポゼッションを保存して復元する(t *testing.T) {
+	db := setupPlayerRepositorySQLite(t)
+	seedPlayerWithHonors(t, db, 1, false)
+	repo := &playerRepository{db: db}
+	player, err := repo.FindByID(context.Background(), db, 1)
+	require.NoError(t, err)
+
+	player.PossessionID = 5
+	require.NoError(t, repo.Save(context.Background(), db, player))
+
+	saved, err := repo.FindByID(context.Background(), db, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 5, saved.PossessionID)
+}
+
 func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bool) time.Time {
 	t.Helper()
 
@@ -275,10 +291,10 @@ func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bo
 		INSERT INTO players (
 			id, user_id, player_name, player_level,
 			official_player_rating, calculated_player_rating, new_average_rating, best_average_rating,
-			class_emblem_id, class_emblem_base_id, last_played_at,
+			class_emblem_id, class_emblem_base_id, possession_id, last_played_at,
 			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, nil, nil, 1234.567, 98.75, now, now, now)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, playerID, 20, "テストプレイヤー", 30, 16.25, nil, nil, nil, nil, nil, 1, nil, nil, 1234.567, 98.75, now, now, now)
 	require.NoError(t, err)
 
 	if !withHonors {

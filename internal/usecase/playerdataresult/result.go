@@ -28,6 +28,7 @@ type Profile struct {
 	Rating            *float64
 	ClassEmblemID     *int
 	ClassEmblemBaseID *int
+	PossessionID      int
 	LastPlayedAt      *time.Time
 	OverpowerValue    *float64
 	OverpowerPercent  *float64
