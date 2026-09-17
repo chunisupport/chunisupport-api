@@ -69,33 +69,49 @@ type chartStatsScoreJSON struct {
 }
 
 type chartStatsJSON struct {
-	SongID         string                `json:"song_id"`
-	Title          string                `json:"title"`
-	Const          float64               `json:"const"`
-	IsConstUnknown bool                  `json:"is_const_unknown"`
-	PlayerCount    int                   `json:"player_count"`
-	Scores         []chartStatsScoreJSON `json:"scores"`
-	Rank           chartStatsRankJSON    `json:"rank"`
-	Clear          chartStatsClearJSON   `json:"clear"`
-	Combo          chartStatsComboJSON   `json:"combo"`
+	SongID         string              `json:"song_id"`
+	Title          string              `json:"title"`
+	Const          float64             `json:"const"`
+	IsConstUnknown bool                `json:"is_const_unknown"`
+	PlayerCount    int                 `json:"player_count"`
+	Rank           chartStatsRankJSON  `json:"rank"`
+	Clear          chartStatsClearJSON `json:"clear"`
+	Combo          chartStatsComboJSON `json:"combo"`
 }
 
 type worldsendChartStatsJSON struct {
-	SongID      string                `json:"song_id"`
-	Title       string                `json:"title"`
-	LevelStar   *int                  `json:"level_star"`
-	Attribute   *string               `json:"attribute"`
-	PlayerCount int                   `json:"player_count"`
-	Scores      []chartStatsScoreJSON `json:"scores"`
-	Rank        chartStatsRankJSON    `json:"rank"`
-	Clear       chartStatsClearJSON   `json:"clear"`
-	Combo       chartStatsComboJSON   `json:"combo"`
+	SongID      string              `json:"song_id"`
+	Title       string              `json:"title"`
+	LevelStar   *int                `json:"level_star"`
+	Attribute   *string             `json:"attribute"`
+	PlayerCount int                 `json:"player_count"`
+	Rank        chartStatsRankJSON  `json:"rank"`
+	Clear       chartStatsClearJSON `json:"clear"`
+	Combo       chartStatsComboJSON `json:"combo"`
+}
+
+type chartScoresJSON struct {
+	SongID string                `json:"song_id"`
+	Scores []chartStatsScoreJSON `json:"scores"`
+}
+
+type worldsendChartScoresJSON struct {
+	SongID    string                `json:"song_id"`
+	LevelStar *int                  `json:"level_star"`
+	Attribute *string               `json:"attribute"`
+	Scores    []chartStatsScoreJSON `json:"scores"`
 }
 
 type chartStatsPayload[T any] struct {
 	GeneratedAt string `json:"generated_at"`
 	Difficulty  string `json:"difficulty"`
 	RatingBand  string `json:"rating_band"`
+	Charts      []T    `json:"charts"`
+}
+
+type chartScoresPayload[T any] struct {
+	GeneratedAt string `json:"generated_at"`
+	Difficulty  string `json:"difficulty"`
 	Charts      []T    `json:"charts"`
 }
 
@@ -115,8 +131,10 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 	generatedAt := e.now().Format(time.RFC3339)
 	difficulties := info.ChartStatsDifficulties()
 	chartsByDifficulty := make(map[string][]chartStatsJSON, len(difficulties))
+	scoresByDifficulty := make(map[string][]chartScoresJSON, len(difficulties))
 	for _, difficulty := range difficulties {
 		chartsByDifficulty[difficulty] = []chartStatsJSON{}
+		scoresByDifficulty[difficulty] = []chartScoresJSON{}
 	}
 	for _, chart := range snapshot.Charts {
 		charts, ok := chartsByDifficulty[chart.Difficulty]
@@ -126,8 +144,10 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		chartsByDifficulty[chart.Difficulty] = append(charts, chartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, Const: chart.ChartConst.Float64(),
 			IsConstUnknown: chart.IsConstUnknown, PlayerCount: chart.PlayerCount,
-			Scores: scoresJSON(chart.Scores),
-			Rank:   rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+		})
+		scoresByDifficulty[chart.Difficulty] = append(scoresByDifficulty[chart.Difficulty], chartScoresJSON{
+			SongID: chart.SongDisplayID, Scores: scoresJSON(chart.Scores),
 		})
 	}
 
@@ -135,7 +155,7 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		key  string
 		body []byte
 	}
-	objects := make([]object, 0, len(difficulties)+1)
+	objects := make([]object, 0, 2*(len(difficulties)+1))
 	for _, difficulty := range difficulties {
 		body, err := json.Marshal(chartStatsPayload[chartStatsJSON]{
 			GeneratedAt: generatedAt,
@@ -147,15 +167,28 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 			return ChartStatsExportResult{}, fmt.Errorf("failed to marshal %s chart stats snapshot: %w", difficulty, err)
 		}
 		objects = append(objects, object{key: info.ChartStatsSnapshotObjectKey(difficulty), body: body})
+		scoreBody, err := json.Marshal(chartScoresPayload[chartScoresJSON]{
+			GeneratedAt: generatedAt,
+			Difficulty:  difficulty,
+			Charts:      scoresByDifficulty[difficulty],
+		})
+		if err != nil {
+			return ChartStatsExportResult{}, fmt.Errorf("failed to marshal %s chart scores snapshot: %w", difficulty, err)
+		}
+		objects = append(objects, object{key: info.ChartScoresSnapshotObjectKey(difficulty), body: scoreBody})
 	}
 
 	worldsendCharts := make([]worldsendChartStatsJSON, 0, len(snapshot.WorldsendCharts))
+	worldsendScores := make([]worldsendChartScoresJSON, 0, len(snapshot.WorldsendCharts))
 	for _, chart := range snapshot.WorldsendCharts {
 		worldsendCharts = append(worldsendCharts, worldsendChartStatsJSON{
 			SongID: chart.SongDisplayID, Title: chart.SongTitle, LevelStar: chart.LevelStar,
 			Attribute: chart.Attribute, PlayerCount: chart.PlayerCount,
-			Scores: scoresJSON(chart.Scores),
-			Rank:   rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+			Rank: rankJSON(chart.Rank), Clear: clearJSON(chart.Clear), Combo: comboJSON(chart.Combo),
+		})
+		worldsendScores = append(worldsendScores, worldsendChartScoresJSON{
+			SongID: chart.SongDisplayID, LevelStar: chart.LevelStar,
+			Attribute: chart.Attribute, Scores: scoresJSON(chart.Scores),
 		})
 	}
 	worldsendBody, err := json.Marshal(chartStatsPayload[worldsendChartStatsJSON]{
@@ -168,6 +201,15 @@ func (e *ChartStatsExporter) Export(ctx context.Context) (ChartStatsExportResult
 		return ChartStatsExportResult{}, fmt.Errorf("failed to marshal worldsend chart stats snapshot: %w", err)
 	}
 	objects = append(objects, object{key: info.WorldsendChartStatsSnapshotObjectKey, body: worldsendBody})
+	worldsendScoreBody, err := json.Marshal(chartScoresPayload[worldsendChartScoresJSON]{
+		GeneratedAt: generatedAt,
+		Difficulty:  info.StatsDifficultyWorldsend,
+		Charts:      worldsendScores,
+	})
+	if err != nil {
+		return ChartStatsExportResult{}, fmt.Errorf("failed to marshal worldsend chart scores snapshot: %w", err)
+	}
+	objects = append(objects, object{key: info.WorldsendChartScoresSnapshotObjectKey, body: worldsendScoreBody})
 
 	objectKeys := make([]string, 0, len(objects))
 	for _, item := range objects {

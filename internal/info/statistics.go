@@ -22,9 +22,22 @@ var chartStatsSnapshotObjectKeys = map[string]string{
 	"ULTIMA":   UltimaChartStatsSnapshotObjectKey,
 }
 
+var chartScoresSnapshotObjectKeys = map[string]string{
+	"BASIC":    BasicChartScoresSnapshotObjectKey,
+	"ADVANCED": AdvancedChartScoresSnapshotObjectKey,
+	"EXPERT":   ExpertChartScoresSnapshotObjectKey,
+	"MASTER":   MasterChartScoresSnapshotObjectKey,
+	"ULTIMA":   UltimaChartScoresSnapshotObjectKey,
+}
+
 // ChartStatsSnapshotObjectKey は難易度名と公開キーの対応を生成処理へ集約します。
 func ChartStatsSnapshotObjectKey(difficulty string) string {
 	return chartStatsSnapshotObjectKeys[difficulty]
+}
+
+// ChartScoresSnapshotObjectKey は件数統計とスコア統計の保存先を分けます。
+func ChartScoresSnapshotObjectKey(difficulty string) string {
+	return chartScoresSnapshotObjectKeys[difficulty]
 }
 
 // ChartStatsDifficulties は呼び出し側の変更で固定順が壊れないよう複製して返します。
@@ -39,6 +52,15 @@ func ChartStatsSnapshotObjectKeys() []string {
 		keys = append(keys, chartStatsSnapshotObjectKeys[difficulty])
 	}
 	return append(keys, WorldsendChartStatsSnapshotObjectKey)
+}
+
+// ChartScoresSnapshotObjectKeys はスコア統計の全公開キーをパージ対象へ渡します。
+func ChartScoresSnapshotObjectKeys() []string {
+	keys := make([]string, 0, len(chartStatsDifficulties)+1)
+	for _, difficulty := range chartStatsDifficulties {
+		keys = append(keys, chartScoresSnapshotObjectKeys[difficulty])
+	}
+	return append(keys, WorldsendChartScoresSnapshotObjectKey)
 }
 
 // DifficultyPathParam はパスパラメータ用の難易度名です。

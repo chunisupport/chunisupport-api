@@ -81,7 +81,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `v1/chart-stats/ULTIMA.json` | `ULTIMA` |
 | `v1/chart-stats/WORLDS_END.json` | `WORLD'S END` |
 
-各ファイルは次の形式です。トップレベルの`rating_band`は件数分布の対象を示す`ALL`固定で、`rank`、`clear`、`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。各譜面の`scores`はレート帯マスタの表示順で`ALL`と個別レート帯を含み、各帯のクリア済み記録の平均スコアと中央値スコアを表します。クリア済み記録がない帯は両値を`null`とします。
+各ファイルは次の形式です。`rating_band`は`ALL`固定で、`rank`、`clear`、`combo`は排他的な件数です。達成率や累積件数は`player_count`を分母として利用側で計算します。`player_count`はFAILEDの記録を含みます。
 
 ```json
 {
@@ -95,10 +95,6 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
       "const": 12.7,
       "is_const_unknown": true,
       "player_count": 19525,
-      "scores": [
-        { "rating_band": "ALL", "average_score": 1007000.5, "median_score": 1008000 },
-        { "rating_band": "15.0", "average_score": null, "median_score": null }
-      ],
       "rank": { "max": 914, "sssp": 5512, "sss": 2501, "ssp": 0, "ss": 0, "sp": 0, "s": 0, "aaal": 0 },
       "clear": { "failed": 0, "clear": 12000, "hard": 5000, "brave": 1500, "absolute": 800, "catastrophy": 225 },
       "combo": { "none": 0, "fc": 2995, "aj": 2140, "ajc": 914 }
@@ -130,7 +126,36 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 WORLD'S ENDの行は`const`と`is_const_unknown`の代わりに、nullableな`level_star`と`attribute`を持ちます。
 論理削除されていない全譜面を出力し、統計行がまだ存在しない譜面も各件数を0として含めます。通常譜面全体またはWORLD'S END譜面全体が0件の場合は既存オブジェクトを上書きしません。
 
-6種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。すべてのPUTが成功した後、6つの公開URLを1回のCloudflare APIリクエストでパージします。途中のPUTが失敗した場合の整合性とパージの再試行規則は、楽曲・譜面一覧と同じです。
+同じ実行で、スコア統計だけを次の固定キーへ別途出力します。
+
+| オブジェクトキー | 対象難易度 |
+| --- | --- |
+| `v1/chart-scores/BASIC.json` | `BASIC` |
+| `v1/chart-scores/ADVANCED.json` | `ADVANCED` |
+| `v1/chart-scores/EXPERT.json` | `EXPERT` |
+| `v1/chart-scores/MASTER.json` | `MASTER` |
+| `v1/chart-scores/ULTIMA.json` | `ULTIMA` |
+| `v1/chart-scores/WORLDS_END.json` | `WORLD'S END` |
+
+`scores`はレート帯マスタの表示順で`ALL`と個別レート帯を含み、各帯のクリア済み記録の平均スコアと中央値スコアを表します。クリア済み記録がない帯は両値を`null`とします。通常譜面の行は`song_id`と`scores`を持ち、WORLD'S ENDの行は譜面を識別する`level_star`と`attribute`も持ちます。
+
+```json
+{
+  "generated_at": "2026-09-02T12:00:00+09:00",
+  "difficulty": "MASTER",
+  "charts": [
+    {
+      "song_id": "0123456789abcdef",
+      "scores": [
+        { "rating_band": "ALL", "average_score": 1007000.5, "median_score": 1008000 },
+        { "rating_band": "15.0", "average_score": null, "median_score": null }
+      ]
+    }
+  ]
+}
+```
+
+12種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。すべてのPUTが成功した後、12の公開URLを1回のCloudflare APIリクエストでパージします。途中のPUTが失敗した場合の整合性とパージの再試行規則は、楽曲・譜面一覧と同じです。
 
 ## スケジュールと監視
 

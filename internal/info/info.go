@@ -60,6 +60,12 @@ const (
 	MasterChartStatsSnapshotObjectKey           = "v1/chart-stats/MASTER.json"
 	UltimaChartStatsSnapshotObjectKey           = "v1/chart-stats/ULTIMA.json"
 	WorldsendChartStatsSnapshotObjectKey        = "v1/chart-stats/WORLDS_END.json"
+	BasicChartScoresSnapshotObjectKey           = "v1/chart-scores/BASIC.json"
+	AdvancedChartScoresSnapshotObjectKey        = "v1/chart-scores/ADVANCED.json"
+	ExpertChartScoresSnapshotObjectKey          = "v1/chart-scores/EXPERT.json"
+	MasterChartScoresSnapshotObjectKey          = "v1/chart-scores/MASTER.json"
+	UltimaChartScoresSnapshotObjectKey          = "v1/chart-scores/ULTIMA.json"
+	WorldsendChartScoresSnapshotObjectKey       = "v1/chart-scores/WORLDS_END.json"
 	CloudflareAPIBaseURL                        = "https://api.cloudflare.com/client/v4"
 	CloudflareCachePurgeMaxAttempts             = 3
 	CloudflareCachePurgeRetryBaseDelay          = time.Second
