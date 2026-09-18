@@ -2496,6 +2496,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。`view=rating` 以外では、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
+  - `player.official_overpower` と `player.official_overpower_percent` はCHUNITHM-NETから取得した公式OP・公式OP%です。公式OP%の記録開始前は `null` になります。
 
 #### レスポンス例
 
@@ -2512,6 +2513,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27,
+    "official_overpower": 96120.12,
+    "official_overpower_percent": 76.26,
     "honors": [
       { "slot": 1, "name": "称号名（上段）", "type_name": "gold", "image_url": "https://..." },
       { "slot": 2, "name": "称号名（中段）", "type_name": "platina", "image_url": "https://..." },
@@ -2598,6 +2601,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
+    "official_overpower": 1230.12,
+    "official_overpower_percent": 98.72,
     "honors": [
       {
         "slot": 1,
@@ -4811,6 +4816,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
+- `player.official_overpower` と `player.official_overpower_percent` はCHUNITHM-NETから取得した公式OP・公式OP%です。公式OP%の記録開始前は `null` になります。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
@@ -4832,6 +4838,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
+    "official_overpower": 1230.12,
+    "official_overpower_percent": 98.72,
     "honors": [
       {
         "slot": 1,
@@ -5330,6 +5338,8 @@ interface PlayerDTO {
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
+  official_overpower: number;
+  official_overpower_percent: number | null;
   honors: HonorDTO[];
   created_at: string;
   updated_at: string;

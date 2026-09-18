@@ -18,10 +18,13 @@ func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	// Given
 	officialRating := 17.25
 	calculatedRating := 17.1234
+	officialOPPercent := 98.7654
 	player := &entity.Player{
-		Name:             playername.MustNewPlayerName("テストプレイヤー"),
-		OfficialRating:   officialRating,
-		CalculatedRating: &calculatedRating,
+		Name:                     playername.MustNewPlayerName("テストプレイヤー"),
+		OfficialRating:           officialRating,
+		OfficialOverpower:        12345.67,
+		OfficialOverpowerPercent: &officialOPPercent,
+		CalculatedRating:         &calculatedRating,
 	}
 
 	// When
@@ -30,16 +33,21 @@ func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	// Then
 	require.NotNil(t, actual)
 	assert.Equal(t, &calculatedRating, actual.Rating)
+	assert.Equal(t, 12345.67, actual.OfficialOverpower)
+	assert.Equal(t, &officialOPPercent, actual.OfficialOverpowerPercent)
 }
 
 func TestToV1UserProfileDTO_Ratingには計算値を設定する(t *testing.T) {
 	// Given
 	officialRating := 17.25
 	calculatedRating := 17.1234
+	officialOPPercent := 98.7654
 	profile := &api_internal.UserProfileWithRecordsDTO{
 		Player: &dto.PlayerDTO{
-			Rating:           &officialRating,
-			CalculatedRating: &calculatedRating,
+			Rating:                   &officialRating,
+			CalculatedRating:         &calculatedRating,
+			OfficialOverpower:        12345.67,
+			OfficialOverpowerPercent: &officialOPPercent,
 		},
 	}
 
@@ -50,6 +58,8 @@ func TestToV1UserProfileDTO_Ratingには計算値を設定する(t *testing.T) {
 	require.NotNil(t, actual)
 	require.NotNil(t, actual.Player)
 	assert.Equal(t, &calculatedRating, actual.Player.Rating)
+	assert.Equal(t, 12345.67, actual.Player.OfficialOverpower)
+	assert.Equal(t, &officialOPPercent, actual.Player.OfficialOverpowerPercent)
 }
 
 func TestToV1PlayerRecordDTO_OverpowerPercent(t *testing.T) {
