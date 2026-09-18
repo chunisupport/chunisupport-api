@@ -38,6 +38,7 @@
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
 - トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。権限は `read`（参照系APIのみ）または `read_write`（参照系・更新系API）です。発行済みトークンに有効期限はありません。
+- `read_write` の新規発行はEDITORまたはADMINに限られます。PLAYERやEXTDEVは `read` のみ発行できます。
 - `read_write` はユーザーのアカウント権限を拡張しません。更新系APIはAPIトークンの権限とユーザーのEDITOR以上のロールの両方が必要です。
 
 ## レートリミット（現行実装値）
@@ -696,6 +697,7 @@ Content-Type: application/json
 
 - `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
 - `permission` は必須で、`read` または `read_write` を指定します。発行後に変更できません。権限を変更する場合はトークンを削除して再発行してください。
+- `read_write` はEDITORまたはADMINのみ指定できます。PLAYERやEXTDEVが指定した場合は403 Forbiddenになります。
 - **レスポンス**: 201 Created
 
 ```json
@@ -715,6 +717,7 @@ Content-Type: application/json
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_name`): 名前が不正
   - 400 Bad Request (`invalid_api_token_permission`): `permission` が未指定または `read` / `read_write` 以外
+- 403 Forbidden (`forbidden`): `read_write` の発行にEDITORまたはADMIN権限が必要
   - 400 Bad Request (`api_token_limit_exceeded`): 10個発行済み
   - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 

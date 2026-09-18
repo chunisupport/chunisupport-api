@@ -174,7 +174,7 @@ func TestAPITokenUsecase_Generate_ExistingTokenRemainsAvailable(t *testing.T) {
 	legacy := newAPITokenForTest(t, 1, 10, "既存のトークン", "legacy-token", nil, nil)
 	repo.tokens[legacy.ID] = legacy
 	repo.nextID = 2
-	users := &tokenStubUserRepository{user: &entity.User{ID: 10}}
+	users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: info.AccountTypeEditor}}
 	uc := newAPITokenUsecaseWithClock(nil, apiTokenPassthroughTransactionManager{}, repo, users, time.Now)
 
 	// When
@@ -221,7 +221,7 @@ func TestAPITokenUsecase_Generate_RejectsLimitAndDuplicateName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, tt.repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
+			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, tt.repo, &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: info.AccountTypeEditor}})
 
 			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
 
@@ -248,6 +248,51 @@ func TestAPITokenUsecase_Generate_PersistsReadPermission(t *testing.T) {
 	require.NotNil(t, generated)
 	assert.Equal(t, "read", generated.Metadata.Permission)
 	assert.Equal(t, "read", repo.tokens[generated.Metadata.ID].Permission.String())
+}
+
+func TestAPITokenUsecase_Generate_RejectsReadWriteForNonEditor(t *testing.T) {
+	tests := []struct {
+		name          string
+		accountTypeID int
+	}{
+		{name: "PLAYER", accountTypeID: info.AccountTypePlayer},
+		{name: "EXTDEV", accountTypeID: info.AccountTypeExtDev},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newStubAPITokenRepository()
+			users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: tt.accountTypeID}}
+			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
+
+			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+
+			assert.ErrorIs(t, err, ErrAPITokenWritePermissionDenied)
+			assert.Zero(t, repo.saveCalls)
+		})
+	}
+}
+
+func TestAPITokenUsecase_Generate_AllowsReadWriteForEditorAndAdmin(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		accountTypeID int
+	}{
+		{name: "EDITOR", accountTypeID: info.AccountTypeEditor},
+		{name: "ADMIN", accountTypeID: info.AccountTypeAdmin},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newStubAPITokenRepository()
+			users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: tt.accountTypeID}}
+			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
+
+			generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+
+			require.NoError(t, err)
+			require.NotNil(t, generated)
+			assert.Equal(t, "read_write", generated.Metadata.Permission)
+		})
+	}
 }
 
 func TestAPITokenUsecase_Generate_RejectsInvalidPermission(t *testing.T) {

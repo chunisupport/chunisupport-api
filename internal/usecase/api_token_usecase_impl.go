@@ -18,13 +18,14 @@ import (
 )
 
 var (
-	ErrInvalidAPIToken           = errors.New("invalid API token")
-	ErrInvalidAPITokenName       = errors.New("invalid API token name")
-	ErrInvalidAPITokenPermission = errors.New("invalid API token permission")
-	ErrInvalidAPITokenID         = errors.New("invalid API token id")
-	ErrAPITokenNotFound          = errors.New("API token not found")
-	ErrAPITokenLimitExceeded     = errors.New("API token limit exceeded")
-	ErrAPITokenNameConflict      = errors.New("API token name conflict")
+	ErrInvalidAPIToken               = errors.New("invalid API token")
+	ErrInvalidAPITokenName           = errors.New("invalid API token name")
+	ErrInvalidAPITokenPermission     = errors.New("invalid API token permission")
+	ErrInvalidAPITokenID             = errors.New("invalid API token id")
+	ErrAPITokenNotFound              = errors.New("API token not found")
+	ErrAPITokenLimitExceeded         = errors.New("API token limit exceeded")
+	ErrAPITokenNameConflict          = errors.New("API token name conflict")
+	ErrAPITokenWritePermissionDenied = errors.New("API token write permission denied")
 )
 
 // apiTokenUsecase は APITokenUsecase の実装です。
@@ -72,8 +73,12 @@ func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string,
 	}
 
 	err = u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		if _, err := u.userRepo.FindByIDForUpdate(ctx, tx, userID); err != nil {
+		lockedUser, err := u.userRepo.FindByIDForUpdate(ctx, tx, userID)
+		if err != nil {
 			return err
+		}
+		if validatedPermission.CanWrite() && !info.HasRole(lockedUser.AccountTypeID, info.AccountTypeEditor) {
+			return ErrAPITokenWritePermissionDenied
 		}
 		count, err := u.tokenRepo.CountByUserID(ctx, tx, userID)
 		if err != nil {

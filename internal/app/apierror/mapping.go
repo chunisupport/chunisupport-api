@@ -79,6 +79,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidAPITokenID.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPITokenPermission):
 		return ErrInvalidAPITokenPermission.WithInternal(err)
+	case errors.Is(err, usecase.ErrAPITokenWritePermissionDenied):
+		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrAPITokenNotFound):
 		return ErrAPITokenNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrAPITokenLimitExceeded):

@@ -25,7 +25,7 @@ type GeneratedAPITokenOutput struct {
 
 // APITokenUsecase はAPIトークンに関するユースケースを提供します。
 type APITokenUsecase interface {
-	// Generate は権限付きの名前付きAPIトークンを追加発行します。
+	// Generate は権限付きの名前付きAPIトークンを追加発行します。read_writeはEDITOR以上に限ります。
 	Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error)
 	// List はユーザーが所有するAPIトークンを返します。
 	List(ctx context.Context, userID int) ([]*APITokenOutput, error)
