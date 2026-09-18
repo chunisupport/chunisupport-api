@@ -255,12 +255,6 @@ func chartConstTenths(value float64) int64 {
 	return int64(math.Round(value * 10))
 }
 
-// roundN は入出力境界で扱う小数を指定桁数に丸めます。
-func roundN(num float64, n int) float64 {
-	factor := math.Pow10(n)
-	return math.Round(num*factor) / factor
-}
-
 // truncN は入出力境界で扱う小数を指定桁数で切り捨てます。
 func truncN(num float64, n int) float64 {
 	factor := math.Pow10(n)

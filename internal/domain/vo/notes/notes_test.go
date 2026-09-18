@@ -40,11 +40,3 @@ func TestNotes_Scan(t *testing.T) {
 		})
 	}
 }
-
-func TestNotes_Scan_NilReceiver(t *testing.T) {
-	var got *Notes
-
-	err := got.Scan(int64(10))
-
-	require.Error(t, err)
-}

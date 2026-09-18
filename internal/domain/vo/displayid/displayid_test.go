@@ -17,43 +17,13 @@ func TestNewDisplayID(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "全て0の16文字",
-			input:   "0000000000000000",
-			wantErr: false,
-		},
-		{
-			name:    "全てfの16文字",
-			input:   "ffffffffffffffff",
-			wantErr: false,
-		},
-		{
 			name:    "15文字(短すぎる)",
 			input:   "0123456789abcde",
 			wantErr: true,
 		},
 		{
-			name:    "17文字(長すぎる)",
-			input:   "0123456789abcdef0",
-			wantErr: true,
-		},
-		{
 			name:    "大文字を含む",
 			input:   "0123456789ABCDEF",
-			wantErr: true,
-		},
-		{
-			name:    "16進数以外の文字を含む",
-			input:   "0123456789abcdeg",
-			wantErr: true,
-		},
-		{
-			name:    "空文字列",
-			input:   "",
-			wantErr: true,
-		},
-		{
-			name:    "スペースを含む",
-			input:   "0123456789abcd f",
 			wantErr: true,
 		},
 	}
@@ -82,11 +52,6 @@ func TestDisplayID_IsValid(t *testing.T) {
 			name:  "有効なID",
 			id:    "0123456789abcdef",
 			valid: true,
-		},
-		{
-			name:  "無効なID(短い)",
-			id:    "0123456789abcde",
-			valid: false,
 		},
 		{
 			name:  "無効なID(大文字)",

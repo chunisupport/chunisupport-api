@@ -28,6 +28,7 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER NOT NULL,
 			name TEXT NOT NULL,
+			permission TEXT NOT NULL DEFAULT 'read_write',
 			hashed_token TEXT NOT NULL UNIQUE,
 			token_prefix TEXT NULL,
 			last_used_at DATETIME NULL,
@@ -43,7 +44,7 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde")
+	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde", "read_write")
 	require.NoError(t, err)
 
 	require.NoError(t, repo.Save(context.Background(), db, token))
@@ -53,6 +54,7 @@ func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, tokens, 1)
 	assert.Equal(t, "CLI", tokens[0].Name.String())
+	assert.Equal(t, "read_write", tokens[0].Permission.String())
 	require.NotNil(t, tokens[0].TokenPrefix)
 	assert.Equal(t, "abcde", *tokens[0].TokenPrefix)
 
@@ -66,6 +68,19 @@ func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	assert.Equal(t, "Batch", updated.Name.String())
 	require.NotNil(t, updated.LastUsedAt)
 	assert.Equal(t, usedAt, *updated.LastUsedAt)
+}
+
+func TestAPITokenRepository_SaveAndLoad_ReadPermission(t *testing.T) {
+	db := setupAPITokenRepositorySQLite(t)
+	repo := &apiTokenRepository{}
+	token, err := entity.NewAPIToken(10, "Read only", strings.Repeat("d", 64), "abcde", "read")
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Save(context.Background(), db, token))
+	loaded, err := repo.FindByIDAndUserID(context.Background(), db, token.ID, 10)
+
+	require.NoError(t, err)
+	assert.Equal(t, "read", loaded.Permission.String())
 }
 
 func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T) {
@@ -94,7 +109,7 @@ func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T
 func TestAPITokenRepository_DeleteByIDAndUserID_IsScopedToOwner(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("c", 64), "abcde")
+	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("c", 64), "abcde", "read_write")
 	require.NoError(t, err)
 	require.NoError(t, repo.Save(context.Background(), db, token))
 

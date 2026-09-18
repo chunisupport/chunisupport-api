@@ -37,6 +37,7 @@ type UpdateWorldsendSongInput struct {
 	BPM        *int
 	ReleasedAt *time.Time
 	Jacket     *string
+	IsNew      bool
 	Charts     map[string]*UpdateWorldsendChartInput
 }
 
@@ -58,6 +59,7 @@ type CreateWorldsendSongInput struct {
 	BPM         *int
 	ReleasedAt  *time.Time
 	Jacket      *string
+	IsNew       bool
 	Chart       *CreateWorldsendChartInput
 }
 
@@ -246,6 +248,7 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 	updatedSong.BPM = req.BPM
 	updatedSong.ReleasedAt = req.ReleasedAt
 	updatedSong.Jacket = req.Jacket
+	updatedSong.IsNew = req.IsNew
 	updatedSong.IsWorldsend = true
 
 	var updatedChart *entity.WorldsendChart
@@ -336,6 +339,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.BPM = input.BPM
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
+	song.IsNew = input.IsNew
 	song.IsWorldsend = true
 
 	// 譜面情報の構築（全フィールド任意）

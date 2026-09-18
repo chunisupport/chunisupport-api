@@ -16,6 +16,7 @@ import (
 	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenpermission"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/testutil"
@@ -85,6 +86,8 @@ func authenticateTestUser(idToken string) *entity.User {
 	switch idToken {
 	case "editor-token":
 		return &entity.User{ID: 1, AccountTypeID: info.AccountTypeEditor}
+	case "read-editor-token":
+		return &entity.User{ID: 4, AccountTypeID: info.AccountTypeEditor}
 	case "admin-token":
 		return &entity.User{ID: 2, AccountTypeID: info.AccountTypeAdmin}
 	default:
@@ -94,7 +97,7 @@ func authenticateTestUser(idToken string) *entity.User {
 
 type stubAPITokenUsecase struct{}
 
-func (stubAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
+func (stubAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*usecase.GeneratedAPITokenOutput, error) {
 	return nil, nil
 }
 
@@ -107,7 +110,11 @@ func (stubAPITokenUsecase) Rename(ctx context.Context, userID int, id string, na
 }
 
 func (stubAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*entity.User, *entity.APIToken, error) {
-	return authenticateTestUser(rawToken), &entity.APIToken{ID: 1}, nil
+	permission := apitokenpermission.ReadWrite
+	if rawToken == "read-editor-token" {
+		permission = apitokenpermission.Read
+	}
+	return authenticateTestUser(rawToken), &entity.APIToken{ID: 1, Permission: permission}, nil
 }
 
 func (stubAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
@@ -260,6 +267,11 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 			wantStatus: http.StatusNoContent,
 			wantCalled: true,
 		},
+		{
+			name:       "read権限のEDITORトークンは拒否される",
+			token:      "read-editor-token",
+			wantStatus: http.StatusForbidden,
+		},
 	}
 
 	for _, tt := range tests {
@@ -365,6 +377,7 @@ func TestRegisterRoutes_外部譜面定数更新はEDITOR以上のAPIトーク�
 		{name: "PLAYERは拒否される", token: "player-token", wantStatus: http.StatusForbidden},
 		{name: "EDITORは更新できる", token: "editor-token", wantStatus: http.StatusOK, wantCalled: true},
 		{name: "ADMINは更新できる", token: "admin-token", wantStatus: http.StatusOK, wantCalled: true},
+		{name: "read権限のEDITORトークンは拒否される", token: "read-editor-token", wantStatus: http.StatusForbidden},
 	}
 
 	for _, tt := range tests {

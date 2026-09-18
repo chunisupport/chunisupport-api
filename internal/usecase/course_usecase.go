@@ -48,7 +48,7 @@ type CourseUsecase interface {
 	Update(ctx context.Context, displayID string, input UpdateCourseInput) (*CourseOutput, error)
 	Delete(ctx context.Context, displayID string) error
 	Restore(ctx context.Context, displayID string) error
-	GetUserRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*CourseRecordResult, error)
+	GetUserRecords(ctx context.Context, username string, requester *entity.User) (*CourseRecordResult, error)
 	GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error)
 }
 
@@ -178,7 +178,7 @@ func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, delete
 // meta.updated_at 相当の UpdatedAt は、コースマスタの最大更新日時と
 // 対象プレイヤーのコースレコード最大更新日時のうち新しい方とする。
 // 一覧レスポンスが名称・クラス・未プレイ補完などマスタ情報にも依存するため。
-func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, requester *entity.User, includeNoPlay bool) (*CourseRecordResult, error) {
+func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, requester *entity.User) (*CourseRecordResult, error) {
 	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
 	if errors.Is(err, repository.ErrUserNotFound) {
 		return nil, ErrUserNotFound
@@ -204,7 +204,7 @@ func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, req
 		return &CourseRecordResult{Records: []*CourseRecordOutput{}, UpdatedAt: masterUpdatedAt}, nil
 	}
 
-	records, err := u.repo.FindRecordsByPlayerID(ctx, u.db, *user.PlayerID, false, includeNoPlay)
+	records, err := u.repo.FindRecordsByPlayerID(ctx, u.db, *user.PlayerID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func newerTimePtr(a, b *time.Time) *time.Time {
 }
 
 func (u *courseUsecase) GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error) {
-	result, err := u.GetUserRecords(ctx, username, requester, true)
+	result, err := u.GetUserRecords(ctx, username, requester)
 	if err != nil {
 		return nil, err
 	}

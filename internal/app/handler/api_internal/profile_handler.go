@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -59,7 +60,7 @@ func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 		return apierror.ErrRecentSignInRequired
 	}
 	req := new(updateUsernameRequest)
-	if err := c.Bind(req); err != nil {
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	updatedUsername, err := h.userCredentialUsecase.UpdateUsername(c.Request().Context(), user.ID, req.Username, reauthToken)
@@ -79,7 +80,7 @@ func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 	}
 
 	req := new(updatePrivacyRequest)
-	if err := c.Bind(req); err != nil {
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 

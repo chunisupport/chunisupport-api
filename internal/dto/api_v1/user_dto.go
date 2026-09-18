@@ -20,17 +20,20 @@ type V1HonorDTO struct {
 
 // V1PlayerDTO は外部API v1 用のプレイヤー情報DTOです。
 type V1PlayerDTO struct {
-	Name              string        `json:"name"`
-	Level             int           `json:"level"`
-	Rating            *float64      `json:"rating"`
-	ClassEmblemID     *int          `json:"class_emblem_id"`
-	ClassEmblemBaseID *int          `json:"class_emblem_base_id"`
-	LastPlayedAt      *time.Time    `json:"last_played_at"`
-	OverpowerValue    *float64      `json:"overpower_value"`
-	OverpowerPercent  *float64      `json:"overpower_percent"`
-	Honors            []*V1HonorDTO `json:"honors"`
-	CreatedAt         time.Time     `json:"created_at"`
-	UpdatedAt         time.Time     `json:"updated_at"`
+	Name                     string        `json:"name"`
+	Level                    int           `json:"level"`
+	Rating                   *float64      `json:"rating"`
+	ClassEmblemID            *int          `json:"class_emblem_id"`
+	ClassEmblemBaseID        *int          `json:"class_emblem_base_id"`
+	PossessionID             int           `json:"possession_id"`
+	LastPlayedAt             *time.Time    `json:"last_played_at"`
+	OverpowerValue           *float64      `json:"overpower_value"`
+	OverpowerPercent         *float64      `json:"overpower_percent"`
+	OfficialOverpower        float64       `json:"official_overpower"`
+	OfficialOverpowerPercent *float64      `json:"official_overpower_percent"`
+	Honors                   []*V1HonorDTO `json:"honors"`
+	CreatedAt                time.Time     `json:"created_at"`
+	UpdatedAt                time.Time     `json:"updated_at"`
 }
 
 // V1PlayerRecordDTO は外部API v1 用のプレイヤーレコードDTOです。
@@ -119,17 +122,20 @@ func ToV1PlayerDTO(player *entity.Player) *V1PlayerDTO {
 	}
 
 	return &V1PlayerDTO{
-		Name:              player.Name.String(),
-		Level:             player.Level,
-		Rating:            player.CalculatedRating,
-		ClassEmblemID:     player.ClassEmblemID,
-		ClassEmblemBaseID: player.ClassEmblemBaseID,
-		LastPlayedAt:      player.LastPlayedAt,
-		OverpowerValue:    player.OverpowerValue,
-		OverpowerPercent:  player.OverpowerPercent,
-		Honors:            []*V1HonorDTO{},
-		CreatedAt:         player.CreatedAt,
-		UpdatedAt:         player.UpdatedAt,
+		Name:                     player.Name.String(),
+		Level:                    player.Level,
+		Rating:                   player.CalculatedRating,
+		ClassEmblemID:            player.ClassEmblemID,
+		ClassEmblemBaseID:        player.ClassEmblemBaseID,
+		PossessionID:             player.PossessionID,
+		LastPlayedAt:             player.LastPlayedAt,
+		OverpowerValue:           player.OverpowerValue,
+		OverpowerPercent:         player.OverpowerPercent,
+		OfficialOverpower:        player.OfficialOverpower,
+		OfficialOverpowerPercent: player.OfficialOverpowerPercent,
+		Honors:                   []*V1HonorDTO{},
+		CreatedAt:                player.CreatedAt,
+		UpdatedAt:                player.UpdatedAt,
 	}
 }
 
@@ -299,17 +305,20 @@ func ToV1UserProfileDTO(profile *api_internal.UserProfileWithRecordsDTO) *V1User
 	var v1Player *V1PlayerDTO
 	if profile.Player != nil {
 		v1Player = &V1PlayerDTO{
-			Name:              profile.Player.Name,
-			Level:             profile.Player.Level,
-			Rating:            profile.Player.CalculatedRating,
-			ClassEmblemID:     profile.Player.ClassEmblemID,
-			ClassEmblemBaseID: profile.Player.ClassEmblemBaseID,
-			LastPlayedAt:      profile.Player.LastPlayedAt,
-			OverpowerValue:    profile.Player.OverpowerValue,
-			OverpowerPercent:  profile.Player.OverpowerPercent,
-			Honors:            make([]*V1HonorDTO, len(profile.Player.Honors)),
-			CreatedAt:         profile.Player.CreatedAt,
-			UpdatedAt:         profile.Player.UpdatedAt,
+			Name:                     profile.Player.Name,
+			Level:                    profile.Player.Level,
+			Rating:                   profile.Player.CalculatedRating,
+			ClassEmblemID:            profile.Player.ClassEmblemID,
+			ClassEmblemBaseID:        profile.Player.ClassEmblemBaseID,
+			PossessionID:             profile.Player.PossessionID,
+			LastPlayedAt:             profile.Player.LastPlayedAt,
+			OverpowerValue:           profile.Player.OverpowerValue,
+			OverpowerPercent:         profile.Player.OverpowerPercent,
+			OfficialOverpower:        profile.Player.OfficialOverpower,
+			OfficialOverpowerPercent: profile.Player.OfficialOverpowerPercent,
+			Honors:                   make([]*V1HonorDTO, len(profile.Player.Honors)),
+			CreatedAt:                profile.Player.CreatedAt,
+			UpdatedAt:                profile.Player.UpdatedAt,
 		}
 		for i, h := range profile.Player.Honors {
 			v1Player.Honors[i] = ToV1HonorDTO(h)

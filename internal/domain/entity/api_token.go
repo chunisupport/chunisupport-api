@@ -6,15 +6,17 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenname"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenpermission"
 )
 
 const apiTokenHashLength = 64
 
 var (
-	ErrAPITokenIDInvalid     = errors.New("API token id is invalid")
-	ErrAPITokenUserIDInvalid = errors.New("API token user id is invalid")
-	ErrAPITokenHashInvalid   = errors.New("API token hash is invalid")
-	ErrAPITokenPrefixInvalid = errors.New("API token prefix is invalid")
+	ErrAPITokenIDInvalid         = errors.New("API token id is invalid")
+	ErrAPITokenUserIDInvalid     = errors.New("API token user id is invalid")
+	ErrAPITokenHashInvalid       = errors.New("API token hash is invalid")
+	ErrAPITokenPrefixInvalid     = errors.New("API token prefix is invalid")
+	ErrAPITokenPermissionInvalid = apitokenpermission.ErrInvalidAPITokenPermission
 )
 
 // APIToken は外部APIで利用する永続化トークンを表します。
@@ -22,14 +24,15 @@ type APIToken struct {
 	ID          uint64
 	UserID      int
 	Name        apitokenname.APITokenName
+	Permission  apitokenpermission.APITokenPermission
 	HashedToken string
 	TokenPrefix *string
 	LastUsedAt  *time.Time
 	CreatedAt   time.Time
 }
 
-// NewAPIToken は新規発行するAPIトークンを生成します。
-func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string) (*APIToken, error) {
+// NewAPIToken は権限付きの新規APIトークンを生成します。
+func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string, permission string) (*APIToken, error) {
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
 		return nil, err
@@ -43,10 +46,15 @@ func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string
 	if len(tokenPrefix) != 5 {
 		return nil, ErrAPITokenPrefixInvalid
 	}
+	validatedPermission, err := apitokenpermission.NewAPITokenPermission(permission)
+	if err != nil {
+		return nil, ErrAPITokenPermissionInvalid
+	}
 	prefix := tokenPrefix
 	return &APIToken{
 		UserID:      userID,
 		Name:        validatedName,
+		Permission:  validatedPermission,
 		HashedToken: hashedToken,
 		TokenPrefix: &prefix,
 	}, nil
@@ -54,7 +62,7 @@ func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string
 
 // RestoreAPIToken は永続化済みデータからAPIトークンを復元します。
 // 旧仕様のトークンは表示用prefixを保持していないため、nilを許容します。
-func RestoreAPIToken(id uint64, userID int, name string, hashedToken string, tokenPrefix *string, lastUsedAt *time.Time, createdAt time.Time) (*APIToken, error) {
+func RestoreAPIToken(id uint64, userID int, name string, hashedToken string, tokenPrefix *string, lastUsedAt *time.Time, createdAt time.Time, permission string) (*APIToken, error) {
 	if id == 0 {
 		return nil, ErrAPITokenIDInvalid
 	}
@@ -71,10 +79,15 @@ func RestoreAPIToken(id uint64, userID int, name string, hashedToken string, tok
 	if tokenPrefix != nil && len(*tokenPrefix) != 5 {
 		return nil, ErrAPITokenPrefixInvalid
 	}
+	validatedPermission, err := apitokenpermission.NewAPITokenPermission(permission)
+	if err != nil {
+		return nil, ErrAPITokenPermissionInvalid
+	}
 	return &APIToken{
 		ID:          id,
 		UserID:      userID,
 		Name:        validatedName,
+		Permission:  validatedPermission,
 		HashedToken: hashedToken,
 		TokenPrefix: cloneStringPointer(tokenPrefix),
 		LastUsedAt:  cloneTimePointer(lastUsedAt),
@@ -90,6 +103,11 @@ func (t *APIToken) Rename(name string) error {
 	}
 	t.Name = validatedName
 	return nil
+}
+
+// CanWrite は更新系APIを利用できるトークンかを返します。
+func (t *APIToken) CanWrite() bool {
+	return t.Permission.CanWrite()
 }
 
 // ShouldRecordUsage は最終利用日時を永続化する間隔を経過したか判定します。

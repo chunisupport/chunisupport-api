@@ -68,6 +68,7 @@ func (h *PlayerLockedSongHandler) Unlock(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	// UnlockはJSONボディではなく path/query をバインドするため、BindStrictJSONではなくc.Bindを使う。
 	var req internaldto.PlayerLockedSongUnlockRequest
 	if err := c.Bind(&req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)

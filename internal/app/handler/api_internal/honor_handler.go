@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -48,7 +49,7 @@ func (h *HonorHandler) GetHonor(c *echo.Context) error {
 // CreateHonor は称号を作成します。
 func (h *HonorHandler) CreateHonor(c *echo.Context) error {
 	var req api_internal.HonorRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
@@ -74,7 +75,7 @@ func (h *HonorHandler) UpdateHonor(c *echo.Context) error {
 	}
 
 	var req api_internal.HonorRequest
-	if err := c.Bind(&req); err != nil {
+	if err := apphandler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {

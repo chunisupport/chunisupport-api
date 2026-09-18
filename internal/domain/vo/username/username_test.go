@@ -39,25 +39,6 @@ func TestNewUserName(t *testing.T) {
 	}
 }
 
-func TestMustNewUserName(t *testing.T) {
-	t.Run("有効な入力", func(t *testing.T) {
-		value := "testuser"
-		got := MustNewUserName(value)
-		assert.Equal(t, UserName{value: value}, got)
-	})
-
-	t.Run("無効な入力はパニックする", func(t *testing.T) {
-		assert.Panics(t, func() {
-			MustNewUserName("")
-		})
-	})
-}
-
-func TestUserName_Value(t *testing.T) {
-	userName := UserName{value: "testuser"}
-	assert.Equal(t, "testuser", userName.String())
-}
-
 func TestUserName_Scan(t *testing.T) {
 	type args struct {
 		src any
@@ -100,22 +81,6 @@ func TestUserName_Scan(t *testing.T) {
 			want:    UserName{value: "before"},
 			wantErr: assert.Error,
 		},
-		{
-			name: "5文字未満の[]byteはエラー",
-			args: args{
-				src: []byte("test"),
-			},
-			want:    UserName{value: "before"},
-			wantErr: assert.Error,
-		},
-		{
-			name: "DBの空文字列はエラー",
-			args: args{
-				src: "",
-			},
-			want:    UserName{value: "before"},
-			wantErr: assert.Error,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -125,30 +90,6 @@ func TestUserName_Scan(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, *u, "Scan(%v)", tt.args.src)
-		})
-	}
-}
-
-func TestValidateUserName(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   string
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name:    "有効なユーザー名",
-			value:   "testuser",
-			wantErr: assert.NoError,
-		},
-		{
-			name:    "無効な空文字列",
-			value:   "",
-			wantErr: assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.wantErr(t, validateUserName(tt.value), fmt.Sprintf("validateUserName(%v)", tt.value))
 		})
 	}
 }

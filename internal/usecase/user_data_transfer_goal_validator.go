@@ -46,7 +46,7 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 		if err != nil {
 			return fmt.Errorf("%w: transferred goal is invalid: %v", ErrDataTransferInvalidData, err)
 		}
-		validations = append(validations, dynamicValidation{achievementType: goal.AchievementType, params: params, filter: goalTargetFilter(attrs)})
+		validations = append(validations, dynamicValidation{achievementType: goal.AchievementType, params: params, filter: goalTargetFilter(attrs, goal.AchievementType, params)})
 		return nil
 	}
 	for _, goal := range goals.Ungrouped {

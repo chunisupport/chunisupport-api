@@ -157,16 +157,16 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 ```json
 {
   "format": "chunisupport-user-transfer",
-  "schema_version": 2
+  "schema_version": 3
 }
 ```
 
-- エクスポートではスキーマバージョン2を出力する。
-- インポートではスキーマバージョン1および2を受け付ける。
+- エクスポートではスキーマバージョン3を出力する。
+- インポートではスキーマバージョン1、2および3を受け付ける。
 - 未対応の`format`または`schema_version`は拒否する。
 - サーバーID、移行ID、エクスポート日時は持たない。
 
-スキーマバージョン2では、プレイヤー現在値および公式指標履歴に`official_overpower_percent`を追加している。スキーマバージョン1の読み込み時は、この値を`null`として扱う。
+スキーマバージョン2では、プレイヤー現在値および公式指標履歴に`official_overpower_percent`を追加している。スキーマバージョン3では、プレイヤーに`possession_name`を追加している。スキーマバージョン1および2の読み込み時、`official_overpower_percent`は`null`、`possession_name`は`normal`として扱う。
 
 ### 6.3 サイズ上限
 
@@ -201,7 +201,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 
 ### 7.1 プレイヤー
 
-プレイヤー名、プレイヤーレベル、公式RATING、公式OVER POWER、公式OVER POWER割合、クラスエンブレム名、クラスエンブレムベース名、最終プレイ日時、データ取得日時、プレイヤー作成日時を移行する。公式OVER POWER割合は記録開始前のデータでは`null`となる。
+プレイヤー名、プレイヤーレベル、公式RATING、公式OVER POWER、公式OVER POWER割合、クラスエンブレム名、クラスエンブレムベース名、ポゼッション名、最終プレイ日時、データ取得日時、プレイヤー作成日時を移行する。公式OVER POWER割合は記録開始前のデータでは`null`となる。ポゼッション名は`normal`、`silver`、`gold`、`platina`、`rainbow`のいずれかで、旧スキーマで欠落している場合は`normal`とする。
 
 計算レーティング、Best枠平均、New枠平均、計算OVER POWER値は移行せず、移行先で再計算する。`players.updated_at`および`users.updated_at`はインポート日時に更新する。
 
@@ -251,7 +251,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 }
 ```
 
-各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、表示順、作成日時を格納する。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。目標IDと目標グループIDは移行先で新規採番する。
+各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、表示順、作成日時を格納する。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。`rating_count` も移行先の最新マスタから到達可能譜面数を再計算するため、移行元と分母が異なる場合があり、0件または `count` / `remaining` 超過となる目標はインポートを拒否する。目標IDと目標グループIDは移行先で新規採番する。
 
 ### 7.9 保存済みフィルタ
 
@@ -289,6 +289,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 | スロット | マスター名 | `slot_id` |
 | クラスエンブレム | マスター名 | `class_emblem_id` |
 | クラスエンブレムベース | マスター名 | `class_emblem_base_id` |
+| ポゼッション | マスター名 | `possession_id` |
 | 称号タイプ | タイプ名 | `honor_type_id` |
 | 称号 | 画像URL、または名称とタイプ名 | `honor_id` |
 | achievement type | コード | `achievement_type_id` |

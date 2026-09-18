@@ -87,6 +87,41 @@ func TestEnsurePlayer_取得日時のない既存値は履歴へ保存しない(
 	assert.Nil(t, playerRepo.savedPlayer.PendingMetricHistory())
 }
 
+func TestEnsurePlayer_指定したポゼッションを保存する(t *testing.T) {
+	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
+	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
+		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		PossessionID: entity.DefaultPossessionID, CreatedAt: createdAt, UpdatedAt: createdAt,
+	}}
+	userRepo := new(MockUserRepository)
+	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
+	playerID := 10
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+		Name: "変更後", Level: 1, PossessionID: 5, OfficialRating: 17.25, OfficialOverpower: 12345.67,
+	}, createdAt.Add(time.Hour))
+
+	require.NoError(t, err)
+	assert.Equal(t, 5, playerRepo.savedPlayer.PossessionID)
+}
+
+func TestEnsurePlayer_未指定のポゼッションはnormalで初期化する(t *testing.T) {
+	playerRepo := &stubPlayerRepositoryForPlayerData{}
+	userRepo := new(MockUserRepository)
+	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest")}
+	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+		Name: "新規", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
+	}, time.Date(2026, 8, 7, 11, 0, 0, 0, time.UTC))
+
+	require.NoError(t, err)
+	assert.Equal(t, entity.DefaultPossessionID, playerRepo.savedPlayer.PossessionID)
+}
+
 func (s *stubPlayerRepositoryForPlayerData) FindByIDWithHonors(ctx context.Context, exec repository.Executor, id int) (*repository.PlayerWithHonors, error) {
 	return nil, nil
 }

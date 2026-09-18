@@ -1,4 +1,4 @@
-﻿# データベースマイグレーションとスキーマ
+# データベースマイグレーションとスキーマ
 
 ## マイグレーションツール
 
@@ -38,6 +38,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `id`: トークンのユニークID。
     - `user_id`: `users`テーブルへの外部キー。
     - `name`: ユーザー内で一意の管理用名。
+    - `permission`: `read`または`read_write`。旧仕様から移行したトークンは`read_write`。
     - `hashed_token`: トークンのハッシュ値。
     - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
     - `last_used_at`: 認証に最後に使用した日時。
@@ -69,6 +70,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `new_average_rating`: 新曲枠の平均レーティング（DECIMAL(6,4)）。
     - `best_average_rating`: ベスト枠の平均レーティング（DECIMAL(6,4)）。
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
+    - `possession_id`: ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）への外部キー。未指定時は `normal`（ID=1）。NULL不可。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
@@ -152,6 +154,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM）。
 - `class_emblems`: クラスエンブレムマスタ（1、2、3、4、5、inf）。
 - `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5、inf）。
+- `possessions`: ポゼッションマスタ（normal、silver、gold、platina、rainbow）。IDは固定値で自動採番しない。
 - `genres` / `difficulties` / `class_emblems` / `class_emblem_bases` / `clear_lamp_types` / `combo_lamp_types` / `full_chain_types`: `sort_order` カラムで0始まりの表示順を保持。
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
@@ -198,6 +201,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000042**: プレイヤー現在値と公式指標履歴の取得日時を秒精度へ変更。
 - **000044**: 最上位のレーティング帯を `17.6`（17.6以上17.7未満）と `17.7+`に分割。up/downとも旧区分で集計した統計3表を全削除するため、適用後は統計バッチで再生成する。
 - **000045**: 目標成果種別に `fullchain_count` を追加し、`GOLD` / `PLATINUM` のFULL CHAIN達成譜面数を目標に設定できるようにする。downはユーザー目標を暗黙に削除せず、参照が残る場合は外部キー制約により中止する。
+- **000049**: ポゼッションマスタ（`normal`、`silver`、`gold`、`platina`、`rainbow`）を固定IDで追加し、`players.possession_id` から NOT NULL（既定値 `normal`=1）で参照できるようにする。
 
 #### 000045のロールバック前確認
 
@@ -307,3 +311,19 @@ WHERE official_player_rating IS NULL;
 ### 000043 公式OP%履歴
 
 `players`と`player_metric_histories`に`official_overpower_percent DECIMAL(5,2) NULL`を追加する。既存の取得時点には公式OP%の原本がないためバックフィルせず、記録開始前の値は`NULL`のまま保持する。新バイナリへの切替後はプレイヤーデータ登録の`overpower.percentage`を必須とし、RATING・公式OVER POWER・公式OP%のいずれかが変化した場合に更新前の組を履歴化する。
+
+### 000046 単曲レート達成数目標
+
+`achievement_types`に`rating_count`を追加する。downはこの成果種別を参照する目標が残っている間は外部キー制約で失敗するため、ロールバック前に対象目標の移行または削除を完了する。
+
+### 000047 プレイヤーIDの拡張
+
+`players.id`を`MEDIUMINT UNSIGNED`から`INT UNSIGNED`へ拡張し、`users.player_id`および全プレイヤー関連テーブルの`player_id`も同じ型へ変更する。MySQLでは外部キーの参照元と参照先の型を一致させる必要があるため、適用中はプレイヤーデータとユーザー紐付けの書き込みを停止し、外部キーをいったん削除して型変更後に同じ削除規則で再作成する。
+
+downは型縮小より前に接続の`@@SESSION.sql_mode`をSQLで検証し、`STRICT_ALL_TABLES`と`STRICT_TRANS_TABLES`のどちらも無効な場合は`CHECK`制約違反により明示的に中止する。検証用の一時テーブルを作成するため、マイグレーション実行ユーザーには`CREATE TEMPORARY TABLES`権限が必要となる。strict SQL modeのもとで`MEDIUMINT UNSIGNED`の上限を超えるIDが存在する場合も失敗させる。ロールバック前に`players.id`と全参照カラムの最大値が16,777,215以下であることを必ず確認する。各DDLは暗黙コミットされるため、途中失敗時は型と外部キーの状態を確認し、SQLの記載順に不足分のみ再適用する。
+
+### 000048 APIトークン権限
+
+適用中はAPIトークンの発行・一覧・改名を停止する。既存トークンには`read_write`を設定し、新しいトークンは`read`または`read_write`を明示して発行する。API更新後に管理APIを再開する。
+
+downでは`permission`列と値のCHECK制約を削除する。新バイナリはこの列を必須とするため、ロールバック時は旧バイナリへ切り替えてからdownを実行すること。

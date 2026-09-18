@@ -37,7 +37,9 @@
 
 - `Authorization: Bearer <token>` ヘッダーで API トークンを送信します。
 - `/v1`、`/compat/chunirec/2.0`、`/compat/reiwa/1` はすべて API トークン認証です。
-- トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。発行済みトークンに有効期限はありません。
+- トークンは `/internal/auth/api-tokens` で1ユーザーあたり最大10個まで発行できます。権限は `read`（参照系APIのみ）または `read_write`（参照系・更新系API）です。発行済みトークンに有効期限はありません。
+- `read_write` の新規発行はEDITORまたはADMINに限られます。PLAYERやEXTDEVは `read` のみ発行できます。
+- `read_write` はユーザーのアカウント権限を拡張しません。更新系APIはAPIトークンの権限とユーザーのEDITOR以上のロールの両方が必要です。
 
 ## レートリミット（現行実装値）
 
@@ -55,6 +57,21 @@
 - `/compat/reiwa/1/*`: **`/v1` と同一**
 
 実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
+
+## 共通リクエスト仕様
+
+JSONボディを受け取るエンドポイントは、原則として `BindStrictJSON` でデコードします。
+
+- `Content-Type` は `application/json` が必須です（`; charset=utf-8` などのパラメータ付きも可）。欠落や不一致は 400 です。
+- 未知フィールドは拒否します。
+- 先頭のJSON値の後に別のJSON値が続く場合は拒否します。
+- 構文不正なJSONは 400 です。
+
+例外:
+
+- `POST /internal/me/register-data` と `POST /internal/player-data/temp`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/me/data-transfer/validate` と `POST /internal/me/data-transfer/import`: 移行ファイル本体を受け取り、未知フィールドの拒否は専用コーデック側で行います。
+- `DELETE /internal/me/locked-songs/:displayid`: JSONボディではなく path / query をバインドします。
 
 ## 共通レスポンス仕様
 
@@ -95,6 +112,7 @@
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | 認証情報不正 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `invalid_api_token_permission` | APIトークン権限が不正 |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
@@ -179,7 +197,7 @@ Content-Type: application/json
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 通常時不要 | アプリケーション名とビルド日を返します。メンテナンス中はFirebase認証済みのADMIN / EDITORのみ利用可 |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
-| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得 |
+| `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得（`read` / `read_write`いずれも可） |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer + Turnstile | Firebase IDトークンで初回ユーザー登録 |
@@ -248,6 +266,7 @@ Content-Type: application/json
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username/permission` | PATCH | Firebase Bearer (ADMIN) | ユーザーの権限変更 |
+| `/internal/users/:username/suspicious` | PATCH | Firebase Bearer (ADMIN) | 不審アカウントフラグの変更 |
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
@@ -290,8 +309,8 @@ Content-Type: application/json
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
-| `/v1/songs` | PUT | APIトークン (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
-| `/v1/songs/chart-constant` | PATCH | APIトークン (EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
+| `/v1/songs` | PUT | APIトークン (`read_write`、EDITOR+) | 楽曲情報と譜面情報の一括更新 |
+| `/v1/songs/chart-constant` | PATCH | APIトークン (`read_write`、EDITOR+) | 公式IDと難易度接頭辞による譜面定数更新 |
 | `/v1/songs/:id` | GET | APIトークン | 楽曲詳細取得 |
 | `/v1/songs/:id/stats/:difficulty` | GET | APIトークン | 難易度別楽曲統計取得 |
 | `/v1/songs/:id/score-history/:difficulty` | GET | APIトークン | 通常譜面スコア履歴取得 |
@@ -339,7 +358,7 @@ Content-Type: application/json
   - 204 No Content: 空レスポンス。メンテナンス中も同じレスポンスを維持します。
 
 ### GET `/version`
-- **認証**: APIトークン (ADMIN)
+- **認証**: APIトークン (`read` / `read_write`) (ADMIN)
 - **レスポンス**:
   - 200 OK: APIのビルド識別子とGoバージョンを返します。
 
@@ -673,16 +692,19 @@ Content-Type: application/json
 - **リクエスト**:
 
 ```json
-{"name":"Discord Bot"}
+{"name":"Discord Bot","permission":"read"}
 ```
 
 - `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
+- `permission` は必須で、`read` または `read_write` を指定します。発行後に変更できません。権限を変更する場合はトークンを削除して再発行してください。
+- `read_write` はEDITORまたはADMINのみ指定できます。PLAYERやEXTDEVが指定した場合は403 Forbiddenになります。
 - **レスポンス**: 201 Created
 
 ```json
 {
   "id": 42,
   "name": "Discord Bot",
+  "permission": "read",
   "token": "plain-text-api-token",
   "token_prefix": "plain",
   "last_used_at": null,
@@ -694,6 +716,8 @@ Content-Type: application/json
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_name`): 名前が不正
+  - 400 Bad Request (`invalid_api_token_permission`): `permission` が未指定または `read` / `read_write` 以外
+- 403 Forbidden (`forbidden`): `read_write` の発行にEDITORまたはADMIN権限が必要
   - 400 Bad Request (`api_token_limit_exceeded`): 10個発行済み
   - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 
@@ -707,6 +731,7 @@ Content-Type: application/json
     {
       "id": 42,
       "name": "Discord Bot",
+      "permission": "read",
       "token_prefix": "plain",
       "last_used_at": "2026-07-22T13:00:00+09:00",
       "created_at": "2026-07-22T12:34:56+09:00"
@@ -714,6 +739,7 @@ Content-Type: application/json
     {
       "id": 1,
       "name": "既存のトークン",
+      "permission": "read_write",
       "token_prefix": null,
       "last_used_at": null,
       "created_at": "2026-04-16T12:34:56+09:00"
@@ -724,6 +750,7 @@ Content-Type: application/json
 
 - 未発行の場合は `tokens` が空配列になります。
 - 旧仕様から移行したトークンは平文を復元できないため `token_prefix=null` のままです。認証には引き続き使用できます。
+- 旧仕様から移行したトークンの `permission` は `read_write` です。
 - `last_used_at` は認証成功時に更新されます。DB書き込みを抑えるため、最大1時間の遅延があります。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -731,7 +758,7 @@ Content-Type: application/json
 
 ### PATCH `/internal/auth/api-tokens/:id`
 - **認証**: Firebase Bearer 必須
-- **リクエスト**: `POST` と同じ `name`
+- **リクエスト**: `name` のみ。`permission` は変更できません。
 - **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDまたは名前が不正
@@ -1465,6 +1492,7 @@ curl -X POST \
     "medal_class": "06",
     "base_class": "04"
   },
+  "possession": "rainbow",
   "team": {
     "name": "チーム名",
     "color": "green"
@@ -1523,6 +1551,7 @@ curl -X POST \
 | `overpower.percentage` | number | ✓ | CHUNITHM-NETに表示された公式OP%（`players.official_overpower_percent` に保存。通常譜面スコアから再計算する `overpower_percent` とは別管理） |
 | `class_emblem.medal_class` | string | ✓ | クラスエンブレム（0埋め2桁） |
 | `class_emblem.base_class` | string | ✓ | クラスエンブレムベース（0埋め2桁） |
+| `possession` | string | | ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）。省略時は`normal` |
 | `team.name` | string | | チーム名 |
 | `team.color` | string | | チームカラー |
 | `honors` | object | | 称号情報（キー: スロット番号 "1"〜"3"） |
@@ -1578,6 +1607,7 @@ curl -X POST \
     "rating": 17.29,
     "class_emblem_id": 6,
     "class_emblem_base_id": 4,
+    "possession_id": 5,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27011
@@ -1698,7 +1728,7 @@ curl -X POST \
 | `player_id` | number | 登録されたプレイヤーID |
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
-| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` を含みます |
+| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` / `possession_id` を含みます |
 | `summary` | object | プレイヤーサマリー情報 |
 | `metric_diffs` | object | 計算レート、OVER POWER値、OP%の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
 | `statistics` | object | 通常譜面とWORLD'S ENDの登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
@@ -1853,7 +1883,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 目標はユーザー個人のデータであり、認証済みユーザーの個人データ操作が集約されている `/internal/me` 配下に配置されます。他ユーザーへの公開は現時点では行いません。
 
-- 1ユーザーあたり目標上限は **100件** です。
+- 1ユーザーあたり目標上限は **300件** です。
 - 1ユーザーあたり目標グループ上限は **20件** です。空グループも保持されます。
 - 目標は「属性（`attributes`）」と「成果（`achievement`）」を持ちます。
 - 外部API（`/v1`）には公開しません。
@@ -1918,6 +1948,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 |---|---|
 | `rank_count` | 指定ランク（スコア）以上の譜面数 |
 | `score_count` | 指定スコア以上の譜面数 |
+| `rating_count` | 指定単曲レート以上の譜面数 |
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
@@ -1934,14 +1965,15 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `achievement_type` | 省略可能なパラメータ | 省略/null時の扱い |
 |---|---|---|
 | `rank_count` / `score_count` | `count` | 対象譜面数（動的上限） |
+| `rating_count` | `count` | 指定単曲レートへ理論上到達可能な対象譜面数（動的上限） |
 | `hardlamp_count` / `combolamp_count` / `fullchain_count` | `count` | 対象譜面数（動的上限） |
 | `rainbow_count` | `count` | 対象楽曲数（動的上限） |
 | `total_score` | `total` | 対象譜面数 × 1,010,000（動的上限） |
 | `overpower_value` | `total` | 対象譜面の理論値OP合計（動的上限） |
 
-上記以外のパラメータは必須です。例えば `score_count` の `score`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
+上記以外のパラメータは必須です。例えば `score_count` の `score`、`rating_count` の `rating`、`avg_score` の `score`、`overpower_percent` の `total` は省略できません。
 
-`rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
+`rank_count` / `score_count` / `rating_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` / `rainbow_count` では、絶対目標値の `count` に代えて次のいずれかを指定できます。
 
 - `remaining`: 動的上限から差し引く残数
 - `percent`: 動的上限に対する目標割合（%）
@@ -1964,6 +1996,21 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
 | `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+#### `rating_count`
+
+```json
+{ "rating": 18.00, "count": 1 }
+```
+
+| パラメータ | 型 | 範囲 | 説明 |
+|---|---|---|---|
+| `rating` | `number` | 0.01以上、小数第2位まで | 単曲レート閾値。固定上限は設けません |
+| `count` | `integer \| null` | null または 1〜到達可能譜面数 | 目標件数。省略/null時は到達可能譜面数そのものを目標にします |
+| `remaining` | `integer \| null` | null または 0〜到達可能譜面数 | 動的上限から差し引く残数 |
+| `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
+
+到達可能譜面数は、`attributes` に一致する通常譜面のうち、譜面定数が既知で、理論単曲レート（譜面定数 + 2.15）が `rating` 以上の譜面数です。比較は0.01単位の整数で行います。楽曲追加・削除状態・譜面定数・定数既知状態の変更に追従して動的に変化します。到達可能譜面が0件となる入力は作成・更新できません。既存目標がマスタ変更後に0件となっても、一覧取得では保存済み定義をそのまま返します。
 
 #### `avg_score`
 
@@ -2153,6 +2200,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` の `count` ≤ 対象譜面数
+   - `rating_count` の到達可能譜面数が1件以上で、`count` / `remaining` ≤ 到達可能譜面数
    - `rainbow_count.count` ≤ 対象楽曲数
    - 譜面件数系成果種別の `remaining` ≤ 対象譜面数
    - `rainbow_count.remaining` ≤ 対象楽曲数
@@ -2163,7 +2211,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
    - `percent` は 0〜100 の固定範囲
    - `overpower_percent.total` は 0〜100 の固定上限
 
-#### 100件上限の担保
+#### 300件上限の担保
 
 作成トランザクション内で `SELECT id FROM users WHERE id = ? FOR UPDATE` によりユーザー行をロックした後、`SELECT COUNT(*)` で件数を確認します。作成・削除・並び替えは同じユーザー行ロックを使用するため、件数と表示順を変更する同一ユーザーのリクエストは直列化されます。
 
@@ -2194,7 +2242,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### POST `/internal/me/goals`
 
-目標を新規作成します。100件上限を超える場合は `goal_limit_exceeded` エラーを返します。
+目標を新規作成します。300件上限を超える場合は `goal_limit_exceeded` エラーを返します。
 
 新しい目標は指定グループ（未指定時は未分類）の末尾へ追加され、レスポンスにはサーバーが採番した `sort_order` が含まれます。
 
@@ -2260,7 +2308,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | エラーコード | HTTP | 説明 |
 |---|---|---|
 | `goal_not_found` | 404 | 指定した goal が存在しない（他ユーザーの goal も含む） |
-| `goal_limit_exceeded` | 400 | 100件上限を超えて作成しようとした |
+| `goal_limit_exceeded` | 400 | 300件上限を超えて作成しようとした |
 | `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
@@ -2445,10 +2493,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
     - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend`/`course` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend`/`course` のみを返します。
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。`view=rating` と併用した場合は `include_noplay` は無視されます。`view=record` と併用した場合も補完されます。
-- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
+- **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。`view=rating` 以外では、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
+  - `player.official_overpower` と `player.official_overpower_percent` はCHUNITHM-NETから取得した公式OP・公式OP%です。公式OP%の記録開始前は `null` になります。
 
 #### レスポンス例
 
@@ -2461,9 +2509,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 17.29,
     "class_emblem_id": 6,
     "class_emblem_base_id": 4,
+    "possession_id": 5,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27,
+    "official_overpower": 96120.12,
+    "official_overpower_percent": 76.26,
     "honors": [
       { "slot": 1, "name": "称号名（上段）", "type_name": "gold", "image_url": "https://..." },
       { "slot": 2, "name": "称号名（中段）", "type_name": "platina", "image_url": "https://..." },
@@ -2546,9 +2597,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.5,
     "class_emblem_id": 3,
     "class_emblem_base_id": 1,
+    "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
+    "official_overpower": 1230.12,
+    "official_overpower_percent": 98.72,
     "honors": [
       {
         "slot": 1,
@@ -2729,10 +2783,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 
-- **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`standard` と `worldsend` に未プレイ譜面を補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
-
-- **レスポンス**: `UserRecordDTO`
+- **レスポンス**: `standard` と `worldsend` に未プレイ譜面を、`course` に未プレイコースを常に補完した `UserRecordDTO` を返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 ```json
 {
@@ -2810,9 +2861,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: 指定した通常楽曲に属するユーザーレコードだけを返します。
+- **概要**: 指定した通常楽曲に属するユーザーレコードを、未プレイ譜面を含めて返します。
 - **クエリパラメータ**:
-  - `include_noplay` (任意): `true` の場合は未プレイ譜面も補完します。
   - `difficulty` (任意): `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`。大文字小文字は区別しません。指定した難易度の譜面が曲に存在しない場合は `400 invalid_difficulty` を返します。
 - **レスポンス**: `standard` は最大5件です。`meta.updated_at` は返却したプレイ済みレコードの最終更新日時で、該当レコードがなければ `null` です。
 
@@ -2838,9 +2888,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 指定した WORLD'S END 楽曲のユーザーレコードを返します。
-- **クエリパラメータ**:
-  - `include_noplay` (任意): `true` の場合は未プレイレコードを補完します。
-- **レスポンス**: レコードがなければ `worldsend` は `null` です。`include_noplay=true` の場合は未プレイオブジェクトを返します。
+- **レスポンス**: プレイヤー連携済みの場合は、未プレイでも `is_played=false` の `worldsend` オブジェクトを返します。プレイヤー未連携の場合は `worldsend` が `null` です。
+
+プレイヤー未連携時のレスポンス例:
 
 ```json
 {
@@ -2978,8 +3028,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
-- **レスポンス**: 対象ユーザーのコースレコード一覧を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `courses` が空配列です。
+- **レスポンス**: 未プレイコースを常に補完した対象ユーザーのコースレコード一覧を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `courses` が空配列です。
 
 #### レスポンス例
 
@@ -3109,6 +3158,30 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 403 Forbidden (`forbidden`): ADMIN権限が不足、または自分自身の降格
   - 404 Not Found (`user_not_found`): ユーザーが存在しない
   - 409 Conflict (`conflict`): 保存時に権限などの更新前提が一致しない
+
+### PATCH `/internal/users/:username/suspicious`
+
+- **認証**: Firebase Bearer 必須
+- **権限**: ADMIN
+- **パスパラメータ**: `username` - 変更対象ユーザーのユーザー名
+- **概要**: 対象ユーザーの不審アカウントフラグを変更します。`is_private` はこのAPIでは変更しません。
+- **リクエストボディ**: `Content-Type: application/json`
+
+```json
+{
+  "is_suspicious": true
+}
+```
+
+`is_suspicious` は必須の真偽値です。
+
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 403 Forbidden (`forbidden`): ADMIN権限が不足
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない
+  - 409 Conflict (`conflict`): 保存時の更新前提が一致しない
 
 ### DELETE `/internal/users/:username`
 - **認証**: Firebase Bearer 必須
@@ -3648,6 +3721,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "release": "2024-01-15",
       "jacket": "img_filename",
       "official_idx": "123",
+      "is_new": true,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -3673,6 +3747,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `official_idx` | string | 公式インデックス |
+| `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -3751,6 +3826,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "bpm": 180,
   "released_at": "2024-01-01",
   "jacket": "ce21ae87308e7599",
+  "is_new": true,
   "chart": {
     "attribute": "red",
     "level_star": 5,
@@ -3770,6 +3846,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `bpm` | int | - | BPM（省略可） |
 | `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
 | `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
+| `is_new` | bool | - | 最新の2週間ごとの更新で追加された楽曲かどうか（省略時はfalse） |
 | `chart` | object | - | 譜面情報（省略可、省略時は空行を挿入） |
 | `chart.attribute` | string | - | アトリビュート（省略可） |
 | `chart.level_star` | int | - | レベル星数（1〜5、省略可） |
@@ -3805,6 +3882,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "bpm": 180,
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
+    "is_new": true,
     "charts": {
       "WORLDSEND": {
         "attribute": "狂",
@@ -3829,6 +3907,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `bpm` | int \| null | | BPM（正の整数、nullの場合DBをNULLに更新） |
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
+| `is_new` | bool | ✓ | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
 
 **UpdateWorldsendChartRequest**:
@@ -4034,7 +4113,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4079,7 +4158,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/master`
 
 - **認証**: 不要
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ、ポゼッション）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
 
@@ -4167,6 +4246,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     { "id": 4, "name": "gold" },
     { "id": 5, "name": "platina" },
     { "id": 6, "name": "rainbow" }
+  ],
+  "possessions": [
+    { "id": 1, "name": "normal" },
+    { "id": 2, "name": "silver" },
+    { "id": 3, "name": "gold" },
+    { "id": 4, "name": "platina" },
+    { "id": 5, "name": "rainbow" }
   ]
 }
 ```
@@ -4188,6 +4274,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `full_chains` | MasterItemDTO[] | フルチェインランプ一覧（sort_order順）。`PlayerRecordDTO.full_chain` の取りうる値 |
 | `slots` | MasterItemDTO[] | スロット一覧（ID順）。`PlayerRecordDTO.slot` の取りうる値 |
 | `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID順）。`HonorDTO.type_name` の取りうる値 |
+| `possessions` | MasterItemDTO[] | ポゼッション一覧（ID順）。`PlayerDTO.possession_id` の解決に使用 |
 
 **MasterItemDTO**:
 
@@ -4366,7 +4453,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/v1/songs`
 - **認証**: APIトークン必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
 - **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
 
@@ -4399,12 +4486,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 400 Bad Request (`validation_failed`): バリデーションエラー
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
+  - 403 Forbidden (`forbidden`): 権限不足（`read`トークンまたはPLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
 ### PATCH `/v1/songs/chart-constant`
 - **認証**: APIトークン必須
-- **権限**: EDITOR または ADMIN 権限が必要
+- **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲の既存譜面について、公式ID、難易度名の先頭3文字、譜面定数だけを指定して更新します。更新後は `is_const_unknown` が `false` になります。
 
 ```json
@@ -4450,6 +4537,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "release": "2024-01-15",
       "jacket": "https://example.com/jacket.png",
       "official_idx": "123",
+      "is_new": true,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -4475,6 +4563,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `release` | string \| null | リリース日（YYYY-MM-DD形式） |
 | `jacket` | string \| null | ジャケット画像URL |
 | `official_idx` | string | 公式インデックス |
+| `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -4727,16 +4816,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
+- `player.official_overpower` と `player.official_overpower_percent` はCHUNITHM-NETから取得した公式OP・公式OP%です。公式OP%の記録開始前は `null` になります。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `username` | string | ユーザー名 |
 
-- **クエリパラメータ**:
-    - `include_noplay` (任意): `true` を指定すると、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを補完して返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
-
-- **レスポンス**: 200 OK
+- **レスポンス**: `records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完して 200 OK を返します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。
 
 ```json
 {
@@ -4747,9 +4834,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.50,
     "class_emblem_id": 3,
     "class_emblem_base_id": 1,
+    "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
+    "official_overpower": 1230.12,
+    "official_overpower_percent": 98.72,
     "honors": [
       {
         "slot": 1,
@@ -4837,8 +4927,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/users/:username/records/courses`
 - **認証**: APIトークン必須
-- **概要**: 対象ユーザーのコースレコード一覧を取得します。非公開ユーザーは本人または承認済みフレンド以外 404 です。
-- **クエリパラメータ**: `include_noplay` - `true` のとき未プレイコースを補完して返す
+- **概要**: 未プレイコースを常に補完した対象ユーザーのコースレコード一覧を取得します。非公開ユーザーは本人または承認済みフレンド以外 404 です。
 - **レスポンス**: 200 OK
 
 ```json
@@ -5245,9 +5334,12 @@ interface PlayerDTO {
   rating: number;
   class_emblem_id: number | null;
   class_emblem_base_id: number | null;
+  possession_id: number;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
+  official_overpower: number;
+  official_overpower_percent: number | null;
   honors: HonorDTO[];
   created_at: string;
   updated_at: string;
@@ -5381,6 +5473,7 @@ interface PlayerDataProfile {
   rating: number | null;
   class_emblem_id: number | null;
   class_emblem_base_id: number | null;
+  possession_id: number;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;

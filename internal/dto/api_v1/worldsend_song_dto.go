@@ -25,6 +25,7 @@ type V1WorldsendSongDTO struct {
 	Release     *string                         `json:"release"`
 	Jacket      *string                         `json:"jacket"`
 	OfficialIdx string                          `json:"official_idx"`
+	IsNew       bool                            `json:"is_new"`
 	Charts      map[string]*V1WorldsendChartDTO `json:"charts"`
 }
 
@@ -80,6 +81,7 @@ func ToV1WorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genre
 		Release:     releaseDateStr,
 		Jacket:      song.Jacket,
 		OfficialIdx: song.OfficialIdx,
+		IsNew:       song.IsNew,
 		Charts:      charts,
 	}
 }

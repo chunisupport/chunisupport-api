@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProfileHandler_Me(t *testing.T) {
@@ -123,6 +124,73 @@ func TestProfileHandler_UpdateUsername(t *testing.T) {
 		assert.ErrorIs(t, err, apierror.ErrRecentSignInRequired)
 		userCredentialMock.AssertNumberOfCalls(t, "UpdateUsername", 1)
 	})
+}
+
+func TestProfileHandler_UpdatePrivacy_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"is_private":true}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"is_private":true,"unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"is_private":true} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newTestEcho()
+			h, userCredentialMock := newProfileHandlerWithMocks()
+			req := httptest.NewRequest(http.MethodPut, "/internal/me/privacy", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+			c := e.NewContext(req, httptest.NewRecorder())
+			c.Set("userEntity", &entity.User{ID: 10})
+
+			err := h.UpdatePrivacy(c)
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			userCredentialMock.AssertNotCalled(t, "UpdatePrivacy", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+func TestProfileHandler_UpdateUsername_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"username":"newname"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"username":"newname","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"username":"newname"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newTestEcho()
+			h, userCredentialMock := newProfileHandlerWithMocks()
+			req := httptest.NewRequest(http.MethodPut, "/internal/me/username", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+			req.Header.Set("X-Reauth-Token", "reauth-token")
+			c := e.NewContext(req, httptest.NewRecorder())
+			c.Set("userEntity", &entity.User{ID: 10})
+
+			err := h.UpdateUsername(c)
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			userCredentialMock.AssertNotCalled(t, "UpdateUsername", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 func TestProfileHandler_DeleteAccount(t *testing.T) {

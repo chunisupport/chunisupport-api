@@ -69,11 +69,19 @@ func TestCourseRepository_FindByDisplayID_存在しないIDを拒否する(t *te
 
 func TestCourseRepository_FindRecordsByPlayerID_未プレイを補完する(t *testing.T) {
 	repo := setupCourseRepositoryDB(t)
-	records, err := repo.FindRecordsByPlayerID(context.Background(), repo.db, 100, false, true)
+	_, err := repo.db.Exec(`INSERT INTO courses VALUES (12, '0000000000000012', '50030', '未プレイコース', 7, 0, '2026-07-01 00:00:00')`)
 	require.NoError(t, err)
-	require.Len(t, records, 1)
+
+	records, err := repo.FindRecordsByPlayerID(context.Background(), repo.db, 100, false)
+
+	require.NoError(t, err)
+	require.Len(t, records, 2)
 	assert.Equal(t, uint32(3023238), records[0].Score.Uint32())
 	assert.True(t, records[0].IsClear)
+	assert.Equal(t, "未プレイコース", records[1].Course.Name)
+	assert.Equal(t, uint32(0), records[1].Score.Uint32())
+	assert.False(t, records[1].IsClear)
+	assert.True(t, records[1].UpdatedAt.IsZero())
 }
 
 func TestCourseRepository_FindLatestUpdatedAt_最大値を返す(t *testing.T) {

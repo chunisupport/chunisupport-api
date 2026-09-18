@@ -78,6 +78,7 @@ type Handlers struct {
 	User                  *api_internal.UserHandler
 	AdminUser             *api_internal.AdminUserHandler
 	UserPermission        *api_internal.UserPermissionHandler
+	UserSuspicious        *api_internal.UserSuspiciousHandler
 	AdminUserStatistics   *api_internal.AdminUserStatisticsHandler
 	AdminChartRanking     *api_internal.AdminChartRankingHandler
 	Song                  *api_internal.SongHandler
@@ -261,6 +262,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
+	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -268,6 +270,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		User:                  api_internal.NewUserHandler(userUsecase),
 		AdminUser:             api_internal.NewAdminUserHandler(userUsecase),
 		UserPermission:        api_internal.NewUserPermissionHandler(usecase.NewUserPermissionUsecase(db, tm, userRepo)),
+		UserSuspicious:        api_internal.NewUserSuspiciousHandler(userSuspiciousUsecase),
 		AdminUserStatistics:   api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
 		AdminChartRanking:     api_internal.NewAdminChartRankingHandler(adminChartRankingUsecase),
 		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
@@ -388,6 +391,8 @@ func registerRoutes(
 	})
 	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
+	// APIトークンの更新権限を要求するミドルウェア
+	requireAPITokenWrite := middleware.RequireAPITokenWrite()
 
 	// ADMIN以上の権限を要求するミドルウェア
 	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
@@ -512,6 +517,7 @@ func registerRoutes(
 		usersGroup.GET("/", handlers.AdminUser.GetAllUsers, requireAdmin)
 		usersGroup.DELETE("/:username", handlers.User.DeleteUser, requireAdmin)
 		usersGroup.PATCH("/:username/permission", handlers.UserPermission.UpdatePermission, requireAdmin)
+		usersGroup.PATCH("/:username/suspicious", handlers.UserSuspicious.UpdateSuspicious, requireAdmin)
 	}
 
 	adminGroup := internal.Group("/admin")
@@ -647,8 +653,8 @@ func registerRoutes(
 		apiV1.GET("/worldsend-songs/:id/score-history", handlers.ScoreHistory.GetWorldsend)
 		apiV1.GET("/users/:username/rating-op-history", handlers.MetricHistory.Get)
 		apiV1.GET("/songs", handlers.V1Song.GetSongs)
-		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireEditor)
-		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireEditor)
+		apiV1.PUT("/songs", handlers.V1Song.UpdateSongs, requireAPITokenWrite, requireEditor)
+		apiV1.PATCH("/songs/chart-constant", handlers.V1Song.UpdateChartConstant, requireAPITokenWrite, requireEditor)
 		apiV1.GET("/songs/:id", handlers.V1Song.GetSong)
 		apiV1.GET("/songs/:id/stats/:difficulty", handlers.V1Song.GetChartStatsByDifficulty)
 		apiV1.GET("/worldsend-songs", handlers.V1Worldsend.GetWorldsendSongs)

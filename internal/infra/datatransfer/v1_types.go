@@ -40,6 +40,7 @@ type playerV1 struct {
 	OfficialOverpowerPercent *float64     `json:"official_overpower_percent"`
 	ClassEmblemName          *string      `json:"class_emblem_name"`
 	ClassEmblemBaseName      *string      `json:"class_emblem_base_name"`
+	PossessionName           *string      `json:"possession_name"`
 	LastPlayedAt             *utcDateTime `json:"last_played_at"`
 	DataCollectedAt          *utcDateTime `json:"data_collected_at"`
 	CreatedAt                utcDateTime  `json:"created_at"`

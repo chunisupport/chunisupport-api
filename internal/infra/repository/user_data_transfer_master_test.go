@@ -55,7 +55,7 @@ func TestFindTransferUnresolvedReferencesCollectsAndSorts(t *testing.T) {
 	masters := &transferMasterData{
 		songIDs: map[string]int{}, charts: map[string]transferChartMaster{}, worldsendChartIDs: map[string]int{}, courseIDs: map[string]int{},
 		clearLampIDs: map[string]int{"NONE": 1}, comboLampIDs: map[string]int{"NONE": 1}, fullChainIDs: map[string]int{"NONE": 1}, slotIDs: map[string]int{"none": 1},
-		classEmblemIDs: map[string]int{}, classEmblemBaseIDs: map[string]int{}, honorTypeIDs: map[string]int{}, honorIDsByImage: map[string]int{}, honorIDsByNameAndType: map[string]int{},
+		classEmblemIDs: map[string]int{}, classEmblemBaseIDs: map[string]int{}, possessionIDs: map[string]int{entity.PossessionNameNormal: entity.DefaultPossessionID}, honorTypeIDs: map[string]int{}, honorIDsByImage: map[string]int{}, honorIDsByNameAndType: map[string]int{},
 		achievementTypeIDs: map[string]int{}, difficultyIDs: map[string]int{"MASTER": 4}, difficultyNames: map[int]string{4: "MASTER"},
 		genreIDs: map[string]int{}, genreNames: map[int]string{}, versionIDs: map[string]int{}, versionNames: map[int]string{},
 	}
@@ -74,6 +74,7 @@ func TestFindTransferUnresolvedReferencesAllowsUnregisteredHonor(t *testing.T) {
 		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
 	}}
 	masters := &transferMasterData{
+		possessionIDs:         map[string]int{entity.PossessionNameNormal: entity.DefaultPossessionID},
 		honorTypeIDs:          map[string]int{"gold": 2},
 		honorIDsByImage:       map[string]int{},
 		honorIDsByNameAndType: map[string]int{},
@@ -93,6 +94,7 @@ func TestFindTransferUnresolvedReferencesRejectsUnknownHonorType(t *testing.T) {
 		EquippedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
 	}}
 	masters := &transferMasterData{
+		possessionIDs:         map[string]int{entity.PossessionNameNormal: entity.DefaultPossessionID},
 		honorTypeIDs:          map[string]int{"gold": 2},
 		honorIDsByImage:       map[string]int{},
 		honorIDsByNameAndType: map[string]int{},

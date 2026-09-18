@@ -36,6 +36,7 @@ type WorldsendSongDTO struct {
 	Release     *string                       `json:"release"`
 	Jacket      *string                       `json:"jacket"`
 	OfficialIdx string                        `json:"official_idx"`
+	IsNew       bool                          `json:"is_new"`
 	Charts      map[string]*WorldsendChartDTO `json:"charts"`
 }
 
@@ -76,6 +77,7 @@ type UpdateWorldsendSongRequest struct {
 	BPM        *int                                    `json:"bpm" validate:"omitempty,gt=0"`
 	ReleasedAt *DateOnly                               `json:"released_at"`
 	Jacket     *string                                 `json:"jacket"`
+	IsNew      *bool                                   `json:"is_new" validate:"required"`
 	Charts     map[string]*UpdateWorldsendChartRequest `json:"charts" validate:"dive"`
 }
 
@@ -98,6 +100,7 @@ type CreateWorldsendSongRequest struct {
 	BPM         *int                         `json:"bpm" validate:"omitempty,gt=0"`
 	ReleasedAt  *DateOnly                    `json:"released_at"`
 	Jacket      *string                      `json:"jacket" validate:"omitempty,max=20"`
+	IsNew       bool                         `json:"is_new"`
 	Chart       *CreateWorldsendChartRequest `json:"chart" validate:"omitempty"`
 }
 
@@ -164,6 +167,7 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 		Release:     releaseDateStr,
 		Jacket:      song.Jacket,
 		OfficialIdx: song.OfficialIdx,
+		IsNew:       song.IsNew,
 		Charts:      charts,
 	}
 }

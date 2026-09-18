@@ -21,8 +21,8 @@ type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string) (*usecase.GeneratedAPITokenOutput, error) {
-	args := m.Called(ctx, userID, name)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name, permission)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

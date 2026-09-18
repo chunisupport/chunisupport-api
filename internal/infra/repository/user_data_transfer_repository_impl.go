@@ -52,15 +52,17 @@ func (r *userDataTransferRepository) exportSnapshot(ctx context.Context, exec do
 		OfficialOverpowerPercent *float64   `db:"official_overpower_percent"`
 		ClassEmblemName          *string    `db:"class_emblem_name"`
 		ClassEmblemBaseName      *string    `db:"class_emblem_base_name"`
+		PossessionName           *string    `db:"possession_name"`
 		LastPlayedAt             *time.Time `db:"last_played_at"`
 		DataCollectedAt          *time.Time `db:"data_collected_at"`
 		CreatedAt                time.Time  `db:"created_at"`
 	}
 	const playerQuery = `SELECT p.id, p.player_name, p.player_level, p.official_player_rating, p.official_overpower, p.official_overpower_percent,
-		ce.name AS class_emblem_name, ceb.name AS class_emblem_base_name, p.last_played_at, p.data_collected_at, p.created_at
+		ce.name AS class_emblem_name, ceb.name AS class_emblem_base_name, pos.name AS possession_name, p.last_played_at, p.data_collected_at, p.created_at
 		FROM players p INNER JOIN users u ON u.id = p.user_id AND u.player_id = p.id
 		LEFT JOIN class_emblems ce ON ce.id = p.class_emblem_id
-		LEFT JOIN class_emblem_bases ceb ON ceb.id = p.class_emblem_base_id WHERE u.id = ?`
+		LEFT JOIN class_emblem_bases ceb ON ceb.id = p.class_emblem_base_id
+		LEFT JOIN possessions pos ON pos.id = p.possession_id WHERE u.id = ?`
 	if err := exec.GetContext(ctx, &playerRow, playerQuery, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, usecase.ErrDataTransferPlayerNotFound
@@ -73,7 +75,7 @@ func (r *userDataTransferRepository) exportSnapshot(ctx context.Context, exec do
 	}
 	snapshot := &entity.UserDataTransferSnapshot{
 		Player: entity.UserDataTransferPlayer{Name: name, Level: playerRow.Level, OfficialRating: playerRow.OfficialRating, OfficialOverpower: playerRow.OfficialOverpower, OfficialOverpowerPercent: playerRow.OfficialOverpowerPercent,
-			ClassEmblemName: playerRow.ClassEmblemName, ClassEmblemBaseName: playerRow.ClassEmblemBaseName,
+			ClassEmblemName: playerRow.ClassEmblemName, ClassEmblemBaseName: playerRow.ClassEmblemBaseName, PossessionName: entity.NormalizePossessionName(playerRow.PossessionName),
 			LastPlayedAt: transferUTCOptional(playerRow.LastPlayedAt), DataCollectedAt: transferUTCOptional(playerRow.DataCollectedAt), CreatedAt: transferUTC(playerRow.CreatedAt)},
 		Records: []entity.UserDataTransferRecord{}, RecordHistories: []entity.UserDataTransferRecordHistory{},
 		WorldsendRecords: []entity.UserDataTransferWorldsendRecord{}, WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},

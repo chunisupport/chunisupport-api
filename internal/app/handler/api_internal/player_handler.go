@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -29,7 +30,7 @@ type createPlayerRequest struct {
 // CreatePlayer はプレイヤー作成リクエストを処理します。
 func (h *PlayerHandler) CreatePlayer(c *echo.Context) error {
 	req := new(createPlayerRequest)
-	if err := c.Bind(req); err != nil {
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(req); err != nil {

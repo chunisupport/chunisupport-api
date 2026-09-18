@@ -44,6 +44,7 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 			FullChains:       []masterdata.Item{},
 			Slots:            []masterdata.Item{},
 			HonorTypes:       []masterdata.Item{},
+			Possessions:      []masterdata.Item{},
 		}
 	}
 
@@ -71,6 +72,9 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 		}),
 		Slots:      sortedByID(masters.Slots, func(v master.Slot) masterdata.Item { return masterdata.Item{ID: v.ID, Name: v.Name} }),
 		HonorTypes: sortedByID(masters.HonorTypes, func(v master.HonorType) masterdata.Item { return masterdata.Item{ID: v.ID, Name: v.Name} }),
+		Possessions: sortedByID(masters.Possessions, func(v master.Possession) masterdata.Item {
+			return masterdata.Item{ID: v.ID, Name: v.Name}
+		}),
 	}
 }
 

@@ -471,6 +471,20 @@ func TestExpandAPITokensDown_1ユーザー1トークンへ戻す(t *testing.T) {
 	assert.Contains(t, downSQL, "DROP COLUMN name")
 }
 
+func TestAddAPITokenPermissionUp_既存トークンをreadWriteへ移行する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000048_add_api_token_permission.up.sql")
+
+	assert.Contains(t, upSQL, "ADD COLUMN permission VARCHAR(10) NOT NULL DEFAULT 'read_write'")
+	assert.Contains(t, upSQL, "ADD CONSTRAINT chk_api_tokens_permission CHECK (permission IN ('read', 'read_write'))")
+}
+
+func TestAddAPITokenPermissionDown_権限列と制約を削除する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000048_add_api_token_permission.down.sql")
+
+	assert.Contains(t, downSQL, "DROP CHECK chk_api_tokens_permission")
+	assert.Contains(t, downSQL, "DROP COLUMN permission")
+}
+
 func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *testing.T) {
 	// Given
 	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
@@ -482,6 +496,9 @@ func TestSchemaMySQL_APIトークンの複数発行用カラムを含む(t *test
 	assert.Contains(t, schemaSQL, "`last_used_at` datetime DEFAULT NULL")
 	assert.Contains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`)")
 	assert.NotContains(t, schemaSQL, "UNIQUE KEY `uq_api_tokens_user_id` (`user_id`)")
+	assert.Contains(t, schemaSQL, "`permission` varchar(10)")
+	assert.Contains(t, schemaSQL, "NOT NULL DEFAULT 'read_write'")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_api_tokens_permission`")
 }
 
 func TestCreateSystemMaintenanceUp_単一行のメンテナンス状態を作成する(t *testing.T) {
@@ -582,4 +599,111 @@ func TestAddFullChainCountGoalDown_目標を暗黙に削除しない(t *testing.
 	assert.Equal(t, "DELETE FROM achievement_types WHERE code = 'fullchain_count';", downSQL)
 	assert.NotContains(t, downSQL, "DELETE FROM goals")
 	assert.NotContains(t, downSQL, "DELETE g FROM goals")
+}
+
+func TestAddRatingCountGoalUp_成果種別を追加する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000046_add_rating_count_goal.up.sql")
+
+	assert.Equal(t, "INSERT INTO achievement_types (code) VALUES ('rating_count');", upSQL)
+}
+
+func TestAddRatingCountGoalDown_目標を暗黙に削除しない(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000046_add_rating_count_goal.down.sql")
+
+	assert.Equal(t, "DELETE FROM achievement_types WHERE code = 'rating_count';", downSQL)
+	assert.NotContains(t, downSQL, "DELETE FROM goals")
+	assert.NotContains(t, downSQL, "DELETE g FROM goals")
+}
+
+func TestExpandPlayerIDUp_参照先と参照元をINTへ拡張する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.up.sql")
+
+	assert.Contains(t, upSQL, "ALTER TABLE players MODIFY COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, upSQL, "INT")
+}
+
+func TestExpandPlayerIDDown_参照先と参照元をMEDIUMINTへ戻す(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players MODIFY COLUMN id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assertPlayerIDReferences(t, downSQL, "MEDIUMINT")
+}
+
+func TestExpandPlayerIDDown_StrictSQLModeを型縮小前に検証する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000047_expand_player_id.down.sql")
+	cleanupBeforeCheck := "DROP TEMPORARY TABLE IF EXISTS migration_require_strict_sql_mode;"
+	createCheckTable := "CREATE TEMPORARY TABLE migration_require_strict_sql_mode"
+	strictCheck := "INSERT INTO migration_require_strict_sql_mode (enabled) SELECT FIND_IN_SET('STRICT_ALL_TABLES', @@SESSION.sql_mode) > 0 OR FIND_IN_SET('STRICT_TRANS_TABLES', @@SESSION.sql_mode) > 0;"
+	cleanupAfterCheck := "DROP TEMPORARY TABLE migration_require_strict_sql_mode;"
+	firstForeignKeyDrop := "ALTER TABLE users DROP FOREIGN KEY fk_users_player_id;"
+
+	assert.Contains(t, downSQL, "CONSTRAINT chk_migration_require_strict_sql_mode CHECK (enabled = TRUE)")
+	assert.Contains(t, downSQL, strictCheck)
+	assert.Less(t, strings.Index(downSQL, cleanupBeforeCheck), strings.Index(downSQL, createCheckTable))
+	assert.Less(t, strings.Index(downSQL, createCheckTable), strings.Index(downSQL, strictCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, cleanupAfterCheck))
+	assert.Less(t, strings.Index(downSQL, strictCheck), strings.Index(downSQL, firstForeignKeyDrop))
+}
+
+func TestCreatePossessionsAndAddPlayerPossessionUp_固定IDマスタと外部キーを追加する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000049_create_possessions_and_add_player_possession.up.sql")
+
+	assert.Contains(t, upSQL, "CREATE TABLE possessions ( id TINYINT UNSIGNED NOT NULL, name VARCHAR(10) NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (id)")
+	assert.Contains(t, upSQL, "UNIQUE KEY uq_possessions_name (name)")
+	assert.Contains(t, upSQL, "INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold'), (4, 'platina'), (5, 'rainbow')")
+	assert.NotContains(t, upSQL, "AUTO_INCREMENT")
+	assert.Contains(t, upSQL, "ADD COLUMN possession_id TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER class_emblem_base_id")
+	assert.Contains(t, upSQL, "ADD CONSTRAINT fk_players_possession_id FOREIGN KEY (possession_id) REFERENCES possessions(id)")
+	assert.Less(t, strings.Index(upSQL, "CREATE TABLE possessions"), strings.Index(upSQL, "ALTER TABLE players"))
+}
+
+func TestCreatePossessionsAndAddPlayerPossessionDown_外部キーから順に削除する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000049_create_possessions_and_add_player_possession.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players DROP FOREIGN KEY fk_players_possession_id")
+	assert.Contains(t, downSQL, "DROP INDEX idx_players_possession_id")
+	assert.Contains(t, downSQL, "DROP COLUMN possession_id")
+	assert.Contains(t, downSQL, "DROP TABLE possessions")
+	assert.Less(t, strings.Index(downSQL, "DROP COLUMN possession_id"), strings.Index(downSQL, "DROP TABLE possessions"))
+}
+
+func TestSchemaMySQL_ポゼッションマスタと参照列を含む(t *testing.T) {
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	assert.Contains(t, schemaSQL, "CREATE TABLE `possessions`")
+	assert.Contains(t, schemaSQL, "`id` tinyint unsigned NOT NULL")
+	assert.Contains(t, schemaSQL, "`name` varchar(10)")
+	assert.Contains(t, schemaSQL, "`possession_id` tinyint unsigned NOT NULL DEFAULT '1'")
+	assert.Contains(t, schemaSQL, "KEY `idx_players_possession_id` (`possession_id`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`)")
+}
+
+func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
+	t.Helper()
+
+	references := []struct {
+		tableName   string
+		constraint  string
+		nullability string
+		onDelete    string
+	}{
+		{"users", "fk_users_player_id", "NULL", "SET NULL"},
+		{"player_course_records", "fk_player_course_records_player", "NOT NULL", "CASCADE"},
+		{"player_favorite_songs", "fk_player_favorite_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_honors", "player_honors_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_latest_updates", "fk_player_latest_updates_player", "NOT NULL", "CASCADE"},
+		{"player_locked_songs", "fk_player_locked_songs_player_id", "NOT NULL", "CASCADE"},
+		{"player_metric_histories", "fk_player_metric_histories_player", "NOT NULL", "CASCADE"},
+		{"player_record_histories", "fk_player_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_records", "player_records_ibfk_1", "NOT NULL", "CASCADE"},
+		{"player_worldsend_record_histories", "fk_player_worldsend_record_histories_player", "NOT NULL", "CASCADE"},
+		{"player_worldsend_records", "player_worldsend_records_ibfk_1", "NOT NULL", "CASCADE"},
+	}
+
+	for _, ref := range references {
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" DROP FOREIGN KEY "+ref.constraint)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" MODIFY COLUMN player_id "+columnType+" UNSIGNED "+ref.nullability)
+		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" ADD CONSTRAINT "+ref.constraint+" FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE "+ref.onDelete)
+	}
 }

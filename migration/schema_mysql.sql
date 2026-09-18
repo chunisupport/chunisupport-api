@@ -14,6 +14,7 @@ CREATE TABLE `api_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '既存のトークン',
+  `permission` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'read_write',
   `hashed_token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `token_prefix` char(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_used_at` datetime DEFAULT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE `api_tokens` (
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
   UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   KEY `idx_api_tokens_user_created_id` (`user_id`,`created_at` DESC,`id` DESC),
+  CONSTRAINT `chk_api_tokens_permission` CHECK ((`permission` in (_utf8mb4'read',_utf8mb4'read_write'))),
   CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `chart_best_slot_stats_by_rating_band` (
@@ -229,7 +231,7 @@ CREATE TABLE `honors` (
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_course_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `course_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `is_clear` tinyint(1) NOT NULL,
@@ -245,7 +247,7 @@ CREATE TABLE `player_course_records` (
   CONSTRAINT `chk_player_course_records_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_favorite_songs` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `song_id` int unsigned NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`player_id`,`song_id`),
@@ -254,7 +256,7 @@ CREATE TABLE `player_favorite_songs` (
   CONSTRAINT `fk_player_favorite_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_honors` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `honor_id` int unsigned NOT NULL,
   `slot` tinyint NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -265,7 +267,7 @@ CREATE TABLE `player_honors` (
   CONSTRAINT `player_honors_chk_1` CHECK ((`slot` between 1 and 3))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_latest_updates` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `schema_version` int unsigned NOT NULL,
   `result_gzip` mediumblob NOT NULL,
   `source_updated_at` datetime(6) NOT NULL,
@@ -275,7 +277,7 @@ CREATE TABLE `player_latest_updates` (
   CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_locked_songs` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `song_id` int unsigned NOT NULL,
   `is_ultima` tinyint(1) NOT NULL,
   PRIMARY KEY (`player_id`,`song_id`,`is_ultima`),
@@ -284,7 +286,7 @@ CREATE TABLE `player_locked_songs` (
   CONSTRAINT `fk_player_locked_songs_song_id` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_metric_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `official_rating` decimal(4,2) NOT NULL,
   `official_overpower` decimal(8,2) NOT NULL,
   `official_overpower_percent` decimal(5,2) DEFAULT NULL,
@@ -293,7 +295,7 @@ CREATE TABLE `player_metric_histories` (
   CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_record_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL,
@@ -307,7 +309,7 @@ CREATE TABLE `player_record_histories` (
   CONSTRAINT `chk_player_record_histories_score` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL DEFAULT '1',
@@ -333,7 +335,7 @@ CREATE TABLE `player_records` (
   CONSTRAINT `player_records_chk_2` CHECK (((`slot_order` is null) or (`slot_order` between 1 and 255)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_worldsend_record_histories` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `worldsend_chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL,
@@ -347,7 +349,7 @@ CREATE TABLE `player_worldsend_record_histories` (
   CONSTRAINT `chk_player_worldsend_record_histories_score` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_worldsend_records` (
-  `player_id` mediumint unsigned NOT NULL,
+  `player_id` int unsigned NOT NULL,
   `worldsend_chart_id` mediumint unsigned NOT NULL,
   `score` mediumint unsigned NOT NULL,
   `clear_lamp_id` tinyint unsigned NOT NULL DEFAULT '1',
@@ -367,8 +369,14 @@ CREATE TABLE `player_worldsend_records` (
   CONSTRAINT `player_worldsend_records_ibfk_5` FOREIGN KEY (`full_chain_id`) REFERENCES `full_chain_types` (`id`),
   CONSTRAINT `player_worldsend_records_chk_1` CHECK ((`score` between 0 and 1010000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `possessions` (
+  `id` tinyint unsigned NOT NULL,
+  `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_possessions_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `players` (
-  `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
   `player_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `player_level` int NOT NULL,
@@ -378,6 +386,7 @@ CREATE TABLE `players` (
   `best_average_rating` decimal(6,4) DEFAULT NULL,
   `class_emblem_id` tinyint unsigned DEFAULT NULL,
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
+  `possession_id` tinyint unsigned NOT NULL DEFAULT '1',
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -389,10 +398,12 @@ CREATE TABLE `players` (
   UNIQUE KEY `uq_players_user_id` (`user_id`),
   KEY `class_emblem_id` (`class_emblem_id`),
   KEY `class_emblem_base_id` (`class_emblem_base_id`),
+  KEY `idx_players_possession_id` (`possession_id`),
   KEY `idx_players_player_name` (`player_name`),
   CONSTRAINT `fk_players_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
+  CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (
@@ -469,7 +480,7 @@ CREATE TABLE `users` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `account_type_id` tinyint unsigned NOT NULL DEFAULT '1',
-  `player_id` mediumint unsigned DEFAULT NULL,
+  `player_id` int unsigned DEFAULT NULL,
   `is_private` tinyint(1) NOT NULL DEFAULT '0',
   `is_suspicious` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),

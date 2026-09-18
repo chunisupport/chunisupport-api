@@ -73,8 +73,6 @@ const (
 	CloudflareAPIResponseMaxBytes               = 1024 * 1024
 	DevelopCloudflareZoneID                     = "575f883bc4eb7c2d89c56ee987c73873"
 	DevelopStaticDataPublicBaseURL              = "https://static.chunisup-dev.f5.si"
-	BetaCloudflareZoneID                        = "6ef634111241a2dc524992ed7cfcf20f"
-	BetaStaticDataPublicBaseURL                 = "https://static.beta-chunisup.f5.si"
 	ProductionCloudflareZoneID                  = "c7e970656a686c79cce6fad84c888d2c"
 	ProductionStaticDataPublicBaseURL           = "https://static.chunisupport.net"
 	PlayerLatestUpdateSchemaVersion             = 3
@@ -87,6 +85,7 @@ const (
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore
+	TheoreticalSingleRatingAdd  = int64(215)
 	TheoreticalOverpowerBaseAdd = 2.0
 	TheoreticalOverpowerScale   = 5.0
 	TheoreticalOverpowerBonus   = 5.0
@@ -127,7 +126,7 @@ const (
 	// リクエストボディサイズ上限
 	RequestBodyLimit                      = 5 * 1024 * 1024
 	DataTransferFormat                    = "chunisupport-user-transfer"
-	DataTransferSchemaVersion             = 2
+	DataTransferSchemaVersion             = 3
 	DataTransferMinSupportedSchemaVersion = 1
 	DataTransferHMACSecretMinBytes        = 32
 	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024

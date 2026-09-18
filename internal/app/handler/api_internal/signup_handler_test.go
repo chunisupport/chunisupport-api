@@ -99,3 +99,37 @@ func TestSignupHandler_Signup(t *testing.T) {
 		signupUsecase.AssertExpectations(t)
 	})
 }
+
+func TestSignupHandler_Signup_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"username":"newuser","turnstile_token":"turnstile-token"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"username":"newuser","turnstile_token":"turnstile-token","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"username":"newuser","turnstile_token":"turnstile-token"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signupUsecase := new(mockSignupUsecase)
+			h := api_internal.NewSignupHandler(signupUsecase)
+			e := echo.New()
+			e.Validator = app.NewCustomValidator()
+			req := httptest.NewRequest(http.MethodPost, "/internal/auth/signup", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+			req.Header.Set(echo.HeaderAuthorization, "Bearer firebase-id-token")
+
+			err := h.Signup(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			signupUsecase.AssertNotCalled(t, "Signup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}

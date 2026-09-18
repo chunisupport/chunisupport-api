@@ -46,7 +46,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 	}{
 		{
 			name:             "正常な配列で204が返る",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000,"notes_designer":"譜面作者A"}}}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","genre":"POPS & ANIME","bpm":180,"released_at":"2024-01-01","jacket":"we_jacket","is_new":true,"charts":{"WORLDSEND":{"attribute":"狂","level_star":5,"notes":2000,"notes_designer":"譜面作者A"}}}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -77,6 +77,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 				if req.Jacket == nil || *req.Jacket != "we_jacket" {
 					require.Failf(t, "前提条件失敗", "Jacket = %v, want we_jacket", req.Jacket)
 				}
+				assert.True(t, req.IsNew)
 				chart, ok := req.Charts["WORLDSEND"]
 				if !ok || chart == nil {
 					require.Failf(t, "前提条件失敗", "Charts[WORLDSEND] = %v, want non-nil", chart)
@@ -108,7 +109,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 		},
 		{
 			name:             "charts省略でも楽曲情報のみ更新できる",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト"}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -123,7 +124,7 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 		},
 		{
 			name:             "chartsがnullでも楽曲情報のみ更新できる",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","charts":null}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":null}]`,
 			expectedStatus:   http.StatusNoContent,
 			expectUsecaseHit: true,
 			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) {
@@ -137,13 +138,18 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			},
 		},
 		{
+			name:            "is_new省略はvalidation_failedが返る",
+			body:            `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト"}]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
 			name:            "不正なdisplayidでvalidation_failedが返る",
-			body:            `[{"id":"short","title":"WE曲","artist":"WEアーティスト","charts":{"WORLDSEND":{}}}]`,
+			body:            `[{"id":"short","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":{"WORLDSEND":{}}}]`,
 			expectedErrCode: apierror.CodeValidationFailed,
 		},
 		{
 			name:             "usecaseで入力エラーならvalidation_failedが返る",
-			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","charts":{"MASTER":{"level_star":5}}}]`,
+			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":{"MASTER":{"level_star":5}}}]`,
 			expectedErrCode:  apierror.CodeValidationFailed,
 			expectUsecaseHit: true,
 			usecaseErr:       usecase.ErrInvalidWorldsendInput,
@@ -194,6 +200,80 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			if called != tc.expectUsecaseHit {
 				require.Failf(t, "前提条件失敗", "UpdateWorldsendSongs usecase called = %v, want %v", called, tc.expectUsecaseHit)
 			}
+		})
+	}
+}
+
+func TestWorldsendHandler_CreateWorldsendSong_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME"}`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME","unknown":1}`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `{"official_idx":"1","title":"WE曲","artist":"A","genre":"POPS & ANIME"} {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewWorldsendHandler(&testutil.MockWorldsendUsecase{
+				CreateWorldsendSongFunc: func(ctx context.Context, input *usecase.CreateWorldsendSongInput, masters *domainmasterdata.SongMasters) (*entity.WorldsendSongWithChart, error) {
+					called = true
+					return nil, nil
+				},
+			}, &masterdata.Cache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPost, "/internal/worldsend-songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.CreateWorldsendSong(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
+func TestWorldsendHandler_UpdateWorldsendSongs_不正JSONは400(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+	}{
+		{name: "Content-Typeなし", body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A"}]`},
+		{name: "未知フィールド", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A","unknown":1}]`},
+		{name: "複数JSON値", contentType: echo.MIMEApplicationJSON, body: `[{"id":"1234567890abcdef","title":"WE曲","artist":"A"}] []`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := NewWorldsendHandler(&testutil.MockWorldsendUsecase{
+				UpdateWorldsendSongsFunc: func(ctx context.Context, requests []*usecase.UpdateWorldsendSongInput, masters *domainmasterdata.SongMasters) error {
+					called = true
+					return nil
+				},
+			}, &masterdata.Cache{})
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPut, "/internal/worldsend-songs", bytes.NewBufferString(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set(echo.HeaderContentType, tt.contentType)
+			}
+
+			err := handler.UpdateWorldsendSongs(e.NewContext(req, httptest.NewRecorder()))
+
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+			assert.False(t, called)
 		})
 	}
 }

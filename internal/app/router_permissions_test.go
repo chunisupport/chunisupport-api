@@ -72,6 +72,13 @@ func (s *permissionChangeStub) ChangePermission(context.Context, *entity.User, s
 	return nil
 }
 
+type suspiciousChangeStub struct{ called bool }
+
+func (s *suspiciousChangeStub) ChangeSuspicious(context.Context, *entity.User, string, bool) error {
+	s.called = true
+	return nil
+}
+
 func TestRegisterRoutes_権限変更はADMIN専用(t *testing.T) {
 	tests := []struct {
 		name, token string
@@ -93,6 +100,39 @@ func TestRegisterRoutes_権限変更はADMIN専用(t *testing.T) {
 			auth := permissionAuthenticator{}
 			registerRoutes(e, handlers, auth, auth, nil, stubMaintenanceUsecase{}, config.Config{})
 			req := httptest.NewRequest(http.MethodPatch, "/internal/users/target/permission", strings.NewReader(`{"permission":"EDITOR"}`))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			assert.Equal(t, tt.status, rec.Code)
+			assert.Equal(t, tt.status == http.StatusNoContent, uc.called)
+		})
+	}
+}
+
+func TestRegisterRoutes_不審アカウントフラグ変更はADMIN専用(t *testing.T) {
+	tests := []struct {
+		name, token string
+		status      int
+	}{
+		{"ADMIN", "admin-token", http.StatusNoContent},
+		{"EDITOR", "editor-token", http.StatusForbidden},
+		{"EXTDEV", "extdev-token", http.StatusForbidden},
+		{"PLAYER", "player-token", http.StatusForbidden},
+		{"未認証", "", http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &suspiciousChangeStub{}
+			handlers := newAuthorizationTestHandlers()
+			handlers.UserSuspicious = internalhandler.NewUserSuspiciousHandler(uc)
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			auth := permissionAuthenticator{}
+			registerRoutes(e, handlers, auth, auth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequest(http.MethodPatch, "/internal/users/target/suspicious", strings.NewReader(`{"is_suspicious":true}`))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			if tt.token != "" {
 				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)

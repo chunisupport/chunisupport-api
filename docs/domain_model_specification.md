@@ -328,14 +328,14 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - **ClassEmblem**: クラスエンブレム（称号）
 - **ClassEmblemBase**: クラスエンブレムベース（称号の基礎デザイン）
 - **APIToken**: API認証トークン
-- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count` 等）
+- **AchievementType**: 目標の成果種別マスタ（`rank_count`, `score_count`, `rating_count` 等）
 
 ---
 
 ### Goal（目標エンティティ）
 
 #### 概要
-ユーザーが設定する目標を表すエンティティ。成果種別（`achievement_type`）と対象譜面の絞り込み条件（`attributes`）を持ち、達成状況の追跡に使用されます。1ユーザーあたり最大100件まで作成可能です。
+ユーザーが設定する目標を表すエンティティ。成果種別（`achievement_type`）と対象譜面の絞り込み条件（`attributes`）を持ち、達成状況の追跡に使用されます。1ユーザーあたり最大300件まで作成可能です。
 
 #### フィールド
 
@@ -368,11 +368,13 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `AchievementParams` は `AchievementType` に対応する構造のJSON
 - `Attributes` は許可キー（`diff`, `chart_target`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
 - 同一ユーザー・同一グループ（未分類を含む）の `SortOrder` は1から所属目標件数までの連番。作成・削除・移動・並び替え時にユーザー行ロック下で更新する
-- 1ユーザーあたり最大100件（`GoalMaxPerUser` 定数で管理）
+- 1ユーザーあたり最大300件（`GoalMaxPerUser` 定数で管理）
 
 #### `AchievementParams` の型整合ルール
 
 `achievement_type` と `achievement_params` の構造は厳密に対応しなければなりません。不一致は不正入力として4xxエラーを返します。詳細な仕様は `docs/API.md` の「`achievement_params` 仕様」を参照してください。
+
+`rating_count` は0.01以上・小数第2位までの `rating` と、相互排他な `count` / `remaining` / `percent` を持ちます。動的上限は属性一致・譜面定数既知・「譜面定数 + 2.15 >= rating」をすべて満たす通常譜面数です。比較は0.01単位の整数で行い、到達可能譜面が0件の作成・更新を拒否します。
 
 #### `Attributes` の仕様
 

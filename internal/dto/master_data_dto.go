@@ -75,6 +75,7 @@ type MasterDataResponse struct {
 	FullChains       []*MasterItemDTO `json:"full_chains"`
 	Slots            []*MasterItemDTO `json:"slots"`
 	HonorTypes       []*MasterItemDTO `json:"honor_types"`
+	Possessions      []*MasterItemDTO `json:"possessions"`
 }
 
 // RatingBandDTO はレーティング帯マスタのDTOです。

@@ -104,7 +104,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		requester = userEntity
 	}
 
-	result, err := h.userUsecase.GetUserProfileRecordView(ctx, username, requester, false)
+	result, err := h.userUsecase.GetUserProfileRecordView(ctx, username, requester)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
@@ -149,7 +149,7 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	}
 
 	// ユーザープロファイルとレコードを取得
-	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, validUsername, requester, false)
+	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, validUsername, requester)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):

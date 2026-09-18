@@ -143,6 +143,7 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 			BPM:        &newBPM,
 			ReleasedAt: &releasedAt,
 			Jacket:     &newJacket,
+			IsNew:      true,
 		},
 		Chart: nil,
 	}}
@@ -154,11 +155,13 @@ func TestUpdateSongs_SkipsNilChartAndUpdatesSongOnly(t *testing.T) {
 	var song struct {
 		Title  string `db:"title"`
 		Artist string `db:"artist"`
+		IsNew  bool   `db:"is_new"`
 	}
-	err = db.Get(&song, `SELECT title, artist FROM songs WHERE id = 1`)
+	err = db.Get(&song, `SELECT title, artist, is_new FROM songs WHERE id = 1`)
 	require.NoError(t, err)
 	assert.Equal(t, "new title", song.Title)
 	assert.Equal(t, "new artist", song.Artist)
+	assert.True(t, song.IsNew)
 
 	var chart struct {
 		LevelStar     *int    `db:"level_star"`

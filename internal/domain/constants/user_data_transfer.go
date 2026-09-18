@@ -1,7 +1,7 @@
 package constants
 
 const (
-	GoalMaxPerUser                   = 100
+	GoalMaxPerUser                   = 300
 	GoalGroupMaxPerUser              = 20
 	RecordFilterMaxPerUser           = 100
 	RecordFilterNameMaxLength        = 30

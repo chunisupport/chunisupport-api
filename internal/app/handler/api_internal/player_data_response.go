@@ -26,7 +26,7 @@ func toPlayerDataResponse(result *playerdataresult.Result) *dto.PlayerDataResult
 		Profile: dto.PlayerDataProfile{
 			PlayerID: result.Profile.PlayerID, Name: result.Profile.Name, Level: result.Profile.Level,
 			Rating: result.Profile.Rating, ClassEmblemID: result.Profile.ClassEmblemID,
-			ClassEmblemBaseID: result.Profile.ClassEmblemBaseID, LastPlayedAt: result.Profile.LastPlayedAt,
+			ClassEmblemBaseID: result.Profile.ClassEmblemBaseID, PossessionID: result.Profile.PossessionID, LastPlayedAt: result.Profile.LastPlayedAt,
 			OverpowerValue: result.Profile.OverpowerValue, OverpowerPercent: result.Profile.OverpowerPercent,
 		},
 		Summary: dto.PlayerDataSummary{

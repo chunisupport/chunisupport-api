@@ -99,7 +99,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 // UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
 func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateSongRequest
-	if err := c.Bind(&requests); err != nil {
+	if err := handler.BindStrictJSON(c, &requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if requests == nil {

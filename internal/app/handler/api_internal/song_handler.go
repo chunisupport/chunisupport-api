@@ -153,7 +153,7 @@ func (h *SongHandler) DeleteSong(c *echo.Context) error {
 // CreateSong は新規楽曲を追加します。
 func (h *SongHandler) CreateSong(c *echo.Context) error {
 	var req api_internal.CreateSongRequest
-	if err := c.Bind(&req); err != nil {
+	if err := handler.BindStrictJSON(c, &req); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if err := c.Validate(&req); err != nil {
@@ -221,7 +221,7 @@ func (h *SongHandler) RestoreSong(c *echo.Context) error {
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 func (h *SongHandler) UpdateSongs(c *echo.Context) error {
 	var requests []*api_internal.UpdateSongRequest
-	if err := c.Bind(&requests); err != nil {
+	if err := handler.BindStrictJSON(c, &requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if requests == nil {

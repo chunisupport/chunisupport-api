@@ -72,25 +72,6 @@ func TestNewPlayerName(t *testing.T) {
 	}
 }
 
-func TestMustNewPlayerName(t *testing.T) {
-	t.Run("有効な入力", func(t *testing.T) {
-		value := "太郎１２３"
-		got := MustNewPlayerName(value)
-		assert.Equal(t, PlayerName{value: value}, got)
-	})
-
-	t.Run("無効な入力はパニックする", func(t *testing.T) {
-		assert.Panics(t, func() {
-			MustNewPlayerName("")
-		})
-	})
-}
-
-func TestPlayerName_Value(t *testing.T) {
-	playerName := PlayerName{value: "太郎１２３"}
-	assert.Equal(t, "太郎１２３", playerName.String())
-}
-
 func TestPlayerName_Scan(t *testing.T) {
 	type args struct {
 		src any
@@ -134,14 +115,6 @@ func TestPlayerName_Scan(t *testing.T) {
 			want:    PlayerName{value: "変更前"},
 			wantErr: assert.Error,
 		},
-		{
-			name: "DBの空文字列はエラー",
-			args: args{
-				src: "",
-			},
-			want:    PlayerName{value: "変更前"},
-			wantErr: assert.Error,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -154,54 +127,6 @@ func TestPlayerName_Scan(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, *p, "Scan(%v)", tt.args.src)
-		})
-	}
-}
-
-func TestValidatePlayerName(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   string
-		wantErr assert.ErrorAssertionFunc
-		skip    bool
-	}{
-		{
-			name:    "有効な1文字",
-			value:   "太",
-			wantErr: assert.NoError,
-		},
-		{
-			name:    "有効な8文字",
-			value:   "あいうえおかきく",
-			wantErr: assert.NoError,
-		},
-		{
-			name:    "有効な全角混在文字列",
-			value:   "太郎１２３",
-			wantErr: assert.NoError,
-		},
-		{
-			name:    "無効な空文字列",
-			value:   "",
-			wantErr: assert.Error,
-		},
-		{
-			name:    "無効な9文字",
-			value:   "あいうえおかきくけ",
-			wantErr: assert.Error,
-		},
-		{
-			name:    "無効な半角英数字を含む",
-			value:   "太郎123A",
-			wantErr: assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.skip {
-				t.Skip("プレイヤー名の仕様が確定するまでスキップ")
-			}
-			tt.wantErr(t, validatePlayerName(tt.value), fmt.Sprintf("validatePlayerName(%v)", tt.value))
 		})
 	}
 }

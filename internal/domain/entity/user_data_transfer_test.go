@@ -218,6 +218,16 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "record_filters[0].filter")
 	})
 
+	t.Run("空のポゼッション名を拒否する", func(t *testing.T) {
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Player.PossessionName = stringPointer("")
+
+		err := snapshot.Validate()
+
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "possession_name")
+	})
+
 	t.Run("保存済みフィルタが既存上限を超えたら拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.RecordFilters[0].Filter = json.RawMessage(`{"value":"` + strings.Repeat("a", info.RecordFilterMaxPayloadBytes) + `"}`)

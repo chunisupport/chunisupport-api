@@ -65,6 +65,55 @@ func TestUserDataTransferRepositoryImportSnapshotPersistsOfficialOverpowerPercen
 	assert.Equal(t, historyPercent, storedHistory)
 }
 
+func TestUserDataTransferRepositoryImportSnapshotPersistsPossession(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	possessionName := "rainbow"
+	snapshot.Player.PossessionName = &possessionName
+
+	playerID, err := repo.ImportSnapshot(context.Background(), 1, snapshot)
+
+	require.NoError(t, err)
+	var storedPossessionID int
+	require.NoError(t, db.Get(&storedPossessionID, "SELECT possession_id FROM players WHERE id = ?", playerID))
+	assert.Equal(t, 5, storedPossessionID)
+}
+
+func TestUserDataTransferRepositoryImportSnapshotDefaultsMissingPossessionToNormal(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+
+	playerID, err := repo.ImportSnapshot(context.Background(), 1, emptyTransferRepositorySnapshot(t))
+
+	require.NoError(t, err)
+	var storedPossessionID int
+	require.NoError(t, db.Get(&storedPossessionID, "SELECT possession_id FROM players WHERE id = ?", playerID))
+	assert.Equal(t, entity.DefaultPossessionID, storedPossessionID)
+}
+
+func TestUserDataTransferRepositoryExportSnapshotIncludesPossessionName(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	possessionName := "rainbow"
+	snapshot.Player.PossessionName = &possessionName
+	_, err = repo.ImportSnapshot(context.Background(), 1, snapshot)
+	require.NoError(t, err)
+
+	exported, err := repo.(*userDataTransferRepository).exportSnapshot(context.Background(), db, 1)
+
+	require.NoError(t, err)
+	require.NotNil(t, exported.Player.PossessionName)
+	assert.Equal(t, "rainbow", *exported.Player.PossessionName)
+}
+
 func TestUserDataTransferRepositoryImportSnapshotCreatesUnregisteredHonor(t *testing.T) {
 	db := newTransferRepositoryTestDB(t)
 	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
@@ -166,6 +215,11 @@ func TestUserDataTransferRepositoryImportSnapshotRollsBackAfterChildSaveFailure(
 	require.NoError(t, err)
 	_, err = db.Exec("INSERT INTO honor_types (id, name) VALUES (1, 'normal')")
 	require.NoError(t, err)
+	// フィルタ保存だけを失敗させ、先に入ったプレイヤー行がロールバックされることを検証する。
+	_, err = db.Exec("DROP TABLE record_filters")
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE TABLE record_filters (id BLOB PRIMARY KEY, user_id INTEGER)")
+	require.NoError(t, err)
 	repo := NewUserDataTransferRepository(db)
 	snapshot := emptyTransferRepositorySnapshot(t)
 	snapshot.Honors = []entity.UserDataTransferHonor{{
@@ -240,14 +294,18 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 	t.Cleanup(func() { _ = db.Close() })
 	statements := []string{
 		"CREATE TABLE users (id INTEGER PRIMARY KEY, player_id INTEGER NULL, updated_at DATETIME)",
-		"CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, player_name TEXT, player_level INTEGER, official_player_rating REAL, calculated_player_rating REAL, new_average_rating REAL, best_average_rating REAL, class_emblem_id INTEGER NULL, class_emblem_base_id INTEGER NULL, last_played_at DATETIME NULL, overpower_value REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME NULL, created_at DATETIME, updated_at DATETIME)",
-		"CREATE TABLE goals (id INTEGER PRIMARY KEY, user_id INTEGER, group_id INTEGER)",
-		"CREATE TABLE goal_groups (id INTEGER PRIMARY KEY, user_id INTEGER)",
-		"CREATE TABLE record_filters (id BLOB PRIMARY KEY, user_id INTEGER)",
+		"CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, player_name TEXT, player_level INTEGER, official_player_rating REAL, calculated_player_rating REAL, new_average_rating REAL, best_average_rating REAL, class_emblem_id INTEGER NULL, class_emblem_base_id INTEGER NULL, possession_id INTEGER NOT NULL DEFAULT 1, last_played_at DATETIME NULL, overpower_value REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME NULL, created_at DATETIME, updated_at DATETIME)",
+		"CREATE TABLE goals (id INTEGER PRIMARY KEY, user_id INTEGER, group_id INTEGER, title TEXT, achievement_type_id INTEGER, achievement_params BLOB, attributes BLOB, invert_value INTEGER, invert_percentage INTEGER, sort_order INTEGER, created_at DATETIME)",
+		"CREATE TABLE goal_groups (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, sort_order INTEGER, created_at DATETIME)",
+		"CREATE TABLE record_filters (id BLOB PRIMARY KEY, user_id INTEGER, name TEXT, filter_value_gzip BLOB, is_worldsend INTEGER, created_at DATETIME, updated_at DATETIME)",
 		"CREATE TABLE songs (id INTEGER PRIMARY KEY, official_idx TEXT, is_deleted INTEGER)",
-		"CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT)",
+		"CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT, sort_order INTEGER)",
 		"CREATE TABLE charts (id INTEGER PRIMARY KEY, song_id INTEGER, difficulty_id INTEGER, const REAL)",
 		"CREATE TABLE worldsend_charts (id INTEGER PRIMARY KEY, song_id INTEGER)",
+		"CREATE TABLE player_records (player_id INTEGER, chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, slot_id INTEGER, slot_order INTEGER, updated_at DATETIME)",
+		"CREATE TABLE player_record_histories (player_id INTEGER, chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
+		"CREATE TABLE player_worldsend_records (player_id INTEGER, worldsend_chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
+		"CREATE TABLE player_worldsend_record_histories (player_id INTEGER, worldsend_chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE courses (id INTEGER PRIMARY KEY, official_idx TEXT)",
 		"CREATE TABLE clear_lamp_types (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE combo_lamp_types (id INTEGER PRIMARY KEY, name TEXT)",
@@ -255,6 +313,8 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"CREATE TABLE slots (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE class_emblems (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE class_emblem_bases (id INTEGER PRIMARY KEY, name TEXT)",
+		"CREATE TABLE possessions (id INTEGER PRIMARY KEY, name TEXT)",
+		"INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold'), (4, 'platina'), (5, 'rainbow')",
 		"CREATE TABLE achievement_types (id INTEGER PRIMARY KEY, code TEXT)",
 		"CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT)",

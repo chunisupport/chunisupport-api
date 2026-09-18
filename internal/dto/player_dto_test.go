@@ -14,10 +14,13 @@ func TestToPlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	// Given
 	officialRating := 17.25
 	calculatedRating := 17.1234
+	officialOPPercent := 98.7654
 	player := &entity.Player{
-		Name:             playername.MustNewPlayerName("テストプレイヤー"),
-		OfficialRating:   officialRating,
-		CalculatedRating: &calculatedRating,
+		Name:                     playername.MustNewPlayerName("テストプレイヤー"),
+		OfficialRating:           officialRating,
+		OfficialOverpower:        12345.67,
+		OfficialOverpowerPercent: &officialOPPercent,
+		CalculatedRating:         &calculatedRating,
 	}
 
 	// When
@@ -26,4 +29,6 @@ func TestToPlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	// Then
 	require.NotNil(t, actual)
 	assert.Equal(t, &calculatedRating, actual.Rating)
+	assert.Equal(t, 12345.67, actual.OfficialOverpower)
+	assert.Equal(t, &officialOPPercent, actual.OfficialOverpowerPercent)
 }

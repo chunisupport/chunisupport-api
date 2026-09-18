@@ -21,19 +21,19 @@ func (stubChunirecUserUsecase) GetUserProfile(context.Context, string, *entity.U
 func (stubChunirecUserUsecase) GetUserUpdatedAt(context.Context, string, *entity.User) (*usecase.UserUpdatedAtOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserProfileWithRecords(context.Context, string, *entity.User, bool) (*usecase.UserProfileWithRecordsOutput, error) {
+func (stubChunirecUserUsecase) GetUserProfileWithRecords(context.Context, string, *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
 	return &usecase.UserProfileWithRecordsOutput{}, nil
 }
 func (stubChunirecUserUsecase) GetUserProfileRatingView(context.Context, string, *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserProfileRecordView(context.Context, string, *entity.User, bool) (*usecase.UserProfileRecordViewOutput, error) {
+func (stubChunirecUserUsecase) GetUserProfileRecordView(context.Context, string, *entity.User) (*usecase.UserProfileRecordViewOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserSongRecord(context.Context, string, *entity.User, string, bool, string) (*usecase.UserSongRecordOutput, error) {
+func (stubChunirecUserUsecase) GetUserSongRecord(context.Context, string, *entity.User, string, string) (*usecase.UserSongRecordOutput, error) {
 	return nil, nil
 }
-func (stubChunirecUserUsecase) GetUserWorldsendSongRecord(context.Context, string, *entity.User, string, bool) (*usecase.UserWorldsendSongRecordOutput, error) {
+func (stubChunirecUserUsecase) GetUserWorldsendSongRecord(context.Context, string, *entity.User, string) (*usecase.UserWorldsendSongRecordOutput, error) {
 	return nil, nil
 }
 func (stubChunirecUserUsecase) GetAllUsersForAdmin(context.Context, int, int, string) ([]usecase.AdminUserOutput, error) {

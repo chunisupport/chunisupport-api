@@ -265,8 +265,8 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 }
 
 func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, targets map[string]worldsendUpdateTarget) (int64, error) {
-	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases []string
-	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs []any
+	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
+	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
 	songIDs := make([]int, 0, len(songs))
 
 	for _, song := range songs {
@@ -293,6 +293,9 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 
 		jacketCases = append(jacketCases, "WHEN id = ? THEN ?")
 		jacketArgs = append(jacketArgs, target.SongID, song.Jacket)
+
+		isNewCases = append(isNewCases, "WHEN id = ? THEN ?")
+		isNewArgs = append(isNewArgs, target.SongID, song.IsNew)
 	}
 
 	args := make([]any, 0)
@@ -303,6 +306,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	args = append(args, bpmArgs...)
 	args = append(args, releasedArgs...)
 	args = append(args, jacketArgs...)
+	args = append(args, isNewArgs...)
 
 	placeholders := make([]string, len(songIDs))
 	for i, id := range songIDs {
@@ -318,7 +322,8 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
 			released_at = CASE %s END,
-			jacket = CASE %s END
+			jacket = CASE %s END,
+			is_new = CASE %s END
 		WHERE is_worldsend = 1 AND id IN (%s)
 	`,
 		strings.Join(titleCases, " "),
@@ -328,6 +333,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		strings.Join(bpmCases, " "),
 		strings.Join(releasedCases, " "),
 		strings.Join(jacketCases, " "),
+		strings.Join(isNewCases, " "),
 		strings.Join(placeholders, ","),
 	)
 

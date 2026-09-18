@@ -16,20 +16,23 @@ type HonorDTO struct {
 
 // PlayerDTO はプレイヤー情報を外部に公開するためのDTOです。
 type PlayerDTO struct {
-	Name              string      `json:"name"`
-	Level             int         `json:"level"`
-	Rating            *float64    `json:"rating"`
-	CalculatedRating  *float64    `json:"-"`
-	BestAverageRating *float64    `json:"-"`
-	NewAverageRating  *float64    `json:"-"`
-	ClassEmblemID     *int        `json:"class_emblem_id"`
-	ClassEmblemBaseID *int        `json:"class_emblem_base_id"`
-	LastPlayedAt      *time.Time  `json:"last_played_at"`
-	OverpowerValue    *float64    `json:"overpower_value"`
-	OverpowerPercent  *float64    `json:"overpower_percent"`
-	Honors            []*HonorDTO `json:"honors"` // 称号情報（スロット順）
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	Name                     string      `json:"name"`
+	Level                    int         `json:"level"`
+	Rating                   *float64    `json:"rating"`
+	CalculatedRating         *float64    `json:"-"`
+	BestAverageRating        *float64    `json:"-"`
+	NewAverageRating         *float64    `json:"-"`
+	ClassEmblemID            *int        `json:"class_emblem_id"`
+	ClassEmblemBaseID        *int        `json:"class_emblem_base_id"`
+	PossessionID             int         `json:"possession_id"`
+	LastPlayedAt             *time.Time  `json:"last_played_at"`
+	OverpowerValue           *float64    `json:"overpower_value"`
+	OverpowerPercent         *float64    `json:"overpower_percent"`
+	OfficialOverpower        float64     `json:"official_overpower"`
+	OfficialOverpowerPercent *float64    `json:"official_overpower_percent"`
+	Honors                   []*HonorDTO `json:"honors"` // 称号情報（スロット順）
+	CreatedAt                time.Time   `json:"created_at"`
+	UpdatedAt                time.Time   `json:"updated_at"`
 }
 
 // ToPlayerDTO はエンティティからDTOへ変換します。
@@ -40,19 +43,22 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 	}
 
 	return &PlayerDTO{
-		Name:              player.Name.String(),
-		Level:             player.Level,
-		Rating:            player.CalculatedRating,
-		CalculatedRating:  player.CalculatedRating,
-		BestAverageRating: player.BestAverageRating,
-		NewAverageRating:  player.NewAverageRating,
-		ClassEmblemID:     player.ClassEmblemID,
-		ClassEmblemBaseID: player.ClassEmblemBaseID,
-		LastPlayedAt:      player.LastPlayedAt,
-		OverpowerValue:    player.OverpowerValue,
-		OverpowerPercent:  player.OverpowerPercent,
-		Honors:            []*HonorDTO{}, // 空のスライスで初期化（nullを避ける）
-		CreatedAt:         player.CreatedAt,
-		UpdatedAt:         player.UpdatedAt,
+		Name:                     player.Name.String(),
+		Level:                    player.Level,
+		Rating:                   player.CalculatedRating,
+		CalculatedRating:         player.CalculatedRating,
+		BestAverageRating:        player.BestAverageRating,
+		NewAverageRating:         player.NewAverageRating,
+		ClassEmblemID:            player.ClassEmblemID,
+		ClassEmblemBaseID:        player.ClassEmblemBaseID,
+		PossessionID:             player.PossessionID,
+		LastPlayedAt:             player.LastPlayedAt,
+		OverpowerValue:           player.OverpowerValue,
+		OverpowerPercent:         player.OverpowerPercent,
+		OfficialOverpower:        player.OfficialOverpower,
+		OfficialOverpowerPercent: player.OfficialOverpowerPercent,
+		Honors:                   []*HonorDTO{}, // 空のスライスで初期化（nullを避ける）
+		CreatedAt:                player.CreatedAt,
+		UpdatedAt:                player.UpdatedAt,
 	}
 }

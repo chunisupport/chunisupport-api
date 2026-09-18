@@ -45,6 +45,8 @@ func TestCodecEncodeDecode(t *testing.T) {
 	assert.Equal(t, snapshot.Player.Name.String(), decoded.Player.Name.String())
 	require.NotNil(t, decoded.Player.OfficialOverpowerPercent)
 	assert.Equal(t, 0.0, *decoded.Player.OfficialOverpowerPercent)
+	require.NotNil(t, decoded.Player.PossessionName)
+	assert.Equal(t, "rainbow", *decoded.Player.PossessionName)
 	assert.NotNil(t, decoded.Records)
 	assert.NotNil(t, decoded.Goals.Groups)
 	assert.NotNil(t, decoded.Goals.Ungrouped)
@@ -145,6 +147,38 @@ func TestCodecDecodeAcceptsVersion1WithoutOfficialOverpowerPercent(t *testing.T)
 	assert.Nil(t, decoded.Player.OfficialOverpowerPercent)
 	for _, history := range decoded.MetricHistories {
 		assert.Nil(t, history.OfficialOverpowerPercent)
+	}
+}
+
+func TestCodecDecodeDefaultsMissingPossessionNameToNormal(t *testing.T) {
+	codec, err := NewCodec(codecTestSecret)
+	require.NoError(t, err)
+	encoded := encodeCodecTestFile(t, codec)
+	withoutPossession := mutatePayloadJSON(t, encoded, func(payload map[string]any) {
+		player := payload["player"].(map[string]any)
+		delete(player, "possession_name")
+	})
+
+	tests := []struct {
+		name          string
+		schemaVersion float64
+	}{
+		{name: "スキーマバージョン1", schemaVersion: 1},
+		{name: "スキーマバージョン2", schemaVersion: 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			versioned := mutateProtectedJSON(t, withoutPossession, func(header map[string]any) {
+				header["schema_version"] = tt.schemaVersion
+			})
+
+			decoded, err := codec.Decode(versioned)
+
+			require.NoError(t, err)
+			require.NotNil(t, decoded.Player.PossessionName)
+			assert.Equal(t, entity.PossessionNameNormal, *decoded.Player.PossessionName)
+		})
 	}
 }
 
@@ -307,6 +341,7 @@ func codecTestSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 	name, err := playername.NewPlayerName("テスト")
 	require.NoError(t, err)
 	officialOverpowerPercent := 0.0
+	possessionName := "rainbow"
 	return &entity.UserDataTransferSnapshot{
 		Player: entity.UserDataTransferPlayer{
 			Name:                     name,
@@ -314,6 +349,7 @@ func codecTestSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 			OfficialRating:           0,
 			OfficialOverpower:        0,
 			OfficialOverpowerPercent: &officialOverpowerPercent,
+			PossessionName:           &possessionName,
 			CreatedAt:                time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
 		},
 		Records:                  []entity.UserDataTransferRecord{},

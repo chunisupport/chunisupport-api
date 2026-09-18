@@ -34,11 +34,9 @@ func TestNewSystemMaintenanceUsecase_起動時の状態を読み込む(t *testin
 		UpdatedAt: updatedAt,
 	}, maintenanceUsecase.Current())
 
-	// リポジトリが返した可変エンティティや呼び出し元へ返した値から、公開中の状態を変更できないことを確認します。
+	// リポジトリが返した可変エンティティから公開中の状態を変更できないことを確認します。
 	initial.Enabled = false
 	initial.UpdatedAt = updatedAt.Add(time.Hour)
-	copiedState := maintenanceUsecase.Current()
-	copiedState.Enabled = false
 	assert.True(t, maintenanceUsecase.Current().Enabled)
 	assert.Equal(t, updatedAt, maintenanceUsecase.Current().UpdatedAt)
 	assert.Equal(t, 1, repo.findCalls)

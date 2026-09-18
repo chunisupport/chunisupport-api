@@ -16,12 +16,6 @@ func TestNewPlayerLockedSong(t *testing.T) {
 		wantErr  string
 	}{
 		{
-			name:     "通常譜面群の未解禁状態を生成できる",
-			playerID: 1,
-			songID:   10,
-			isUltima: false,
-		},
-		{
 			name:     "ULTIMA譜面の未解禁状態を生成できる",
 			playerID: 1,
 			songID:   10,

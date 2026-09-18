@@ -19,6 +19,7 @@ type Player struct {
 	BestAverageRating        *float64                  // ベスト枠平均レーティング (best_average_rating)
 	ClassEmblemID            *int                      // クラスエンブレムID
 	ClassEmblemBaseID        *int                      // クラスエンブレムのベースID
+	PossessionID             int                       // ポゼッションID（未指定時は normal）
 	LastPlayedAt             *time.Time                // 最終プレイ日時
 	OverpowerValue           *float64                  // オーバーパワー値
 	OfficialOverpower        float64                   // 公式オーバーパワー値
@@ -35,11 +36,12 @@ func NewPlayer(userID int, name playername.PlayerName) *Player {
 	now := time.Now().UTC()
 
 	return &Player{
-		UserID:    userID,
-		Name:      name,
-		Level:     DefaultPlayerLevel,
-		CreatedAt: now,
-		UpdatedAt: now,
+		UserID:       userID,
+		Name:         name,
+		Level:        DefaultPlayerLevel,
+		PossessionID: DefaultPossessionID,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 }
 
@@ -82,11 +84,25 @@ func (p *Player) PendingMetricHistory() *PlayerMetricHistoryEntry {
 	return p.metricHistoryToAppend
 }
 
+// ChangeProfile は既存のプロフィール更新呼び出しとの互換性を保つため、ポゼッションを変更せずに更新します。
 func (p *Player) ChangeProfile(name playername.PlayerName, level int, classEmblemID, classEmblemBaseID *int, lastPlayedAt *time.Time) {
+	p.changeProfile(name, level, classEmblemID, classEmblemBaseID, p.PossessionID, lastPlayedAt)
+}
+
+// ChangeProfileWithPossession はプロフィールとポゼッションを更新します。
+func (p *Player) ChangeProfileWithPossession(name playername.PlayerName, level int, classEmblemID, classEmblemBaseID *int, possessionID int, lastPlayedAt *time.Time) {
+	p.changeProfile(name, level, classEmblemID, classEmblemBaseID, possessionID, lastPlayedAt)
+}
+
+func (p *Player) changeProfile(name playername.PlayerName, level int, classEmblemID, classEmblemBaseID *int, possessionID int, lastPlayedAt *time.Time) {
 	p.Name = name
 	p.Level = level
 	p.ClassEmblemID = classEmblemID
 	p.ClassEmblemBaseID = classEmblemBaseID
+	if possessionID == 0 {
+		possessionID = DefaultPossessionID
+	}
+	p.PossessionID = possessionID
 	p.LastPlayedAt = lastPlayedAt
 }
 

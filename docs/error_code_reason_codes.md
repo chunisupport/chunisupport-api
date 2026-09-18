@@ -52,6 +52,7 @@
 | `api_token_name_conflict` | APIトークン名重複 |
 | `invalid_api_token_name` | APIトークン名不正 |
 | `invalid_api_token_id` | APIトークンID不正 |
+| `invalid_api_token_permission` | APIトークン権限不正 |
 | `payload_too_large` | ペイロード過大 |
 | `unsupported_media_type` | Content-Type不正 |
 | `method_not_allowed` | HTTPメソッド不正 |
@@ -97,6 +98,7 @@
 | --- | --- |
 | `count_over_dynamic_max` | `count` が属性絞り込み後の譜面数（`rainbow_count` は楽曲数）上限を超過 |
 | `remaining_over_dynamic_max` | `remaining` が属性絞り込み後の譜面数（`rainbow_count` は楽曲数）上限を超過 |
+| `rating_count_no_reachable_charts` | `rating_count` の指定レートへ理論上到達可能な譜面が0件 |
 | `total_score_over_dynamic_max` | `total_score.total` が理論上限超過 |
 | `total_score_remaining_over_dynamic_max` | `total_score.remaining` が理論上限超過 |
 | `overpower_value_over_dynamic_max` | `overpower_value.total` が理論上限超過 |

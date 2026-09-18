@@ -156,6 +156,8 @@ func TestFromUsecaseError_APIトークン管理エラーを変換する(t *testi
 	}{
 		{name: "ID不正", err: usecase.ErrInvalidAPITokenID, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidAPITokenID},
 		{name: "名前不正", err: usecase.ErrInvalidAPITokenName, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidAPITokenName},
+		{name: "権限不正", err: usecase.ErrInvalidAPITokenPermission, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidAPITokenPermission},
+		{name: "書き込み権限不足", err: usecase.ErrAPITokenWritePermissionDenied, wantStatus: http.StatusForbidden, wantCode: CodeForbidden},
 		{name: "上限超過", err: usecase.ErrAPITokenLimitExceeded, wantStatus: http.StatusBadRequest, wantCode: CodeAPITokenLimitExceeded},
 		{name: "名前重複", err: usecase.ErrAPITokenNameConflict, wantStatus: http.StatusConflict, wantCode: CodeAPITokenNameConflict},
 		{name: "未検出", err: usecase.ErrAPITokenNotFound, wantStatus: http.StatusNotFound, wantCode: CodeAPITokenNotFound},

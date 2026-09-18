@@ -48,7 +48,7 @@ OP計算では、プレイヤーが解禁済みの楽曲・譜面のみを計算
 ### 3.2 カラム
 
 ```sql
-player_id MEDIUMINT UNSIGNED NOT NULL
+player_id INT UNSIGNED NOT NULL
 song_id INT UNSIGNED NOT NULL
 is_ultima BOOLEAN NOT NULL
 ```
@@ -91,7 +91,7 @@ DDL:
 
 ```sql
 CREATE TABLE player_locked_songs (
-  player_id MEDIUMINT UNSIGNED NOT NULL,
+  player_id INT UNSIGNED NOT NULL,
   song_id INT UNSIGNED NOT NULL,
   is_ultima BOOLEAN NOT NULL,
   PRIMARY KEY (player_id, song_id, is_ultima),
