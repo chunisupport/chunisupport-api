@@ -14,17 +14,17 @@ func (b *strictBool) UnmarshalParam(param string) error {
 }
 
 type PlayerLockedSongRequest struct {
-	DisplayID string `json:"display_id" validate:"required"`
+	DisplayID string `json:"id" validate:"required"`
 	IsUltima  bool   `json:"is_ultima"`
 }
 
 type PlayerLockedSongUnlockRequest struct {
-	DisplayID string     `param:"displayid" validate:"required"`
+	DisplayID string     `param:"id" validate:"required"`
 	IsUltima  strictBool `query:"is_ultima"`
 }
 
 type PlayerLockedSongResponseItem struct {
-	DisplayID string `json:"display_id"`
+	DisplayID string `json:"id"`
 	Title     string `json:"title"`
 	IsUltima  bool   `json:"is_ultima"`
 }
@@ -34,7 +34,7 @@ type PlayerLockedSongsResponse struct {
 }
 
 type PlayerLockedSongBatchRequestItem struct {
-	DisplayID string `json:"display_id" validate:"required"`
+	DisplayID string `json:"id" validate:"required"`
 	IsUltima  bool   `json:"is_ultima"`
 }
 

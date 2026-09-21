@@ -44,7 +44,7 @@ func TestAdminChartRankingHandler_不正なパスパラメータはHTTP422を返
 			e := echo.New()
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 			handler := NewAdminChartRankingHandler(stubAdminChartRankingUsecase{})
-			e.GET("/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty", handler.GetStandard)
+			e.GET("/internal/admin/chart-rankings/songs/:id/charts/:difficulty", handler.GetStandard)
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
 			rec := httptest.NewRecorder()
 

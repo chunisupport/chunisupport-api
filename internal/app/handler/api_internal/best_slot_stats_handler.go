@@ -61,7 +61,7 @@ func (h *BestSlotStatsHandler) GetRanking(c *echo.Context) error {
 
 // GetChartStats は指定された通常譜面のレート帯別ベスト枠採用統計を返します。
 func (h *BestSlotStatsHandler) GetChartStats(c *echo.Context) error {
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

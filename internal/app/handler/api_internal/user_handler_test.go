@@ -127,7 +127,7 @@ func TestUserHandler_GetUserSongRecord(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.SetPathValues(echo.PathValues{
 		{Name: "username", Value: "testuser"},
-		{Name: "displayid", Value: "0000000000000001"},
+		{Name: "id", Value: "0000000000000001"},
 	})
 
 	// When
@@ -156,7 +156,7 @@ func TestUserHandler_GetUserWorldsendSongRecord_楽曲不存在(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.SetPathValues(echo.PathValues{
 		{Name: "username", Value: "testuser"},
-		{Name: "displayid", Value: "0000000000000002"},
+		{Name: "id", Value: "0000000000000002"},
 	})
 
 	// When

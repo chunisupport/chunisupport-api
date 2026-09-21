@@ -73,7 +73,7 @@ func TestPlayerLockedSongHandler_List(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"items":[{"display_id":"1234567890abcdef","title":"テスト楽曲","is_ultima":true}]}`, rec.Body.String())
+		assert.JSONEq(t, `{"items":[{"id":"1234567890abcdef","title":"テスト楽曲","is_ultima":true}]}`, rec.Body.String())
 	})
 
 	t.Run("不正なusernameは境界で拒否する", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestPlayerLockedSongHandler_Unlock(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 			c.Set("userEntity", &entity.User{ID: 1})
-			c.SetPathValues(echo.PathValues{{Name: "displayid", Value: tt.displayID}})
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: tt.displayID}})
 
 			err := handler.Unlock(c)
 
@@ -186,7 +186,7 @@ func TestPlayerLockedSongHandler_Unlock(t *testing.T) {
 func TestPlayerLockedSongHandler_Batch(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}
-	body := `{"add":[{"display_id":"1234567890abcdef","is_ultima":true}],"delete":[{"display_id":"fedcba0987654321","is_ultima":false}]}`
+	body := `{"add":[{"id":"1234567890abcdef","is_ultima":true}],"delete":[{"id":"fedcba0987654321","is_ultima":false}]}`
 	req := httptest.NewRequest(http.MethodPost, "/internal/me/locked-songs/batch", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()

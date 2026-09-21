@@ -23,7 +23,7 @@ func NewScoreHistoryHandler(scoreHistoryUsecase usecase.ScoreHistoryUsecase) *Sc
 
 // GetStandard は通常譜面のスコア履歴を返します。
 func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -46,7 +46,7 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 
 // GetWorldsend はWORLD'S END譜面のスコア履歴を返します。
 func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

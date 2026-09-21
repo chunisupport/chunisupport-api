@@ -328,7 +328,7 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/0000000000000000", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "0000000000000000"}})
+		c.SetPathValues(echo.PathValues{{Name: "id", Value: "0000000000000000"}})
 
 		// When
 		err := handler.DeleteSong(c)
@@ -354,7 +354,7 @@ func TestSongHandler_DeleteSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/internal/songs/invalid", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+		c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 		// When
 		err := handler.DeleteSong(c)
@@ -385,7 +385,7 @@ func TestSongHandler_RestoreSong(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/internal/songs/0000000000000000/restore", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "0000000000000000"}})
+		c.SetPathValues(echo.PathValues{{Name: "id", Value: "0000000000000000"}})
 
 		// When
 		err := handler.RestoreSong(c)

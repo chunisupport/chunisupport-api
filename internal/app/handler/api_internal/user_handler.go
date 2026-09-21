@@ -108,7 +108,7 @@ func (h *UserHandler) GetUserSongRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -131,7 +131,7 @@ func (h *UserHandler) GetUserWorldsendSongRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

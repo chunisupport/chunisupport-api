@@ -83,14 +83,14 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `GET /internal/songs/updated-at`
 - `GET /internal/courses/updated-at`
 - `GET /internal/songs`
-- `GET /internal/songs/:displayid`
-- `GET /internal/songs/:displayid/stats/:difficulty`
-- `GET /internal/songs/:displayid/best-slot-stats/:difficulty`
+- `GET /internal/songs/:id`
+- `GET /internal/songs/:id/stats/:difficulty`
+- `GET /internal/songs/:id/best-slot-stats/:difficulty`
 - `GET /internal/best-slot-rankings`
 - `GET /internal/worldsend-songs`
-- `GET /internal/worldsend-songs/:displayid`
+- `GET /internal/worldsend-songs/:id`
 - `GET /internal/courses`
-- `GET /internal/courses/:displayid`
+- `GET /internal/courses/:id`
 
 これらは Firebase Bearer 任意の公開参照エンドポイントです。Bearer トークンがある場合のみ失効確認なしで UID を検証し、未認証時は匿名として処理します。未認証時には匿名 IP レートリミットが適用されます。
 
@@ -102,12 +102,12 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `GET /internal/users/:username/rating`
 - `GET /internal/users/:username/rating-op-history`
 - `GET /internal/users/:username/record`
-- `GET /internal/users/:username/record/songs/:displayid`
-- `GET /internal/users/:username/record/songs/:displayid/:difficulty/history`
-- `GET /internal/users/:username/record/worldsend-songs/:displayid`
-- `GET /internal/users/:username/record/worldsend-songs/:displayid/history`
+- `GET /internal/users/:username/record/songs/:id`
+- `GET /internal/users/:username/record/songs/:id/:difficulty/history`
+- `GET /internal/users/:username/record/worldsend-songs/:id`
+- `GET /internal/users/:username/record/worldsend-songs/:id/history`
 - `GET /internal/users/:username/record/courses`
-- `GET /internal/users/:username/record/courses/:displayid`
+- `GET /internal/users/:username/record/courses/:id`
 - `GET /internal/users/:username/locked-songs`
 - `GET /internal/users/:username/favorite-songs`
 - `GET /internal/users/:username`

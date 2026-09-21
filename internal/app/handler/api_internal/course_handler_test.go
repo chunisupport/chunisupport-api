@@ -56,18 +56,19 @@ func TestCourseHandler_Get_DisplayIDを渡してレスポンスへ含める(t *t
 	handler := NewCourseHandler(&courseUsecaseStub{get: func(_ context.Context, value string, includeDeleted bool) (*usecase.CourseOutput, error) {
 		assert.Equal(t, displayID, value)
 		assert.False(t, includeDeleted)
-		return &usecase.CourseOutput{DisplayID: displayID, Idx: "50020", Name: "通常コース", Class: "1"}, nil
+		return &usecase.CourseOutput{ID: 42, DisplayID: displayID, Idx: "50020", Name: "通常コース", Class: "1"}, nil
 	}})
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/internal/courses/"+displayID, nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: displayID}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: displayID}})
 
 	err := handler.Get(c)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"id":"0123456789abcdef","idx":"50020","name":"通常コース","class":"1"}`, rec.Body.String())
 	var response dto.CourseDTO
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
 	assert.Equal(t, displayID, response.DisplayID)
@@ -83,7 +84,7 @@ func TestCourseHandler_Get_不正なDisplayIDを拒否する(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/internal/courses/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	err := handler.Get(c)
 

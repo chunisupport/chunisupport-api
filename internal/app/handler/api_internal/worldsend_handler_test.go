@@ -291,7 +291,7 @@ func TestWorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T) 
 	req := httptest.NewRequest(http.MethodGet, "/internal/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	err := handler.GetWorldsendSong(c)
 
@@ -315,7 +315,7 @@ func TestWorldsendHandler_DeleteWorldsendSongRejectsInvalidDisplayID(t *testing.
 	req := httptest.NewRequest(http.MethodDelete, "/internal/worldsend-songs/invalid", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 	err := handler.DeleteWorldsendSong(c)
 
