@@ -43,8 +43,8 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/song/master/history", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPath("/internal/users/:username/record/songs/:displayid/:difficulty/history")
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
+		c.SetPath("/internal/users/:username/record/songs/:id/:difficulty/history")
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "id", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
 		c.Set("userEntity", requester)
 
 		err := h.GetStandard(c)
@@ -59,7 +59,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/-/record/songs/song/master/history", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "id", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "master"}})
 
 		err := h.GetStandard(c)
 
@@ -74,7 +74,7 @@ func TestInternalScoreHistoryHandler_GetStandard(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/song/invalid/history", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "invalid"}})
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "id", Value: "0123456789abcdef"}, {Name: "difficulty", Value: "invalid"}})
 
 		err := h.GetStandard(c)
 
@@ -99,8 +99,8 @@ func TestInternalScoreHistoryHandler_GetWorldsend(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/song/history", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPath("/internal/users/:username/record/worldsend-songs/:displayid/history")
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "0123456789abcdef"}})
+	c.SetPath("/internal/users/:username/record/worldsend-songs/:id/history")
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "id", Value: "0123456789abcdef"}})
 	c.Set("userEntity", requester)
 
 	err := h.GetWorldsend(c)
@@ -115,7 +115,7 @@ func TestInternalScoreHistoryHandler_GetStandard_不正な楽曲IDはUsecaseへ�
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/songs/invalid/master/history", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "invalid"}, {Name: "difficulty", Value: "master"}})
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "id", Value: "invalid"}, {Name: "difficulty", Value: "master"}})
 
 	err := h.GetStandard(c)
 
@@ -131,7 +131,7 @@ func TestInternalScoreHistoryHandler_GetWorldsend_不正な楽曲IDはUsecaseへ
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/testuser/record/worldsend-songs/invalid/history", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "displayid", Value: "invalid"}})
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}, {Name: "id", Value: "invalid"}})
 
 	err := h.GetWorldsend(c)
 
@@ -147,7 +147,7 @@ func TestInternalScoreHistoryHandler_GetWorldsend_不正なユーザー名は400
 	req := httptest.NewRequest(http.MethodGet, "/internal/users/-/record/worldsend-songs/song/history", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "displayid", Value: "0123456789abcdef"}})
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "-"}, {Name: "id", Value: "0123456789abcdef"}})
 
 	err := h.GetWorldsend(c)
 

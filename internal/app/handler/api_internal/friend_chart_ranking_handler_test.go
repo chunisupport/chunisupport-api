@@ -26,7 +26,7 @@ func TestFriendChartRankingHandler_不正なDisplayIDはHTTP422を返す(t *test
 	e := echo.New()
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 	handler := NewFriendChartRankingHandler(stubFriendChartRankingUsecase{})
-	e.GET("/internal/friend-rankings/songs/:displayid/charts/:difficulty", func(c *echo.Context) error {
+	e.GET("/internal/friend-rankings/songs/:id/charts/:difficulty", func(c *echo.Context) error {
 		c.Set("userEntity", &entity.User{ID: 1})
 		return handler.GetStandard(c)
 	})

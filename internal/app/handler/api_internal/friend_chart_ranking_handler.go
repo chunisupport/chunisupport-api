@@ -24,7 +24,7 @@ func (h *FriendChartRankingHandler) GetStandard(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -45,7 +45,7 @@ func (h *FriendChartRankingHandler) GetWorldsend(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

@@ -8,8 +8,7 @@ import (
 )
 
 type CourseDTO struct {
-	ID        int        `json:"id,omitempty"`
-	DisplayID string     `json:"display_id"`
+	DisplayID string     `json:"id"`
 	Idx       string     `json:"idx"`
 	Name      string     `json:"name"`
 	Class     string     `json:"class"`
@@ -18,7 +17,7 @@ type CourseDTO struct {
 }
 
 type CourseRecordDTO struct {
-	DisplayID string     `json:"display_id"`
+	DisplayID string     `json:"id"`
 	Idx       string     `json:"idx"`
 	Name      string     `json:"name"`
 	Class     string     `json:"class"`
@@ -39,7 +38,6 @@ func ToCourseDTO(course *entity.Course, editor bool) *CourseDTO {
 	}
 	result := &CourseDTO{DisplayID: course.DisplayID.String(), Idx: course.OfficialIdx, Name: course.Name, Class: class}
 	if editor {
-		result.ID = course.ID
 		result.IsDeleted = course.IsDeleted
 		result.UpdatedAt = &course.UpdatedAt
 	}

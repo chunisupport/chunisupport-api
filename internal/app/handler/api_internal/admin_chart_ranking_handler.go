@@ -19,7 +19,7 @@ func NewAdminChartRankingHandler(u usecase.AdminChartRankingUsecase) *AdminChart
 }
 
 func (h *AdminChartRankingHandler) GetStandard(c *echo.Context) error {
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -36,7 +36,7 @@ func (h *AdminChartRankingHandler) GetStandard(c *echo.Context) error {
 }
 
 func (h *AdminChartRankingHandler) GetWorldsend(c *echo.Context) error {
-	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}

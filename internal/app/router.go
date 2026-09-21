@@ -450,9 +450,9 @@ func registerRoutes(
 		meGroup.DELETE("/record-filters/:id", handlers.RecordFilter.Delete)
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
-		meGroup.DELETE("/locked-songs/:displayid", handlers.PlayerLockedSong.Unlock)
+		meGroup.DELETE("/locked-songs/:id", handlers.PlayerLockedSong.Unlock)
 		meGroup.POST("/favorite-songs", handlers.PlayerFavoriteSong.Add)
-		meGroup.DELETE("/favorite-songs/:displayid", handlers.PlayerFavoriteSong.Remove)
+		meGroup.DELETE("/favorite-songs/:id", handlers.PlayerFavoriteSong.Remove)
 	}
 
 	friendshipGroup := internal.Group("/friends")
@@ -471,8 +471,8 @@ func registerRoutes(
 	friendRankingGroup := internal.Group("/friend-rankings")
 	friendRankingGroup.Use(firebaseAuthStrict)
 	{
-		friendRankingGroup.GET("/songs/:displayid/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
-		friendRankingGroup.GET("/worldsend-songs/:displayid", handlers.FriendChartRanking.GetWorldsend)
+		friendRankingGroup.GET("/songs/:id/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
+		friendRankingGroup.GET("/worldsend-songs/:id", handlers.FriendChartRanking.GetWorldsend)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")
@@ -499,12 +499,12 @@ func registerRoutes(
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
-		publicUsersGroup.GET("/:username/record/songs/:displayid", handlers.User.GetUserSongRecord)
-		publicUsersGroup.GET("/:username/record/songs/:displayid/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
-		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid", handlers.User.GetUserWorldsendSongRecord)
+		publicUsersGroup.GET("/:username/record/songs/:id", handlers.User.GetUserSongRecord)
+		publicUsersGroup.GET("/:username/record/songs/:id/:difficulty/history", handlers.InternalScoreHistory.GetStandard)
+		publicUsersGroup.GET("/:username/record/worldsend-songs/:id", handlers.User.GetUserWorldsendSongRecord)
 		publicUsersGroup.GET("/:username/record/courses", handlers.Course.GetUserRecords)
-		publicUsersGroup.GET("/:username/record/courses/:displayid", handlers.Course.GetUserRecord)
-		publicUsersGroup.GET("/:username/record/worldsend-songs/:displayid/history", handlers.InternalScoreHistory.GetWorldsend)
+		publicUsersGroup.GET("/:username/record/courses/:id", handlers.Course.GetUserRecord)
+		publicUsersGroup.GET("/:username/record/worldsend-songs/:id/history", handlers.InternalScoreHistory.GetWorldsend)
 		publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
 		publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 		publicUsersGroup.GET("/:username/favorite-songs", handlers.PlayerFavoriteSong.List)
@@ -525,8 +525,8 @@ func registerRoutes(
 	{
 		adminGroup.GET("/build-info", handleAdminBuildInfo)
 		adminGroup.GET("/user-stats", handlers.AdminUserStatistics.Get)
-		adminGroup.GET("/chart-rankings/songs/:displayid/charts/:difficulty", handlers.AdminChartRanking.GetStandard)
-		adminGroup.GET("/chart-rankings/worldsend-songs/:displayid", handlers.AdminChartRanking.GetWorldsend)
+		adminGroup.GET("/chart-rankings/songs/:id/charts/:difficulty", handlers.AdminChartRanking.GetStandard)
+		adminGroup.GET("/chart-rankings/worldsend-songs/:id", handlers.AdminChartRanking.GetWorldsend)
 		adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
 		adminGroup.GET("/versions", handlers.Version.List)
 		adminGroup.POST("/versions", handlers.Version.Create)
@@ -551,9 +551,9 @@ func registerRoutes(
 	{
 		publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 		publicSongsGroup.GET("", handlers.Song.GetSongs)
-		publicSongsGroup.GET("/:displayid", handlers.Song.GetSong)
-		publicSongsGroup.GET("/:displayid/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
-		publicSongsGroup.GET("/:displayid/best-slot-stats/:difficulty", handlers.BestSlotStats.GetChartStats)
+		publicSongsGroup.GET("/:id", handlers.Song.GetSong)
+		publicSongsGroup.GET("/:id/stats/:difficulty", handlers.Song.GetChartStatsByDifficulty)
+		publicSongsGroup.GET("/:id/best-slot-stats/:difficulty", handlers.BestSlotStats.GetChartStats)
 	}
 
 	bestSlotRankingGroup := internal.Group("/best-slot-rankings")
@@ -567,7 +567,7 @@ func registerRoutes(
 	publicWorldsendGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
 		publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
-		publicWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetWorldsendSong)
+		publicWorldsendGroup.GET("/:id", handlers.Worldsend.GetWorldsendSong)
 	}
 
 	songsGroup := internal.Group("/songs")
@@ -575,8 +575,8 @@ func registerRoutes(
 	{
 		songsGroup.POST("", handlers.Song.CreateSong, requireAdmin)
 		songsGroup.PUT("", handlers.Song.UpdateSongs, requireEditor)
-		songsGroup.DELETE("/:displayid", handlers.Song.DeleteSong, requireAdmin)
-		songsGroup.POST("/:displayid/restore", handlers.Song.RestoreSong, requireEditor)
+		songsGroup.DELETE("/:id", handlers.Song.DeleteSong, requireAdmin)
+		songsGroup.POST("/:id/restore", handlers.Song.RestoreSong, requireEditor)
 	}
 
 	worldsendGroup := internal.Group("/worldsend-songs")
@@ -584,22 +584,22 @@ func registerRoutes(
 	{
 		worldsendGroup.POST("", handlers.Worldsend.CreateWorldsendSong, requireAdmin)
 		worldsendGroup.PUT("", handlers.Worldsend.UpdateWorldsendSongs, requireEditor)
-		worldsendGroup.DELETE("/:displayid", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
-		worldsendGroup.POST("/:displayid/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
+		worldsendGroup.DELETE("/:id", handlers.Worldsend.DeleteWorldsendSong, requireAdmin)
+		worldsendGroup.POST("/:id/restore", handlers.Worldsend.RestoreWorldsendSong, requireEditor)
 	}
 
 	editorSongsGroup := internal.Group("/editor/songs")
 	editorSongsGroup.Use(firebaseAuthStrict, requireEditor)
 	{
 		editorSongsGroup.GET("", handlers.Song.GetEditorSongs)
-		editorSongsGroup.GET("/:displayid", handlers.Song.GetEditorSong)
+		editorSongsGroup.GET("/:id", handlers.Song.GetEditorSong)
 	}
 
 	editorWorldsendGroup := internal.Group("/editor/worldsend-songs")
 	editorWorldsendGroup.Use(firebaseAuthStrict, requireEditor)
 	{
 		editorWorldsendGroup.GET("", handlers.Worldsend.GetEditorWorldsendSongs)
-		editorWorldsendGroup.GET("/:displayid", handlers.Worldsend.GetEditorWorldsendSong)
+		editorWorldsendGroup.GET("/:id", handlers.Worldsend.GetEditorWorldsendSong)
 	}
 
 	publicCoursesGroup := internal.Group("/courses")
@@ -607,21 +607,21 @@ func registerRoutes(
 	{
 		publicCoursesGroup.GET("/updated-at", handlers.Course.GetCoursesUpdatedAt)
 		publicCoursesGroup.GET("", handlers.Course.List)
-		publicCoursesGroup.GET("/:displayid", handlers.Course.Get)
+		publicCoursesGroup.GET("/:id", handlers.Course.Get)
 	}
 	coursesGroup := internal.Group("/courses")
 	coursesGroup.Use(firebaseAuthStrict)
 	{
 		coursesGroup.POST("", handlers.Course.Create, requireAdmin)
-		coursesGroup.PUT("/:displayid", handlers.Course.Update, requireEditor)
-		coursesGroup.DELETE("/:displayid", handlers.Course.Delete, requireAdmin)
-		coursesGroup.POST("/:displayid/restore", handlers.Course.Restore, requireEditor)
+		coursesGroup.PUT("/:id", handlers.Course.Update, requireEditor)
+		coursesGroup.DELETE("/:id", handlers.Course.Delete, requireAdmin)
+		coursesGroup.POST("/:id/restore", handlers.Course.Restore, requireEditor)
 	}
 	editorCoursesGroup := internal.Group("/editor/courses")
 	editorCoursesGroup.Use(firebaseAuthStrict, requireEditor)
 	{
 		editorCoursesGroup.GET("", handlers.Course.ListEditor)
-		editorCoursesGroup.GET("/:displayid", handlers.Course.GetEditor)
+		editorCoursesGroup.GET("/:id", handlers.Course.GetEditor)
 	}
 
 	// api.chunisupport.net/internal/master

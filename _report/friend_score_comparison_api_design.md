@@ -7,8 +7,8 @@
 現行APIには以下が存在します。
 
 - `GET /internal/users/:username/record`: 指定ユーザーの未プレイ補完を含む全レコード取得
-- `GET /internal/friend-rankings/songs/:displayid/charts/:difficulty`: 通常譜面1件のフレンドランキング取得
-- `GET /internal/friend-rankings/worldsend-songs/:displayid`: WORLD'S END譜面1件のフレンドランキング取得
+- `GET /internal/friend-rankings/songs/:id/charts/:difficulty`: 通常譜面1件のフレンドランキング取得
+- `GET /internal/friend-rankings/worldsend-songs/:id`: WORLD'S END譜面1件のフレンドランキング取得
 
 既存の全レコードAPIを自分とフレンドの2人分取得し、クライアント側で比較することは可能です。ただし、全難易度と比較に不要なレーティング・OVER POWER・スロット等も転送・展開します。また、譜面単位ランキングAPIを全譜面分呼び出す方式はNリクエストになるため採用しません。
 

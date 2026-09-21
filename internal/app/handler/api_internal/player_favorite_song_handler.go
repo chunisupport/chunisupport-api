@@ -73,7 +73,7 @@ func (h *PlayerFavoriteSongHandler) Remove(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	displayIDStr := c.Param("displayid")
+	displayIDStr := c.Param("id")
 	displayID, err := displayid.NewDisplayID(displayIDStr)
 	if err != nil {
 		return apierror.ErrValidationFailed.WithInternal(err)

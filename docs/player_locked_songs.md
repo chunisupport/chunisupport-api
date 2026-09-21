@@ -128,7 +128,7 @@ type PlayerLockedSong struct {
 }
 ```
 
-このエンティティは永続化タグを持たず、未解禁状態の永続化に必要な純粋な状態だけを保持する。API一覧返却用の `display_id` はプレゼンテーション境界の都合であるため、ドメインエンティティには含めない。DB用構造体が必要な場合は `internal/infra/models` に分離する。
+このエンティティは永続化タグを持たず、未解禁状態の永続化に必要な純粋な状態だけを保持する。API一覧返却用の `id` はプレゼンテーション境界の都合であるため、ドメインエンティティには含めない。DB用構造体が必要な場合は `internal/infra/models` に分離する。
 
 ### 5.2 ドメイン上の意味
 
@@ -178,7 +178,7 @@ Repositoryインターフェースには、用途のない `Exists` は含めな
 
 削除専用の楽曲ID解決ポートは、`songs.display_id` を条件にし、`songs.is_deleted` / `songs.is_worldsend` では絞り込まない。これは、論理削除済み楽曲に紐づく未解禁レコードを削除可能にするためである。戻り値は `(*int, error)` 相当とし、`display_id` に該当する楽曲が存在しない場合は `nil, nil` を返す。Usecaseは `nil` を削除対象なしとして扱い、`Delete` を呼び出さず成功扱いにする。
 
-API一覧レスポンスでは `display_id` が必要なため、専用のRead Model取得を別ポートとして定義する。
+API一覧レスポンスでは `id` が必要なため、専用のRead Model取得を別ポートとして定義する。
 
 ```go
 type PlayerLockedSongReadModel struct {
@@ -304,10 +304,10 @@ Unlockは指定された `is_ultima` のレコードだけを削除する。削�
 GET    /internal/users/:username/locked-songs
 POST   /internal/me/locked-songs
 POST   /internal/me/locked-songs/batch
-DELETE /internal/me/locked-songs/:displayid[?is_ultima={true|false}]
+DELETE /internal/me/locked-songs/:id[?is_ultima={true|false}]
 ```
 
-一覧は `GET /internal/users/:username/locked-songs` とし、任意認証で他人の未解禁曲を参照できるようにする。登録は `POST /internal/me/locked-songs`、一括登録・解除は `POST /internal/me/locked-songs/batch`、解除は `DELETE /internal/me/locked-songs/:displayid` + query とする。DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
+一覧は `GET /internal/users/:username/locked-songs` とし、任意認証で他人の未解禁曲を参照できるようにする。登録は `POST /internal/me/locked-songs`、一括登録・解除は `POST /internal/me/locked-songs/batch`、解除は `DELETE /internal/me/locked-songs/:id` + query とする。DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
 
 DELETEの `is_ultima` queryは任意とし、未指定時は `false` として扱う。空文字や `true` / `false` 以外の値は `bad_request` とする。
 
@@ -317,12 +317,12 @@ DELETEの `is_ultima` queryは任意とし、未指定時は `false` として�
 
 ```json
 {
-  "display_id": "0000000000000123",
+  "id": "0000000000000123",
   "is_ultima": false
 }
 ```
 
-DBは `song_id` を保持するが、API境界では既存の楽曲APIに合わせて `display_id` を受ける。これにより、内部IDをAPI契約へ直接出さずに済む。
+DBは `song_id` を保持するが、API境界では既存の楽曲APIに合わせて `id` を受ける。これにより、内部IDをAPI契約へ直接出さずに済む。
 
 POSTのJSONリクエストは `BindStrictJSON` で厳格にデコードし、未知のトップレベルキーは `bad_request` として拒否する。
 
@@ -340,12 +340,12 @@ DELETE /internal/me/locked-songs/0000000000000123?is_ultima=false
 {
   "items": [
     {
-      "display_id": "0000000000000123",
+      "id": "0000000000000123",
       "title": "楽曲名A",
       "is_ultima": false
     },
     {
-      "display_id": "0000000000000456",
+      "id": "0000000000000456",
       "title": "楽曲名B",
       "is_ultima": true
     }
@@ -353,7 +353,7 @@ DELETE /internal/me/locked-songs/0000000000000123?is_ultima=false
 }
 ```
 
-一覧レスポンスには `title` を含める。未解禁曲一覧はユーザーが曲名で認識する画面であり、`display_id` だけでは表示情報として不足するためである。Read Model取得時点で既に `songs` とJOINするため、`songs.title` を同時に取得するコストは小さく、フロントエンド側で楽曲マスタAPIを別途呼び出す必要もなくなる。
+一覧レスポンスには `title` を含める。未解禁曲一覧はユーザーが曲名で認識する画面であり、`id` だけでは表示情報として不足するためである。Read Model取得時点で既に `songs` とJOINするため、`songs.title` を同時に取得するコストは小さく、フロントエンド側で楽曲マスタAPIを別途呼び出す必要もなくなる。
 
 ### 8.4 DTO
 
@@ -370,7 +370,7 @@ DTOはAPI境界の責務として、Usecase入出力と分離する。
 | `GET /internal/users/:username/locked-songs` | 200 | 一覧JSON |
 | `POST /internal/me/locked-songs` | 204 | なし |
 | `POST /internal/me/locked-songs/batch` | 204 | なし |
-| `DELETE /internal/me/locked-songs/:displayid?is_ultima=false` | 204 | なし |
+| `DELETE /internal/me/locked-songs/:id?is_ultima=false` | 204 | なし |
 
 登録・解除は冪等操作のため、既に登録済みの曲を登録しても204、未登録の曲を解除しても204を返す。
 
@@ -380,13 +380,13 @@ DTOはAPI境界の責務として、Usecase入出力と分離する。
 | --- | --- | --- |
 | `unauthorized` | 401 | 認証情報がない、またはコンテキストにユーザーがいない |
 | `bad_request` | 400 | JSON不正、Content-Type不正、未知トップレベルキー、`is_ultima` queryがboolとして解釈できない |
-| `validation_failed` | 422 | DTOレベル必須チェック失敗、`display_id` の形式不正 |
+| `validation_failed` | 422 | DTOレベル必須チェック失敗、`id` の形式不正 |
 | `player_not_linked` | 404 | 認証ユーザーにプレイヤーが紐づいていない |
-| `song_not_found` | 404 | 登録時に、`display_id` に対応する通常楽曲が存在しない、論理削除済み、またはWORLD'S END楽曲 |
+| `song_not_found` | 404 | 登録時に、`id` に対応する通常楽曲が存在しない、論理削除済み、またはWORLD'S END楽曲 |
 | `chart_not_found` | 404 | 登録時に、`is_ultima = true` だが対象楽曲にULTIMA譜面が存在しない |
 | `internal_error` | 500 | DB異常、マスタ不整合など |
 
-`display_id` は既存の楽曲APIと同じくパスパラメータまたはJSON文字列として受ける。16文字の小文字16進数として不正な場合は `validation_failed`、形式は正しいが存在しない場合は、登録時には `song_not_found` にする。削除APIは冪等な状態削除として扱うため、形式が正しい `display_id` であれば通常の楽曲存在確認によるエラー判定を行わず、対象レコードが存在しなくても204を返す。削除済み楽曲やWORLD'S END楽曲を外部から区別できないようにするため、登録時の管理対象外楽曲も同じ404とする。一覧取得時はRead Model取得で通常楽曲かつ未削除の楽曲に絞り込む。
+`id` は既存の楽曲APIと同じくパスパラメータまたはJSON文字列として受ける。16文字の小文字16進数として不正な場合は `validation_failed`、形式は正しいが存在しない場合は、登録時には `song_not_found` にする。削除APIは冪等な状態削除として扱うため、形式が正しい `id` であれば通常の楽曲存在確認によるエラー判定を行わず、対象レコードが存在しなくても204を返す。削除済み楽曲やWORLD'S END楽曲を外部から区別できないようにするため、登録時の管理対象外楽曲も同じ404とする。一覧取得時はRead Model取得で通常楽曲かつ未削除の楽曲に絞り込む。
 
 ULTIMA譜面未存在は、既存の `chart_not_found` を使う。既存コードでは `chart_not_found` が譜面未検出の意味で定義済みであり、`docs/API.md` でも指定難易度の譜面が存在しない場合のエラーとして使われているため、この用途に専用エラーコードは定義しない。
 
@@ -405,7 +405,7 @@ OP計算API本体では、次の順序で対象譜面を絞り込む。
 
 N+1回避のため、未解禁設定は `ListByPlayerID` で一括取得し、`song_id + is_ultima` のセットとして扱う。
 
-API一覧取得では `display_id` が必要なため、Read Model取得でJOINするか、`song_id` 群に対して `IN` 句によるバルクフェッチを行う。いずれの場合も、未解禁レコード1件ごとに楽曲取得を行ってはいけない。
+API一覧取得では `id` が必要なため、Read Model取得でJOINするか、`song_id` 群に対して `IN` 句によるバルクフェッチを行う。いずれの場合も、未解禁レコード1件ごとに楽曲取得を行ってはいけない。
 
 ---
 
@@ -454,11 +454,11 @@ API一覧取得では `display_id` が必要なため、Read Model取得でJOIN�
 - `GET /internal/users/:username/locked-songs` が任意認証で一覧を返す
 - `POST /internal/me/locked-songs` が妥当な入力で登録する
 - `POST /internal/me/locked-songs` は厳格JSONデコードを行い、未知トップレベルキーを `bad_request` にする
-- `DELETE /internal/me/locked-songs/:displayid?is_ultima=false` が解除する
+- `DELETE /internal/me/locked-songs/:id?is_ultima=false` が解除する
 - DELETEの `is_ultima` 未指定時は `false` として扱う
 - DELETEの `is_ultima` が空文字またはboolとして解釈できない値の場合は `bad_request` にする
-- DELETEは形式が正しい `display_id` であれば通常の楽曲存在確認によるエラー判定を行わず、未登録でも204を返す
-- 不正な `display_id` は `validation_failed`、不正な `is_ultima` queryは `bad_request` になる
+- DELETEは形式が正しい `id` であれば通常の楽曲存在確認によるエラー判定を行わず、未登録でも204を返す
+- 不正な `id` は `validation_failed`、不正な `is_ultima` queryは `bad_request` になる
 
 ---
 
@@ -483,7 +483,7 @@ API一覧取得では `display_id` が必要なため、Read Model取得でJOIN�
 
 採用:
 
-- `DELETE /internal/me/locked-songs/:displayid?is_ultima=false`
+- `DELETE /internal/me/locked-songs/:id?is_ultima=false`
 
 DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
 
@@ -520,20 +520,20 @@ DELETE bodyに依存しないため、クライアント・プロキシ差異の
 採用:
 
 - `entity.PlayerLockedSong` は `PlayerID`, `SongID`, `IsUltima` のみ保持する
-- API一覧用の `display_id` はUsecase出力またはRead Modelで扱う
+- API一覧用の `id` はUsecase出力またはRead Modelで扱う
 - N+1回避が必要な一覧取得はJOINまたは `IN` 句によるバルクフェッチで行う
 
-`display_id` はAPI契約上必要だが、未解禁状態そのもののドメイン状態ではないため、ドメインエンティティには含めない。
+`id` はAPI契約上必要だが、未解禁状態そのもののドメイン状態ではないため、ドメインエンティティには含めない。
 
 ### 12.6 APIで使う楽曲識別子
 
 採用:
 
-- `display_id`
+- `id`
 
-DB内部では `song_id` を使う。APIでは、既存の楽曲APIが `display_id` をパスパラメータとして使っているため、フロントエンドから操作する管理APIも `display_id` を受ける。登録時はUsecaseで通常楽曲であること、論理削除されていないこと、WORLD'S END楽曲ではないことを検証したうえで `song_id` に変換する。解除時は論理削除済み楽曲の未解禁レコードも消せるように、通常の楽曲取得ではなく削除専用の楽曲ID解決ポートで `song_id` を解決する。未解禁リポジトリ自体は `song_id` と `is_ultima` を引数に取る `Delete` を提供し、Repository境界にAPI用の `display_id` を持ち込まない。
+DB内部では `song_id` を使う。APIでは、既存の楽曲APIが `id` をパスパラメータとして使っているため、フロントエンドから操作する管理APIも `id` を受ける。登録時はUsecaseで通常楽曲であること、論理削除されていないこと、WORLD'S END楽曲ではないことを検証したうえで `song_id` に変換する。解除時は論理削除済み楽曲の未解禁レコードも消せるように、通常の楽曲取得ではなく削除専用の楽曲ID解決ポートで `song_id` を解決する。未解禁リポジトリ自体は `song_id` と `is_ultima` を引数に取る `Delete` を提供し、Repository境界にAPI用の `id` を持ち込まない。
 
-DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:displayid` と揃えられるため `display_id` を採用する。
+DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:id` と揃えられるため `id` を採用する。
 
 ### 12.7 楽曲未検出エラーコード
 
@@ -556,16 +556,16 @@ DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:dis
 採用:
 
 - 削除APIでは通常の楽曲存在確認によるエラー判定を行わない
-- `display_id` に該当する楽曲が存在しない場合も204を返す
+- `id` に該当する楽曲が存在しない場合も204を返す
 - 論理削除済み楽曲に紐づく未解禁レコードも削除できる
 
-存在しない楽曲の削除操作をエラーにすると、楽曲が論理削除された後に未解禁レコードをユーザー操作で消せなくなる。そのため、解除APIは状態削除の冪等操作として扱い、形式が正しい `display_id` であれば削除対象なしでも成功扱いにする。通常の `SongRepository` で楽曲を事前取得せず、削除専用の楽曲ID解決ポートで `song_id` を解決できた場合だけ `PlayerLockedSongRepository.Delete` で削除する。
+存在しない楽曲の削除操作をエラーにすると、楽曲が論理削除された後に未解禁レコードをユーザー操作で消せなくなる。そのため、解除APIは状態削除の冪等操作として扱い、形式が正しい `id` であれば削除対象なしでも成功扱いにする。通常の `SongRepository` で楽曲を事前取得せず、削除専用の楽曲ID解決ポートで `song_id` を解決できた場合だけ `PlayerLockedSongRepository.Delete` で削除する。
 
 ---
 
 ## 13. 結論
 
-今回の未解禁曲管理は、DBには日付・履歴・論理削除を持たせない最小構成で進めるのが妥当である。一方で、一覧APIはフロントエンドの表示利便性を優先し、`display_id` に加えて `title` も返す。
+今回の未解禁曲管理は、DBには日付・履歴・論理削除を持たせない最小構成で進めるのが妥当である。一方で、一覧APIはフロントエンドの表示利便性を優先し、`id` に加えて `title` も返す。
 
 `player_locked_songs` は `player_id`, `song_id`, `is_ultima` の複合主キーだけを持つことで、容量を抑えつつ、通常譜面群未解禁とULTIMA単独未解禁の両方を表現できる。
 

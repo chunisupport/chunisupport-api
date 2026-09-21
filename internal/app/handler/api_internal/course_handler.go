@@ -42,7 +42,7 @@ func (h *CourseHandler) ListEditor(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &internaldto.CourseListResponse{Courses: toCourseDTOs(items)})
 }
 func (h *CourseHandler) Get(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -53,7 +53,7 @@ func (h *CourseHandler) Get(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) GetEditor(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -78,7 +78,7 @@ func (h *CourseHandler) Create(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, toCourseDTO(item))
 }
 func (h *CourseHandler) Update(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -96,7 +96,7 @@ func (h *CourseHandler) Update(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toCourseDTO(item))
 }
 func (h *CourseHandler) Delete(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -106,7 +106,7 @@ func (h *CourseHandler) Delete(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 func (h *CourseHandler) Restore(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -128,7 +128,7 @@ func (h *CourseHandler) GetUserRecords(c *echo.Context) error {
 }
 
 func (h *CourseHandler) GetUserRecord(c *echo.Context) error {
-	displayID, apiErr := handler.ValidateDisplayID(c.Param("displayid"))
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
 	if apiErr != nil {
 		return apiErr
 	}
@@ -147,7 +147,7 @@ func toCourseDTO(value *usecase.CourseOutput) *dto.CourseDTO {
 	if value == nil {
 		return nil
 	}
-	return &dto.CourseDTO{ID: value.ID, DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
+	return &dto.CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
 }
 func toCourseDTOs(values []*usecase.CourseOutput) []*dto.CourseDTO {
 	result := make([]*dto.CourseDTO, 0, len(values))

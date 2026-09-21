@@ -71,7 +71,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 
 - `POST /internal/me/register-data` と `POST /internal/player-data/temp`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
 - `POST /internal/me/data-transfer/validate` と `POST /internal/me/data-transfer/import`: 移行ファイル本体を受け取り、未知フィールドの拒否は専用コーデック側で行います。
-- `DELETE /internal/me/locked-songs/:displayid`: JSONボディではなく path / query をバインドします。
+- `DELETE /internal/me/locked-songs/:id`: JSONボディではなく path / query をバインドします。
 
 ## 共通レスポンス仕様
 
@@ -209,8 +209,8 @@ Content-Type: application/json
 | `/internal/admin/user-stats` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けユーザー集計取得 |
 | `/internal/admin/versions` | GET / POST | Firebase Bearer (ADMIN+) | バージョン全件一覧・追加 |
 | `/internal/admin/versions/:id` | PUT / DELETE | Firebase Bearer (ADMIN+) | バージョン改名・削除 |
-| `/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
-| `/internal/admin/chart-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
+| `/internal/admin/chart-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
+| `/internal/admin/chart-rankings/worldsend-songs/:id` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
@@ -223,9 +223,9 @@ Content-Type: application/json
 | `/internal/me/data-transfer/import` | POST | Firebase Bearer | 移行ファイルをインポート |
 | `/internal/me/locked-songs` | POST | Firebase Bearer | 自分の未解禁曲を登録 |
 | `/internal/me/locked-songs/batch` | POST | Firebase Bearer | 自分の未解禁曲をまとめて登録・解除 |
-| `/internal/me/locked-songs/:displayid` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
+| `/internal/me/locked-songs/:id` | DELETE | Firebase Bearer | 自分の未解禁曲を解除 |
 | `/internal/me/favorite-songs` | POST | Firebase Bearer | 自分のお気に入り楽曲を登録 |
-| `/internal/me/favorite-songs/:displayid` | DELETE | Firebase Bearer | 自分のお気に入り楽曲を解除 |
+| `/internal/me/favorite-songs/:id` | DELETE | Firebase Bearer | 自分のお気に入り楽曲を解除 |
 | `/internal/friends` | GET | Firebase Bearer | フレンド一覧取得 |
 | `/internal/friends/:username` | DELETE | Firebase Bearer | フレンド解除 |
 | `/internal/friends/requests` | POST | Firebase Bearer | username完全一致でフレンド申請 |
@@ -234,8 +234,8 @@ Content-Type: application/json
 | `/internal/friends/requests/:username/accept` | POST | Firebase Bearer | フレンド申請承認 |
 | `/internal/friends/requests/:username/reject` | POST | Firebase Bearer | フレンド申請拒否 |
 | `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
-| `/internal/friend-rankings/songs/:displayid/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
-| `/internal/friend-rankings/worldsend-songs/:displayid` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
+| `/internal/friend-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
+| `/internal/friend-rankings/worldsend-songs/:id` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -258,10 +258,10 @@ Content-Type: application/json
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/rating-op-history` | GET | Firebase Bearer (任意) | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
-| `/internal/users/:username/record/songs/:displayid` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
-| `/internal/users/:username/record/songs/:displayid/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
-| `/internal/users/:username/record/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲1曲分のレコード取得 |
-| `/internal/users/:username/record/worldsend-songs/:displayid/history` | GET | Firebase Bearer (任意) | WORLD'S ENDスコア履歴取得 |
+| `/internal/users/:username/record/songs/:id` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
+| `/internal/users/:username/record/songs/:id/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
+| `/internal/users/:username/record/worldsend-songs/:id` | GET | Firebase Bearer (任意) | WORLD'S END楽曲1曲分のレコード取得 |
+| `/internal/users/:username/record/worldsend-songs/:id/history` | GET | Firebase Bearer (任意) | WORLD'S ENDスコア履歴取得 |
 | `/internal/users/:username/locked-songs` | GET | Firebase Bearer (任意) | ユーザーの未解禁曲一覧を取得 |
 | `/internal/users/:username/favorite-songs` | GET | Firebase Bearer (任意) | ユーザーのお気に入り楽曲一覧を取得 |
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
@@ -270,40 +270,40 @@ Content-Type: application/json
 | `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
-| `/internal/songs/:displayid` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
-| `/internal/songs/:displayid/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
-| `/internal/songs/:displayid/best-slot-stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別ベスト枠採用統計取得 |
+| `/internal/songs/:id` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
+| `/internal/songs/:id/stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別楽曲統計取得 |
+| `/internal/songs/:id/best-slot-stats/:difficulty` | GET | Firebase Bearer (任意) | 難易度別ベスト枠採用統計取得 |
 | `/internal/best-slot-rankings` | GET | Firebase Bearer (任意) | ベスト枠平均レート帯別の譜面採用率ランキング取得 |
 | `/internal/songs` | POST | Firebase Bearer (ADMIN+) | 楽曲の新規追加 |
 | `/internal/songs` | PUT | Firebase Bearer (EDITOR+) | 楽曲情報と譜面情報の一括更新 |
-| `/internal/songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
-| `/internal/songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
+| `/internal/songs/:id` | DELETE | Firebase Bearer (ADMIN+) | 楽曲の論理削除 |
+| `/internal/songs/:id/restore` | POST | Firebase Bearer (EDITOR+) | 楽曲の復活 |
 | `/internal/worldsend-songs` | GET | Firebase Bearer (任意) | WORLD'S END楽曲一覧取得 |
-| `/internal/worldsend-songs/:displayid` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
+| `/internal/worldsend-songs/:id` | GET | Firebase Bearer (任意) | WORLD'S END楽曲詳細取得 |
 | `/internal/worldsend-songs` | POST | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の新規追加 |
 | `/internal/worldsend-songs` | PUT | Firebase Bearer (EDITOR+) | WORLD'S END楽曲情報と譜面情報の一括更新 |
-| `/internal/worldsend-songs/:displayid` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
-| `/internal/worldsend-songs/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
+| `/internal/worldsend-songs/:id` | DELETE | Firebase Bearer (ADMIN+) | WORLD'S END楽曲の論理削除 |
+| `/internal/worldsend-songs/:id/restore` | POST | Firebase Bearer (EDITOR+) | WORLD'S END楽曲の復活 |
 | `/internal/honors` | GET | Firebase Bearer (ADMIN+) | 称号一覧取得 |
 | `/internal/honors/:id` | GET | Firebase Bearer (ADMIN+) | 称号詳細取得 |
 | `/internal/honors` | POST | Firebase Bearer (ADMIN+) | 称号の新規追加 |
 | `/internal/honors/:id` | PUT | Firebase Bearer (ADMIN+) | 称号の更新 |
 | `/internal/honors/:id` | DELETE | Firebase Bearer (ADMIN+) | 称号の物理削除 |
 | `/internal/editor/songs` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/songs/:id` | GET | Firebase Bearer (EDITOR+) | 編集者向け通常楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/editor/worldsend-songs` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲一覧取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
-| `/internal/editor/worldsend-songs/:displayid` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
+| `/internal/editor/worldsend-songs/:id` | GET | Firebase Bearer (EDITOR+) | 編集者向けWORLD'S END楽曲詳細取得（`is_deleted`, `updated_at`, 譜面の `updated_at` を含む） |
 | `/internal/courses/updated-at` | GET | Firebase Bearer (任意) | コースマスタキャッシュ用の最終更新日時のみ取得 |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
-| `/internal/courses/:displayid` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses/:id` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
-| `/internal/courses/:displayid` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
-| `/internal/courses/:displayid` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
-| `/internal/courses/:displayid/restore` | POST | Firebase Bearer (EDITOR+) | コース復元 |
+| `/internal/courses/:id` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
+| `/internal/courses/:id` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
+| `/internal/courses/:id/restore` | POST | Firebase Bearer (EDITOR+) | コース復元 |
 | `/internal/editor/courses` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース一覧取得 |
-| `/internal/editor/courses/:displayid` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース詳細取得 |
+| `/internal/editor/courses/:id` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース詳細取得 |
 | `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
-| `/internal/users/:username/record/courses/:displayid` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
+| `/internal/users/:username/record/courses/:id` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
@@ -503,7 +503,7 @@ Content-Type: application/json
 | `users_with_player_data` | integer | プレイヤーデータが紐付けられているユーザー数 |
 | `active_player_data_last_30_days` | integer | `players.data_collected_at` が取得時点から30日前以降のプレイヤーデータ数（境界日時を含む） |
 
-### GET `/internal/admin/chart-rankings/songs/:displayid/charts/:difficulty`
+### GET `/internal/admin/chart-rankings/songs/:id/charts/:difficulty`
 
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: 通常譜面1つについて、対象譜面をプレイ済みの全ユーザーから現在スコア上位100件を返します。
@@ -511,7 +511,7 @@ Content-Type: application/json
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の16桁表示用ID |
+| `id` | string | 楽曲の16桁表示用ID |
 | `difficulty` | string | 難易度（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`。短縮形は既存のパス難易度変換に従う） |
 
 - **ソート・順位**:
@@ -560,9 +560,9 @@ Content-Type: application/json
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 403 Forbidden (`forbidden`): ADMIN以外によるアクセス
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
 
-### GET `/internal/admin/chart-rankings/worldsend-songs/:displayid`
+### GET `/internal/admin/chart-rankings/worldsend-songs/:id`
 
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: WORLD'S END譜面1つについて、対象譜面をプレイ済みの全ユーザーから現在スコア上位100件を返します。
@@ -570,7 +570,7 @@ Content-Type: application/json
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | WORLD'S END楽曲の16桁表示用ID |
+| `id` | string | WORLD'S END楽曲の16桁表示用ID |
 
 ソート、順位、100件制限、`total` の定義は通常譜面と同じです。WORLD'S END はレーティング・OVER POWER計算の対象外のため、`const` / `is_const_unknown` / `rating` / `overpower` / `overpower_percent` は返しません。`chart` には `level_star` と `attribute` を返します。
 
@@ -578,7 +578,7 @@ Content-Type: application/json
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 403 Forbidden (`forbidden`): ADMIN以外によるアクセス
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
 
 ### GET `/internal/admin/build-info`
 - **認証**: Firebase Bearer (ADMIN)
@@ -897,7 +897,7 @@ Firebase Bearer Token（任意）
 {
   "items": [
     {
-      "display_id": "0000000000000123",
+      "id": "0000000000000123",
       "title": "楽曲名",
       "jacket": "example.jpg",
       "favorited_at": "2026-07-05T12:34:56Z"
@@ -909,7 +909,7 @@ Firebase Bearer Token（任意）
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `items` | array | お気に入り楽曲リスト。空の場合は `{"items":[]}` |
-| `.display_id` | string | 楽曲識別子 |
+| `.id` | string | 楽曲識別子 |
 | `.title` | string | 楽曲タイトル |
 | `.jacket` | string or null | ジャケット画像ファイル名 |
 | `.favorited_at` | string (ISO 8601) | お気に入り登録日時 |
@@ -935,13 +935,13 @@ Firebase Bearer Token（必須）
 
 ```json
 {
-  "display_id": "0000000000000123"
+  "id": "0000000000000123"
 }
 ```
 
 | フィールド | 型 | 必須 | 説明 |
 | --- | --- | --- | --- |
-| `display_id` | string | 必須 | 楽曲識別子（16桁16進数） |
+| `id` | string | 必須 | 楽曲識別子（16桁16進数） |
 
 未知のトップレベルキーは拒否されます。
 
@@ -955,7 +955,7 @@ Firebase Bearer Token（必須）
 | --- | --- | --- |
 | `unauthorized` | 401 | 認証情報がない |
 | `bad_request` | 400 | JSONデコード失敗 |
-| `validation_failed` | 422 | `display_id` の形式不正 |
+| `validation_failed` | 422 | `id` の形式不正 |
 | `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
 | `song_not_found` | 404 | 楽曲が存在しない、論理削除済み、またはWORLD'S END |
 | `favorite_song_limit_exceeded` | 400 | お気に入りが100件に達している（再登録時は発生しない） |
@@ -965,7 +965,7 @@ Firebase Bearer Token（必須）
 - 登録済み楽曲の再登録は成功し、登録日時を変更しません（冪等）
 - お気に入りはプレイヤー単位で保持され、最大100件です
 
-### DELETE `/internal/me/favorite-songs/:displayid`
+### DELETE `/internal/me/favorite-songs/:id`
 
 認証済みユーザーのお気に入りから楽曲を解除します。
 
@@ -977,7 +977,7 @@ Firebase Bearer Token（必須）
 
 | パラメータ | 型 | 必須 | 説明 |
 | --- | --- | --- | --- |
-| `displayid` | パス | 必須 | 楽曲識別子（16桁16進数） |
+| `id` | パス | 必須 | 楽曲識別子（16桁16進数） |
 
 #### レスポンス（204 No Content）
 
@@ -988,7 +988,7 @@ Firebase Bearer Token（必須）
 | コード | HTTP | 条件 |
 | --- | --- | --- |
 | `unauthorized` | 401 | 認証情報がない |
-| `validation_failed` | 422 | `display_id` の形式不正 |
+| `validation_failed` | 422 | `id` の形式不正 |
 | `player_not_linked` | 404 | ユーザーにプレイヤーが紐づいていない |
 
 #### 備考
@@ -1105,7 +1105,7 @@ Firebase Bearer Token（必須）
 
 フレンドランキングは、自分と双方向 `accepted` のフレンドのうち、対象譜面をプレイ済みのユーザーだけを返します。未プレイユーザーは返しません。
 
-### GET `/internal/friend-rankings/songs/:displayid/charts/:difficulty`
+### GET `/internal/friend-rankings/songs/:id/charts/:difficulty`
 
 - **認証**: Firebase Bearer 必須
 - **概要**: 通常譜面1つについて、自分と承認済みフレンド内の現在スコアランキングを取得します。
@@ -1113,7 +1113,7 @@ Firebase Bearer Token（必須）
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲の表示用ID |
 | `difficulty` | string | 難易度（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`。短縮形は既存のパス難易度変換に従う） |
 
 - **ソート・順位**:
@@ -1160,12 +1160,12 @@ Firebase Bearer Token（必須）
 `my_rank` は自分が対象譜面を未プレイの場合 `null` です。`combo_lamp` と `full_chain` はマスタ値が `NONE` の場合 `null` です。
 
 - **主なエラー**:
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
   - 400 Bad Request (`invalid_difficulty`): 難易度が不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・WORLD'S END楽曲
 
-### GET `/internal/friend-rankings/worldsend-songs/:displayid`
+### GET `/internal/friend-rankings/worldsend-songs/:id`
 
 - **認証**: Firebase Bearer 必須
 - **概要**: WORLD'S END譜面1つについて、自分と承認済みフレンド内の現在スコアランキングを取得します。
@@ -1173,7 +1173,7 @@ Firebase Bearer Token（必須）
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | WORLD'S END楽曲の表示用ID |
+| `id` | string | WORLD'S END楽曲の表示用ID |
 
 - **ソート・順位**:
   - `score` 降順
@@ -1216,7 +1216,7 @@ Firebase Bearer Token（必須）
 WORLD'S END はレーティング・OVER POWER計算の対象外のため、通常譜面で返す `const` / `is_const_unknown` / `rating` / `overpower` / `overpower_percent` は返しません。ランキング表示に必要なスコアとランプは `ranking` の各要素に含まれます。
 
 - **主なエラー**:
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
@@ -1236,12 +1236,12 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 {
   "items": [
     {
-      "display_id": "0000000000000001",
+      "id": "0000000000000001",
       "title": "楽曲名",
       "is_ultima": false
     },
     {
-      "display_id": "0000000000000002",
+      "id": "0000000000000002",
       "title": "ULTIMA未解禁の楽曲名",
       "is_ultima": true
     }
@@ -1254,7 +1254,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `items` | PlayerLockedSongResponseItem[] | 未解禁曲の一覧。未解禁曲がない場合は空配列 |
-| `items[].display_id` | string | 楽曲の表示用ID |
+| `items[].id` | string | 楽曲の表示用ID |
 | `items[].title` | string | 楽曲名 |
 | `items[].is_ultima` | bool | trueの場合はULTIMA譜面のみ未解禁、falseの場合は通常の未解禁 |
 
@@ -1270,14 +1270,14 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 ```json
 {
-  "display_id": "0000000000000001",
+  "id": "0000000000000001",
   "is_ultima": false
 }
 ```
 
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
-| `display_id` | string | ✓ | 楽曲の表示用ID |
+| `id` | string | ✓ | 楽曲の表示用ID |
 | `is_ultima` | bool | - | trueの場合はULTIMA譜面のみ未解禁として登録。省略時はfalse |
 
 - **レスポンス**: 204 No Content（ボディなし）
@@ -1286,21 +1286,21 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正
-  - 422 Unprocessable Entity (`validation_failed`): `display_id` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 404 Not Found (`song_not_found`): 楽曲が見つからない、または登録対象外
   - 404 Not Found (`chart_not_found`): ULTIMA譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### DELETE `/internal/me/locked-songs/:displayid`
+### DELETE `/internal/me/locked-songs/:id`
 - **認証**: Firebase Bearer 必須
 - **概要**: 自分のプレイヤーから指定した未解禁曲を解除します。対象の未解禁曲が存在しない場合でも204を返します。
 - **パスパラメータ**:
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
-| `displayid` | string | 楽曲の表示用ID |
+| `id` | string | 楽曲の表示用ID |
 
 - **クエリパラメータ**:
 
@@ -1312,7 +1312,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): `is_ultima` がboolとして解釈できない
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
@@ -1325,10 +1325,10 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 ```json
 {
   "add": [
-    { "display_id": "0000000000000001", "is_ultima": false }
+    { "id": "0000000000000001", "is_ultima": false }
   ],
   "delete": [
-    { "display_id": "0000000000000002", "is_ultima": true }
+    { "id": "0000000000000002", "is_ultima": true }
   ]
 }
 ```
@@ -1337,7 +1337,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 | ---------- | -- | ---- | ---- |
 | `add` | object[] | - | 追加する未解禁曲の配列 |
 | `delete` | object[] | - | 解除する未解禁曲の配列 |
-| `add[].display_id` / `delete[].display_id` | string | ✓ | 楽曲の表示用ID |
+| `add[].id` / `delete[].id` | string | ✓ | 楽曲の表示用ID |
 | `add[].is_ultima` / `delete[].is_ultima` | bool | - | true の場合はULTIMA未解禁を対象 |
 
 - **レスポンス**: 204 No Content（ボディなし）
@@ -1345,7 +1345,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式不正
-  - 422 Unprocessable Entity (`validation_failed`): `display_id` が未指定または形式不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` が未指定または形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`player_not_linked`): プレイヤーデータが連携されていない
   - 404 Not Found (`song_not_found`): 追加対象の楽曲が見つからない、または登録対象外
@@ -2857,7 +2857,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 }
 ```
 
-### GET `/internal/users/:username/record/songs/:displayid`
+### GET `/internal/users/:username/record/songs/:id`
 
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
@@ -2883,7 +2883,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 }
 ```
 
-### GET `/internal/users/:username/record/worldsend-songs/:displayid`
+### GET `/internal/users/:username/record/worldsend-songs/:id`
 
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
@@ -2901,7 +2901,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 }
 ```
 
-両APIともユーザー不存在・非公開ユーザー・楽曲不存在・パスと楽曲種別の不一致は `404` を返します。`username` または `displayid` の形式不正は `400 validation_failed` です。
+両APIともユーザー不存在・非公開ユーザー・楽曲不存在・パスと楽曲種別の不一致は `404` を返します。`username` または `id` の形式不正は `400 validation_failed` です。
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
@@ -2951,7 +2951,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "courses": [
     {
-      "display_id": "0123456789abcdef",
+      "id": "0123456789abcdef",
       "idx": "50020",
       "name": "CLASS I COURSE",
       "class": "1"
@@ -2960,7 +2960,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 }
 ```
 
-### GET `/internal/courses/:displayid`
+### GET `/internal/courses/:id`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 有効なコースマスタ単件を取得します。
@@ -2986,12 +2986,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `name` | string | ✓ | コース名。最大255文字。前後空白除去後に空不可 |
 | `class` | string | ✓ | コースクラス。`1`〜`5` / `inf` / `extra`。最大16文字 |
 
-- **レスポンス**: 201 Created。編集者向けフィールド（`id` / `is_deleted` / `updated_at`）を含むコースオブジェクト
+- **レスポンス**: 201 Created。文字列の外部識別子 `id` と編集者向けフィールド（`is_deleted` / `updated_at`）を含むコースオブジェクト
 - **主なエラー**:
   - 409 Conflict (`duplicate_official_idx`): `idx` 重複
   - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
 
-### PUT `/internal/courses/:displayid`
+### PUT `/internal/courses/:id`
 - **認証**: Firebase Bearer (EDITOR+)
 - **概要**: コース名称とクラスを更新します。`idx` は変更できません。
 - **リクエストボディ**: `{ "name": "...", "class": "..." }`
@@ -3000,14 +3000,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`not_found`): コースが存在しない
   - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
 
-### DELETE `/internal/courses/:displayid`
+### DELETE `/internal/courses/:id`
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: コースを論理削除します。
 - **レスポンス**: 204 No Content
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない
 
-### POST `/internal/courses/:displayid/restore`
+### POST `/internal/courses/:id/restore`
 - **認証**: Firebase Bearer (EDITOR+)
 - **概要**: 論理削除したコースを復元します。
 - **レスポンス**: 204 No Content
@@ -3016,9 +3016,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/internal/editor/courses`
 - **認証**: Firebase Bearer (EDITOR+)
-- **概要**: 削除済みを含むコース一覧を取得します。各要素に `id` / `is_deleted` / `updated_at` を含みます。
+- **概要**: 削除済みを含むコース一覧を取得します。各要素に文字列の外部識別子 `id` と `is_deleted` / `updated_at` を含みます。
 
-### GET `/internal/editor/courses/:displayid`
+### GET `/internal/editor/courses/:id`
 - **認証**: Firebase Bearer (EDITOR+)
 - **概要**: 削除済みを含むコース詳細を取得します。
 - **主なエラー**:
@@ -3036,7 +3036,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "courses": [
     {
-      "display_id": "0123456789abcdef",
+      "id": "0123456789abcdef",
       "idx": "50020",
       "name": "CLASS I COURSE",
       "class": "1",
@@ -3066,7 +3066,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 各要素の `courses[i].updated_at` は当該プレイ済みレコードの更新日時であり、`meta.updated_at` とは独立する。未プレイ補完データでは `null`。
 
-### GET `/internal/users/:username/record/courses/:displayid`
+### GET `/internal/users/:username/record/courses/:id`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **概要**: 指定したコースのユーザーレコード単件を返します。未プレイの場合も `is_played=false` のオブジェクトを返します。
@@ -3284,10 +3284,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/:displayid`
+### GET `/internal/songs/:id`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
 
@@ -3326,11 +3326,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/:displayid/stats/:difficulty`
+### GET `/internal/songs/:id/stats/:difficulty`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: 
-  - `displayid` - 楽曲の表示用ID
+  - `id` - 楽曲の表示用ID
   - `difficulty` - 難易度名（小文字）: `basic`, `advanced`, `expert`, `master`, `ultima`, `worldsend`
 - **概要**: 指定楽曲の特定難易度のレーティング帯別統計を取得します。削除済みの譜面は集計対象外です。
 - **レスポンス**: 200 OK
@@ -3481,13 +3481,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 422 Unprocessable Entity (`validation_failed`): `rating_band`、`limit`、`cursor` が不正
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/songs/:displayid/best-slot-stats/:difficulty`
+### GET `/internal/songs/:id/best-slot-stats/:difficulty`
 
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
 - **概要**: 指定した通常譜面について、ベスト枠平均レート帯別の採用人数、集計対象人数、採用率を取得します。WORLD'S ENDは対象外です。
 - **パスパラメータ**:
-  - `displayid`: 楽曲の表示用ID
+  - `id`: 楽曲の表示用ID
   - `difficulty`: `basic`, `advanced`, `expert`, `master`, `ultima`
 - **レスポンス**: 200 OK
 
@@ -3526,20 +3526,20 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`chart_not_found`): 指定された難易度の譜面が存在しない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/users/:username/record/songs/:displayid/:difficulty/history`
+### GET `/internal/users/:username/record/songs/:id/:difficulty/history`
 - **認証**: Firebase Bearer（任意）
 - **レート制限**: 認証なしの場合 1分間60回/IP
 - **概要**: パスで指定したユーザーについて、通常譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
   - `username`: 対象ユーザー名
-  - `displayid`: 楽曲の表示用ID
+  - `id`: 楽曲の表示用ID
   - `difficulty`: `expert`, `master`, `ultima`
 - **レスポンス**: 200 OK。形式は GET `/v1/songs/:id/score-history/:difficulty` と同一です。
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` が不正
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 400 Bad Request (`score_history_unsupported_difficulty`): 履歴対象外の難易度
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式が不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
   - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、または通常楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
@@ -3547,7 +3547,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### POST `/internal/songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **概要**: 新規楽曲（WORLD'S ENDを除く）を追加します。`display_id` はサーバーが自動生成します。
+- **概要**: 新規楽曲（WORLD'S ENDを除く）を追加します。`id` はサーバーが自動生成します。
 - **リクエスト**: JSON オブジェクト
 
 ```json
@@ -3593,7 +3593,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **レスポンス**: `201 Created` — 作成された楽曲情報（EditorSong形式）
 
-レスポンスフィールドの詳細は GET `/internal/editor/songs/:displayid` と同様です。
+レスポンスフィールドの詳細は GET `/internal/editor/songs/:id` と同様です。
 
 - **エラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式が不正
@@ -3659,7 +3659,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `notes_designer` | string \| null | | 譜面製作者名（100文字以下、nullの場合DBをNULLに更新） |
 
 **注意事項**:
-- リクエスト配列内で `id`（display_id）が重複している場合はエラーになります。
+- リクエスト配列内で `id` が重複している場合はエラーになります。
 - WORLD'S END楽曲（`is_worldsend = 1`）の `id` を指定した場合、このエンドポイントでは更新できずエラーになります。
 - マスタに存在しないジャンル名を指定するとエラーになります。
 - `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
@@ -3674,10 +3674,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
-### DELETE `/internal/songs/:displayid`
+### DELETE `/internal/songs/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
@@ -3687,10 +3687,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### POST `/internal/songs/:displayid/restore`
+### POST `/internal/songs/:id/restore`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定されたDisplayIDの削除済み楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
@@ -3763,10 +3763,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`invalid_token`): Bearerトークンが指定されているが不正
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/worldsend-songs/:displayid`
+### GET `/internal/worldsend-songs/:id`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を譜面情報付きで取得します。削除済み楽曲も取得可能です。
 - **レスポンス**: 200 OK
 
@@ -3795,17 +3795,17 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/users/:username/record/worldsend-songs/:displayid/history`
+### GET `/internal/users/:username/record/worldsend-songs/:id/history`
 - **認証**: Firebase Bearer（任意）
 - **レート制限**: 認証なしの場合 1分間60回/IP
 - **概要**: パスで指定したユーザーについて、WORLD'S END譜面の現行ベストと過去のベストを新しい順で取得します。公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
 - **パスパラメータ**:
   - `username`: 対象ユーザー名
-  - `displayid`: WORLD'S END楽曲の表示用ID
+  - `id`: WORLD'S END楽曲の表示用ID
 - **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:id/score-history` と同一です。
 - **主なエラー**:
   - 400 Bad Request (`validation_failed`): `username` が不正
-  - 422 Unprocessable Entity (`validation_failed`): `displayid` の形式が不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
   - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、またはWORLD'S END楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
@@ -3813,7 +3813,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### POST `/internal/worldsend-songs`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **概要**: 新規 WORLD'S END 楽曲を追加します。`display_id` はサーバーが自動生成します。
+- **概要**: 新規 WORLD'S END 楽曲を追加します。`id` はサーバーが自動生成します。
 - **リクエスト**: JSON オブジェクト
 
 ```json
@@ -3855,7 +3855,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **レスポンス**: `201 Created` — 作成された WORLD'S END 楽曲情報（EditorWorldsendSong形式）
 
-レスポンスフィールドの詳細は GET `/internal/editor/worldsend-songs/:displayid` と同様です。
+レスポンスフィールドの詳細は GET `/internal/editor/worldsend-songs/:id` と同様です。
 
 - **エラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式が不正
@@ -3923,7 +3923,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - `charts` を省略または `null` にした場合、譜面情報は更新されません（楽曲情報のみ更新されます）
 - `charts` を指定する場合は `WORLDSEND` キーのみ指定可能です（大文字固定）
 - `charts` で `WORLDSEND` 以外のキーを指定するとエラーになります
-- リクエスト配列内で `id`（display_id）が重複している場合はエラーになります
+- リクエスト配列内で `id` が重複している場合はエラーになります
 - マスタに存在しないジャンル名を指定するとエラーになります
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます
 
@@ -3937,10 +3937,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 422 Unprocessable Entity (`validation_failed`): バリデーションエラー
   - 500 Internal Server Error (`internal_error`): 楽曲・譜面・マスタ不整合などのサーバー内部エラー
 
-### DELETE `/internal/worldsend-songs/:displayid`
+### DELETE `/internal/worldsend-songs/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の WORLD'S END 楽曲を論理削除します。物理削除ではなく、`is_deleted` フラグを `true` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
@@ -3950,10 +3950,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`song_not_found`): 楽曲が見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### POST `/internal/worldsend-songs/:displayid/restore`
+### POST `/internal/worldsend-songs/:id/restore`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 指定された DisplayID の削除済み WORLD'S END 楽曲を復活させます。`is_deleted` フラグを `false` に設定します。
 - **レスポンス**: 204 No Content（成功時）
 
@@ -4086,10 +4086,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/editor/songs/:displayid`
+### GET `/internal/editor/songs/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの通常楽曲を取得します。削除済みも取得対象です。
 - **レスポンス**: 200 OK (`EditorSongDTO`)
 
@@ -4138,10 +4138,10 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 403 Forbidden (`forbidden`): 権限不足（PLAYER権限ではアクセス不可）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
-### GET `/internal/editor/worldsend-songs/:displayid`
+### GET `/internal/editor/worldsend-songs/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: EDITOR または ADMIN 権限が必要
-- **パスパラメータ**: `displayid` - 楽曲の表示用ID
+- **パスパラメータ**: `id` - 楽曲の表示用ID
 - **概要**: 編集者向けに、指定されたDisplayIDの WORLD'S END 楽曲を取得します。削除済みも取得対象です。
 - **レスポンス**: 200 OK (`EditorWorldsendSongDTO`)
 
@@ -4663,7 +4663,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 - **レスポンス**: 200 OK
 
-レスポンス形式は GET `/internal/songs/:displayid/stats/:difficulty` と同様です。
+レスポンス形式は GET `/internal/songs/:id/stats/:difficulty` と同様です。
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
@@ -4903,7 +4903,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/courses`
 - **認証**: APIトークン必須
-- **概要**: 有効なコースマスタ一覧を取得します。識別子は `id`（内部APIの `display_id` と同じ値）です。
+- **概要**: 有効なコースマスタ一覧を取得します。識別子 `id` は内部APIと同じ外部識別子です。
 - **レスポンス**: 200 OK
 
 ```json
@@ -5405,7 +5405,7 @@ interface WorldsendRecordDTO {
 }
 
 interface CourseRecordDTO {
-  display_id: string;
+  id: string;
   idx: string;
   name: string;
   class: string;

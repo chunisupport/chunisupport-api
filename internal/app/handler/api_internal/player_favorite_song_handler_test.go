@@ -68,7 +68,7 @@ func TestPlayerFavoriteSongHandler_List(t *testing.T) {
 		err := handler.List(c)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"items":[{"display_id":"1234567890abcdef","title":"テスト楽曲","jacket":"test.jpg","favorited_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
+		assert.JSONEq(t, `{"items":[{"id":"1234567890abcdef","title":"テスト楽曲","jacket":"test.jpg","favorited_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
 	})
 
 	t.Run("不正なusernameは拒否する", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestPlayerFavoriteSongHandler_Add(t *testing.T) {
 				return nil
 			},
 		})
-		body := `{"display_id":"1234567890abcdef"}`
+		body := `{"id":"1234567890abcdef"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/favorite-songs", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestPlayerFavoriteSongHandler_Add(t *testing.T) {
 		e := echo.New()
 		e.Validator = &testValidator{validator: validator.New()}
 		handler := NewPlayerFavoriteSongHandler(&mockPlayerFavoriteSongUsecase{})
-		body := `{"display_id":"1234567890abcdef"}`
+		body := `{"id":"1234567890abcdef"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/favorite-songs", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -164,11 +164,11 @@ func TestPlayerFavoriteSongHandler_Add(t *testing.T) {
 		assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
 	})
 
-	t.Run("不正なdisplay_idでvalidation_failed", func(t *testing.T) {
+	t.Run("不正なidでvalidation_failed", func(t *testing.T) {
 		e := echo.New()
 		e.Validator = &testValidator{validator: validator.New()}
 		handler := NewPlayerFavoriteSongHandler(&mockPlayerFavoriteSongUsecase{})
-		body := `{"display_id":"invalid"}`
+		body := `{"id":"invalid"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/favorite-songs", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -186,7 +186,7 @@ func TestPlayerFavoriteSongHandler_Add(t *testing.T) {
 		e := echo.New()
 		e.Validator = &testValidator{validator: validator.New()}
 		handler := NewPlayerFavoriteSongHandler(&mockPlayerFavoriteSongUsecase{})
-		body := `{"display_id":"1234567890abcdef","unknown_field":"test"}`
+		body := `{"id":"1234567890abcdef","unknown_field":"test"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/favorite-songs", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -208,7 +208,7 @@ func TestPlayerFavoriteSongHandler_Add(t *testing.T) {
 				return usecase.ErrPlayerFavoriteSongLimitExceeded
 			},
 		})
-		body := `{"display_id":"1234567890abcdef"}`
+		body := `{"id":"1234567890abcdef"}`
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/favorite-songs", strings.NewReader(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
@@ -240,7 +240,7 @@ func TestPlayerFavoriteSongHandler_Remove(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "1234567890abcdef"}})
+		c.SetPathValues(echo.PathValues{{Name: "id", Value: "1234567890abcdef"}})
 
 		err := handler.Remove(c)
 		require.NoError(t, err)
@@ -248,14 +248,14 @@ func TestPlayerFavoriteSongHandler_Remove(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 	})
 
-	t.Run("不正なdisplay_idでvalidation_failed", func(t *testing.T) {
+	t.Run("不正なidでvalidation_failed", func(t *testing.T) {
 		e := echo.New()
 		handler := NewPlayerFavoriteSongHandler(&mockPlayerFavoriteSongUsecase{})
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me/favorite-songs/invalid", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set("userEntity", &entity.User{ID: 1})
-		c.SetPathValues(echo.PathValues{{Name: "displayid", Value: "invalid"}})
+		c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
 
 		err := handler.Remove(c)
 		require.Error(t, err)
