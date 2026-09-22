@@ -38,6 +38,8 @@ type FriendScoreComparisonChartRecord struct {
 	SongArtist     string
 	ChartConst     chartconstant.ChartConstant
 	IsConstUnknown bool
+	LevelStar      *int
+	Attribute      *string
 	Self           *FriendScoreComparisonPlay
 	Friend         *FriendScoreComparisonPlay
 }
@@ -56,4 +58,6 @@ type FriendScoreComparisonQueryService interface {
 		friendPlayerID int,
 		difficulty string,
 	) ([]*FriendScoreComparisonChartRecord, error)
+
+	ListWorldsendChartRecords(ctx context.Context, selfPlayerID int, friendPlayerID int) ([]*FriendScoreComparisonChartRecord, error)
 }

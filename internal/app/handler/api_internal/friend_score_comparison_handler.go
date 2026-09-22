@@ -7,6 +7,7 @@ import (
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 )
@@ -42,22 +43,43 @@ func (h *FriendScoreComparisonHandler) Get(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toFriendScoreComparisonResponse(result))
 }
 
+func (h *FriendScoreComparisonHandler) GetWorldsend(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
+	if apiErr != nil {
+		return apiErr
+	}
+	result, err := h.usecase.GetWorldsend(c.Request().Context(), user.ID, username)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, toFriendScoreComparisonResponse(result))
+}
+
 func toFriendScoreComparisonResponse(result *usecase.FriendScoreComparisonResult) *internaldto.FriendScoreComparisonResponse {
 	if result == nil {
 		return nil
 	}
 	items := make([]internaldto.FriendScoreComparisonItemDTO, 0, len(result.Items))
 	for _, item := range result.Items {
+		chart := internaldto.FriendScoreComparisonChartDTO{}
+		if result.Difficulty == info.StatsDifficultyWorldsend {
+			chart.LevelStar = &item.Chart.LevelStar
+			chart.Attribute = &item.Chart.Attribute
+		} else {
+			chart.Const = &item.Chart.Const
+			chart.IsConstUnknown = &item.Chart.IsConstUnknown
+		}
 		items = append(items, internaldto.FriendScoreComparisonItemDTO{
 			Song: internaldto.FriendScoreComparisonSongDTO{
 				ID:     item.Song.ID,
 				Title:  item.Song.Title,
 				Artist: item.Song.Artist,
 			},
-			Chart: internaldto.FriendScoreComparisonChartDTO{
-				Const:          item.Chart.Const,
-				IsConstUnknown: item.Chart.IsConstUnknown,
-			},
+			Chart:           chart,
 			Self:            toFriendScoreComparisonRecordDTO(item.Self),
 			Friend:          toFriendScoreComparisonRecordDTO(item.Friend),
 			ScoreDifference: item.ScoreDifference,

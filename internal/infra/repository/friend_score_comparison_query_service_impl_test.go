@@ -119,6 +119,55 @@ func TestFriendScoreComparisonQueryService_ListChartRecords_他難易度と対�
 	assert.Empty(t, ultimaRecords)
 }
 
+func TestFriendScoreComparisonQueryService_ListWorldsendChartRecords_有効譜面と記録を返す(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	setupFriendScoreComparisonDB(t, db)
+	_, err := db.Exec(`
+		CREATE TABLE worldsend_charts (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL, level_star INTEGER, attribute TEXT);
+		CREATE TABLE player_worldsend_records (
+			player_id INTEGER NOT NULL, worldsend_chart_id INTEGER NOT NULL, score INTEGER NOT NULL,
+			clear_lamp_id INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, full_chain_id INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL
+		);
+		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted) VALUES
+			(10, '0000000000000010', '未プレイ', '作曲者', 1, '10', 1, 0),
+			(20, '0000000000000020', 'スコア0', '作曲者', 1, '20', 1, 0),
+			(30, '0000000000000030', '両者プレイ', '作曲者', 1, '30', 1, 0),
+			(40, '0000000000000040', '削除', '作曲者', 1, '40', 1, 1),
+			(50, '0000000000000050', '通常', '作曲者', 1, '50', 0, 0);
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute) VALUES
+			(10, 10, NULL, NULL), (20, 20, 3, '光'), (30, 30, 4, '蔵'), (40, 40, 5, '狂'), (50, 50, 2, '改');
+		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at) VALUES
+			(101, 20, 0, 2, 1, 1, '2026-07-20T10:00:00Z'),
+			(101, 30, 1009000, 1, 2, 1, '2026-07-20T10:00:00Z'),
+			(102, 30, 1007500, 1, 1, 1, '2026-07-19T10:00:00Z'),
+			(101, 40, 1010000, 1, 2, 1, '2026-07-20T10:00:00Z');
+	`)
+	require.NoError(t, err)
+
+	records, err := NewFriendScoreComparisonQueryService(db).ListWorldsendChartRecords(context.Background(), 101, 102)
+
+	require.NoError(t, err)
+	require.Len(t, records, 3)
+	assert.Equal(t, []string{"0000000000000010", "0000000000000020", "0000000000000030"}, []string{
+		records[0].SongDisplayID, records[1].SongDisplayID, records[2].SongDisplayID,
+	})
+	assert.Nil(t, records[0].LevelStar)
+	assert.Nil(t, records[0].Attribute)
+	assert.Nil(t, records[0].Self)
+	assert.Nil(t, records[0].Friend)
+	require.NotNil(t, records[1].Self)
+	assert.Equal(t, uint32(0), records[1].Self.Score)
+	assert.Nil(t, records[1].Friend)
+	require.NotNil(t, records[2].LevelStar)
+	assert.Equal(t, 4, *records[2].LevelStar)
+	require.NotNil(t, records[2].Attribute)
+	assert.Equal(t, "蔵", *records[2].Attribute)
+	assert.Equal(t, uint32(1009000), records[2].Self.Score)
+	assert.Equal(t, uint32(1007500), records[2].Friend.Score)
+}
+
 func setupFriendScoreComparisonDB(t *testing.T, db *sqlx.DB) {
 	t.Helper()
 	_, err := db.Exec(`

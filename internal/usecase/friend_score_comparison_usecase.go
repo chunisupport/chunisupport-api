@@ -7,6 +7,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 const (
@@ -32,6 +33,8 @@ type FriendScoreComparisonSong struct {
 type FriendScoreComparisonChart struct {
 	Const          chartconstant.ChartConstant
 	IsConstUnknown bool
+	LevelStar      *int
+	Attribute      *string
 }
 
 // FriendScoreComparisonRecord は未プレイを正規化した1人分の現在レコードです。
@@ -80,6 +83,7 @@ type FriendScoreComparisonResult struct {
 // FriendScoreComparisonUsecase は承認済みフレンドとの譜面スコア比較を提供します。
 type FriendScoreComparisonUsecase interface {
 	Get(ctx context.Context, selfUserID int, friendUsername string, difficulty string) (*FriendScoreComparisonResult, error)
+	GetWorldsend(ctx context.Context, selfUserID int, friendUsername string) (*FriendScoreComparisonResult, error)
 }
 
 type friendScoreComparisonUsecase struct {
@@ -114,6 +118,25 @@ func (u *friendScoreComparisonUsecase) Get(ctx context.Context, selfUserID int, 
 	return buildFriendScoreComparisonResult(difficulty, pair, rows), nil
 }
 
+func (u *friendScoreComparisonUsecase) GetWorldsend(ctx context.Context, selfUserID int, friendUsername string) (*FriendScoreComparisonResult, error) {
+	pair, err := u.query.FindAcceptedFriendPair(ctx, selfUserID, friendUsername)
+	if err != nil {
+		return nil, err
+	}
+	if pair == nil {
+		return nil, ErrFriendNotFound
+	}
+	if pair.Self.PlayerID == nil || pair.Friend.PlayerID == nil {
+		return nil, ErrFriendScoreComparisonUnavailable
+	}
+
+	rows, err := u.query.ListWorldsendChartRecords(ctx, *pair.Self.PlayerID, *pair.Friend.PlayerID)
+	if err != nil {
+		return nil, err
+	}
+	return buildFriendScoreComparisonResult(info.StatsDifficultyWorldsend, pair, rows), nil
+}
+
 func buildFriendScoreComparisonResult(difficulty string, pair *repository.FriendScoreComparisonUsers, rows []*repository.FriendScoreComparisonChartRecord) *FriendScoreComparisonResult {
 	result := &FriendScoreComparisonResult{
 		Difficulty: difficulty,
@@ -142,6 +165,8 @@ func buildFriendScoreComparisonResult(difficulty string, pair *repository.Friend
 			Chart: FriendScoreComparisonChart{
 				Const:          row.ChartConst,
 				IsConstUnknown: row.IsConstUnknown,
+				LevelStar:      row.LevelStar,
+				Attribute:      row.Attribute,
 			},
 			Self:            selfRecord,
 			Friend:          friendRecord,

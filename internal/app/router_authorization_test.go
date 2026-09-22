@@ -55,6 +55,11 @@ func (s *stubFriendScoreComparisonUsecase) Get(context.Context, int, string, str
 	return &usecase.FriendScoreComparisonResult{Items: []usecase.FriendScoreComparisonItem{}}, nil
 }
 
+func (s *stubFriendScoreComparisonUsecase) GetWorldsend(context.Context, int, string) (*usecase.FriendScoreComparisonResult, error) {
+	s.calls++
+	return &usecase.FriendScoreComparisonResult{Items: []usecase.FriendScoreComparisonItem{}}, nil
+}
+
 func (s stubMaintenanceUsecase) Current() usecase.MaintenanceState {
 	return s.state
 }
@@ -572,6 +577,42 @@ func TestRegisterRoutes_フレンドスコア比較はstrict認証を要求す�
 			require.Equal(t, tt.wantStatus, rec.Code)
 			assert.Equal(t, tt.wantAuthCalls, strictAuth.authenticateCalls)
 			assert.Equal(t, tt.wantUsecase, comparisonUsecase.calls)
+			assert.Zero(t, readOptimizedAuth.authenticateCalls)
+			assert.Zero(t, readOptimizedAuth.authenticateOptionalCalls)
+		})
+	}
+}
+
+func TestRegisterRoutes_Worldsendフレンドスコア比較はstrict認証を要求する(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		token      string
+		wantStatus int
+		wantCalls  int
+	}{
+		{name: "未認証", wantStatus: http.StatusUnauthorized},
+		{name: "認証済み", token: "player-token", wantStatus: http.StatusOK, wantCalls: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			handlers := newAuthorizationTestHandlers()
+			comparisonUsecase := &stubFriendScoreComparisonUsecase{}
+			handlers.FriendScoreComparison = internalhandler.NewFriendScoreComparisonHandler(comparisonUsecase)
+			strictAuth := &roleCountingAuthenticator{}
+			readOptimizedAuth := &countingAuthenticator{}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/friend-comparisons/frienduser/worldsend", nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			e.ServeHTTP(rec, req)
+
+			require.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantCalls, comparisonUsecase.calls)
+			assert.Equal(t, tt.wantCalls, strictAuth.authenticateCalls)
 			assert.Zero(t, readOptimizedAuth.authenticateCalls)
 			assert.Zero(t, readOptimizedAuth.authenticateOptionalCalls)
 		})

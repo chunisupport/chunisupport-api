@@ -483,6 +483,7 @@ func registerRoutes(
 	friendComparisonGroup.Use(firebaseAuthStrict)
 	{
 		friendComparisonGroup.GET("/:username/charts/:difficulty", handlers.FriendScoreComparison.Get)
+		friendComparisonGroup.GET("/:username/worldsend", handlers.FriendScoreComparison.GetWorldsend)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")

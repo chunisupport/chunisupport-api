@@ -32,6 +32,61 @@ func (s *stubFriendScoreComparisonUsecase) Get(ctx context.Context, selfUserID i
 	return s.result, s.err
 }
 
+func (s *stubFriendScoreComparisonUsecase) GetWorldsend(ctx context.Context, selfUserID int, friendUsername string) (*usecase.FriendScoreComparisonResult, error) {
+	s.calls++
+	s.username = friendUsername
+	return s.result, s.err
+}
+
+func TestFriendScoreComparisonHandler_Worldsend専用の譜面情報を返す(t *testing.T) {
+	levelStar := 4
+	attribute := "蔵"
+	stub := &stubFriendScoreComparisonUsecase{result: &usecase.FriendScoreComparisonResult{
+		Difficulty: "WORLD'S END",
+		Items: []usecase.FriendScoreComparisonItem{{
+			Chart: usecase.FriendScoreComparisonChart{LevelStar: &levelStar, Attribute: &attribute},
+		}},
+	}}
+	e := echo.New()
+	handler := NewFriendScoreComparisonHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/internal/friend-comparisons/frienduser/worldsend", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
+	c.Set("userEntity", &entity.User{ID: 7})
+
+	err := handler.GetWorldsend(c)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 1, stub.calls)
+	assert.Equal(t, "frienduser", stub.username)
+	assert.JSONEq(t, `{"level_star":4,"attribute":"蔵"}`, extractFriendComparisonChartJSON(t, rec.Body.Bytes()))
+	assert.Contains(t, rec.Body.String(), `"difficulty":"WORLD'S END"`)
+}
+
+func TestFriendScoreComparisonResponse_Worldsend譜面情報未設定はnullを返す(t *testing.T) {
+	response := toFriendScoreComparisonResponse(&usecase.FriendScoreComparisonResult{
+		Difficulty: "WORLD'S END",
+		Items:      []usecase.FriendScoreComparisonItem{{}},
+	})
+	body, err := json.Marshal(response)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"level_star":null,"attribute":null}`, extractFriendComparisonChartJSON(t, body))
+}
+
+func extractFriendComparisonChartJSON(t *testing.T, body []byte) string {
+	t.Helper()
+	var response struct {
+		Items []struct {
+			Chart json.RawMessage `json:"chart"`
+		} `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(body, &response))
+	require.Len(t, response.Items, 1)
+	return string(response.Items[0].Chart)
+}
+
 func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testing.T) {
 	// Given
 	updatedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)

@@ -212,6 +212,55 @@ func TestFriendScoreComparisonUsecase_Get_許可されていない難易度はRe
 	}
 }
 
+func TestFriendScoreComparisonUsecase_GetWorldsend_専用譜面を比較する(t *testing.T) {
+	levelStar := 4
+	attribute := "蔵"
+	updatedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
+	query := &friendScoreComparisonQueryMock{
+		pair: acceptedComparisonPair(101, 102),
+		worldsendRecords: []*repository.FriendScoreComparisonChartRecord{{
+			SongDisplayID: "0000000000000006",
+			LevelStar:     &levelStar,
+			Attribute:     &attribute,
+			Self:          playedComparison(1009000, updatedAt),
+		}},
+	}
+	u := NewFriendScoreComparisonUsecase(query)
+
+	result, err := u.GetWorldsend(context.Background(), 1, "frienduser")
+
+	require.NoError(t, err)
+	assert.Equal(t, "WORLD'S END", result.Difficulty)
+	assert.Equal(t, 1, query.worldsendCalls)
+	assert.Zero(t, query.listCalls)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, &levelStar, result.Items[0].Chart.LevelStar)
+	assert.Equal(t, &attribute, result.Items[0].Chart.Attribute)
+	assert.Equal(t, FriendScoreComparisonSelfWin, result.Items[0].Result)
+	assert.Equal(t, 1, result.Summary.SelfOnlyPlayed)
+}
+
+func TestFriendScoreComparisonUsecase_GetWorldsend_未承認と未連携は取得しない(t *testing.T) {
+	tests := []struct {
+		name string
+		pair *repository.FriendScoreComparisonUsers
+		want error
+	}{
+		{name: "未承認", want: ErrFriendNotFound},
+		{name: "未連携", pair: acceptedComparisonPair(101, 102), want: ErrFriendScoreComparisonUnavailable},
+	}
+	tests[1].pair.Friend.PlayerID = nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query := &friendScoreComparisonQueryMock{pair: tt.pair}
+			result, err := NewFriendScoreComparisonUsecase(query).GetWorldsend(context.Background(), 1, "frienduser")
+			assert.Nil(t, result)
+			assert.ErrorIs(t, err, tt.want)
+			assert.Zero(t, query.worldsendCalls)
+		})
+	}
+}
+
 func TestFriendScoreComparisonUsecase_Get_フレンドでない場合は比較行を取得しない(t *testing.T) {
 	// Given
 	query := &friendScoreComparisonQueryMock{}
@@ -284,13 +333,15 @@ func TestFriendScoreComparisonUsecase_Get_比較対象譜面0件は空レスポ�
 }
 
 type friendScoreComparisonQueryMock struct {
-	pair           *repository.FriendScoreComparisonUsers
-	pairErr        error
-	records        []*repository.FriendScoreComparisonChartRecord
-	recordsErr     error
-	findCalls      int
-	listCalls      int
-	listDifficulty string
+	pair             *repository.FriendScoreComparisonUsers
+	pairErr          error
+	records          []*repository.FriendScoreComparisonChartRecord
+	recordsErr       error
+	worldsendRecords []*repository.FriendScoreComparisonChartRecord
+	worldsendCalls   int
+	findCalls        int
+	listCalls        int
+	listDifficulty   string
 }
 
 func (m *friendScoreComparisonQueryMock) FindAcceptedFriendPair(ctx context.Context, selfUserID int, friendUsername string) (*repository.FriendScoreComparisonUsers, error) {
@@ -302,6 +353,11 @@ func (m *friendScoreComparisonQueryMock) ListChartRecords(ctx context.Context, s
 	m.listCalls++
 	m.listDifficulty = difficulty
 	return m.records, m.recordsErr
+}
+
+func (m *friendScoreComparisonQueryMock) ListWorldsendChartRecords(ctx context.Context, selfPlayerID int, friendPlayerID int) ([]*repository.FriendScoreComparisonChartRecord, error) {
+	m.worldsendCalls++
+	return m.worldsendRecords, m.recordsErr
 }
 
 func acceptedComparisonPair(selfPlayerID int, friendPlayerID int) *repository.FriendScoreComparisonUsers {

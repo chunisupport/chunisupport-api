@@ -45,8 +45,10 @@ type FriendScoreComparisonSongDTO struct {
 
 // FriendScoreComparisonChartDTO は比較対象譜面の公開概要です。
 type FriendScoreComparisonChartDTO struct {
-	Const          chartconstant.ChartConstant `json:"const"`
-	IsConstUnknown bool                        `json:"is_const_unknown"`
+	Const          *chartconstant.ChartConstant `json:"const,omitempty"`
+	IsConstUnknown *bool                        `json:"is_const_unknown,omitempty"`
+	LevelStar      **int                        `json:"level_star,omitempty"`
+	Attribute      **string                     `json:"attribute,omitempty"`
 }
 
 // FriendScoreComparisonItemDTO は1譜面の比較結果です。

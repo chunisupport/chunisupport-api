@@ -239,6 +239,7 @@ Content-Type: application/json
 | `/internal/friend-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/friend-rankings/worldsend-songs/:id` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
 | `/internal/friend-comparisons/:username/charts/:difficulty` | GET | Firebase Bearer | 承認済みフレンドとの指定難易度スコア比較 |
+| `/internal/friend-comparisons/:username/worldsend` | GET | Firebase Bearer | 承認済みフレンドとのWORLD'S ENDスコア比較 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -1226,9 +1227,9 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 
 ## `/internal/friend-comparisons` グループ
 
-承認済みの双方向フレンド1人と、指定した1難易度の全有効通常譜面を比較します。WORLD'S END、コース、全難易度の一括取得は対象外です。公開アカウントであっても、承認済みフレンドでなければ比較できません。
+承認済みの双方向フレンド1人と、指定した1難易度の全有効通常譜面または全有効WORLD'S END譜面を比較します。コースと全難易度の一括取得は対象外です。公開アカウントであっても、承認済みフレンドでなければ比較できません。
 
-未プレイも比較と集計の対象です。未プレイは `is_played: false`、`score: 0`、ランプと `updated_at` は `null` に正規化します。`is_played` はスコア値ではなく `player_records` 行の有無で判定するため、スコア0のレコードはプレイ済みです。
+未プレイも比較と集計の対象です。未プレイは `is_played: false`、`score: 0`、ランプと `updated_at` は `null` に正規化します。`is_played` はスコア値ではなく、通常譜面は `player_records`、WORLD'S ENDは `player_worldsend_records` の行の有無で判定するため、スコア0のレコードはプレイ済みです。
 
 `score_difference` は常に `self.score - friend.score` です。自分のスコアが大きければ `SELF_WIN`、小さければ `FRIEND_WIN`、同じならランプや更新日時にかかわらず `DRAW` です。両者未プレイ、および片方だけプレイ済みでもスコア0の場合は引き分けです。
 
@@ -1321,6 +1322,33 @@ friend_played = both_played + friend_only_played
   - 404 Not Found (`friend_not_found`): 承認済み双方向フレンドではない、自分自身を指定した、または対象ユーザーが存在しない
   - 409 Conflict (`friend_score_comparison_unavailable`): 自分または承認済みフレンドがプレイヤーデータ未連携
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/friend-comparisons/:username/worldsend`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分と指定した承認済みフレンドについて、全有効WORLD'S END譜面のスコア比較と集計を返します。ページングはありません。
+- **パスパラメータ**: `username` はフレンド一覧APIが返すユーザー名です。
+- **並び順**: `items` は楽曲マスタの内部ID昇順です。
+- **レスポンス**: 通常譜面の比較と同じ `self`、`friend`、`summary`、`items` の構造です。`difficulty` は `WORLD'S END`、各 `chart` は `level_star` と `attribute` を持ちます。値が未設定の場合もフィールドを返し、値は `null` です。`const` と `is_const_unknown` は返しません。
+
+```json
+{
+  "difficulty": "WORLD'S END",
+  "self": {"username": "myuser", "player_name": "MY PLAYER"},
+  "friend": {"username": "frienduser", "player_name": "FRIEND"},
+  "summary": {"total_charts": 1, "self_wins": 1, "draws": 0, "friend_wins": 0, "self_played": 1, "friend_played": 0, "both_played": 0, "self_only_played": 1, "friend_only_played": 0, "both_unplayed": 0},
+  "items": [{
+    "song": {"id": "0000000000000006", "title": "楽曲名", "artist": "アーティスト名"},
+    "chart": {"level_star": 4, "attribute": "蔵"},
+    "self": {"is_played": true, "score": 1009000, "clear_lamp": "CLEAR", "combo_lamp": null, "full_chain": null, "updated_at": "2026-07-20T10:00:00Z"},
+    "friend": {"is_played": false, "score": 0, "clear_lamp": null, "combo_lamp": null, "full_chain": null, "updated_at": null},
+    "score_difference": 1009000,
+    "result": "SELF_WIN"
+  }]
+}
+```
+
+対象譜面が0件でも集計0かつ `items: []` を返します。エラーは通常譜面の比較と共通ですが、難易度パラメータがないため `invalid_difficulty` は発生しません。
 
 ### GET `/internal/users/:username/locked-songs`
 - **認証**: Firebase Bearer 任意

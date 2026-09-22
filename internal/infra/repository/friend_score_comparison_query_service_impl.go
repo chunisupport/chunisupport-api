@@ -39,6 +39,8 @@ type friendScoreComparisonChartRow struct {
 	SongArtist          string                      `db:"song_artist"`
 	ChartConst          chartconstant.ChartConstant `db:"chart_const"`
 	IsConstUnknown      bool                        `db:"is_const_unknown"`
+	LevelStar           *int                        `db:"level_star"`
+	Attribute           *string                     `db:"attribute"`
 	SelfRecordChartID   *int64                      `db:"self_record_chart_id"`
 	FriendRecordChartID *int64                      `db:"friend_record_chart_id"`
 	SelfScore           sql.NullInt64               `db:"self_score"`
@@ -128,6 +130,8 @@ func (q *FriendScoreComparisonQueryService) ListChartRecords(
 			s.artist AS song_artist,
 			c.const AS chart_const,
 			c.is_const_unknown AS is_const_unknown,
+			NULL AS level_star,
+			NULL AS attribute,
 			self_pr.chart_id AS self_record_chart_id,
 			friend_pr.chart_id AS friend_record_chart_id,
 			self_pr.score AS self_score,
@@ -164,15 +168,70 @@ func (q *FriendScoreComparisonQueryService) ListChartRecords(
 	if err := sqlx.SelectContext(ctx, q.db, &rows, query, selfPlayerID, friendPlayerID, difficulty); err != nil {
 		return nil, wrapFriendScoreComparisonQueryError("list chart records", err)
 	}
+	return mapFriendScoreComparisonRows(rows, "list chart records")
+}
+
+func (q *FriendScoreComparisonQueryService) ListWorldsendChartRecords(
+	ctx context.Context,
+	selfPlayerID int,
+	friendPlayerID int,
+) ([]*domainrepo.FriendScoreComparisonChartRecord, error) {
+	const query = `
+		SELECT
+			s.display_id AS song_display_id,
+			s.title AS song_title,
+			s.artist AS song_artist,
+			0 AS chart_const,
+			1 AS is_const_unknown,
+			wc.level_star AS level_star,
+			wc.attribute AS attribute,
+			self_pwr.worldsend_chart_id AS self_record_chart_id,
+			friend_pwr.worldsend_chart_id AS friend_record_chart_id,
+			self_pwr.score AS self_score,
+			self_cl.name AS self_clear_lamp,
+			self_co.name AS self_combo_lamp,
+			self_fc.name AS self_full_chain,
+			self_pwr.updated_at AS self_updated_at,
+			friend_pwr.score AS friend_score,
+			friend_cl.name AS friend_clear_lamp,
+			friend_co.name AS friend_combo_lamp,
+			friend_fc.name AS friend_full_chain,
+			friend_pwr.updated_at AS friend_updated_at
+		FROM worldsend_charts wc
+		INNER JOIN songs s ON s.id = wc.song_id
+		LEFT JOIN player_worldsend_records self_pwr
+			ON self_pwr.worldsend_chart_id = wc.id
+		   AND self_pwr.player_id = ?
+		LEFT JOIN player_worldsend_records friend_pwr
+			ON friend_pwr.worldsend_chart_id = wc.id
+		   AND friend_pwr.player_id = ?
+		LEFT JOIN clear_lamp_types self_cl ON self_cl.id = self_pwr.clear_lamp_id
+		LEFT JOIN combo_lamp_types self_co ON self_co.id = self_pwr.combo_lamp_id
+		LEFT JOIN full_chain_types self_fc ON self_fc.id = self_pwr.full_chain_id
+		LEFT JOIN clear_lamp_types friend_cl ON friend_cl.id = friend_pwr.clear_lamp_id
+		LEFT JOIN combo_lamp_types friend_co ON friend_co.id = friend_pwr.combo_lamp_id
+		LEFT JOIN full_chain_types friend_fc ON friend_fc.id = friend_pwr.full_chain_id
+		WHERE s.is_deleted = 0
+		  AND s.is_worldsend = 1
+		ORDER BY s.id ASC
+	`
+	var rows []friendScoreComparisonChartRow
+	if err := sqlx.SelectContext(ctx, q.db, &rows, query, selfPlayerID, friendPlayerID); err != nil {
+		return nil, wrapFriendScoreComparisonQueryError("list worldsend chart records", err)
+	}
+	return mapFriendScoreComparisonRows(rows, "list worldsend chart records")
+}
+
+func mapFriendScoreComparisonRows(rows []friendScoreComparisonChartRow, operation string) ([]*domainrepo.FriendScoreComparisonChartRecord, error) {
 	records := make([]*domainrepo.FriendScoreComparisonChartRecord, 0, len(rows))
 	for _, row := range rows {
 		selfPlay, err := comparisonPlay(row.SelfRecordChartID, row.SelfScore, row.SelfClearLamp, row.SelfComboLamp, row.SelfFullChain, row.SelfUpdatedAt)
 		if err != nil {
-			return nil, wrapFriendScoreComparisonQueryError("list chart records", err)
+			return nil, wrapFriendScoreComparisonQueryError(operation, err)
 		}
 		friendPlay, err := comparisonPlay(row.FriendRecordChartID, row.FriendScore, row.FriendClearLamp, row.FriendComboLamp, row.FriendFullChain, row.FriendUpdatedAt)
 		if err != nil {
-			return nil, wrapFriendScoreComparisonQueryError("list chart records", err)
+			return nil, wrapFriendScoreComparisonQueryError(operation, err)
 		}
 		records = append(records, &domainrepo.FriendScoreComparisonChartRecord{
 			SongDisplayID:  row.SongDisplayID,
@@ -180,6 +239,8 @@ func (q *FriendScoreComparisonQueryService) ListChartRecords(
 			SongArtist:     row.SongArtist,
 			ChartConst:     row.ChartConst,
 			IsConstUnknown: row.IsConstUnknown,
+			LevelStar:      row.LevelStar,
+			Attribute:      row.Attribute,
 			Self:           selfPlay,
 			Friend:         friendPlay,
 		})
