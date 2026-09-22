@@ -31,6 +31,16 @@ const (
 
 var playerRecordDifficultyNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 
+// IsExactStandardDifficulty は大文字正規形の通常難易度だけを許可します。
+func IsExactStandardDifficulty(name string) bool {
+	for _, difficulty := range playerRecordDifficultyNames {
+		if name == difficulty {
+			return true
+		}
+	}
+	return false
+}
+
 const playerRecordStatisticsWorldsendName = "WE"
 
 var playerRecordStatisticsGroupNames = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA", playerRecordStatisticsWorldsendName}

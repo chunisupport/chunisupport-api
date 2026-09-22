@@ -132,6 +132,7 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `/internal/admin` 配下
 - `/internal/friends` 配下
 - `/internal/friend-rankings` 配下
+- `/internal/friend-comparisons` 配下
 
 `/internal/master` 配下と `GET /internal/system/status` は認証不要です。
 

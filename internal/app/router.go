@@ -97,6 +97,7 @@ type Handlers struct {
 	PlayerFavoriteSong    *api_internal.PlayerFavoriteSongHandler
 	Friendship            *api_internal.FriendshipHandler
 	FriendChartRanking    *api_internal.FriendChartRankingHandler
+	FriendScoreComparison *api_internal.FriendScoreComparisonHandler
 	BestSlotStats         *api_internal.BestSlotStatsHandler
 	InternalScoreHistory  *api_internal.ScoreHistoryHandler
 	InternalMetricHistory *api_internal.PlayerMetricHistoryHandler
@@ -165,6 +166,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
+	friendScoreComparisonQueryService := infra.NewFriendScoreComparisonQueryService(db)
 	adminChartRankingQueryService := infra.NewAdminChartRankingQueryService(db)
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
@@ -245,6 +247,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		panic(fmt.Sprintf("failed to create friendship usecase: %v", err))
 	}
 	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
+	friendScoreComparisonUsecase := usecase.NewFriendScoreComparisonUsecase(friendScoreComparisonQueryService)
 	adminChartRankingUsecase := usecase.NewAdminChartRankingUsecase(adminChartRankingQueryService)
 	bestSlotRankingUsecase := usecase.NewBestSlotRankingUsecase(bestSlotRankingQueryService, chartStatsMasterProvider)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
@@ -289,6 +292,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
 		Friendship:            api_internal.NewFriendshipHandler(friendshipUsecase),
 		FriendChartRanking:    api_internal.NewFriendChartRankingHandler(friendChartRankingUsecase),
+		FriendScoreComparison: api_internal.NewFriendScoreComparisonHandler(friendScoreComparisonUsecase),
 		BestSlotStats:         api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
 		InternalScoreHistory:  api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		InternalMetricHistory: api_internal.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
@@ -473,6 +477,12 @@ func registerRoutes(
 	{
 		friendRankingGroup.GET("/songs/:id/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
 		friendRankingGroup.GET("/worldsend-songs/:id", handlers.FriendChartRanking.GetWorldsend)
+	}
+
+	friendComparisonGroup := internal.Group("/friend-comparisons")
+	friendComparisonGroup.Use(firebaseAuthStrict)
+	{
+		friendComparisonGroup.GET("/:username/charts/:difficulty", handlers.FriendScoreComparison.Get)
 	}
 
 	temporaryPlayerDataGroup := internal.Group("/player-data")

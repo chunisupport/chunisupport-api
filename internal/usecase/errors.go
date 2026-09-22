@@ -28,4 +28,9 @@ var (
 
 	ErrPlayerFavoriteSongLimitExceeded = errors.New("player favorite song limit exceeded")
 	ErrPlayerLatestUpdateNotFound      = errors.New("player latest update not found")
+
+	// ErrFriendNotFound は承認済み双方向フレンドではない比較対象を、存在有無と区別せず拒否する場合に返します。
+	ErrFriendNotFound = errors.New("friend not found")
+	// ErrFriendScoreComparisonUnavailable は承認済みフレンド関係の確認後、自分または相手がプレイヤー未連携の場合に返します。
+	ErrFriendScoreComparisonUnavailable = errors.New("friend score comparison unavailable")
 )

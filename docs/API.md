@@ -125,6 +125,8 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `friendship_limit_exceeded` | フレンド枠の上限超過 |
 | `friendship_conflict` | 既に申請中またはフレンド成立済み |
 | `friend_request_not_found` | 対象のフレンド申請が見つからない |
+| `friend_not_found` | 承認済み双方向フレンドではない |
+| `friend_score_comparison_unavailable` | 承認済みフレンドだが自分または相手がプレイヤー未連携 |
 
 ## メンテナンスモード
 
@@ -236,6 +238,7 @@ Content-Type: application/json
 | `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/friend-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/friend-rankings/worldsend-songs/:id` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
+| `/internal/friend-comparisons/:username/charts/:difficulty` | GET | Firebase Bearer | 承認済みフレンドとの指定難易度スコア比較 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -1219,6 +1222,104 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
   - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+## `/internal/friend-comparisons` グループ
+
+承認済みの双方向フレンド1人と、指定した1難易度の全有効通常譜面を比較します。WORLD'S END、コース、全難易度の一括取得は対象外です。公開アカウントであっても、承認済みフレンドでなければ比較できません。
+
+未プレイも比較と集計の対象です。未プレイは `is_played: false`、`score: 0`、ランプと `updated_at` は `null` に正規化します。`is_played` はスコア値ではなく `player_records` 行の有無で判定するため、スコア0のレコードはプレイ済みです。
+
+`score_difference` は常に `self.score - friend.score` です。自分のスコアが大きければ `SELF_WIN`、小さければ `FRIEND_WIN`、同じならランプや更新日時にかかわらず `DRAW` です。両者未プレイ、および片方だけプレイ済みでもスコア0の場合は引き分けです。
+
+### GET `/internal/friend-comparisons/:username/charts/:difficulty`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分と指定した承認済みフレンドについて、指定難易度の全通常譜面のスコア比較と集計を返します。ページングはありません。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | フレンド一覧APIが返す `username` |
+| `difficulty` | string | `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`。大文字正規形のみ。小文字・混在・短縮形は不可 |
+
+- **並び順**: `items` は楽曲マスタの内部ID昇順です。勝敗順やスコア差順は返しません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "difficulty": "MASTER",
+  "self": {
+    "username": "myuser",
+    "player_name": "MY PLAYER"
+  },
+  "friend": {
+    "username": "frienduser",
+    "player_name": "FRIEND"
+  },
+  "summary": {
+    "total_charts": 3,
+    "self_wins": 1,
+    "draws": 1,
+    "friend_wins": 1,
+    "self_played": 2,
+    "friend_played": 1,
+    "both_played": 1,
+    "self_only_played": 1,
+    "friend_only_played": 0,
+    "both_unplayed": 1
+  },
+  "items": [
+    {
+      "song": {
+        "id": "0000000000000001",
+        "title": "楽曲名",
+        "artist": "アーティスト名"
+      },
+      "chart": {
+        "const": 14.5,
+        "is_const_unknown": false
+      },
+      "self": {
+        "is_played": true,
+        "score": 1009000,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "FULL COMBO",
+        "full_chain": null,
+        "updated_at": "2026-07-20T10:00:00Z"
+      },
+      "friend": {
+        "is_played": true,
+        "score": 1007500,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null,
+        "updated_at": "2026-07-19T10:00:00Z"
+      },
+      "score_difference": 1500,
+      "result": "SELF_WIN"
+    }
+  ]
+}
+```
+
+`song.id` は楽曲の `display_id` です。数値の内部ユーザーIDと内部楽曲IDは返しません。`clear_lamp` / `combo_lamp` / `full_chain` は未プレイ、またはマスタ値 `NONE` の場合 `null` です。対象譜面が0件でもエラーにはせず、集計0かつ `items: []` を返します。
+
+集計は次の不変条件を満たします。
+
+```text
+total_charts = self_wins + draws + friend_wins
+total_charts = both_played + self_only_played + friend_only_played + both_unplayed
+self_played = both_played + self_only_played
+friend_played = both_played + friend_only_played
+```
+
+- **主なエラー**:
+  - 400 Bad Request (`username_too_short` / `username_too_long` / `username_invalid_char`): `username` の形式不正
+  - 400 Bad Request (`invalid_difficulty`): 難易度が未指定または許可値でない
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`friend_not_found`): 承認済み双方向フレンドではない、自分自身を指定した、または対象ユーザーが存在しない
+  - 409 Conflict (`friend_score_comparison_unavailable`): 自分または承認済みフレンドがプレイヤーデータ未連携
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/users/:username/locked-songs`

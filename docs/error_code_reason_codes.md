@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-08-31
+最終更新: 2026-09-22
 
 ## 更新ルール
 
@@ -87,6 +87,8 @@
 | `friendship_limit_exceeded` | フレンド枠の上限超過 |
 | `friendship_conflict` | 既に申請中またはフレンド成立済み |
 | `friend_request_not_found` | 対象のフレンド申請が見つからない |
+| `friend_not_found` | 承認済み双方向フレンドではない（不存在・自分自身・片方向を含む） |
+| `friend_score_comparison_unavailable` | 承認済みフレンドだが自分または相手がプレイヤー未連携 |
 
 `maintenance_mode` は、互換API以外でメンテナンスゲートまたはログイン時のロール制御が利用を遮断した場合にHTTP 503で返します。レスポンス本文にはメンテナンスコメントを含めません。状態とコメントは `GET /internal/system/status` から取得してください。`/compat/chunirec/2.0` と `/compat/reiwa/1` は既存の互換形式を維持するため、本文のコードは数値の `503` になります。
 

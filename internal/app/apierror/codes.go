@@ -98,9 +98,11 @@ const (
 	CodeFavoriteSongLimitExceeded = "favorite_song_limit_exceeded"
 
 	// フレンド関連エラー
-	CodeFriendshipLimitExceeded = "friendship_limit_exceeded"
-	CodeFriendshipConflict      = "friendship_conflict"
-	CodeFriendRequestNotFound   = "friend_request_not_found"
+	CodeFriendshipLimitExceeded          = "friendship_limit_exceeded"
+	CodeFriendshipConflict               = "friendship_conflict"
+	CodeFriendRequestNotFound            = "friend_request_not_found"
+	CodeFriendNotFound                   = "friend_not_found"
+	CodeFriendScoreComparisonUnavailable = "friend_score_comparison_unavailable"
 
 	// バージョン管理関連エラー
 	CodeInvalidVersionInput = "invalid_version_input"

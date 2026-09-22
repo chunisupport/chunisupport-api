@@ -46,6 +46,15 @@ func (stubAdminUserStatisticsUsecase) Get(context.Context) (usecase.AdminUserSta
 	return usecase.AdminUserStatisticsOutput{}, nil
 }
 
+type stubFriendScoreComparisonUsecase struct {
+	calls int
+}
+
+func (s *stubFriendScoreComparisonUsecase) Get(context.Context, int, string, string) (*usecase.FriendScoreComparisonResult, error) {
+	s.calls++
+	return &usecase.FriendScoreComparisonResult{Items: []usecase.FriendScoreComparisonItem{}}, nil
+}
+
 func (s stubMaintenanceUsecase) Current() usecase.MaintenanceState {
 	return s.state
 }
@@ -525,6 +534,48 @@ func TestRegisterRoutes_usersUpdatedAtはread最適化認証を使う(t *testing
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
 	assert.Equal(t, 1, readOptimizedAuth.authenticateOptionalCalls)
+}
+
+func TestRegisterRoutes_フレンドスコア比較はstrict認証を要求する(t *testing.T) {
+	tests := []struct {
+		name          string
+		token         string
+		wantStatus    int
+		wantAuthCalls int
+		wantUsecase   int
+	}{
+		{name: "未認証は拒否する", wantStatus: http.StatusUnauthorized},
+		{name: "Firebase認証済みならHandlerへ到達する", token: "player-token", wantStatus: http.StatusOK, wantAuthCalls: 1, wantUsecase: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			handlers := newAuthorizationTestHandlers()
+			comparisonUsecase := &stubFriendScoreComparisonUsecase{}
+			handlers.FriendScoreComparison = internalhandler.NewFriendScoreComparisonHandler(comparisonUsecase)
+			strictAuth := &roleCountingAuthenticator{}
+			readOptimizedAuth := &countingAuthenticator{}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/friend-comparisons/frienduser/charts/MASTER", nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantAuthCalls, strictAuth.authenticateCalls)
+			assert.Equal(t, tt.wantUsecase, comparisonUsecase.calls)
+			assert.Zero(t, readOptimizedAuth.authenticateCalls)
+			assert.Zero(t, readOptimizedAuth.authenticateOptionalCalls)
+		})
+	}
 }
 
 func TestRegisterRoutes_メンテナンス中の標準API経路を遮断する(t *testing.T) {
