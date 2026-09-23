@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,4 +63,33 @@ func TestLogReiwaError_メンテナンス応答はアプリケーションエラ
 
 	// Then
 	assert.Empty(t, output.String())
+}
+
+func TestReiwaErrorHandlerMiddleware_クライアント切断は499としてINFOログに出す(t *testing.T) {
+	// Given
+	var output bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+	})
+
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/reiwa/test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	handler := ReiwaErrorHandlerMiddleware()(func(c *echo.Context) error {
+		return apierror.ErrInternalError.WithInternal(context.Canceled)
+	})
+
+	// When
+	err := handler(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, info.StatusClientClosedRequest, rec.Code)
+	assert.Empty(t, rec.Body.String())
+	assert.Contains(t, output.String(), "level=INFO")
+	assert.Contains(t, output.String(), `msg="Reiwa HTTP request canceled by client"`)
+	assert.Contains(t, output.String(), "status=499")
 }

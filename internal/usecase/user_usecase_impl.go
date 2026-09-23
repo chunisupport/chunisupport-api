@@ -771,7 +771,11 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 
 	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
 	if err != nil {
-		slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("failed to find songs for no-play completion due to context canceled", "player_id", playerID, "error", err)
+		} else {
+			slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
+		}
 		return nil, err
 	}
 

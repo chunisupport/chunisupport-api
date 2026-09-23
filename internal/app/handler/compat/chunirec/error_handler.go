@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
 
@@ -37,6 +38,21 @@ func handleChunirecError(err error, c *echo.Context) {
 		return
 	}
 
+	// クライアント切断はサーバー障害ではないため、互換形式のエラー応答は返さずに記録だけ残します。
+	if errors.Is(err, context.Canceled) {
+		slog.Info("Chunirec HTTP request canceled by client",
+			"method", c.Request().Method,
+			"path", c.Request().URL.Path,
+			"remote_addr", c.RealIP(),
+			"status", info.StatusClientClosedRequest,
+			"error", sanitizeLogValue(err.Error()),
+		)
+		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
+			slog.Debug("Failed to send chunirec client closed response", "error", err)
+		}
+		return
+	}
+
 	// エラーの種類に応じてHTTPステータスコードを決定
 	var apiErr *apierror.APIError
 	if errors.As(err, &apiErr) {
@@ -60,6 +76,7 @@ func handleChunirecError(err error, c *echo.Context) {
 	// chunirec API 2.0は既に更新が終了しており、仕様変更の可能性はありません。
 	// 対応するHTTPステータスコード: 400, 404, 405, 429, 503
 	// それ以外のステータスコードは503として処理されます。
+	// ただしクライアント切断時は応答が届かないため、この変換より前に499を返しています。
 	var errorResponse ChunirecErrorResponse
 	switch httpStatus {
 	case http.StatusBadRequest:
@@ -92,14 +109,6 @@ func logChunirecError(status int, err error, c *echo.Context) {
 
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
-	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
-	if errors.Is(err, context.Canceled) {
-		logger.Warn("Chunirec HTTP request canceled by client",
-			"status", status,
-			"error", errorMessage,
-		)
-		return
-	}
 
 	// 5xx系エラーはERRORログ
 	if status >= 500 {

@@ -81,7 +81,10 @@ const (
 	PlayerLatestUpdateOPPercentSchemaVersion    = 3
 	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
 	MaintenanceRetryAfterSeconds                = 60
-	VersionCacheReloadTimeout                   = 5 * time.Second
+	// StatusClientClosedRequest はクライアントが応答前に切断したことを表すステータスです。
+	// net/http に定義がないため、nginx の慣習である 499 を用いてサーバー障害（5xx）と区別します。
+	StatusClientClosedRequest = 499
+	VersionCacheReloadTimeout = 5 * time.Second
 
 	// Goal関連の理論値計算定数
 	TheoreticalScore            = constants.TheoreticalScore

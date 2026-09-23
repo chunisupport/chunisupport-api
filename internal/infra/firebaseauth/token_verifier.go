@@ -91,7 +91,7 @@ func (v *tokenVerifier) verifyTokenWithRevocationCheck(ctx context.Context, idTo
 			return nil, errors.Join(usecase.ErrInvalidIDToken, err)
 		}
 
-		return nil, errors.Join(usecase.ErrInternalError, err)
+		return nil, wrapSDKInternalError(ctx, err)
 	}
 
 	if token == nil || normalizeUID(token.UID) == "" {
@@ -99,6 +99,13 @@ func (v *tokenVerifier) verifyTokenWithRevocationCheck(ctx context.Context, idTo
 	}
 
 	return token, nil
+}
+
+// wrapSDKInternalError は SDK の内部エラーを usecase.ErrInternalError として包みます。
+// Firebase Admin SDK は HTTP 通信エラーを元のエラーを保持しない FirebaseError に変換するため、
+// クライアント切断を errors.Is(err, context.Canceled) で判定できるよう ctx のエラーも併せて保持します。
+func wrapSDKInternalError(ctx context.Context, err error) error {
+	return errors.Join(usecase.ErrInternalError, ctx.Err(), err)
 }
 
 func normalizeUID(uid string) string {
@@ -119,7 +126,7 @@ func (v *tokenVerifier) verifyTokenWithoutRevocationCheck(ctx context.Context, i
 			return nil, errors.Join(usecase.ErrInvalidIDToken, err)
 		}
 
-		return nil, errors.Join(usecase.ErrInternalError, err)
+		return nil, wrapSDKInternalError(ctx, err)
 	}
 
 	if token == nil || normalizeUID(token.UID) == "" {

@@ -7,9 +7,9 @@
 ID トークン検証には次の 2 経路があります。
 
 - strict 経路: `VerifyIDTokenAndCheckRevoked` を利用し、トークンの失効とユーザー無効化も確認する。
-- read 最適化経路: `VerifyIDToken` を利用し、失効確認を省いて公開 read エンドポイントの検証コストを抑える。
+- read 最適化経路: `VerifyIDToken` を利用し、失効確認を省いて read エンドポイントの検証コストを抑える。
 
-read 最適化経路は、認証済みユーザー向けの表示調整など、読み取り専用で権限変更を伴わない公開エンドポイントに限定して利用します。書き込み、管理操作、退会、API トークン操作などは strict 経路を維持します。
+strict 経路は失効確認のためにリクエストごとに Firebase へ問い合わせるため、応答が遅くなり、ページ遷移などによるクライアント切断（`context.Canceled`）を招きやすくなります。そのため read 最適化経路は、読み取り専用で権限変更を伴わない GET エンドポイント（公開参照と、ログインユーザー自身・フレンド情報の参照）に利用します。書き込み、管理操作、退会、API トークン操作などは strict 経路を維持します。
 
 ## 2. 実装構成
 
@@ -72,14 +72,15 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 `registerRoutes` では以下のミドルウェアを使い分けます。
 
 - `firebaseAuthStrict`: strict 必須認証。
-- `optionalFirebaseAuthStrict`: strict 任意認証。
+- `firebaseAuthReadOptimized`: read 最適化の必須認証。
 - `optionalFirebaseAuthReadOptimized`: read 最適化の任意認証。
 
-### 3.1 read 最適化経路
+同じパスプレフィックスで読み取りと書き込みが混在する `/internal/me` と `/internal/friends` は、read 用と書き込み用の Group を分けて登録します。
 
-現状、read 最適化経路はキャッシュ確認用途を含む以下の公開 GET に適用されています。
+### 3.1 read 最適化の任意認証
 
-- `GET /internal/users/:username/updated-at`
+以下の公開 GET に適用されています。
+
 - `GET /internal/songs/updated-at`
 - `GET /internal/courses/updated-at`
 - `GET /internal/songs`
@@ -91,13 +92,7 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `GET /internal/worldsend-songs/:id`
 - `GET /internal/courses`
 - `GET /internal/courses/:id`
-
-これらは Firebase Bearer 任意の公開参照エンドポイントです。Bearer トークンがある場合のみ失効確認なしで UID を検証し、未認証時は匿名として処理します。未認証時には匿名 IP レートリミットが適用されます。
-
-### 3.2 strict 任意認証
-
-現状、`/internal/users` のうち更新日時取得以外の公開 GET 群は strict 任意認証です。
-
+- `GET /internal/users/:username/updated-at`
 - `GET /internal/users/:username/profile`
 - `GET /internal/users/:username/rating`
 - `GET /internal/users/:username/rating-op-history`
@@ -112,14 +107,29 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `GET /internal/users/:username/favorite-songs`
 - `GET /internal/users/:username`
 
-これらも Firebase Bearer 任意の公開参照エンドポイントですが、現在の実装では `optionalFirebaseAuthStrict` を利用しているため、Bearer トークンがある場合は失効・無効化確認まで行います。
+これらは Firebase Bearer 任意の公開参照エンドポイントです。Bearer トークンがある場合のみ失効確認なしで UID を検証し、未認証時は匿名として処理します。未認証時には匿名 IP レートリミットが適用されます。
+
+### 3.2 read 最適化の必須認証
+
+以下のログインユーザー向け GET に適用されています。
+
+- `GET /internal/me`
+- `GET /internal/me/player-data/latest-update`
+- `GET /internal/me/goals`
+- `GET /internal/me/goal-groups`
+- `GET /internal/me/record-filters`
+- `GET /internal/friends`
+- `GET /internal/friends/requests/received`
+- `GET /internal/friends/requests/sent`
+- `/internal/friend-rankings` 配下
+- `/internal/friend-comparisons` 配下
 
 ### 3.3 strict 必須認証
 
 以下は strict 必須認証です。
 
 - `/internal/auth/api-tokens` の GET / POST と `/internal/auth/api-tokens/:id` の PATCH / DELETE
-- `/internal/me` 配下
+- `/internal/me` 配下の書き込み操作（3.2 の GET を除く）
 - `POST /internal/player-data/commit`
 - `/internal/users` の管理系操作
 - `/internal/songs` の編集系操作
@@ -130,9 +140,7 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 - `/internal/editor/courses` 配下
 - `/internal/honors` 配下
 - `/internal/admin` 配下
-- `/internal/friends` 配下
-- `/internal/friend-rankings` 配下
-- `/internal/friend-comparisons` 配下
+- `/internal/friends` 配下の書き込み操作（3.2 の GET を除く）
 
 `/internal/master` 配下と `GET /internal/system/status` は認証不要です。
 
@@ -140,11 +148,11 @@ firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo,
 
 ## 4. セキュリティ上の扱い
 
-read 最適化経路では、Firebase ID トークン自体の署名、有効期限、基本的な形式は検証しますが、失効確認は行いません。そのため、トークン失効直後や Firebase ユーザー無効化直後でも、ID トークンの有効期限内は公開 read エンドポイントの任意認証として通る可能性があります。
+read 最適化経路では、Firebase ID トークン自体の署名、有効期限、基本的な形式は検証しますが、失効確認は行いません。そのため、トークン失効直後や Firebase ユーザー無効化直後でも、ID トークンの有効期限内（最長 1 時間）は read エンドポイントの認証を通る可能性があります。ただし DB 上で退会済みのユーザーは Firebase UID からユーザーを解決できないため拒否されます。
 
 このリスクを限定するため、以下の方針で適用範囲を制限しています。
 
-- 書き込み操作、管理操作、権限が必要な操作には read 最適化経路を使わない。
+- 書き込み操作、管理操作、権限（EDITOR / ADMIN）が必要な操作には read 最適化経路を使わない。
 - API トークン発行・削除、退会、プレイヤーデータ登録などの重要操作は strict 経路を使う。
 - recent sign-in が必要な処理では `VerifyRecentSignIn` を使い、失効確認と `auth_time` 検証を行う。
 

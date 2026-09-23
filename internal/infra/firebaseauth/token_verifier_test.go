@@ -262,3 +262,56 @@ func TestTokenVerifier_VerifyIDTokenWithoutRevocationCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestTokenVerifier_クライアント切断時はcontextCanceledを保持する(t *testing.T) {
+	// Firebase Admin SDK は HTTP 通信エラーを元のエラーを保持しない FirebaseError に変換するため、
+	// SDK が返すエラーは context.Canceled を含まない不透明なエラーとして再現する。
+	sdkErr := errors.New("unknown error while making an http call: context canceled")
+
+	tests := []struct {
+		name   string
+		verify func(v *tokenVerifier, ctx context.Context) error
+	}{
+		{
+			name: "失効確認ありの検証",
+			verify: func(v *tokenVerifier, ctx context.Context) error {
+				_, err := v.VerifyIDToken(ctx, "token")
+				return err
+			},
+		},
+		{
+			name: "失効確認なしの検証",
+			verify: func(v *tokenVerifier, ctx context.Context) error {
+				_, err := v.VerifyIDTokenWithoutRevocationCheck(ctx, "token")
+				return err
+			},
+		},
+		{
+			name: "recent sign-in の検証",
+			verify: func(v *tokenVerifier, ctx context.Context) error {
+				_, err := v.VerifyRecentSignIn(ctx, "token")
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			verifier := &tokenVerifier{client: &stubAuthClient{
+				verifyIDTokenErr:                sdkErr,
+				verifyIDTokenAndCheckRevokedErr: sdkErr,
+			}}
+
+			// When
+			err := tt.verify(verifier, ctx)
+
+			// Then
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.ErrorIs(t, err, usecase.ErrInternalError)
+			assert.ErrorIs(t, err, sdkErr)
+		})
+	}
+}

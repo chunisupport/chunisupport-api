@@ -382,7 +382,8 @@ func registerRoutes(
 
 	// Firebase認証ミドルウェア
 	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
-	optionalFirebaseAuthStrict := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
+	// 読み取り専用GETは失効確認（Firebaseへの問い合わせ）を省き、応答遅延とクライアント切断を減らします。
+	firebaseAuthReadOptimized := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
 	optionalFirebaseAuthReadOptimized := middleware.OptionalFirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
 	anonymousRateLimit := middleware.AnonymousIPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
@@ -422,10 +423,19 @@ func registerRoutes(
 	}
 
 	// api.chunisupport.net/internal/me
+	meReadGroup := internal.Group("/me")
+	meReadGroup.Use(firebaseAuthReadOptimized)
+	{
+		meReadGroup.GET("", handlers.Profile.Me)
+		meReadGroup.GET("/player-data/latest-update", handlers.Me.GetLatestPlayerUpdate)
+		meReadGroup.GET("/goals", handlers.Goal.List)
+		meReadGroup.GET("/goal-groups", handlers.GoalGroup.List)
+		meReadGroup.GET("/record-filters", handlers.RecordFilter.List)
+	}
+
 	meGroup := internal.Group("/me")
 	meGroup.Use(firebaseAuthStrict)
 	{
-		meGroup.GET("", handlers.Profile.Me)
 		meGroup.POST("/data-transfer/export", handlers.DataTransfer.Export, dataTransferRateLimit)
 		meGroup.POST("/data-transfer/validate", handlers.DataTransfer.Validate, dataTransferRateLimit)
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
@@ -436,19 +446,15 @@ func registerRoutes(
 			Requests: info.RegisterDataRateLimitRequests,
 			Window:   info.RegisterDataRateLimitWindow,
 		}))
-		meGroup.GET("/player-data/latest-update", handlers.Me.GetLatestPlayerUpdate)
 		meGroup.DELETE("/player-data", handlers.Me.DeletePlayerData)
-		meGroup.GET("/goals", handlers.Goal.List)
 		meGroup.POST("/goals", handlers.Goal.Create)
 		meGroup.PUT("/goals/order", handlers.Goal.Reorder)
 		meGroup.PUT("/goals/:id", handlers.Goal.Update)
 		meGroup.DELETE("/goals/:id", handlers.Goal.Delete)
-		meGroup.GET("/goal-groups", handlers.GoalGroup.List)
 		meGroup.POST("/goal-groups", handlers.GoalGroup.Create)
 		meGroup.PUT("/goal-groups/order", handlers.GoalGroup.Reorder)
 		meGroup.PUT("/goal-groups/:id", handlers.GoalGroup.Update)
 		meGroup.DELETE("/goal-groups/:id", handlers.GoalGroup.Delete)
-		meGroup.GET("/record-filters", handlers.RecordFilter.List)
 		meGroup.POST("/record-filters", handlers.RecordFilter.Create)
 		meGroup.PUT("/record-filters/:id", handlers.RecordFilter.Update)
 		meGroup.DELETE("/record-filters/:id", handlers.RecordFilter.Delete)
@@ -459,13 +465,18 @@ func registerRoutes(
 		meGroup.DELETE("/favorite-songs/:id", handlers.PlayerFavoriteSong.Remove)
 	}
 
+	friendshipReadGroup := internal.Group("/friends")
+	friendshipReadGroup.Use(firebaseAuthReadOptimized)
+	{
+		friendshipReadGroup.GET("", handlers.Friendship.ListFriends)
+		friendshipReadGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
+		friendshipReadGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
+	}
+
 	friendshipGroup := internal.Group("/friends")
 	friendshipGroup.Use(firebaseAuthStrict)
 	{
-		friendshipGroup.GET("", handlers.Friendship.ListFriends)
 		friendshipGroup.POST("/requests", handlers.Friendship.SendRequest)
-		friendshipGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
-		friendshipGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
 		friendshipGroup.POST("/requests/:username/accept", handlers.Friendship.AcceptRequest)
 		friendshipGroup.POST("/requests/:username/reject", handlers.Friendship.RejectRequest)
 		friendshipGroup.DELETE("/requests/:username", handlers.Friendship.CancelRequest)
@@ -473,14 +484,14 @@ func registerRoutes(
 	}
 
 	friendRankingGroup := internal.Group("/friend-rankings")
-	friendRankingGroup.Use(firebaseAuthStrict)
+	friendRankingGroup.Use(firebaseAuthReadOptimized)
 	{
 		friendRankingGroup.GET("/songs/:id/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
 		friendRankingGroup.GET("/worldsend-songs/:id", handlers.FriendChartRanking.GetWorldsend)
 	}
 
 	friendComparisonGroup := internal.Group("/friend-comparisons")
-	friendComparisonGroup.Use(firebaseAuthStrict)
+	friendComparisonGroup.Use(firebaseAuthReadOptimized)
 	{
 		friendComparisonGroup.GET("/:username/charts/:difficulty", handlers.FriendScoreComparison.Get)
 		friendComparisonGroup.GET("/:username/worldsend", handlers.FriendScoreComparison.GetWorldsend)
@@ -500,13 +511,10 @@ func registerRoutes(
 	}))
 
 	// api.chunisupport.net/internal/users
-	userUpdatedAtGroup := internal.Group("/users")
-	userUpdatedAtGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
-	userUpdatedAtGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
-
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(optionalFirebaseAuthStrict, anonymousRateLimit)
+	publicUsersGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
+		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
