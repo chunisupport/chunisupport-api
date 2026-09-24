@@ -98,7 +98,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 
 // UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
 func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
-	var requests []*api_internal.UpdateSongRequest
+	var requests []*api_v1.V1UpdateSongRequest
 	if err := handler.BindStrictJSON(c, &requests); err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
@@ -106,6 +106,7 @@ func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
 	}
 
+	internalRequests := make([]*api_internal.UpdateSongRequest, 0, len(requests))
 	for idx, req := range requests {
 		if req == nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
@@ -118,9 +119,10 @@ func (h *V1SongHandler) UpdateSongs(c *echo.Context) error {
 		if err := c.Validate(req); err != nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: %w", idx, err))
 		}
+		internalRequests = append(internalRequests, req.ToInternalRequest())
 	}
 
-	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(requests)); err != nil {
+	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(internalRequests)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 

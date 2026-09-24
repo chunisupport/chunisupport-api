@@ -27,17 +27,18 @@ type EditorWorldsendChartDTO struct {
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
 // WORLD'S END はレーティング対象外のため、charts は "WORLDSEND" キーのみを持ち maxop フィールドは存在しません。
 type WorldsendSongDTO struct {
-	DisplayID   string                        `json:"id"`
-	Title       string                        `json:"title"`
-	Reading     *string                       `json:"reading"`
-	Artist      string                        `json:"artist"`
-	Genre       *string                       `json:"genre"`
-	BPM         *int                          `json:"bpm"`
-	Release     *string                       `json:"release"`
-	Jacket      *string                       `json:"jacket"`
-	OfficialIdx string                        `json:"official_idx"`
-	IsNew       bool                          `json:"is_new"`
-	Charts      map[string]*WorldsendChartDTO `json:"charts"`
+	DisplayID     string                        `json:"id"`
+	Title         string                        `json:"title"`
+	WikiPageTitle *string                       `json:"wiki_page_title"`
+	Reading       *string                       `json:"reading"`
+	Artist        string                        `json:"artist"`
+	Genre         *string                       `json:"genre"`
+	BPM           *int                          `json:"bpm"`
+	Release       *string                       `json:"release"`
+	Jacket        *string                       `json:"jacket"`
+	OfficialIdx   string                        `json:"official_idx"`
+	IsNew         bool                          `json:"is_new"`
+	Charts        map[string]*WorldsendChartDTO `json:"charts"`
 }
 
 // WorldsendSongsResponse は WORLD'S END 楽曲一覧のレスポンスを表します。
@@ -69,16 +70,17 @@ type UpdateWorldsendChartRequest struct {
 
 // UpdateWorldsendSongRequest は WORLD'S END 楽曲更新リクエストを表します。
 type UpdateWorldsendSongRequest struct {
-	DisplayID  string                                  `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
-	Title      string                                  `json:"title" validate:"required"`
-	Reading    *string                                 `json:"reading" validate:"omitempty,max=300"`
-	Artist     string                                  `json:"artist" validate:"required"`
-	Genre      *string                                 `json:"genre"`
-	BPM        *int                                    `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt *DateOnly                               `json:"released_at"`
-	Jacket     *string                                 `json:"jacket"`
-	IsNew      *bool                                   `json:"is_new" validate:"required"`
-	Charts     map[string]*UpdateWorldsendChartRequest `json:"charts" validate:"dive"`
+	DisplayID     string                                  `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
+	Title         string                                  `json:"title" validate:"required"`
+	WikiPageTitle OptionalWikiPageTitle                   `json:"wiki_page_title"`
+	Reading       *string                                 `json:"reading" validate:"omitempty,max=300"`
+	Artist        string                                  `json:"artist" validate:"required"`
+	Genre         *string                                 `json:"genre"`
+	BPM           *int                                    `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt    *DateOnly                               `json:"released_at"`
+	Jacket        *string                                 `json:"jacket"`
+	IsNew         *bool                                   `json:"is_new" validate:"required"`
+	Charts        map[string]*UpdateWorldsendChartRequest `json:"charts" validate:"dive"`
 }
 
 // CreateWorldsendChartRequest は WORLD'S END 譜面追加リクエストを表します。
@@ -92,16 +94,17 @@ type CreateWorldsendChartRequest struct {
 
 // CreateWorldsendSongRequest は WORLD'S END 楽曲追加リクエストを表します。
 type CreateWorldsendSongRequest struct {
-	OfficialIdx string                       `json:"official_idx" validate:"required,max=10"`
-	Title       string                       `json:"title" validate:"required"`
-	Reading     *string                      `json:"reading" validate:"omitempty,max=300"`
-	Artist      string                       `json:"artist" validate:"required"`
-	Genre       string                       `json:"genre" validate:"required"`
-	BPM         *int                         `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt  *DateOnly                    `json:"released_at"`
-	Jacket      *string                      `json:"jacket" validate:"omitempty,max=20"`
-	IsNew       bool                         `json:"is_new"`
-	Chart       *CreateWorldsendChartRequest `json:"chart" validate:"omitempty"`
+	OfficialIdx   string                       `json:"official_idx" validate:"required,max=10"`
+	Title         string                       `json:"title" validate:"required"`
+	WikiPageTitle *string                      `json:"wiki_page_title" validate:"omitnil,min=1,max=300"`
+	Reading       *string                      `json:"reading" validate:"omitempty,max=300"`
+	Artist        string                       `json:"artist" validate:"required"`
+	Genre         string                       `json:"genre" validate:"required"`
+	BPM           *int                         `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt    *DateOnly                    `json:"released_at"`
+	Jacket        *string                      `json:"jacket" validate:"omitempty,max=20"`
+	IsNew         bool                         `json:"is_new"`
+	Chart         *CreateWorldsendChartRequest `json:"chart" validate:"omitempty"`
 }
 
 // ToWorldsendChartDTO は WorldsendChart エンティティから WorldsendChartDTO へ変換します。
@@ -158,16 +161,17 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 	charts["WORLDSEND"] = ToWorldsendChartDTO(chart)
 
 	return &WorldsendSongDTO{
-		DisplayID:   song.DisplayID,
-		Title:       song.Title,
-		Reading:     song.Reading,
-		Artist:      song.Artist,
-		Genre:       genrePtr,
-		BPM:         song.BPM,
-		Release:     releaseDateStr,
-		Jacket:      song.Jacket,
-		OfficialIdx: song.OfficialIdx,
-		IsNew:       song.IsNew,
-		Charts:      charts,
+		DisplayID:     song.DisplayID,
+		Title:         song.Title,
+		WikiPageTitle: song.WikiPageTitle,
+		Reading:       song.Reading,
+		Artist:        song.Artist,
+		Genre:         genrePtr,
+		BPM:           song.BPM,
+		Release:       releaseDateStr,
+		Jacket:        song.Jacket,
+		OfficialIdx:   song.OfficialIdx,
+		IsNew:         song.IsNew,
+		Charts:        charts,
 	}
 }

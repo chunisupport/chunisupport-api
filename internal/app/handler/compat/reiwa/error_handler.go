@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
 
@@ -29,6 +30,21 @@ func handleReiwaError(err error, c *echo.Context) {
 	var additionalMessage string
 
 	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
+		return
+	}
+
+	// クライアント切断はサーバー障害ではないため、互換形式のエラー応答は返さずに記録だけ残します。
+	if errors.Is(err, context.Canceled) {
+		slog.Info("Reiwa HTTP request canceled by client",
+			"method", c.Request().Method,
+			"path", c.Request().URL.Path,
+			"remote_addr", c.RealIP(),
+			"status", info.StatusClientClosedRequest,
+			"error", sanitizeLogValue(err.Error()),
+		)
+		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
+			slog.Debug("Failed to send reiwa client closed response", "error", err)
+		}
 		return
 	}
 
@@ -76,13 +92,6 @@ func logReiwaError(status int, err error, c *echo.Context) {
 
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
-	if errors.Is(err, context.Canceled) {
-		logger.Warn("Reiwa HTTP request canceled by client",
-			"status", status,
-			"error", errorMessage,
-		)
-		return
-	}
 	if status >= 500 {
 		logger.Error("Reiwa HTTP error",
 			"status", status,

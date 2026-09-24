@@ -215,6 +215,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 | ID | int | ✓ | 楽曲ID（主キー） |
 | DisplayID | string | ✓ | 表示用ID（小文字16進16文字） |
 | Title | string | ✓ | 楽曲タイトル |
+| WikiPageTitle | *string | - | Wikiのページタイトル |
 | Reading | *string | - | 読み |
 | Artist | string | ✓ | アーティスト名 |
 | GenreID | *int | - | ジャンルID |

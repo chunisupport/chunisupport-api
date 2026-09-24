@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	sharedto "github.com/chunisupport/chunisupport-api/internal/dto"
+	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 )
 
 // V1ChartDTO は外部API v1 用の譜面情報DTOです。
@@ -90,6 +91,38 @@ type UpdateChartConstantRequest struct {
 	OfficialIdx string   `json:"official_idx" validate:"required,max=10"`
 	Difficulty  string   `json:"difficulty" validate:"required,len=3"`
 	Const       *float64 `json:"const" validate:"required"`
+}
+
+// V1UpdateSongRequest は外部API v1 の楽曲更新リクエストです。
+// v1 API では Wiki ページタイトルを扱わないため、内部APIの UpdateSongRequest から wiki_page_title を除いた契約としています。
+type V1UpdateSongRequest struct {
+	DisplayID  string                                      `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
+	Title      string                                      `json:"title" validate:"required"`
+	Reading    *string                                     `json:"reading" validate:"omitempty,max=300"`
+	Artist     string                                      `json:"artist" validate:"required"`
+	Genre      *string                                     `json:"genre"`
+	BPM        *int                                        `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt *api_internal.DateOnly                      `json:"released_at"`
+	Jacket     *string                                     `json:"jacket"`
+	IsNew      *bool                                       `json:"is_new"`
+	Charts     map[string]*api_internal.UpdateChartRequest `json:"charts" validate:"dive"`
+}
+
+// ToInternalRequest は内部APIの楽曲更新リクエストへ変換します。
+// wiki_page_title は未指定として扱われるため、更新時に既存値が維持されます。
+func (r *V1UpdateSongRequest) ToInternalRequest() *api_internal.UpdateSongRequest {
+	return &api_internal.UpdateSongRequest{
+		DisplayID:  r.DisplayID,
+		Title:      r.Title,
+		Reading:    r.Reading,
+		Artist:     r.Artist,
+		Genre:      r.Genre,
+		BPM:        r.BPM,
+		ReleasedAt: r.ReleasedAt,
+		Jacket:     r.Jacket,
+		IsNew:      r.IsNew,
+		Charts:     r.Charts,
+	}
 }
 
 // ToV1ChartDTO はChartエンティティから V1ChartDTO へ変換します。

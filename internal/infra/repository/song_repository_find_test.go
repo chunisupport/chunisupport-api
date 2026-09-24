@@ -229,3 +229,73 @@ func TestFindByDisplayID_ReturnsNormalSongWithCharts(t *testing.T) {
 	assert.False(t, song.IsMaxOPUnknown)
 	require.NotNil(t, song.Charts[0].NotesDesigner)
 }
+
+func TestSongRepository_LoadsWikiPageTitle(t *testing.T) {
+	wikiPageTitle := "Song 1(CHUNITHM)"
+	tests := []struct {
+		name string
+		// When: 楽曲の取得方法
+		find func(ctx context.Context, repo *songRepository, exec repository.Executor) (map[string]*entity.Song, error)
+	}{
+		{
+			name: "FindAllExcludingWorldsendでWikiページタイトルを取得できる",
+			find: func(ctx context.Context, repo *songRepository, exec repository.Executor) (map[string]*entity.Song, error) {
+				songs, err := repo.FindAllExcludingWorldsend(ctx, exec, false)
+				return songsByDisplayID(songs), err
+			},
+		},
+		{
+			name: "FindByDisplayIDsでWikiページタイトルを取得できる",
+			find: func(ctx context.Context, repo *songRepository, exec repository.Executor) (map[string]*entity.Song, error) {
+				songs, err := repo.FindByDisplayIDs(ctx, exec, []string{"DISPLAY001", "DISPLAY002"})
+				return songsByDisplayID(songs), err
+			},
+		},
+		{
+			name: "FindByDisplayIDでWikiページタイトルを取得できる",
+			find: func(ctx context.Context, repo *songRepository, exec repository.Executor) (map[string]*entity.Song, error) {
+				song1, err := repo.FindByDisplayID(ctx, exec, "DISPLAY001")
+				if err != nil {
+					return nil, err
+				}
+				song2, err := repo.FindByDisplayID(ctx, exec, "DISPLAY002")
+				return songsByDisplayID([]*entity.Song{song1, song2}), err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupTestDB(t)
+			defer db.Close()
+
+			_, err := db.Exec(`
+				INSERT INTO songs (id, display_id, title, wiki_page_title, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+				VALUES
+					(1, 'DISPLAY001', 'Song 1', ?, 'Artist 1', 1, 180, NULL, 'IDX001', NULL, 0, 0, 0),
+					(2, 'DISPLAY002', 'Song 2', NULL, 'Artist 2', 1, 180, NULL, 'IDX002', NULL, 0, 0, 0)
+			`, wikiPageTitle)
+			require.NoError(t, err)
+
+			// When
+			songs, err := tt.find(context.Background(), &songRepository{db: db}, db)
+
+			// Then
+			require.NoError(t, err)
+			require.Contains(t, songs, "DISPLAY001")
+			require.Contains(t, songs, "DISPLAY002")
+			assert.Equal(t, &wikiPageTitle, songs["DISPLAY001"].WikiPageTitle)
+			assert.Nil(t, songs["DISPLAY002"].WikiPageTitle)
+		})
+	}
+}
+
+// songsByDisplayID は検証しやすいように楽曲を DisplayID で引けるマップに変換します。
+func songsByDisplayID(songs []*entity.Song) map[string]*entity.Song {
+	result := make(map[string]*entity.Song, len(songs))
+	for _, song := range songs {
+		result[song.DisplayID] = song
+	}
+	return result
+}

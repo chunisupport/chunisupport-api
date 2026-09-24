@@ -28,20 +28,21 @@ func NewSongRepository(db *sqlx.DB) repository.SongRepository {
 
 // songRow はDBから取得する楽曲データの行を表します。
 type songRow struct {
-	ID          int        `db:"id"`
-	DisplayID   string     `db:"display_id"`
-	Title       string     `db:"title"`
-	Reading     *string    `db:"reading"`
-	Artist      string     `db:"artist"`
-	GenreID     *int       `db:"genre_id"`
-	BPM         *int       `db:"bpm"`
-	ReleasedAt  *time.Time `db:"released_at"`
-	OfficialIdx string     `db:"official_idx"`
-	Jacket      *string    `db:"jacket"`
-	IsWorldsend bool       `db:"is_worldsend"`
-	IsNew       bool       `db:"is_new"`
-	IsDeleted   bool       `db:"is_deleted"`
-	UpdatedAt   *time.Time `db:"updated_at"`
+	ID            int        `db:"id"`
+	DisplayID     string     `db:"display_id"`
+	Title         string     `db:"title"`
+	WikiPageTitle *string    `db:"wiki_page_title"`
+	Reading       *string    `db:"reading"`
+	Artist        string     `db:"artist"`
+	GenreID       *int       `db:"genre_id"`
+	BPM           *int       `db:"bpm"`
+	ReleasedAt    *time.Time `db:"released_at"`
+	OfficialIdx   string     `db:"official_idx"`
+	Jacket        *string    `db:"jacket"`
+	IsWorldsend   bool       `db:"is_worldsend"`
+	IsNew         bool       `db:"is_new"`
+	IsDeleted     bool       `db:"is_deleted"`
+	UpdatedAt     *time.Time `db:"updated_at"`
 }
 
 // chartRow はDBから取得する譜面データの行を表します。
@@ -62,7 +63,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -187,6 +188,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.ID = row.ID
 	song.DisplayID = row.DisplayID
 	song.Title = row.Title
+	song.WikiPageTitle = row.WikiPageTitle
 	song.Reading = row.Reading
 	song.Artist = row.Artist
 	song.GenreID = row.GenreID
@@ -237,7 +239,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 	}
 
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -339,7 +341,7 @@ func (r *songRepository) findByIdentifierForUpdate(ctx context.Context, exec rep
 	}
 
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE %s = ? AND is_worldsend = 0
 		FOR UPDATE
@@ -389,7 +391,7 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
 		FROM songs
 		WHERE %s = ? AND is_worldsend = 0
 	`, column)
@@ -438,7 +440,7 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, is_deleted = ?
+		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -446,6 +448,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		query,
 		song.DisplayID,
 		song.Title,
+		song.WikiPageTitle,
 		song.Reading,
 		song.Artist,
 		song.GenreID,
@@ -484,9 +487,17 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 // UpdateSongs は楽曲および譜面情報を一括更新します。
 // トランザクション管理はUseCase層（TransactionManager経由）で行います。
 // PERF-008対策: N+1問題を解消するため、一括更新クエリを使用します。
-func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
-	if len(songs) == 0 {
+func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.SongUpdate) error {
+	if len(updates) == 0 {
 		return nil
+	}
+
+	songs := make([]*entity.Song, 0, len(updates))
+	for i, update := range updates {
+		if update == nil || update.Song == nil {
+			return fmt.Errorf("updates[%d].song is nil", i)
+		}
+		songs = append(songs, update.Song)
 	}
 
 	// 重複display_idは後続のCASE WHEN構築で先出現側が暗黙適用されるため事前に弾く
@@ -536,7 +547,7 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	}
 
 	// 7. 楽曲を一括更新（CASE式を使用）
-	if err := r.bulkUpdateSongs(ctx, exec, songs, displayIDToSongID); err != nil {
+	if err := r.bulkUpdateSongs(ctx, exec, updates, displayIDToSongID); err != nil {
 		return fmt.Errorf("failed to bulk update songs: %w", err)
 	}
 
@@ -548,29 +559,45 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	return nil
 }
 
+// wikiPageTitleUpdateExpr は一括更新時の wiki_page_title の代入式を組み立てます。
+// 更新指定のある楽曲だけを書き換え、それ以外は SQL 上で既存値を維持します。
+// 楽曲データ収集バッチによる並行更新を消さないよう、読み取った値の書き戻しは行いません。
+func wikiPageTitleUpdateExpr(cases []string) string {
+	if len(cases) == 0 {
+		return "wiki_page_title"
+	}
+	return fmt.Sprintf("CASE %s ELSE wiki_page_title END", strings.Join(cases, " "))
+}
+
 // bulkUpdateSongs は楽曲情報をCASE式で一括更新します。
-func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, displayIDToSongID map[string]int) error {
-	if len(songs) == 0 {
+func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.SongUpdate, displayIDToSongID map[string]int) error {
+	if len(updates) == 0 {
 		return nil
 	}
 
 	// 更新対象のsongIDリストを作成
-	songIDs := make([]int, 0, len(songs))
-	for _, song := range songs {
-		songIDs = append(songIDs, displayIDToSongID[song.DisplayID])
+	songIDs := make([]int, 0, len(updates))
+	for _, update := range updates {
+		songIDs = append(songIDs, displayIDToSongID[update.Song.DisplayID])
 	}
 
 	// CASE式を構築
-	// 注意: SQLの引数順序はCASE式の出現順（title→reading→artist→genre→...→IN句）であるため、
+	// 注意: SQLの引数順序はCASE式の出現順（title→wiki_page_title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
-	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
+	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
 
-	for _, song := range songs {
+	for _, update := range updates {
+		song := update.Song
 		songID := displayIDToSongID[song.DisplayID]
 
 		titleCases = append(titleCases, "WHEN id = ? THEN ?")
 		titleArgs = append(titleArgs, songID, song.Title)
+
+		if update.UpdateWikiPageTitle {
+			wikiPageTitleCases = append(wikiPageTitleCases, "WHEN id = ? THEN ?")
+			wikiPageTitleArgs = append(wikiPageTitleArgs, songID, song.WikiPageTitle)
+		}
 
 		readingCases = append(readingCases, "WHEN id = ? THEN ?")
 		readingArgs = append(readingArgs, songID, song.Reading)
@@ -594,9 +621,10 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		isNewArgs = append(isNewArgs, songID, song.IsNew)
 	}
 
-	// SQLの引数順序に合わせて結合: title→reading→artist→genre→bpm→released→jacket→is_new→IN句
+	// SQLの引数順序に合わせて結合: title→wiki_page_title→reading→artist→genre→bpm→released→jacket→is_new→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
+	args = append(args, wikiPageTitleArgs...)
 	args = append(args, readingArgs...)
 	args = append(args, artistArgs...)
 	args = append(args, genreArgs...)
@@ -618,6 +646,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	query := fmt.Sprintf(`
 		UPDATE songs SET
 			title = CASE %s END,
+			wiki_page_title = %s,
 			reading = CASE %s END,
 			artist = CASE %s END,
 			genre_id = CASE %s END,
@@ -629,6 +658,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		  AND is_worldsend = 0
 	`,
 		strings.Join(titleCases, " "),
+		wikiPageTitleUpdateExpr(wikiPageTitleCases),
 		strings.Join(readingCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
@@ -740,11 +770,12 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
+		song.WikiPageTitle,
 		song.Reading,
 		song.Artist,
 		song.GenreID,

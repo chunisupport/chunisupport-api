@@ -11,20 +11,21 @@ import (
 
 // SongModel はデータベース用のSongモデルです。
 type SongModel struct {
-	ID          int        `db:"id"`
-	DisplayID   string     `db:"display_id"`
-	Title       string     `db:"title"`
-	Reading     *string    `db:"reading"`
-	Artist      string     `db:"artist"`
-	GenreID     *int       `db:"genre_id"`
-	BPM         *int       `db:"bpm"`
-	ReleasedAt  *time.Time `db:"released_at"`
-	OfficialIdx string     `db:"official_idx"`
-	Jacket      *string    `db:"jacket"`
-	IsWorldsend bool       `db:"is_worldsend"`
-	IsNew       bool       `db:"is_new"`
-	IsDeleted   bool       `db:"is_deleted"`
-	UpdatedAt   *time.Time `db:"updated_at"`
+	ID            int        `db:"id"`
+	DisplayID     string     `db:"display_id"`
+	Title         string     `db:"title"`
+	WikiPageTitle *string    `db:"wiki_page_title"`
+	Reading       *string    `db:"reading"`
+	Artist        string     `db:"artist"`
+	GenreID       *int       `db:"genre_id"`
+	BPM           *int       `db:"bpm"`
+	ReleasedAt    *time.Time `db:"released_at"`
+	OfficialIdx   string     `db:"official_idx"`
+	Jacket        *string    `db:"jacket"`
+	IsWorldsend   bool       `db:"is_worldsend"`
+	IsNew         bool       `db:"is_new"`
+	IsDeleted     bool       `db:"is_deleted"`
+	UpdatedAt     *time.Time `db:"updated_at"`
 }
 
 // ToEntity はSongModelをentity.Songに変換します。
@@ -33,6 +34,7 @@ func (m *SongModel) ToEntity() *entity.Song {
 	song.ID = m.ID
 	song.DisplayID = m.DisplayID
 	song.Title = m.Title
+	song.WikiPageTitle = m.WikiPageTitle
 	song.Reading = m.Reading
 	song.Artist = m.Artist
 	song.GenreID = m.GenreID
@@ -50,20 +52,21 @@ func (m *SongModel) ToEntity() *entity.Song {
 // FromSongEntity はentity.SongをSongModelに変換します。
 func FromSongEntity(e *entity.Song) *SongModel {
 	return &SongModel{
-		ID:          e.ID,
-		DisplayID:   e.DisplayID,
-		Title:       e.Title,
-		Reading:     e.Reading,
-		Artist:      e.Artist,
-		GenreID:     e.GenreID,
-		BPM:         e.BPM,
-		ReleasedAt:  e.ReleasedAt,
-		OfficialIdx: e.OfficialIdx,
-		Jacket:      e.Jacket,
-		IsWorldsend: e.IsWorldsend,
-		IsNew:       e.IsNew,
-		IsDeleted:   e.IsDeleted,
-		UpdatedAt:   e.UpdatedAt,
+		ID:            e.ID,
+		DisplayID:     e.DisplayID,
+		Title:         e.Title,
+		WikiPageTitle: e.WikiPageTitle,
+		Reading:       e.Reading,
+		Artist:        e.Artist,
+		GenreID:       e.GenreID,
+		BPM:           e.BPM,
+		ReleasedAt:    e.ReleasedAt,
+		OfficialIdx:   e.OfficialIdx,
+		Jacket:        e.Jacket,
+		IsWorldsend:   e.IsWorldsend,
+		IsNew:         e.IsNew,
+		IsDeleted:     e.IsDeleted,
+		UpdatedAt:     e.UpdatedAt,
 	}
 }
 

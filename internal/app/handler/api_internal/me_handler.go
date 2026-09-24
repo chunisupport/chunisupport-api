@@ -50,6 +50,27 @@ func (h *MeHandler) GetLatestPlayerUpdate(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &response)
 }
 
+// GetRecentPlayerUpdates は本人の直近5件の登録結果を返します。
+func (h *MeHandler) GetRecentPlayerUpdates(c *echo.Context) error {
+	user, ok := c.Get("userEntity").(*entity.User)
+	if !ok || user == nil {
+		return apierror.ErrUnauthorized
+	}
+	updates, err := h.playerDataUsecase.GetRecentUpdates(c.Request().Context(), user)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	responses := make([]dto_internal.PlayerLatestUpdateResult, 0, len(updates))
+	for _, raw := range updates {
+		var response dto_internal.PlayerLatestUpdateResult
+		if err := json.Unmarshal(raw, &response); err != nil {
+			return apierror.ErrInternalError.WithInternal(err)
+		}
+		responses = append(responses, response)
+	}
+	return c.JSON(http.StatusOK, responses)
+}
+
 // NewMeHandler は MeHandler のインスタンスを生成します。
 func NewMeHandler(playerDataUsecase usecase.PlayerDataUsecase) *MeHandler {
 	return &MeHandler{playerDataUsecase: playerDataUsecase}

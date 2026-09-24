@@ -13,7 +13,11 @@ type FriendshipUserSummary struct {
 	PlayerLevel *int
 	PlayerName  *string
 	Rating      *float64
-	IsPrivate   bool
+	// OverpowerValue はOVER POWER値です。
+	OverpowerValue *float64
+	// PossessionID はポゼッションマスタのIDです。プレイヤー未連携または非公開の未承認相手では nil です。
+	PossessionID *int
+	IsPrivate    bool
 }
 
 // FriendshipWithUserSummary は片方向フレンド関係と相手ユーザー概要をまとめた読み取りモデルです。

@@ -1,6 +1,7 @@
 package chunirec
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -112,7 +113,11 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		case errors.Is(err, usecase.ErrUserPrivate):
 			return apierror.ErrUserNotFound
 		default:
-			slog.Error("failed to get user records", "username", username, "error", err)
+			if errors.Is(err, context.Canceled) {
+				slog.Warn("failed to get user records due to context canceled", "username", username, "error", err)
+			} else {
+				slog.Error("failed to get user records", "username", username, "error", err)
+			}
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}

@@ -158,7 +158,7 @@ func (r *playerDataRepository) ClearRankedSlots(ctx context.Context, exec reposi
 	return nil
 }
 
-// SaveLatestUpdate は収集日時が新しいプレイヤーデータ登録結果だけを保存します。
+// SaveLatestUpdate は収集日時ごとに登録結果を保存し、最新5件を残します。
 func (r *playerDataRepository) SaveLatestUpdate(ctx context.Context, exec repository.Executor, update *entity.PlayerLatestUpdate) error {
 	if exec == nil {
 		return fmt.Errorf("SaveLatestUpdate requires a non-nil executor: must be called within a transaction")
@@ -168,49 +168,75 @@ func (r *playerDataRepository) SaveLatestUpdate(ctx context.Context, exec reposi
 	}
 
 	model := models.FromPlayerLatestUpdateEntity(update)
+	var existingHash string
+	err := exec.GetContext(ctx, &existingHash, `
+		SELECT body_hash FROM player_latest_updates
+		WHERE player_id = ? AND source_updated_at = ?
+	`, update.PlayerID(), update.SourceUpdatedAt())
+	if err == nil {
+		if existingHash != update.BodyHash() {
+			return entity.ErrConflictingPlayerDataBody
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to check player update history: %w", err)
+	}
 	insertQuery := `
 		INSERT INTO player_latest_updates (
 			player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
 		) VALUES (
 			:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
 		)
-		ON DUPLICATE KEY UPDATE player_id = player_id
 	`
-	if r.db.DriverName() == "sqlite" {
-		insertQuery = `
-			INSERT INTO player_latest_updates (
-				player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
-			) VALUES (
-				:player_id, :schema_version, :result_gzip, :source_updated_at, :imported_at, :body_hash
-			)
-			ON CONFLICT(player_id) DO NOTHING
-		`
-	}
 	if _, err := exec.NamedExecContext(ctx, insertQuery, model); err != nil {
 		return fmt.Errorf("failed to save player latest update: %w", err)
 	}
-
-	updateQuery := `
-		UPDATE player_latest_updates
-		SET schema_version = :schema_version,
-			result_gzip = :result_gzip,
-			source_updated_at = :source_updated_at,
-			imported_at = :imported_at,
-			body_hash = :body_hash
-		WHERE player_id = :player_id
-		  AND (
-			source_updated_at < :source_updated_at
-			OR (
-				source_updated_at = :source_updated_at
-				AND body_hash <> :body_hash
-				AND imported_at < :imported_at
-			)
-		  )
-	`
-	if _, err := exec.NamedExecContext(ctx, updateQuery, model); err != nil {
-		return fmt.Errorf("failed to update player latest update: %w", err)
+	var cutoff time.Time
+	err = exec.GetContext(ctx, &cutoff, `
+		SELECT source_updated_at FROM player_latest_updates
+		WHERE player_id = ?
+		ORDER BY source_updated_at DESC
+		LIMIT 1 OFFSET ?
+	`, update.PlayerID(), info.PlayerUpdateHistoryLimit-1)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to find player update history cutoff: %w", err)
+	}
+	_, err = exec.ExecContext(ctx, `
+		DELETE FROM player_latest_updates
+		WHERE player_id = ? AND source_updated_at < ?
+	`, update.PlayerID(), cutoff)
+	if err != nil {
+		return fmt.Errorf("failed to trim player update history: %w", err)
 	}
 	return nil
+}
+
+// FindRecentUpdatesByPlayerID は保存済みの最新5件を収集日時順に取得します。
+func (r *playerDataRepository) FindRecentUpdatesByPlayerID(ctx context.Context, playerID int) ([]*entity.PlayerLatestUpdate, error) {
+	var rows []models.PlayerLatestUpdateModel
+	err := r.db.SelectContext(ctx, &rows, `
+		SELECT player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
+		FROM player_latest_updates
+		WHERE player_id = ?
+		ORDER BY source_updated_at DESC
+		LIMIT ?
+	`, playerID, info.PlayerUpdateHistoryLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find player update history: %w", err)
+	}
+	updates := make([]*entity.PlayerLatestUpdate, 0, len(rows))
+	for i := range rows {
+		update, err := rows[i].ToEntity()
+		if err != nil {
+			return nil, fmt.Errorf("failed to restore player update history: %w", err)
+		}
+		updates = append(updates, update)
+	}
+	return updates, nil
 }
 
 // FindLatestUpdateByPlayerID はプレイヤーIDに対応する最新データ登録結果を取得します。
@@ -232,6 +258,8 @@ func (r *playerDataRepository) findLatestUpdateByPlayerID(ctx context.Context, e
 		SELECT player_id, schema_version, result_gzip, source_updated_at, imported_at, body_hash
 		FROM player_latest_updates
 		WHERE player_id = ?
+		ORDER BY source_updated_at DESC
+		LIMIT 1
 	`
 	if forUpdate && r.db.DriverName() == "mysql" {
 		query += " FOR UPDATE"

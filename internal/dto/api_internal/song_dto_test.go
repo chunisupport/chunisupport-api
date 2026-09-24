@@ -247,3 +247,40 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 func stringPtr(value string) *string {
 	return &value
 }
+
+func TestToSongDTO_WikiPageTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 楽曲のWikiページタイトル
+		wikiPageTitle *string
+		// Then: JSONに出力される wiki_page_title
+		expectedJSON string
+	}{
+		{
+			name:          "Wikiページタイトルが設定されている場合はその値を返す",
+			wikiPageTitle: stringPtr("楽曲名(CHUNITHM)"),
+			expectedJSON:  `"wiki_page_title":"楽曲名(CHUNITHM)"`,
+		},
+		{
+			name:          "Wikiページタイトルが未設定の場合はnullを返す",
+			wikiPageTitle: nil,
+			expectedJSON:  `"wiki_page_title":null`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			song := &entity.Song{WikiPageTitle: tt.wikiPageTitle}
+
+			// When
+			dto := ToSongDTO(song, map[int]string{}, 0)
+			jsonBytes, err := json.Marshal(dto)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.wikiPageTitle, dto.WikiPageTitle)
+			assert.Contains(t, string(jsonBytes), tt.expectedJSON)
+		})
+	}
+}

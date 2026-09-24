@@ -82,6 +82,10 @@ func (s *stubPlayerDataUsecase) GetLatestUpdate(_ context.Context, _ *entity.Use
 	return nil, ErrPlayerLatestUpdateNotFound
 }
 
+func (s *stubPlayerDataUsecase) GetRecentUpdates(_ context.Context, _ *entity.User) ([]json.RawMessage, error) {
+	return nil, nil
+}
+
 func (s *stubPlayerDataUsecase) Delete(_ context.Context, _ *entity.User) error { return nil }
 
 func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {

@@ -124,8 +124,8 @@ func (m *MockSongRepository) Save(ctx context.Context, exec repository.Executor,
 	return args.Error(0)
 }
 
-func (m *MockSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
-	args := m.Called(ctx, exec, songs)
+func (m *MockSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.SongUpdate) error {
+	args := m.Called(ctx, exec, updates)
 	return args.Error(0)
 }
 

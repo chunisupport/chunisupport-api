@@ -16,6 +16,7 @@ type Song struct {
 	ID                   int
 	DisplayID            string
 	Title                string
+	WikiPageTitle        *string
 	Reading              *string
 	Artist               string
 	GenreID              *int

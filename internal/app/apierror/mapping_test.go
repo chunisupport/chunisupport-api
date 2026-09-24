@@ -27,6 +27,22 @@ func TestFromUsecaseError_公式指標履歴時刻競合を409へ変換する(t 
 	assert.Equal(t, CodeConflict, apiErr.Code)
 }
 
+func TestFromUsecaseError_フレンド比較対象なしを404へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrFriendNotFound)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, CodeFriendNotFound, apiErr.Code)
+}
+
+func TestFromUsecaseError_フレンド比較不能を409へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrFriendScoreComparisonUnavailable)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+	assert.Equal(t, CodeFriendScoreComparisonUnavailable, apiErr.Code)
+}
+
 func TestFromUsecaseError_公式指標履歴なしを404へ変換する(t *testing.T) {
 	apiErr := FromUsecaseError(usecase.ErrPlayerMetricHistoryNotFound)
 

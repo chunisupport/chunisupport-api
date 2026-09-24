@@ -472,6 +472,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return latestUpdateErr
 		}
 		if latestUpdateErr = us.playerDataRepo.SaveLatestUpdate(ctx, tx, latestUpdate); latestUpdateErr != nil {
+			if errors.Is(latestUpdateErr, entity.ErrConflictingPlayerDataBody) {
+				return &PlayerDataConflictError{Reason: latestUpdateErr.Error()}
+			}
 			return latestUpdateErr
 		}
 

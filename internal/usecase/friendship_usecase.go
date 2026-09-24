@@ -23,7 +23,11 @@ type FriendshipUserOutput struct {
 	PlayerLevel *int
 	PlayerName  *string
 	Rating      *float64
-	IsPrivate   bool
-	RequestedAt time.Time
-	AcceptedAt  *time.Time
+	// OverpowerValue はOVER POWER値です。
+	OverpowerValue *float64
+	// PossessionID はポゼッションマスタのIDです。
+	PossessionID *int
+	IsPrivate    bool
+	RequestedAt  time.Time
+	AcceptedAt   *time.Time
 }

@@ -117,6 +117,8 @@ A が B に申請済みの状態で B が A に申請した場合、新しい `p
 
 その他の操作も公開識別子である `username` をパスパラメータで指定します。
 
+スコア比較API `GET /internal/friend-comparisons/:username/charts/:difficulty` と `GET /internal/friend-comparisons/:username/worldsend` は、承認済みの双方向フレンドだけを対象にします。パスとレスポンスに数値の内部ユーザーIDは出しません。自分自身、未承認、片方向、不存在は区別せず `friend_not_found` です。承認済みであることを確認したあと、自分または相手がプレイヤー未連携なら `friend_score_comparison_unavailable` を返します。
+
 一覧レスポンスの相手ユーザー概要は次の情報を含みます。
 
 - username

@@ -82,6 +82,8 @@ type PlayerDataUsecase interface {
 	Register(ctx context.Context, user *entity.User, payload *PlayerDataPayload, bodyHash string) (*playerdataresult.Result, error)
 	// GetLatestUpdate はユーザーに紐づくプレイヤーの最新データ登録結果を返します。
 	GetLatestUpdate(ctx context.Context, user *entity.User) (json.RawMessage, error)
+	// GetRecentUpdates は直近5件のデータ登録結果を返します。
+	GetRecentUpdates(ctx context.Context, user *entity.User) ([]json.RawMessage, error)
 	// Delete はユーザーに紐づくプレイヤーと関連データを削除し、連携を解除します。
 	Delete(ctx context.Context, user *entity.User) error
 }

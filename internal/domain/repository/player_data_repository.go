@@ -66,6 +66,8 @@ type PlayerDataRepository interface {
 
 	// FindLatestUpdateByPlayerID はプレイヤーの最新データ登録結果を取得します。
 	FindLatestUpdateByPlayerID(ctx context.Context, playerID int) (*entity.PlayerLatestUpdate, error)
+	// FindRecentUpdatesByPlayerID は収集日時の新しい順に保存済み結果を取得します。
+	FindRecentUpdatesByPlayerID(ctx context.Context, playerID int) ([]*entity.PlayerLatestUpdate, error)
 
 	// FindLatestUpdateByPlayerIDForUpdate は最新データ登録結果をトランザクション内でロックして取得します。
 	FindLatestUpdateByPlayerIDForUpdate(ctx context.Context, exec Executor, playerID int) (*entity.PlayerLatestUpdate, error)

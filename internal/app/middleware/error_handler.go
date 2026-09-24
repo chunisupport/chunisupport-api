@@ -39,6 +39,22 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 		return
 	}
 
+	// クライアント切断はサーバー障害ではないため、500 として扱わずに記録だけ残します。
+	// 応答は届かないが、未送信のまま返すと net/http が 200 を書き込むため 499 を明示します。
+	if errors.Is(err, context.Canceled) {
+		slog.Info("HTTP request canceled by client",
+			"method", c.Request().Method,
+			"path", c.Request().URL.Path,
+			"remote_addr", c.RealIP(),
+			"status", info.StatusClientClosedRequest,
+			"error", sanitizeLogValue(err.Error()),
+		)
+		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
+			slog.Debug("Failed to send client closed response", "error", err)
+		}
+		return
+	}
+
 	if errorCode == apierror.CodeMaintenanceMode {
 		setMaintenanceResponseHeaders(c)
 	}
@@ -123,15 +139,6 @@ func logError(status int, code string, err error, c *echo.Context) {
 
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
-	// context.Canceled の場合はクライアントキャンセルとしてWARNログ
-	if errors.Is(err, context.Canceled) {
-		logger.Warn("HTTP request canceled by client",
-			"status", status,
-			"code", code,
-			"error", errorMessage,
-		)
-		return
-	}
 
 	// 4xx系は警告、5xx系はエラーとして出力
 	if status >= 500 {

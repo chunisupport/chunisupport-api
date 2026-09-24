@@ -8,9 +8,11 @@ import (
 
 // WorldsendUpdate は WORLD'S END 楽曲と譜面の更新情報を表します。
 // Chart が nil の場合は楽曲情報のみ更新します。
+// UpdateWikiPageTitle の扱いは SongUpdate と同じです。
 type WorldsendUpdate struct {
-	Song  *entity.Song
-	Chart *entity.WorldsendChart
+	Song                *entity.Song
+	Chart               *entity.WorldsendChart
+	UpdateWikiPageTitle bool
 }
 
 // WorldsendChartRepository は WORLD'S END 譜面に関する永続化を扱うリポジトリです。

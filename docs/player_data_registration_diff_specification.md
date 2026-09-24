@@ -245,17 +245,17 @@
 
 差分は「保存前状態の取得」と「upsert予定値」の比較で作る。同一プレイヤーに対する複数の登録リクエストを同時実行した場合、別リクエストが取得後に状態を変更すると、返却した差分が最終的なDB更新内容と一致しない可能性がある。現行実装は同一プレイヤーの登録が同時実行されない通常利用を前提とし、排他制御による差分の直列化は行わない。
 
-## 10. 最新登録結果の保存
+## 10. 登録結果の保存
 
-登録成功時の結果は `player_latest_updates` にプレイヤーごとに1件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
+登録成功時の結果は `player_latest_updates` にプレイヤーごとに収集日時の新しい順で最大5件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
 
 最新の保存形式はschema version 3であり、`metric_diffs.overpower_percent` を含む。schema version 1の保存済み結果も取得可能だが `metric_diffs` は含まれず、schema version 2には `rating` と `overpower_value` の差分だけが含まれる。
 
 JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` をUTCへ正規化した値を `source_updated_at`、サーバーの登録受付日時を `imported_at`、入力本文のSHA-256を `body_hash` として別カラムにも保存する。
 
-既存行より `source_updated_at` が新しい場合だけ最新結果を更新する。同じ `source_updated_at` で本文ハッシュが異なる場合は `imported_at` が新しい結果を採用し、本文ハッシュも同じ場合は更新しない。日時はマイクロ秒精度で保存する。保存はスコア更新と同じトランザクション内で行うため、最新登録結果の保存に失敗した場合はプレイヤーデータ登録全体をロールバックする。
+同じ `source_updated_at` と本文ハッシュの結果は重複保存せず、同じ収集日時で本文ハッシュが異なる入力は競合として拒否する。6件目以降の古い結果は登録時に削除する。日時はマイクロ秒精度で保存する。保存と古い結果の削除はスコア更新と同じトランザクション内で行い、失敗した場合はプレイヤーデータ登録全体をロールバックする。
 
-保存済みの最新登録結果は、Firebase認証が必要な `GET /internal/me/player-data/latest-update` で本人だけが参照できる。プレイヤー連携済みで保存済み結果がない場合は `204 No Content`、プレイヤー未連携の場合は `404 player_not_linked` を返す。
+保存済みの最新登録結果は、Firebase認証が必要な `GET /internal/me/player-data/latest-update` で本人だけが参照できる。`GET /internal/me/player-data/updates` は同じ形式の結果を新しい順の配列で最大5件返す。プレイヤー連携済みで保存済み結果がない場合、最新結果APIは `204 No Content`、履歴APIは空配列を返す。プレイヤー未連携の場合は `404 player_not_linked` を返す。
 
 ## 11. 実装上の参照先
 
@@ -265,4 +265,5 @@ JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` �
 - DB upsert条件: `internal/infra/repository/player_data_repository_impl.go`
 - 最新登録結果の変換: `internal/usecase/player_latest_update.go`
 - 最新登録結果テーブル: `migration/mysql/000035_create_player_latest_updates.up.sql`
+- 更新履歴への拡張: `migration/mysql/000050_retain_player_update_history.up.sql`
 - HTTPエンドポイント: `internal/app/handler/api_internal/me_handler.go`、`internal/app/handler/api_internal/temporary_player_data_handler.go`

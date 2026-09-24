@@ -143,9 +143,11 @@ var (
 
 	ErrFavoriteSongLimitExceeded = New(CodeFavoriteSongLimitExceeded, http.StatusBadRequest)
 
-	ErrFriendshipLimitExceeded = New(CodeFriendshipLimitExceeded, http.StatusBadRequest)
-	ErrFriendshipConflict      = New(CodeFriendshipConflict, http.StatusConflict)
-	ErrFriendRequestNotFound   = New(CodeFriendRequestNotFound, http.StatusNotFound)
+	ErrFriendshipLimitExceeded          = New(CodeFriendshipLimitExceeded, http.StatusBadRequest)
+	ErrFriendshipConflict               = New(CodeFriendshipConflict, http.StatusConflict)
+	ErrFriendRequestNotFound            = New(CodeFriendRequestNotFound, http.StatusNotFound)
+	ErrFriendNotFound                   = New(CodeFriendNotFound, http.StatusNotFound)
+	ErrFriendScoreComparisonUnavailable = New(CodeFriendScoreComparisonUnavailable, http.StatusConflict)
 
 	ErrInvalidVersionInput = New(CodeInvalidVersionInput, http.StatusUnprocessableEntity)
 	ErrVersionNotFound     = New(CodeVersionNotFound, http.StatusNotFound)

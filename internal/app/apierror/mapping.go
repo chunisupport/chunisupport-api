@@ -186,6 +186,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrFriendshipConflict.WithInternal(err)
 	case errors.Is(err, usecase.ErrFriendRequestNotFound):
 		return ErrFriendRequestNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendNotFound):
+		return ErrFriendNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrFriendScoreComparisonUnavailable):
+		return ErrFriendScoreComparisonUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidFriendRequest):
 		return ErrValidationFailedBadRequest.WithInternal(err)
 	}

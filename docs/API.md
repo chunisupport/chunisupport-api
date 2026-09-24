@@ -125,6 +125,8 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `friendship_limit_exceeded` | フレンド枠の上限超過 |
 | `friendship_conflict` | 既に申請中またはフレンド成立済み |
 | `friend_request_not_found` | 対象のフレンド申請が見つからない |
+| `friend_not_found` | 承認済み双方向フレンドではない |
+| `friend_score_comparison_unavailable` | 承認済みフレンドだが自分または相手がプレイヤー未連携 |
 
 ## メンテナンスモード
 
@@ -217,6 +219,7 @@ Content-Type: application/json
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data/latest-update` | GET | Firebase Bearer | 自分の最新プレイヤーデータ登録結果を取得 |
+| `/internal/me/player-data/updates` | GET | Firebase Bearer | 自分の直近5件のプレイヤーデータ登録結果を取得 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/me/data-transfer/export` | POST | Firebase Bearer | ユーザーデータを移行ファイルとしてエクスポート |
 | `/internal/me/data-transfer/validate` | POST | Firebase Bearer | 移行ファイルを検証 |
@@ -236,6 +239,8 @@ Content-Type: application/json
 | `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/friend-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/friend-rankings/worldsend-songs/:id` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
+| `/internal/friend-comparisons/:username/charts/:difficulty` | GET | Firebase Bearer | 承認済みフレンドとの指定難易度スコア比較 |
+| `/internal/friend-comparisons/:username/worldsend` | GET | Firebase Bearer | 承認済みフレンドとのWORLD'S ENDスコア比較 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
 | `/internal/player-data/commit` | POST | Firebase Bearer | 一時受付したプレイヤーデータを確定保存 |
 | `/internal/me/goals` | GET | Firebase Bearer | 目標一覧を取得 |
@@ -1014,6 +1019,8 @@ Firebase Bearer Token（必須）
       "player_level": 42,
       "player_name": "PLAYER",
       "rating": 15.25,
+      "overpower_value": 18000.25,
+      "possession_id": 3,
       "is_private": false,
       "requested_at": "2026-07-08T12:00:00Z",
       "accepted_at": "2026-07-08T12:05:00Z"
@@ -1022,7 +1029,8 @@ Firebase Bearer Token（必須）
 }
 ```
 
-`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。未承認の送受信申請では、非公開ユーザーの `player_level`、`player_name`、`rating` をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
+`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。`overpower_value` はOVER POWER値、`possession_id` は `MasterDataDTO.possessions` の `id` です。プレイヤーデータ未連携の場合、プレイヤー由来の項目（`player_level`、`player_name`、`rating`、`overpower_value`、`possession_id`）はすべて `null` です。
+未承認の送受信申請では、非公開ユーザーのプレイヤー由来の項目をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
 
 ### GET `/internal/friends`
 
@@ -1220,6 +1228,131 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+## `/internal/friend-comparisons` グループ
+
+承認済みの双方向フレンド1人と、指定した1難易度の全有効通常譜面または全有効WORLD'S END譜面を比較します。コースと全難易度の一括取得は対象外です。公開アカウントであっても、承認済みフレンドでなければ比較できません。
+
+未プレイも比較と集計の対象です。未プレイは `is_played: false`、`score: 0`、ランプと `updated_at` は `null` に正規化します。`is_played` はスコア値ではなく、通常譜面は `player_records`、WORLD'S ENDは `player_worldsend_records` の行の有無で判定するため、スコア0のレコードはプレイ済みです。
+
+`score_difference` は常に `self.score - friend.score` です。自分のスコアが大きければ `SELF_WIN`、小さければ `FRIEND_WIN`、同じならランプや更新日時にかかわらず `DRAW` です。両者未プレイ、および片方だけプレイ済みでもスコア0の場合は引き分けです。
+
+### GET `/internal/friend-comparisons/:username/charts/:difficulty`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分と指定した承認済みフレンドについて、指定難易度の全通常譜面のスコア比較と集計を返します。ページングはありません。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `username` | string | フレンド一覧APIが返す `username` |
+| `difficulty` | string | `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`。大文字正規形のみ。小文字・混在・短縮形は不可 |
+
+- **並び順**: `items` は楽曲マスタの内部ID昇順です。勝敗順やスコア差順は返しません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "difficulty": "MASTER",
+  "self": {
+    "username": "myuser",
+    "player_name": "MY PLAYER"
+  },
+  "friend": {
+    "username": "frienduser",
+    "player_name": "FRIEND"
+  },
+  "summary": {
+    "total_charts": 3,
+    "self_wins": 1,
+    "draws": 1,
+    "friend_wins": 1,
+    "self_played": 2,
+    "friend_played": 1,
+    "both_played": 1,
+    "self_only_played": 1,
+    "friend_only_played": 0,
+    "both_unplayed": 1
+  },
+  "items": [
+    {
+      "song": {
+        "id": "0000000000000001",
+        "title": "楽曲名",
+        "artist": "アーティスト名"
+      },
+      "chart": {
+        "const": 14.5,
+        "is_const_unknown": false
+      },
+      "self": {
+        "is_played": true,
+        "score": 1009000,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": "FULL COMBO",
+        "full_chain": null,
+        "updated_at": "2026-07-20T10:00:00Z"
+      },
+      "friend": {
+        "is_played": true,
+        "score": 1007500,
+        "clear_lamp": "CLEAR",
+        "combo_lamp": null,
+        "full_chain": null,
+        "updated_at": "2026-07-19T10:00:00Z"
+      },
+      "score_difference": 1500,
+      "result": "SELF_WIN"
+    }
+  ]
+}
+```
+
+`song.id` は楽曲の `display_id` です。数値の内部ユーザーIDと内部楽曲IDは返しません。`clear_lamp` / `combo_lamp` / `full_chain` は未プレイ、またはマスタ値 `NONE` の場合 `null` です。対象譜面が0件でもエラーにはせず、集計0かつ `items: []` を返します。
+
+集計は次の不変条件を満たします。
+
+```text
+total_charts = self_wins + draws + friend_wins
+total_charts = both_played + self_only_played + friend_only_played + both_unplayed
+self_played = both_played + self_only_played
+friend_played = both_played + friend_only_played
+```
+
+- **主なエラー**:
+  - 400 Bad Request (`username_too_short` / `username_too_long` / `username_invalid_char`): `username` の形式不正
+  - 400 Bad Request (`invalid_difficulty`): 難易度が未指定または許可値でない
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 404 Not Found (`friend_not_found`): 承認済み双方向フレンドではない、自分自身を指定した、または対象ユーザーが存在しない
+  - 409 Conflict (`friend_score_comparison_unavailable`): 自分または承認済みフレンドがプレイヤーデータ未連携
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/friend-comparisons/:username/worldsend`
+
+- **認証**: Firebase Bearer 必須
+- **概要**: 自分と指定した承認済みフレンドについて、全有効WORLD'S END譜面のスコア比較と集計を返します。ページングはありません。
+- **パスパラメータ**: `username` はフレンド一覧APIが返すユーザー名です。
+- **並び順**: `items` は楽曲マスタの内部ID昇順です。
+- **レスポンス**: 通常譜面の比較と同じ `self`、`friend`、`summary`、`items` の構造です。`difficulty` は `WORLD'S END`、各 `chart` は `level_star` と `attribute` を持ちます。値が未設定の場合もフィールドを返し、値は `null` です。`const` と `is_const_unknown` は返しません。
+
+```json
+{
+  "difficulty": "WORLD'S END",
+  "self": {"username": "myuser", "player_name": "MY PLAYER"},
+  "friend": {"username": "frienduser", "player_name": "FRIEND"},
+  "summary": {"total_charts": 1, "self_wins": 1, "draws": 0, "friend_wins": 0, "self_played": 1, "friend_played": 0, "both_played": 0, "self_only_played": 1, "friend_only_played": 0, "both_unplayed": 0},
+  "items": [{
+    "song": {"id": "0000000000000006", "title": "楽曲名", "artist": "アーティスト名"},
+    "chart": {"level_star": 4, "attribute": "蔵"},
+    "self": {"is_played": true, "score": 1009000, "clear_lamp": "CLEAR", "combo_lamp": null, "full_chain": null, "updated_at": "2026-07-20T10:00:00Z"},
+    "friend": {"is_played": false, "score": 0, "clear_lamp": null, "combo_lamp": null, "full_chain": null, "updated_at": null},
+    "score_difference": 1009000,
+    "result": "SELF_WIN"
+  }]
+}
+```
+
+対象譜面が0件でも集計0かつ `items: []` を返します。エラーは通常譜面の比較と共通ですが、難易度パラメータがないため `invalid_difficulty` は発生しません。
 
 ### GET `/internal/users/:username/locked-songs`
 - **認証**: Firebase Bearer 任意
@@ -1795,6 +1928,12 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
   - 404 Not Found (`player_not_linked`): プレイヤー未連携
+
+---
+
+### GET `/internal/me/player-data/updates`
+
+認証済みユーザーに紐づくプレイヤーの保存済みデータ登録結果を、収集日時の新しい順に最大5件返します。配列内の各要素は `GET /internal/me/player-data/latest-update` と同じ形式です。最新結果は先頭に含まれます。同じ収集日時・本文の再登録は世代を増やしません。保存済み結果がない場合は `200 OK` と空配列 `[]` を返します。プレイヤー未連携の場合は `404 player_not_linked` を返します。
 
 ---
 
@@ -3216,6 +3355,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "wiki_page_title": "楽曲名",
       "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
@@ -3258,6 +3398,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID（16進数16文字） |
 | `title` | string | 楽曲名 |
+| `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string | ジャンル名（IDではなく名称） |
@@ -3295,6 +3436,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "id": "0123456789abcdef",
   "title": "楽曲名",
+  "wiki_page_title": "楽曲名",
   "artist": "アーティスト名",
   "genre": "ジャンル名",
   "bpm": 180,
@@ -3554,6 +3696,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "wiki_page_title": "楽曲タイトル",
   "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
@@ -3577,6 +3720,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `wiki_page_title` | string \| null | - | Wikiのページタイトル（1〜300文字、省略可。空文字は不可） |
 | `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
@@ -3615,6 +3759,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "wiki_page_title": "楽曲タイトル",
     "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
@@ -3640,6 +3785,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `wiki_page_title` | string \| null | | Wikiのページタイトル（1〜300文字）。省略した場合は既存値を維持し、nullの場合はDBをNULLに更新。空文字は不可（空にする場合はnullを指定） |
 | `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
@@ -3664,6 +3810,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - マスタに存在しないジャンル名を指定するとエラーになります。
 - `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます。
+- `wiki_page_title` は他の項目と異なり、省略すると既存値が維持されます（Wikiのページタイトルを扱わないクライアントが既存値を消さないようにするため）。
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -3714,6 +3861,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "wiki_page_title": "楽曲名(WORLD'S END)",
       "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
@@ -3740,6 +3888,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
+| `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
@@ -3774,6 +3923,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "id": "0123456789abcdef",
   "title": "楽曲名",
+  "wiki_page_title": "楽曲名(WORLD'S END)",
   "artist": "アーティスト名",
   "genre": "ジャンル名",
   "bpm": 180,
@@ -3820,6 +3970,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "wiki_page_title": "楽曲タイトル",
   "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
@@ -3840,6 +3991,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `wiki_page_title` | string \| null | - | Wikiのページタイトル（1〜300文字、省略可。空文字は不可） |
 | `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
@@ -3876,6 +4028,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "wiki_page_title": "楽曲タイトル",
     "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
@@ -3901,6 +4054,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `wiki_page_title` | string \| null | | Wikiのページタイトル（1〜300文字）。省略した場合は既存値を維持し、nullの場合はDBをNULLに更新。空文字は不可（空にする場合はnullを指定） |
 | `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
@@ -3926,6 +4080,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - リクエスト配列内で `id` が重複している場合はエラーになります
 - マスタに存在しないジャンル名を指定するとエラーになります
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+- `wiki_page_title` は他の項目と異なり、省略すると既存値が維持されます（Wikiのページタイトルを扱わないクライアントが既存値を消さないようにするため）。
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -4061,7 +4216,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4113,7 +4268,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4455,7 +4610,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: APIトークン必須
 - **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
-- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
+- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じですが、`wiki_page_title` は指定できません（指定すると `bad_request`）。v1 API での更新時、Wikiのページタイトルは既存値が維持されます。
 
 ```json
 [

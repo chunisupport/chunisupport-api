@@ -46,6 +46,20 @@ func (stubAdminUserStatisticsUsecase) Get(context.Context) (usecase.AdminUserSta
 	return usecase.AdminUserStatisticsOutput{}, nil
 }
 
+type stubFriendScoreComparisonUsecase struct {
+	calls int
+}
+
+func (s *stubFriendScoreComparisonUsecase) Get(context.Context, int, string, string) (*usecase.FriendScoreComparisonResult, error) {
+	s.calls++
+	return &usecase.FriendScoreComparisonResult{Items: []usecase.FriendScoreComparisonItem{}}, nil
+}
+
+func (s *stubFriendScoreComparisonUsecase) GetWorldsend(context.Context, int, string) (*usecase.FriendScoreComparisonResult, error) {
+	s.calls++
+	return &usecase.FriendScoreComparisonResult{Items: []usecase.FriendScoreComparisonItem{}}, nil
+}
+
 func (s stubMaintenanceUsecase) Current() usecase.MaintenanceState {
 	return s.state
 }
@@ -487,7 +501,7 @@ func TestRegisterRoutes_公開GETはread最適化認証を使い書き込みはs
 	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
 }
 
-func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
+func TestRegisterRoutes_users公開GETはread最適化認証を使う(t *testing.T) {
 	// Given
 	e := echo.New()
 	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
@@ -503,8 +517,8 @@ func TestRegisterRoutes_users公開GETはstrict認証を使う(t *testing.T) {
 
 	// Then
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.Equal(t, 1, strictAuth.authenticateOptionalCalls)
-	assert.Equal(t, 0, readOptimizedAuth.authenticateOptionalCalls)
+	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
+	assert.Equal(t, 1, readOptimizedAuth.authenticateOptionalCalls)
 }
 
 func TestRegisterRoutes_usersUpdatedAtはread最適化認証を使う(t *testing.T) {
@@ -525,6 +539,135 @@ func TestRegisterRoutes_usersUpdatedAtはread最適化認証を使う(t *testing
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Equal(t, 0, strictAuth.authenticateOptionalCalls)
 	assert.Equal(t, 1, readOptimizedAuth.authenticateOptionalCalls)
+}
+
+func TestRegisterRoutes_認証必須の読み取りGETはread最適化認証を使い書き込みはstrict認証を使う(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		method string
+		path   string
+		// Then
+		wantStrictCalls        int
+		wantReadOptimizedCalls int
+	}{
+		{name: "自分のプロフィール取得", method: http.MethodGet, path: "/internal/me", wantReadOptimizedCalls: 1},
+		{name: "最新プレイヤーデータ更新の取得", method: http.MethodGet, path: "/internal/me/player-data/latest-update", wantReadOptimizedCalls: 1},
+		{name: "プレイヤーデータ更新履歴の取得", method: http.MethodGet, path: "/internal/me/player-data/updates", wantReadOptimizedCalls: 1},
+		{name: "目標一覧の取得", method: http.MethodGet, path: "/internal/me/goals", wantReadOptimizedCalls: 1},
+		{name: "目標グループ一覧の取得", method: http.MethodGet, path: "/internal/me/goal-groups", wantReadOptimizedCalls: 1},
+		{name: "レコードフィルタ一覧の取得", method: http.MethodGet, path: "/internal/me/record-filters", wantReadOptimizedCalls: 1},
+		{name: "フレンド一覧の取得", method: http.MethodGet, path: "/internal/friends", wantReadOptimizedCalls: 1},
+		{name: "受信したフレンド申請の取得", method: http.MethodGet, path: "/internal/friends/requests/received", wantReadOptimizedCalls: 1},
+		{name: "送信したフレンド申請の取得", method: http.MethodGet, path: "/internal/friends/requests/sent", wantReadOptimizedCalls: 1},
+		{name: "フレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/songs/abc/charts/MASTER", wantReadOptimizedCalls: 1},
+		{name: "WORLD'S ENDフレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/worldsend-songs/abc", wantReadOptimizedCalls: 1},
+		{name: "公開設定の更新", method: http.MethodPut, path: "/internal/me/privacy", wantStrictCalls: 1},
+		{name: "アカウント削除", method: http.MethodDelete, path: "/internal/me", wantStrictCalls: 1},
+		{name: "フレンド申請の送信", method: http.MethodPost, path: "/internal/friends/requests", wantStrictCalls: 1},
+		{name: "フレンド削除", method: http.MethodDelete, path: "/internal/friends/frienduser", wantStrictCalls: 1},
+		{name: "APIトークン一覧の取得", method: http.MethodGet, path: "/internal/auth/api-tokens", wantStrictCalls: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			strictAuth := &countingAuthenticator{}
+			readOptimizedAuth := &countingAuthenticator{}
+			registerRoutes(e, newAuthorizationTestHandlers(), strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer any-token")
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			assert.Equal(t, tt.wantStrictCalls, strictAuth.authenticateCalls)
+			assert.Equal(t, tt.wantReadOptimizedCalls, readOptimizedAuth.authenticateCalls)
+		})
+	}
+}
+
+func TestRegisterRoutes_フレンドスコア比較はread最適化認証を要求する(t *testing.T) {
+	tests := []struct {
+		name          string
+		token         string
+		wantStatus    int
+		wantAuthCalls int
+		wantUsecase   int
+	}{
+		{name: "未認証は拒否する", wantStatus: http.StatusUnauthorized},
+		{name: "Firebase認証済みならHandlerへ到達する", token: "player-token", wantStatus: http.StatusOK, wantAuthCalls: 1, wantUsecase: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			handlers := newAuthorizationTestHandlers()
+			comparisonUsecase := &stubFriendScoreComparisonUsecase{}
+			handlers.FriendScoreComparison = internalhandler.NewFriendScoreComparisonHandler(comparisonUsecase)
+			strictAuth := &countingAuthenticator{}
+			readOptimizedAuth := &roleCountingAuthenticator{}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/friend-comparisons/frienduser/charts/MASTER", nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantAuthCalls, readOptimizedAuth.authenticateCalls)
+			assert.Equal(t, tt.wantUsecase, comparisonUsecase.calls)
+			assert.Zero(t, strictAuth.authenticateCalls)
+			assert.Zero(t, strictAuth.authenticateOptionalCalls)
+		})
+	}
+}
+
+func TestRegisterRoutes_Worldsendフレンドスコア比較はread最適化認証を要求する(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		token      string
+		wantStatus int
+		wantCalls  int
+	}{
+		{name: "未認証", wantStatus: http.StatusUnauthorized},
+		{name: "認証済み", token: "player-token", wantStatus: http.StatusOK, wantCalls: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			handlers := newAuthorizationTestHandlers()
+			comparisonUsecase := &stubFriendScoreComparisonUsecase{}
+			handlers.FriendScoreComparison = internalhandler.NewFriendScoreComparisonHandler(comparisonUsecase)
+			strictAuth := &countingAuthenticator{}
+			readOptimizedAuth := &roleCountingAuthenticator{}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, strictAuth, readOptimizedAuth, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/friend-comparisons/frienduser/worldsend", nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			e.ServeHTTP(rec, req)
+
+			require.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantCalls, comparisonUsecase.calls)
+			assert.Equal(t, tt.wantCalls, readOptimizedAuth.authenticateCalls)
+			assert.Zero(t, strictAuth.authenticateCalls)
+			assert.Zero(t, strictAuth.authenticateOptionalCalls)
+		})
+	}
 }
 
 func TestRegisterRoutes_メンテナンス中の標準API経路を遮断する(t *testing.T) {

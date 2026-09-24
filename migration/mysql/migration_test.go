@@ -440,8 +440,19 @@ func TestSchemaMySQL_プレイヤー最新登録結果テーブルを含む(t *t
 	// Then
 	assert.Contains(t, schemaSQL, "CREATE TABLE `player_latest_updates`")
 	assert.Contains(t, schemaSQL, "`result_gzip` mediumblob NOT NULL")
-	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`)")
+	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`,`source_updated_at`)")
 	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE")
+}
+
+func TestRetainPlayerUpdateHistory_収集日時を世代キーにする(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000050_retain_player_update_history.up.sql")
+	downSQL := readNormalizedMigrationSQL(t, "000050_retain_player_update_history.down.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ADD PRIMARY KEY (player_id, source_updated_at)")
+	assert.Contains(t, downSQL, "older.source_updated_at < newer.source_updated_at")
+	assert.Contains(t, downSQL, "ADD PRIMARY KEY (player_id)")
 }
 
 func TestExpandAPITokensUp_既存トークンを保持して複数発行に対応する(t *testing.T) {

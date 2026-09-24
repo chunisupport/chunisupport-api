@@ -273,7 +273,7 @@ CREATE TABLE `player_latest_updates` (
   `source_updated_at` datetime(6) NOT NULL,
   `imported_at` datetime(6) NOT NULL,
   `body_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`player_id`),
+  PRIMARY KEY (`player_id`,`source_updated_at`),
   CONSTRAINT `fk_player_latest_updates_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_locked_songs` (
