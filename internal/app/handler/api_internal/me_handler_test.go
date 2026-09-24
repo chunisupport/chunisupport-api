@@ -51,6 +51,43 @@ func (m *mockPlayerDataUsecase) GetLatestUpdate(ctx context.Context, user *entit
 	return args.Get(0).(json.RawMessage), args.Error(1)
 }
 
+func (m *mockPlayerDataUsecase) GetRecentUpdates(ctx context.Context, user *entity.User) ([]json.RawMessage, error) {
+	args := m.Called(ctx, user)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]json.RawMessage), args.Error(1)
+}
+
+func TestMeHandler_GetRecentPlayerUpdates_本人の履歴を配列で返す(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.JSONSerializer = app.NewTimezoneJSONSerializer(time.FixedZone("Asia/Tokyo", 9*60*60))
+	testUser := &entity.User{ID: 1, Username: username.MustNewUserName("testuser")}
+	mockUsecase := new(mockPlayerDataUsecase)
+	mockUsecase.On("GetRecentUpdates", mock.Anything, testUser).Return([]json.RawMessage{
+		json.RawMessage(`{"schema_version":1,"player_id":12,"app_ver":"1.2.3","imported_at":"2026-07-16T02:03:04Z","profile":{},"summary":{},"statistics":{},"counts":{},"changes":[]}`),
+	}, nil).Once()
+	h := api_internal.NewMeHandler(mockUsecase)
+	req := httptest.NewRequest(http.MethodGet, "/internal/me/player-data/updates", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", testUser)
+
+	// When
+	err := h.GetRecentPlayerUpdates(c)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var response []map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	if assert.Len(t, response, 1) {
+		assert.Equal(t, "2026-07-16T11:03:04+09:00", response[0]["imported_at"])
+	}
+	mockUsecase.AssertExpectations(t)
+}
+
 // compressAndEncodeGzipBase64 はJSONデータをgzip圧縮してbase64エンコードします。
 func compressAndEncodeGzipBase64(data []byte) (string, error) {
 	var buf bytes.Buffer

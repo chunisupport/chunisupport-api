@@ -219,6 +219,7 @@ Content-Type: application/json
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
 | `/internal/me/register-data` | POST | Firebase Bearer | CHUNITHMプレイヤーデータ登録 |
 | `/internal/me/player-data/latest-update` | GET | Firebase Bearer | 自分の最新プレイヤーデータ登録結果を取得 |
+| `/internal/me/player-data/updates` | GET | Firebase Bearer | 自分の直近5件のプレイヤーデータ登録結果を取得 |
 | `/internal/me/player-data` | DELETE | Firebase Bearer | プレイヤー連携を解除し、プレイヤー関連レコードを削除 |
 | `/internal/me/data-transfer/export` | POST | Firebase Bearer | ユーザーデータを移行ファイルとしてエクスポート |
 | `/internal/me/data-transfer/validate` | POST | Firebase Bearer | 移行ファイルを検証 |
@@ -1927,6 +1928,12 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): Bearerトークン欠如または無効
   - 404 Not Found (`player_not_linked`): プレイヤー未連携
+
+---
+
+### GET `/internal/me/player-data/updates`
+
+認証済みユーザーに紐づくプレイヤーの保存済みデータ登録結果を、収集日時の新しい順に最大5件返します。配列内の各要素は `GET /internal/me/player-data/latest-update` と同じ形式です。最新結果は先頭に含まれます。同じ収集日時・本文の再登録は世代を増やしません。保存済み結果がない場合は `200 OK` と空配列 `[]` を返します。プレイヤー未連携の場合は `404 player_not_linked` を返します。
 
 ---
 

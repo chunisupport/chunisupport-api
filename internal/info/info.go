@@ -80,6 +80,7 @@ const (
 	PlayerLatestUpdateMetricDiffSchemaVersion   = 2
 	PlayerLatestUpdateOPPercentSchemaVersion    = 3
 	PlayerLatestUpdateMaxPayloadBytes           = 1024 * 1024
+	PlayerUpdateHistoryLimit                    = 5
 	MaintenanceRetryAfterSeconds                = 60
 	// StatusClientClosedRequest はクライアントが応答前に切断したことを表すステータスです。
 	// net/http に定義がないため、nginx の慣習である 499 を用いてサーバー障害（5xx）と区別します。

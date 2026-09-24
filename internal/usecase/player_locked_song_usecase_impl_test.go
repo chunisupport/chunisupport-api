@@ -209,6 +209,10 @@ func (s *stubPlayerDataRepositoryForLockedSong) FindLatestUpdateByPlayerID(_ con
 	return nil, repository.ErrPlayerLatestUpdateNotFound
 }
 
+func (s *stubPlayerDataRepositoryForLockedSong) FindRecentUpdatesByPlayerID(_ context.Context, _ int) ([]*entity.PlayerLatestUpdate, error) {
+	return nil, nil
+}
+
 func (s *stubPlayerDataRepositoryForLockedSong) FindLatestUpdateByPlayerIDForUpdate(_ context.Context, _ repository.Executor, _ int) (*entity.PlayerLatestUpdate, error) {
 	return nil, repository.ErrPlayerLatestUpdateNotFound
 }

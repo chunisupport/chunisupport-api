@@ -3,100 +3,74 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
 
-func TestPlayerDataRepository_SaveLatestUpdate_新しい収集結果だけを保存する(t *testing.T) {
+func TestPlayerDataRepository_SaveLatestUpdate_最新5件を保持する(t *testing.T) {
 	// Given
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	_, err = db.Exec(`
 		CREATE TABLE player_latest_updates (
-			player_id INTEGER NOT NULL PRIMARY KEY,
+			player_id INTEGER NOT NULL,
 			schema_version INTEGER NOT NULL,
 			result_gzip BLOB NOT NULL,
 			source_updated_at DATETIME NOT NULL,
 			imported_at DATETIME NOT NULL,
-			body_hash TEXT NOT NULL
+			body_hash TEXT NOT NULL,
+			PRIMARY KEY (player_id, source_updated_at)
 		)
 	`)
 	require.NoError(t, err)
-
 	repo := NewPlayerDataRepository(db)
 	baseTime := time.Date(2026, 7, 16, 0, 0, 0, 0, time.UTC)
-	first, err := entity.NewPlayerLatestUpdate(10, 1, []byte("first"), baseTime, baseTime.Add(time.Minute), "hash-1")
-	require.NoError(t, err)
-	duplicate, err := entity.NewPlayerLatestUpdate(10, 9, []byte("duplicate"), baseTime, baseTime.Add(90*time.Second), "hash-1")
-	require.NoError(t, err)
-	sameSourceNewer, err := entity.NewPlayerLatestUpdate(10, 2, []byte("same-source-newer"), baseTime, baseTime.Add(2*time.Minute), "hash-2")
-	require.NoError(t, err)
-	sameSourceDelayed, err := entity.NewPlayerLatestUpdate(10, 3, []byte("same-source-delayed"), baseTime, baseTime.Add(105*time.Second), "hash-3")
-	require.NoError(t, err)
-	older, err := entity.NewPlayerLatestUpdate(10, 1, []byte("older"), baseTime.Add(-time.Minute), baseTime.Add(2*time.Minute), "hash-2")
-	require.NoError(t, err)
-	newer, err := entity.NewPlayerLatestUpdate(10, 2, []byte("newer"), baseTime.Add(time.Minute), baseTime.Add(3*time.Minute), "hash-3")
-	require.NoError(t, err)
+	makeUpdate := func(playerID, minute int, hash string) *entity.PlayerLatestUpdate {
+		update, err := entity.NewPlayerLatestUpdate(playerID, 1, []byte(hash), baseTime.Add(time.Duration(minute)*time.Minute), baseTime.Add(time.Duration(minute+1)*time.Minute), hash)
+		require.NoError(t, err)
+		return update
+	}
+	ctx := context.Background()
 
 	// When
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, first))
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, duplicate))
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, sameSourceNewer))
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, sameSourceDelayed))
-
-	var sameSourceSaved struct {
-		ResultGzip []byte    `db:"result_gzip"`
-		ImportedAt time.Time `db:"imported_at"`
-		BodyHash   string    `db:"body_hash"`
+	for minute := range info.PlayerUpdateHistoryLimit + 1 {
+		require.NoError(t, repo.SaveLatestUpdate(ctx, db, makeUpdate(10, minute, fmt.Sprintf("hash-%d", minute))))
 	}
-	err = db.Get(&sameSourceSaved, `SELECT result_gzip, imported_at, body_hash FROM player_latest_updates WHERE player_id = ?`, 10)
-	require.NoError(t, err)
-	assert.Equal(t, []byte("same-source-newer"), sameSourceSaved.ResultGzip)
-	assert.Equal(t, baseTime.Add(2*time.Minute), sameSourceSaved.ImportedAt)
-	assert.Equal(t, "hash-2", sameSourceSaved.BodyHash)
-
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, older))
-	require.NoError(t, repo.SaveLatestUpdate(context.Background(), db, newer))
+	require.NoError(t, repo.SaveLatestUpdate(ctx, db, makeUpdate(20, 0, "other")))
+	require.NoError(t, repo.SaveLatestUpdate(ctx, db, makeUpdate(10, 3, "hash-3")))
+	assert.ErrorIs(t, repo.SaveLatestUpdate(ctx, db, makeUpdate(10, 3, "conflict")), entity.ErrConflictingPlayerDataBody)
+	require.NoError(t, repo.SaveLatestUpdate(ctx, db, makeUpdate(10, -1, "too-old")))
 
 	// Then
-	var saved struct {
-		SchemaVersion int       `db:"schema_version"`
-		ResultGzip    []byte    `db:"result_gzip"`
-		SourceAt      time.Time `db:"source_updated_at"`
-		ImportedAt    time.Time `db:"imported_at"`
-		BodyHash      string    `db:"body_hash"`
+	updates, err := repo.FindRecentUpdatesByPlayerID(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, updates, info.PlayerUpdateHistoryLimit)
+	for index, update := range updates {
+		assert.Equal(t, baseTime.Add(time.Duration(info.PlayerUpdateHistoryLimit-index)*time.Minute), update.SourceUpdatedAt())
 	}
-	err = db.Get(&saved, `SELECT schema_version, result_gzip, source_updated_at, imported_at, body_hash FROM player_latest_updates WHERE player_id = ?`, 10)
+	latest, err := repo.FindLatestUpdateByPlayerID(ctx, 10)
 	require.NoError(t, err)
-	assert.Equal(t, 2, saved.SchemaVersion)
-	assert.Equal(t, []byte("newer"), saved.ResultGzip)
-	assert.Equal(t, baseTime.Add(time.Minute), saved.SourceAt)
-	assert.Equal(t, baseTime.Add(3*time.Minute), saved.ImportedAt)
-	assert.Equal(t, "hash-3", saved.BodyHash)
-
-	found, err := repo.FindLatestUpdateByPlayerID(context.Background(), 10)
+	assert.Equal(t, updates[0].BodyHash(), latest.BodyHash())
+	locked, err := repo.FindLatestUpdateByPlayerIDForUpdate(ctx, db, 10)
 	require.NoError(t, err)
-	assert.Equal(t, 10, found.PlayerID())
-	assert.Equal(t, 2, found.SchemaVersion())
-	assert.Equal(t, []byte("newer"), found.ResultGzip())
-	assert.Equal(t, baseTime.Add(time.Minute), found.SourceUpdatedAt())
-	assert.Equal(t, baseTime.Add(3*time.Minute), found.ImportedAt())
-	assert.Equal(t, "hash-3", found.BodyHash())
-
-	foundForUpdate, err := repo.FindLatestUpdateByPlayerIDForUpdate(context.Background(), db, 10)
+	assert.Equal(t, latest.BodyHash(), locked.BodyHash())
+	other, err := repo.FindRecentUpdatesByPlayerID(ctx, 20)
 	require.NoError(t, err)
-	assert.Equal(t, found.BodyHash(), foundForUpdate.BodyHash())
-
-	_, err = repo.FindLatestUpdateByPlayerID(context.Background(), 999)
-	assert.True(t, errors.Is(err, domainrepo.ErrPlayerLatestUpdateNotFound))
-	_, err = repo.FindLatestUpdateByPlayerIDForUpdate(context.Background(), db, 999)
+	require.Len(t, other, 1)
+	assert.Equal(t, "other", other[0].BodyHash())
+	empty, err := repo.FindRecentUpdatesByPlayerID(ctx, 999)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+	_, err = repo.FindLatestUpdateByPlayerID(ctx, 999)
 	assert.True(t, errors.Is(err, domainrepo.ErrPlayerLatestUpdateNotFound))
 }

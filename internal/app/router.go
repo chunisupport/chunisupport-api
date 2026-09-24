@@ -428,6 +428,7 @@ func registerRoutes(
 	{
 		meReadGroup.GET("", handlers.Profile.Me)
 		meReadGroup.GET("/player-data/latest-update", handlers.Me.GetLatestPlayerUpdate)
+		meReadGroup.GET("/player-data/updates", handlers.Me.GetRecentPlayerUpdates)
 		meReadGroup.GET("/goals", handlers.Goal.List)
 		meReadGroup.GET("/goal-groups", handlers.GoalGroup.List)
 		meReadGroup.GET("/record-filters", handlers.RecordFilter.List)

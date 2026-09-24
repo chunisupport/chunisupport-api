@@ -768,6 +768,13 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerID(
 	return s.latestUpdate, s.latestUpdateErr
 }
 
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindRecentUpdatesByPlayerID(_ context.Context, _ int) ([]*entity.PlayerLatestUpdate, error) {
+	if s.latestUpdate == nil {
+		return nil, nil
+	}
+	return []*entity.PlayerLatestUpdate{s.latestUpdate}, nil
+}
+
 func (s *stubPlayerDataRepositoryForApplyScoresTest) FindLatestUpdateByPlayerIDForUpdate(_ context.Context, exec repository.Executor, _ int) (*entity.PlayerLatestUpdate, error) {
 	s.findLatestUpdateForUpdateCalls++
 	s.latestUpdateExec = exec

@@ -141,6 +141,29 @@ func TestPlayerDataUsecase_GetLatestUpdate(t *testing.T) {
 	assert.NotContains(t, payload, "skipped_records")
 }
 
+func TestPlayerDataUsecase_GetRecentUpdates_保存済み結果を配列で返す(t *testing.T) {
+	// Given
+	playerID := 12
+	result := &playerdataresult.Result{
+		PlayerID: playerID, AppVersion: "1.2.3", ImportedAt: time.Date(2026, 7, 16, 2, 3, 4, 0, time.UTC),
+		Changes: []playerdataresult.RecordChange{},
+	}
+	update, err := buildPlayerLatestUpdate(result, result.ImportedAt.Add(-time.Minute), "body-hash")
+	require.NoError(t, err)
+	u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
+
+	// When
+	results, err := u.GetRecentUpdates(context.Background(), &entity.User{PlayerID: &playerID})
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(results[0], &payload))
+	assert.Equal(t, "1.2.3", payload["app_ver"])
+	assert.NotContains(t, payload, "skipped_records")
+}
+
 func TestPlayerDataUsecase_GetLatestUpdate_schema1の保存結果も返す(t *testing.T) {
 	// Given
 	playerID := 12

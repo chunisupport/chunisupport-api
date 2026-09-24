@@ -58,7 +58,30 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 		}
 		return nil, err
 	}
+	return decodePlayerUpdate(update, *user.PlayerID)
+}
 
+// GetRecentUpdates は保存済み登録結果を収集日時の新しい順に展開します。
+func (us *playerDataUsecase) GetRecentUpdates(ctx context.Context, user *entity.User) ([]json.RawMessage, error) {
+	if user == nil || !user.HasLinkedPlayer() {
+		return nil, ErrPlayerNotLinked
+	}
+	updates, err := us.playerDataRepo.FindRecentUpdatesByPlayerID(ctx, *user.PlayerID)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]json.RawMessage, 0, len(updates))
+	for _, update := range updates {
+		raw, err := decodePlayerUpdate(update, *user.PlayerID)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, raw)
+	}
+	return results, nil
+}
+
+func decodePlayerUpdate(update *entity.PlayerLatestUpdate, playerID int) (json.RawMessage, error) {
 	raw, err := gunzipBytes(update.ResultGzip(), info.PlayerLatestUpdateMaxPayloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to decompress player latest update: %v", ErrInternalError, err)
@@ -98,8 +121,8 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 			return nil, fmt.Errorf("%w: player latest update field is invalid: metric_diffs.overpower_percent", ErrInternalError)
 		}
 	}
-	var playerID int
-	if err := json.Unmarshal(envelope["player_id"], &playerID); err != nil || playerID != update.PlayerID() || playerID != *user.PlayerID {
+	var payloadPlayerID int
+	if err := json.Unmarshal(envelope["player_id"], &payloadPlayerID); err != nil || payloadPlayerID != update.PlayerID() || payloadPlayerID != playerID {
 		return nil, fmt.Errorf("%w: player latest update player_id is invalid", ErrInternalError)
 	}
 

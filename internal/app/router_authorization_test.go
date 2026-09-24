@@ -553,6 +553,7 @@ func TestRegisterRoutes_認証必須の読み取りGETはread最適化認証を�
 	}{
 		{name: "自分のプロフィール取得", method: http.MethodGet, path: "/internal/me", wantReadOptimizedCalls: 1},
 		{name: "最新プレイヤーデータ更新の取得", method: http.MethodGet, path: "/internal/me/player-data/latest-update", wantReadOptimizedCalls: 1},
+		{name: "プレイヤーデータ更新履歴の取得", method: http.MethodGet, path: "/internal/me/player-data/updates", wantReadOptimizedCalls: 1},
 		{name: "目標一覧の取得", method: http.MethodGet, path: "/internal/me/goals", wantReadOptimizedCalls: 1},
 		{name: "目標グループ一覧の取得", method: http.MethodGet, path: "/internal/me/goal-groups", wantReadOptimizedCalls: 1},
 		{name: "レコードフィルタ一覧の取得", method: http.MethodGet, path: "/internal/me/record-filters", wantReadOptimizedCalls: 1},
