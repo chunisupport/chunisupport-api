@@ -7,6 +7,15 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
+// SongUpdate は通常楽曲と譜面の更新情報を表します。
+// UpdateWikiPageTitle が false の場合、Song.WikiPageTitle は無視して既存値を維持します。
+// Wiki ページタイトルは楽曲データ収集バッチも書き込むため、読み取った値の書き戻しではなく
+// SQL 上で既存値を維持し、並行更新による消失を防ぎます。
+type SongUpdate struct {
+	Song                *entity.Song
+	UpdateWikiPageTitle bool
+}
+
 // SongRepository は楽曲に関する永続化を扱うリポジトリです。
 // 他のリポジトリと同様に、全メソッドでExecutorを受け取り、
 // UseCase層からのトランザクション制御を可能にします。
@@ -46,7 +55,7 @@ type SongRepository interface {
 	// UpdateSongs は楽曲および譜面情報を一括更新します。
 	// トランザクション管理はUseCase層（TransactionManager経由）で行います。
 	// 存在しない楽曲・譜面がある場合はエラーを返します。
-	UpdateSongs(ctx context.Context, exec Executor, songs []*entity.Song) error
+	UpdateSongs(ctx context.Context, exec Executor, updates []*SongUpdate) error
 
 	// FindByDisplayIDForChange は指定されたDisplayIDの通常楽曲を変更用に排他的に取得します。
 	// 論理削除済みの楽曲も含めて取得します。

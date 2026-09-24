@@ -169,16 +169,17 @@ func (h *SongHandler) CreateSong(c *echo.Context) error {
 	}
 
 	input := &usecase.CreateSongInput{
-		OfficialIdx: req.OfficialIdx,
-		Title:       req.Title,
-		Reading:     req.Reading,
-		Artist:      req.Artist,
-		Genre:       req.Genre,
-		BPM:         req.BPM,
-		ReleasedAt:  req.ReleasedAt.TimePtr(),
-		Jacket:      req.Jacket,
-		IsNew:       req.IsNew,
-		Charts:      convertToCreateChartInputs(req.Charts),
+		OfficialIdx:   req.OfficialIdx,
+		Title:         req.Title,
+		WikiPageTitle: req.WikiPageTitle,
+		Reading:       req.Reading,
+		Artist:        req.Artist,
+		Genre:         req.Genre,
+		BPM:           req.BPM,
+		ReleasedAt:    req.ReleasedAt.TimePtr(),
+		Jacket:        req.Jacket,
+		IsNew:         req.IsNew,
+		Charts:        convertToCreateChartInputs(req.Charts),
 	}
 
 	song, err := h.songUsecase.CreateSong(c.Request().Context(), input)

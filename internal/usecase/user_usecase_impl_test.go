@@ -368,7 +368,7 @@ func (s *stubSongRepository) Save(ctx context.Context, exec repository.Executor,
 	return errors.New("not implemented")
 }
 
-func (s *stubSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
+func (s *stubSongRepository) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.SongUpdate) error {
 	return errors.New("not implemented")
 }
 

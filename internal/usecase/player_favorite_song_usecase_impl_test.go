@@ -183,7 +183,7 @@ func (s *stubSongRepoForFavAdd) Save(ctx context.Context, exec repository.Execut
 	return errors.New("not implemented")
 }
 
-func (s *stubSongRepoForFavAdd) UpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song) error {
+func (s *stubSongRepoForFavAdd) UpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.SongUpdate) error {
 	return errors.New("not implemented")
 }
 

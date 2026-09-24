@@ -194,3 +194,40 @@ func TestWorldsendSongDTO_JSONMarshal(t *testing.T) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain notes_designer, got: %s", jsonString)
 	}
 }
+
+func TestToWorldsendSongDTO_WikiPageTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 楽曲のWikiページタイトル
+		wikiPageTitle *string
+		// Then: JSONに出力される wiki_page_title
+		expectedJSON string
+	}{
+		{
+			name:          "Wikiページタイトルが設定されている場合はその値を返す",
+			wikiPageTitle: stringPtr("楽曲名(WORLD'S END)"),
+			expectedJSON:  `"wiki_page_title":"楽曲名(WORLD'S END)"`,
+		},
+		{
+			name:          "Wikiページタイトルが未設定の場合はnullを返す",
+			wikiPageTitle: nil,
+			expectedJSON:  `"wiki_page_title":null`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			song := &entity.Song{WikiPageTitle: tt.wikiPageTitle}
+
+			// When
+			dto := ToWorldsendSongDTO(song, &entity.WorldsendChart{}, map[int]string{})
+			jsonBytes, err := json.Marshal(dto)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.wikiPageTitle, dto.WikiPageTitle)
+			assert.Contains(t, string(jsonBytes), tt.expectedJSON)
+		})
+	}
+}

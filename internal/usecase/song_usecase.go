@@ -16,17 +16,21 @@ type UpdateChartInput struct {
 }
 
 // UpdateSongInput は楽曲と譜面の一括更新値です。
+// UpdateWikiPageTitle が false の場合、WikiPageTitle は無視して既存値を維持します。
+// Wiki ページタイトルを扱わない更新経路（v1 API や項目省略時）で既存値を消さないためです。
 type UpdateSongInput struct {
-	DisplayID  string
-	Title      string
-	Reading    *string
-	Artist     string
-	Genre      *string
-	BPM        *int
-	ReleasedAt *time.Time
-	Jacket     *string
-	IsNew      *bool
-	Charts     map[string]*UpdateChartInput
+	DisplayID           string
+	Title               string
+	WikiPageTitle       *string
+	UpdateWikiPageTitle bool
+	Reading             *string
+	Artist              string
+	Genre               *string
+	BPM                 *int
+	ReleasedAt          *time.Time
+	Jacket              *string
+	IsNew               *bool
+	Charts              map[string]*UpdateChartInput
 }
 
 // CreateChartInput は譜面追加入力を表します。
@@ -40,16 +44,17 @@ type CreateChartInput struct {
 
 // CreateSongInput は楽曲追加入力を表します。
 type CreateSongInput struct {
-	OfficialIdx string
-	Title       string
-	Reading     *string
-	Artist      string
-	Genre       string
-	BPM         *int
-	ReleasedAt  *time.Time
-	Jacket      *string
-	IsNew       bool
-	Charts      []*CreateChartInput
+	OfficialIdx   string
+	Title         string
+	WikiPageTitle *string
+	Reading       *string
+	Artist        string
+	Genre         string
+	BPM           *int
+	ReleasedAt    *time.Time
+	Jacket        *string
+	IsNew         bool
+	Charts        []*CreateChartInput
 }
 
 // UpdateChartConstantInput は公式IDを使った譜面定数更新の入力です。

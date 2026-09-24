@@ -28,7 +28,7 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.is_deleted, s.updated_at,
+			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.is_deleted, s.updated_at,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
@@ -56,7 +56,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 		var chartModel models.WorldsendChartModel
 
 		err := rows.Scan(
-			&songModel.ID, &songModel.DisplayID, &songModel.Title,
+			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.WikiPageTitle,
 			&songModel.Reading, &songModel.Artist, &songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.IsDeleted, &songModel.UpdatedAt,
 			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
@@ -78,7 +78,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.is_deleted, s.updated_at,
+			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.is_deleted, s.updated_at,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
@@ -94,7 +94,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 	var chartModel models.WorldsendChartModel
 
 	err := exec.QueryRowxContext(ctx, query, displayID).Scan(
-		&songModel.ID, &songModel.DisplayID, &songModel.Title,
+		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.WikiPageTitle,
 		&songModel.Reading, &songModel.Artist, &songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.IsDeleted, &songModel.UpdatedAt,
 		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
@@ -117,7 +117,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_new = ?, is_deleted = ?
+		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_new = ?, is_deleted = ?
 		WHERE id = ? AND is_worldsend = 1
 	`
 	result, err := exec.ExecContext(
@@ -125,6 +125,7 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 		query,
 		song.DisplayID,
 		song.Title,
+		song.WikiPageTitle,
 		song.Reading,
 		song.Artist,
 		song.GenreID,
@@ -179,7 +180,7 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		}
 	}
 
-	songRowsAffected, err := r.bulkUpdateSongs(ctx, exec, songs, targets)
+	songRowsAffected, err := r.bulkUpdateSongs(ctx, exec, updates, targets)
 	if err != nil {
 		return err
 	}
@@ -264,17 +265,23 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 	return targets, nil
 }
 
-func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, songs []*entity.Song, targets map[string]worldsendUpdateTarget) (int64, error) {
-	var titleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
-	var titleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
-	songIDs := make([]int, 0, len(songs))
+func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, error) {
+	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
+	songIDs := make([]int, 0, len(updates))
 
-	for _, song := range songs {
+	for _, update := range updates {
+		song := update.Song
 		target := targets[song.DisplayID]
 		songIDs = append(songIDs, target.SongID)
 
 		titleCases = append(titleCases, "WHEN id = ? THEN ?")
 		titleArgs = append(titleArgs, target.SongID, song.Title)
+
+		if update.UpdateWikiPageTitle {
+			wikiPageTitleCases = append(wikiPageTitleCases, "WHEN id = ? THEN ?")
+			wikiPageTitleArgs = append(wikiPageTitleArgs, target.SongID, song.WikiPageTitle)
+		}
 
 		readingCases = append(readingCases, "WHEN id = ? THEN ?")
 		readingArgs = append(readingArgs, target.SongID, song.Reading)
@@ -300,6 +307,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
+	args = append(args, wikiPageTitleArgs...)
 	args = append(args, readingArgs...)
 	args = append(args, artistArgs...)
 	args = append(args, genreArgs...)
@@ -317,6 +325,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	query := fmt.Sprintf(`
 		UPDATE songs SET
 			title = CASE %s END,
+			wiki_page_title = %s,
 			reading = CASE %s END,
 			artist = CASE %s END,
 			genre_id = CASE %s END,
@@ -327,6 +336,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		WHERE is_worldsend = 1 AND id IN (%s)
 	`,
 		strings.Join(titleCases, " "),
+		wikiPageTitleUpdateExpr(wikiPageTitleCases),
 		strings.Join(readingCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
@@ -472,11 +482,12 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
+		song.WikiPageTitle,
 		song.Reading,
 		song.Artist,
 		song.GenreID,

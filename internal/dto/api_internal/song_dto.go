@@ -118,6 +118,7 @@ func (o EditorOrderedChartsMap) MarshalJSON() ([]byte, error) {
 type SongDTO struct {
 	DisplayID          string           `json:"id"`
 	Title              string           `json:"title"`
+	WikiPageTitle      *string          `json:"wiki_page_title"`
 	Reading            *string          `json:"reading"`
 	Artist             string           `json:"artist"`
 	Genre              *string          `json:"genre"`
@@ -159,18 +160,34 @@ type UpdateChartRequest struct {
 	NotesDesigner  *string `json:"notes_designer" validate:"omitempty,max=100"`
 }
 
+// OptionalWikiPageTitle は更新リクエストの wiki_page_title を表します。
+// 項目の省略（既存値を維持）と null の指定（NULL に更新）を区別するため、
+// JSON にキーが存在した場合だけ Present を true にします。
+// 空文字は受け付けず、値を空にする場合は null を指定させます（バッチが空文字を未設定として扱うため）。
+type OptionalWikiPageTitle struct {
+	Present bool
+	Value   *string `validate:"omitnil,min=1,max=300"`
+}
+
+// UnmarshalJSON はキーが存在したことを記録したうえで値を読み込みます。
+func (o *OptionalWikiPageTitle) UnmarshalJSON(data []byte) error {
+	o.Present = true
+	return json.Unmarshal(data, &o.Value)
+}
+
 // UpdateSongRequest は楽曲更新リクエストを表します。
 type UpdateSongRequest struct {
-	DisplayID  string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
-	Title      string                         `json:"title" validate:"required"`
-	Reading    *string                        `json:"reading" validate:"omitempty,max=300"`
-	Artist     string                         `json:"artist" validate:"required"`
-	Genre      *string                        `json:"genre"`
-	BPM        *int                           `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt *DateOnly                      `json:"released_at"`
-	Jacket     *string                        `json:"jacket"`
-	IsNew      *bool                          `json:"is_new"`
-	Charts     map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
+	DisplayID     string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
+	Title         string                         `json:"title" validate:"required"`
+	WikiPageTitle OptionalWikiPageTitle          `json:"wiki_page_title"`
+	Reading       *string                        `json:"reading" validate:"omitempty,max=300"`
+	Artist        string                         `json:"artist" validate:"required"`
+	Genre         *string                        `json:"genre"`
+	BPM           *int                           `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt    *DateOnly                      `json:"released_at"`
+	Jacket        *string                        `json:"jacket"`
+	IsNew         *bool                          `json:"is_new"`
+	Charts        map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
 }
 
 // CreateChartRequest は譜面追加リクエストを表します。
@@ -184,16 +201,17 @@ type CreateChartRequest struct {
 
 // CreateSongRequest は楽曲追加リクエストを表します。
 type CreateSongRequest struct {
-	OfficialIdx string                `json:"official_idx" validate:"required,max=10"`
-	Title       string                `json:"title" validate:"required"`
-	Reading     *string               `json:"reading" validate:"omitempty,max=300"`
-	Artist      string                `json:"artist" validate:"required"`
-	Genre       string                `json:"genre" validate:"required"`
-	BPM         *int                  `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt  *DateOnly             `json:"released_at"`
-	Jacket      *string               `json:"jacket" validate:"omitempty,max=20"`
-	IsNew       bool                  `json:"is_new"`
-	Charts      []*CreateChartRequest `json:"charts" validate:"dive"`
+	OfficialIdx   string                `json:"official_idx" validate:"required,max=10"`
+	Title         string                `json:"title" validate:"required"`
+	WikiPageTitle *string               `json:"wiki_page_title" validate:"omitnil,min=1,max=300"`
+	Reading       *string               `json:"reading" validate:"omitempty,max=300"`
+	Artist        string                `json:"artist" validate:"required"`
+	Genre         string                `json:"genre" validate:"required"`
+	BPM           *int                  `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt    *DateOnly             `json:"released_at"`
+	Jacket        *string               `json:"jacket" validate:"omitempty,max=20"`
+	IsNew         bool                  `json:"is_new"`
+	Charts        []*CreateChartRequest `json:"charts" validate:"dive"`
 }
 
 // ToChartDTO はChartエンティティからChartDTOへ変換します。
@@ -263,6 +281,7 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 	return &SongDTO{
 		DisplayID:          song.DisplayID,
 		Title:              song.Title,
+		WikiPageTitle:      song.WikiPageTitle,
 		Reading:            song.Reading,
 		Artist:             song.Artist,
 		Genre:              genrePtr,

@@ -120,6 +120,7 @@ entity "songs" as songs {
   --
   display_id: CHAR(16) UNIQUE NOT NULL
   title: VARCHAR(300) NOT NULL
+  wiki_page_title: VARCHAR(300)
   artist: VARCHAR(300) NOT NULL
   genre_id: TINYINT NOT NULL
   bpm: INT

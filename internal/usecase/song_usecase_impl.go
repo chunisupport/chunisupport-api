@@ -177,8 +177,8 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 		return fmt.Errorf("master cache is not initialized")
 	}
 
-	// DTOからエンティティへ変換
-	songsWithCharts, err := s.convertRequestsToEntities(requests, masters)
+	// DTOから更新情報へ変換
+	updates, err := s.convertRequestsToUpdates(requests, masters)
 	if err != nil {
 		return fmt.Errorf("failed to convert requests to entities: %w", err)
 	}
@@ -188,7 +188,7 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 
 	// トランザクション内でリポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return s.songRepo.UpdateSongs(ctx, tx, songsWithCharts)
+		return s.songRepo.UpdateSongs(ctx, tx, updates)
 	}); err != nil {
 		return err
 	}
@@ -261,10 +261,10 @@ func (s *songUsecaseImpl) CalcSongMaxOP(song *entity.Song) float64 {
 	return service.CalcSongMaxOP(song.MaxChartConst)
 }
 
-// convertRequestsToEntities はユースケース入力からエンティティリストに変換します。
+// convertRequestsToUpdates はユースケース入力からリポジトリの更新情報リストに変換します。
 // IDフィールドは既存データの参照に使用されないため、0のままです。
-func (s *songUsecaseImpl) convertRequestsToEntities(requests []*UpdateSongInput, masters *domainmasterdata.SongMasters) ([]*entity.Song, error) {
-	result := make([]*entity.Song, 0, len(requests))
+func (s *songUsecaseImpl) convertRequestsToUpdates(requests []*UpdateSongInput, masters *domainmasterdata.SongMasters) ([]*repository.SongUpdate, error) {
+	result := make([]*repository.SongUpdate, 0, len(requests))
 
 	for _, req := range requests {
 		var genreID *int
@@ -280,6 +280,7 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*UpdateSongInput,
 		song := entity.NewSong()
 		song.DisplayID = req.DisplayID
 		song.Title = req.Title
+		song.WikiPageTitle = req.WikiPageTitle
 		song.Reading = req.Reading
 		song.Artist = req.Artist
 		song.GenreID = genreID
@@ -325,7 +326,10 @@ func (s *songUsecaseImpl) convertRequestsToEntities(requests []*UpdateSongInput,
 		}
 
 		song.Charts = charts
-		result = append(result, song)
+		result = append(result, &repository.SongUpdate{
+			Song:                song,
+			UpdateWikiPageTitle: req.UpdateWikiPageTitle,
+		})
 	}
 
 	return result, nil
@@ -410,6 +414,7 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.DisplayID = displayID
 	song.OfficialIdx = input.OfficialIdx
 	song.Title = input.Title
+	song.WikiPageTitle = input.WikiPageTitle
 	song.Reading = input.Reading
 	song.Artist = input.Artist
 	song.GenreID = &genreID

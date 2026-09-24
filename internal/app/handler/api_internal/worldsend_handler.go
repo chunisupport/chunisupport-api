@@ -136,16 +136,17 @@ func (h *WorldsendHandler) CreateWorldsendSong(c *echo.Context) error {
 	}
 
 	input := &usecase.CreateWorldsendSongInput{
-		OfficialIdx: req.OfficialIdx,
-		Title:       req.Title,
-		Reading:     req.Reading,
-		Artist:      req.Artist,
-		Genre:       req.Genre,
-		BPM:         req.BPM,
-		ReleasedAt:  req.ReleasedAt.TimePtr(),
-		Jacket:      req.Jacket,
-		IsNew:       req.IsNew,
-		Chart:       chartInput,
+		OfficialIdx:   req.OfficialIdx,
+		Title:         req.Title,
+		WikiPageTitle: req.WikiPageTitle,
+		Reading:       req.Reading,
+		Artist:        req.Artist,
+		Genre:         req.Genre,
+		BPM:           req.BPM,
+		ReleasedAt:    req.ReleasedAt.TimePtr(),
+		Jacket:        req.Jacket,
+		IsNew:         req.IsNew,
+		Chart:         chartInput,
 	}
 
 	songWithChart, err := h.worldsendUsecase.CreateWorldsendSong(c.Request().Context(), input, masters)
@@ -209,14 +210,16 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 	inputs := make([]*usecase.UpdateWorldsendSongInput, 0, len(requests))
 	for _, req := range requests {
 		input := &usecase.UpdateWorldsendSongInput{
-			DisplayID: req.DisplayID,
-			Title:     req.Title,
-			Reading:   req.Reading,
-			Artist:    req.Artist,
-			Genre:     req.Genre,
-			BPM:       req.BPM,
-			Jacket:    req.Jacket,
-			IsNew:     *req.IsNew,
+			DisplayID:           req.DisplayID,
+			Title:               req.Title,
+			WikiPageTitle:       req.WikiPageTitle.Value,
+			UpdateWikiPageTitle: req.WikiPageTitle.Present,
+			Reading:             req.Reading,
+			Artist:              req.Artist,
+			Genre:               req.Genre,
+			BPM:                 req.BPM,
+			Jacket:              req.Jacket,
+			IsNew:               *req.IsNew,
 		}
 
 		if req.ReleasedAt != nil {

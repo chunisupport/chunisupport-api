@@ -28,17 +28,20 @@ type UpdateWorldsendChartInput struct {
 }
 
 // UpdateWorldsendSongInput は WORLD'S END 楽曲更新入力を表します。
+// UpdateWikiPageTitle が false の場合、WikiPageTitle は無視して既存値を維持します。
 type UpdateWorldsendSongInput struct {
-	DisplayID  string
-	Title      string
-	Reading    *string
-	Artist     string
-	Genre      *string
-	BPM        *int
-	ReleasedAt *time.Time
-	Jacket     *string
-	IsNew      bool
-	Charts     map[string]*UpdateWorldsendChartInput
+	DisplayID           string
+	Title               string
+	WikiPageTitle       *string
+	UpdateWikiPageTitle bool
+	Reading             *string
+	Artist              string
+	Genre               *string
+	BPM                 *int
+	ReleasedAt          *time.Time
+	Jacket              *string
+	IsNew               bool
+	Charts              map[string]*UpdateWorldsendChartInput
 }
 
 // CreateWorldsendChartInput は WORLD'S END 譜面追加入力を表します。nil の場合は空行を挿入します。
@@ -51,16 +54,17 @@ type CreateWorldsendChartInput struct {
 
 // CreateWorldsendSongInput は WORLD'S END 楽曲追加入力を表します。
 type CreateWorldsendSongInput struct {
-	OfficialIdx string
-	Title       string
-	Reading     *string
-	Artist      string
-	Genre       string
-	BPM         *int
-	ReleasedAt  *time.Time
-	Jacket      *string
-	IsNew       bool
-	Chart       *CreateWorldsendChartInput
+	OfficialIdx   string
+	Title         string
+	WikiPageTitle *string
+	Reading       *string
+	Artist        string
+	Genre         string
+	BPM           *int
+	ReleasedAt    *time.Time
+	Jacket        *string
+	IsNew         bool
+	Chart         *CreateWorldsendChartInput
 }
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
@@ -242,6 +246,7 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 	updatedSong := entity.NewSong()
 	updatedSong.DisplayID = req.DisplayID
 	updatedSong.Title = req.Title
+	updatedSong.WikiPageTitle = req.WikiPageTitle
 	updatedSong.Reading = req.Reading
 	updatedSong.Artist = req.Artist
 	updatedSong.GenreID = genreID
@@ -280,8 +285,9 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 	}
 
 	return &repository.WorldsendUpdate{
-		Song:  updatedSong,
-		Chart: updatedChart,
+		Song:                updatedSong,
+		Chart:               updatedChart,
+		UpdateWikiPageTitle: req.UpdateWikiPageTitle,
 	}, nil
 }
 
@@ -333,6 +339,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.DisplayID = displayID
 	song.OfficialIdx = input.OfficialIdx
 	song.Title = input.Title
+	song.WikiPageTitle = input.WikiPageTitle
 	song.Reading = input.Reading
 	song.Artist = input.Artist
 	song.GenreID = &genreID

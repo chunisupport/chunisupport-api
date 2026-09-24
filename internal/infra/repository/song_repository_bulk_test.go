@@ -39,6 +39,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			display_id TEXT UNIQUE NOT NULL,
 			title TEXT NOT NULL,
+			wiki_page_title TEXT,
 			reading TEXT,
 			artist TEXT NOT NULL,
 			genre_id INTEGER NOT NULL,
@@ -142,7 +143,7 @@ func TestBulkUpdateSongs_ArgumentOrder(t *testing.T) {
 	}
 
 	// バルク更新を実行
-	err = repo.bulkUpdateSongs(ctx, db, songs, displayIDToSongID)
+	err = repo.bulkUpdateSongs(ctx, db, toSongUpdates(songs), displayIDToSongID)
 	require.NoError(t, err)
 
 	// 更新結果を検証
@@ -310,7 +311,7 @@ func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicat
 	}
 
 	repo := &songRepository{db: db}
-	err = repo.UpdateSongs(ctx, db, songs)
+	err = repo.UpdateSongs(ctx, db, toSongUpdates(songs))
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domainrepo.ErrDuplicateDisplayID)
 
@@ -357,7 +358,7 @@ func TestSongUpdateSongs_ReturnsErrorWhenTargetIsWorldsendSong(t *testing.T) {
 	}
 
 	repo := &songRepository{db: db}
-	err = repo.UpdateSongs(ctx, db, songs)
+	err = repo.UpdateSongs(ctx, db, toSongUpdates(songs))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "song with display_id 'WORLD001' not found")
 
@@ -402,7 +403,7 @@ func TestBulkUpdateSongs_DoesNotUpdateWorldsendSongs(t *testing.T) {
 		"WORLD001":  2,
 	}
 
-	err = repo.bulkUpdateSongs(ctx, db, songs, displayIDToSongID)
+	err = repo.bulkUpdateSongs(ctx, db, toSongUpdates(songs), displayIDToSongID)
 	require.NoError(t, err)
 
 	var rows []struct {
@@ -470,7 +471,7 @@ func TestSongUpdateSongs_ReturnsErrorWithoutPartialUpdateWhenMixedWithWorldsend(
 	}
 
 	repo := &songRepository{db: db}
-	err = repo.UpdateSongs(ctx, db, songs)
+	err = repo.UpdateSongs(ctx, db, toSongUpdates(songs))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "song with display_id 'WORLD001' not found")
 
@@ -487,4 +488,13 @@ func TestSongUpdateSongs_ReturnsErrorWithoutPartialUpdateWhenMixedWithWorldsend(
 	assert.Equal(t, 180, rows[0].BPM)
 	assert.Equal(t, "Worldsend Title", rows[1].Title)
 	assert.Equal(t, 200, rows[1].BPM)
+}
+
+// toSongUpdates は Wiki ページタイトルを更新しない（既存値を維持する）更新情報へ変換します。
+func toSongUpdates(songs []*entity.Song) []*domainrepo.SongUpdate {
+	updates := make([]*domainrepo.SongUpdate, 0, len(songs))
+	for _, song := range songs {
+		updates = append(updates, &domainrepo.SongUpdate{Song: song})
+	}
+	return updates
 }

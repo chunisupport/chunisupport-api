@@ -3355,6 +3355,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "wiki_page_title": "楽曲名",
       "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
@@ -3397,6 +3398,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID（16進数16文字） |
 | `title` | string | 楽曲名 |
+| `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string | ジャンル名（IDではなく名称） |
@@ -3434,6 +3436,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "id": "0123456789abcdef",
   "title": "楽曲名",
+  "wiki_page_title": "楽曲名",
   "artist": "アーティスト名",
   "genre": "ジャンル名",
   "bpm": 180,
@@ -3693,6 +3696,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "wiki_page_title": "楽曲タイトル",
   "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
@@ -3716,6 +3720,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `wiki_page_title` | string \| null | - | Wikiのページタイトル（1〜300文字、省略可。空文字は不可） |
 | `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
@@ -3754,6 +3759,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "wiki_page_title": "楽曲タイトル",
     "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
@@ -3779,6 +3785,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `wiki_page_title` | string \| null | | Wikiのページタイトル（1〜300文字）。省略した場合は既存値を維持し、nullの場合はDBをNULLに更新。空文字は不可（空にする場合はnullを指定） |
 | `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
@@ -3803,6 +3810,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - マスタに存在しないジャンル名を指定するとエラーになります。
 - `charts` のキーは難易度名（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）を指定します。
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます。
+- `wiki_page_title` は他の項目と異なり、省略すると既存値が維持されます（Wikiのページタイトルを扱わないクライアントが既存値を消さないようにするため）。
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -3853,6 +3861,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     {
       "id": "0123456789abcdef",
       "title": "楽曲名",
+      "wiki_page_title": "楽曲名(WORLD'S END)",
       "reading": "ガッキョクメイ",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
@@ -3879,6 +3888,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- |
 | `id` | string | 楽曲の表示用ID |
 | `title` | string | 楽曲名 |
+| `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
@@ -3913,6 +3923,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "id": "0123456789abcdef",
   "title": "楽曲名",
+  "wiki_page_title": "楽曲名(WORLD'S END)",
   "artist": "アーティスト名",
   "genre": "ジャンル名",
   "bpm": 180,
@@ -3959,6 +3970,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 {
   "official_idx": "1234567890",
   "title": "楽曲タイトル",
+  "wiki_page_title": "楽曲タイトル",
   "reading": "ガッキョクタイトル",
   "artist": "アーティスト名",
   "genre": "POPS & ANIME",
@@ -3979,6 +3991,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 |---|---|---|---|
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `title` | string | ✅ | 楽曲タイトル |
+| `wiki_page_title` | string \| null | - | Wikiのページタイトル（1〜300文字、省略可。空文字は不可） |
 | `reading` | string | - | 楽曲名の読み（最大300文字、省略可） |
 | `artist` | string | ✅ | アーティスト名 |
 | `genre` | string | ✅ | ジャンル名（マスターデータと一致する必要あり） |
@@ -4015,6 +4028,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   {
     "id": "0123456789abcdef",
     "title": "楽曲タイトル",
+    "wiki_page_title": "楽曲タイトル",
     "reading": "ガッキョクタイトル",
     "artist": "アーティスト名",
     "genre": "POPS & ANIME",
@@ -4040,6 +4054,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- | ---- |
 | `id` | string | ✓ | 楽曲の表示用ID（16文字の16進数文字列） |
 | `title` | string | ✓ | 楽曲名 |
+| `wiki_page_title` | string \| null | | Wikiのページタイトル（1〜300文字）。省略した場合は既存値を維持し、nullの場合はDBをNULLに更新。空文字は不可（空にする場合はnullを指定） |
 | `reading` | string \| null | | 楽曲名の読み（300文字以下、nullの場合DBをNULLに更新） |
 | `artist` | string | ✓ | アーティスト名 |
 | `genre` | string \| null | | ジャンル名（マスタに存在する必要がある） |
@@ -4065,6 +4080,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - リクエスト配列内で `id` が重複している場合はエラーになります
 - マスタに存在しないジャンル名を指定するとエラーになります
 - ポインタ型フィールド（`genre`, `bpm`, `released_at`, `jacket`, `attribute`, `level_star`, `notes`, `notes_designer`）にnullを指定すると、DBの該当カラムがNULLに更新されます
+- `wiki_page_title` は他の項目と異なり、省略すると既存値が維持されます（Wikiのページタイトルを扱わないクライアントが既存値を消さないようにするため）。
 
 - **レスポンス**: 204 No Content（成功時）
 
@@ -4200,7 +4216,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4252,7 +4268,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4594,7 +4610,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: APIトークン必須
 - **権限**: `read_write` APIトークンかつEDITORまたはADMIN権限が必要（`read`トークンは利用不可）
 - **概要**: 通常楽曲（WORLD'S ENDを除く）の楽曲情報と譜面情報を一括更新します。既存データの修正専用で、新規追加・削除は行いません。
-- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じです。
+- **リクエスト**: JSON配列。形式は PUT `/internal/songs` と同じですが、`wiki_page_title` は指定できません（指定すると `bad_request`）。v1 API での更新時、Wikiのページタイトルは既存値が維持されます。
 
 ```json
 [
