@@ -135,13 +135,15 @@ func toFriendshipListResponse(items []*usecase.FriendshipUserOutput) *internaldt
 	}
 	for _, item := range items {
 		res.Items = append(res.Items, &internaldto.FriendshipUserResponse{
-			Username:    item.Username,
-			PlayerLevel: item.PlayerLevel,
-			PlayerName:  item.PlayerName,
-			Rating:      item.Rating,
-			IsPrivate:   item.IsPrivate,
-			RequestedAt: item.RequestedAt,
-			AcceptedAt:  item.AcceptedAt,
+			Username:       item.Username,
+			PlayerLevel:    item.PlayerLevel,
+			PlayerName:     item.PlayerName,
+			Rating:         item.Rating,
+			OverpowerValue: item.OverpowerValue,
+			PossessionID:   item.PossessionID,
+			IsPrivate:      item.IsPrivate,
+			RequestedAt:    item.RequestedAt,
+			AcceptedAt:     item.AcceptedAt,
 		})
 	}
 	return res

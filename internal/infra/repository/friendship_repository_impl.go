@@ -103,7 +103,9 @@ func (r *FriendshipRepository) ListFriends(ctx context.Context, exec domainrepo.
 			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
-			p.calculated_player_rating AS summary_rating
+			p.calculated_player_rating AS summary_rating,
+			p.overpower_value AS summary_overpower_value,
+			p.possession_id AS summary_possession_id
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.friend_user_id
 		LEFT JOIN players p ON p.id = u.player_id
@@ -121,7 +123,9 @@ func (r *FriendshipRepository) ListReceivedRequests(ctx context.Context, exec do
 			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
-			p.calculated_player_rating AS summary_rating
+			p.calculated_player_rating AS summary_rating,
+			p.overpower_value AS summary_overpower_value,
+			p.possession_id AS summary_possession_id
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.user_id
 		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
@@ -139,7 +143,9 @@ func (r *FriendshipRepository) ListSentRequests(ctx context.Context, exec domain
 			u.id AS summary_user_id, u.username AS summary_username, u.is_private AS summary_is_private,
 			p.player_level AS summary_player_level,
 			p.player_name AS summary_player_name,
-			p.calculated_player_rating AS summary_rating
+			p.calculated_player_rating AS summary_rating,
+			p.overpower_value AS summary_overpower_value,
+			p.possession_id AS summary_possession_id
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.friend_user_id
 		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
@@ -171,6 +177,8 @@ type friendshipSummaryRow struct {
 	SummaryPlayerLevel *int     `db:"summary_player_level"`
 	SummaryPlayerName  *string  `db:"summary_player_name"`
 	SummaryRating      *float64 `db:"summary_rating"`
+	SummaryOverpower   *float64 `db:"summary_overpower_value"`
+	SummaryPossession  *int     `db:"summary_possession_id"`
 	SummaryIsPrivate   bool     `db:"summary_is_private"`
 }
 
@@ -184,12 +192,14 @@ func selectFriendshipSummaries(ctx context.Context, exec domainrepo.Executor, qu
 		res = append(res, &domainrepo.FriendshipWithUserSummary{
 			Friendship: row.FriendshipModel.ToEntity(),
 			User: &domainrepo.FriendshipUserSummary{
-				UserID:      row.SummaryUserID,
-				Username:    row.SummaryUsername,
-				PlayerLevel: row.SummaryPlayerLevel,
-				PlayerName:  row.SummaryPlayerName,
-				Rating:      row.SummaryRating,
-				IsPrivate:   row.SummaryIsPrivate,
+				UserID:         row.SummaryUserID,
+				Username:       row.SummaryUsername,
+				PlayerLevel:    row.SummaryPlayerLevel,
+				PlayerName:     row.SummaryPlayerName,
+				Rating:         row.SummaryRating,
+				OverpowerValue: row.SummaryOverpower,
+				PossessionID:   row.SummaryPossession,
+				IsPrivate:      row.SummaryIsPrivate,
 			},
 		})
 	}

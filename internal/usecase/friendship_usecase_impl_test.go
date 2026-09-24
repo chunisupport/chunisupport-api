@@ -21,6 +21,7 @@ type stubFriendshipRepo struct {
 	exists    map[[2]int]bool
 	saved     []*entity.Friendship
 	deleted   [][2]int
+	friends   []*repository.FriendshipWithUserSummary
 }
 
 type stubUserRepoForFriendship struct {
@@ -126,7 +127,7 @@ func (s *stubFriendshipRepo) CountOutgoingActive(ctx context.Context, exec repos
 }
 
 func (s *stubFriendshipRepo) ListFriends(ctx context.Context, exec repository.Executor, userID int) ([]*repository.FriendshipWithUserSummary, error) {
-	return nil, nil
+	return s.friends, nil
 }
 
 func (s *stubFriendshipRepo) ListReceivedRequests(ctx context.Context, exec repository.Executor, userID int) ([]*repository.FriendshipWithUserSummary, error) {
@@ -368,6 +369,41 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		// Then
 		require.ErrorIs(t, err, ErrFriendRequestNotFound)
 	})
+}
+
+func TestFriendshipUsecase_ListFriends(t *testing.T) {
+	// Given
+	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+	name := "PLAYER"
+	level := 42
+	rating := 17.25
+	overpowerValue := 31234.56
+	possessionID := 3
+	friendship, err := entity.NewAcceptedFriendship(1, 2, now.Add(-time.Hour), now)
+	require.NoError(t, err)
+	repo := newStubFriendshipRepo()
+	repo.friends = []*repository.FriendshipWithUserSummary{{
+		Friendship: friendship,
+		User: &repository.FriendshipUserSummary{
+			UserID: 2, Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
+			OverpowerValue: &overpowerValue,
+			PossessionID:   &possessionID,
+		},
+	}}
+	u := &friendshipUsecase{db: &MockExecutor{}, friendshipRepo: repo}
+
+	// When
+	got, err := u.ListFriends(context.Background(), 1)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, &FriendshipUserOutput{
+		Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
+		OverpowerValue: &overpowerValue,
+		PossessionID:   &possessionID,
+		RequestedAt:    now.Add(-time.Hour), AcceptedAt: friendship.AcceptedAt,
+	}, got[0])
 }
 
 func TestUserUsecase_PrivateUserAccessibleByFriend(t *testing.T) {

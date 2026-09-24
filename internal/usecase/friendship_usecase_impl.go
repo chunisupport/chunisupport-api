@@ -299,13 +299,15 @@ func toFriendshipUserOutputs(rows []*repository.FriendshipWithUserSummary) []*Fr
 			continue
 		}
 		items = append(items, &FriendshipUserOutput{
-			Username:    row.User.Username,
-			PlayerLevel: row.User.PlayerLevel,
-			PlayerName:  row.User.PlayerName,
-			Rating:      row.User.Rating,
-			IsPrivate:   row.User.IsPrivate,
-			RequestedAt: row.Friendship.RequestedAt,
-			AcceptedAt:  row.Friendship.AcceptedAt,
+			Username:       row.User.Username,
+			PlayerLevel:    row.User.PlayerLevel,
+			PlayerName:     row.User.PlayerName,
+			Rating:         row.User.Rating,
+			OverpowerValue: row.User.OverpowerValue,
+			PossessionID:   row.User.PossessionID,
+			IsPrivate:      row.User.IsPrivate,
+			RequestedAt:    row.Friendship.RequestedAt,
+			AcceptedAt:     row.Friendship.AcceptedAt,
 		})
 	}
 	return items

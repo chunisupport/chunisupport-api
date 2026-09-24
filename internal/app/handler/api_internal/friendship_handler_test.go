@@ -188,12 +188,16 @@ func TestFriendshipHandler_ListFriends(t *testing.T) {
 		level := 42
 		name := "PLAYER"
 		rating := 15.25
+		overpowerValue := 18000.25
+		possessionID := 3
 		handler := NewFriendshipHandler(&mockFriendshipUsecase{
 			listFriendsFunc: func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error) {
 				assert.Equal(t, 1, userID)
 				return []*usecase.FriendshipUserOutput{{
 					Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
-					RequestedAt: now.Add(-time.Hour), AcceptedAt: &now,
+					OverpowerValue: &overpowerValue,
+					PossessionID:   &possessionID,
+					RequestedAt:    now.Add(-time.Hour), AcceptedAt: &now,
 				}}, nil
 			},
 		})
@@ -208,7 +212,7 @@ func TestFriendshipHandler_ListFriends(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"items":[{"username":"frienduser","player_level":42,"player_name":"PLAYER","rating":15.25,"is_private":false,"requested_at":"`+now.Add(-time.Hour).Format(time.RFC3339Nano)+`","accepted_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
+		assert.JSONEq(t, `{"items":[{"username":"frienduser","player_level":42,"player_name":"PLAYER","rating":15.25,"overpower_value":18000.25,"possession_id":3,"is_private":false,"requested_at":"`+now.Add(-time.Hour).Format(time.RFC3339Nano)+`","accepted_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
 	})
 }
 
@@ -235,7 +239,7 @@ func TestFriendshipHandler_ListSentRequests_非公開ユーザーはUsernameだ�
 
 	// Then
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"items":[{"username":"privateuser","player_level":null,"player_name":null,"rating":null,"is_private":true,"requested_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"items":[{"username":"privateuser","player_level":null,"player_name":null,"rating":null,"overpower_value":null,"possession_id":null,"is_private":true,"requested_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "user_id")
 }
 

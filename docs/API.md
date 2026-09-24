@@ -1018,6 +1018,8 @@ Firebase Bearer Token（必須）
       "player_level": 42,
       "player_name": "PLAYER",
       "rating": 15.25,
+      "overpower_value": 18000.25,
+      "possession_id": 3,
       "is_private": false,
       "requested_at": "2026-07-08T12:00:00Z",
       "accepted_at": "2026-07-08T12:05:00Z"
@@ -1026,7 +1028,8 @@ Firebase Bearer Token（必須）
 }
 ```
 
-`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。未承認の送受信申請では、非公開ユーザーの `player_level`、`player_name`、`rating` をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
+`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。`overpower_value` はOVER POWER値、`possession_id` は `MasterDataDTO.possessions` の `id` です。プレイヤーデータ未連携の場合、プレイヤー由来の項目（`player_level`、`player_name`、`rating`、`overpower_value`、`possession_id`）はすべて `null` です。
+未承認の送受信申請では、非公開ユーザーのプレイヤー由来の項目をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
 
 ### GET `/internal/friends`
 

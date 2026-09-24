@@ -9,13 +9,15 @@ type FriendRequestCreateRequest struct {
 
 // FriendshipUserResponse はフレンド・申請一覧の相手ユーザー概要です。
 type FriendshipUserResponse struct {
-	Username    string     `json:"username"`
-	PlayerLevel *int       `json:"player_level"`
-	PlayerName  *string    `json:"player_name"`
-	Rating      *float64   `json:"rating"`
-	IsPrivate   bool       `json:"is_private"`
-	RequestedAt time.Time  `json:"requested_at"`
-	AcceptedAt  *time.Time `json:"accepted_at,omitempty"`
+	Username       string     `json:"username"`
+	PlayerLevel    *int       `json:"player_level"`
+	PlayerName     *string    `json:"player_name"`
+	Rating         *float64   `json:"rating"`
+	OverpowerValue *float64   `json:"overpower_value"`
+	PossessionID   *int       `json:"possession_id"`
+	IsPrivate      bool       `json:"is_private"`
+	RequestedAt    time.Time  `json:"requested_at"`
+	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`
 }
 
 // FriendshipListResponse はフレンド・申請一覧レスポンスです。
