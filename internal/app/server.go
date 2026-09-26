@@ -27,12 +27,17 @@ type Server struct {
 	cfg               config.Config
 	masterCache       *masterdata.Cache
 	staticMasterCache *masterdata.StaticCache
+	cancelSongBatch   context.CancelFunc
+	songBatchJobs     *usecase.SongBatchJobUsecase
 }
 
 // NewServer は永続化済みの運用状態を読み込んでServerインスタンスを作成します。
 func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*Server, error) {
-	router, err := NewRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
+	// 管理画面から起動した楽曲バッチは、停止シグナルに加えて Shutdown でもキャンセルできるようにする
+	routerCtx, cancelSongBatch := context.WithCancel(ctx)
+	router, songBatchJobs, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
 	if err != nil {
+		cancelSongBatch()
 		return nil, err
 	}
 
@@ -46,6 +51,8 @@ func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		cfg:               cfg,
 		masterCache:       masterCache,
 		staticMasterCache: staticMasterCache,
+		cancelSongBatch:   cancelSongBatch,
+		songBatchJobs:     songBatchJobs,
 	}, nil
 }
 
@@ -82,6 +89,22 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		case <-s.startDone:
 		case <-ctx.Done():
 			slog.Error("Failed to shutdown echo server", "error", ctx.Err())
+			shutdownErrs = append(shutdownErrs, ctx.Err())
+		}
+	}
+
+	if s.songBatchJobs != nil {
+		// 実行中の楽曲バッチをキャンセルし、ロールバックと中断の記録が終わってから DB 接続を閉じる
+		s.cancelSongBatch()
+		done := make(chan struct{})
+		go func() {
+			s.songBatchJobs.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			slog.Error("Failed to wait for song batch jobs", "error", ctx.Err())
 			shutdownErrs = append(shutdownErrs, ctx.Err())
 		}
 	}

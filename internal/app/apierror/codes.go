@@ -110,4 +110,10 @@ const (
 	CodeVersionNameConflict = "version_name_conflict"
 	CodeVersionNotLatest    = "version_not_latest"
 	CodeVersionInUse        = "version_in_use"
+
+	// 楽曲バッチ関連エラー
+	CodeSongBatchAlreadyRunning = "song_batch_already_running"
+	CodeSongBatchJobNotFound    = "song_batch_job_not_found"
+	CodeInvalidSongBatchJobID   = "invalid_song_batch_job_id"
+	CodeInvalidSongBatchMode    = "invalid_song_batch_mode"
 )

@@ -90,4 +90,7 @@ var (
 
 	// ErrSystemMaintenanceNotFound はメンテナンス状態の単一行が存在しない場合に返されます。
 	ErrSystemMaintenanceNotFound = errors.New("system maintenance not found")
+
+	// ErrSongBatchJobNotFound は楽曲バッチジョブが見つからない場合に返されます。
+	ErrSongBatchJobNotFound = errors.New("song batch job not found")
 )

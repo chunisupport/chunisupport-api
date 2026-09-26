@@ -26,8 +26,10 @@ import (
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/datatransfer"
+	infradb "github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
+	infrasongbatch "github.com/chunisupport/chunisupport-api/internal/infra/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
 	"github.com/chunisupport/chunisupport-api/internal/infra/turnstile"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -103,6 +105,7 @@ type Handlers struct {
 	InternalMetricHistory *api_internal.PlayerMetricHistoryHandler
 	Course                *api_internal.CourseHandler
 	SystemMaintenance     *api_internal.SystemMaintenanceHandler
+	SongBatch             *api_internal.SongBatchHandler
 	// 外部API v1 用ハンドラ
 	V1Song        *api_v1.V1SongHandler
 	V1Worldsend   *api_v1.V1WorldsendHandler
@@ -120,9 +123,16 @@ type Handlers struct {
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
 func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, error) {
+	e, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
+	return e, err
+}
+
+// newRouter はルーターを構築し、サーバー停止時に完了を待つ必要がある楽曲バッチのユースケースも返します。
+// ctx は管理画面から起動した楽曲バッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
+func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, *usecase.SongBatchJobUsecase, error) {
 	e := echo.New()
 	if err := configureIPExtractor(e, cfg.ClientIP); err != nil {
-		return nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
+		return nil, nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
 	}
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
@@ -177,7 +187,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	tm := transaction.NewTransactionManager(db)
 	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(ctx, systemMaintenanceRepo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
 	}
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	usernamePolicy, err := service.NewForbiddenUsernamePolicy(cfg.UsernamePolicy.Exact, cfg.UsernamePolicy.Contains)
@@ -253,10 +263,17 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 	dataTransferCodec, err := datatransfer.NewCodec(cfg.DataTransferHMACSecret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize data transfer codec: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize data transfer codec: %w", err)
 	}
 	dataTransferRepo := infra.NewUserDataTransferRepository(db)
 	dataTransferUsecase := usecase.NewUserDataTransferUsecase(dataTransferCodec, dataTransferRepo, goalUsecase)
+	songBatchJobUsecase := usecase.NewSongBatchJobUsecase(
+		ctx,
+		infradb.NewAdvisoryLockProvider(db),
+		infra.NewSongBatchJobRepository(db),
+		infrasongbatch.NewSongBatchUsecase(db, cfg.SongBatch.WikiBaseURL),
+		overpowerDenominatorProvider,
+	)
 
 	// DI - Handlers
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
@@ -298,6 +315,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		InternalMetricHistory: api_internal.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		Course:                api_internal.NewCourseHandler(courseUsecase),
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
+		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:        api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend:   api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -326,7 +344,7 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	// ルートの登録
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
-	return e, nil
+	return e, songBatchJobUsecase, nil
 }
 
 func configureIPExtractor(e *echo.Echo, cfg config.ClientIP) error {
@@ -552,6 +570,9 @@ func registerRoutes(
 		adminGroup.POST("/versions", handlers.Version.Create)
 		adminGroup.PUT("/versions/:id", handlers.Version.Rename)
 		adminGroup.DELETE("/versions/:id", handlers.Version.Delete)
+		adminGroup.GET("/song-batch/jobs", handlers.SongBatch.List)
+		adminGroup.POST("/song-batch/jobs", handlers.SongBatch.Start)
+		adminGroup.GET("/song-batch/jobs/:id", handlers.SongBatch.Get)
 	}
 
 	// api.chunisupport.net/internal/honors

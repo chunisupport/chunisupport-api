@@ -16,9 +16,33 @@ go run ./cmd/song-batch
 
 設定ファイルは他のバッチと同じく `config.LoadBatchConfig()` で読み込みます（`APP_ENV`、`.config/<APP_ENV>.settings.json`、DB 接続用の環境変数が必要です）。
 
+## 管理画面からの実行
+
+ADMIN は管理画面（`/admin/song-batch`）から、CLI と同じ処理を任意のタイミングで実行できます。API は `POST /internal/admin/song-batch/jobs` で要求を受け付け、API プロセス内でバックグラウンド実行します（仕様は [API.md](API.md) を参照）。
+
+- 画面から選べるのは通常実行・大型アップデートと、リリース日補完の有無です。
+- CLI と管理画面は同じアドバイザリロックを使うため、同時に実行される楽曲バッチは常に1つです。管理画面からの要求は、実行中なら `409` で拒否します。
+- API の停止時に実行中だったジョブはキャンセルされ、MySQL への同期はロールバックされます。
+- 管理画面から実行して成功した場合は、API プロセス内の OVER POWER 分母キャッシュをすぐに無効化します。CLI から実行した場合は、キャッシュの有効期限（10分）で反映されます。
+- データソースの環境変数は API プロセスでも必要です。値を変更した場合、管理画面からの実行に反映するには API の再起動が必要です。
+
+## 実行履歴
+
+CLI・管理画面のどちらから実行した場合も、`song_batch_jobs` テーブルへ実行履歴を記録します（ロック競合でスキップした実行は記録しません）。
+
+| 状態 | 意味 |
+| --- | --- |
+| `RUNNING` | 実行中 |
+| `SUCCEEDED` | 全データソースを利用して成功 |
+| `SUCCEEDED_WITH_WARNINGS` | 補完データソースを除外して成功 |
+| `FAILED` | 失敗。MySQL は更新されていません |
+| `INTERRUPTED` | プロセス停止などで中断。MySQL は更新されていません |
+
+プロセスが異常終了して `RUNNING` のまま残った行は、次に楽曲バッチがロックを取得したときに `INTERRUPTED` へ更新します。
+
 ## 処理フロー
 
-1. **ロック** – 全起動経路で MySQL アドバイザリロック `chunisupport:song-batch` を取得します。通常実行と `--fill-missing-release-date` は競合時にスキップ（終了コード 0）、`--major-update` はエラー終了します。
+1. **ロック** – 全起動経路（CLI・管理画面）で MySQL アドバイザリロック `chunisupport:song-batch` を取得します。通常実行と `--fill-missing-release-date` は競合時にスキップ（終了コード 0）、`--major-update` はエラー終了します。
 2. **データソース解決** – 通常実行は全データソースを解決します。`--major-update` は official と additional_songs だけを対象にします。
 3. **データダウンロード** – 実行専用の一時ディレクトリへ毎回取得し、終了後に削除します。過去に取得した JSON は読み込みません。
 4. **インポートと検証** – データソースごとのインポーターが JSON を読み取り、構造・必須項目・ソース全体の異常を検証します。
@@ -60,6 +84,7 @@ go run ./cmd/song-batch
 | `cmd/song-batch` | CLI のエントリーポイント（フラグ解析、DB 接続、ロック） |
 | `internal/domain/songbatch` | 実行モード、データソース種別、必須判定などの業務ルールと、取り込み用のエンティティ・値オブジェクト |
 | `internal/usecase/song_batch_usecase.go` | 取得・必須判定・インポート・統合の実行 |
+| `internal/usecase/song_batch_job_usecase.go` | ロック取得、実行履歴の記録、管理画面からのバックグラウンド実行 |
 | `internal/infra/songbatch/registry` | 環境変数からデータソース定義を解決 |
 | `internal/infra/songbatch/datasource` | ダウンローダー（HTTP、Google Sheets） |
 | `internal/infra/songbatch/importer` | JSON 取り込みと検証 |

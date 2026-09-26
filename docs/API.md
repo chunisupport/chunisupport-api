@@ -214,6 +214,8 @@ Content-Type: application/json
 | `/internal/admin/chart-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/chart-rankings/worldsend-songs/:id` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
+| `/internal/admin/song-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 楽曲バッチの実行履歴取得・実行 |
+| `/internal/admin/song-batch/jobs/:id` | GET | Firebase Bearer (ADMIN+) | 楽曲バッチジョブの状態取得 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -605,6 +607,83 @@ Content-Type: application/json
 | `build_date` | string | ビルド日 |
 | `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
 | `go_version` | string | APIバイナリのGoバージョン |
+
+### 楽曲バッチ `/internal/admin/song-batch/jobs`
+
+楽曲データ収集バッチ（`cmd/song-batch` と同じ処理）を管理画面から実行し、実行履歴を確認します。処理内容は [song_batch.md](song_batch.md) を参照してください。
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **レスポンスヘッダー**: `Cache-Control: no-store`
+
+#### POST `/internal/admin/song-batch/jobs`
+
+楽曲バッチの実行を受け付けます。処理には数分かかるため、API プロセス内でバックグラウンド実行し、開始したジョブを 202 Accepted で返します。結果は `GET` で確認してください。
+
+```json
+{
+  "mode": "MAJOR_UPDATE",
+  "fill_missing_release_date": false
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `mode` | string | ✓ | `NORMAL`（通常実行）または `MAJOR_UPDATE`（大型アップデート。CLI の `--major-update` 相当） |
+| `fill_missing_release_date` | boolean | | `true` でリリース日補完を行います（CLI の `--fill-missing-release-date` 相当）。省略時は `false` |
+
+- CLI（cron）と同じ MySQL アドバイザリロックを使うため、CLI・管理画面のどちらかで楽曲バッチが実行中の場合は受け付けません。
+- データソースの URL とシート ID は API プロセスの環境変数から解決します。環境変数を変更した場合は API の再起動後に反映されます。
+- API の停止時に実行中だったジョブはキャンセルされ、MySQL への同期はロールバックされて `INTERRUPTED` になります。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド
+  - 400 Bad Request (`invalid_song_batch_mode`): `mode` が未指定または未定義
+  - 409 Conflict (`song_batch_already_running`): 楽曲バッチが実行中
+
+#### GET `/internal/admin/song-batch/jobs`
+
+開始日時の新しい順に直近20件の実行履歴を返します。CLI（cron）から実行したものも含みます。
+
+```json
+{
+  "jobs": [
+    {
+      "id": "0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b",
+      "mode": "NORMAL",
+      "fill_missing_release_date": false,
+      "trigger": "ADMIN",
+      "requested_by": "adminuser",
+      "status": "SUCCEEDED_WITH_WARNINGS",
+      "started_at": "2026-09-26T12:00:00+09:00",
+      "finished_at": "2026-09-26T12:03:10+09:00",
+      "warning_count": 1,
+      "error_message": null
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | ジョブID（UUID） |
+| `mode` | string | `NORMAL` / `MAJOR_UPDATE` |
+| `fill_missing_release_date` | boolean | リリース日補完の有無 |
+| `trigger` | string | 起動元。`CLI`（cron など）/ `ADMIN`（管理画面） |
+| `requested_by` | string \| null | 管理画面から実行したユーザー名。CLI 実行、または要求者が削除済みの場合は `null` |
+| `status` | string | `RUNNING` / `SUCCEEDED` / `SUCCEEDED_WITH_WARNINGS`（補完データソースを除外して成功）/ `FAILED` / `INTERRUPTED`（プロセス停止などで中断） |
+| `started_at` | string | 開始日時 |
+| `finished_at` | string \| null | 終了日時。実行中は `null` |
+| `warning_count` | integer | 利用できず除外した補完データソースの件数 |
+| `error_message` | string \| null | 失敗理由（最大1,000文字）。失敗以外は `null` |
+
+`FAILED` と `INTERRUPTED` の場合、MySQL の楽曲・譜面データは更新されていません。
+
+#### GET `/internal/admin/song-batch/jobs/:id`
+
+指定したジョブを `GET /internal/admin/song-batch/jobs` の要素と同じ形式で返します。
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_song_batch_job_id`): `id` が UUID 形式でない
+  - 404 Not Found (`song_batch_job_not_found`): ジョブが存在しない
 
 ---
 

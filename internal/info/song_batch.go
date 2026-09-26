@@ -1,5 +1,7 @@
 package info
 
+import "time"
+
 // 楽曲データ収集バッチ（song-batch）で使用する定数です。
 const (
 	// SongBatchLockName は song-batch の全起動経路（CLI・管理画面）で共有する MySQL アドバイザリロック名です。
@@ -11,6 +13,11 @@ const (
 	SongBatchBulkInsertChunkSize = 500
 	// SongBatchSQLiteCompoundSelectLimit は SQLite の UNION ALL 制約を考慮した上限です。
 	SongBatchSQLiteCompoundSelectLimit = 400
+	// SongBatchJobHistoryLimit は管理画面へ返す実行履歴の件数です。
+	SongBatchJobHistoryLimit = 20
+	// SongBatchJobFinalizeTimeout は実行結果の記録とロック解放に使う猶予です。
+	// 停止シグナルで実行がキャンセルされた後も、中断を記録できるよう独立したタイムアウトを使います。
+	SongBatchJobFinalizeTimeout = 10 * time.Second
 )
 
 // song-batch が参照する環境変数名です。

@@ -10,14 +10,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
-	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
+	infrarepo "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	infrasongbatch "github.com/chunisupport/chunisupport-api/internal/infra/songbatch"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 func main() {
@@ -61,7 +61,6 @@ func run() int {
 	}
 	slog.SetDefault(slog.New(logHandler))
 	defer logHandler.Close()
-	songBatchConfig := config.LoadSongBatchConfigFromEnv()
 
 	database, err := db.ConnectWithRetry(ctx, cfg.Database.DbConfig)
 	if err != nil {
@@ -70,9 +69,16 @@ func run() int {
 	}
 	defer database.Close()
 
-	lock, acquired, err := db.NewAdvisoryLockProvider(database).TryAcquire(ctx, info.SongBatchLockName)
+	jobUsecase := usecase.NewSongBatchJobUsecase(
+		ctx,
+		db.NewAdvisoryLockProvider(database),
+		infrarepo.NewSongBatchJobRepository(database),
+		infrasongbatch.NewSongBatchUsecase(database, cfg.SongBatch.WikiBaseURL),
+		nil,
+	)
+	acquired, err := jobUsecase.RunFromCLI(ctx, req)
 	if err != nil {
-		slog.Error("楽曲バッチのロック取得に失敗しました", "error", err)
+		slog.Error("楽曲バッチに失敗しました", "error", err)
 		return 1
 	}
 	if !acquired {
@@ -81,21 +87,6 @@ func run() int {
 			return 1
 		}
 		slog.Info("別の楽曲バッチが実行中のためスキップします")
-		return 0
-	}
-	defer func() {
-		releaseCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := lock.Release(releaseCtx); err != nil {
-			slog.Error("楽曲バッチのロック解放に失敗しました", "error", err)
-		}
-	}()
-
-	slog.Info("楽曲バッチを開始します", "mode", req.Mode, "fill_missing_release_date", req.FillMissingReleaseDate)
-	batchUsecase := infrasongbatch.NewSongBatchUsecase(database, songBatchConfig.WikiBaseURL)
-	if _, err := batchUsecase.Execute(ctx, req); err != nil {
-		slog.Error("楽曲バッチに失敗しました", "error", err)
-		return 1
 	}
 	return 0
 }
