@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMainframeDownloader_parseSheetData(t *testing.T) {
@@ -60,6 +63,37 @@ func TestMainframeDownloader_parseSheetData(t *testing.T) {
 	if len(chartsWithDuplicates) != 1 {
 		t.Errorf("Expected 1 chart after deduplication, got %d", len(chartsWithDuplicates))
 	}
+}
+
+func TestMainframeDownloader_parseSheetData_skipsUnfilledConstants(t *testing.T) {
+	d := NewMainframeDownloader("test_output", "dummy_key", "dummy_id", "https://sheets.googleapis.com/v4/spreadsheets")
+	data := &batchGetResponse{
+		ValueRanges: []struct {
+			Range  string     `json:"range"`
+			Values [][]string `json:"values"`
+		}{
+			{
+				Range: "Sheet1",
+				Values: [][]string{
+					{"定数あり", "MAS", "ORIGINAL", "", "14.5"},
+					{"未入力", "EXP", "POPS", "", ""},
+					{"空白のみ", "ADV", "VARIETY", "", "   "},
+					{"空白付き数値", "BAS", "niconico", "", " 12.0 "},
+					{"不正値", "ULT", "東方Project", "", "未定"},
+				},
+			},
+		},
+	}
+
+	charts := d.parseSheetData(data)
+
+	require.Len(t, charts, 2)
+	got := make(map[string]float64, len(charts))
+	for _, chart := range charts {
+		got[chart.Title] = chart.Const
+	}
+	assert.Equal(t, 14.5, got["定数あり"])
+	assert.Equal(t, 12.0, got["空白付き数値"])
 }
 
 func TestMainframeDownloader_isDifficultyShort(t *testing.T) {

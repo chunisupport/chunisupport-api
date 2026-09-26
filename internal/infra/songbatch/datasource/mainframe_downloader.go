@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -179,6 +180,10 @@ func (d *MainframeDownloader) batchGetSheetData(ctx context.Context, sheetNames 
 // parseSheetData はスプレッドシートのデータを解析してMainframeChartDataのスライスに変換します
 func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []MainframeChartData {
 	resultMap := make(map[string]MainframeChartData)
+	// 定数未入力の空欄はバージョンシートをまたいで定常的に大量発生する。
+	// Discordへ転送するWARNにはせず、空欄以外のパース失敗だけを件数で1回にまとめる。
+	var skippedEmptyConst int
+	var skippedInvalidConst int
 
 	for _, valueRange := range data.ValueRanges {
 		for _, row := range valueRange.Values {
@@ -206,16 +211,14 @@ func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []Mainframe
 				if colIdx+3 >= len(row) {
 					continue
 				}
-				constStr := row[colIdx+3]
+				constStr := strings.TrimSpace(row[colIdx+3])
+				if constStr == "" {
+					skippedEmptyConst++
+					continue
+				}
 				constValue, err := strconv.ParseFloat(constStr, 64)
 				if err != nil {
-					// メモ：「parsing \"\": invalid syntax"」←まだ定数が入力されておらず空欄なだけ
-					slog.Warn("Failed to parse constant value, skipping this chart entry",
-						"title", title,
-						"difficulty", cell,
-						"genre", genre,
-						"constStr", constStr,
-						"error", err)
+					skippedInvalidConst++
 					continue
 				}
 
@@ -229,6 +232,13 @@ func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []Mainframe
 				}
 			}
 		}
+	}
+
+	if skippedEmptyConst > 0 {
+		slog.Info("Skipped mainframe chart entries with empty constants", "count", skippedEmptyConst)
+	}
+	if skippedInvalidConst > 0 {
+		slog.Warn("Failed to parse some mainframe constant values; skipped those chart entries", "count", skippedInvalidConst)
 	}
 
 	// mapをスライスに変換
