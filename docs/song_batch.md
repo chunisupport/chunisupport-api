@@ -20,6 +20,14 @@ go run ./cmd/song-batch
 - ログの出力先は標準出力固定ではなく、設定ファイルの `logging` に従います。
 - 実行履歴を `song_batch_jobs` テーブルへ記録するため、マイグレーション `000052` を適用してから新しいバイナリを使ってください。
 
+### cron の設定例
+
+API と同じアーティファクトに同梱され、API のディレクトリへ展開されます。設定ファイルと `.env` を読み込むため、API のディレクトリで実行してください（スケジュールは運用に合わせて設定します）。
+
+```cron
+5 3,19 * * * cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
+```
+
 ## 管理画面からの実行
 
 ADMIN は管理画面（`/admin/song-batch`）から、CLI と同じ処理を任意のタイミングで実行できます。API は `POST /internal/admin/song-batch/jobs` で要求を受け付け、API プロセス内でバックグラウンド実行します（仕様は [API.md](API.md) を参照）。
@@ -65,18 +73,7 @@ CLI・管理画面のどちらから実行した場合も、`song_batch_jobs` �
 
 ## 環境変数
 
-| 変数名 | 用途 |
-| --- | --- |
-| `CHUNISUPPORT_BATCH_OFFICIAL_URL` | 公式データソースのダウンロード URL |
-| `CHUNISUPPORT_BATCH_ST1027_URL` | st1027 データソースのダウンロード URL |
-| `CHUNISUPPORT_BATCH_OTOGE_DB_URL` | otoge-db データソースのダウンロード URL（リリース日、WORLD'S END の BPM・ノーツ数・譜面製作者、Wiki ページタイトル補完用） |
-| `CHUNISUPPORT_BATCH_WIKI_BASE_URL` | otoge-db の `wikiwiki_url` から除去する Wiki のベース URL（例: `https://wikiwiki.jp/chunithmwiki/`）。`songs.wiki_page_title` が未設定（NULL）の楽曲にのみ保存します。未設定の場合は補完をスキップします |
-| `CHUNISUPPORT_BATCH_GOOGLE_CLOUD_API_KEY` | Google Sheets API のキー（mainframe / additional_songs） |
-| `CHUNISUPPORT_BATCH_GOOGLE_SHEET_ID` | mainframe のスプレッドシート ID |
-| `CHUNISUPPORT_BATCH_ADDITIONAL_SONGS_SHEET_ID` | additional_songs のスプレッドシート ID |
-| `CHUNISUPPORT_BATCH_GOOGLE_SPREADSHEET_BASE_URL` | Google Sheets API のベース URL |
-
-データソースの URL とシート ID は実行ごとに環境変数から解決します。`CHUNISUPPORT_BATCH_WIKI_BASE_URL` だけは起動時に一度読み込みます。
+データソースの URL や Google スプレッドシートの ID は `CHUNISUPPORT_BATCH_*` 環境変数で指定します。変数の一覧と必須・任意の区別は [設定ファイル・環境変数](configuration.md#楽曲データ収集バッチ) を参照してください。
 
 ## `display_id` の生成
 

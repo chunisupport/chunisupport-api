@@ -188,6 +188,38 @@ APIサーバーの起動にはこれらの環境変数は不要です。本番�
 
 出力するオブジェクトキーや実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
 
+## 楽曲データ収集バッチ
+
+`cmd/song-batch` と、管理画面から楽曲バッチを実行する API サーバーの両方で、以下の環境変数が必要です。統合前の `chunisupport-song-batch` と同じ名前です。
+
+| 変数名 | 通常実行 | 大型アップデート | 用途 |
+| --- | --- | --- | --- |
+| `CHUNISUPPORT_BATCH_OFFICIAL_URL` | 必須 | 必須 | 公式データソースのURL |
+| `CHUNISUPPORT_BATCH_ADDITIONAL_SONGS_SHEET_ID` | 必須 | 必須 | 追加楽曲のスプレッドシートID |
+| `CHUNISUPPORT_BATCH_GOOGLE_CLOUD_API_KEY` | 必須 | 必須 | Google Sheets APIのキー |
+| `CHUNISUPPORT_BATCH_GOOGLE_SPREADSHEET_BASE_URL` | 必須 | 必須 | Google Sheets APIのベースURL |
+| `CHUNISUPPORT_BATCH_GOOGLE_SHEET_ID` | 必須 | 不要 | mainframe（譜面定数）のスプレッドシートID |
+| `CHUNISUPPORT_BATCH_ST1027_URL` | 任意 | 不要 | st1027データソースのURL |
+| `CHUNISUPPORT_BATCH_OTOGE_DB_URL` | 任意 | 不要 | otoge-dbデータソースのURL |
+| `CHUNISUPPORT_BATCH_WIKI_BASE_URL` | 任意 | 不要 | otoge-dbの `wikiwiki_url` から除去するWikiのベースURL。未設定の場合はWikiページタイトルを補完しません |
+
+- 必須の変数が欠けている場合、その実行は失敗し、MySQLは更新されません。任意の変数が欠けている場合は、そのデータソースを除外して警告付き成功になります。
+- API サーバーは起動時に環境変数を読み込みます。大型アップデートで `CHUNISUPPORT_BATCH_GOOGLE_SHEET_ID` などを変更した場合は、管理画面から実行する前に API サーバーを再起動してください。CLI は実行のたびに読み込みます。
+- API キーは秘密情報です。設定ファイル（`.config/<APP_ENV>.settings.json`）には書かず、環境変数で渡してください。
+
+`.env` の例:
+
+```bash
+CHUNISUPPORT_BATCH_OFFICIAL_URL=https://chunithm.sega.jp/storage/json/music.json
+CHUNISUPPORT_BATCH_ST1027_URL=https://ntools.st1027.org/json/songdata_chunithm.json
+CHUNISUPPORT_BATCH_OTOGE_DB_URL=https://otoge-db.net/chunithm/data/music-ex.json
+CHUNISUPPORT_BATCH_WIKI_BASE_URL=https://wikiwiki.jp/chunithmwiki/
+CHUNISUPPORT_BATCH_GOOGLE_SPREADSHEET_BASE_URL=https://sheets.googleapis.com/v4/spreadsheets
+CHUNISUPPORT_BATCH_GOOGLE_CLOUD_API_KEY=<Google Cloud APIキー>
+CHUNISUPPORT_BATCH_GOOGLE_SHEET_ID=<mainframeのスプレッドシートID>
+CHUNISUPPORT_BATCH_ADDITIONAL_SONGS_SHEET_ID=<追加楽曲のスプレッドシートID>
+```
+
 ## 起動失敗時の終了コード
 
 設定読み込み、ログ初期化、DB接続、マスタデータのプリロード、Firebase認証サービスの初期化、サーバ起動、graceful shutdown に失敗した場合、アプリケーションは終了コード `1` で終了します。正常な SIGINT / SIGTERM による停止は終了コード `0` で終了します。
