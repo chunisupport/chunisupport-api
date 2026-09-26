@@ -42,9 +42,10 @@ func (p *fakeSongBatchLockProvider) TryAcquire(_ context.Context, name string) (
 }
 
 type fakeSongBatchJobRepository struct {
-	mu    sync.Mutex
-	jobs  map[uuid.UUID]entity.SongBatchJob
-	limit int
+	mu      sync.Mutex
+	jobs    map[uuid.UUID]entity.SongBatchJob
+	limit   int
+	saveErr error
 }
 
 func newFakeSongBatchJobRepository(jobs ...*entity.SongBatchJob) *fakeSongBatchJobRepository {
@@ -58,6 +59,9 @@ func newFakeSongBatchJobRepository(jobs ...*entity.SongBatchJob) *fakeSongBatchJ
 func (r *fakeSongBatchJobRepository) Save(_ context.Context, job *entity.SongBatchJob) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.saveErr != nil {
+		return r.saveErr
+	}
 	r.jobs[job.ID()] = *job
 	return nil
 }
@@ -189,11 +193,12 @@ func TestSongBatchJobUsecase_RunFromCLI(t *testing.T) {
 			expectedMessage:  "required datasource official failed",
 		},
 		{
-			name:            "実行中にキャンセルされた場合は中断を記録する",
-			runner:          &fakeSongBatchRunner{},
-			cancelDuringRun: true,
-			wantErr:         true,
-			expectedStatus:  entity.SongBatchJobStatusInterrupted,
+			name:             "実行中にキャンセルされた場合は中断までの警告件数とともに中断を記録する",
+			runner:           &fakeSongBatchRunner{result: SongBatchResult{WarningCount: 1}},
+			cancelDuringRun:  true,
+			wantErr:          true,
+			expectedStatus:   entity.SongBatchJobStatusInterrupted,
+			expectedWarnings: 1,
 		},
 	}
 
@@ -312,24 +317,73 @@ func TestSongBatchJobUsecase_StartFromAdmin_実行中の場合は受け付けな
 	assert.Empty(t, repo.jobs)
 }
 
-func TestSongBatchJobUsecase_StartFromAdmin_サーバー停止時は中断を記録する(t *testing.T) {
-	// Given
-	backgroundCtx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+func TestSongBatchJobUsecase_StartFromAdmin_リクエストがキャンセルされても実行を続ける(t *testing.T) {
+	// Given: 受付直後に終了する HTTP リクエストの context
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
 	repo := newFakeSongBatchJobRepository()
-	runner := &fakeSongBatchRunner{cancel: cancel}
-	uc := newTestSongBatchJobUsecase(backgroundCtx, &fakeSongBatchLockProvider{acquired: true}, repo, runner, nil)
+	runner := &fakeSongBatchRunner{}
+	uc := newTestSongBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, runner, nil)
 	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
 
 	// When
-	job, err := uc.StartFromAdmin(context.Background(), requester, songbatch.NewRunRequest(false, false))
+	job, err := uc.StartFromAdmin(requestCtx, requester, songbatch.NewRunRequest(false, false))
+	cancelRequest()
 	uc.Wait()
 
 	// Then
 	require.NoError(t, err)
 	saved, err := repo.FindByID(context.Background(), job.ID())
 	require.NoError(t, err)
-	assert.Equal(t, entity.SongBatchJobStatusInterrupted, saved.Status())
+	assert.Equal(t, entity.SongBatchJobStatusSucceeded, saved.Status())
+}
+
+func TestSongBatchJobUsecase_StartFromAdmin_停止処理後は受け付けない(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(uc *SongBatchJobUsecase, cancel context.CancelFunc)
+	}{
+		{name: "停止シグナルを受けた後は受け付けない", setup: func(_ *SongBatchJobUsecase, cancel context.CancelFunc) { cancel() }},
+		{name: "完了待ちを始めた後は受け付けない", setup: func(uc *SongBatchJobUsecase, _ context.CancelFunc) { uc.Wait() }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			backgroundCtx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			lockProvider := &fakeSongBatchLockProvider{acquired: true}
+			runner := &fakeSongBatchRunner{}
+			uc := newTestSongBatchJobUsecase(backgroundCtx, lockProvider, newFakeSongBatchJobRepository(), runner, nil)
+			tt.setup(uc, cancel)
+			requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+
+			// When
+			_, err := uc.StartFromAdmin(context.Background(), requester, songbatch.NewRunRequest(false, false))
+
+			// Then
+			assert.ErrorIs(t, err, ErrSongBatchUnavailable)
+			assert.Empty(t, lockProvider.names)
+			assert.False(t, runner.called)
+		})
+	}
+}
+
+func TestSongBatchJobUsecase_ジョブを記録できない場合はロックを解放して実行しない(t *testing.T) {
+	// Given
+	lockProvider := &fakeSongBatchLockProvider{acquired: true}
+	repo := newFakeSongBatchJobRepository()
+	repo.saveErr = errors.New("db down")
+	runner := &fakeSongBatchRunner{}
+	uc := newTestSongBatchJobUsecase(context.Background(), lockProvider, repo, runner, nil)
+
+	// When
+	acquired, err := uc.RunFromCLI(context.Background(), songbatch.NewRunRequest(false, false))
+
+	// Then
+	assert.False(t, acquired)
+	assert.Error(t, err)
+	assert.True(t, lockProvider.lock.released)
+	assert.False(t, runner.called)
 }
 
 func TestSongBatchJobUsecase_List(t *testing.T) {

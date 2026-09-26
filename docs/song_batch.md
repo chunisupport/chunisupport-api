@@ -14,7 +14,11 @@ go run ./cmd/song-batch
 | `--major-update` | 大型アップデート用モード。公式データと追加楽曲だけを取得し、定数更新ルールを適用します |
 | `--fill-missing-release-date` | どのデータソースからも日付が得られず、MySQL にも存在しない新規楽曲へ実行日（JST）を `released_at` として補完します |
 
-設定ファイルは他のバッチと同じく `config.LoadBatchConfig()` で読み込みます（`APP_ENV`、`.config/<APP_ENV>.settings.json`、DB 接続用の環境変数が必要です）。
+設定は他のバッチと同じく `config.LoadBatchConfig()` で読み込みます。統合前の song-batch とは次の点が異なります。
+
+- `APP_ENV` が必須です（未設定時に `develop` として扱うことはしません）。`.config/<APP_ENV>.settings.json` と DB 接続用の環境変数も必要なため、cron では API のディレクトリで実行してください。
+- ログの出力先は標準出力固定ではなく、設定ファイルの `logging` に従います。
+- 実行履歴を `song_batch_jobs` テーブルへ記録するため、マイグレーション `000052` を適用してから新しいバイナリを使ってください。
 
 ## 管理画面からの実行
 
@@ -36,9 +40,10 @@ CLI・管理画面のどちらから実行した場合も、`song_batch_jobs` �
 | `SUCCEEDED` | 全データソースを利用して成功 |
 | `SUCCEEDED_WITH_WARNINGS` | 補完データソースを除外して成功 |
 | `FAILED` | 失敗。MySQL は更新されていません |
-| `INTERRUPTED` | プロセス停止などで中断。MySQL は更新されていません |
+| `INTERRUPTED` | プロセス停止などで中断（下記参照） |
 
-プロセスが異常終了して `RUNNING` のまま残った行は、次に楽曲バッチがロックを取得したときに `INTERRUPTED` へ更新します。
+実行中にキャンセルされて `INTERRUPTED` になった場合、MySQL への同期はロールバック済みです。
+プロセスが異常終了して `RUNNING` のまま残った行は、次に楽曲バッチがロックを取得したときに `INTERRUPTED` へ更新します。この場合は同期のコミット直後に停止した可能性もあるため、同期の成否は不明です。
 
 ## 処理フロー
 

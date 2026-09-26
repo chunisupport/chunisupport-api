@@ -66,28 +66,3 @@ func TestID_Int(t *testing.T) {
 		})
 	}
 }
-
-func TestID_Int8(t *testing.T) {
-	tests := []struct {
-		name string
-		id   ID
-		want int8
-	}{
-		{"Unknown", Unknown, 0},
-		{"Basic", Basic, 1},
-		{"Advanced", Advanced, 2},
-		{"Expert", Expert, 3},
-		{"Master", Master, 4},
-		{"Ultima", Ultima, 5},
-		{"Worldsend", Worldsend, 6},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.id.Int8()
-			if got != tt.want {
-				t.Errorf("ID(%d).Int8() = %v, want %v", tt.id, got, tt.want)
-			}
-		})
-	}
-}

@@ -351,7 +351,7 @@ type mysqlWorldsendChart struct {
 
 func (w *SongChartWorkspace) loadWorkspaceSongs(ctx context.Context) ([]workspaceSong, error) {
 	var songs []workspaceSong
-	if err := w.db.SelectContext(ctx, &songs, `SELECT * FROM songs ORDER BY id`); err != nil {
+	if err := w.db.SelectContext(ctx, &songs, `SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted FROM songs ORDER BY id`); err != nil {
 		return nil, fmt.Errorf("failed to load workspace songs: %w", err)
 	}
 
@@ -360,7 +360,7 @@ func (w *SongChartWorkspace) loadWorkspaceSongs(ctx context.Context) ([]workspac
 
 func (w *SongChartWorkspace) loadWorkspaceCharts(ctx context.Context) ([]workspaceChart, error) {
 	var charts []workspaceChart
-	if err := w.db.SelectContext(ctx, &charts, `SELECT * FROM charts ORDER BY id`); err != nil {
+	if err := w.db.SelectContext(ctx, &charts, `SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer FROM charts ORDER BY id`); err != nil {
 		return nil, fmt.Errorf("failed to load workspace charts: %w", err)
 	}
 
@@ -369,7 +369,7 @@ func (w *SongChartWorkspace) loadWorkspaceCharts(ctx context.Context) ([]workspa
 
 func (w *SongChartWorkspace) loadWorkspaceWorldsendCharts(ctx context.Context) ([]workspaceWorldsendChart, error) {
 	var charts []workspaceWorldsendChart
-	if err := w.db.SelectContext(ctx, &charts, `SELECT * FROM worldsend_charts ORDER BY id`); err != nil {
+	if err := w.db.SelectContext(ctx, &charts, `SELECT id, song_id, level_star, attribute, notes, notes_designer FROM worldsend_charts ORDER BY id`); err != nil {
 		return nil, fmt.Errorf("failed to load workspace worldsend_charts: %w", err)
 	}
 

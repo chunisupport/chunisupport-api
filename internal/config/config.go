@@ -273,7 +273,7 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		config.DataTransferHMACSecret = dataTransferSecret
 	}
 
-	config.SongBatch = LoadSongBatchConfigFromEnv()
+	config.SongBatch = loadSongBatchConfigFromEnv()
 
 	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")

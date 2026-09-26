@@ -38,33 +38,6 @@ func NewSong(
 	}
 }
 
-// ReconstructSong はDBから読み込んだデータでSongを再構築します
-func ReconstructSong(
-	id int,
-	displayID vo.DisplayID,
-	title, artist string,
-	genreID int,
-	officialIdx vo.OfficialIdx,
-	jacket vo.JacketImage,
-	bpm *int,
-	releasedAt vo.ReleaseDate,
-	isWorldsEnd, isDeleted bool,
-) *Song {
-	return &Song{
-		id:          id,
-		displayID:   displayID,
-		title:       title,
-		artist:      artist,
-		genreID:     genreID,
-		officialIdx: officialIdx,
-		jacket:      jacket,
-		bpm:         bpm,
-		releasedAt:  releasedAt,
-		isWorldsEnd: isWorldsEnd,
-		isDeleted:   isDeleted,
-	}
-}
-
 // ID は楽曲IDを返します
 func (s *Song) ID() int { return s.id }
 
@@ -116,10 +89,4 @@ func (s *Song) SetReleasedAt(releasedAt vo.ReleaseDate) {
 // Delete は楽曲を削除済みにします
 func (s *Song) Delete() {
 	s.isDeleted = true
-}
-
-// SetID はDBでの採番後にIDを設定します
-// 注意: このメソッドはインフラ層からのみ使用されるべきです
-func (s *Song) SetID(id int) {
-	s.id = id
 }

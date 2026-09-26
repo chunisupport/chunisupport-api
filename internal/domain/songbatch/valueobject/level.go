@@ -24,11 +24,6 @@ func ParseLevel(s string) (Level, error) {
 	return Level(v), nil
 }
 
-// NewLevel は数値からLevelを生成します
-func NewLevel(v float64) Level {
-	return Level(v)
-}
-
 // Float64 はLevelをfloat64として返します
 func (l Level) Float64() float64 {
 	return float64(l)

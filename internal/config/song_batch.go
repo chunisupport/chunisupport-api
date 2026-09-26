@@ -15,9 +15,9 @@ type SongBatchConfig struct {
 	WikiBaseURL string
 }
 
-// LoadSongBatchConfigFromEnv は楽曲データ収集バッチの設定を環境変数から読み込みます。
+// loadSongBatchConfigFromEnv は楽曲データ収集バッチの設定を環境変数から読み込みます。
 // Wikiページタイトルは補完用途のため、未設定でもバッチ全体は止めません。
-func LoadSongBatchConfigFromEnv() SongBatchConfig {
+func loadSongBatchConfigFromEnv() SongBatchConfig {
 	return SongBatchConfig{
 		WikiBaseURL: strings.TrimSpace(os.Getenv(info.SongBatchEnvWikiBaseURL)),
 	}

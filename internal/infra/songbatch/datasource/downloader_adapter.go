@@ -28,12 +28,10 @@ func (a downloaderAdapter) DownloadAll(ctx context.Context, datasources []usecas
 	out := make([]usecase.SongBatchDownloadResult, len(results))
 	for i, result := range results {
 		out[i] = usecase.SongBatchDownloadResult{
-			Type:      songbatch.DataSourceType(result.Type),
-			Success:   result.Success,
-			Path:      result.Path,
-			FetchedAt: result.FetchedAt,
-			Bytes:     result.Bytes,
-			Error:     result.Error,
+			Type:    songbatch.DataSourceType(result.Type),
+			Success: result.Success,
+			Path:    result.Path,
+			Error:   result.Error,
 		}
 	}
 	return out, nil

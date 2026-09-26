@@ -52,36 +52,3 @@ func TestRemoveBOM(t *testing.T) {
 		})
 	}
 }
-
-func TestTrimBOM(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    []byte
-		expected []byte
-	}{
-		{
-			name:     "UTF-8 BOM",
-			input:    []byte{0xEF, 0xBB, 0xBF, 'h', 'e', 'l', 'l', 'o'},
-			expected: []byte{'h', 'e', 'l', 'l', 'o'},
-		},
-		{
-			name:     "No BOM",
-			input:    []byte{'h', 'e', 'l', 'l', 'o'},
-			expected: []byte{'h', 'e', 'l', 'l', 'o'},
-		},
-		{
-			name:     "Empty data",
-			input:    []byte{},
-			expected: []byte{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := trimBOM(tt.input)
-			if !bytes.Equal(result, tt.expected) {
-				t.Errorf("trimBOM() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}

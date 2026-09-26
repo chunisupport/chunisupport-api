@@ -314,7 +314,7 @@ func TestOfficialConsolidator_Consolidate_EmptyData(t *testing.T) {
 	// 空データ
 	var emptyData importer.OfficialData
 
-	consolidator := NewOfficialConsolidator(db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &emptyData)
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &emptyData)
 
 	err = consolidator.Consolidate(ctx)
 	if err != nil {
@@ -341,7 +341,7 @@ func TestOfficialConsolidator_Consolidate_NilData(t *testing.T) {
 	}
 	defer db.Close()
 
-	consolidator := NewOfficialConsolidator(db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, nil)
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, nil)
 
 	err = consolidator.Consolidate(ctx)
 	if err != nil {
@@ -425,7 +425,7 @@ func TestOfficialConsolidator_Consolidate_InsertsSongs(t *testing.T) {
 		},
 	}
 
-	consolidator := NewOfficialConsolidator(db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
 
 	err = consolidator.Consolidate(ctx)
 	if err != nil {
@@ -559,7 +559,7 @@ func TestOfficialConsolidator_Consolidate_SkipsInvalidData(t *testing.T) {
 		},
 	}
 
-	consolidator := NewOfficialConsolidator(db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
 
 	err = consolidator.Consolidate(ctx)
 	if err != nil {
@@ -642,7 +642,7 @@ func TestPrepareSongsForUpsert(t *testing.T) {
 		},
 	}
 
-	consolidator := NewOfficialConsolidator(db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
 
 	songs, seen := consolidator.prepareSongsForUpsert()
 

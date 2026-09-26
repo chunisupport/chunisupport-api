@@ -7,10 +7,13 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type stubResolver struct {
@@ -382,5 +385,77 @@ func TestExecuteMajorUpdateUsesOnlyRequiredSources(t *testing.T) {
 	}
 	if len(resolver.called) != 2 {
 		t.Fatalf("resolved sources=%v", resolver.called)
+	}
+}
+
+func TestExecute_警告件数と統合順(t *testing.T) {
+	tests := []struct {
+		name             string
+		resolveErrs      map[songbatch.DataSourceType]error
+		downloadFailures []songbatch.DataSourceType
+		importFailures   []songbatch.DataSourceType
+		wantErr          bool
+		expectedWarnings int
+		expectedNames    []string
+	}{
+		{
+			name:          "全データソースを統合順に渡す",
+			expectedNames: []string{"official", "additional_songs", "st1027", "mainframe", "otoge_db"},
+		},
+		{
+			name:             "解決・取得・検証の各段階で除外した補完ソースを1件ずつ数える",
+			resolveErrs:      map[songbatch.DataSourceType]error{songbatch.DataSourceSt1027: errors.New("missing env")},
+			downloadFailures: []songbatch.DataSourceType{songbatch.DataSourceOtogeDb},
+			expectedWarnings: 2,
+			expectedNames:    []string{"official", "additional_songs", "mainframe"},
+		},
+		{
+			name:             "必須ソースの失敗時もそれまでの警告件数を返す",
+			resolveErrs:      map[songbatch.DataSourceType]error{songbatch.DataSourceSt1027: errors.New("missing env")},
+			importFailures:   []songbatch.DataSourceType{songbatch.DataSourceOtogeDb, songbatch.DataSourceMainframe},
+			wantErr:          true,
+			expectedWarnings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			consolidator := &stubConsolidator{}
+			var tempDir string
+			uc := newUsecase(
+				&stubResolver{sources: allResolved(), errs: tt.resolveErrs},
+				func(outputDir string, datasources []SongBatchDatasourceRef) ([]SongBatchDownloadResult, error) {
+					results, _ := successfulDownloads(t, outputDir, datasources)
+					for i := range results {
+						if slices.Contains(tt.downloadFailures, results[i].Type) {
+							results[i] = SongBatchDownloadResult{Type: results[i].Type, Error: "timeout"}
+						}
+					}
+					return results, nil
+				},
+				func(sourceType songbatch.DataSourceType, _ string) (*songbatch.ImportedSource, error) {
+					if slices.Contains(tt.importFailures, sourceType) {
+						return nil, errors.New("invalid JSON")
+					}
+					return successfulImport(sourceType), nil
+				},
+				consolidator,
+				&tempDir,
+			)
+
+			// When
+			result, err := uc.Execute(context.Background(), songbatch.NewRunRequest(false, false))
+
+			// Then
+			assert.Equal(t, tt.expectedWarnings, result.WarningCount)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.False(t, consolidator.called)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedNames, consolidator.names())
+		})
 	}
 }

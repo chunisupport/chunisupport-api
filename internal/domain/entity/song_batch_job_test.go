@@ -95,9 +95,10 @@ func TestSongBatchJob_Finish(t *testing.T) {
 			expectedErrorMessage: "required datasource official failed",
 		},
 		{
-			name:           "中断すると中断状態になる",
-			finish:         func(job *SongBatchJob) error { return job.Interrupt(finishedAt) },
-			expectedStatus: SongBatchJobStatusInterrupted,
+			name:                 "中断すると中断までの警告件数とともに中断状態になる",
+			finish:               func(job *SongBatchJob) error { return job.Interrupt(1, finishedAt) },
+			expectedStatus:       SongBatchJobStatusInterrupted,
+			expectedWarningCount: 1,
 		},
 	}
 
@@ -130,7 +131,7 @@ func TestSongBatchJob_FinishedJobCannotTransition(t *testing.T) {
 	}{
 		{name: "完了済みジョブは再度完了できない", finish: func(job *SongBatchJob) error { return job.Complete(0, finishedAt) }},
 		{name: "完了済みジョブは失敗にできない", finish: func(job *SongBatchJob) error { return job.Fail(0, "error", finishedAt) }},
-		{name: "完了済みジョブは中断にできない", finish: func(job *SongBatchJob) error { return job.Interrupt(finishedAt) }},
+		{name: "完了済みジョブは中断にできない", finish: func(job *SongBatchJob) error { return job.Interrupt(0, finishedAt) }},
 	}
 
 	for _, tt := range tests {

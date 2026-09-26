@@ -9,7 +9,7 @@ import (
 
 func TestNewSong(t *testing.T) {
 	t.Run("正常系: 新しいSongが生成される", func(t *testing.T) {
-		displayID := vo.MustNewDisplayID()
+		displayID := vo.DisplayID("0123456789abcdef")
 		officialIdx, _ := vo.NewOfficialIdx("12345")
 
 		song := entity.NewSong(
@@ -48,7 +48,7 @@ func TestNewSong(t *testing.T) {
 	})
 
 	t.Run("正常系: WORLD'S END楽曲として生成", func(t *testing.T) {
-		displayID := vo.MustNewDisplayID()
+		displayID := vo.DisplayID("0123456789abcdef")
 		officialIdx, _ := vo.NewOfficialIdx("67890")
 
 		song := entity.NewSong(
@@ -67,7 +67,7 @@ func TestNewSong(t *testing.T) {
 }
 
 func TestSong_SetJacket(t *testing.T) {
-	displayID := vo.MustNewDisplayID()
+	displayID := vo.DisplayID("0123456789abcdef")
 	officialIdx, _ := vo.NewOfficialIdx("12345")
 
 	song := entity.NewSong(displayID, "Test", "Test", 1, officialIdx, false)
@@ -81,7 +81,7 @@ func TestSong_SetJacket(t *testing.T) {
 }
 
 func TestSong_SetBPM(t *testing.T) {
-	displayID := vo.MustNewDisplayID()
+	displayID := vo.DisplayID("0123456789abcdef")
 	officialIdx, _ := vo.NewOfficialIdx("12345")
 
 	song := entity.NewSong(displayID, "Test", "Test", 1, officialIdx, false)
@@ -96,7 +96,7 @@ func TestSong_SetBPM(t *testing.T) {
 }
 
 func TestSong_SetReleasedAt(t *testing.T) {
-	displayID := vo.MustNewDisplayID()
+	displayID := vo.DisplayID("0123456789abcdef")
 	officialIdx, _ := vo.NewOfficialIdx("12345")
 
 	song := entity.NewSong(displayID, "Test", "Test", 1, officialIdx, false)
@@ -110,7 +110,7 @@ func TestSong_SetReleasedAt(t *testing.T) {
 }
 
 func TestSong_Delete(t *testing.T) {
-	displayID := vo.MustNewDisplayID()
+	displayID := vo.DisplayID("0123456789abcdef")
 	officialIdx, _ := vo.NewOfficialIdx("12345")
 
 	song := entity.NewSong(displayID, "Test", "Test", 1, officialIdx, false)
@@ -124,47 +124,4 @@ func TestSong_Delete(t *testing.T) {
 	if !song.IsDeleted() {
 		t.Error("IsDeleted() = false after Delete(), want true")
 	}
-}
-
-func TestReconstructSong(t *testing.T) {
-	t.Run("正常系: DBからSongを再構築", func(t *testing.T) {
-		displayID := vo.ReconstructDisplayID("abc123def456")
-		officialIdx := vo.ReconstructOfficialIdx("12345")
-		jacket := vo.ReconstructJacketImage("jacket123")
-		bpm := 180
-		releasedAt := vo.ReconstructReleaseDate("2024-01-15")
-
-		song := entity.ReconstructSong(
-			100,
-			displayID,
-			"Reconstructed Song",
-			"Reconstructed Artist",
-			3,
-			officialIdx,
-			jacket,
-			&bpm,
-			releasedAt,
-			true,
-			false,
-		)
-
-		if song.ID() != 100 {
-			t.Errorf("ID() = %v, want 100", song.ID())
-		}
-		if song.DisplayID() != displayID {
-			t.Errorf("DisplayID() = %v, want %v", song.DisplayID(), displayID)
-		}
-		if song.Jacket() != jacket {
-			t.Errorf("Jacket() = %v, want %v", song.Jacket(), jacket)
-		}
-		if song.BPM() == nil || *song.BPM() != bpm {
-			t.Errorf("BPM() = %v, want %v", song.BPM(), bpm)
-		}
-		if song.ReleasedAt() != releasedAt {
-			t.Errorf("ReleasedAt() = %v, want %v", song.ReleasedAt(), releasedAt)
-		}
-		if !song.IsWorldsEnd() {
-			t.Error("IsWorldsEnd() = false, want true")
-		}
-	})
 }

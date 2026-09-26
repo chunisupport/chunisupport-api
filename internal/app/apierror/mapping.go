@@ -113,6 +113,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrVersionNotLatest.WithInternal(err)
 	case errors.Is(err, usecase.ErrVersionInUse):
 		return ErrVersionInUse.WithInternal(err)
+	case errors.Is(err, usecase.ErrSongBatchUnavailable):
+		return ErrServiceUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrSongBatchAlreadyRunning):
 		return ErrSongBatchAlreadyRunning.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidSongBatchJobID):

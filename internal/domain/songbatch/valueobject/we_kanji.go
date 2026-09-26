@@ -22,11 +22,6 @@ func NewWeKanji(s string) WeKanji {
 	return WeKanji(string(r))
 }
 
-// ReconstructWeKanji はDBから読み込んだ文字列からWeKanjiを復元します
-func ReconstructWeKanji(s string) WeKanji {
-	return WeKanji(s)
-}
-
 // String はWeKanjiを文字列として返します
 func (w WeKanji) String() string {
 	return string(w)

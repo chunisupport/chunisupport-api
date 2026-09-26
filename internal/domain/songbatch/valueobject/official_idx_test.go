@@ -33,16 +33,6 @@ func TestNewOfficialIdx(t *testing.T) {
 	}
 }
 
-func TestReconstructOfficialIdx(t *testing.T) {
-	t.Run("正常系: 文字列からOfficialIdxを復元", func(t *testing.T) {
-		original := "123"
-		idx := valueobject.ReconstructOfficialIdx(original)
-		if idx.String() != original {
-			t.Errorf("expected %s, got %s", original, idx.String())
-		}
-	})
-}
-
 func TestOfficialIdx_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string

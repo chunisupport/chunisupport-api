@@ -34,13 +34,13 @@ type OfficialConsolidator struct {
 }
 
 // NewOfficialConsolidator は新しいOfficialConsolidatorのインスタンスを生成します。
-func NewOfficialConsolidator(db apirepo.Executor, difficultyRepo songbatch.DifficultyRepository, genreRepo songbatch.GenreRepository, workspace *songchart.SongChartWorkspace, data *importer.OfficialData) *OfficialConsolidator {
-	difficultyMap, err := loadDifficultyMap(context.Background(), difficultyRepo)
+func NewOfficialConsolidator(ctx context.Context, db apirepo.Executor, difficultyRepo songbatch.DifficultyRepository, genreRepo songbatch.GenreRepository, workspace *songchart.SongChartWorkspace, data *importer.OfficialData) *OfficialConsolidator {
+	difficultyMap, err := loadDifficultyMap(ctx, difficultyRepo)
 	if err != nil {
 		slog.Warn("Failed to load chart difficulties; falling back to defaults", "error", err)
 		difficultyMap = defaultDifficultyMap()
 	}
-	genreMap, err := loadGenreMap(context.Background(), genreRepo)
+	genreMap, err := loadGenreMap(ctx, genreRepo)
 	if err != nil {
 		slog.Warn("Failed to load genres; official genre assignment may be incomplete", "error", err)
 		genreMap = make(map[string]int)

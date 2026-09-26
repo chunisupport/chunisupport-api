@@ -17,11 +17,6 @@ func NewOfficialIdx(s string) (OfficialIdx, error) {
 	return OfficialIdx(s), nil
 }
 
-// ReconstructOfficialIdx はDBから読み込んだ文字列からOfficialIdxを復元します
-func ReconstructOfficialIdx(s string) OfficialIdx {
-	return OfficialIdx(s)
-}
-
 // String はOfficialIdxを文字列として返します
 func (o OfficialIdx) String() string {
 	return string(o)

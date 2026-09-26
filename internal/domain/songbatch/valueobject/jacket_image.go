@@ -16,11 +16,6 @@ func NewJacketImage(s string) JacketImage {
 	return JacketImage(s)
 }
 
-// ReconstructJacketImage はDBから読み込んだ文字列からJacketImageを復元します
-func ReconstructJacketImage(s string) JacketImage {
-	return JacketImage(s)
-}
-
 // String はJacketImageを文字列として返します
 func (j JacketImage) String() string {
 	return string(j)

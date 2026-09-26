@@ -19,6 +19,8 @@ var (
 	ErrSongBatchAlreadyRunning = errors.New("song batch is already running")
 	// ErrInvalidSongBatchJobID はジョブIDの形式が不正であることを表します。
 	ErrInvalidSongBatchJobID = errors.New("invalid song batch job id")
+	// ErrSongBatchUnavailable はサーバー停止処理中のため新しいジョブを受け付けられないことを表します。
+	ErrSongBatchUnavailable = errors.New("song batch is unavailable")
 )
 
 // SongBatchRunner は楽曲バッチ1回分を実行します。
@@ -35,7 +37,11 @@ type SongBatchJobUsecase struct {
 	runner        SongBatchRunner
 	denominator   repository.OverpowerDenominatorProvider
 	now           func() time.Time
-	wg            sync.WaitGroup
+
+	// mu は受付停止の判定と WaitGroup への登録を不可分にし、Wait 中の登録を防ぎます。
+	mu     sync.Mutex
+	closed bool
+	wg     sync.WaitGroup
 }
 
 // NewSongBatchJobUsecase は SongBatchJobUsecase を生成します。
@@ -73,6 +79,13 @@ func (u *SongBatchJobUsecase) RunFromCLI(ctx context.Context, req songbatch.RunR
 // StartFromAdmin は管理画面からの実行要求を受け付け、バックグラウンドで楽曲バッチを実行します。
 // 処理には数分かかるため、ジョブを記録した時点で呼び出し元へ返し、結果は履歴から確認させます。
 func (u *SongBatchJobUsecase) StartFromAdmin(ctx context.Context, requester entity.SongBatchJobRequester, req songbatch.RunRequest) (*entity.SongBatchJob, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	// 停止シグナル後に受け付けても即座に中断されるだけのため、ロックを取る前に拒否する
+	if u.closed || u.backgroundCtx.Err() != nil {
+		return nil, ErrSongBatchUnavailable
+	}
+
 	lock, job, acquired, err := u.begin(ctx, func(id uuid.UUID, startedAt time.Time) *entity.SongBatchJob {
 		return entity.StartSongBatchJobFromAdmin(id, req, requester, startedAt)
 	})
@@ -91,9 +104,12 @@ func (u *SongBatchJobUsecase) StartFromAdmin(ctx context.Context, requester enti
 	return &started, nil
 }
 
-// Wait はバックグラウンドで実行中のジョブが結果を記録し終えるまで待ちます。
+// Wait は新しいジョブの受付を停止し、バックグラウンドで実行中のジョブが結果を記録し終えるまで待ちます。
 // サーバー停止時、DB接続を閉じる前に呼び出します。
 func (u *SongBatchJobUsecase) Wait() {
+	u.mu.Lock()
+	u.closed = true
+	u.mu.Unlock()
 	u.wg.Wait()
 }
 
@@ -123,18 +139,19 @@ func (u *SongBatchJobUsecase) begin(
 	}
 
 	if err := u.interruptOrphanedJobs(ctx); err != nil {
-		u.releaseLock(ctx, lock)
+		u.releaseLockAfterFailure(ctx, lock)
 		return nil, nil, false, err
 	}
 	job := newJob(uuid.NewV4(), u.now())
 	if err := u.jobRepo.Save(ctx, job); err != nil {
-		u.releaseLock(ctx, lock)
+		u.releaseLockAfterFailure(ctx, lock)
 		return nil, nil, false, err
 	}
 	return lock, job, true, nil
 }
 
 // interruptOrphanedJobs はプロセス停止などで終了を記録できなかったジョブを中断扱いにします。
+// MySQL 同期のコミット直後に停止した可能性もあるため、取り残されたジョブの同期結果は不明として扱います。
 // ロックを取得できた時点で他に実行中の楽曲バッチは存在しないため、RUNNING のまま残った行はすべて取り残されたものです。
 // 取得のたびに片付けるため対象は通常0件で、多くても数件に限られます。
 func (u *SongBatchJobUsecase) interruptOrphanedJobs(ctx context.Context) error {
@@ -143,7 +160,7 @@ func (u *SongBatchJobUsecase) interruptOrphanedJobs(ctx context.Context) error {
 		return err
 	}
 	for _, orphan := range orphans {
-		if err := orphan.Interrupt(u.now()); err != nil {
+		if err := orphan.Interrupt(orphan.WarningCount(), u.now()); err != nil {
 			return err
 		}
 		if err := u.jobRepo.Save(ctx, orphan); err != nil {
@@ -173,7 +190,7 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 		finishErr = job.Complete(result.WarningCount, finishedAt)
 		logger.Info("楽曲バッチが完了しました", "status", job.Status(), "warning_count", result.WarningCount)
 	case ctx.Err() != nil:
-		finishErr = job.Interrupt(finishedAt)
+		finishErr = job.Interrupt(result.WarningCount, finishedAt)
 		logger.Warn("楽曲バッチが中断されました", "error", execErr)
 	default:
 		finishErr = job.Fail(result.WarningCount, execErr.Error(), finishedAt)
@@ -191,8 +208,17 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	return execErr
 }
 
+// releaseLockAfterFailure はジョブ開始前の失敗時にロックを解放します。
+// リクエストのキャンセルに関係なく解放できるよう、期限だけを持つ context を使います。
+func (u *SongBatchJobUsecase) releaseLockAfterFailure(ctx context.Context, lock repository.BatchLock) {
+	releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
+	defer cancel()
+	u.releaseLock(releaseCtx, lock)
+}
+
+// releaseLock はロックを解放します。ctx には期限付きの context を渡します。
 func (u *SongBatchJobUsecase) releaseLock(ctx context.Context, lock repository.BatchLock) {
-	if err := lock.Release(context.WithoutCancel(ctx)); err != nil {
+	if err := lock.Release(ctx); err != nil {
 		slog.Error("楽曲バッチのロック解放に失敗しました", "error", err)
 	}
 }

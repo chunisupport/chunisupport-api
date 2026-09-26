@@ -50,13 +50,3 @@ func TestDisplayID_IsEmpty(t *testing.T) {
 		})
 	}
 }
-
-func TestReconstructDisplayID(t *testing.T) {
-	t.Run("正常系: 文字列からDisplayIDを復元", func(t *testing.T) {
-		original := "abc123def456"
-		id := valueobject.ReconstructDisplayID(original)
-		if id.String() != original {
-			t.Errorf("expected %s, got %s", original, id.String())
-		}
-	})
-}

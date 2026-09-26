@@ -633,11 +633,12 @@ Content-Type: application/json
 
 - CLI（cron）と同じ MySQL アドバイザリロックを使うため、CLI・管理画面のどちらかで楽曲バッチが実行中の場合は受け付けません。
 - データソースの URL とシート ID は API プロセスの環境変数から解決します。環境変数を変更した場合は API の再起動後に反映されます。
-- API の停止時に実行中だったジョブはキャンセルされ、MySQL への同期はロールバックされて `INTERRUPTED` になります。
+- API の停止時に実行中だったジョブはキャンセルされ、MySQL への同期はロールバックされて `INTERRUPTED` になります。停止処理が始まった後の要求は 503 Service Unavailable (`service_unavailable`) で拒否します。
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド
   - 400 Bad Request (`invalid_song_batch_mode`): `mode` が未指定または未定義
   - 409 Conflict (`song_batch_already_running`): 楽曲バッチが実行中
+  - 503 Service Unavailable (`service_unavailable`): API の停止処理中
 
 #### GET `/internal/admin/song-batch/jobs`
 
@@ -675,7 +676,7 @@ Content-Type: application/json
 | `warning_count` | integer | 利用できず除外した補完データソースの件数 |
 | `error_message` | string \| null | 失敗理由（最大1,000文字）。失敗以外は `null` |
 
-`FAILED` と `INTERRUPTED` の場合、MySQL の楽曲・譜面データは更新されていません。
+`FAILED` の場合、MySQL の楽曲・譜面データは更新されていません。`INTERRUPTED` のうち、API の停止などで実行中にキャンセルされたものはロールバック済みです。プロセスの異常終了で `RUNNING` のまま残り、次の実行時に `INTERRUPTED` へ更新したものは、同期の成否が不明です。
 
 #### GET `/internal/admin/song-batch/jobs/:id`
 

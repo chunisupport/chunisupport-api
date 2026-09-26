@@ -44,19 +44,6 @@ func WeStarFromOfficialValue(officialValue int) (WeStar, error) {
 	}
 }
 
-// NewWeStar は直接の星数（1-5）からWeStarを生成します
-func NewWeStar(star int) (WeStar, error) {
-	if star < 0 || star > 5 {
-		return 0, fmt.Errorf("we_star must be between 0 and 5, got %d", star)
-	}
-	return WeStar(star), nil
-}
-
-// ReconstructWeStar はDBから読み込んだ値からWeStarを復元します
-func ReconstructWeStar(star int) WeStar {
-	return WeStar(star)
-}
-
 // Int はWeStarをintとして返します
 func (w WeStar) Int() int {
 	return int(w)

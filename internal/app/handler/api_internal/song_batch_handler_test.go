@@ -185,7 +185,6 @@ func TestSongBatchHandler_Get(t *testing.T) {
 	}{
 		{name: "存在するジョブは200", expectedStatus: http.StatusOK},
 		{name: "存在しないジョブは404", getErr: repository.ErrSongBatchJobNotFound, expectedStatus: http.StatusNotFound, expectedCode: apierror.CodeSongBatchJobNotFound},
-		{name: "不正なIDは400", getErr: usecase.ErrInvalidSongBatchJobID, expectedStatus: http.StatusBadRequest, expectedCode: apierror.CodeInvalidSongBatchJobID},
 	}
 
 	for _, tt := range tests {

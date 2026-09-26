@@ -69,29 +69,6 @@ func TestWeStarFromOfficialValue(t *testing.T) {
 	}
 }
 
-func TestNewWeStar(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   int
-		wantErr bool
-	}{
-		{"星0", 0, false},
-		{"星1", 1, false},
-		{"星5", 5, false},
-		{"星6（範囲外）", 6, true},
-		{"負の値", -1, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := valueobject.NewWeStar(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewWeStar() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestWeStar_IntPtr(t *testing.T) {
 	tests := []struct {
 		name      string

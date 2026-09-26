@@ -115,6 +115,28 @@ func TestSongBatchJobRepository_Save_既存ジョブを更新する(t *testing.T
 	assert.Equal(t, 1, count)
 }
 
+func TestSongBatchJobRepository_Save_終了済みのジョブは上書きしない(t *testing.T) {
+	// Given: 取り残されたジョブとして中断扱いにした行
+	db := setupSongBatchJobRepositorySQLite(t)
+	repo := NewSongBatchJobRepository(db)
+	id := uuid.NewV4()
+	orphan := entity.StartSongBatchJobFromCLI(id, songbatch.NewRunRequest(false, false), songBatchJobRepoStartedAt)
+	require.NoError(t, repo.Save(context.Background(), orphan))
+	require.NoError(t, orphan.Interrupt(0, songBatchJobRepoStartedAt.Add(time.Hour)))
+	require.NoError(t, repo.Save(context.Background(), orphan))
+	late := entity.StartSongBatchJobFromCLI(id, songbatch.NewRunRequest(false, false), songBatchJobRepoStartedAt)
+	require.NoError(t, late.Complete(0, songBatchJobRepoStartedAt.Add(2*time.Hour)))
+
+	// When: ロックを失った元のプロセスが後から成功を記録しようとする
+	err := repo.Save(context.Background(), late)
+
+	// Then
+	assert.Error(t, err)
+	found, err := repo.FindByID(context.Background(), id)
+	require.NoError(t, err)
+	assert.Equal(t, entity.SongBatchJobStatusInterrupted, found.Status())
+}
+
 func TestSongBatchJobRepository_FindByID_存在しない場合は専用エラーを返す(t *testing.T) {
 	// Given
 	db := setupSongBatchJobRepositorySQLite(t)

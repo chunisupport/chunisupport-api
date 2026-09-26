@@ -1,7 +1,5 @@
 package importer
 
-import "bytes"
-
 // removeBOM はByte Order Mark (BOM)をデータから除去します。
 // UTF-8 BOM (EF BB BF) を検出して削除します。
 func removeBOM(data []byte) []byte {
@@ -18,9 +16,4 @@ func removeBOM(data []byte) []byte {
 		return data[2:]
 	}
 	return data
-}
-
-// trimBOM はバイトスライスの先頭からBOMを除去します（bytes.Trimを使用）
-func trimBOM(data []byte) []byte {
-	return bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
 }

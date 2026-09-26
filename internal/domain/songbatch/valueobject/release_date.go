@@ -28,11 +28,6 @@ func ParseReleaseDate(s string) (ReleaseDate, error) {
 	return ReleaseDate(normalized), nil
 }
 
-// ReconstructReleaseDate はDBから読み込んだ文字列からReleaseDateを復元します
-func ReconstructReleaseDate(s string) ReleaseDate {
-	return ReleaseDate(s)
-}
-
 // String はReleaseDateを文字列として返します（YYYY-MM-DD形式）
 func (r ReleaseDate) String() string {
 	return string(r)

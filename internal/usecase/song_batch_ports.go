@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 )
@@ -17,12 +16,10 @@ type SongBatchDatasourceRef struct {
 
 // SongBatchDownloadResult はデータソース単位の取得結果です。
 type SongBatchDownloadResult struct {
-	Type      songbatch.DataSourceType
-	Success   bool
-	Path      string
-	FetchedAt time.Time
-	Bytes     int64
-	Error     string
+	Type    songbatch.DataSourceType
+	Success bool
+	Path    string
+	Error   string
 }
 
 // SongBatchDatasourceResolver はデータソース定義を解決します。

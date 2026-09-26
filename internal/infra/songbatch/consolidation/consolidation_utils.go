@@ -243,10 +243,6 @@ func BulkUpdateChartNotesInBatches(ctx context.Context, db sqlx.ExtContext, reco
 		return 0, nil
 	}
 
-	if info.SongBatchSQLiteCompoundSelectLimit <= 0 {
-		return 0, fmt.Errorf("invalid SQLiteCompoundSelectLimit: %d", info.SongBatchSQLiteCompoundSelectLimit)
-	}
-
 	var totalAffected int64
 	for i := 0; i < len(records); i += info.SongBatchSQLiteCompoundSelectLimit {
 		if err := ctx.Err(); err != nil {
@@ -285,10 +281,6 @@ func ExecuteBulkUpdateChartNotesDesigner(ctx context.Context, db sqlx.ExtContext
 func BulkUpdateChartNotesDesignerInBatches(ctx context.Context, db sqlx.ExtContext, records []ChartNotesDesignerRecord) (int64, error) {
 	if len(records) == 0 {
 		return 0, nil
-	}
-
-	if info.SongBatchSQLiteCompoundSelectLimit <= 0 {
-		return 0, fmt.Errorf("invalid SQLiteCompoundSelectLimit: %d", info.SongBatchSQLiteCompoundSelectLimit)
 	}
 
 	var totalAffected int64
@@ -345,10 +337,6 @@ func BulkUpdateWorldsendChartNotesInBatches(ctx context.Context, db sqlx.ExtCont
 		return 0, nil
 	}
 
-	if info.SongBatchSQLiteCompoundSelectLimit <= 0 {
-		return 0, fmt.Errorf("invalid SQLiteCompoundSelectLimit: %d", info.SongBatchSQLiteCompoundSelectLimit)
-	}
-
 	var totalAffected int64
 	for i := 0; i < len(records); i += info.SongBatchSQLiteCompoundSelectLimit {
 		if err := ctx.Err(); err != nil {
@@ -389,10 +377,6 @@ func BulkUpdateWorldsendChartNotesDesignerInBatches(ctx context.Context, db sqlx
 		return 0, nil
 	}
 
-	if info.SongBatchSQLiteCompoundSelectLimit <= 0 {
-		return 0, fmt.Errorf("invalid SQLiteCompoundSelectLimit: %d", info.SongBatchSQLiteCompoundSelectLimit)
-	}
-
 	var totalAffected int64
 	for i := 0; i < len(records); i += info.SongBatchSQLiteCompoundSelectLimit {
 		if err := ctx.Err(); err != nil {
@@ -431,10 +415,6 @@ func ExecuteBulkUpdateSongWikiPageTitles(ctx context.Context, db sqlx.ExtContext
 func BulkUpdateSongWikiPageTitlesInBatches(ctx context.Context, db sqlx.ExtContext, records []SongWikiPageTitleRecord) (int64, error) {
 	if len(records) == 0 {
 		return 0, nil
-	}
-
-	if info.SongBatchSQLiteCompoundSelectLimit <= 0 {
-		return 0, fmt.Errorf("invalid SQLiteCompoundSelectLimit: %d", info.SongBatchSQLiteCompoundSelectLimit)
 	}
 
 	var totalAffected int64

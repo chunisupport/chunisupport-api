@@ -29,7 +29,7 @@ func TestLoadSongBatchConfigFromEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv(info.SongBatchEnvWikiBaseURL, tt.value)
 
-			got := LoadSongBatchConfigFromEnv()
+			got := loadSongBatchConfigFromEnv()
 
 			assert.Equal(t, tt.expected, got)
 		})

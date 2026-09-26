@@ -51,13 +51,13 @@ type AdditionalSongsConsolidator struct {
 }
 
 // NewAdditionalSongsConsolidator は新しいAdditionalSongsConsolidatorのインスタンスを生成します。
-func NewAdditionalSongsConsolidator(db apirepo.Executor, difficultyRepo songbatch.DifficultyRepository, genreRepo songbatch.GenreRepository, workspace *songchart.SongChartWorkspace, data *importer.AdditionalSongsData) *AdditionalSongsConsolidator {
-	difficultyMap, err := loadDifficultyMap(context.Background(), difficultyRepo)
+func NewAdditionalSongsConsolidator(ctx context.Context, db apirepo.Executor, difficultyRepo songbatch.DifficultyRepository, genreRepo songbatch.GenreRepository, workspace *songchart.SongChartWorkspace, data *importer.AdditionalSongsData) *AdditionalSongsConsolidator {
+	difficultyMap, err := loadDifficultyMap(ctx, difficultyRepo)
 	if err != nil {
 		slog.Warn("Failed to load chart difficulties; falling back to defaults", "error", err)
 		difficultyMap = defaultDifficultyMap()
 	}
-	genreMap, err := loadGenreMap(context.Background(), genreRepo)
+	genreMap, err := loadGenreMap(ctx, genreRepo)
 	if err != nil {
 		slog.Warn("Failed to load genres; additional_songs genre assignment may be incomplete", "error", err)
 		genreMap = make(map[string]int)

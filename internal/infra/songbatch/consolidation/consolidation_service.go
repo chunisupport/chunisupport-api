@@ -131,14 +131,14 @@ func (s *ConsolidationService) consolidateSource(ctx context.Context, workspace 
 			slog.Warn("Skipping official consolidation due to missing data")
 			return nil
 		}
-		consolidator := NewOfficialConsolidator(s.db, s.difficultyRepo, s.genreRepo, workspace, s.sources.Official)
+		consolidator := NewOfficialConsolidator(ctx, s.db, s.difficultyRepo, s.genreRepo, workspace, s.sources.Official)
 		return consolidator.Consolidate(ctx)
 	case songbatch.DataSourceAdditionalSongs:
 		if s.sources.AdditionalSongs == nil {
 			slog.Warn("Skipping additional_songs consolidation due to missing data")
 			return nil
 		}
-		consolidator := NewAdditionalSongsConsolidator(s.db, s.difficultyRepo, s.genreRepo, workspace, s.sources.AdditionalSongs)
+		consolidator := NewAdditionalSongsConsolidator(ctx, s.db, s.difficultyRepo, s.genreRepo, workspace, s.sources.AdditionalSongs)
 		return consolidator.Consolidate(ctx)
 	case songbatch.DataSourceSt1027:
 		if s.sources.St1027 == nil {
@@ -168,6 +168,7 @@ func (s *ConsolidationService) consolidateSource(ctx context.Context, workspace 
 }
 
 // assignSource は取り込み済みデータをデータソースの種類に応じた型で保持します。
+// インポーターはデータソースの種類に対応する型だけを返すため、型の不一致は実装の誤りとしてエラーにします。
 func assignSource(sources *ConsolidationSources, source songbatch.ImportedSource) error {
 	switch source.Type {
 	case songbatch.DataSourceOfficial:

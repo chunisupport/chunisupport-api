@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch/entity"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // difficultyRepositoryImpl は DifficultyRepository のインフラ層実装です。
@@ -49,9 +50,8 @@ func (r *courseRepositoryImpl) SaveAll(ctx context.Context, courses []entity.Cou
 		return fmt.Errorf("error during course classes iteration: %w", err)
 	}
 
-	const chunkSize = 500
-	for start := 0; start < len(courses); start += chunkSize {
-		end := min(start+chunkSize, len(courses))
+	for start := 0; start < len(courses); start += info.SongBatchBulkInsertChunkSize {
+		end := min(start+info.SongBatchBulkInsertChunkSize, len(courses))
 		chunk := courses[start:end]
 		values := make([]string, len(chunk))
 		args := make([]any, 0, len(chunk)*4)

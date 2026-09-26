@@ -34,7 +34,8 @@ const (
 	// SongBatchJobStatusFailed は処理を完了できず、MySQL を更新しなかったことを表します。
 	SongBatchJobStatusFailed SongBatchJobStatus = "FAILED"
 	// SongBatchJobStatusInterrupted はプロセス停止などで処理が中断されたことを表します。
-	// MySQL への同期は単一トランザクションのため、中断時はロールバック済みです。
+	// 実行中のキャンセルで中断した場合、MySQL への同期は単一トランザクションのためロールバック済みです。
+	// 終了を記録できずに取り残されたジョブを後から中断扱いにした場合は、同期の成否は不明です。
 	SongBatchJobStatusInterrupted SongBatchJobStatus = "INTERRUPTED"
 )
 
@@ -189,9 +190,12 @@ func (j *SongBatchJob) Fail(warningCount int, message string, finishedAt time.Ti
 	return j.finish(SongBatchJobStatusFailed, warningCount, message, finishedAt)
 }
 
-// Interrupt は処理の中断を記録します。
-func (j *SongBatchJob) Interrupt(finishedAt time.Time) error {
-	return j.finish(SongBatchJobStatusInterrupted, j.warningCount, "", finishedAt)
+// Interrupt は処理の中断を記録します。中断までに除外した補完データソースの件数も保持します。
+func (j *SongBatchJob) Interrupt(warningCount int, finishedAt time.Time) error {
+	if warningCount < 0 {
+		return ErrInvalidSongBatchJob
+	}
+	return j.finish(SongBatchJobStatusInterrupted, warningCount, "", finishedAt)
 }
 
 func (j *SongBatchJob) finish(status SongBatchJobStatus, warningCount int, message string, finishedAt time.Time) error {

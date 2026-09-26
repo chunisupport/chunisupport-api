@@ -25,6 +25,12 @@ func TestFromUsecaseError_楽曲バッチ関連エラー(t *testing.T) {
 			expectedCode:   CodeSongBatchAlreadyRunning,
 		},
 		{
+			name:           "サーバー停止処理中は503",
+			err:            usecase.ErrSongBatchUnavailable,
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   CodeServiceUnavailable,
+		},
+		{
 			name:           "ジョブIDが不正な場合は400",
 			err:            usecase.ErrInvalidSongBatchJobID,
 			expectedStatus: http.StatusBadRequest,

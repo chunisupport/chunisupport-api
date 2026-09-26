@@ -31,15 +31,18 @@ func NewSongBatchJobRepository(db *sqlx.DB) domainrepo.SongBatchJobRepository {
 	return &songBatchJobRepository{db: db}
 }
 
-// Save はジョブを更新し、存在しなければ新規作成します。
+// Save は実行中のジョブを更新し、存在しなければ新規作成します。
 // ジョブの作成と終了記録は楽曲バッチのアドバイザリロック取得中に行うため、同一IDへの同時保存は発生しません。
+// 終了済みの行は更新しないため、取り残されたジョブとして中断扱いにした行を、ロックを失った元のプロセスが上書きすることもありません
+// （その場合は INSERT が主キー重複で失敗します）。
+// 本番のDSNは clientFoundRows=true のため、値が変わらない UPDATE でもマッチした行数が返り、存在判定に使えます。
 func (r *songBatchJobRepository) Save(ctx context.Context, job *entity.SongBatchJob) error {
 	model := models.FromSongBatchJobEntity(job)
 	result, err := r.db.ExecContext(ctx, `
 UPDATE song_batch_jobs
 SET status = ?, finished_at = ?, warning_count = ?, error_message = ?
-WHERE id = ?
-`, model.Status, model.FinishedAt, model.WarningCount, model.ErrorMessage, model.ID)
+WHERE id = ? AND status = ?
+`, model.Status, model.FinishedAt, model.WarningCount, model.ErrorMessage, model.ID, string(entity.SongBatchJobStatusRunning))
 	if err != nil {
 		return err
 	}

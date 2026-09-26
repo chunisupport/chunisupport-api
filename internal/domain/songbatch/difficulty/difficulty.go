@@ -40,8 +40,3 @@ func ParseName(name string) ID {
 func (d ID) Int() int {
 	return int(d)
 }
-
-// Int8 はIDをint8に変換します。
-func (d ID) Int8() int8 {
-	return int8(d)
-}
