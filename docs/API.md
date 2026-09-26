@@ -642,7 +642,7 @@ Content-Type: application/json
 
 #### GET `/internal/admin/song-batch/jobs`
 
-開始日時の新しい順に直近20件の実行履歴を返します。CLI（cron）から実行したものも含みます。
+開始日時の新しい順に実行履歴を返します（最大50件）。CLI（cron）から実行したものも含みます。実行履歴は最新50件だけを保持し、新しいジョブを記録した時点でそれより古いジョブを削除します。
 
 ```json
 {

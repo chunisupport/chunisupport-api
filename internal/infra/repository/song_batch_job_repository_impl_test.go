@@ -10,6 +10,7 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,6 +136,35 @@ func TestSongBatchJobRepository_Save_終了済みのジョブは上書きしな�
 	found, err := repo.FindByID(context.Background(), id)
 	require.NoError(t, err)
 	assert.Equal(t, entity.SongBatchJobStatusInterrupted, found.Status())
+}
+
+func TestSongBatchJobRepository_Save_上限を超えた古いジョブを削除する(t *testing.T) {
+	// Given: 上限件数まで保存済み
+	db := setupSongBatchJobRepositorySQLite(t)
+	repo := NewSongBatchJobRepository(db)
+	var oldestID uuid.UUID
+	for i := range info.SongBatchJobHistoryLimit {
+		job := entity.StartSongBatchJobFromCLI(uuid.NewV4(), songbatch.NewRunRequest(false, false), songBatchJobRepoStartedAt.Add(time.Duration(i)*time.Hour))
+		require.NoError(t, job.Complete(0, songBatchJobRepoStartedAt.Add(time.Duration(i)*time.Hour+time.Minute)))
+		require.NoError(t, repo.Save(context.Background(), job))
+		if i == 0 {
+			oldestID = job.ID()
+		}
+	}
+	newest := entity.StartSongBatchJobFromCLI(uuid.NewV4(), songbatch.NewRunRequest(false, false), songBatchJobRepoStartedAt.Add(time.Duration(info.SongBatchJobHistoryLimit)*time.Hour))
+
+	// When
+	err := repo.Save(context.Background(), newest)
+
+	// Then
+	require.NoError(t, err)
+	var count int
+	require.NoError(t, db.Get(&count, `SELECT COUNT(*) FROM song_batch_jobs`))
+	assert.Equal(t, info.SongBatchJobHistoryLimit, count)
+	_, err = repo.FindByID(context.Background(), oldestID)
+	assert.ErrorIs(t, err, domainrepo.ErrSongBatchJobNotFound)
+	_, err = repo.FindByID(context.Background(), newest.ID())
+	assert.NoError(t, err)
 }
 
 func TestSongBatchJobRepository_FindByID_存在しない場合は専用エラーを返す(t *testing.T) {
