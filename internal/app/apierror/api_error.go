@@ -154,6 +154,11 @@ var (
 	ErrVersionNameConflict = New(CodeVersionNameConflict, http.StatusConflict)
 	ErrVersionNotLatest    = New(CodeVersionNotLatest, http.StatusConflict)
 	ErrVersionInUse        = New(CodeVersionInUse, http.StatusConflict)
+
+	ErrSongBatchAlreadyRunning = New(CodeSongBatchAlreadyRunning, http.StatusConflict)
+	ErrSongBatchJobNotFound    = New(CodeSongBatchJobNotFound, http.StatusNotFound)
+	ErrInvalidSongBatchJobID   = New(CodeInvalidSongBatchJobID, http.StatusBadRequest)
+	ErrInvalidSongBatchMode    = New(CodeInvalidSongBatchMode, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

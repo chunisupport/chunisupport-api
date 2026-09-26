@@ -77,15 +77,16 @@ type Config struct {
 	// Location は検証済みのAPI出力用タイムゾーンです。
 	Location *time.Location `json:"-"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
-	CORS                   CORS           `json:"cors"`
-	ClientIP               ClientIP       `json:"client_ip"`
-	TempData               TempData       `json:"temp_data"`
-	UsernamePolicy         UsernamePolicy `json:"-"`
-	DataTransferHMACSecret []byte         `json:"-"`
-	Firebase               Firebase       // 環境変数から読み込み
-	Turnstile              Turnstile      // 環境変数から読み込み
-	Database               Database       // 環境変数から読み込み
+	ShutdownTimeoutSeconds int             `json:"shutdown_timeout_seconds"`
+	CORS                   CORS            `json:"cors"`
+	ClientIP               ClientIP        `json:"client_ip"`
+	TempData               TempData        `json:"temp_data"`
+	UsernamePolicy         UsernamePolicy  `json:"-"`
+	DataTransferHMACSecret []byte          `json:"-"`
+	Firebase               Firebase        // 環境変数から読み込み
+	Turnstile              Turnstile       // 環境変数から読み込み
+	Database               Database        // 環境変数から読み込み
+	SongBatch              SongBatchConfig `json:"-"` // 環境変数から読み込み
 	loggingSet             bool
 }
 
@@ -271,6 +272,8 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	} else {
 		config.DataTransferHMACSecret = dataTransferSecret
 	}
+
+	config.SongBatch = loadSongBatchConfigFromEnv()
 
 	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")

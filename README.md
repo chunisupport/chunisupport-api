@@ -7,11 +7,13 @@
 - **内部API認証**: `/internal` エンドポイントでは Firebase ID トークンによる Bearer 認証を提供します。
 - **APIトークン認証**: 外部クライアント向けに、1ユーザーあたり最大10個の名前付き永続APIキーで保護された `/v1` エンドポイントを提供します。
 - **プレイヤー情報**: ユーザーに紐づくプレイヤー情報を管理します。
-- **楽曲データ**: CHUNITHMの公式楽曲データを元にしたデータベースを提供します。データの構築は別リポジトリのバッチ処理で行われます。
+- **楽曲データ**: CHUNITHMの公式楽曲データを元にしたデータベースを提供します。データは同梱の楽曲データ収集バッチ（`cmd/song-batch`）で構築し、ADMINは管理画面からも実行できます。
 
 ## ドキュメント
 
 - [API仕様書（内部/公開）](docs/API.md)
+- [設定ファイル・環境変数](docs/configuration.md)
+- [楽曲データ収集バッチ](docs/song_batch.md)
 - [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
@@ -105,7 +107,9 @@ cmd/
 │   └── main.go
 ├── recalculate-player-data/ # プレイヤーデータ再計算バッチ
 │   └── main.go
-└── export-static-data/ # 静的データ出力バッチ
+├── export-static-data/ # 静的データ出力バッチ
+│   └── main.go
+└── song-batch/   # 楽曲データ収集バッチ
     └── main.go
 internal/         # 共通のドメインロジック・ユースケース・インフラ
 └── ...
@@ -119,6 +123,24 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | APIサーバー | `go build -o _chunisupport-api ./cmd/api` | `go run ./cmd/api` |
 | プレイヤーデータ再計算バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-recalculate-player-data-linux-amd64 ./cmd/recalculate-player-data` | `go run ./cmd/recalculate-player-data` |
 | 静的データ出力バッチ | `go build -o _chunisupport-export-static-data ./cmd/export-static-data` | `go run ./cmd/export-static-data` |
+| 楽曲データ収集バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-song-batch-linux-amd64 ./cmd/song-batch` | `go run ./cmd/song-batch` |
+
+## 楽曲データ収集バッチ
+
+`go run ./cmd/song-batch` は公式データ、追加楽曲シート、mainframe などの外部データソースを取得し、`songs` / `charts` / `worldsend_charts` / `courses` を更新します。以前は `chunisupport-song-batch` リポジトリで管理していたものを統合しました。
+
+| 実行方法 | 内容 |
+|---|---|
+| `go run ./cmd/song-batch` | 通常実行（cron から定期実行） |
+| `go run ./cmd/song-batch --major-update` | 大型アップデート用。公式データと追加楽曲だけで更新し、譜面定数の更新ルールを適用 |
+| `go run ./cmd/song-batch --fill-missing-release-date` | 日付が得られない新規楽曲に実行日（JST）をリリース日として補完 |
+| 管理画面 `/admin/song-batch` | ADMINが上記と同じ処理を任意のタイミングで実行（API プロセス内でバックグラウンド実行） |
+
+- CLI と管理画面は同じ MySQL アドバイザリロックを使うため、同時に実行される楽曲バッチは常に1つです。
+- 実行結果は `song_batch_jobs` テーブルに記録され、管理画面で確認できます。保持するのは最新50件までです。
+- データソースの URL や Google スプレッドシートの ID は `CHUNISUPPORT_BATCH_*` 環境変数で指定します。API サーバーと CLI の両方の実行環境に設定してください（[設定ファイル・環境変数](docs/configuration.md#楽曲データ収集バッチ)）。
+
+処理の流れ、必須・補完データソース、実行履歴の状態は [楽曲データ収集バッチ](docs/song_batch.md) を参照してください。
 
 ## プレイヤーデータ再計算バッチ
 

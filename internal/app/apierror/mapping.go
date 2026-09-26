@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
@@ -112,6 +113,16 @@ func FromUsecaseError(err error) *APIError {
 		return ErrVersionNotLatest.WithInternal(err)
 	case errors.Is(err, usecase.ErrVersionInUse):
 		return ErrVersionInUse.WithInternal(err)
+	case errors.Is(err, usecase.ErrSongBatchUnavailable):
+		return ErrServiceUnavailable.WithInternal(err)
+	case errors.Is(err, usecase.ErrSongBatchAlreadyRunning):
+		return ErrSongBatchAlreadyRunning.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidSongBatchJobID):
+		return ErrInvalidSongBatchJobID.WithInternal(err)
+	case errors.Is(err, repository.ErrSongBatchJobNotFound):
+		return ErrSongBatchJobNotFound.WithInternal(err)
+	case errors.Is(err, songbatch.ErrInvalidRunMode):
+		return ErrInvalidSongBatchMode.WithInternal(err)
 	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
 		return ErrConflict.WithInternal(err)
 	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):
