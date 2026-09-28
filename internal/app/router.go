@@ -412,6 +412,13 @@ func registerRoutes(
 		Requests: info.DataTransferRateLimitRequests,
 		Window:   info.DataTransferRateLimitWindow,
 	})
+	badgeGroup := e.Group("/badges")
+	badgeGroup.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
+	badgeGroup.Use(middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.InternalPublicRateLimitRequests,
+		Window:   info.InternalPublicRateLimitWindow,
+	}))
+	badgeGroup.GET("/users/:username/rating", handlers.User.GetOfficialRatingBadge)
 	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
 	// APIトークンの更新権限を要求するミドルウェア

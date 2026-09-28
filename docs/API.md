@@ -199,6 +199,7 @@ Content-Type: application/json
 | ---- | -------- | ---- | ---- |
 | `/` | GET | 通常時不要 | アプリケーション名とビルド日を返します。メンテナンス中はFirebase認証済みのADMIN / EDITORのみ利用可 |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
+| `/badges/users/:username/rating` | GET | 不要 | Shields.io向けの公式RATINGバッジ情報 |
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得（`read` / `read_write`いずれも可） |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
@@ -339,6 +340,32 @@ Content-Type: application/json
 | `/compat/reiwa/1/chunithm_versions.json` | GET | APIトークン | reiwa互換：CHUNITHMバージョン一覧取得 |
 
 ---
+
+## Shields.io向けバッジ
+
+### GET `/badges/users/:username/rating`
+
+- **認証**: 不要
+- **レートリミット**: 1分間60回/IP
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **レスポンス**: Shields.io Endpoint BadgeのJSON形式。保存済みの公式RATINGを小数第2位まで表示します。プレイヤー未連携の場合は `message: "no data"`、`color: "lightgrey"` を返します。ユーザーが存在しない場合や非公開の場合は同じ404を返します。
+
+```json
+{
+  "schemaVersion": 1,
+  "label": "CHUNITHM RATING",
+  "message": "17.29",
+  "color": "blue"
+}
+```
+
+Shields.ioからの利用例（`example` を対象ユーザー名に置き換えます）:
+
+```markdown
+![CHUNITHM RATING](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.chunisupport.net%2Fbadges%2Fusers%2Fexample%2Frating)
+```
+
+Shields.io側のキャッシュにより、公式RATINGの更新や非公開設定の変更がバッジへ反映されるまで時間がかかる場合があります。
 
 ## 監視用エンドポイント
 

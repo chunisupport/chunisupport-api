@@ -21,6 +21,10 @@ type mockV1UserUsecase struct {
 	getUserProfileRatingViewFunc  func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error)
 }
 
+func (m *mockV1UserUsecase) GetPublicOfficialRating(context.Context, string) (*float64, error) {
+	return nil, nil
+}
+
 func (m *mockV1UserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileOutput, error) {
 	return nil, nil
 }
