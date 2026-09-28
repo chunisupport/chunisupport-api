@@ -1,10 +1,12 @@
 package models
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
@@ -69,14 +71,58 @@ func FromUserEntity(e *entity.User) *UserModel {
 // StructScanでLEFT JOIN結果を取得するために使用します。
 type UserWithPlayerRow struct {
 	// ユーザー情報
-	UserID       int     `db:"user_id"`
-	Username     string  `db:"username"`
-	FirebaseUID  *string `db:"firebase_uid"`
-	UserPlayerID *int    `db:"user_player_id"`
+	UserID            int       `db:"user_id"`
+	Username          string    `db:"username"`
+	FirebaseUID       *string   `db:"firebase_uid"`
+	UserAccountTypeID int       `db:"user_account_type_id"`
+	UserPlayerID      *int      `db:"user_player_id"`
+	UserCreatedAt     time.Time `db:"user_created_at"`
+	UserUpdatedAt     time.Time `db:"user_updated_at"`
+	UserIsSuspicious  bool      `db:"user_is_suspicious"`
+	UserIsPrivate     bool      `db:"user_is_private"`
 
 	// プレイヤー情報（LEFT JOINなのでnull許容）
 	PlayerID               *int     `db:"player_id"`
 	PlayerName             *string  `db:"player_name"`
 	PlayerCalculatedRating *float64 `db:"player_calculated_rating"`
 	PlayerOverpowerValue   *float64 `db:"player_overpower_value"`
+}
+
+// ToEntity はJOIN結果をユーザーとプレイヤーの組へ変換します。
+// ユーザーの変換は UserModel と共通にし、値オブジェクトの検証を一か所に保ちます。
+func (r *UserWithPlayerRow) ToEntity() (entity.UserWithPlayer, error) {
+	userModel := UserModel{
+		ID:            r.UserID,
+		Username:      r.Username,
+		FirebaseUID:   r.FirebaseUID,
+		CreatedAt:     r.UserCreatedAt,
+		UpdatedAt:     r.UserUpdatedAt,
+		PlayerID:      r.UserPlayerID,
+		AccountTypeID: r.UserAccountTypeID,
+		IsSuspicious:  r.UserIsSuspicious,
+		IsPrivate:     r.UserIsPrivate,
+	}
+	user, err := userModel.ToEntity()
+	if err != nil {
+		return entity.UserWithPlayer{}, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	result := entity.UserWithPlayer{User: *user}
+	if r.PlayerID == nil {
+		return result, nil
+	}
+
+	player := &entity.Player{
+		ID:               *r.PlayerID,
+		CalculatedRating: r.PlayerCalculatedRating,
+		OverpowerValue:   r.PlayerOverpowerValue,
+	}
+	if r.PlayerName != nil {
+		player.Name, err = playername.NewPlayerName(*r.PlayerName)
+		if err != nil {
+			return entity.UserWithPlayer{}, fmt.Errorf("failed to create player name: %w", err)
+		}
+	}
+	result.Player = player
+	return result, nil
 }
