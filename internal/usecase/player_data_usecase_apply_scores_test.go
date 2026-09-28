@@ -503,6 +503,7 @@ func TestValidatePlayerDataIdentity_同一取得日時の本文だけを許可�
 			if tt.wantConflict {
 				var conflictErr *PlayerDataConflictError
 				assert.ErrorAs(t, err, &conflictErr)
+				assert.ErrorIs(t, err, entity.ErrConflictingPlayerDataBody)
 				return
 			}
 			assert.NoError(t, err)
