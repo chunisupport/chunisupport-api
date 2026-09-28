@@ -90,6 +90,7 @@ func (r playerDataScoreEntryRequest) toUsecase() usecase.PlayerDataScoreEntry {
 var playerDataRequestFields = jsonFieldNames(reflect.TypeFor[playerDataRequest]())
 
 // jsonFieldNames は構造体型のJSONフィールド名の集合を返します。
+// 埋め込み構造体のフィールド昇格は扱わないため、埋め込みを持たない入力型にだけ使います。
 func jsonFieldNames(t reflect.Type) map[string]struct{} {
 	names := make(map[string]struct{}, t.NumField())
 	for field := range t.Fields() {
