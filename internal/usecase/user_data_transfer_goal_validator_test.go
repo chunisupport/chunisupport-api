@@ -73,3 +73,18 @@ func TestValidateTransferredRatingCountRejectsNoReachableCharts(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
 }
+
+func TestValidateTransferredGoals_不正な目標は原因エラーを保持する(t *testing.T) {
+	// Given
+	validator := &goalUsecase{goalRepo: &stubGoalRepo{}, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{}`)},
+	}}
+
+	// When
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	// Then
+	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
+	assert.ErrorIs(t, err, ErrInvalidGoalTitle)
+}

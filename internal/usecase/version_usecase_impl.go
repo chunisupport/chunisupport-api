@@ -32,7 +32,7 @@ func (u *versionUsecaseImpl) ListAll(ctx context.Context) ([]*entity.Version, er
 func (u *versionUsecaseImpl) Create(ctx context.Context, name string, releasedAt time.Time) (*entity.Version, error) {
 	version, err := entity.NewVersion(name, releasedAt)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidVersionInput, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidVersionInput, err)
 	}
 
 	u.updateMu.Lock()
@@ -74,7 +74,7 @@ func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName string)
 			return err
 		}
 		if err := current.Rename(newName); err != nil {
-			return fmt.Errorf("%w: %v", ErrInvalidVersionInput, err)
+			return fmt.Errorf("%w: %w", ErrInvalidVersionInput, err)
 		}
 		if err := u.versionRepo.Save(ctx, tx, current); err != nil {
 			return err

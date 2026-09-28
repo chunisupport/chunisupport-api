@@ -63,7 +63,7 @@ func bulkInsertScoreHistories[T any](ctx context.Context, exec domainrepo.Execut
 func wrapScoreHistoryInsertError(err error) error {
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntryErrorNumber {
-		return fmt.Errorf("%w: %v", domainrepo.ErrScoreHistoryTimestampConflict, err)
+		return fmt.Errorf("%w: %w", domainrepo.ErrScoreHistoryTimestampConflict, err)
 	}
 	return fmt.Errorf("failed to insert score histories: %w", err)
 }
