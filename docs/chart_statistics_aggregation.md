@@ -8,7 +8,7 @@
 
 通常譜面は `chart_id × rating_band_id`、WORLD'S END 譜面は `worldsend_chart_id × rating_band_id` を集計単位とする。
 
-レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーと、不正利用疑い（`users.is_suspicious = 1`）のユーザーのプレイヤーは対象外とする。この条件は譜面統計・WORLD'S END 譜面統計・ベスト枠採用率のすべてに共通である。
+レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーと、不正利用疑い（`users.is_suspicious = 1`）のユーザーのプレイヤーは対象外とする。削除済み楽曲（`songs.is_deleted = 1`）の譜面も対象外とする。これらの条件は譜面統計・WORLD'S END 譜面統計・ベスト枠採用率のすべてに共通である。
 
 不審フラグの変更は即時には統計へ反映されず、次回の再集計で反映される。
 

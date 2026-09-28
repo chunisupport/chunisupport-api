@@ -56,6 +56,10 @@ func setupChartStatsBatchRepositorySQLite(t *testing.T) *sqlx.DB {
 			id INTEGER NOT NULL PRIMARY KEY,
 			song_id INTEGER NOT NULL
 		);
+		CREATE TABLE worldsend_charts (
+			id INTEGER NOT NULL PRIMARY KEY,
+			song_id INTEGER NOT NULL
+		);
 		CREATE TABLE player_records (
 			player_id INTEGER NOT NULL,
 			chart_id INTEGER NOT NULL,
@@ -178,9 +182,12 @@ func TestChartStatsBatchRepository_StreamSource(t *testing.T) {
 		-- プレイヤー3は不審ユーザー、プレイヤー4はベスト枠平均レーティングが未計算のため、どの統計でも集計対象外
 		INSERT INTO players (id, user_id, best_average_rating) VALUES (1, 1, 17.0), (2, 2, 16.5), (3, 3, 17.2), (4, 4, NULL);
 		INSERT INTO slots (id, name) VALUES (1, 'best'), (2, 'new'), (3, 'other');
-		INSERT INTO songs (id, is_deleted, is_worldsend) VALUES (1, 0, 0), (2, 1, 0), (3, 0, 1);
+		-- 楽曲2と楽曲4は削除済みのため、その譜面はどの統計でも集計対象外
+		INSERT INTO songs (id, is_deleted, is_worldsend) VALUES (1, 0, 0), (2, 1, 0), (3, 0, 1), (4, 1, 1);
 		INSERT INTO charts (id, song_id) VALUES (10, 1), (20, 2), (30, 3), (11, 1);
+		INSERT INTO worldsend_charts (id, song_id) VALUES (5, 3), (6, 4);
 		INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, slot_id) VALUES
+			(1, 20, 1000000, 2, 1, 2),
 			(2, 11, 1000000, 2, 2, 1),
 			(1, 11, 1005000, 3, 3, 2),
 			(1, 10, 990000, 1, 1, 1),
@@ -190,14 +197,15 @@ func TestChartStatsBatchRepository_StreamSource(t *testing.T) {
 			(2, 5, 980000, 2, 1),
 			(1, 5, 1010000, 6, 3),
 			(3, 5, 1009000, 2, 1),
-			(4, 5, 1000000, 2, 1);
+			(4, 5, 1000000, 2, 1),
+			(1, 6, 1000000, 2, 1);
 	`)
 	require.NoError(t, err)
 
 	// When
 	result := streamChartStatsBatchSource(t, NewChartStatsBatchRepository(db))
 
-	// Then: 譜面統計は不審ユーザーを除外し、譜面ID順、同じ譜面内はプレイヤーID順に返す
+	// Then: 譜面統計は不審ユーザーと削除済み楽曲を除外し、譜面ID順、同じ譜面内はプレイヤーID順に返す
 	assert.Equal(t, []chartstatsbatch.ChartRecord{
 		{ChartID: 10, BestAverageRating: 17.0, Score: 990000, ClearLampID: 1, ComboLampID: 1},
 		{ChartID: 11, BestAverageRating: 17.0, Score: 1005000, ClearLampID: 3, ComboLampID: 3},
