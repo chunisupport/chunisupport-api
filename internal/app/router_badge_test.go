@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	appmiddleware "github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +21,29 @@ type badgeUserUsecaseStub struct {
 	usecase.UserUsecase
 	rating *float64
 	err    error
+}
+
+func TestOfficialRatingBadgeRoute_異なるユーザー名でもIP全体の上限を守る(t *testing.T) {
+	rating := 17.29
+	e := echo.New()
+	e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+	handlers := newAuthorizationTestHandlers()
+	handlers.User = internalhandler.NewUserHandler(badgeUserUsecaseStub{rating: &rating})
+	registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, stubMaintenanceUsecase{}, config.Config{})
+
+	request := func(username string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/badges/users/"+username+"/rating", nil)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	for i := range info.RatingBadgeIPRateLimitRequests {
+		username := fmt.Sprintf("badge%04d", i)
+		require.Equal(t, http.StatusOK, request(username), "ユーザー名: %s", username)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, request("nextbadge"))
 }
 
 func (s badgeUserUsecaseStub) GetPublicOfficialRating(context.Context, string) (*float64, error) {

@@ -346,7 +346,7 @@ Content-Type: application/json
 ### GET `/badges/users/:username/rating`
 
 - **認証**: 不要
-- **レートリミット**: 1分間60回/IP
+- **レートリミット**: 1分間60回/送信元IP・対象ユーザー名。異なるユーザー名のバッジはこの枠を共有しません。濫用防止のため、送信元IP全体にも1分間600回の上限があります。
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **レスポンス**: Shields.io Endpoint BadgeのJSON形式。保存済みの公式RATINGを小数第2位まで表示します。プレイヤー未連携の場合は `message: "no data"`、`color: "lightgrey"` を返します。ユーザーが存在しない場合や非公開の場合は同じ404を返します。
 

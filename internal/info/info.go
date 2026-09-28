@@ -107,6 +107,7 @@ const (
 	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
 	InternalPublicRateLimitRequests = 60
 	InternalPublicRateLimitWindow   = 1 * time.Minute
+	RatingBadgeIPRateLimitRequests  = 600
 	RatingBadgeSchemaVersion        = 1
 	RatingBadgeLabel                = "CHUNITHM RATING"
 	RatingBadgeColor                = "blue"

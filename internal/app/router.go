@@ -415,6 +415,10 @@ func registerRoutes(
 	badgeGroup := e.Group("/badges")
 	badgeGroup.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
 	badgeGroup.Use(middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
+		Requests: info.RatingBadgeIPRateLimitRequests,
+		Window:   info.InternalPublicRateLimitWindow,
+	}))
+	badgeGroup.Use(middleware.IPAndUsernameRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.InternalPublicRateLimitRequests,
 		Window:   info.InternalPublicRateLimitWindow,
 	}))
