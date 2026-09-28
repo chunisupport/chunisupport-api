@@ -107,16 +107,7 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 		return domainrepo.PlayerBatchConflict, nil
 	}
 	var recordRows []playerBatchRecordRow
-	recordQuery := `
-		SELECT pr.chart_id, pr.score, pr.combo_lamp_id, sl.name AS slot_name, pr.slot_order
-		FROM player_records pr
-		INNER JOIN slots sl ON sl.id = pr.slot_id
-		WHERE pr.player_id = ?
-		ORDER BY pr.chart_id`
-	if r.db.DriverName() != "sqlite" {
-		recordQuery += " FOR UPDATE"
-	}
-	if err = tx.SelectContext(ctx, &recordRows, recordQuery, key.ID); err != nil {
+	if err = tx.SelectContext(ctx, &recordRows, playerBatchRecordQuery(r.db.DriverName()), key.ID); err != nil {
 		return status, err
 	}
 	for _, row := range recordRows {
@@ -155,6 +146,22 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 		return status, err
 	}
 	return domainrepo.PlayerBatchUpdated, nil
+}
+
+// playerBatchRecordQuery は再計算対象プレイヤーの成績行をロックして取得するクエリを返します。
+// JOIN した slots は全プレイヤーが共有するマスタで、データ登録時の外部キー検査やサブクエリが共有ロックを取ります。
+// slots まで排他ロックすると別プレイヤーの登録とデッドロックするため、ロック対象を player_records に限定します。
+func playerBatchRecordQuery(driverName string) string {
+	query := `
+		SELECT pr.chart_id, pr.score, pr.combo_lamp_id, sl.name AS slot_name, pr.slot_order
+		FROM player_records pr
+		INNER JOIN slots sl ON sl.id = pr.slot_id
+		WHERE pr.player_id = ?
+		ORDER BY pr.chart_id`
+	if driverName != "sqlite" {
+		query += " FOR UPDATE OF pr"
+	}
+	return query
 }
 
 type batchVersionRow struct {
