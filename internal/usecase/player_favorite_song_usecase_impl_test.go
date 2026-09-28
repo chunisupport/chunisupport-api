@@ -195,14 +195,14 @@ func TestNewPlayerFavoriteSongUsecase(t *testing.T) {
 	db := &MockExecutor{}
 	tm := &MockTransactionManager{}
 
-	u, err := NewPlayerFavoriteSongUsecase(db, tm, nil, nil, nil, nil, nil, nil, nil)
+	u, err := NewPlayerFavoriteSongUsecase(db, tm, nil, nil, nil, nil, &stubFriendshipRepo{}, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, u)
 
-	_, err = NewPlayerFavoriteSongUsecase(nil, tm, nil, nil, nil, nil, nil, nil, nil)
+	_, err = NewPlayerFavoriteSongUsecase(nil, tm, nil, nil, nil, nil, &stubFriendshipRepo{}, nil, nil, nil)
 	require.Error(t, err)
 
-	_, err = NewPlayerFavoriteSongUsecase(db, nil, nil, nil, nil, nil, nil, nil, nil)
+	_, err = NewPlayerFavoriteSongUsecase(db, nil, nil, nil, nil, nil, &stubFriendshipRepo{}, nil, nil, nil)
 	require.Error(t, err)
 }
 
@@ -262,8 +262,9 @@ func TestPlayerFavoriteSongUsecase_List(t *testing.T) {
 
 	t.Run("非公開ユーザーを他人が取得できない", func(t *testing.T) {
 		u := &playerFavoriteSongUsecase{
-			db:       &MockExecutor{},
-			userRepo: &stubUserRepoForFav{user: &entity.User{ID: 1, IsPrivate: true}},
+			db:             &MockExecutor{},
+			userRepo:       &stubUserRepoForFav{user: &entity.User{ID: 1, IsPrivate: true}},
+			friendshipRepo: newStubFriendshipRepo(),
 		}
 
 		_, err := u.List(context.Background(), "private", &entity.User{ID: 2})
@@ -497,4 +498,12 @@ func TestPlayerFavoriteSongUsecase_Remove(t *testing.T) {
 
 func strPtrFS(s string) *string {
 	return &s
+}
+
+func TestNewPlayerFavoriteSongUsecase_フレンド判定リポジトリは必須(t *testing.T) {
+	// When
+	_, err := NewPlayerFavoriteSongUsecase(&MockExecutor{}, &MockTransactionManager{}, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	// Then
+	assert.ErrorIs(t, err, errPlayerFavoriteSongNilFriendshipRepo)
 }

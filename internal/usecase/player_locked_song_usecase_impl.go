@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	errPlayerLockedSongInputRequired = errors.New("input is required")
-	errPlayerLockedSongNilDB         = errors.New("database executor is nil")
-	errPlayerLockedSongNilTM         = errors.New("transaction manager is nil")
+	errPlayerLockedSongInputRequired     = errors.New("input is required")
+	errPlayerLockedSongNilDB             = errors.New("database executor is nil")
+	errPlayerLockedSongNilTM             = errors.New("transaction manager is nil")
+	errPlayerLockedSongNilFriendshipRepo = errors.New("friendship repository is nil")
 )
 
 type playerLockedSongUsecase struct {
@@ -32,19 +33,19 @@ type playerLockedSongUsecase struct {
 	resolver       PlayerSongIDResolver
 }
 
-// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
-func (u *playerLockedSongUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
-	u.friendshipRepo = friendshipRepo
-}
-
-func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) (PlayerLockedSongUsecase, error) {
+// NewPlayerLockedSongUsecase は未解禁曲ユースケースを生成します。
+// friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使うため必須です。
+func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecRepo repository.PlayerRecordRepository, playerDataRepo repository.PlayerDataRepository, songRepo repository.SongRepository, lockedRepo repository.PlayerLockedSongRepository, friendshipRepo repository.FriendshipRepository, queryService PlayerLockedSongQueryService, resolver PlayerSongIDResolver) (PlayerLockedSongUsecase, error) {
 	if db == nil {
 		return nil, errPlayerLockedSongNilDB
 	}
 	if tm == nil {
 		return nil, errPlayerLockedSongNilTM
 	}
-	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, queryService: queryService, resolver: resolver}, nil
+	if friendshipRepo == nil {
+		return nil, errPlayerLockedSongNilFriendshipRepo
+	}
+	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, friendshipRepo: friendshipRepo, queryService: queryService, resolver: resolver}, nil
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {

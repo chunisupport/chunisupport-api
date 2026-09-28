@@ -28,7 +28,7 @@ func TestUserUsecase_GetUserProfile_Success(t *testing.T) {
 		Level:     10,
 		UpdatedAt: now,
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfile(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -52,14 +52,14 @@ func TestUserUsecase_GetUserProfile_PrivateUserBlocked(t *testing.T) {
 		Level:     1,
 		UpdatedAt: time.Now(),
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	_, err = service.GetUserProfile(context.Background(), "privateuser", nil)
 	assert.ErrorIs(t, err, ErrUserPrivate)
 }
 
 func TestUserUsecase_GetUserProfile_UserNotFound(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfile(context.Background(), "nobody", nil)
 	assert.ErrorIs(t, err, ErrUserNotFound)
@@ -72,7 +72,7 @@ func TestUserUsecase_GetUserProfile_PlayerNotLinkedReturnsNilPlayer(t *testing.T
 		ID:       1,
 		Username: un,
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfile(context.Background(), "tester", nil)
 	require.NoError(t, err)

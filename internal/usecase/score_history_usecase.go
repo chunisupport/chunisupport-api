@@ -39,23 +39,20 @@ type scoreHistoryUsecase struct {
 	masterProvider repository.PlayerDataMasterProvider
 }
 
-// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
-func (us *scoreHistoryUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
-	us.friendshipRepo = friendshipRepo
-}
-
 // NewScoreHistoryUsecase はスコア履歴取得ユースケースを生成します。
+// friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使います。
 func NewScoreHistoryUsecase(
 	exec repository.Executor,
 	userRepo repository.UserRepository,
 	songRepo repository.SongRepository,
 	worldsendRepo repository.WorldsendChartRepository,
 	historyRepo repository.ScoreHistoryRepository,
+	friendshipRepo repository.FriendshipRepository,
 	masterProvider repository.PlayerDataMasterProvider,
 ) ScoreHistoryUsecase {
 	return &scoreHistoryUsecase{
 		exec: exec, userRepo: userRepo, songRepo: songRepo, worldsendRepo: worldsendRepo,
-		historyRepo: historyRepo, masterProvider: masterProvider,
+		historyRepo: historyRepo, friendshipRepo: friendshipRepo, masterProvider: masterProvider,
 	}
 }
 

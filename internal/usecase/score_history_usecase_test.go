@@ -101,7 +101,7 @@ func TestScoreHistoryUsecase_GetStandard_公開中の通常楽曲だけ履歴を
 	setScoreHistoryReadUserExpectation(userRepo, exec, user)
 	songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(song, nil).Once()
 	historyRepo.On("FindStandardTimeline", ctx, 10, 30).Return(wantRows, nil).Once()
-	uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, newScoreHistoryReadMasterProvider())
+	uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 	got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", "EXPERT")
 
@@ -142,7 +142,7 @@ func TestScoreHistoryUsecase_GetStandard_公開対象外の楽曲は404へ正規
 
 			setScoreHistoryReadUserExpectation(userRepo, exec, user)
 			songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(tt.song, nil).Once()
-			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, newScoreHistoryReadMasterProvider())
+			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 			got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", "EXPERT")
 
@@ -171,7 +171,7 @@ func TestScoreHistoryUsecase_GetWorldsend_公開中のWORLDsend楽曲だけ履�
 	setScoreHistoryReadUserExpectation(userRepo, exec, user)
 	worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(song, nil).Once()
 	historyRepo.On("FindWorldsendTimeline", ctx, 10, 40).Return(wantRows, nil).Once()
-	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, newScoreHistoryReadMasterProvider())
+	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 	got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")
 
@@ -232,7 +232,7 @@ func TestScoreHistoryUsecase_GetWorldsend_公開対象外の楽曲は404へ正�
 
 			setScoreHistoryReadUserExpectation(userRepo, exec, user)
 			worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(tt.songChart, nil).Once()
-			uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, newScoreHistoryReadMasterProvider())
+			uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 			got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")
 

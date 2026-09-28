@@ -46,7 +46,8 @@ type userProfilePlayerRecords struct {
 }
 
 // NewUserUsecase は UserUsecase の実装を生成します。
-func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider) UserUsecase {
+// friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使います。
+func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
@@ -55,6 +56,7 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 		worldsendRecordRepo: worldsendRecordRepo,
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
+		friendshipRepo:      friendshipRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		masterProvider:      masterProvider,
 		firebaseDeleter:     noopFirebaseUserDeleter{},
@@ -62,8 +64,8 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 }
 
 // NewUserUsecaseWithOverpowerDenominator はOVER POWER割合の随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
@@ -71,11 +73,6 @@ func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo rep
 	impl.playerLockedSongRepo = playerLockedSongRepo
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
 	return impl
-}
-
-// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
-func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
-	s.friendshipRepo = friendshipRepo
 }
 
 // SetCourseRepository はユーザーレコードレスポンスへコースを統合します。
@@ -90,8 +87,8 @@ func (s *userUsecase) SetPhysicalDeletionDependencies(transactionManager Transac
 }
 
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, firebaseDeleter FirebaseUserDeleter) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
@@ -103,8 +100,8 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 }
 
 // NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
-	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, firebaseDeleter)
+func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
+	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, firebaseDeleter)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
