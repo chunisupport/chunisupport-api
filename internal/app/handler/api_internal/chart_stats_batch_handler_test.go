@@ -12,7 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -52,12 +52,13 @@ func (s *chartStatsBatchJobUsecaseStub) Get(_ context.Context, id string) (*enti
 
 var chartStatsBatchHandlerStartedAt = time.Date(2026, 9, 28, 3, 0, 0, 0, time.UTC)
 
-func newChartStatsBatchHandlerContext(method, target string) (*echo.Context, *httptest.ResponseRecorder) {
+func newChartStatsBatchHandlerContext(t *testing.T, method, target string) (*echo.Context, *httptest.ResponseRecorder) {
+	t.Helper()
 	e := echo.New()
 	req := httptest.NewRequestWithContext(context.Background(), method, target, nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userEntity", &entity.User{ID: 42, Username: username.MustNewUserName("adminuser")})
+	c.Set("userEntity", &entity.User{ID: 42, Username: usernametest.New(t, "adminuser")})
 	return c, rec
 }
 
@@ -65,7 +66,7 @@ func TestChartStatsBatchHandler_Start_管理者の実行要求を受け付ける
 	// Given
 	stub := &chartStatsBatchJobUsecaseStub{}
 	handler := NewChartStatsBatchHandler(stub)
-	c, rec := newChartStatsBatchHandlerContext(http.MethodPost, "/internal/admin/chart-stats-batch/jobs")
+	c, rec := newChartStatsBatchHandlerContext(t, http.MethodPost, "/internal/admin/chart-stats-batch/jobs")
 
 	// When
 	err := handler.Start(c)
@@ -74,7 +75,7 @@ func TestChartStatsBatchHandler_Start_管理者の実行要求を受け付ける
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusAccepted, rec.Code)
 	assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
-	assert.Equal(t, entity.ChartStatsBatchJobRequester{UserID: 42, Username: username.MustNewUserName("adminuser")}, stub.requester)
+	assert.Equal(t, entity.ChartStatsBatchJobRequester{UserID: 42, Username: usernametest.New(t, "adminuser")}, stub.requester)
 
 	var response internaldto.ChartStatsBatchJobDTO
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
@@ -115,7 +116,7 @@ func TestChartStatsBatchHandler_Start_エラー(t *testing.T) {
 			// Given
 			stub := &chartStatsBatchJobUsecaseStub{startErr: tt.startErr}
 			handler := NewChartStatsBatchHandler(stub)
-			c, _ := newChartStatsBatchHandlerContext(http.MethodPost, "/internal/admin/chart-stats-batch/jobs")
+			c, _ := newChartStatsBatchHandlerContext(t, http.MethodPost, "/internal/admin/chart-stats-batch/jobs")
 
 			// When
 			err := handler.Start(c)
@@ -134,7 +135,7 @@ func TestChartStatsBatchHandler_List(t *testing.T) {
 	finished := entity.StartChartStatsBatchJobFromCLI(uuid.NewV4(), chartStatsBatchHandlerStartedAt)
 	require.NoError(t, finished.Fail("replace chart stats: deadlock", chartStatsBatchHandlerStartedAt.Add(time.Minute)))
 	handler := NewChartStatsBatchHandler(&chartStatsBatchJobUsecaseStub{jobs: []*entity.ChartStatsBatchJob{finished}})
-	c, rec := newChartStatsBatchHandlerContext(http.MethodGet, "/internal/admin/chart-stats-batch/jobs")
+	c, rec := newChartStatsBatchHandlerContext(t, http.MethodGet, "/internal/admin/chart-stats-batch/jobs")
 
 	// When
 	err := handler.List(c)
@@ -175,7 +176,7 @@ func TestChartStatsBatchHandler_Get(t *testing.T) {
 			// Given
 			stub := &chartStatsBatchJobUsecaseStub{jobs: []*entity.ChartStatsBatchJob{job}, getErr: tt.getErr}
 			handler := NewChartStatsBatchHandler(stub)
-			c, rec := newChartStatsBatchHandlerContext(http.MethodGet, "/internal/admin/chart-stats-batch/jobs/"+job.ID().String())
+			c, rec := newChartStatsBatchHandlerContext(t, http.MethodGet, "/internal/admin/chart-stats-batch/jobs/"+job.ID().String())
 			c.SetPathValues(echo.PathValues{{Name: "id", Value: job.ID().String()}})
 
 			// When

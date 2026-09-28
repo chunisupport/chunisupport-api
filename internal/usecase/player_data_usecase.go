@@ -89,9 +89,11 @@ type PlayerDataUsecase interface {
 }
 
 // PlayerDataValidationError は入力値検証に失敗した場合のエラーです。
+// Err には原因エラーを保持し、上位層が errors.Is / errors.As で原因を判定できるようにします。
 type PlayerDataValidationError struct {
 	Field   string
 	Message string
+	Err     error
 }
 
 func (e *PlayerDataValidationError) Error() string {
@@ -99,6 +101,11 @@ func (e *PlayerDataValidationError) Error() string {
 		return e.Message
 	}
 	return e.Field + ": " + e.Message
+}
+
+// Unwrap は原因エラーを返します。
+func (e *PlayerDataValidationError) Unwrap() error {
+	return e.Err
 }
 
 // PlayerDataNotFoundError はマスターデータなどが見つからない場合に発生します。
@@ -112,12 +119,19 @@ func (e *PlayerDataNotFoundError) Error() string {
 }
 
 // PlayerDataConflictError は矛盾した入力などで処理できない場合に返されます。
+// Err には原因エラーを保持し、上位層が errors.Is / errors.As で原因を判定できるようにします。
 type PlayerDataConflictError struct {
 	Reason string
+	Err    error
 }
 
 func (e *PlayerDataConflictError) Error() string {
 	return e.Reason
+}
+
+// Unwrap は原因エラーを返します。
+func (e *PlayerDataConflictError) Unwrap() error {
+	return e.Err
 }
 
 // PlayerDataSummaryInput はプレイヤー情報の更新値です。

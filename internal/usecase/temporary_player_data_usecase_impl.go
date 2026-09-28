@@ -49,7 +49,7 @@ func (u *temporaryPlayerDataUsecase) Create(ctx context.Context, input CreateTem
 		now.Add(u.ttl),
 	)
 	if err != nil {
-		return nil, &PlayerDataValidationError{Field: "payload", Message: err.Error()}
+		return nil, &PlayerDataValidationError{Field: "payload", Message: err.Error(), Err: err}
 	}
 
 	if err := u.repo.Create(ctx, u.exec, entry); err != nil {

@@ -9,8 +9,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -46,14 +46,14 @@ func (s *stubPlayerRepositoryForPlayerData) FindByID(ctx context.Context, exec r
 func TestEnsurePlayer_公式指標が変化した場合は更新前の組を履歴へ保存する(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
 	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
-		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 40,
+		ID: 10, UserID: 1, Name: playernametest.New(t, "変更前"), Level: 40,
 		OfficialRating: 17.24, OfficialOverpower: 12340.12,
 		DataCollectedAt: &collectedAt, CreatedAt: collectedAt.Add(-24 * time.Hour), UpdatedAt: collectedAt,
 	}}
 	userRepo := new(MockUserRepository)
 	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
 	playerID := 10
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	updatedAt := collectedAt.Add(time.Hour)
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -71,13 +71,13 @@ func TestEnsurePlayer_公式指標が変化した場合は更新前の組を履�
 func TestEnsurePlayer_取得日時のない既存値は履歴へ保存しない(t *testing.T) {
 	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
 	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
-		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		ID: 10, UserID: 1, Name: playernametest.New(t, "変更前"), Level: 1,
 		OfficialRating: 0, OfficialOverpower: 0, CreatedAt: createdAt, UpdatedAt: createdAt,
 	}}
 	userRepo := new(MockUserRepository)
 	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
 	playerID := 10
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
@@ -91,13 +91,13 @@ func TestEnsurePlayer_取得日時のない既存値は履歴へ保存しない(
 func TestEnsurePlayer_指定したポゼッションを保存する(t *testing.T) {
 	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
 	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
-		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		ID: 10, UserID: 1, Name: playernametest.New(t, "変更前"), Level: 1,
 		PossessionID: entity.DefaultPossessionID, CreatedAt: createdAt, UpdatedAt: createdAt,
 	}}
 	userRepo := new(MockUserRepository)
 	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
 	playerID := 10
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
@@ -112,7 +112,7 @@ func TestEnsurePlayer_未指定のポゼッションはnormalで初期化する(
 	playerRepo := &stubPlayerRepositoryForPlayerData{}
 	userRepo := new(MockUserRepository)
 	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest")}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest")}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
@@ -160,7 +160,7 @@ func TestRegister_同一取得日時の異なる本文は後続保存前に競�
 	officialOverpowerPercent := 98.76
 	playerID := 10
 	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
-		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("登録済み"), Level: 50,
+		ID: 10, UserID: 1, Name: playernametest.New(t, "登録済み"), Level: 50,
 		OfficialRating: 17.25, OfficialOverpower: 12345.67, OfficialOverpowerPercent: &officialOverpowerPercent,
 		DataCollectedAt: &updatedAt, CreatedAt: updatedAt.Add(-24 * time.Hour), UpdatedAt: updatedAt,
 	}}
@@ -169,7 +169,7 @@ func TestRegister_同一取得日時の異なる本文は後続保存前に競�
 	playerDataRepo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: latestUpdate}
 	txExecutor := &sqlx.DB{}
 	tm := &passthroughTransactionManagerForPlayerDataIdentity{exec: txExecutor}
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByIDForUpdate", mock.Anything, txExecutor, 1).Return(user, nil).Once()
 	uc := &playerDataUsecase{
@@ -208,8 +208,8 @@ func TestPlayerDataUsecaseDelete_ロック後の最新ユーザーを保存す�
 	txExecutor := &sqlx.DB{}
 	tm := &passthroughTransactionManagerForPlayerDataIdentity{exec: txExecutor}
 	playerID := 10
-	staleUser := &entity.User{ID: 1, Username: username.MustNewUserName("oldname"), PlayerID: &playerID}
-	lockedUser := &entity.User{ID: 1, Username: username.MustNewUserName("newname"), PlayerID: &playerID}
+	staleUser := &entity.User{ID: 1, Username: usernametest.New(t, "oldname"), PlayerID: &playerID}
+	lockedUser := &entity.User{ID: 1, Username: usernametest.New(t, "newname"), PlayerID: &playerID}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByIDForUpdate", mock.Anything, txExecutor, 1).Return(lockedUser, nil).Once()
 	userRepo.On("Save", mock.Anything, txExecutor, mock.MatchedBy(func(savedUser *entity.User) bool {
@@ -251,12 +251,12 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 
 			user := &entity.User{
 				ID:       1,
-				Username: username.MustNewUserName("playerdatatest"),
+				Username: usernametest.New(t, "playerdatatest"),
 			}
 			updatedAt := time.Date(2026, 3, 16, 15, 28, 53, 0, time.FixedZone("JST", 9*60*60))
 			before := time.Now()
 			officialRating := 16.25
-			playerName := playername.MustNewPlayerName("テストプレイヤー")
+			playerName := playernametest.New(t, "テストプレイヤー")
 			summary := &PlayerDataSummaryInput{
 				Name:           playerName.String(),
 				Level:          42,
@@ -295,13 +295,13 @@ func TestEnsurePlayer_登録時は再計算済みの記録を無効にする(t *
 	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
 	fingerprint := masterfingerprint.Compute([]byte("master"))
 	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
-		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		ID: 10, UserID: 1, Name: playernametest.New(t, "変更前"), Level: 1,
 		CreatedAt: createdAt, UpdatedAt: createdAt, RecalculatedMasterFingerprint: &fingerprint,
 	}}
 	userRepo := new(MockUserRepository)
 	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
 	playerID := 10
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	// When

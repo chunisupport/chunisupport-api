@@ -328,7 +328,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 	nameVO, err := playername.NewPlayerName(payload.Name)
 	if err != nil {
-		return nil, &PlayerDataValidationError{Field: "name", Message: err.Error()}
+		return nil, &PlayerDataValidationError{Field: "name", Message: err.Error(), Err: err}
 	}
 
 	lastPlayedAt, updatedAt, err := parsePlayerDataTimes(payload.LastPlayed, payload.UpdatedAt)
@@ -473,7 +473,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		if latestUpdateErr = us.playerDataRepo.SaveLatestUpdate(ctx, tx, latestUpdate); latestUpdateErr != nil {
 			if errors.Is(latestUpdateErr, entity.ErrConflictingPlayerDataBody) {
-				return &PlayerDataConflictError{Reason: latestUpdateErr.Error()}
+				return &PlayerDataConflictError{Reason: latestUpdateErr.Error(), Err: latestUpdateErr}
 			}
 			return latestUpdateErr
 		}
@@ -509,7 +509,7 @@ func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx 
 		return fmt.Errorf("failed to validate player data identity: %w", err)
 	}
 	if err := latestUpdate.ValidateInputIdentity(updatedAt, bodyHash); err != nil {
-		return &PlayerDataConflictError{Reason: err.Error()}
+		return &PlayerDataConflictError{Reason: err.Error(), Err: err}
 	}
 	return nil
 }
@@ -542,6 +542,7 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 			return nil, time.Time{}, &PlayerDataValidationError{
 				Field:   "last_played",
 				Message: fmt.Sprintf("must match %s: %v", tokyoLayout, err),
+				Err:     err,
 			}
 		}
 		utc := parsed.UTC()
@@ -553,6 +554,7 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 		return nil, time.Time{}, &PlayerDataValidationError{
 			Field:   "updated_at",
 			Message: fmt.Sprintf("must be RFC3339: %v", err),
+			Err:     err,
 		}
 	}
 
@@ -727,7 +729,7 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 	player.ChangeOverpower(summary.OverpowerValue, summary.OverpowerPercent)
 
 	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {
-		return 0, nil, &PlayerDataConflictError{Reason: err.Error()}
+		return 0, nil, &PlayerDataConflictError{Reason: err.Error(), Err: err}
 	}
 
 	// 保存（IDがなければINSERT、それ以外はUPDATE）

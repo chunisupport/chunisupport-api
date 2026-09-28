@@ -7,7 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ func TestUserUsecase_GetUserProfile_Success(t *testing.T) {
 	}
 	player := &entity.Player{
 		ID:        1,
-		Name:      playername.MustNewPlayerName("テストプレイヤー"),
+		Name:      playernametest.New(t, "テストプレイヤー"),
 		Level:     10,
 		UpdatedAt: now,
 	}
@@ -48,7 +48,7 @@ func TestUserUsecase_GetUserProfile_PrivateUserBlocked(t *testing.T) {
 	}
 	player := &entity.Player{
 		ID:        1,
-		Name:      playername.MustNewPlayerName("プライベ"),
+		Name:      playernametest.New(t, "プライベ"),
 		Level:     1,
 		UpdatedAt: time.Now(),
 	}

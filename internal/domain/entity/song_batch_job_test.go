@@ -8,7 +8,7 @@ import (
 	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func newRunningSongBatchJob() *SongBatchJob {
 }
 
 func TestStartSongBatchJob(t *testing.T) {
-	requester := SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 	tests := []struct {
 		name              string
@@ -211,7 +211,7 @@ func TestSongBatchJob_CompleteRejectsNegativeWarningCount(t *testing.T) {
 
 func TestReconstructSongBatchJob(t *testing.T) {
 	finishedAt := songBatchJobStartedAt.Add(time.Minute)
-	requester := &SongBatchJobRequester{UserID: 1, Username: username.MustNewUserName("adminuser")}
+	requester := &SongBatchJobRequester{UserID: 1, Username: usernametest.New(t, "adminuser")}
 
 	tests := []struct {
 		name       string

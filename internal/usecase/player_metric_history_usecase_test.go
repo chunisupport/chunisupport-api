@@ -7,7 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func (s *stubMetricHistoryRepository) FindTimeline(_ context.Context, playerID i
 
 func TestPlayerMetricHistoryUsecase_Get(t *testing.T) {
 	playerID := 10
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("testuser"), PlayerID: &playerID}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "testuser"), PlayerID: &playerID}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(user, nil).Once()
 	collectedAt := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
@@ -46,7 +46,7 @@ func TestPlayerMetricHistoryUsecase_Get(t *testing.T) {
 }
 
 func TestPlayerMetricHistoryUsecase_Get_プレイヤー未連携は履歴なし(t *testing.T) {
-	user := &entity.User{ID: 1, Username: username.MustNewUserName("testuser")}
+	user := &entity.User{ID: 1, Username: usernametest.New(t, "testuser")}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByUsername", mock.Anything, mock.Anything, "testuser").Return(user, nil).Once()
 	us := NewPlayerMetricHistoryUsecase(nil, userRepo, &stubMetricHistoryRepository{}, nil)
@@ -58,7 +58,7 @@ func TestPlayerMetricHistoryUsecase_Get_プレイヤー未連携は履歴なし(
 
 func TestPlayerMetricHistoryUsecase_Get_非公開ユーザーは匿名参照できない(t *testing.T) {
 	playerID := 10
-	user := &entity.User{ID: 2, Username: username.MustNewUserName("privateuser"), PlayerID: &playerID, IsPrivate: true}
+	user := &entity.User{ID: 2, Username: usernametest.New(t, "privateuser"), PlayerID: &playerID, IsPrivate: true}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByUsername", mock.Anything, mock.Anything, "privateuser").Return(user, nil).Once()
 	us := NewPlayerMetricHistoryUsecase(nil, userRepo, &stubMetricHistoryRepository{}, newStubFriendshipRepo())
@@ -70,7 +70,7 @@ func TestPlayerMetricHistoryUsecase_Get_非公開ユーザーは匿名参照で�
 
 func TestPlayerMetricHistoryUsecase_Get_非公開ユーザーは承認済みフレンドが参照できる(t *testing.T) {
 	playerID := 10
-	user := &entity.User{ID: 2, Username: username.MustNewUserName("privateuser"), PlayerID: &playerID, IsPrivate: true}
+	user := &entity.User{ID: 2, Username: usernametest.New(t, "privateuser"), PlayerID: &playerID, IsPrivate: true}
 	userRepo := new(MockUserRepository)
 	userRepo.On("FindByUsername", mock.Anything, mock.Anything, "privateuser").Return(user, nil).Once()
 	friendshipRepo := newStubFriendshipRepo()

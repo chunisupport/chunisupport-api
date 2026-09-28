@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ import (
 var chartStatsBatchJobStartedAt = time.Date(2026, 9, 28, 3, 0, 0, 0, time.UTC)
 
 func TestStartChartStatsBatchJob(t *testing.T) {
-	requester := ChartStatsBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := ChartStatsBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 	tests := []struct {
 		name              string
 		job               *ChartStatsBatchJob

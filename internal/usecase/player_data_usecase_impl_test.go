@@ -59,6 +59,8 @@ func TestParsePlayerDataTimes_不正な日時はフィールド付き検証エ�
 			var validationErr *PlayerDataValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, tt.field, validationErr.Field)
+			var parseErr *time.ParseError
+			assert.ErrorAs(t, err, &parseErr)
 		})
 	}
 }
@@ -71,6 +73,7 @@ func TestPlayerDataUsecase_Register_不正な名前はフィールド付き検�
 	var validationErr *PlayerDataValidationError
 	require.ErrorAs(t, err, &validationErr)
 	assert.Equal(t, "name", validationErr.Field)
+	assert.Error(t, errors.Unwrap(validationErr))
 }
 
 func TestWithPlayerDataRegistrationContext_識別情報を付加して原因を保持する(t *testing.T) {

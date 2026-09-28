@@ -34,18 +34,6 @@ func NewUserName(value string) (UserName, error) {
 	return UserName{value: value}, nil
 }
 
-// MustNewUserName はバリデーションなしで新しい UserName を作成します
-// バリデーションエラーが発生した場合はパニックします
-// 警告: テストコード専用。本番コードでは使用禁止。
-// 既にバリデーション済みの値を使用する場合にのみ使用してください
-func MustNewUserName(value string) UserName {
-	userName, err := NewUserName(value)
-	if err != nil {
-		panic(err)
-	}
-	return userName
-}
-
 // String は UserName の文字列値を返します
 func (u UserName) String() string {
 	return u.value

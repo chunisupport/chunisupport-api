@@ -25,16 +25,6 @@ func New(value string) (ReauthToken, error) {
 	return ReauthToken{value: normalizedValue}, nil
 }
 
-// MustNew はテスト用途の ReauthToken を生成します。
-func MustNew(value string) ReauthToken {
-	token, err := New(value)
-	if err != nil {
-		panic(err)
-	}
-
-	return token
-}
-
 // String は正規化済みの文字列表現を返します。
 func (t ReauthToken) String() string {
 	return t.value

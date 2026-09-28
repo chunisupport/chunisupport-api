@@ -555,7 +555,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 #### ファクトリメソッド
 
 - `NewUserName(value string) (UserName, error)`: バリデーション付き生成
-- `MustNewUserName(value string) UserName`: バリデーションなし生成（パニックあり）
+- テストでは `usernametest.New(tb testing.TB, value string) UserName` を利用する（生成に失敗した場合はテストを失敗させる。本番パッケージに panic する Must 系コンストラクタは置かない）
 
 #### メソッド
 
@@ -582,7 +582,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 #### ファクトリメソッド
 
 - `NewPlayerName(value string) (PlayerName, error)`: バリデーション付き生成
-- `MustNewPlayerName(value string) PlayerName`: バリデーションなし生成
+- テストでは `playernametest.New(tb testing.TB, value string) PlayerName` を利用する（生成に失敗した場合はテストを失敗させる）
 
 #### メソッド
 

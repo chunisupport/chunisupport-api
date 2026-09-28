@@ -14,7 +14,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -56,13 +56,14 @@ func (s *songBatchJobUsecaseStub) Get(_ context.Context, id string) (*entity.Son
 
 var songBatchHandlerStartedAt = time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC)
 
-func newSongBatchHandlerContext(method, target, body string) (*echo.Context, *httptest.ResponseRecorder) {
+func newSongBatchHandlerContext(t *testing.T, method, target, body string) (*echo.Context, *httptest.ResponseRecorder) {
+	t.Helper()
 	e := echo.New()
 	req := httptest.NewRequestWithContext(context.Background(), method, target, bytes.NewBufferString(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userEntity", &entity.User{ID: 42, Username: username.MustNewUserName("adminuser")})
+	c.Set("userEntity", &entity.User{ID: 42, Username: usernametest.New(t, "adminuser")})
 	return c, rec
 }
 
@@ -70,7 +71,7 @@ func TestSongBatchHandler_Start_管理者の実行要求を受け付ける(t *te
 	// Given
 	stub := &songBatchJobUsecaseStub{}
 	handler := NewSongBatchHandler(stub)
-	c, rec := newSongBatchHandlerContext(http.MethodPost, "/internal/admin/song-batch/jobs", `{"mode":"MAJOR_UPDATE","fill_missing_release_date":true}`)
+	c, rec := newSongBatchHandlerContext(t, http.MethodPost, "/internal/admin/song-batch/jobs", `{"mode":"MAJOR_UPDATE","fill_missing_release_date":true}`)
 
 	// When
 	err := handler.Start(c)
@@ -79,7 +80,7 @@ func TestSongBatchHandler_Start_管理者の実行要求を受け付ける(t *te
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusAccepted, rec.Code)
 	assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
-	assert.Equal(t, entity.SongBatchJobRequester{UserID: 42, Username: username.MustNewUserName("adminuser")}, stub.requester)
+	assert.Equal(t, entity.SongBatchJobRequester{UserID: 42, Username: usernametest.New(t, "adminuser")}, stub.requester)
 	assert.Equal(t, songbatch.RunRequest{Mode: songbatch.RunModeMajorUpdate, FillMissingReleaseDate: true}, stub.request)
 
 	var response internaldto.SongBatchJobDTO
@@ -132,7 +133,7 @@ func TestSongBatchHandler_Start_エラー(t *testing.T) {
 			// Given
 			stub := &songBatchJobUsecaseStub{startErr: tt.startErr}
 			handler := NewSongBatchHandler(stub)
-			c, _ := newSongBatchHandlerContext(http.MethodPost, "/internal/admin/song-batch/jobs", tt.body)
+			c, _ := newSongBatchHandlerContext(t, http.MethodPost, "/internal/admin/song-batch/jobs", tt.body)
 
 			// When
 			err := handler.Start(c)
@@ -152,7 +153,7 @@ func TestSongBatchHandler_List(t *testing.T) {
 	finished := entity.StartSongBatchJobFromCLI(uuid.NewV4(), songbatch.NewRunRequest(false, false), songBatchHandlerStartedAt)
 	require.NoError(t, finished.Fail(1, "required datasource official failed", songBatchHandlerStartedAt.Add(time.Minute)))
 	handler := NewSongBatchHandler(&songBatchJobUsecaseStub{jobs: []*entity.SongBatchJob{finished}})
-	c, rec := newSongBatchHandlerContext(http.MethodGet, "/internal/admin/song-batch/jobs", "")
+	c, rec := newSongBatchHandlerContext(t, http.MethodGet, "/internal/admin/song-batch/jobs", "")
 
 	// When
 	err := handler.List(c)
@@ -192,7 +193,7 @@ func TestSongBatchHandler_Get(t *testing.T) {
 			// Given
 			stub := &songBatchJobUsecaseStub{jobs: []*entity.SongBatchJob{job}, getErr: tt.getErr}
 			handler := NewSongBatchHandler(stub)
-			c, rec := newSongBatchHandlerContext(http.MethodGet, "/internal/admin/song-batch/jobs/"+job.ID().String(), "")
+			c, rec := newSongBatchHandlerContext(t, http.MethodGet, "/internal/admin/song-batch/jobs/"+job.ID().String(), "")
 			c.SetPathValues(echo.PathValues{{Name: "id", Value: job.ID().String()}})
 
 			// When

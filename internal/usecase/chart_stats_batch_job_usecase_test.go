@@ -10,7 +10,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,7 +106,10 @@ func (r *fakeChartStatsBatchRunner) Execute(ctx context.Context) (ChartStatsBatc
 
 var chartStatsBatchJobNow = time.Date(2026, 9, 28, 3, 0, 0, 0, time.UTC)
 
-var chartStatsBatchRequester = entity.ChartStatsBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+func newChartStatsBatchRequester(t *testing.T) entity.ChartStatsBatchJobRequester {
+	t.Helper()
+	return entity.ChartStatsBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
+}
 
 func newTestChartStatsBatchJobUsecase(
 	backgroundCtx context.Context,
@@ -250,13 +253,14 @@ func TestChartStatsBatchJobUsecase_StartFromAdmin(t *testing.T) {
 	uc := newTestChartStatsBatchJobUsecase(context.Background(), lockProvider, repo, runner)
 
 	// When
-	job, err := uc.StartFromAdmin(context.Background(), chartStatsBatchRequester)
+	requester := newChartStatsBatchRequester(t)
+	job, err := uc.StartFromAdmin(context.Background(), requester)
 	uc.Wait()
 
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, entity.ChartStatsBatchJobStatusRunning, job.Status())
-	assert.Equal(t, &chartStatsBatchRequester, job.Requester())
+	assert.Equal(t, &requester, job.Requester())
 	assert.True(t, runner.called)
 	assert.True(t, lockProvider.lock.released)
 	saved, err := repo.FindByID(context.Background(), job.ID())
@@ -272,7 +276,8 @@ func TestChartStatsBatchJobUsecase_StartFromAdmin_実行中の場合は受け付
 	uc := newTestChartStatsBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{}, repo, runner)
 
 	// When
-	_, err := uc.StartFromAdmin(context.Background(), chartStatsBatchRequester)
+	requester := newChartStatsBatchRequester(t)
+	_, err := uc.StartFromAdmin(context.Background(), requester)
 	uc.Wait()
 
 	// Then
@@ -288,7 +293,8 @@ func TestChartStatsBatchJobUsecase_StartFromAdmin_リクエストがキャンセ
 	uc := newTestChartStatsBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, &fakeChartStatsBatchRunner{})
 
 	// When
-	job, err := uc.StartFromAdmin(requestCtx, chartStatsBatchRequester)
+	requester := newChartStatsBatchRequester(t)
+	job, err := uc.StartFromAdmin(requestCtx, requester)
 	cancelRequest()
 	uc.Wait()
 
@@ -319,7 +325,8 @@ func TestChartStatsBatchJobUsecase_StartFromAdmin_停止処理後は受け付け
 			tt.setup(uc, cancel)
 
 			// When
-			_, err := uc.StartFromAdmin(context.Background(), chartStatsBatchRequester)
+			requester := newChartStatsBatchRequester(t)
+			_, err := uc.StartFromAdmin(context.Background(), requester)
 
 			// Then
 			assert.ErrorIs(t, err, ErrChartStatsBatchUnavailable)

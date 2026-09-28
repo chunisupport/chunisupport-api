@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,7 +29,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			turnstile: "turnstile-token",
 			remoteIP:  "203.0.113.1",
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
-				un := username.MustNewUserName("loginuser")
+				un := usernametest.New(t, "loginuser")
 				user := &entity.User{ID: 10, Username: un, AccountTypeID: info.AccountTypePlayer}
 				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
 				authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()
@@ -142,7 +142,7 @@ func TestLoginUsecase_Login_メンテナンス中のロール制御(t *testing.T
 			// Given
 			authUsecase := new(mockFirebaseAuthUsecase)
 			turnstileVerifier := new(mockTurnstileVerifier)
-			un := username.MustNewUserName("loginuser")
+			un := usernametest.New(t, "loginuser")
 			user := &entity.User{ID: 10, Username: un, AccountTypeID: tt.accountTypeID}
 			turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
 			authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()

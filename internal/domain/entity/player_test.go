@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewPlayer(t *testing.T) {
-	name := playername.MustNewPlayerName("プレイヤー")
+	name := playernametest.New(t, "プレイヤー")
 
 	player := NewPlayer(42, name)
 
@@ -23,7 +23,7 @@ func TestNewPlayer(t *testing.T) {
 
 func TestPlayer_MarkRecalculated_フィンガープリントを記録する(t *testing.T) {
 	// Given
-	player := NewPlayer(42, playername.MustNewPlayerName("プレイヤー"))
+	player := NewPlayer(42, playernametest.New(t, "プレイヤー"))
 	fingerprint := masterfingerprint.Compute([]byte("master"))
 
 	// When
@@ -35,7 +35,7 @@ func TestPlayer_MarkRecalculated_フィンガープリントを記録する(t *t
 }
 
 func TestPlayer_計算入力や計算値の変更で再計算済みの記録を消す(t *testing.T) {
-	name := playername.MustNewPlayerName("プレイヤー")
+	name := playernametest.New(t, "プレイヤー")
 	value := 12345.0
 	tests := []struct {
 		name   string
