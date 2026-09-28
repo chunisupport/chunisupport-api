@@ -606,6 +606,38 @@ func TestBuildBulkInsertSongsSQL(t *testing.T) {
 	}
 }
 
+// TestBuildBulkInsertChartsSQL は新規譜面のINSERTがAUTO_INCREMENTを浪費するUPSERT句を含まないことを確認します。
+func TestBuildBulkInsertChartsSQL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		build       func(n int) string
+		n           int
+		wantTable   string
+		columnCount int
+	}{
+		{name: "charts 1件", build: buildBulkInsertChartsSQL, n: 1, wantTable: "INSERT INTO charts", columnCount: chartInsertColumnCount},
+		{name: "charts 3件", build: buildBulkInsertChartsSQL, n: 3, wantTable: "INSERT INTO charts", columnCount: chartInsertColumnCount},
+		{name: "worldsend_charts 1件", build: buildBulkInsertWorldsendChartsSQL, n: 1, wantTable: "INSERT INTO worldsend_charts", columnCount: worldsendChartInsertColumnCount},
+		{name: "worldsend_charts 3件", build: buildBulkInsertWorldsendChartsSQL, n: 3, wantTable: "INSERT INTO worldsend_charts", columnCount: worldsendChartInsertColumnCount},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// When
+			query := tt.build(tt.n)
+
+			// Then
+			assert.Contains(t, query, tt.wantTable)
+			assert.NotContains(t, query, "ON DUPLICATE KEY UPDATE")
+			assert.Equal(t, tt.n*tt.columnCount, strings.Count(query, "?"))
+		})
+	}
+}
+
 // TestBuildBulkUpdateChartsSQL は生成 SQL の構造を確認します。
 // データ値はすべてプレースホルダー(?) であり、SQL 文字列にリテラル値が埋め込まれないことを保証します。
 func TestBuildBulkUpdateChartsSQL(t *testing.T) {
