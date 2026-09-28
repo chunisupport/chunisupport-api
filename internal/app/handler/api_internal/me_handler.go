@@ -126,37 +126,11 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 
 	hashText := hex.EncodeToString(hash[:])
 
-	// 未知のフィールドを検出するため、まずmapにデコード
-	var rawMap map[string]any
-	if err := json.Unmarshal(jsonData, &rawMap); err != nil {
+	// 公式エクスポートJSONの前方互換性を保つため、未知フィールドは警告ログへ記録して登録を継続する
+	unknownFields, err := unknownPlayerDataFields(jsonData)
+	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-
-	// PlayerDataPayloadの既知のフィールド（jsonタグ）
-	knownFields := map[string]bool{
-		"app_ver":      true,
-		"name":         true,
-		"level":        true,
-		"rating":       true,
-		"last_played":  true,
-		"overpower":    true,
-		"class_emblem": true,
-		"possession":   true,
-		"team":         true,
-		"honors":       true,
-		"scores":       true,
-		"updated_at":   true,
-	}
-
-	// 未知のフィールドを検出
-	var unknownFields []string
-	for key := range rawMap {
-		if !knownFields[key] {
-			unknownFields = append(unknownFields, key)
-		}
-	}
-
-	// 未知のフィールドがあれば警告ログを出力
 	if len(unknownFields) > 0 {
 		slog.Warn("unknown fields in player data payload", "unknown_fields", unknownFields, "user_id", user.ID)
 	}
