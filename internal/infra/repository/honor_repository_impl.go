@@ -136,22 +136,28 @@ func toHonorEntity(row *honorRow) *entity.Honor {
 
 // EnsureHonor は称号を登録または既存のIDを取得します。
 // 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
+// InnoDB は INSERT が重複で失敗・UPDATE へ切り替わった場合も AUTO_INCREMENT を消費するため、
+// 既存称号ではINSERTを発行しないよう先に検索します。
 func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (repository.HonorEnsureResult, error) {
 	storedTitle := strings.TrimSpace(title)
 	var storedImageURL any
 	if imageURL != nil {
 		storedImageURL = nullableHonorImageURL(*imageURL)
 	}
+	var existingID int
+	var findErr error
 	if storedImageURL != nil {
-		var existingID int
-		err := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
-		if err == nil {
-			return repository.HonorEnsureResult{ID: existingID}, nil
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return repository.HonorEnsureResult{}, err
-		}
+		findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+	} else {
+		findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE name = ? AND honor_type_id = ?`, storedTitle, honorTypeID)
 	}
+	if findErr == nil {
+		return repository.HonorEnsureResult{ID: existingID}, nil
+	}
+	if !errors.Is(findErr, sql.ErrNoRows) {
+		return repository.HonorEnsureResult{}, findErr
+	}
+	// 検索後に並行登録された場合に備え、通常称号は重複時に既存IDを返すUpsertとする。
 	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
 	if storedImageURL == nil && (r.db == nil || r.db.DriverName() != "sqlite") {
 		query += ` ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`
@@ -160,9 +166,8 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 	if err != nil {
 		if storedImageURL != nil && (isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") ||
 			isMySQLDuplicateEntryForKey(err, "unique_honor_name_type")) {
-			var existingID int
 			// 先行トランザクションのコミット後の行をREPEATABLE READでも取得するためカレントリードする。
-			findErr := exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ? FOR UPDATE`, storedImageURL)
+			findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ? FOR UPDATE`, storedImageURL)
 			if findErr == nil {
 				return repository.HonorEnsureResult{ID: existingID}, nil
 			}

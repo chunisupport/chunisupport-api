@@ -23,12 +23,14 @@ type honorEnsureExec struct {
 	getCalled   bool
 	getCount    int
 	getQueries  []string
+	getArgs     [][]any
 }
 
-func (e *honorEnsureExec) GetContext(_ context.Context, dest any, query string, _ ...any) error {
+func (e *honorEnsureExec) GetContext(_ context.Context, dest any, query string, args ...any) error {
 	e.getCalled = true
 	e.getCount++
 	e.getQueries = append(e.getQueries, query)
+	e.getArgs = append(e.getArgs, args)
 	existingID := e.existingID
 	if e.getCount > 1 {
 		existingID = e.afterMissID
@@ -83,6 +85,24 @@ func TestEnsureHonor_画像URLがnilの場合はNULLでUpsertする(t *testing.T
 	assert.False(t, result.ImageURLRegistered)
 	assert.Contains(t, exec.query, "ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)")
 	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
+}
+
+func TestEnsureHonor_既存の通常称号はINSERTせず既存IDを返す(t *testing.T) {
+	// Given: INSERT ... ON DUPLICATE KEY UPDATE は重複時もAUTO_INCREMENTを消費するため、既存称号では実行しない
+	exec := &honorEnsureExec{existingID: 20}
+	repo := &honorRepository{}
+
+	// When
+	result, err := repo.EnsureHonor(context.Background(), exec, " 称号A ", 2, nil)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, 20, result.ID)
+	assert.False(t, result.ImageURLRegistered)
+	require.Len(t, exec.getQueries, 1)
+	assert.Contains(t, exec.getQueries[0], "WHERE name = ? AND honor_type_id = ?")
+	assert.Equal(t, []any{"称号A", 2}, exec.getArgs[0])
+	assert.Empty(t, exec.query)
 }
 
 func TestEnsureHonor_画像URLが空文字の場合はNULLでUpsertする(t *testing.T) {
