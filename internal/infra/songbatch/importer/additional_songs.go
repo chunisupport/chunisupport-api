@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 // AdditionalSongsImporter は追加楽曲データソースのデータをロードします
@@ -25,7 +26,7 @@ func (ai *AdditionalSongsImporter) Import(filePath string) (*songbatch.ImportedS
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceAdditionalSongs, Data: nil}, nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read additional_songs data file %s: %w", filePath, err)
 	}

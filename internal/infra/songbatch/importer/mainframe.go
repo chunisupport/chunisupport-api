@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -29,7 +30,7 @@ func (mi *MainframeImporter) Import(filePath string) (*songbatch.ImportedSource,
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceMainframe, Data: nil}, nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mainframe data file %s: %w", filePath, err)
 	}

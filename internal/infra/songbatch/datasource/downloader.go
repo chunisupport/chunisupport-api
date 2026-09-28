@@ -52,7 +52,7 @@ func NewDownloader(outputDir string) *Downloader {
 // DownloadAll はすべてのデータソースをダウンロードし、ソース単位の結果を返します。
 // 一部失敗は全体 error にせず、失敗した要素の Success=false として表します。
 func (d *Downloader) DownloadAll(ctx context.Context, datasources []Datasource) ([]DownloadResult, error) {
-	if err := os.MkdirAll(d.outputDir, 0755); err != nil {
+	if err := os.MkdirAll(d.outputDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -169,7 +169,7 @@ func (d *Downloader) downloadDatasource(ctx context.Context, ds Datasource) erro
 	filename := fmt.Sprintf("%s.json", ds.Type)
 	filePath := filepath.Join(d.outputDir, filename)
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
