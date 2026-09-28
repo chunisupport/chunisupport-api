@@ -251,6 +251,15 @@ func TestPlayerDataBatchRepository_ProcessPlayer_枠の差分だけを更新す�
 	}
 }
 
+func TestPlayerBatchRecordQuery_ロック対象を成績行に限定する(t *testing.T) {
+	t.Run("MySQLでは共有マスタのslotsをロックしない", func(t *testing.T) {
+		assert.Contains(t, playerBatchRecordQuery("mysql"), "FOR UPDATE OF pr")
+	})
+	t.Run("SQLiteではロック句を付けない", func(t *testing.T) {
+		assert.NotContains(t, playerBatchRecordQuery("sqlite"), "FOR UPDATE")
+	})
+}
+
 func seedPlayerForBatchList(t *testing.T, db *sqlx.DB, playerID int, fingerprint any) {
 	t.Helper()
 	now := time.Date(2026, 3, 29, 10, 0, 0, 0, time.UTC)
