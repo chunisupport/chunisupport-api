@@ -3484,6 +3484,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 `is_suspicious` は必須の真偽値です。
 
+不審アカウントのプレイヤーは譜面統計（`/internal/songs/:id/stats/:difficulty` など）とベスト枠採用率の集計から除外されます。フラグの変更は次回の譜面統計バッチ実行時に反映されます。
+
 - **レスポンス**: 204 No Content
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): リクエスト形式が不正

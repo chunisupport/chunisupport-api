@@ -175,7 +175,7 @@ func TestChartStatsBatchRepository_StreamSource(t *testing.T) {
 	db := setupChartStatsBatchRepositorySQLite(t)
 	_, err := db.Exec(`
 		INSERT INTO users (id, is_suspicious) VALUES (1, 0), (2, 0), (3, 1), (4, 0);
-		-- プレイヤー4はベスト枠平均レーティングが未計算のため集計対象外
+		-- プレイヤー3は不審ユーザー、プレイヤー4はベスト枠平均レーティングが未計算のため、どの統計でも集計対象外
 		INSERT INTO players (id, user_id, best_average_rating) VALUES (1, 1, 17.0), (2, 2, 16.5), (3, 3, 17.2), (4, 4, NULL);
 		INSERT INTO slots (id, name) VALUES (1, 'best'), (2, 'new'), (3, 'other');
 		INSERT INTO songs (id, is_deleted, is_worldsend) VALUES (1, 0, 0), (2, 1, 0), (3, 0, 1);
@@ -189,6 +189,7 @@ func TestChartStatsBatchRepository_StreamSource(t *testing.T) {
 		INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id) VALUES
 			(2, 5, 980000, 2, 1),
 			(1, 5, 1010000, 6, 3),
+			(3, 5, 1009000, 2, 1),
 			(4, 5, 1000000, 2, 1);
 	`)
 	require.NoError(t, err)
@@ -196,10 +197,9 @@ func TestChartStatsBatchRepository_StreamSource(t *testing.T) {
 	// When
 	result := streamChartStatsBatchSource(t, NewChartStatsBatchRepository(db))
 
-	// Then: 譜面統計は譜面ID順、同じ譜面内はプレイヤーID順に返す
+	// Then: 譜面統計は不審ユーザーを除外し、譜面ID順、同じ譜面内はプレイヤーID順に返す
 	assert.Equal(t, []chartstatsbatch.ChartRecord{
 		{ChartID: 10, BestAverageRating: 17.0, Score: 990000, ClearLampID: 1, ComboLampID: 1},
-		{ChartID: 10, BestAverageRating: 17.2, Score: 1009000, ClearLampID: 2, ComboLampID: 1},
 		{ChartID: 11, BestAverageRating: 17.0, Score: 1005000, ClearLampID: 3, ComboLampID: 3},
 		{ChartID: 11, BestAverageRating: 16.5, Score: 1000000, ClearLampID: 2, ComboLampID: 2},
 	}, result.chartRecords)

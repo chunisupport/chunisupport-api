@@ -15,6 +15,7 @@ import (
 )
 
 // 集計元の読み取りクエリです。
+// 不正なスコアで統計が歪まないよう、すべての統計で不審ユーザーを除外します。
 // 中央値の計算で保持するスコアを1譜面分に抑えるため、譜面統計の記録は譜面ID順に返します。
 const (
 	chartStatsBatchChartRecordQuery = `
@@ -23,6 +24,7 @@ const (
 		INNER JOIN users u ON u.id = p.user_id
 		INNER JOIN player_records pr ON pr.player_id = p.id
 		WHERE p.best_average_rating IS NOT NULL
+		  AND u.is_suspicious = 0
 		ORDER BY pr.chart_id, p.id
 	`
 	chartStatsBatchWorldsendChartRecordQuery = `
@@ -31,6 +33,7 @@ const (
 		INNER JOIN users u ON u.id = p.user_id
 		INNER JOIN player_worldsend_records pwr ON pwr.player_id = p.id
 		WHERE p.best_average_rating IS NOT NULL
+		  AND u.is_suspicious = 0
 		ORDER BY pwr.worldsend_chart_id, p.id
 	`
 	chartStatsBatchEligiblePlayerQuery = `
