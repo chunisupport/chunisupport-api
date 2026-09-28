@@ -84,6 +84,12 @@
 - 難易度を表す文字列（`BASIC`, `ADVANCED`, `EXPERT`, `MASTER`, `ULTIMA`）は、DB、コード、API入出力のすべてにおいて**必ず大文字**で扱ってください（キャッシュキーが大文字統一されているため）。
 - 検索や比較に `strings.ToLower()` を使用することは禁止します。必要に応じて `strings.ToUpper()` を使用してください。
 
+### エラーのラップ（原因エラーの保持）
+- エラーハンドラーは `errors.Is(err, context.Canceled)` でクライアント切断を判定し、500 ではなく 499 として扱います。原因エラーが失われると、切断が 500 の ERROR ログとして記録されてしまいます。
+- エラーをラップする際は、原因エラーを必ず `%w` で保持してください。`fmt.Errorf("%w: ...: %v", ErrXxx, err)` のように原因エラーを `%v` で文字列化してはいけません。
+  - *推奨*: `fmt.Errorf("%w: list charts: %w", domainrepo.ErrRepositoryOperationFailed, err)`
+- ハンドラーで usecase のエラーを `return apierror.ErrInternalError` のように捨ててはいけません。`apierror.FromUsecaseError(err)` を返してください。
+
 ---
 
 ## 4. 品質保証・テスト・レビュープロセス
