@@ -10,7 +10,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -328,7 +328,7 @@ func TestPlayerRepository_Save_新規作成時に再計算済みフィンガー�
 	// Given
 	db := setupPlayerRepositorySQLite(t)
 	repo := &playerRepository{db: db}
-	player := entity.NewPlayer(30, playername.MustNewPlayerName("新規"))
+	player := entity.NewPlayer(30, playernametest.New(t, "新規"))
 	fingerprint := masterfingerprint.Compute([]byte("master"))
 	player.MarkRecalculated(fingerprint)
 

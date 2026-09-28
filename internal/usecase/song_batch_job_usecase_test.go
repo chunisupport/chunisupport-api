@@ -11,7 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -280,7 +280,7 @@ func TestSongBatchJobUsecase_StartFromAdmin(t *testing.T) {
 	runner := &fakeSongBatchRunner{}
 	denominator := &fakeOverpowerDenominatorInvalidator{}
 	uc := newTestSongBatchJobUsecase(context.Background(), lockProvider, repo, runner, denominator)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 	req := songbatch.NewRunRequest(true, false)
 
 	// When
@@ -305,7 +305,7 @@ func TestSongBatchJobUsecase_StartFromAdmin_実行中の場合は受け付けな
 	runner := &fakeSongBatchRunner{}
 	repo := newFakeSongBatchJobRepository()
 	uc := newTestSongBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{}, repo, runner, nil)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 	// When
 	_, err := uc.StartFromAdmin(context.Background(), requester, songbatch.NewRunRequest(false, false))
@@ -323,7 +323,7 @@ func TestSongBatchJobUsecase_StartFromAdmin_リクエストがキャンセルさ
 	repo := newFakeSongBatchJobRepository()
 	runner := &fakeSongBatchRunner{}
 	uc := newTestSongBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, runner, nil)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 	// When
 	job, err := uc.StartFromAdmin(requestCtx, requester, songbatch.NewRunRequest(false, false))
@@ -355,7 +355,7 @@ func TestSongBatchJobUsecase_StartFromAdmin_停止処理後は受け付けない
 			runner := &fakeSongBatchRunner{}
 			uc := newTestSongBatchJobUsecase(backgroundCtx, lockProvider, newFakeSongBatchJobRepository(), runner, nil)
 			tt.setup(uc, cancel)
-			requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+			requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 			// When
 			_, err := uc.StartFromAdmin(context.Background(), requester, songbatch.NewRunRequest(false, false))

@@ -16,7 +16,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
@@ -63,7 +63,7 @@ func TestMeHandler_GetRecentPlayerUpdates_本人の履歴を配列で返す(t *t
 	// Given
 	e := echo.New()
 	e.JSONSerializer = app.NewTimezoneJSONSerializer(time.FixedZone("Asia/Tokyo", 9*60*60))
-	testUser := &entity.User{ID: 1, Username: username.MustNewUserName("testuser")}
+	testUser := &entity.User{ID: 1, Username: usernametest.New(t, "testuser")}
 	mockUsecase := new(mockPlayerDataUsecase)
 	mockUsecase.On("GetRecentUpdates", mock.Anything, testUser).Return([]json.RawMessage{
 		json.RawMessage(`{"schema_version":1,"player_id":12,"app_ver":"1.2.3","imported_at":"2026-07-16T02:03:04Z","profile":{},"summary":{},"statistics":{},"counts":{},"changes":[]}`),
@@ -102,7 +102,7 @@ func compressAndEncodeGzipBase64(data []byte) (string, error) {
 }
 
 func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
-	testUser := &entity.User{ID: 1, Username: username.MustNewUserName("testuser")}
+	testUser := &entity.User{ID: 1, Username: usernametest.New(t, "testuser")}
 
 	t.Run("保存済みの最新登録結果を返す", func(t *testing.T) {
 		// Given
@@ -239,7 +239,7 @@ func TestMeHandler_RegisterData(t *testing.T) {
 
 	testUser := &entity.User{
 		ID:       1,
-		Username: username.MustNewUserName("testuser"),
+		Username: usernametest.New(t, "testuser"),
 	}
 
 	mockUsecase.On("Register", mock.Anything, testUser, mock.Anything, mock.Anything).Return(expectedResult, nil)

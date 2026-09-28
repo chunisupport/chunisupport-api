@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +54,7 @@ var songBatchJobRepoStartedAt = time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC)
 
 func TestSongBatchJobRepository_SaveAndFindByID(t *testing.T) {
 	finishedAt := songBatchJobRepoStartedAt.Add(5 * time.Minute)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 	tests := []struct {
 		name   string
@@ -223,7 +223,7 @@ func TestSongBatchJobRepository_要求者が削除された場合は要求者な
 	// Given
 	db := setupSongBatchJobRepositorySQLite(t)
 	repo := NewSongBatchJobRepository(db)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 	job := entity.StartSongBatchJobFromAdmin(uuid.NewV4(), songbatch.NewRunRequest(false, false), requester, songBatchJobRepoStartedAt)
 	require.NoError(t, repo.Save(context.Background(), job))
 	// MySQL の ON DELETE SET NULL 相当

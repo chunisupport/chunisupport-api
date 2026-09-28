@@ -8,7 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken/reauthtokentest"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -96,7 +96,7 @@ func TestProfileHandler_UpdateUsername(t *testing.T) {
 	// Given
 	e := newTestEcho()
 	h, userCredentialMock := newProfileHandlerWithMocks()
-	userCredentialMock.On("UpdateUsername", mock.Anything, 10, "newname", reauthtoken.MustNew("reauth-token")).Return("newname", nil).Once()
+	userCredentialMock.On("UpdateUsername", mock.Anything, 10, "newname", reauthtokentest.New(t, "reauth-token")).Return("newname", nil).Once()
 	req := httptest.NewRequest(http.MethodPut, "/internal/me/username", bytes.NewBufferString(`{"username":"newname"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.Header.Set("X-Reauth-Token", "reauth-token")
@@ -200,7 +200,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 20}
-		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20, reauthtoken.MustNew("reauth-token")).Return(nil).Once()
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 20, reauthtokentest.New(t, "reauth-token")).Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		req.Header.Set("X-Reauth-Token", "reauth-token")
@@ -256,7 +256,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 			"DeleteOwnAccount",
 			mock.Anything,
 			22,
-			reauthtoken.MustNew("reauth-token"),
+			reauthtokentest.New(t, "reauth-token"),
 		).Return(usecase.ErrInvalidCredentials).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
@@ -281,7 +281,7 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		h, userCredentialMock := newProfileHandlerWithMocks()
 		// Given
 		user := &entity.User{ID: 23}
-		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 23, reauthtoken.MustNew("reauth-token")).Return(nil).Once()
+		userCredentialMock.On("DeleteOwnAccount", mock.Anything, 23, reauthtokentest.New(t, "reauth-token")).Return(nil).Once()
 
 		req := httptest.NewRequest(http.MethodDelete, "/internal/me", nil)
 		req.Header.Set("X-Reauth-Token", "  reauth-token  ")

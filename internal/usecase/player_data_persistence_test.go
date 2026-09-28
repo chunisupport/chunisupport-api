@@ -8,7 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +53,7 @@ func (r *ratingRecordsRepository) FindByPlayerIDForRating(_ context.Context, exe
 func TestCalculateAndUpdateRatings_ロック後の集約を保存し他の値を保持する(t *testing.T) {
 	now := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
 	overpower := 12345.0
-	player := &entity.Player{ID: 10, UserID: 20, Name: playername.MustNewPlayerName("最新"), Level: 50,
+	player := &entity.Player{ID: 10, UserID: 20, Name: playernametest.New(t, "最新"), Level: 50,
 		OfficialRating: 17, OfficialOverpower: 12300, OverpowerValue: &overpower, DataCollectedAt: &now, CreatedAt: now, UpdatedAt: now}
 	expected := *player
 	zero := 0.0

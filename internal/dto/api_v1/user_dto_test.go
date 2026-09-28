@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -20,7 +20,7 @@ func TestToV1PlayerDTO_Ratingには計算値を設定する(t *testing.T) {
 	calculatedRating := 17.1234
 	officialOPPercent := 98.7654
 	player := &entity.Player{
-		Name:                     playername.MustNewPlayerName("テストプレイヤー"),
+		Name:                     playernametest.New(t, "テストプレイヤー"),
 		OfficialRating:           officialRating,
 		OfficialOverpower:        12345.67,
 		OfficialOverpowerPercent: &officialOPPercent,

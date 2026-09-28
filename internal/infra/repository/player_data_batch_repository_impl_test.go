@@ -8,7 +8,7 @@ import (
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func TestPlayerDataBatchRepository_ProcessPlayer_最新集約を保存する(t *
 	player, err := playerRepo.FindByUserIDForUpdate(ctx, tx, 20)
 	require.NoError(t, err)
 	require.NotNil(t, player)
-	player.Name = playername.MustNewPlayerName("最新の名前")
+	player.Name = playernametest.New(t, "最新の名前")
 	require.NoError(t, playerRepo.Save(ctx, tx, player))
 	_, err = tx.Exec(`INSERT INTO player_locked_songs VALUES (1, 100, true)`)
 	require.NoError(t, err)

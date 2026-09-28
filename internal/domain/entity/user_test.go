@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,8 +70,8 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 
 func TestUser_ChangeUsername(t *testing.T) {
 	// Given
-	oldName := username.MustNewUserName("oldname")
-	newName := username.MustNewUserName("newname")
+	oldName := usernametest.New(t, "oldname")
+	newName := usernametest.New(t, "newname")
 	user := &User{Username: oldName, UpdatedAt: time.Now().Add(-time.Hour)}
 	oldUpdatedAt := user.UpdatedAt
 

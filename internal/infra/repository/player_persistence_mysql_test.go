@@ -9,7 +9,7 @@ import (
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -135,7 +135,7 @@ func TestPlayerPersistenceMySQL_バッチ後の通常更新が再計算値を保
 		defer tx.Rollback()
 		player, err := repo.FindByUserIDForUpdate(ctx, tx, 20)
 		if err == nil {
-			player.ChangeProfile(playername.MustNewPlayerName("更新後"), 40, nil, nil, nil)
+			player.ChangeProfile(playernametest.New(t, "更新後"), 40, nil, nil, nil)
 			err = repo.Save(ctx, tx, player)
 		}
 		if err == nil {

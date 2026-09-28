@@ -8,7 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +50,7 @@ var chartStatsBatchJobRepoStartedAt = time.Date(2026, 9, 28, 3, 0, 0, 0, time.UT
 
 func TestChartStatsBatchJobRepository_SaveAndFindByID(t *testing.T) {
 	finishedAt := chartStatsBatchJobRepoStartedAt.Add(5 * time.Minute)
-	requester := entity.ChartStatsBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.ChartStatsBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 
 	tests := []struct {
 		name   string
@@ -219,7 +219,7 @@ func TestChartStatsBatchJobRepository_要求者が削除された場合は要求
 	// Given
 	db := setupChartStatsBatchJobRepositorySQLite(t)
 	repo := NewChartStatsBatchJobRepository(db)
-	requester := entity.ChartStatsBatchJobRequester{UserID: 10, Username: username.MustNewUserName("adminuser")}
+	requester := entity.ChartStatsBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
 	job := entity.StartChartStatsBatchJobFromAdmin(uuid.NewV4(), requester, chartStatsBatchJobRepoStartedAt)
 	require.NoError(t, repo.Save(context.Background(), job))
 	// MySQL の ON DELETE SET NULL 相当
