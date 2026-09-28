@@ -602,5 +602,5 @@ func TestNewPlayerLockedSongUsecase_フレンド判定リポジトリは必須(t
 	_, err := NewPlayerLockedSongUsecase(&MockExecutor{}, &MockTransactionManager{}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	// Then
-	assert.ErrorIs(t, err, errPlayerLockedSongNilFriendshipRepo)
+	assert.ErrorIs(t, err, errNilFriendshipRepository)
 }

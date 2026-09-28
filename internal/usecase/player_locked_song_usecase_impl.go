@@ -13,10 +13,9 @@ import (
 )
 
 var (
-	errPlayerLockedSongInputRequired     = errors.New("input is required")
-	errPlayerLockedSongNilDB             = errors.New("database executor is nil")
-	errPlayerLockedSongNilTM             = errors.New("transaction manager is nil")
-	errPlayerLockedSongNilFriendshipRepo = errors.New("friendship repository is nil")
+	errPlayerLockedSongInputRequired = errors.New("input is required")
+	errPlayerLockedSongNilDB         = errors.New("database executor is nil")
+	errPlayerLockedSongNilTM         = errors.New("transaction manager is nil")
 )
 
 type playerLockedSongUsecase struct {
@@ -43,7 +42,7 @@ func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, u
 		return nil, errPlayerLockedSongNilTM
 	}
 	if friendshipRepo == nil {
-		return nil, errPlayerLockedSongNilFriendshipRepo
+		return nil, errNilFriendshipRepository
 	}
 	return &playerLockedSongUsecase{db: db, tm: tm, userRepo: userRepo, playerRepo: playerRepo, playerRecRepo: playerRecRepo, playerDataRepo: playerDataRepo, songRepo: songRepo, lockedRepo: lockedRepo, friendshipRepo: friendshipRepo, queryService: queryService, resolver: resolver}, nil
 }

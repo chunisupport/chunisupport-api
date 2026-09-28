@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	errPlayerFavoriteSongNilDB             = errors.New("database executor is nil")
-	errPlayerFavoriteSongNilTM             = errors.New("transaction manager is nil")
-	errPlayerFavoriteSongNilFriendshipRepo = errors.New("friendship repository is nil")
+	errPlayerFavoriteSongNilDB = errors.New("database executor is nil")
+	errPlayerFavoriteSongNilTM = errors.New("transaction manager is nil")
 )
 
 type playerFavoriteSongUsecase struct {
@@ -51,7 +50,7 @@ func NewPlayerFavoriteSongUsecase(
 		return nil, errPlayerFavoriteSongNilTM
 	}
 	if friendshipRepo == nil {
-		return nil, errPlayerFavoriteSongNilFriendshipRepo
+		return nil, errNilFriendshipRepository
 	}
 	return &playerFavoriteSongUsecase{
 		db:             db,
