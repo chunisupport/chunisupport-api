@@ -1,8 +1,10 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -31,6 +33,10 @@ type stubUserRepository struct {
 	savedUser       *entity.User
 	deletedUserID   int
 	deleteByID      func(context.Context, repository.Executor, int) error
+	// usersByID は FindByIDForUpdate が返すユーザーです。
+	usersByID map[int]*entity.User
+	// lockedIDs は FindByIDForUpdate でロックしたユーザーIDを呼び出し順に記録します。
+	lockedIDs []int
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -38,7 +44,11 @@ func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Execu
 }
 
 func (s *stubUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
-	return nil, errors.New("not implemented")
+	s.lockedIDs = append(s.lockedIDs, id)
+	if user, ok := s.usersByID[id]; ok {
+		return user, nil
+	}
+	return nil, repository.ErrUserNotFound
 }
 
 func (s *stubUserRepository) FindByUsername(ctx context.Context, exec repository.Executor, username string) (*entity.User, error) {
@@ -114,7 +124,8 @@ func TestUserUsecase_DeleteUser_RollsBackWhenUserDeletionFails(t *testing.T) {
 		return nil
 	}}
 	userRepo := &stubUserRepository{
-		user: &entity.User{ID: 1, Username: un},
+		user:      &entity.User{ID: 1, Username: un},
+		usersByID: map[int]*entity.User{1: {ID: 1, Username: un}, 99: {ID: 99, AccountTypeID: info.AccountTypeAdmin}},
 		deleteByID: func(context.Context, repository.Executor, int) error {
 			return deleteErr
 		},
@@ -125,7 +136,7 @@ func TestUserUsecase_DeleteUser_RollsBackWhenUserDeletionFails(t *testing.T) {
 	}).SetPhysicalDeletionDependencies(tm, goalRepo)
 
 	// When
-	err = service.DeleteUser(context.Background(), &entity.User{AccountTypeID: info.AccountTypeAdmin}, "testuser")
+	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
 
 	// Then
 	require.ErrorIs(t, err, deleteErr)
@@ -144,7 +155,8 @@ func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testin
 	}}
 	userDeletionCalled := false
 	userRepo := &stubUserRepository{
-		user: &entity.User{ID: 1, Username: un},
+		user:      &entity.User{ID: 1, Username: un},
+		usersByID: map[int]*entity.User{1: {ID: 1, Username: un}, 99: {ID: 99, AccountTypeID: info.AccountTypeAdmin}},
 		deleteByID: func(context.Context, repository.Executor, int) error {
 			userDeletionCalled = true
 			return nil
@@ -156,7 +168,7 @@ func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testin
 	}).SetPhysicalDeletionDependencies(tm, goalRepo)
 
 	// When
-	err = service.DeleteUser(context.Background(), &entity.User{AccountTypeID: info.AccountTypeAdmin}, "testuser")
+	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
 
 	// Then
 	require.ErrorIs(t, err, deleteErr)
@@ -1589,7 +1601,7 @@ func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 		Username: un,
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
-	repo := &stubUserRepository{user: user}
+	repo := &stubUserRepository{user: user, usersByID: map[int]*entity.User{1: user, 99: adminRequester}}
 	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
@@ -1612,7 +1624,7 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 		callOrder = append(callOrder, "goals")
 		return nil
 	}}
-	userRepo := &stubUserRepository{user: user, deleteByID: func(_ context.Context, actualExec repository.Executor, userID int) error {
+	userRepo := &stubUserRepository{user: user, usersByID: map[int]*entity.User{1: user, 99: adminRequester}, deleteByID: func(_ context.Context, actualExec repository.Executor, userID int) error {
 		assert.Same(t, exec, actualExec)
 		assert.Equal(t, 1, userID)
 		callOrder = append(callOrder, "user")
@@ -1663,4 +1675,150 @@ func TestUserUsecase_DeleteUser_NilRequester(t *testing.T) {
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
+}
+
+func TestUserUsecase_DeleteUser_自分自身は削除できない(t *testing.T) {
+	// Given
+	un, err := username.NewUserName("adminuser")
+	require.NoError(t, err)
+	admin := &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}
+	repo := &stubUserRepository{user: admin, usersByID: map[int]*entity.User{1: admin}}
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	// When
+	err = service.DeleteUser(context.Background(), &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin}, "adminuser")
+
+	// Then
+	require.ErrorIs(t, err, ErrCannotDeleteSelf)
+	assert.Zero(t, repo.deletedUserID)
+}
+
+func TestUserUsecase_DeleteUser_ロック後のユーザー状態で判定する(t *testing.T) {
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		// Given: トランザクション内で再取得したユーザーの状態
+		usersByID map[int]*entity.User
+		// Then
+		wantErr error
+	}{
+		{
+			name: "認可確認後に別のADMINから降格されていれば削除しない",
+			usersByID: map[int]*entity.User{
+				1:  {ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin},
+				99: {ID: 99, AccountTypeID: info.AccountTypePlayer},
+			},
+			wantErr: ErrAdminRequired,
+		},
+		{
+			name: "認可確認後にリクエスト元が削除されていれば削除しない",
+			usersByID: map[int]*entity.User{
+				1: {ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin},
+			},
+			wantErr: ErrAdminRequired,
+		},
+		{
+			name: "認可確認後に対象が削除されていればユーザー未存在として扱う",
+			usersByID: map[int]*entity.User{
+				99: {ID: 99, AccountTypeID: info.AccountTypeAdmin},
+			},
+			wantErr: ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			goalDeleted := false
+			goalRepo := &stubGoalRepo{deleteByUserID: func(context.Context, repository.Executor, int) error {
+				goalDeleted = true
+				return nil
+			}}
+			repo := &stubUserRepository{user: &entity.User{ID: 1, Username: un}, usersByID: tt.usersByID}
+			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+			service.(interface {
+				SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
+			}).SetPhysicalDeletionDependencies(&userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo)
+
+			// When
+			err := service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
+
+			// Then
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.False(t, goalDeleted)
+			assert.Zero(t, repo.deletedUserID)
+		})
+	}
+}
+
+func TestUserUsecase_DeleteUser_ユーザー行をIDの昇順でロックする(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		requesterID int
+		targetID    int
+		// Then
+		expectedLockedIDs []int
+	}{
+		{
+			name:              "リクエスト元のIDが大きい場合は対象から先にロックする",
+			requesterID:       99,
+			targetID:          1,
+			expectedLockedIDs: []int{1, 99},
+		},
+		{
+			name:              "リクエスト元のIDが小さい場合はリクエスト元から先にロックする",
+			requesterID:       1,
+			targetID:          99,
+			expectedLockedIDs: []int{1, 99},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			un, err := username.NewUserName("testuser")
+			require.NoError(t, err)
+			target := &entity.User{ID: tt.targetID, Username: un}
+			requester := &entity.User{ID: tt.requesterID, AccountTypeID: info.AccountTypeAdmin}
+			repo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{tt.targetID: target, tt.requesterID: requester}}
+			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+			// When
+			err = service.DeleteUser(context.Background(), requester, "testuser")
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedLockedIDs, repo.lockedIDs)
+			assert.Equal(t, tt.targetID, repo.deletedUserID)
+		})
+	}
+}
+
+func TestUserUsecase_DeleteUser_成功ログに実行者と対象を記録する(t *testing.T) {
+	// Given
+	var buffer bytes.Buffer
+	original := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buffer, nil)))
+	t.Cleanup(func() { slog.SetDefault(original) })
+
+	un, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	target := &entity.User{ID: 1, Username: un}
+	requester := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	repo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: requester}}
+	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil)
+
+	// When
+	err = service.DeleteUser(context.Background(), requester, "testuser")
+
+	// Then
+	require.NoError(t, err)
+	logLine := buffer.String()
+	assert.Contains(t, logLine, `msg="user deleted by admin"`)
+	assert.Contains(t, logLine, "requester_user_id=99")
+	assert.Contains(t, logLine, "target_user_id=1")
+	assert.Contains(t, logLine, "target_username=testuser")
 }

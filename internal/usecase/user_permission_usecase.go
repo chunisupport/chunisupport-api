@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"errors"
-	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -54,7 +53,7 @@ func (u *userPermissionUsecase) ChangePermission(ctx context.Context, requester 
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		lockedRequester, lockedTarget, err := u.lockRequesterAndTarget(ctx, tx, requester.ID, target.ID)
+		lockedRequester, lockedTarget, err := lockRequesterAndTarget(ctx, tx, u.userRepo, requester.ID, target.ID)
 		if err != nil {
 			return err
 		}
@@ -70,28 +69,6 @@ func (u *userPermissionUsecase) ChangePermission(ctx context.Context, requester 
 		}
 		return u.userRepo.Save(ctx, tx, lockedTarget)
 	})
-}
-
-// lockRequesterAndTarget はリクエスト元と対象のユーザー行をロックして取得します。
-// 同時に互いを変更するリクエストでデッドロックしないよう、常にIDの昇順でロックします。
-func (u *userPermissionUsecase) lockRequesterAndTarget(ctx context.Context, tx repository.Executor, requesterID int, targetID int) (*entity.User, *entity.User, error) {
-	locked := make(map[int]*entity.User, 2)
-	ids := []int{min(requesterID, targetID), max(requesterID, targetID)}
-	for _, id := range slices.Compact(ids) {
-		user, err := u.userRepo.FindByIDForUpdate(ctx, tx, id)
-		if errors.Is(err, repository.ErrUserNotFound) {
-			// 認可確認後にリクエスト元が退会した場合は権限がないものとして扱います。
-			if id == requesterID {
-				return nil, nil, ErrAdminRequired
-			}
-			return nil, nil, ErrUserNotFound
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		locked[id] = user
-	}
-	return locked[requesterID], locked[targetID], nil
 }
 
 func accountTypeIDFromPermission(permission string) (int, error) {

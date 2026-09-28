@@ -384,6 +384,8 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 
 // DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
+// トランザクション内でリクエスト元と対象の行をロックし、実行時点でもリクエスト元がADMINであることを確認します。
+// 自分自身の削除を禁止し、ADMIN同士が同時に互いを削除しても一方は認可に失敗するため、ADMINが0人になりません。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	if err := s.ensureDeleteUserPermission(requester); err != nil {
 		return err
@@ -398,13 +400,16 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		slog.Error("failed to find user by username", "username", username, "error", err)
 		return err
 	}
+	if user.ID == requester.ID {
+		return ErrCannotDeleteSelf
+	}
 
 	firebaseUID := ""
 	if user.FirebaseUID != nil {
 		firebaseUID = *user.FirebaseUID
 	}
 
-	if err := s.performPhysicalUserDeletion(ctx, user.ID, username); err != nil {
+	if err := s.performPhysicalUserDeletion(ctx, requester.ID, user.ID, username); err != nil {
 		return err
 	}
 
@@ -414,7 +419,8 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		}
 	}
 
-	slog.Info("user deleted successfully", "username", username, "user_id", user.ID)
+	// 監査のため、削除を実行した管理者と削除対象を同じイベントに記録します。
+	slog.Info("user deleted by admin", "requester_user_id", requester.ID, "target_user_id", user.ID, "target_username", username)
 	return nil
 }
 
@@ -425,8 +431,15 @@ func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
 	return nil
 }
 
-func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID int, username string) error {
+func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, requesterID int, userID int, username string) error {
 	deleteUser := func(exec repository.Executor) error {
+		lockedRequester, _, err := lockRequesterAndTarget(ctx, exec, s.userRepo, requesterID, userID)
+		if err != nil {
+			return err
+		}
+		if !info.HasRole(lockedRequester.AccountTypeID, info.AccountTypeAdmin) {
+			return ErrAdminRequired
+		}
 		if s.goalRepo != nil {
 			if err := s.goalRepo.DeleteByUserID(ctx, exec, userID); err != nil {
 				return err
@@ -442,7 +455,10 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID in
 		err = deleteUser(s.db)
 	}
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, ErrAdminRequired) {
+			return err
+		}
+		if errors.Is(err, ErrUserNotFound) || errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
