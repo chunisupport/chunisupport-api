@@ -14,6 +14,26 @@ func FromUsecaseError(err error) *APIError {
 		return nil
 	}
 
+	// プレイヤーデータの独自エラーは usecase がレスポンスの分類を明示したものです。
+	// Validation / Conflict は原因エラーを Unwrap で保持しているため、原因側の sentinel が下の switch に先にマッチしないよう最初に判定します。
+	// PlayerDataValidationError
+	var validationErr *usecase.PlayerDataValidationError
+	if errors.As(err, &validationErr) {
+		return ErrValidationFailed.WithInternal(err)
+	}
+
+	// PlayerDataNotFoundError
+	var notFoundErr *usecase.PlayerDataNotFoundError
+	if errors.As(err, &notFoundErr) {
+		return ErrResourceNotFound.WithInternal(err)
+	}
+
+	// PlayerDataConflictError
+	var conflictErr *usecase.PlayerDataConflictError
+	if errors.As(err, &conflictErr) {
+		return ErrConflict.WithInternal(err)
+	}
+
 	// usecase層の既知エラーをマッピング
 	// セキュリティ上の理由により、詳細なエラーは汎用的なエラーにマッピングされます
 	switch {
@@ -211,24 +231,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrFriendScoreComparisonUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidFriendRequest):
 		return ErrValidationFailedBadRequest.WithInternal(err)
-	}
-
-	// PlayerDataValidationError
-	var validationErr *usecase.PlayerDataValidationError
-	if errors.As(err, &validationErr) {
-		return ErrValidationFailed.WithInternal(err)
-	}
-
-	// PlayerDataNotFoundError
-	var notFoundErr *usecase.PlayerDataNotFoundError
-	if errors.As(err, &notFoundErr) {
-		return ErrResourceNotFound.WithInternal(err)
-	}
-
-	// PlayerDataConflictError
-	var conflictErr *usecase.PlayerDataConflictError
-	if errors.As(err, &conflictErr) {
-		return ErrConflict.WithInternal(err)
 	}
 
 	// 未知のエラーは内部エラーとして扱う

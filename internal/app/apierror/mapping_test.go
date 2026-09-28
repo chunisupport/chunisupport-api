@@ -217,3 +217,39 @@ func TestFromUsecaseError_データ移行エラーを専用HTTPエラーへ変�
 		})
 	}
 }
+
+func TestFromUsecaseError_プレイヤーデータの独自エラーは原因エラーより優先する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 対応表にある sentinel を原因エラーとして保持する独自エラー
+		err error
+		// Then: 独自エラーの分類で変換される
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "検証エラー",
+			err:        &usecase.PlayerDataValidationError{Field: "name", Message: "invalid", Err: usecase.ErrInternalError},
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   CodeValidationFailed,
+		},
+		{
+			name:       "競合エラー",
+			err:        &usecase.PlayerDataConflictError{Reason: "conflict", Err: repository.ErrSongNotFound},
+			wantStatus: http.StatusConflict,
+			wantCode:   CodeConflict,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+		})
+	}
+}
