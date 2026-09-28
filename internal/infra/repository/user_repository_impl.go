@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/chunisupport/chunisupport-api/internal/utils"
 	"github.com/jmoiron/sqlx"
@@ -97,92 +96,25 @@ func (r *userRepository) LinkFirebaseUID(ctx context.Context, exec repository.Ex
 	return r.validateSingleUserUpdate(ctx, exec, userID, result)
 }
 
+// userListPublicCondition は通常のユーザー一覧で公開するユーザーの条件です。
+// 非公開アカウントとプレイヤー未連携アカウントは一覧に含めません。
+const userListPublicCondition = "u.is_private = FALSE AND u.player_id IS NOT NULL"
+
 // FindAllWithPlayer はユーザー一覧をプレイヤー情報付きで取得します。
-// 通常のユーザー一覧取得用で、プライベート・削除済み・プレイヤー未紐付けアカウントを除外します。
+// 通常のユーザー一覧取得用で、プライベート・プレイヤー未紐付けアカウントを除外します。
 func (r *userRepository) FindAllWithPlayer(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
-	query := `
-		SELECT
-			u.id AS user_id,
-			u.username,
-			u.player_id AS user_player_id,
-			p.id AS player_id,
-			p.player_name,
-			p.calculated_player_rating AS player_calculated_rating,
-			p.overpower_value AS player_overpower_value
-		FROM users u
-		LEFT JOIN players p ON u.player_id = p.id
-		WHERE u.is_private = FALSE
-		AND u.player_id IS NOT NULL
-	`
-	args := []any{}
-
-	if searchName != "" {
-		// 前方一致検索
-		// ユーザー名 OR プレイヤー名
-		query += " AND (u.username LIKE ? OR p.player_name LIKE ?)"
-		// LIKE句の特殊文字（%, _, \）をエスケープしてSQLインジェクションを防ぐ
-		escapedSearchName := utils.EscapeLike(searchName)
-		likePattern := escapedSearchName + "%"
-		args = append(args, likePattern, likePattern)
-	}
-
-	query += " ORDER BY u.id ASC LIMIT ? OFFSET ?"
-	args = append(args, limit, offset)
-
-	rows, err := exec.QueryxContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []entity.UserWithPlayer
-	for rows.Next() {
-		var row models.UserWithPlayerRow
-		if err := rows.StructScan(&row); err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
-		}
-
-		// UserWithPlayerに変換
-		uname, err := username.NewUserName(row.Username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create username: %w", err)
-		}
-
-		result := entity.UserWithPlayer{
-			User: entity.User{
-				ID:       row.UserID,
-				Username: uname,
-				PlayerID: row.UserPlayerID,
-			},
-		}
-
-		if row.PlayerID != nil {
-			var pl entity.Player
-			pl.ID = *row.PlayerID
-			if row.PlayerName != nil {
-				pl.Name, err = playername.NewPlayerName(*row.PlayerName)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create player name: %w", err)
-				}
-			}
-			pl.CalculatedRating = row.PlayerCalculatedRating
-			pl.OverpowerValue = row.PlayerOverpowerValue
-			result.Player = &pl
-		}
-
-		results = append(results, result)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return results, nil
+	return r.findAllWithPlayer(ctx, exec, []string{userListPublicCondition}, limit, offset, searchName)
 }
 
 // FindAllWithPlayerForAdmin はADMIN用にすべてのユーザー一覧をプレイヤー情報付きで取得します。
-// プライベート・削除済み・プレイヤー未紐付けアカウントを含みます。
+// プライベート・プレイヤー未紐付けアカウントを含みます。
 func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
+	return r.findAllWithPlayer(ctx, exec, nil, limit, offset, searchName)
+}
+
+// findAllWithPlayer は公開範囲の条件だけを差し替えて、ユーザー一覧をプレイヤー情報付きで取得します。
+// searchName はユーザー名またはプレイヤー名の前方一致で検索します。
+func (r *userRepository) findAllWithPlayer(ctx context.Context, exec repository.Executor, conditions []string, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
 	query := `
 		SELECT
 			u.id AS user_id,
@@ -200,18 +132,17 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 			p.overpower_value AS player_overpower_value
 		FROM users u
 		LEFT JOIN players p ON u.player_id = p.id
-		WHERE 1=1
 	`
 	args := []any{}
 
 	if searchName != "" {
-		// 前方一致検索
-		// ユーザー名 OR プレイヤー名
-		query += " AND (u.username LIKE ? OR p.player_name LIKE ?)"
+		conditions = append(conditions, "(u.username LIKE ? OR p.player_name LIKE ?)")
 		// LIKE句の特殊文字（%, _, \）をエスケープしてSQLインジェクションを防ぐ
-		escapedSearchName := utils.EscapeLike(searchName)
-		likePattern := escapedSearchName + "%"
+		likePattern := utils.EscapeLike(searchName) + "%"
 		args = append(args, likePattern, likePattern)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	query += " ORDER BY u.id ASC LIMIT ? OFFSET ?"
@@ -225,52 +156,14 @@ func (r *userRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec rep
 
 	var results []entity.UserWithPlayer
 	for rows.Next() {
-		var row struct {
-			models.UserWithPlayerRow
-			UserAccountTypeID int       `db:"user_account_type_id"`
-			UserCreatedAt     time.Time `db:"user_created_at"`
-			UserUpdatedAt     time.Time `db:"user_updated_at"`
-			UserIsSuspicious  *bool     `db:"user_is_suspicious"`
-			UserIsPrivate     *bool     `db:"user_is_private"`
-		}
+		var row models.UserWithPlayerRow
 		if err := rows.StructScan(&row); err != nil {
 			return nil, fmt.Errorf("scan error: %w", err)
 		}
-
-		// UserWithPlayerに変換
-		uname, err := username.NewUserName(row.Username)
+		result, err := row.ToEntity()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create username: %w", err)
+			return nil, err
 		}
-
-		result := entity.UserWithPlayer{
-			User: entity.User{
-				ID:            row.UserID,
-				Username:      uname,
-				FirebaseUID:   row.FirebaseUID,
-				AccountTypeID: row.UserAccountTypeID,
-				CreatedAt:     row.UserCreatedAt,
-				UpdatedAt:     row.UserUpdatedAt,
-				PlayerID:      row.UserPlayerID,
-				IsSuspicious:  row.UserIsSuspicious != nil && *row.UserIsSuspicious,
-				IsPrivate:     row.UserIsPrivate != nil && *row.UserIsPrivate,
-			},
-		}
-
-		if row.PlayerID != nil {
-			var pl entity.Player
-			pl.ID = *row.PlayerID
-			if row.PlayerName != nil {
-				pl.Name, err = playername.NewPlayerName(*row.PlayerName)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create player name: %w", err)
-				}
-			}
-			pl.CalculatedRating = row.PlayerCalculatedRating
-			pl.OverpowerValue = row.PlayerOverpowerValue
-			result.Player = &pl
-		}
-
 		results = append(results, result)
 	}
 
