@@ -84,12 +84,12 @@ func (us *playerDataUsecase) GetRecentUpdates(ctx context.Context, user *entity.
 func decodePlayerUpdate(update *entity.PlayerLatestUpdate, playerID int) (json.RawMessage, error) {
 	raw, err := gunzipBytes(update.ResultGzip(), info.PlayerLatestUpdateMaxPayloadBytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to decompress player latest update: %v", ErrInternalError, err)
+		return nil, fmt.Errorf("%w: failed to decompress player latest update: %w", ErrInternalError, err)
 	}
 
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("%w: failed to decode player latest update: %v", ErrInternalError, err)
+		return nil, fmt.Errorf("%w: failed to decode player latest update: %w", ErrInternalError, err)
 	}
 	var schemaVersion int
 	if err := json.Unmarshal(envelope["schema_version"], &schemaVersion); err != nil ||

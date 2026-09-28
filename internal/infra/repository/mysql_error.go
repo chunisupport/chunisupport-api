@@ -17,7 +17,7 @@ func wrapFirebaseUIDDuplicateError(err error) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %v", domainrepo.ErrFirebaseUIDAlreadyLinked, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrFirebaseUIDAlreadyLinked, err)
 }
 
 func wrapUsernameDuplicateError(err error) error {
@@ -25,7 +25,7 @@ func wrapUsernameDuplicateError(err error) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %v", domainrepo.ErrDuplicateUsername, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrDuplicateUsername, err)
 }
 
 func wrapOfficialIdxDuplicateError(err error) error {
@@ -33,7 +33,7 @@ func wrapOfficialIdxDuplicateError(err error) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %v", domainrepo.ErrDuplicateOfficialIdx, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrDuplicateOfficialIdx, err)
 }
 
 func wrapHonorDuplicateError(err error) error {
@@ -42,7 +42,7 @@ func wrapHonorDuplicateError(err error) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %v", domainrepo.ErrHonorConflict, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrHonorConflict, err)
 }
 
 func wrapHonorReferencedError(err error) error {
@@ -51,21 +51,21 @@ func wrapHonorReferencedError(err error) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %v", domainrepo.ErrHonorConflict, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrHonorConflict, err)
 }
 
 func wrapGoalGroupDuplicateError(err error) error {
 	if !isMySQLDuplicateEntryForKey(err, "uq_goal_groups_user_name") {
 		return err
 	}
-	return fmt.Errorf("%w: %v", domainrepo.ErrGoalGroupConflict, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrGoalGroupConflict, err)
 }
 
 func wrapAPITokenDuplicateError(err error) error {
 	if !isMySQLDuplicateEntryForKey(err, "uq_api_tokens_user_name") {
 		return err
 	}
-	return fmt.Errorf("%w: %v", domainrepo.ErrAPITokenConflict, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrAPITokenConflict, err)
 }
 
 func isMySQLDuplicateEntryForKey(err error, key string) bool {

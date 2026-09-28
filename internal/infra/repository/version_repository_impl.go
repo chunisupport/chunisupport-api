@@ -121,5 +121,5 @@ func wrapVersionDuplicateError(err error) error {
 	if !isMySQLDuplicateEntryForKey(err, "name") {
 		return err
 	}
-	return fmt.Errorf("%w: %v", domainrepo.ErrVersionConflict, err)
+	return fmt.Errorf("%w: %w", domainrepo.ErrVersionConflict, err)
 }

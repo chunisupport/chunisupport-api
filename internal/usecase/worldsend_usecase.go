@@ -356,7 +356,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 		if input.Chart.LevelStar != nil {
 			ls, err := levelstar.NewLevelStar(*input.Chart.LevelStar)
 			if err != nil {
-				return nil, fmt.Errorf("%w: level_star: %v", ErrInvalidWorldsendInput, err)
+				return nil, fmt.Errorf("%w: level_star: %w", ErrInvalidWorldsendInput, err)
 			}
 			levelStarVO = &ls
 		}
@@ -365,7 +365,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 		if input.Chart.Notes != nil {
 			n, err := notes.NewNotes(*input.Chart.Notes)
 			if err != nil {
-				return nil, fmt.Errorf("%w: notes: %v", ErrInvalidWorldsendInput, err)
+				return nil, fmt.Errorf("%w: notes: %w", ErrInvalidWorldsendInput, err)
 			}
 			notesVO = &n
 		}

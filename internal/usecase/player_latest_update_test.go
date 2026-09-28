@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -439,4 +440,19 @@ func TestPlayerDataUsecase_GetLatestUpdate_schema3のOP割合差分形式を検�
 			assert.True(t, errors.Is(err, ErrInternalError))
 		})
 	}
+}
+
+func TestPlayerDataUsecase_GetLatestUpdate_gzip破損時は原因エラーを保持する(t *testing.T) {
+	// Given
+	playerID := 12
+	brokenGzipUpdate, err := entity.NewPlayerLatestUpdate(playerID, playerLatestUpdateSchemaVersion, []byte("broken-gzip"), time.Now().UTC(), time.Now().UTC(), "broken-hash")
+	require.NoError(t, err)
+	u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: brokenGzipUpdate}}
+
+	// When
+	_, err = u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
+
+	// Then
+	assert.ErrorIs(t, err, ErrInternalError)
+	assert.ErrorIs(t, err, gzip.ErrHeader)
 }

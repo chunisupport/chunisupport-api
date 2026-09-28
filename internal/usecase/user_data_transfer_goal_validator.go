@@ -33,7 +33,7 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 	validate := func(goal entity.UserDataTransferGoal) error {
 		attributes, err := internalizeTransferredGoalAttributes(goal.Attributes, masters)
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrDataTransferInvalidData, err)
+			return fmt.Errorf("%w: %w", ErrDataTransferInvalidData, err)
 		}
 		_, attrs, params, err := u.validateInputStatic(&GoalInput{
 			Title:             goal.Title,
@@ -44,7 +44,7 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 			InvertPercentage:  goal.InvertPercentage,
 		})
 		if err != nil {
-			return fmt.Errorf("%w: transferred goal is invalid: %v", ErrDataTransferInvalidData, err)
+			return fmt.Errorf("%w: transferred goal is invalid: %w", ErrDataTransferInvalidData, err)
 		}
 		validations = append(validations, dynamicValidation{achievementType: goal.AchievementType, params: params, filter: goalTargetFilter(attrs, goal.AchievementType, params)})
 		return nil
@@ -74,7 +74,7 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 	}
 	for index, validation := range validations {
 		if err := validateDynamicUpperBoundWithStats(validation.achievementType, validation.params, &stats[index]); err != nil {
-			return fmt.Errorf("%w: transferred goal is invalid: %v", ErrDataTransferInvalidData, err)
+			return fmt.Errorf("%w: transferred goal is invalid: %w", ErrDataTransferInvalidData, err)
 		}
 	}
 	return nil

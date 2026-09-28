@@ -223,7 +223,7 @@ func (s *songUsecaseImpl) UpdateChartConstant(ctx context.Context, input UpdateC
 
 	constant, err := chartconstant.NewChartConstant(input.Const)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidDifficulty, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidDifficulty, err)
 	}
 
 	var updatedSong *entity.Song

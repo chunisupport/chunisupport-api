@@ -257,3 +257,40 @@ func TestVersionUsecase_再読込は要求キャンセルから切り離す(t *t
 func dateForVersionTest(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
+
+func TestVersionUsecase_不正な名前はドメインエラーを保持する(t *testing.T) {
+	tests := []struct {
+		name string
+		// When: 不正な名前で実行する操作
+		run func(uc VersionUsecase) error
+	}{
+		{
+			name: "作成",
+			run: func(uc VersionUsecase) error {
+				_, err := uc.Create(context.Background(), "VERSE", dateForVersionTest(2025, 1, 1))
+				return err
+			},
+		},
+		{
+			name: "名称変更",
+			run: func(uc VersionUsecase) error {
+				_, err := uc.Rename(context.Background(), 1, "VERSE")
+				return err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERS", ReleasedAt: dateForVersionTest(2024, 1, 1)}}}
+			uc := NewVersionUsecase(repo, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
+
+			// When
+			err := tt.run(uc)
+
+			// Then
+			assert.ErrorIs(t, err, ErrInvalidVersionInput)
+			assert.ErrorIs(t, err, entity.ErrInvalidVersion)
+		})
+	}
+}
