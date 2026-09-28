@@ -25,7 +25,16 @@ func NewCourseRepository(db apirepo.Executor) songbatch.CourseRepository {
 	return &courseRepositoryImpl{db: db}
 }
 
-// SaveAll はクラスを一括取得した後、コースをまとめて登録または更新します。
+type existingCourseRow struct {
+	OfficialIdx   string `db:"official_idx"`
+	Name          string `db:"name"`
+	CourseClassID int    `db:"course_class_id"`
+	IsDeleted     bool   `db:"is_deleted"`
+}
+
+// SaveAll はクラスと既存コースを一括取得した後、未登録のコースをまとめて登録し、変更のあるコースだけ更新します。
+// InnoDB は INSERT ... ON DUPLICATE KEY UPDATE が既存行を更新する場合も AUTO_INCREMENT を消費するため、
+// 既存コースにはINSERTを発行しません。
 func (r *courseRepositoryImpl) SaveAll(ctx context.Context, courses []entity.Course) error {
 	if len(courses) == 0 {
 		return nil
@@ -50,27 +59,53 @@ func (r *courseRepositoryImpl) SaveAll(ctx context.Context, courses []entity.Cou
 		return fmt.Errorf("error during course classes iteration: %w", err)
 	}
 
-	for start := 0; start < len(courses); start += info.SongBatchBulkInsertChunkSize {
-		end := min(start+info.SongBatchBulkInsertChunkSize, len(courses))
-		chunk := courses[start:end]
+	existingRows := []existingCourseRow{}
+	if err := r.db.SelectContext(ctx, &existingRows, `SELECT official_idx, name, course_class_id, is_deleted FROM courses`); err != nil {
+		return fmt.Errorf("failed to query courses: %w", err)
+	}
+	existing := make(map[string]existingCourseRow, len(existingRows))
+	for _, row := range existingRows {
+		existing[row.OfficialIdx] = row
+	}
+
+	type courseWithClass struct {
+		course  entity.Course
+		classID int
+	}
+	var inserts []courseWithClass
+	for _, course := range courses {
+		classID, ok := classIDs[strings.ToLower(strings.TrimSpace(course.ClassName))]
+		if !ok {
+			return fmt.Errorf("course %q references unknown class %q", course.OfficialIdx, course.ClassName)
+		}
+		row, found := existing[course.OfficialIdx]
+		if !found {
+			inserts = append(inserts, courseWithClass{course: course, classID: classID})
+			continue
+		}
+		if row.Name == course.Name && row.CourseClassID == classID && !row.IsDeleted {
+			continue
+		}
+		// 既存コースの変更は公式データ更新時のみ発生し件数が限られるため、1件ずつ更新する。
+		if _, err := r.db.ExecContext(ctx, `UPDATE courses SET name = ?, course_class_id = ?, is_deleted = 0 WHERE official_idx = ?`,
+			course.Name, classID, course.OfficialIdx); err != nil {
+			return fmt.Errorf("failed to update course %q: %w", course.OfficialIdx, err)
+		}
+	}
+
+	for start := 0; start < len(inserts); start += info.SongBatchBulkInsertChunkSize {
+		end := min(start+info.SongBatchBulkInsertChunkSize, len(inserts))
+		chunk := inserts[start:end]
 		values := make([]string, len(chunk))
 		args := make([]any, 0, len(chunk)*4)
-		for i, course := range chunk {
-			classID, ok := classIDs[strings.ToLower(strings.TrimSpace(course.ClassName))]
-			if !ok {
-				return fmt.Errorf("course %q references unknown class %q", course.OfficialIdx, course.ClassName)
-			}
+		for i, item := range chunk {
 			values[i] = "(?, ?, ?, ?, 0)"
-			args = append(args, course.DisplayID.String(), course.OfficialIdx, course.Name, classID)
+			args = append(args, item.course.DisplayID.String(), item.course.OfficialIdx, item.course.Name, item.classID)
 		}
 
-		query := `INSERT INTO courses (display_id, official_idx, name, course_class_id, is_deleted) VALUES ` + strings.Join(values, ",") + `
-ON DUPLICATE KEY UPDATE
-	name = VALUES(name),
-	course_class_id = VALUES(course_class_id),
-	is_deleted = 0`
+		query := `INSERT INTO courses (display_id, official_idx, name, course_class_id, is_deleted) VALUES ` + strings.Join(values, ",")
 		if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
-			return fmt.Errorf("failed to save courses (%d-%d): %w", start, end, err)
+			return fmt.Errorf("failed to insert courses (%d-%d): %w", start, end, err)
 		}
 	}
 
