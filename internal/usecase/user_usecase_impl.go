@@ -420,7 +420,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 	}
 
 	// 監査のため、削除を実行した管理者と削除対象を同じイベントに記録します。
-	slog.Info("user deleted by admin", "requester_user_id", requester.ID, "target_user_id", user.ID, "target_username", username)
+	slog.InfoContext(ctx, "user deleted by admin", "requester_user_id", requester.ID, "target_user_id", user.ID, "target_username", username)
 	return nil
 }
 

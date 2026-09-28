@@ -756,6 +756,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		}
 		mockUsecase.AssertExpectations(t)
 	})
+
 	t.Run("異常系: 自分自身は削除できない", func(t *testing.T) {
 		mockUsecase.On("DeleteUser", mock.Anything, adminUser, "adminuser").Return(usecase.ErrCannotDeleteSelf).Once()
 
