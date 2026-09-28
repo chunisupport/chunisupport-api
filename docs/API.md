@@ -217,6 +217,8 @@ Content-Type: application/json
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/admin/song-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 楽曲バッチの実行履歴取得・実行 |
 | `/internal/admin/song-batch/jobs/:id` | GET | Firebase Bearer (ADMIN+) | 楽曲バッチジョブの状態取得 |
+| `/internal/admin/chart-stats-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 譜面統計バッチの実行履歴取得・実行 |
+| `/internal/admin/chart-stats-batch/jobs/:id` | GET | Firebase Bearer (ADMIN+) | 譜面統計バッチジョブの状態取得 |
 | `/internal/me` | GET | Firebase Bearer | 自身のユーザー情報 |
 | `/internal/me/privacy` | PUT | Firebase Bearer | 非公開設定更新 |
 | `/internal/me` | DELETE | Firebase Bearer + X-Reauth-Token | アカウント物理削除 |
@@ -712,6 +714,67 @@ Shields.io側のキャッシュにより、公式RATINGの更新や非公開設�
 - **主なエラー**:
   - 400 Bad Request (`invalid_song_batch_job_id`): `id` が UUID 形式でない
   - 404 Not Found (`song_batch_job_not_found`): ジョブが存在しない
+
+### 譜面統計バッチ `/internal/admin/chart-stats-batch/jobs`
+
+譜面統計バッチ（`cmd/chart-stats-batch` と同じ処理）を管理画面から実行し、実行履歴を確認します。処理内容は [chart_stats_batch.md](chart_stats_batch.md) を参照してください。
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **レスポンスヘッダー**: `Cache-Control: no-store`
+
+#### POST `/internal/admin/chart-stats-batch/jobs`
+
+譜面統計バッチの実行を受け付けます。全記録の集計には時間がかかるため、API プロセス内でバックグラウンド実行し、開始したジョブを 202 Accepted で返します。結果は `GET` で確認してください。
+
+実行条件はないため、リクエストボディは不要です（送信しても参照しません）。
+
+- CLI（cron）と同じ MySQL アドバイザリロックを使うため、CLI・管理画面のどちらかで譜面統計バッチが実行中の場合は受け付けません。
+- 統計テーブルは集計後に単一トランザクションで入れ替えるため、実行中も直前の統計を返し続けます。
+- 公開用の統計JSON（`export-static-data --chart-stats`）は更新しません。次回の定期実行で反映されます。
+- API の停止時に実行中だったジョブはキャンセルされ、統計テーブルの入れ替えはロールバックされて `INTERRUPTED` になります。停止処理が始まった後の要求は 503 Service Unavailable (`service_unavailable`) で拒否します。
+- **主なエラー**:
+  - 409 Conflict (`chart_stats_batch_already_running`): 譜面統計バッチが実行中
+  - 503 Service Unavailable (`service_unavailable`): API の停止処理中
+
+#### GET `/internal/admin/chart-stats-batch/jobs`
+
+開始日時の新しい順に実行履歴を返します（最大50件）。CLI（cron）から実行したものも含みます。実行履歴は最新50件だけを保持し、新しいジョブを記録した時点でそれより古いジョブを削除します。
+
+```json
+{
+  "jobs": [
+    {
+      "id": "0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b",
+      "trigger": "ADMIN",
+      "requested_by": "adminuser",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-28T12:00:00+09:00",
+      "finished_at": "2026-09-28T12:02:30+09:00",
+      "error_message": null
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | ジョブID（UUID） |
+| `trigger` | string | 起動元。`CLI`（cron など）/ `ADMIN`（管理画面） |
+| `requested_by` | string \| null | 管理画面から実行したユーザー名。CLI 実行、または要求者が削除済みの場合は `null` |
+| `status` | string | `RUNNING` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`（プロセス停止などで中断） |
+| `started_at` | string | 開始日時 |
+| `finished_at` | string \| null | 終了日時。実行中は `null` |
+| `error_message` | string \| null | 失敗理由（最大1,000文字）。失敗以外は `null` |
+
+`FAILED` の場合、統計テーブルは更新されていません。`INTERRUPTED` のうち、API の停止などで実行中にキャンセルされたものはロールバック済みです。プロセスの異常終了で `RUNNING` のまま残り、次の実行時に `INTERRUPTED` へ更新したものは、入れ替えの成否が不明です。
+
+#### GET `/internal/admin/chart-stats-batch/jobs/:id`
+
+指定したジョブを `GET /internal/admin/chart-stats-batch/jobs` の要素と同じ形式で返します。
+
+- **主なエラー**:
+  - 400 Bad Request (`invalid_chart_stats_batch_job_id`): `id` が UUID 形式でない
+  - 404 Not Found (`chart_stats_batch_job_not_found`): ジョブが存在しない
 
 ---
 

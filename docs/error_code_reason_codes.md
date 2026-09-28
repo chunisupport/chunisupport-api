@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-09-26
+最終更新: 2026-09-28
 
 ## 更新ルール
 
@@ -93,6 +93,9 @@
 | `song_batch_job_not_found` | 楽曲バッチジョブ未検出 |
 | `invalid_song_batch_job_id` | 楽曲バッチジョブID不正 |
 | `invalid_song_batch_mode` | 楽曲バッチの実行モード不正 |
+| `chart_stats_batch_already_running` | 譜面統計バッチが実行中（CLI・管理画面のどちらから起動したものも含む） |
+| `chart_stats_batch_job_not_found` | 譜面統計バッチジョブ未検出 |
+| `invalid_chart_stats_batch_job_id` | 譜面統計バッチジョブID不正 |
 
 `maintenance_mode` は、互換API以外でメンテナンスゲートまたはログイン時のロール制御が利用を遮断した場合にHTTP 503で返します。レスポンス本文にはメンテナンスコメントを含めません。状態とコメントは `GET /internal/system/status` から取得してください。`/compat/chunirec/2.0` と `/compat/reiwa/1` は既存の互換形式を維持するため、本文のコードは数値の `503` になります。
 

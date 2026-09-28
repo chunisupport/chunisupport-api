@@ -106,6 +106,7 @@ type Handlers struct {
 	Course                *api_internal.CourseHandler
 	SystemMaintenance     *api_internal.SystemMaintenanceHandler
 	SongBatch             *api_internal.SongBatchHandler
+	ChartStatsBatch       *api_internal.ChartStatsBatchHandler
 	// 外部API v1 用ハンドラ
 	V1Song        *api_v1.V1SongHandler
 	V1Worldsend   *api_v1.V1WorldsendHandler
@@ -127,9 +128,15 @@ func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	return e, err
 }
 
-// newRouter はルーターを構築し、サーバー停止時に完了を待つ必要がある楽曲バッチのユースケースも返します。
-// ctx は管理画面から起動した楽曲バッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
-func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, *usecase.SongBatchJobUsecase, error) {
+// backgroundBatchJobs は管理画面から起動したバッチをバックグラウンドで実行するユースケースです。
+// サーバー停止時は DB 接続を閉じる前に Wait で完了を待ちます。
+type backgroundBatchJobs interface {
+	Wait()
+}
+
+// newRouter はルーターを構築し、サーバー停止時に完了を待つ必要があるバッチのユースケースも返します。
+// ctx は管理画面から起動したバッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
+func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, error) {
 	e := echo.New()
 	if err := configureIPExtractor(e, cfg.ClientIP); err != nil {
 		return nil, nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
@@ -274,6 +281,12 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		infrasongbatch.NewSongBatchUsecase(db, cfg.SongBatch.WikiBaseURL),
 		overpowerDenominatorProvider,
 	)
+	chartStatsBatchJobUsecase := usecase.NewChartStatsBatchJobUsecase(
+		ctx,
+		infradb.NewAdvisoryLockProvider(db),
+		infra.NewChartStatsBatchJobRepository(db),
+		usecase.NewChartStatsBatchUsecase(infra.NewChartStatsBatchRepository(db)),
+	)
 
 	// DI - Handlers
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
@@ -316,6 +329,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		Course:                api_internal.NewCourseHandler(courseUsecase),
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
+		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
 		// 外部API v1 用ハンドラ
 		V1Song:        api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend:   api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
@@ -344,7 +358,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	// ルートの登録
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
-	return e, songBatchJobUsecase, nil
+	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, nil
 }
 
 func configureIPExtractor(e *echo.Echo, cfg config.ClientIP) error {
@@ -584,6 +598,9 @@ func registerRoutes(
 		adminGroup.GET("/song-batch/jobs", handlers.SongBatch.List)
 		adminGroup.POST("/song-batch/jobs", handlers.SongBatch.Start)
 		adminGroup.GET("/song-batch/jobs/:id", handlers.SongBatch.Get)
+		adminGroup.GET("/chart-stats-batch/jobs", handlers.ChartStatsBatch.List)
+		adminGroup.POST("/chart-stats-batch/jobs", handlers.ChartStatsBatch.Start)
+		adminGroup.GET("/chart-stats-batch/jobs/:id", handlers.ChartStatsBatch.Get)
 	}
 
 	// api.chunisupport.net/internal/honors

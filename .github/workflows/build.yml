@@ -54,6 +54,7 @@ jobs:
           echo "batch_binary_name=chunisupport-recalculate-player-data-linux-${ARCH}" >> $GITHUB_OUTPUT
           echo "static_data_export_binary_name=chunisupport-export-static-data-linux-${ARCH}" >> $GITHUB_OUTPUT
           echo "song_batch_binary_name=chunisupport-song-batch-linux-${ARCH}" >> $GITHUB_OUTPUT
+          echo "chart_stats_batch_binary_name=chunisupport-chart-stats-batch-linux-${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Build binary
         id: build-binary
@@ -76,6 +77,9 @@ jobs:
           go build -trimpath \
             -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
             -o "${{ steps.target.outputs.song_batch_binary_name }}" ./cmd/song-batch
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/chunisupport/chunisupport-api/internal/info.BuildDate=${BUILD_DATE} -X github.com/chunisupport/chunisupport-api/internal/info.Revision=${REVISION}" \
+            -o "${{ steps.target.outputs.chart_stats_batch_binary_name }}" ./cmd/chart-stats-batch
 
       - name: Package (binary + migration, flat structure)
         id: package
@@ -85,6 +89,7 @@ jobs:
             ${{ steps.target.outputs.batch_binary_name }} \
             ${{ steps.target.outputs.static_data_export_binary_name }} \
             ${{ steps.target.outputs.song_batch_binary_name }} \
+            ${{ steps.target.outputs.chart_stats_batch_binary_name }} \
             migration/
 
       - name: Upload artifact
