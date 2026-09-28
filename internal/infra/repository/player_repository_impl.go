@@ -38,7 +38,8 @@ func (r *playerRepository) findByID(ctx context.Context, exec repository.Executo
 			class_emblem_id, class_emblem_base_id, possession_id, last_played_at,
 			overpower_value, official_overpower, official_overpower_percent,
 			data_collected_at,
-			created_at, updated_at
+			created_at, updated_at,
+			recalculated_master_fingerprint
 		FROM players
 		WHERE id = ?
 	`
@@ -64,6 +65,7 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 			p.overpower_value, p.official_overpower, p.official_overpower_percent,
 			p.data_collected_at,
 			p.created_at, p.updated_at,
+			p.recalculated_master_fingerprint,
 			ph.slot AS honor_slot,
 			h.name AS honor_name,
 			ht.name AS honor_type_name,
@@ -191,7 +193,8 @@ func (r *playerRepository) findByUserID(ctx context.Context, exec repository.Exe
 			class_emblem_id, class_emblem_base_id, possession_id, last_played_at,
 			overpower_value, official_overpower, official_overpower_percent,
 			data_collected_at,
-			created_at, updated_at
+			created_at, updated_at,
+			recalculated_master_fingerprint
 		FROM players
 		WHERE user_id = ?
 	`
@@ -226,14 +229,16 @@ func (r *playerRepository) insert(ctx context.Context, exec repository.Executor,
 			user_id, player_name, player_level, official_player_rating,
 			calculated_player_rating, best_average_rating, new_average_rating,
 			class_emblem_id, class_emblem_base_id, possession_id, last_played_at,
-			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			overpower_value, official_overpower, official_overpower_percent, data_collected_at, created_at, updated_at,
+			recalculated_master_fingerprint
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	result, err := exec.ExecContext(ctx, query,
 		player.UserID, player.Name.String(), player.Level, player.OfficialRating,
 		player.CalculatedRating, player.BestAverageRating, player.NewAverageRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.PossessionID, player.LastPlayedAt,
 		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.CreatedAt, player.UpdatedAt,
+		player.RecalculatedMasterFingerprint,
 	)
 	if err != nil {
 		return err
@@ -273,7 +278,8 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		    official_overpower = ?,
 		    official_overpower_percent = ?,
 		    data_collected_at = ?,
-		    updated_at = ?
+		    updated_at = ?,
+		    recalculated_master_fingerprint = ?
 		WHERE id = ?
 	`
 	_, err := exec.ExecContext(ctx, query,
@@ -281,6 +287,7 @@ func (r *playerRepository) update(ctx context.Context, exec repository.Executor,
 		player.CalculatedRating, player.BestAverageRating, player.NewAverageRating,
 		player.ClassEmblemID, player.ClassEmblemBaseID, player.PossessionID, player.LastPlayedAt,
 		player.OverpowerValue, player.OfficialOverpower, player.OfficialOverpowerPercent, player.DataCollectedAt, player.UpdatedAt,
+		player.RecalculatedMasterFingerprint,
 		player.ID,
 	)
 	return err

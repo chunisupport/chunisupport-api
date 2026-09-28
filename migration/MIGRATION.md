@@ -75,6 +75,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
     - `created_at`, `updated_at`: 作成日時、更新日時。
+    - `recalculated_master_fingerprint`: プレイヤーデータ再計算バッチが直近の再計算に使ったマスタと計算ロジックのフィンガープリント（SHA-256の16進数小文字）。NULLは次回のバッチで再計算が必要であることを表す。
 
 #### `player_records`
 - **役割**: プレイヤーの通常譜面に対するスコア記録を格納します。

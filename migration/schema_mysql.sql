@@ -408,6 +408,7 @@ CREATE TABLE `players` (
   `data_collected_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `recalculated_master_fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_players_user_id` (`user_id`),
   KEY `class_emblem_id` (`class_emblem_id`),

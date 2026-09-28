@@ -62,9 +62,11 @@ func run() int {
 	result, executeErr := batchUsecase.Execute(ctx)
 	slog.Info("プレイヤーデータ再計算バッチを終了しました",
 		"started_at", result.StartedAt, "operational_date", result.OperationalDate.Format(time.DateOnly),
-		"current_version", result.CurrentVersion, "upper_bound_player_id", result.UpperBoundPlayerID,
+		"current_version", result.CurrentVersion, "master_fingerprint", result.MasterFingerprint.String(),
+		"upper_bound_player_id", result.UpperBoundPlayerID,
 		"processed", result.Processed, "success", result.Success, "current_preserved", result.CurrentPreserved,
 		"current_broken_rebuilt", result.CurrentBrokenRebuilt, "legacy_rebuilt", result.LegacyRebuilt,
+		"slots_unchanged", result.SlotsUnchanged,
 		"conflict_skipped", result.ConflictSkipped,
 		"deleted_skipped", result.DeletedSkipped, "failed", result.Failed,
 		"last_player_id", result.LastPlayerID, "duration", time.Since(start))

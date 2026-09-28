@@ -690,6 +690,25 @@ func TestSchemaMySQL_ポゼッションマスタと参照列を含む(t *testing
 	assert.Contains(t, schemaSQL, "CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`)")
 }
 
+func TestAddRecalculatedMasterFingerprintToPlayersUp_NULL許容のASCII列を追加する(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000055_add_recalculated_master_fingerprint_to_players.up.sql")
+
+	assert.Contains(t, upSQL, "ALTER TABLE players ADD COLUMN recalculated_master_fingerprint CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL")
+	assert.NotContains(t, upSQL, "INDEX")
+}
+
+func TestAddRecalculatedMasterFingerprintToPlayersDown_列を削除する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000055_add_recalculated_master_fingerprint_to_players.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE players DROP COLUMN recalculated_master_fingerprint")
+}
+
+func TestSchemaMySQL_再計算済みフィンガープリント列を含む(t *testing.T) {
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	assert.Contains(t, schemaSQL, "`recalculated_master_fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL")
+}
+
 func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
 	t.Helper()
 

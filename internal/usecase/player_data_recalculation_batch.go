@@ -1,9 +1,13 @@
 package usecase
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strconv"
 	"time"
 
@@ -11,6 +15,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -20,12 +25,14 @@ type PlayerDataBatchResult struct {
 	StartedAt            time.Time
 	OperationalDate      time.Time
 	CurrentVersion       string
+	MasterFingerprint    masterfingerprint.Fingerprint
 	UpperBoundPlayerID   int
 	Processed            int
 	Success              int
 	CurrentPreserved     int
 	CurrentBrokenRebuilt int
 	LegacyRebuilt        int
+	SlotsUnchanged       int
 	ConflictSkipped      int
 	DeletedSkipped       int
 	Failed               int
@@ -58,6 +65,7 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 		StartedAt:          startedAt,
 		OperationalDate:    operationalDate,
 		CurrentVersion:     snapshot.Version.Name,
+		MasterFingerprint:  prepared.fingerprint,
 		UpperBoundPlayerID: snapshot.UpperBound,
 	}
 	afterID := 0
@@ -65,7 +73,7 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 		if err := ctx.Err(); err != nil {
 			return result, nil
 		}
-		keys, err := u.repository.ListPlayerKeys(ctx, afterID, snapshot.UpperBound, playerDataBatchPageSize)
+		keys, err := u.repository.ListPlayerKeys(ctx, afterID, snapshot.UpperBound, playerDataBatchPageSize, prepared.fingerprint)
 		if err != nil {
 			return result, err
 		}
@@ -80,12 +88,14 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 			result.LastPlayerID = key.ID
 			isCurrent := false
 			currentBroken := false
+			slotsUnchanged := false
 			var lastPlayedAt *time.Time
 			status, processErr := u.repository.ProcessPlayer(ctx, key, func(data repository.PlayerBatchData) (repository.PlayerBatchUpdate, error) {
 				lastPlayedAt = data.LastPlayedAt
 				isCurrent = data.LastPlayedAt != nil && !databaseWallClockInJST(*data.LastPlayedAt, prepared.versionStartedAt.Location()).Before(prepared.versionStartedAt)
 				update, broken, err := prepared.buildUpdate(data, isCurrent)
 				currentBroken = broken
+				slotsUnchanged = (!isCurrent || broken) && len(update.ClearChartIDs) == 0 && len(update.Assignments) == 0
 				return update, err
 			})
 			if processErr != nil {
@@ -110,6 +120,9 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 				} else {
 					result.LegacyRebuilt++
 				}
+				if slotsUnchanged {
+					result.SlotsUnchanged++
+				}
 			}
 		}
 		afterID = keys[len(keys)-1].ID
@@ -127,6 +140,7 @@ type preparedBatchSnapshot struct {
 	chartsByID       map[int]repository.BatchChart
 	officialIndex    map[int]uint64
 	operationalDate  time.Time
+	fingerprint      masterfingerprint.Fingerprint
 }
 
 func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operationalDate time.Time, jst *time.Location) (preparedBatchSnapshot, error) {
@@ -166,7 +180,74 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 		}
 		prepared.chartsByID[chart.ID] = chart
 	}
+	fingerprint, err := computeMasterFingerprint(snapshot)
+	if err != nil {
+		return preparedBatchSnapshot{}, err
+	}
+	prepared.fingerprint = fingerprint
 	return prepared, nil
+}
+
+// fingerprintSource はフィンガープリントの算出対象を正規化した構造です。
+// buildUpdate と prepareBatchSnapshot が計算に使う項目だけを持ちます。
+// 表示用の項目や計算に使わない項目を含めると、計算結果が変わらない変更でも全プレイヤーが再計算になるため含めません。
+// 配信前の楽曲はidxが確定しないためマスタに存在せず、運用日による配信済み判定は常に同じ結果になるので含めません。
+type fingerprintSource struct {
+	LogicVersion      int
+	VersionID         int
+	VersionReleasedAt time.Time
+	Songs             []fingerprintSong
+	Charts            []fingerprintChart
+	Slots             []fingerprintSlot
+}
+
+type fingerprintSong struct {
+	ID            int
+	ReleasedAt    *time.Time
+	IsDeleted     bool
+	IsWorldsend   bool
+	OfficialIndex string
+}
+
+type fingerprintChart struct {
+	ID             int
+	SongID         int
+	DifficultyName string
+	ChartConst     float64
+}
+
+type fingerprintSlot struct {
+	Name string
+	ID   int
+}
+
+// computeMasterFingerprint は計算結果に影響するマスタ項目と計算ロジックのバージョンからフィンガープリントを求めます。
+// 取得順に依存しないよう、楽曲と譜面はID順、枠は名前順に並べてからシリアライズします。
+func computeMasterFingerprint(snapshot repository.PlayerDataMasterSnapshot) (masterfingerprint.Fingerprint, error) {
+	source := fingerprintSource{
+		LogicVersion:      info.PlayerRecalculationLogicVersion,
+		VersionID:         snapshot.Version.ID,
+		VersionReleasedAt: snapshot.Version.ReleasedAt,
+		Songs:             make([]fingerprintSong, 0, len(snapshot.Songs)),
+		Charts:            make([]fingerprintChart, 0, len(snapshot.Charts)),
+		Slots:             make([]fingerprintSlot, 0, len(snapshot.SlotIDs)),
+	}
+	for _, song := range snapshot.Songs {
+		source.Songs = append(source.Songs, fingerprintSong{ID: song.ID, ReleasedAt: song.ReleasedAt, IsDeleted: song.IsDeleted, IsWorldsend: song.IsWorldsend, OfficialIndex: song.OfficialIndex})
+	}
+	slices.SortFunc(source.Songs, func(a, b fingerprintSong) int { return cmp.Compare(a.ID, b.ID) })
+	for _, chart := range snapshot.Charts {
+		source.Charts = append(source.Charts, fingerprintChart{ID: chart.ID, SongID: chart.SongID, DifficultyName: chart.DifficultyName, ChartConst: chart.ChartConst})
+	}
+	slices.SortFunc(source.Charts, func(a, b fingerprintChart) int { return cmp.Compare(a.ID, b.ID) })
+	for _, name := range slices.Sorted(maps.Keys(snapshot.SlotIDs)) {
+		source.Slots = append(source.Slots, fingerprintSlot{Name: name, ID: snapshot.SlotIDs[name]})
+	}
+	data, err := json.Marshal(source)
+	if err != nil {
+		return masterfingerprint.Fingerprint{}, fmt.Errorf("マスタのフィンガープリントの算出に失敗しました: %w", err)
+	}
+	return masterfingerprint.Compute(data), nil
 }
 
 func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, current bool) (repository.PlayerBatchUpdate, bool, error) {
@@ -234,18 +315,59 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 		}
 		stats := service.AggregateOfficialRating(best, newRecords)
 		op, _ := service.CalcOverpowerSummary(opRecords, 0)
-		return repository.PlayerBatchUpdate{PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, currentBroken, nil
+		return repository.PlayerBatchUpdate{PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op, MasterFingerprint: p.fingerprint}, currentBroken, nil
 	}
 	bestSlots := service.BuildRatingSlots(best, constants.BestSlotMaxCount, constants.CandidateSlotMaxCount)
 	newSlots := service.BuildRatingSlots(newRecords, constants.NewSlotMaxCount, constants.CandidateSlotMaxCount)
-	assignments := make([]repository.PlayerBatchSlotAssignment, 0, len(bestSlots.Main)+len(bestSlots.Candidates)+len(newSlots.Main)+len(newSlots.Candidates))
-	assignments = appendAssignments(assignments, bestSlots.Main, p.snapshot.SlotIDs["best"])
-	assignments = appendAssignments(assignments, bestSlots.Candidates, p.snapshot.SlotIDs["best_candidate"])
-	assignments = appendAssignments(assignments, newSlots.Main, p.snapshot.SlotIDs["new"])
-	assignments = appendAssignments(assignments, newSlots.Candidates, p.snapshot.SlotIDs["new_candidate"])
+	clearChartIDs, assignments := p.diffSlots(data.Records, []slotGroup{
+		{name: "best", records: bestSlots.Main},
+		{name: "best_candidate", records: bestSlots.Candidates},
+		{name: "new", records: newSlots.Main},
+		{name: "new_candidate", records: newSlots.Candidates},
+	})
 	stats := service.AggregateOfficialRating(bestSlots.Main, newSlots.Main)
 	op, _ := service.CalcOverpowerSummary(opRecords, 0)
-	return repository.PlayerBatchUpdate{ResetSlots: true, Assignments: assignments, PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op}, currentBroken, nil
+	return repository.PlayerBatchUpdate{ClearChartIDs: clearChartIDs, Assignments: assignments, PlayerRating: stats.PlayerRating, BestAverage: stats.BestAverage, NewAverage: stats.NewAverage, Overpower: op, MasterFingerprint: p.fingerprint}, currentBroken, nil
+}
+
+// slotGroup は再構築後の1つの枠と、その枠に入る順に並んだ譜面です。
+type slotGroup struct {
+	name    string
+	records []service.RatingSlotRecord
+}
+
+// diffSlots は現在の枠と再構築後の枠を比べ、外す譜面と付け替える譜面だけを返します。
+// 結果が前回と同じプレイヤーで player_records を書き換えないよう、全件の付け替えではなく差分で更新します。
+// noneなのに順位が残っている不整合な行も外す対象に含めます。
+func (p preparedBatchSnapshot) diffSlots(records []repository.PlayerBatchRecord, groups []slotGroup) ([]int, []repository.PlayerBatchSlotAssignment) {
+	current := make(map[int]repository.PlayerBatchRecord)
+	for _, record := range records {
+		if record.SlotName != "none" || record.SlotOrder != nil {
+			current[record.ChartID] = record
+		}
+	}
+	assigned := make(map[int]struct{})
+	assignments := make([]repository.PlayerBatchSlotAssignment, 0)
+	for _, group := range groups {
+		for i, record := range group.records {
+			position := i + 1
+			assigned[record.ChartID] = struct{}{}
+			if before, ok := current[record.ChartID]; ok && before.SlotName == group.name && before.SlotOrder != nil && *before.SlotOrder == position {
+				continue
+			}
+			assignments = append(assignments, repository.PlayerBatchSlotAssignment{ChartID: record.ChartID, SlotID: p.snapshot.SlotIDs[group.name], Position: position})
+		}
+	}
+	clearChartIDs := make([]int, 0)
+	for _, record := range records {
+		if _, slotted := current[record.ChartID]; !slotted {
+			continue
+		}
+		if _, ok := assigned[record.ChartID]; !ok {
+			clearChartIDs = append(clearChartIDs, record.ChartID)
+		}
+	}
+	return clearChartIDs, assignments
 }
 
 func databaseDateInLocation(value time.Time, location *time.Location) time.Time {
@@ -283,13 +405,6 @@ func validateOfficialMainSlots(records []repository.PlayerBatchRecord) (string, 
 		}
 	}
 	return "", nil
-}
-
-func appendAssignments(target []repository.PlayerBatchSlotAssignment, records []service.RatingSlotRecord, slotID int) []repository.PlayerBatchSlotAssignment {
-	for i, record := range records {
-		target = append(target, repository.PlayerBatchSlotAssignment{ChartID: record.ChartID, SlotID: slotID, Position: i + 1})
-	}
-	return target
 }
 
 func validateOfficialSlot(order *int, limit int) error {

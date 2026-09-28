@@ -8,6 +8,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/jmoiron/sqlx"
@@ -287,4 +288,28 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 			userRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestEnsurePlayer_登録時は再計算済みの記録を無効にする(t *testing.T) {
+	// Given
+	createdAt := time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC)
+	fingerprint := masterfingerprint.Compute([]byte("master"))
+	playerRepo := &stubPlayerRepositoryForPlayerData{foundPlayer: &entity.Player{
+		ID: 10, UserID: 1, Name: playername.MustNewPlayerName("変更前"), Level: 1,
+		CreatedAt: createdAt, UpdatedAt: createdAt, RecalculatedMasterFingerprint: &fingerprint,
+	}}
+	userRepo := new(MockUserRepository)
+	uc := &playerDataUsecase{playerRepo: playerRepo, userRepo: userRepo}
+	playerID := 10
+	user := &entity.User{ID: 1, Username: username.MustNewUserName("playerdatatest"), PlayerID: &playerID}
+	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	// When
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+		Name: "変更後", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
+	}, createdAt.Add(time.Hour))
+
+	// Then
+	require.NoError(t, err)
+	assert.Nil(t, playerRepo.savedPlayer.RecalculatedMasterFingerprint)
 }

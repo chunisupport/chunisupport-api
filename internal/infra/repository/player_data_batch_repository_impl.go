@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -68,14 +69,17 @@ func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationa
 	return snapshot, nil
 }
 
-func (r *playerDataBatchRepository) ListPlayerKeys(ctx context.Context, afterID, upperBound, limit int) ([]domainrepo.PlayerBatchKey, error) {
+// ListPlayerKeys は、再計算済みの記録が指定したフィンガープリントと一致しないプレイヤーを列挙します。
+// 一致するプレイヤーはマスタも計算入力も変わっておらず計算結果が同じになるため、トランザクションを開かずに除外します。
+func (r *playerDataBatchRepository) ListPlayerKeys(ctx context.Context, afterID, upperBound, limit int, fingerprint masterfingerprint.Fingerprint) ([]domainrepo.PlayerBatchKey, error) {
 	var rows []playerBatchKeyRow
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, data_collected_at
 		FROM players
 		WHERE id > ? AND id <= ?
+		  AND (recalculated_master_fingerprint IS NULL OR recalculated_master_fingerprint <> ?)
 		ORDER BY id
-		LIMIT ?`, afterID, upperBound, limit)
+		LIMIT ?`, afterID, upperBound, fingerprint, limit)
 	keys := make([]domainrepo.PlayerBatchKey, 0, len(rows))
 	for _, row := range rows {
 		keys = append(keys, domainrepo.PlayerBatchKey{ID: row.ID, DataCollectedAt: row.DataCollectedAt})
@@ -133,21 +137,17 @@ func (r *playerDataBatchRepository) ProcessPlayer(ctx context.Context, key domai
 	if err != nil {
 		return status, err
 	}
-	if update.ResetSlots {
-		// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
-		if _, err = tx.ExecContext(ctx, `
-			UPDATE player_records
-			SET slot_id = (SELECT id FROM slots WHERE name = 'none'), slot_order = NULL, updated_at = updated_at
-			WHERE player_id = ?`, key.ID); err != nil {
-			return status, err
-		}
-		if err = assignSlots(ctx, tx, key.ID, update.Assignments); err != nil {
-			return status, err
-		}
+	if err = clearSlots(ctx, tx, key.ID, update.ClearChartIDs); err != nil {
+		return status, err
+	}
+	if err = assignSlots(ctx, tx, key.ID, update.Assignments); err != nil {
+		return status, err
 	}
 	// Playerのロック取得後は取得日時も関連レコードも通常更新と直列化されるため、再度の条件付きUPDATEは不要です。
 	player.ChangeCalculatedRatings(update.PlayerRating, update.BestAverage, update.NewAverage)
 	player.ChangeOverpower(&update.Overpower, player.OverpowerPercent)
+	// 計算値の変更は再計算済みの記録を無効にするため、計算値を反映した後に記録します。
+	player.MarkRecalculated(update.MasterFingerprint)
 	if err = playerRepo.Save(ctx, tx, player); err != nil {
 		return status, err
 	}
@@ -196,6 +196,23 @@ type playerBatchRecordRow struct {
 type playerBatchLockedSongRow struct {
 	SongID   int  `db:"song_id"`
 	IsUltima bool `db:"is_ultima"`
+}
+
+// clearSlots は指定した譜面を枠から外します。
+// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
+func clearSlots(ctx context.Context, tx *sqlx.Tx, playerID int, chartIDs []int) error {
+	if len(chartIDs) == 0 {
+		return nil
+	}
+	query, args, err := sqlx.In(`
+		UPDATE player_records
+		SET slot_id = (SELECT id FROM slots WHERE name = 'none'), slot_order = NULL, updated_at = updated_at
+		WHERE player_id = ? AND chart_id IN (?)`, playerID, chartIDs)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, tx.Rebind(query), args...)
+	return err
 }
 
 func assignSlots(ctx context.Context, tx *sqlx.Tx, playerID int, assignments []domainrepo.PlayerBatchSlotAssignment) error {
