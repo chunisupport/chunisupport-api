@@ -73,8 +73,16 @@ func TestChartStatsBatchJob_Finish(t *testing.T) {
 			expectedMessage: strings.Repeat("あ", ChartStatsBatchJobErrorMessageMaxLength),
 		},
 		{
-			name:           "中断を記録する",
-			finish:         func(job *ChartStatsBatchJob) error { return job.Interrupt(finishedAt) },
+			name: "中断の理由とともに中断を記録する",
+			finish: func(job *ChartStatsBatchJob) error {
+				return job.Interrupt(" read failed: context canceled\n", finishedAt)
+			},
+			expectedStatus:  ChartStatsBatchJobStatusInterrupted,
+			expectedMessage: "read failed: context canceled",
+		},
+		{
+			name:           "取り残されたジョブは理由なしで中断を記録する",
+			finish:         func(job *ChartStatsBatchJob) error { return job.Interrupt("", finishedAt) },
 			expectedStatus: ChartStatsBatchJobStatusInterrupted,
 		},
 	}
@@ -112,7 +120,7 @@ func TestChartStatsBatchJob_Finish_エラー(t *testing.T) {
 		{
 			name:        "終了済みのジョブは再度終了できない",
 			prepare:     func(job *ChartStatsBatchJob) { _ = job.Complete(chartStatsBatchJobStartedAt) },
-			finish:      func(job *ChartStatsBatchJob) error { return job.Interrupt(chartStatsBatchJobStartedAt) },
+			finish:      func(job *ChartStatsBatchJob) error { return job.Interrupt("", chartStatsBatchJobStartedAt) },
 			expectedErr: ErrChartStatsBatchJobAlreadyFinished,
 		},
 	}

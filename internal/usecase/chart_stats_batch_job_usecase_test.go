@@ -94,8 +94,11 @@ type fakeChartStatsBatchRunner struct {
 func (r *fakeChartStatsBatchRunner) Execute(ctx context.Context) (ChartStatsBatchResult, error) {
 	r.called = true
 	if r.cancel != nil {
-		// 実行中に停止シグナルを受けた状況を再現する
+		// 実行中に停止シグナルを受けた状況を再現する。err を指定した場合は、キャンセルと同時に別のエラーで失敗した状況になる
 		r.cancel()
+		if r.err != nil {
+			return ChartStatsBatchResult{}, r.err
+		}
 		return ChartStatsBatchResult{}, ctx.Err()
 	}
 	return ChartStatsBatchResult{}, r.err
@@ -143,6 +146,15 @@ func TestChartStatsBatchJobUsecase_RunFromCLI(t *testing.T) {
 			cancelDuringRun: true,
 			wantErr:         true,
 			expectedStatus:  entity.ChartStatsBatchJobStatusInterrupted,
+			expectedMessage: context.Canceled.Error(),
+		},
+		{
+			name:            "キャンセルと同時に別のエラーで失敗した場合もエラー内容を中断の理由として残す",
+			runner:          &fakeChartStatsBatchRunner{err: errors.New("replace chart stats: connection reset")},
+			cancelDuringRun: true,
+			wantErr:         true,
+			expectedStatus:  entity.ChartStatsBatchJobStatusInterrupted,
+			expectedMessage: "replace chart stats: connection reset",
 		},
 	}
 

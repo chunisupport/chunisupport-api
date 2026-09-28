@@ -118,7 +118,7 @@ func TestChartStatsBatchJobRepository_Save_終了済みのジョブは上書き�
 	id := uuid.NewV4()
 	orphan := entity.StartChartStatsBatchJobFromCLI(id, chartStatsBatchJobRepoStartedAt)
 	require.NoError(t, repo.Save(context.Background(), orphan))
-	require.NoError(t, orphan.Interrupt(chartStatsBatchJobRepoStartedAt.Add(time.Hour)))
+	require.NoError(t, orphan.Interrupt("", chartStatsBatchJobRepoStartedAt.Add(time.Hour)))
 	require.NoError(t, repo.Save(context.Background(), orphan))
 	late := entity.StartChartStatsBatchJobFromCLI(id, chartStatsBatchJobRepoStartedAt)
 	require.NoError(t, late.Complete(chartStatsBatchJobRepoStartedAt.Add(2*time.Hour)))

@@ -764,7 +764,7 @@ Shields.io側のキャッシュにより、公式RATINGの更新や非公開設�
 | `status` | string | `RUNNING` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`（プロセス停止などで中断） |
 | `started_at` | string | 開始日時 |
 | `finished_at` | string \| null | 終了日時。実行中は `null` |
-| `error_message` | string \| null | 失敗理由（最大1,000文字）。失敗以外は `null` |
+| `error_message` | string \| null | 失敗・中断の理由（最大1,000文字）。成功・実行中、および取り残されて中断扱いにしたジョブは `null` |
 
 `FAILED` の場合、統計テーブルは更新されていません。`INTERRUPTED` のうち、API の停止などで実行中にキャンセルされたものはロールバック済みです。プロセスの異常終了で `RUNNING` のまま残り、次の実行時に `INTERRUPTED` へ更新したものは、入れ替えの成否が不明です。
 

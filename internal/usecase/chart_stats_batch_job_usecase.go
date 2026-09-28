@@ -154,7 +154,7 @@ func (u *ChartStatsBatchJobUsecase) interruptOrphanedJobs(ctx context.Context) e
 		return err
 	}
 	for _, orphan := range orphans {
-		if err := orphan.Interrupt(u.now()); err != nil {
+		if err := orphan.Interrupt("", u.now()); err != nil {
 			return err
 		}
 		if err := u.jobRepo.Save(ctx, orphan); err != nil {
@@ -193,7 +193,8 @@ func (u *ChartStatsBatchJobUsecase) run(ctx context.Context, lock repository.Bat
 			"best_slot_stats", result.BestSlotStatsCount,
 		)
 	case ctx.Err() != nil:
-		finishErr = job.Interrupt(finishedAt)
+		// キャンセルと同時に別のエラーで失敗した可能性もあるため、エラー内容を中断の理由として残す
+		finishErr = job.Interrupt(execErr.Error(), finishedAt)
 		logger.Warn("譜面統計バッチが中断されました", "error", execErr)
 	default:
 		finishErr = job.Fail(execErr.Error(), finishedAt)

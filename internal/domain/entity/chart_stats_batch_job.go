@@ -9,7 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 )
 
-// ChartStatsBatchJobErrorMessageMaxLength は保存する失敗理由の最大文字数です。
+// ChartStatsBatchJobErrorMessageMaxLength は保存する失敗・中断の理由の最大文字数です。
 // DBエラー全文で行が肥大化しないよう、管理画面で状況を把握できる長さに制限します。
 const ChartStatsBatchJobErrorMessageMaxLength = 1000
 
@@ -143,7 +143,7 @@ func (j *ChartStatsBatchJob) StartedAt() time.Time { return j.startedAt }
 // FinishedAt は終了日時を返します。実行中は nil です。
 func (j *ChartStatsBatchJob) FinishedAt() *time.Time { return j.finishedAt }
 
-// ErrorMessage は失敗理由を返します。失敗以外では空文字です。
+// ErrorMessage は失敗・中断の理由を返します。成功・実行中、および理由なしで中断扱いにしたジョブでは空文字です。
 func (j *ChartStatsBatchJob) ErrorMessage() string { return j.errorMessage }
 
 // IsRunning は実行中かどうかを返します。
@@ -156,19 +156,27 @@ func (j *ChartStatsBatchJob) Complete(finishedAt time.Time) error {
 
 // Fail は処理の失敗を記録します。失敗理由は上限文字数で切り詰めます。
 func (j *ChartStatsBatchJob) Fail(message string, finishedAt time.Time) error {
-	message = strings.TrimSpace(message)
+	message = normalizeChartStatsBatchJobMessage(message)
 	if message == "" {
 		return ErrInvalidChartStatsBatchJob
-	}
-	if runes := []rune(message); len(runes) > ChartStatsBatchJobErrorMessageMaxLength {
-		message = string(runes[:ChartStatsBatchJobErrorMessageMaxLength])
 	}
 	return j.finish(ChartStatsBatchJobStatusFailed, message, finishedAt)
 }
 
 // Interrupt は処理の中断を記録します。
-func (j *ChartStatsBatchJob) Interrupt(finishedAt time.Time) error {
-	return j.finish(ChartStatsBatchJobStatusInterrupted, "", finishedAt)
+// キャンセルと同時に別のエラーが起きた場合も原因を追えるよう、実行が返したエラーを理由として残します。
+// 取り残されたジョブを後から中断扱いにする場合は理由が分からないため、空文字を渡します。
+func (j *ChartStatsBatchJob) Interrupt(message string, finishedAt time.Time) error {
+	return j.finish(ChartStatsBatchJobStatusInterrupted, normalizeChartStatsBatchJobMessage(message), finishedAt)
+}
+
+// normalizeChartStatsBatchJobMessage は理由の前後の空白を除き、上限文字数で切り詰めます。
+func normalizeChartStatsBatchJobMessage(message string) string {
+	message = strings.TrimSpace(message)
+	if runes := []rune(message); len(runes) > ChartStatsBatchJobErrorMessageMaxLength {
+		message = string(runes[:ChartStatsBatchJobErrorMessageMaxLength])
+	}
+	return message
 }
 
 func (j *ChartStatsBatchJob) finish(status ChartStatsBatchJobStatus, message string, finishedAt time.Time) error {
