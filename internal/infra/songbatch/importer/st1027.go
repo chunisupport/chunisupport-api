@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -26,7 +27,7 @@ func (si *St1027Importer) Import(filePath string) (*songbatch.ImportedSource, er
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceSt1027, Data: nil}, nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read st1027 data file %s: %w", filePath, err)
 	}

@@ -1,6 +1,13 @@
 package api_internal
 
-import "github.com/chunisupport/chunisupport-api/internal/usecase"
+import (
+	"encoding/json"
+	"reflect"
+	"slices"
+	"strings"
+
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
+)
 
 type playerDataRequest struct {
 	AppVersion  string                            `json:"app_ver"`
@@ -76,4 +83,45 @@ func (r playerDataRequest) toUsecase() usecase.PlayerDataPayload {
 }
 func (r playerDataScoreEntryRequest) toUsecase() usecase.PlayerDataScoreEntry {
 	return usecase.PlayerDataScoreEntry{Diff: r.Diff, Idx: r.Idx, Score: r.Score, ClearLamp: r.ClearLamp, ComboLv: r.ComboLv, FullChain: r.FullChain, Slot: r.Slot, Order: r.Order}
+}
+
+// playerDataRequestFields は playerDataRequest のトップレベルのJSONフィールド名です。
+// 入力型のJSONタグから導出し、フィールド追加時に未知フィールド判定との二重管理を不要にします。
+var playerDataRequestFields = jsonFieldNames(reflect.TypeFor[playerDataRequest]())
+
+// jsonFieldNames は構造体型のJSONフィールド名の集合を返します。
+// 埋め込み構造体のフィールド昇格は扱わないため、埋め込みを持たない入力型にだけ使います。
+func jsonFieldNames(t reflect.Type) map[string]struct{} {
+	names := make(map[string]struct{}, t.NumField())
+	for field := range t.Fields() {
+		if !field.IsExported() {
+			continue
+		}
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		if name == "-" {
+			continue
+		}
+		if name == "" {
+			name = field.Name
+		}
+		names[name] = struct{}{}
+	}
+	return names
+}
+
+// unknownPlayerDataFields はプレイヤーデータJSONのトップレベルにある未知フィールド名を名前順で返します。
+// 公式エクスポートJSONの前方互換性を保つため、未知フィールドは登録を拒否せず警告ログの対象にします。
+func unknownPlayerDataFields(data []byte) ([]string, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	var unknown []string
+	for key := range raw {
+		if _, ok := playerDataRequestFields[key]; !ok {
+			unknown = append(unknown, key)
+		}
+	}
+	slices.Sort(unknown)
+	return unknown, nil
 }

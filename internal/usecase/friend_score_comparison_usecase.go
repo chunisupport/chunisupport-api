@@ -27,6 +27,8 @@ type FriendScoreComparisonSong struct {
 	ID     string
 	Title  string
 	Artist string
+	// Jacket はジャケット画像IDです。未登録の場合は nil です。
+	Jacket *string
 }
 
 // FriendScoreComparisonChart は比較対象譜面の公開概要です。
@@ -161,6 +163,7 @@ func buildFriendScoreComparisonResult(difficulty string, pair *repository.Friend
 				ID:     row.SongDisplayID,
 				Title:  row.SongTitle,
 				Artist: row.SongArtist,
+				Jacket: row.SongJacket,
 			},
 			Chart: FriendScoreComparisonChart{
 				Const:          row.ChartConst,

@@ -50,7 +50,7 @@ func TestUserUsecase_GetPublicOfficialRating(t *testing.T) {
 			if tt.player != nil {
 				playerWithHonors = &repository.PlayerWithHonors{Player: tt.player}
 			}
-			u := NewUserUsecase(nil, &stubUserRepository{user: tt.user}, &stubPlayerRepository{playerWithHonors: playerWithHonors}, nil, nil, nil, nil, nil)
+			u := NewUserUsecase(nil, &stubUserRepository{user: tt.user}, &stubPlayerRepository{playerWithHonors: playerWithHonors}, nil, nil, nil, nil, nil, nil)
 
 			rating, err := u.GetPublicOfficialRating(context.Background(), "testuser")
 			if tt.wantErr != nil {

@@ -65,7 +65,7 @@ func NewMainframeDownloader(outputDir, apiKey, sheetID, baseURL string) *Mainfra
 
 // Download はGoogleスプレッドシートからデータをダウンロードし、JSONファイルとして保存します
 func (d *MainframeDownloader) Download(ctx context.Context) error {
-	if err := os.MkdirAll(d.outputDir, 0755); err != nil {
+	if err := os.MkdirAll(d.outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -99,7 +99,7 @@ func (d *MainframeDownloader) Download(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(filePath, jsonData, 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

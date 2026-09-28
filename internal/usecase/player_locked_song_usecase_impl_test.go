@@ -596,3 +596,11 @@ func TestPlayerLockedSongLock_再計算済みの記録を無効にする(t *test
 	require.NotNil(t, playerRepo.saved)
 	assert.Nil(t, playerRepo.saved.RecalculatedMasterFingerprint)
 }
+
+func TestNewPlayerLockedSongUsecase_フレンド判定リポジトリは必須(t *testing.T) {
+	// When
+	_, err := NewPlayerLockedSongUsecase(&MockExecutor{}, &MockTransactionManager{}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	// Then
+	assert.ErrorIs(t, err, errNilFriendshipRepository)
+}

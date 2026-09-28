@@ -756,4 +756,23 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 		}
 		mockUsecase.AssertExpectations(t)
 	})
+
+	t.Run("異常系: 自分自身は削除できない", func(t *testing.T) {
+		mockUsecase.On("DeleteUser", mock.Anything, adminUser, "adminuser").Return(usecase.ErrCannotDeleteSelf).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/users/adminuser", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "adminuser"}})
+		c.Set("userEntity", adminUser)
+
+		err := h.DeleteUser(c)
+
+		var apiErr *apierror.APIError
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, apierror.CodeForbidden, apiErr.Code)
+			assert.Equal(t, http.StatusForbidden, apiErr.HTTPStatus)
+		}
+		mockUsecase.AssertExpectations(t)
+	})
 }

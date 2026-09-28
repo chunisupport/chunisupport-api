@@ -364,7 +364,7 @@ func (h *UserHandler) DeleteUser(c *echo.Context) error {
 	}
 
 	if err := h.userUsecase.DeleteUser(c.Request().Context(), requester, username); err != nil {
-		if !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrUserNotFound) {
+		if !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrCannotDeleteSelf) && !errors.Is(err, usecase.ErrUserNotFound) {
 			slog.Error("failed to delete user", "username", username, "error", err)
 		}
 		return apierror.FromUsecaseError(err)

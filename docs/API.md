@@ -277,7 +277,7 @@ Content-Type: application/json
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username/permission` | PATCH | Firebase Bearer (ADMIN) | ユーザーの権限変更 |
 | `/internal/users/:username/suspicious` | PATCH | Firebase Bearer (ADMIN) | 不審アカウントフラグの変更 |
-| `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
+| `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除（自分自身は削除不可で403。本人の退会は `DELETE /internal/me`） |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:id` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |
@@ -1449,7 +1449,8 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
       "song": {
         "id": "0000000000000001",
         "title": "楽曲名",
-        "artist": "アーティスト名"
+        "artist": "アーティスト名",
+        "jacket": "example.jpg"
       },
       "chart": {
         "const": 14.5,
@@ -1478,7 +1479,7 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
 }
 ```
 
-`song.id` は楽曲の `display_id` です。数値の内部ユーザーIDと内部楽曲IDは返しません。`clear_lamp` / `combo_lamp` / `full_chain` は未プレイ、またはマスタ値 `NONE` の場合 `null` です。対象譜面が0件でもエラーにはせず、集計0かつ `items: []` を返します。
+`song.id` は楽曲の `display_id` です。数値の内部ユーザーIDと内部楽曲IDは返しません。`song.jacket` は楽曲一覧などと同じジャケット画像IDで、未登録の場合は `null` です。`clear_lamp` / `combo_lamp` / `full_chain` は未プレイ、またはマスタ値 `NONE` の場合 `null` です。対象譜面が0件でもエラーにはせず、集計0かつ `items: []` を返します。
 
 集計は次の不変条件を満たします。
 
@@ -1512,7 +1513,7 @@ friend_played = both_played + friend_only_played
   "friend": {"username": "frienduser", "player_name": "FRIEND"},
   "summary": {"total_charts": 1, "self_wins": 1, "draws": 0, "friend_wins": 0, "self_played": 1, "friend_played": 0, "both_played": 0, "self_only_played": 1, "friend_only_played": 0, "both_unplayed": 0},
   "items": [{
-    "song": {"id": "0000000000000006", "title": "楽曲名", "artist": "アーティスト名"},
+    "song": {"id": "0000000000000006", "title": "楽曲名", "artist": "アーティスト名", "jacket": null},
     "chart": {"level_star": 4, "attribute": "蔵"},
     "self": {"is_played": true, "score": 1009000, "clear_lamp": "CLEAR", "combo_lamp": null, "full_chain": null, "updated_at": "2026-07-20T10:00:00Z"},
     "friend": {"is_played": false, "score": 0, "clear_lamp": null, "combo_lamp": null, "full_chain": null, "updated_at": null},

@@ -71,8 +71,8 @@ func (c *ChartStatsCalculator) flush() {
 type chartStatsAccumulator struct {
 	stats             entity.ChartStatsByRatingBand
 	clearedScoreTotal int64
-	// clearedScores は中央値の計算用です。件数が多いためスコアの値域に収まる int32 で保持します。
-	clearedScores []int32
+	// clearedScores は中央値の計算用です。
+	clearedScores []int
 }
 
 // add は記録を加算します。未クリアの記録は人数とランプには含め、スコアに関する統計からだけ除外します。
@@ -120,7 +120,7 @@ func (a *chartStatsAccumulator) addComboLamp(comboLampID int, score int) {
 
 func (a *chartStatsAccumulator) addClearedScore(score int) {
 	a.clearedScoreTotal += int64(score)
-	a.clearedScores = append(a.clearedScores, int32(score))
+	a.clearedScores = append(a.clearedScores, score)
 
 	rank := &a.stats.Rank
 	switch {

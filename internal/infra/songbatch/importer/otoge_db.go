@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -27,7 +28,7 @@ func (oi *OtogeDbImporter) Import(filePath string) (*songbatch.ImportedSource, e
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceOtogeDb, Data: nil}, nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read otoge-db data file %s: %w", filePath, err)
 	}

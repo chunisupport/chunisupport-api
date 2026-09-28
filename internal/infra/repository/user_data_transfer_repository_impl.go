@@ -116,7 +116,7 @@ func (r *userDataTransferRepository) exportRecords(ctx context.Context, exec dom
 		FROM player_records pr INNER JOIN charts c ON c.id = pr.chart_id INNER JOIN songs s ON s.id = c.song_id
 		INNER JOIN difficulties d ON d.id = c.difficulty_id INNER JOIN clear_lamp_types cl ON cl.id = pr.clear_lamp_id
 		INNER JOIN combo_lamp_types co ON co.id = pr.combo_lamp_id INNER JOIN full_chain_types fc ON fc.id = pr.full_chain_id
-		INNER JOIN slots sl ON sl.id = pr.slot_id WHERE pr.player_id = ? ORDER BY s.official_idx, d.sort_order`
+		INNER JOIN slots sl ON sl.id = pr.slot_id WHERE pr.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx, d.sort_order`
 	if err := exec.SelectContext(ctx, &records, recordQuery, playerID); err != nil {
 		return fmt.Errorf("failed to export player records: %w", err)
 	}
@@ -142,7 +142,7 @@ func (r *userDataTransferRepository) exportRecords(ctx context.Context, exec dom
 		FROM player_record_histories h INNER JOIN charts c ON c.id = h.chart_id INNER JOIN songs s ON s.id = c.song_id
 		INNER JOIN difficulties d ON d.id = c.difficulty_id LEFT JOIN clear_lamp_types cl ON cl.id = h.clear_lamp_id
 		LEFT JOIN combo_lamp_types co ON co.id = h.combo_lamp_id LEFT JOIN full_chain_types fc ON fc.id = h.full_chain_id
-		WHERE h.player_id = ? ORDER BY s.official_idx, d.sort_order, h.updated_at`
+		WHERE h.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx, d.sort_order, h.updated_at`
 	if err := exec.SelectContext(ctx, &histories, historyQuery, playerID); err != nil {
 		return fmt.Errorf("failed to export record histories: %w", err)
 	}
@@ -172,7 +172,7 @@ func (r *userDataTransferRepository) exportWorldsendRecords(ctx context.Context,
 	const query = `SELECT s.official_idx AS song_official_idx, pr.score, cl.name AS clear_lamp_name, co.name AS combo_lamp_name, fc.name AS full_chain_name, pr.updated_at
 		FROM player_worldsend_records pr INNER JOIN worldsend_charts wc ON wc.id = pr.worldsend_chart_id INNER JOIN songs s ON s.id = wc.song_id
 		INNER JOIN clear_lamp_types cl ON cl.id = pr.clear_lamp_id INNER JOIN combo_lamp_types co ON co.id = pr.combo_lamp_id
-		INNER JOIN full_chain_types fc ON fc.id = pr.full_chain_id WHERE pr.player_id = ? ORDER BY s.official_idx`
+		INNER JOIN full_chain_types fc ON fc.id = pr.full_chain_id WHERE pr.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx`
 	if err := exec.SelectContext(ctx, &records, query, playerID); err != nil {
 		return fmt.Errorf("failed to export worldsend records: %w", err)
 	}
@@ -194,7 +194,7 @@ func (r *userDataTransferRepository) exportWorldsendRecords(ctx context.Context,
 	const historyQuery = `SELECT s.official_idx AS song_official_idx, h.score, cl.name AS clear_lamp_name, co.name AS combo_lamp_name, fc.name AS full_chain_name, h.updated_at
 		FROM player_worldsend_record_histories h INNER JOIN worldsend_charts wc ON wc.id = h.worldsend_chart_id INNER JOIN songs s ON s.id = wc.song_id
 		LEFT JOIN clear_lamp_types cl ON cl.id = h.clear_lamp_id LEFT JOIN combo_lamp_types co ON co.id = h.combo_lamp_id LEFT JOIN full_chain_types fc ON fc.id = h.full_chain_id
-		WHERE h.player_id = ? ORDER BY s.official_idx, h.updated_at`
+		WHERE h.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx, h.updated_at`
 	if err := exec.SelectContext(ctx, &histories, historyQuery, playerID); err != nil {
 		return fmt.Errorf("failed to export worldsend histories: %w", err)
 	}
@@ -231,7 +231,7 @@ func (r *userDataTransferRepository) exportAuxiliaryPlayerData(ctx context.Conte
 		ComboLampName string    `db:"combo_lamp_name"`
 		UpdatedAt     time.Time `db:"updated_at"`
 	}
-	if err := exec.SelectContext(ctx, &courses, `SELECT c.official_idx, pr.score, pr.is_clear, cl.name AS combo_lamp_name, pr.updated_at FROM player_course_records pr INNER JOIN courses c ON c.id = pr.course_id INNER JOIN combo_lamp_types cl ON cl.id = pr.combo_lamp_id WHERE pr.player_id = ? ORDER BY c.official_idx`, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &courses, `SELECT c.official_idx, pr.score, pr.is_clear, cl.name AS combo_lamp_name, pr.updated_at FROM player_course_records pr INNER JOIN courses c ON c.id = pr.course_id INNER JOIN combo_lamp_types cl ON cl.id = pr.combo_lamp_id WHERE pr.player_id = ? AND c.is_deleted = 0 ORDER BY c.official_idx`, playerID); err != nil {
 		return err
 	}
 	for _, row := range courses {
@@ -258,7 +258,7 @@ func (r *userDataTransferRepository) exportAuxiliaryPlayerData(ctx context.Conte
 		OfficialIdx string    `db:"official_idx"`
 		FavoritedAt time.Time `db:"favorited_at"`
 	}
-	if err := exec.SelectContext(ctx, &favorites, `SELECT s.official_idx, f.created_at AS favorited_at FROM player_favorite_songs f INNER JOIN songs s ON s.id = f.song_id WHERE f.player_id = ? ORDER BY s.official_idx`, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &favorites, `SELECT s.official_idx, f.created_at AS favorited_at FROM player_favorite_songs f INNER JOIN songs s ON s.id = f.song_id WHERE f.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx`, playerID); err != nil {
 		return err
 	}
 	for _, row := range favorites {
@@ -268,7 +268,7 @@ func (r *userDataTransferRepository) exportAuxiliaryPlayerData(ctx context.Conte
 		OfficialIdx string `db:"official_idx"`
 		IsUltima    bool   `db:"is_ultima"`
 	}
-	if err := exec.SelectContext(ctx, &locked, `SELECT s.official_idx, l.is_ultima FROM player_locked_songs l INNER JOIN songs s ON s.id = l.song_id WHERE l.player_id = ? ORDER BY s.official_idx, l.is_ultima`, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &locked, `SELECT s.official_idx, l.is_ultima FROM player_locked_songs l INNER JOIN songs s ON s.id = l.song_id WHERE l.player_id = ? AND s.is_deleted = 0 ORDER BY s.official_idx, l.is_ultima`, playerID); err != nil {
 		return err
 	}
 	for _, row := range locked {

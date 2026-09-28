@@ -386,3 +386,42 @@ func mustComparisonChartConst(t *testing.T, value float64) chartconstant.ChartCo
 	require.NoError(t, err)
 	return chartConst
 }
+
+func TestFriendScoreComparisonUsecase_Get_楽曲のジャケットを返す(t *testing.T) {
+	jacket := "abcdef0123456789"
+	tests := []struct {
+		name string
+		// Given
+		jacket *string
+		// Then
+		expected *string
+	}{
+		{name: "ジャケット登録済み", jacket: &jacket, expected: &jacket},
+		{name: "ジャケット未登録", jacket: nil, expected: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			query := &friendScoreComparisonQueryMock{
+				pair: acceptedComparisonPair(101, 102),
+				records: []*repository.FriendScoreComparisonChartRecord{{
+					SongDisplayID: "0000000000000001",
+					SongTitle:     "楽曲名",
+					SongArtist:    "アーティスト名",
+					SongJacket:    tt.jacket,
+					ChartConst:    mustComparisonChartConst(t, 14.5),
+				}},
+			}
+			u := NewFriendScoreComparisonUsecase(query)
+
+			// When
+			result, err := u.Get(context.Background(), 1, "frienduser", "MASTER")
+
+			// Then
+			require.NoError(t, err)
+			require.Len(t, result.Items, 1)
+			assert.Equal(t, tt.expected, result.Items[0].Song.Jacket)
+		})
+	}
+}
