@@ -29,11 +29,8 @@ type playerFavoriteSongUsecase struct {
 	resolver       PlayerSongIDResolver
 }
 
-// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
-func (u *playerFavoriteSongUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
-	u.friendshipRepo = friendshipRepo
-}
-
+// NewPlayerFavoriteSongUsecase はお気に入り楽曲ユースケースを生成します。
+// friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使うため必須です。
 func NewPlayerFavoriteSongUsecase(
 	db repository.Executor,
 	tm TransactionManager,
@@ -41,6 +38,7 @@ func NewPlayerFavoriteSongUsecase(
 	playerRepo repository.PlayerRepository,
 	songRepo repository.SongRepository,
 	favoriteRepo repository.PlayerFavoriteSongRepository,
+	friendshipRepo repository.FriendshipRepository,
 	queryService PlayerFavoriteSongQueryService,
 	locker PlayerFavoriteSongLocker,
 	resolver PlayerSongIDResolver,
@@ -51,16 +49,20 @@ func NewPlayerFavoriteSongUsecase(
 	if tm == nil {
 		return nil, errPlayerFavoriteSongNilTM
 	}
+	if friendshipRepo == nil {
+		return nil, errNilFriendshipRepository
+	}
 	return &playerFavoriteSongUsecase{
-		db:           db,
-		tm:           tm,
-		userRepo:     userRepo,
-		playerRepo:   playerRepo,
-		songRepo:     songRepo,
-		favoriteRepo: favoriteRepo,
-		queryService: queryService,
-		locker:       locker,
-		resolver:     resolver,
+		db:             db,
+		tm:             tm,
+		userRepo:       userRepo,
+		playerRepo:     playerRepo,
+		songRepo:       songRepo,
+		favoriteRepo:   favoriteRepo,
+		friendshipRepo: friendshipRepo,
+		queryService:   queryService,
+		locker:         locker,
+		resolver:       resolver,
 	}, nil
 }
 

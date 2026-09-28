@@ -90,7 +90,7 @@ func FromUsecaseError(err error) *APIError {
 		return ErrOperationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInternalError):
 		return ErrInternalError.WithInternal(err)
-	case errors.Is(err, usecase.ErrAdminRequired):
+	case errors.Is(err, usecase.ErrAdminRequired), errors.Is(err, usecase.ErrCannotDeleteSelf):
 		return ErrForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidAPIToken):
 		return ErrInvalidToken.WithInternal(err)

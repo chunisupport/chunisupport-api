@@ -16,6 +16,9 @@ var (
 	ErrVersionInUse                 = errors.New("version in use")
 
 	ErrAdminRequired = errors.New("admin permission required")
+	// ErrCannotDeleteSelf は管理者がユーザー削除APIで自分自身を削除しようとした場合に返します。
+	// 本人の退会はアカウント削除APIで行います。
+	ErrCannotDeleteSelf = errors.New("cannot delete own account via admin user deletion")
 	// ErrMaintenanceMode はメンテナンス中にスタッフ以外の利用を拒否した場合に返します。
 	ErrMaintenanceMode = errors.New("maintenance mode")
 	// ErrInvalidMaintenanceComment はメンテナンスコメントが公開仕様を満たさない場合に返します。

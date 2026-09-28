@@ -203,16 +203,11 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	}
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
 	if configurable, ok := userUsecase.(interface {
 		SetPhysicalDeletionDependencies(usecase.TransactionManager, repository.GoalRepository)
 	}); ok {
 		configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
-	}
-	if configurable, ok := userUsecase.(interface {
-		SetFriendshipRepository(repository.FriendshipRepository)
-	}); ok {
-		configurable.SetFriendshipRepository(friendshipRepo)
 	}
 	if configurable, ok := userUsecase.(interface {
 		SetCourseRepository(repository.CourseRepository)
@@ -221,13 +216,8 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	}
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, courseRepo, userRepo, friendshipRepo)
-	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, masterCache)
+	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, friendshipRepo, masterCache)
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)
-	if configurable, ok := scoreHistoryUsecase.(interface {
-		SetFriendshipRepository(repository.FriendshipRepository)
-	}); ok {
-		configurable.SetFriendshipRepository(friendshipRepo)
-	}
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
 	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
@@ -241,23 +231,13 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	recordFilterUsecase := usecase.NewRecordFilterUsecase(recordFilterRepo)
 	playerLockedSongQueryService := infra.NewPlayerLockedSongQueryService()
 	playerSongIDResolver := infra.NewPlayerSongIDResolver()
-	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, playerLockedSongQueryService, playerSongIDResolver)
+	playerLockedSongUsecase, err := usecase.NewPlayerLockedSongUsecase(db, tm, userRepo, playerRepo, playerRecordRepo, playerDataRepo, songRepo, playerLockedSongRepo, friendshipRepo, playerLockedSongQueryService, playerSongIDResolver)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create player locked song usecase: %v", err))
 	}
-	if configurable, ok := playerLockedSongUsecase.(interface {
-		SetFriendshipRepository(repository.FriendshipRepository)
-	}); ok {
-		configurable.SetFriendshipRepository(friendshipRepo)
-	}
-	playerFavoriteSongUsecase, err := usecase.NewPlayerFavoriteSongUsecase(db, tm, userRepo, playerRepo, songRepo, playerFavoriteSongRepo, playerFavoriteSongQueryService, playerFavoriteSongLocker, playerSongIDResolver)
+	playerFavoriteSongUsecase, err := usecase.NewPlayerFavoriteSongUsecase(db, tm, userRepo, playerRepo, songRepo, playerFavoriteSongRepo, friendshipRepo, playerFavoriteSongQueryService, playerFavoriteSongLocker, playerSongIDResolver)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create player favorite song usecase: %v", err))
-	}
-	if configurable, ok := playerFavoriteSongUsecase.(interface {
-		SetFriendshipRepository(repository.FriendshipRepository)
-	}); ok {
-		configurable.SetFriendshipRepository(friendshipRepo)
 	}
 	friendshipUsecase, err := usecase.NewFriendshipUsecase(db, tm, userRepo, friendshipRepo)
 	if err != nil {

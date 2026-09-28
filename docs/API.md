@@ -277,7 +277,7 @@ Content-Type: application/json
 | `/internal/users/:username` | GET | Firebase Bearer (任意) | プロファイルとレコードを一括取得 |
 | `/internal/users/:username/permission` | PATCH | Firebase Bearer (ADMIN) | ユーザーの権限変更 |
 | `/internal/users/:username/suspicious` | PATCH | Firebase Bearer (ADMIN) | 不審アカウントフラグの変更 |
-| `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除 |
+| `/internal/users/:username` | DELETE | Firebase Bearer (ADMIN+) | ユーザーの物理削除（自分自身は削除不可で403。本人の退会は `DELETE /internal/me`） |
 | `/internal/songs/updated-at` | GET | Firebase Bearer (任意) | 楽曲情報キャッシュ用の最終更新日時のみ取得 |
 | `/internal/songs` | GET | Firebase Bearer (任意) | WORLD'S END以外の楽曲一覧取得 |
 | `/internal/songs/:id` | GET | Firebase Bearer (任意) | 楽曲詳細取得 |

@@ -46,7 +46,8 @@ type userProfilePlayerRecords struct {
 }
 
 // NewUserUsecase は UserUsecase の実装を生成します。
-func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider) UserUsecase {
+// friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使います。
+func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository) UserUsecase {
 	return &userUsecase{
 		db:                  db,
 		userRepo:            userRepo,
@@ -55,6 +56,7 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 		worldsendRecordRepo: worldsendRecordRepo,
 		songRepo:            songRepo,
 		worldsendChartRepo:  worldsendChartRepo,
+		friendshipRepo:      friendshipRepo,
 		recordCompletionSvc: service.NewRecordCompletionService(),
 		masterProvider:      masterProvider,
 		firebaseDeleter:     noopFirebaseUserDeleter{},
@@ -62,8 +64,8 @@ func NewUserUsecase(db repository.Executor, userRepo repository.UserRepository, 
 }
 
 // NewUserUsecaseWithOverpowerDenominator はOVER POWER割合の随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
@@ -71,11 +73,6 @@ func NewUserUsecaseWithOverpowerDenominator(db repository.Executor, userRepo rep
 	impl.playerLockedSongRepo = playerLockedSongRepo
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
 	return impl
-}
-
-// SetFriendshipRepository は非公開ユーザー閲覧時のフレンド判定リポジトリを設定します。
-func (s *userUsecase) SetFriendshipRepository(friendshipRepo repository.FriendshipRepository) {
-	s.friendshipRepo = friendshipRepo
 }
 
 // SetCourseRepository はユーザーレコードレスポンスへコースを統合します。
@@ -90,8 +87,8 @@ func (s *userUsecase) SetPhysicalDeletionDependencies(transactionManager Transac
 }
 
 // NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider)
+func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, firebaseDeleter FirebaseUserDeleter) UserUsecase {
+	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
@@ -103,8 +100,8 @@ func NewUserUsecaseWithFirebaseDeleter(db repository.Executor, userRepo reposito
 }
 
 // NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
-	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, firebaseDeleter)
+func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db repository.Executor, userRepo repository.UserRepository, playerRepo repository.PlayerRepository, playerRecordRepo repository.PlayerRecordRepository, worldsendRecordRepo repository.WorldsendRecordRepository, songRepo repository.SongRepository, worldsendChartRepo repository.WorldsendChartRepository, masterProvider userMasterProvider, friendshipRepo repository.FriendshipRepository, firebaseDeleter FirebaseUserDeleter, playerLockedSongRepo repository.PlayerLockedSongRepository, overpowerDenominatorProvider repository.OverpowerDenominatorProvider, userUpdatedAtQuery repository.UserUpdatedAtQueryService) UserUsecase {
+	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, firebaseDeleter)
 	impl, ok := usecase.(*userUsecase)
 	if !ok {
 		return usecase
@@ -384,6 +381,8 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 
 // DeleteUser はユーザーを物理削除します。
 // 防御的深度: ハンドラ層のミドルウェアに加え、ユースケース層でもADMIN権限を検証します。
+// トランザクション内でリクエスト元と対象の行をロックし、実行時点でもリクエスト元がADMINであることを確認します。
+// 自分自身の削除を禁止し、ADMIN同士が同時に互いを削除しても一方は認可に失敗するため、ADMINが0人になりません。
 func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, username string) error {
 	if err := s.ensureDeleteUserPermission(requester); err != nil {
 		return err
@@ -398,13 +397,16 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		slog.Error("failed to find user by username", "username", username, "error", err)
 		return err
 	}
+	if user.ID == requester.ID {
+		return ErrCannotDeleteSelf
+	}
 
 	firebaseUID := ""
 	if user.FirebaseUID != nil {
 		firebaseUID = *user.FirebaseUID
 	}
 
-	if err := s.performPhysicalUserDeletion(ctx, user.ID, username); err != nil {
+	if err := s.performPhysicalUserDeletion(ctx, requester.ID, user.ID, username); err != nil {
 		return err
 	}
 
@@ -414,7 +416,8 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		}
 	}
 
-	slog.Info("user deleted successfully", "username", username, "user_id", user.ID)
+	// 監査のため、削除を実行した管理者と削除対象を同じイベントに記録します。
+	slog.InfoContext(ctx, "user deleted by admin", "requester_user_id", requester.ID, "target_user_id", user.ID, "target_username", username)
 	return nil
 }
 
@@ -425,8 +428,15 @@ func (s *userUsecase) ensureDeleteUserPermission(requester *entity.User) error {
 	return nil
 }
 
-func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID int, username string) error {
+func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, requesterID int, userID int, username string) error {
 	deleteUser := func(exec repository.Executor) error {
+		lockedRequester, _, err := lockRequesterAndTarget(ctx, exec, s.userRepo, requesterID, userID)
+		if err != nil {
+			return err
+		}
+		if !info.HasRole(lockedRequester.AccountTypeID, info.AccountTypeAdmin) {
+			return ErrAdminRequired
+		}
 		if s.goalRepo != nil {
 			if err := s.goalRepo.DeleteByUserID(ctx, exec, userID); err != nil {
 				return err
@@ -442,7 +452,10 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, userID in
 		err = deleteUser(s.db)
 	}
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, ErrAdminRequired) {
+			return err
+		}
+		if errors.Is(err, ErrUserNotFound) || errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
