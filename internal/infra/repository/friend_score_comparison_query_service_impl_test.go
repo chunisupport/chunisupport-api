@@ -265,3 +265,57 @@ func insertFriendScoreComparisonCharts(t *testing.T, db *sqlx.DB) {
 func intPtr(value int) *int {
 	return &value
 }
+
+func TestFriendScoreComparisonQueryService_ListChartRecords_楽曲のジャケットを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupFriendScoreComparisonDB(t, db)
+	insertFriendScoreComparisonCharts(t, db)
+	_, err := db.Exec(`UPDATE songs SET jacket = 'abcdef0123456789' WHERE id = 30`)
+	require.NoError(t, err)
+	query := NewFriendScoreComparisonQueryService(db)
+
+	// When
+	records, err := query.ListChartRecords(context.Background(), 101, 102, "MASTER")
+
+	// Then
+	require.NoError(t, err)
+	jackets := make(map[string]*string, len(records))
+	for _, record := range records {
+		jackets[record.SongDisplayID] = record.SongJacket
+	}
+	require.NotNil(t, jackets["0000000000000001"])
+	assert.Equal(t, "abcdef0123456789", *jackets["0000000000000001"])
+	assert.Nil(t, jackets["0000000000000009"])
+}
+
+func TestFriendScoreComparisonQueryService_ListWorldsendChartRecords_楽曲のジャケットを返す(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	setupFriendScoreComparisonDB(t, db)
+	_, err := db.Exec(`
+		CREATE TABLE worldsend_charts (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL, level_star INTEGER, attribute TEXT);
+		CREATE TABLE player_worldsend_records (
+			player_id INTEGER NOT NULL, worldsend_chart_id INTEGER NOT NULL, score INTEGER NOT NULL,
+			clear_lamp_id INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, full_chain_id INTEGER NOT NULL,
+			updated_at DATETIME NOT NULL
+		);
+		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, jacket, is_worldsend, is_deleted) VALUES
+			(10, '0000000000000010', 'ジャケットあり', '作曲者', 1, '10', 'abcdef0123456789', 1, 0),
+			(20, '0000000000000020', 'ジャケットなし', '作曲者', 1, '20', NULL, 1, 0);
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute) VALUES (10, 10, 3, '光'), (20, 20, 4, '蔵');
+	`)
+	require.NoError(t, err)
+
+	// When
+	records, err := NewFriendScoreComparisonQueryService(db).ListWorldsendChartRecords(context.Background(), 101, 102)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	require.NotNil(t, records[0].SongJacket)
+	assert.Equal(t, "abcdef0123456789", *records[0].SongJacket)
+	assert.Nil(t, records[1].SongJacket)
+}

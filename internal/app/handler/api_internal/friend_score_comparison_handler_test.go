@@ -92,6 +92,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 	updatedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
 	clearLamp := "CLEAR"
 	comboLamp := "FULL COMBO"
+	jacket := "abcdef0123456789"
 	chartConst, err := chartconstant.NewChartConstant(14.5)
 	require.NoError(t, err)
 	stub := &stubFriendScoreComparisonUsecase{result: &usecase.FriendScoreComparisonResult{
@@ -100,7 +101,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 		Friend:     usecase.FriendScoreComparisonUser{Username: "frienduser", PlayerName: "FRIEND"},
 		Summary:    usecase.FriendScoreComparisonSummary{TotalCharts: 1, SelfWins: 1, SelfPlayed: 1, FriendPlayed: 1, BothPlayed: 1},
 		Items: []usecase.FriendScoreComparisonItem{{
-			Song:            usecase.FriendScoreComparisonSong{ID: "0000000000000001", Title: "楽曲名", Artist: "アーティスト名"},
+			Song:            usecase.FriendScoreComparisonSong{ID: "0000000000000001", Title: "楽曲名", Artist: "アーティスト名", Jacket: &jacket},
 			Chart:           usecase.FriendScoreComparisonChart{Const: chartConst, IsConstUnknown: false},
 			Self:            usecase.FriendScoreComparisonRecord{IsPlayed: true, Score: 1009000, ClearLamp: &clearLamp, ComboLamp: &comboLamp, UpdatedAt: &updatedAt},
 			Friend:          usecase.FriendScoreComparisonRecord{IsPlayed: false, Score: 0},
@@ -139,7 +140,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 			"both_unplayed": 0
 		},
 		"items": [{
-			"song": {"id": "0000000000000001", "title": "楽曲名", "artist": "アーティスト名"},
+			"song": {"id": "0000000000000001", "title": "楽曲名", "artist": "アーティスト名", "jacket": "abcdef0123456789"},
 			"chart": {"const": 14.5, "is_const_unknown": false},
 			"self": {"is_played": true, "score": 1009000, "clear_lamp": "CLEAR", "combo_lamp": "FULL COMBO", "full_chain": null, "updated_at": "2026-07-20T10:00:00Z"},
 			"friend": {"is_played": false, "score": 0, "clear_lamp": null, "combo_lamp": null, "full_chain": null, "updated_at": null},
