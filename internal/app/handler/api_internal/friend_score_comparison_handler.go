@@ -78,6 +78,7 @@ func toFriendScoreComparisonResponse(result *usecase.FriendScoreComparisonResult
 				ID:     item.Song.ID,
 				Title:  item.Song.Title,
 				Artist: item.Song.Artist,
+				Jacket: item.Song.Jacket,
 			},
 			Chart:           chart,
 			Self:            toFriendScoreComparisonRecordDTO(item.Self),
