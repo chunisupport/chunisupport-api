@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -40,7 +39,6 @@ func (u *adminUserStatisticsUsecase) Get(ctx context.Context) (AdminUserStatisti
 	activeSince := u.now().Add(-info.AdminUserStatisticsActivePeriod)
 	statistics, err := u.queryService.Get(ctx, activeSince)
 	if err != nil {
-		slog.Error("failed to fetch admin user statistics", "error", err)
 		return AdminUserStatisticsOutput{}, err
 	}
 

@@ -26,6 +26,13 @@ func (e *APIError) Unwrap() error {
 	return e.Internal
 }
 
+// Is はコードが同じAPIErrorに一致させる（errors.Is対応）
+// WithInternal は新しいインスタンスを返すため、原因エラーを保持したまま定義済みエラーで判定できるようにする。
+func (e *APIError) Is(target error) bool {
+	t, ok := target.(*APIError)
+	return ok && e.Code == t.Code
+}
+
 // WithInternal は内部エラーを設定した新しいAPIErrorを返す
 func (e *APIError) WithInternal(err error) *APIError {
 	return &APIError{

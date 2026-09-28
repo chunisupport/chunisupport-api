@@ -245,5 +245,5 @@ func wrapFriendChartRankingQueryError(operation string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%w: %s: %v", domainrepo.ErrRepositoryOperationFailed, operation, err)
+	return fmt.Errorf("%w: %s: %w", domainrepo.ErrRepositoryOperationFailed, operation, err)
 }

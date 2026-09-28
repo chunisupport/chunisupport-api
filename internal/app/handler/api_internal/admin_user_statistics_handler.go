@@ -28,7 +28,7 @@ func NewAdminUserStatisticsHandler(usecase adminUserStatisticsUsecase) *AdminUse
 func (h *AdminUserStatisticsHandler) Get(c *echo.Context) error {
 	statistics, err := h.usecase.Get(c.Request().Context())
 	if err != nil {
-		return apierror.ErrInternalError
+		return apierror.FromUsecaseError(err)
 	}
 
 	return c.JSON(http.StatusOK, internaldto.AdminUserStatisticsResponse{

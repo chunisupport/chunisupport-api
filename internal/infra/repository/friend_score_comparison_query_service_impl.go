@@ -276,5 +276,5 @@ func comparisonPlay(
 }
 
 func wrapFriendScoreComparisonQueryError(operation string, err error) error {
-	return fmt.Errorf("%w: %s: %v", domainrepo.ErrRepositoryOperationFailed, operation, err)
+	return fmt.Errorf("%w: %s: %w", domainrepo.ErrRepositoryOperationFailed, operation, err)
 }

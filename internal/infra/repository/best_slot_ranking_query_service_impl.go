@@ -118,7 +118,7 @@ func findEligiblePlayerCount(ctx context.Context, exec domainrepo.Executor, rati
 		return 0, nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("%w: find eligible player count: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return 0, fmt.Errorf("%w: find eligible player count: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	return count, nil
 }
@@ -140,7 +140,7 @@ func findBestSlotRankingRows(ctx context.Context, exec domainrepo.Executor, rati
 	`
 	var rows []bestSlotRankingStatsRow
 	if err := exec.SelectContext(ctx, &rows, query, ratingBandID); err != nil {
-		return nil, fmt.Errorf("%w: list best-slot ranking stats: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list best-slot ranking stats: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	return rows, nil
 }
@@ -162,7 +162,7 @@ func findBestSlotRankingCharts(ctx context.Context, exec domainrepo.Executor) ([
 	`
 	var rows []bestSlotRankingChartRow
 	if err := exec.SelectContext(ctx, &rows, query); err != nil {
-		return nil, fmt.Errorf("%w: list best-slot ranking charts: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list best-slot ranking charts: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	return rows, nil
 }
