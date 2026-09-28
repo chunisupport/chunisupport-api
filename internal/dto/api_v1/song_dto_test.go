@@ -19,6 +19,7 @@ func TestToV1SongDTO(t *testing.T) {
 		GenreID:              &genreID,
 		ReleasedAt:           &releaseDate,
 		OpTargetDifficultyID: 5,
+		UnlockRequired:       true,
 	}
 
 	dto := ToV1SongDTO(song, map[int]string{2: "niconico"}, 90)
@@ -31,6 +32,9 @@ func TestToV1SongDTO(t *testing.T) {
 	require.NotNil(t, dto.OpTargetDifficulty)
 	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
 	assert.NotNil(t, dto.Charts)
+	payload, err := json.Marshal(dto)
+	require.NoError(t, err)
+	assert.NotContains(t, string(payload), `"unlock_required"`)
 }
 
 // TestToV1ChartDTO はToV1ChartDTO関数の基本的な変換をテストします。

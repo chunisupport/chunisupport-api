@@ -30,6 +30,11 @@ type SongBPMRecord struct {
 	BPM int `db:"bpm"`
 }
 
+type songUnlockRequiredRecord struct {
+	ID             int
+	UnlockRequired int
+}
+
 // SongWikiPageTitleRecord は songs.wiki_page_title の一括更新に使用される内部レコードです。
 type SongWikiPageTitleRecord struct {
 	ID            int    `db:"id"`
@@ -109,6 +114,43 @@ WHERE id IN (
 	{{- end -}}
 ) AND (bpm IS NULL OR bpm = 0)
 `))
+
+var bulkUpdateSongUnlockRequiredTpl = template.Must(template.New("bulkUpdateSongUnlockRequired").Parse(`
+UPDATE songs SET unlock_required = CASE id
+	{{- range .}}
+	WHEN {{.ID}} THEN {{.UnlockRequired}}
+	{{- end}}
+END
+WHERE id IN (
+	{{- range $i, $e := .}}
+	{{- if $i}},{{end}}{{.ID}}
+	{{- end -}}
+)
+`))
+
+func bulkUpdateSongUnlockRequiredInBatches(ctx context.Context, db sqlx.ExtContext, records []songUnlockRequiredRecord) (int64, error) {
+	var totalAffected int64
+	for i := 0; i < len(records); i += info.SongBatchSQLiteCompoundSelectLimit {
+		if err := ctx.Err(); err != nil {
+			return totalAffected, err
+		}
+		end := min(i+info.SongBatchSQLiteCompoundSelectLimit, len(records))
+		var buf bytes.Buffer
+		if err := bulkUpdateSongUnlockRequiredTpl.Execute(&buf, records[i:end]); err != nil {
+			return totalAffected, fmt.Errorf("failed to build song unlock_required update: %w", err)
+		}
+		result, err := db.ExecContext(ctx, buf.String())
+		if err != nil {
+			return totalAffected, fmt.Errorf("failed to update song unlock_required: %w", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return totalAffected, err
+		}
+		totalAffected += affected
+	}
+	return totalAffected, nil
+}
 
 // bulkUpdateSongWikiPageTitlesTpl は wiki_page_title の一括更新用テンプレートです。
 // 他のデータソースで設定済みの値を壊さないよう、未設定(nullまたは空文字)のレコードにのみ補完します。

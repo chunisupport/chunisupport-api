@@ -27,18 +27,19 @@ type EditorWorldsendChartDTO struct {
 // WorldsendSongDTO は WORLD'S END 楽曲情報を外部に公開するためのDTOです。
 // WORLD'S END はレーティング対象外のため、charts は "WORLDSEND" キーのみを持ち maxop フィールドは存在しません。
 type WorldsendSongDTO struct {
-	DisplayID     string                        `json:"id"`
-	Title         string                        `json:"title"`
-	WikiPageTitle *string                       `json:"wiki_page_title"`
-	Reading       *string                       `json:"reading"`
-	Artist        string                        `json:"artist"`
-	Genre         *string                       `json:"genre"`
-	BPM           *int                          `json:"bpm"`
-	Release       *string                       `json:"release"`
-	Jacket        *string                       `json:"jacket"`
-	OfficialIdx   string                        `json:"official_idx"`
-	IsNew         bool                          `json:"is_new"`
-	Charts        map[string]*WorldsendChartDTO `json:"charts"`
+	DisplayID      string                        `json:"id"`
+	Title          string                        `json:"title"`
+	WikiPageTitle  *string                       `json:"wiki_page_title"`
+	Reading        *string                       `json:"reading"`
+	Artist         string                        `json:"artist"`
+	Genre          *string                       `json:"genre"`
+	BPM            *int                          `json:"bpm"`
+	Release        *string                       `json:"release"`
+	Jacket         *string                       `json:"jacket"`
+	OfficialIdx    string                        `json:"official_idx"`
+	IsNew          bool                          `json:"is_new"`
+	UnlockRequired bool                          `json:"unlock_required"`
+	Charts         map[string]*WorldsendChartDTO `json:"charts"`
 }
 
 // WorldsendSongsResponse は WORLD'S END 楽曲一覧のレスポンスを表します。
@@ -161,17 +162,18 @@ func ToWorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genreNa
 	charts["WORLDSEND"] = ToWorldsendChartDTO(chart)
 
 	return &WorldsendSongDTO{
-		DisplayID:     song.DisplayID,
-		Title:         song.Title,
-		WikiPageTitle: song.WikiPageTitle,
-		Reading:       song.Reading,
-		Artist:        song.Artist,
-		Genre:         genrePtr,
-		BPM:           song.BPM,
-		Release:       releaseDateStr,
-		Jacket:        song.Jacket,
-		OfficialIdx:   song.OfficialIdx,
-		IsNew:         song.IsNew,
-		Charts:        charts,
+		DisplayID:      song.DisplayID,
+		Title:          song.Title,
+		WikiPageTitle:  song.WikiPageTitle,
+		Reading:        song.Reading,
+		Artist:         song.Artist,
+		Genre:          genrePtr,
+		BPM:            song.BPM,
+		Release:        releaseDateStr,
+		Jacket:         song.Jacket,
+		OfficialIdx:    song.OfficialIdx,
+		IsNew:          song.IsNew,
+		UnlockRequired: song.UnlockRequired,
+		Charts:         charts,
 	}
 }

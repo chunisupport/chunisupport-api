@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS songs (
     jacket TEXT,
     is_worldsend INTEGER NOT NULL DEFAULT 0 CHECK(is_worldsend IN (0,1)),
     is_new INTEGER NOT NULL DEFAULT 0 CHECK(is_new IN (0,1)),
+	unlock_required INTEGER CHECK(unlock_required IN (0,1)),
     is_deleted INTEGER NOT NULL DEFAULT 0 CHECK(is_deleted IN (0,1)),
     FOREIGN KEY(genre_id) REFERENCES genres(id) ON DELETE CASCADE,
     CHECK(bpm IS NULL OR bpm > 0)

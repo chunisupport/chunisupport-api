@@ -6,7 +6,34 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/importer"
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/songchart"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestSt1027BulkUpdateSongUnlockRequired(t *testing.T) {
+	ctx := context.Background()
+	ws, err := songchart.NewSongChartWorkspace(ctx, songchart.Config{DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer ws.Close()
+
+	_, err = ws.DB().ExecContext(ctx, `INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, unlock_required)
+		VALUES (1, 'disp-001', 'One', 'Artist', 1, 'OFF001', 0),
+		       (2, 'disp-002', 'Two', 'Artist', 1, 'OFF002', 1),
+		       (3, 'disp-003', 'Three', 'Artist', 1, 'OFF003', 1)`)
+	require.NoError(t, err)
+
+	locked, unlocked := 1, 0
+	c := NewSt1027Consolidator(ws, &importer.St1027Data{Songs: []importer.St1027Song{
+		{Meta: importer.St1027Meta{OfficialID: "OFF001", UnlockRequired: &locked}},
+		{Meta: importer.St1027Meta{OfficialID: "OFF002", UnlockRequired: &unlocked}},
+		{Meta: importer.St1027Meta{OfficialID: "OFF003"}},
+	}})
+	require.NoError(t, c.bulkUpdateSongUnlockRequired(ctx, map[string]int{"OFF001": 1, "OFF002": 2, "OFF003": 3}))
+
+	var values []int
+	require.NoError(t, ws.DB().SelectContext(ctx, &values, `SELECT unlock_required FROM songs ORDER BY id`))
+	assert.Equal(t, []int{1, 0, 1}, values)
+}
 
 func TestSt1027BulkUpdateChartNotes_InitialInsert(t *testing.T) {
 	t.Parallel()

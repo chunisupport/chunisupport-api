@@ -3447,6 +3447,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "is_maxop_unknown": false,
       "op_target_difficulty": "MASTER",
       "is_new": true,
+      "unlock_required": false,
       "charts": {
         "BASIC": {
           "const": 3.0,
@@ -3490,6 +3491,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `op_target_difficulty` | string \| null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `is_new` | bool | 新曲枠の対象かどうか |
+| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持 |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -3950,6 +3952,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "jacket": "img_filename",
       "official_idx": "123",
       "is_new": true,
+      "unlock_required": false,
       "charts": {
         "WORLDSEND": {
           "attribute": "狂",
@@ -3977,6 +3980,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `official_idx` | string | 公式インデックス |
 | `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
+| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持 |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -4296,7 +4300,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4348,7 +4352,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |

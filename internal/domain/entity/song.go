@@ -30,6 +30,7 @@ type Song struct {
 	OpTargetDifficultyID int
 	IsWorldsend          bool
 	IsNew                bool
+	UnlockRequired       bool
 	IsDeleted            bool
 	UpdatedAt            *time.Time
 }

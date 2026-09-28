@@ -28,21 +28,22 @@ func NewSongRepository(db *sqlx.DB) repository.SongRepository {
 
 // songRow はDBから取得する楽曲データの行を表します。
 type songRow struct {
-	ID            int        `db:"id"`
-	DisplayID     string     `db:"display_id"`
-	Title         string     `db:"title"`
-	WikiPageTitle *string    `db:"wiki_page_title"`
-	Reading       *string    `db:"reading"`
-	Artist        string     `db:"artist"`
-	GenreID       *int       `db:"genre_id"`
-	BPM           *int       `db:"bpm"`
-	ReleasedAt    *time.Time `db:"released_at"`
-	OfficialIdx   string     `db:"official_idx"`
-	Jacket        *string    `db:"jacket"`
-	IsWorldsend   bool       `db:"is_worldsend"`
-	IsNew         bool       `db:"is_new"`
-	IsDeleted     bool       `db:"is_deleted"`
-	UpdatedAt     *time.Time `db:"updated_at"`
+	ID             int        `db:"id"`
+	DisplayID      string     `db:"display_id"`
+	Title          string     `db:"title"`
+	WikiPageTitle  *string    `db:"wiki_page_title"`
+	Reading        *string    `db:"reading"`
+	Artist         string     `db:"artist"`
+	GenreID        *int       `db:"genre_id"`
+	BPM            *int       `db:"bpm"`
+	ReleasedAt     *time.Time `db:"released_at"`
+	OfficialIdx    string     `db:"official_idx"`
+	Jacket         *string    `db:"jacket"`
+	IsWorldsend    bool       `db:"is_worldsend"`
+	IsNew          bool       `db:"is_new"`
+	UnlockRequired bool       `db:"unlock_required"`
+	IsDeleted      bool       `db:"is_deleted"`
+	UpdatedAt      *time.Time `db:"updated_at"`
 }
 
 // chartRow はDBから取得する譜面データの行を表します。
@@ -63,7 +64,7 @@ type chartRow struct {
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
@@ -198,6 +199,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.Jacket = row.Jacket
 	song.IsWorldsend = row.IsWorldsend
 	song.IsNew = row.IsNew
+	song.UnlockRequired = row.UnlockRequired
 	song.IsDeleted = row.IsDeleted
 	song.UpdatedAt = row.UpdatedAt
 	return song
@@ -239,7 +241,7 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 	}
 
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
@@ -341,7 +343,7 @@ func (r *songRepository) findByIdentifierForUpdate(ctx context.Context, exec rep
 	}
 
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
 		WHERE %s = ? AND is_worldsend = 0
 		FOR UPDATE
@@ -391,7 +393,7 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 
 	// 1. 楽曲を取得
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted, updated_at
+		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
 		WHERE %s = ? AND is_worldsend = 0
 	`, column)
@@ -440,7 +442,7 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, is_deleted = ?
+		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, unlock_required = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -458,6 +460,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		song.Jacket,
 		song.IsWorldsend,
 		song.IsNew,
+		song.UnlockRequired,
 		song.IsDeleted,
 		song.ID,
 	)

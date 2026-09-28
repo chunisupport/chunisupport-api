@@ -20,6 +20,7 @@ func TestToSongDTO(t *testing.T) {
 		GenreID:              &genreID,
 		ReleasedAt:           &releaseDate,
 		OpTargetDifficultyID: 5,
+		UnlockRequired:       true,
 	}
 
 	dto := ToSongDTO(song, map[int]string{1: "POPS & ANIME"}, 90)
@@ -31,6 +32,7 @@ func TestToSongDTO(t *testing.T) {
 	assert.Equal(t, "2024-01-15", *dto.Release)
 	require.NotNil(t, dto.OpTargetDifficulty)
 	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
+	assert.True(t, dto.UnlockRequired)
 	assert.NotNil(t, dto.Charts)
 }
 
