@@ -287,6 +287,81 @@ func TestUserDataTransferRepositoryExportAuxiliaryPlayerDataPreservesOfficialOve
 	assert.Equal(t, 98.12, *snapshot.MetricHistories[0].OfficialOverpowerPercent)
 }
 
+func TestUserDataTransferRepositoryExportExcludesDeletedSongsAndCourses(t *testing.T) {
+	db := newTransferRepositoryTestDB(t)
+	ctx := context.Background()
+	repo := &userDataTransferRepository{db: db}
+
+	// Given: 有効と削除済みの楽曲・コースが混在するプレイヤーデータ
+	_, err := db.Exec(`INSERT INTO songs (id, official_idx, is_deleted) VALUES
+		(1, '100', 0), (2, '200', 1), (3, '300', 0), (4, '400', 1)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO difficulties (id, name, sort_order) VALUES (1, 'MASTER', 4)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO charts (id, song_id, difficulty_id, const) VALUES (10, 1, 1, 14.0), (20, 2, 1, 14.0)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO worldsend_charts (id, song_id) VALUES (30, 3), (40, 4)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO courses (id, official_idx, is_deleted) VALUES (50, '500', 0), (60, '600', 1)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO clear_lamp_types (id, name) VALUES (1, 'CLEAR')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO combo_lamp_types (id, name) VALUES (1, 'NONE')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO full_chain_types (id, name) VALUES (1, 'NONE')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO slots (id, name) VALUES (1, 'none')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, slot_order, updated_at) VALUES
+		(10, 10, 1000000, 1, 1, 1, 1, NULL, '2026-08-01 00:00:00'),
+		(10, 20, 1000000, 1, 1, 1, 1, NULL, '2026-08-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_record_histories (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at) VALUES
+		(10, 10, 990000, 1, 1, 1, '2026-07-01 00:00:00'),
+		(10, 20, 990000, 1, 1, 1, '2026-07-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at) VALUES
+		(10, 30, 1000000, 1, 1, 1, '2026-08-01 00:00:00'),
+		(10, 40, 1000000, 1, 1, 1, '2026-08-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_worldsend_record_histories (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at) VALUES
+		(10, 30, 990000, 1, 1, 1, '2026-07-01 00:00:00'),
+		(10, 40, 990000, 1, 1, 1, '2026-07-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_course_records (player_id, course_id, score, is_clear, combo_lamp_id, updated_at) VALUES
+		(10, 50, 1000000, 1, 1, '2026-08-01 00:00:00'),
+		(10, 60, 1000000, 1, 1, '2026-08-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_favorite_songs (player_id, song_id, created_at) VALUES
+		(10, 1, '2026-08-01 00:00:00'), (10, 2, '2026-08-01 00:00:00')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES
+		(10, 1, 0), (10, 2, 0)`)
+	require.NoError(t, err)
+	snapshot := emptyTransferRepositorySnapshot(t)
+
+	// When: エクスポートを実行する
+	require.NoError(t, repo.exportRecords(ctx, db, 10, snapshot))
+	require.NoError(t, repo.exportAuxiliaryPlayerData(ctx, db, 10, snapshot))
+
+	// Then: 削除済み楽曲・コースのレコードと履歴は含まれない
+	require.Len(t, snapshot.Records, 1)
+	assert.Equal(t, "100", snapshot.Records[0].SongOfficialIdx)
+	require.Len(t, snapshot.RecordHistories, 1)
+	assert.Equal(t, "100", snapshot.RecordHistories[0].SongOfficialIdx)
+	require.Len(t, snapshot.WorldsendRecords, 1)
+	assert.Equal(t, "300", snapshot.WorldsendRecords[0].SongOfficialIdx)
+	require.Len(t, snapshot.WorldsendRecordHistories, 1)
+	assert.Equal(t, "300", snapshot.WorldsendRecordHistories[0].SongOfficialIdx)
+	require.Len(t, snapshot.CourseRecords, 1)
+	assert.Equal(t, "500", snapshot.CourseRecords[0].CourseOfficialIdx)
+	require.Len(t, snapshot.FavoriteSongs, 1)
+	assert.Equal(t, "100", snapshot.FavoriteSongs[0].SongOfficialIdx)
+	require.Len(t, snapshot.LockedSongs, 1)
+	assert.Equal(t, "100", snapshot.LockedSongs[0].SongOfficialIdx)
+	assert.NoError(t, snapshot.Validate())
+}
+
 func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 	db, err := sqlx.Open("sqlite", ":memory:")
@@ -306,7 +381,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"CREATE TABLE player_record_histories (player_id INTEGER, chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_worldsend_records (player_id INTEGER, worldsend_chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_worldsend_record_histories (player_id INTEGER, worldsend_chart_id INTEGER, score INTEGER, clear_lamp_id INTEGER, combo_lamp_id INTEGER, full_chain_id INTEGER, updated_at DATETIME)",
-		"CREATE TABLE courses (id INTEGER PRIMARY KEY, official_idx TEXT)",
+		"CREATE TABLE courses (id INTEGER PRIMARY KEY, official_idx TEXT, is_deleted INTEGER NOT NULL DEFAULT 0)",
 		"CREATE TABLE clear_lamp_types (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE combo_lamp_types (id INTEGER PRIMARY KEY, name TEXT)",
 		"CREATE TABLE full_chain_types (id INTEGER PRIMARY KEY, name TEXT)",
