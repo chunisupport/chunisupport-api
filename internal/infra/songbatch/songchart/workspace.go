@@ -996,6 +996,22 @@ type chartInsertRecord struct {
 	NotesDesigner sql.NullString
 }
 
+const chartInsertColumnCount = 6
+
+// buildBulkInsertChartsSQL は新規譜面だけを登録するSQL文を生成します。
+// 既存譜面は呼び出し元で UPDATE に振り分け済みのため、UPSERTは使用しません。
+// InnoDB は ON DUPLICATE KEY UPDATE が既存行を更新する場合も AUTO_INCREMENT を消費するためです。
+func buildBulkInsertChartsSQL(n int) string {
+	const queryPrefix = "INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer) VALUES "
+
+	values := make([]string, n)
+	for i := range n {
+		values[i] = "(?, ?, ?, ?, ?, ?)"
+	}
+
+	return queryPrefix + strings.Join(values, ",")
+}
+
 func bulkInsertMySQLCharts(ctx context.Context, mysql apirepo.Executor, records []chartInsertRecord, chunkSize int) error {
 	if len(records) == 0 {
 		return nil
@@ -1005,27 +1021,12 @@ func bulkInsertMySQLCharts(ctx context.Context, mysql apirepo.Executor, records 
 		chunkSize = len(records)
 	}
 
-	const queryPrefix = "INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer) VALUES "
-	const querySuffix = ` ON DUPLICATE KEY UPDATE
-        const = CASE
-                WHEN is_const_unknown = 0 THEN const
-                ELSE VALUES(const)
-        END,
-        is_const_unknown = CASE
-                WHEN is_const_unknown = 0 AND VALUES(is_const_unknown) = 1 THEN 0
-                ELSE VALUES(is_const_unknown)
-        END,
-        notes = COALESCE(VALUES(notes), notes),
-        notes_designer = COALESCE(notes_designer, VALUES(notes_designer))`
-
 	for start := 0; start < len(records); start += chunkSize {
 		end := min(start+chunkSize, len(records))
 
 		chunk := records[start:end]
-		values := make([]string, len(chunk))
-		args := make([]any, 0, len(chunk)*6)
-		for i, rec := range chunk {
-			values[i] = "(?, ?, ?, ?, ?, ?)"
+		args := make([]any, 0, len(chunk)*chartInsertColumnCount)
+		for _, rec := range chunk {
 			args = append(args,
 				rec.SongID,
 				rec.DifficultyID,
@@ -1036,7 +1037,7 @@ func bulkInsertMySQLCharts(ctx context.Context, mysql apirepo.Executor, records 
 			)
 		}
 
-		query := queryPrefix + strings.Join(values, ",") + querySuffix
+		query := buildBulkInsertChartsSQL(len(chunk))
 		if _, err := mysql.ExecContext(ctx, query, args...); err != nil {
 			return fmt.Errorf("failed to bulk insert charts (%d-%d): %w", start, end, err)
 		}
@@ -1053,6 +1054,21 @@ type worldsendChartInsertRecord struct {
 	NotesDesigner sql.NullString
 }
 
+const worldsendChartInsertColumnCount = 5
+
+// buildBulkInsertWorldsendChartsSQL は新規WORLD'S END譜面だけを登録するSQL文を生成します。
+// 既存譜面は呼び出し元で UPDATE に振り分け済みのため、AUTO_INCREMENT を消費するUPSERTは使用しません。
+func buildBulkInsertWorldsendChartsSQL(n int) string {
+	const queryPrefix = "INSERT INTO worldsend_charts (song_id, level_star, attribute, notes, notes_designer) VALUES "
+
+	values := make([]string, n)
+	for i := range n {
+		values[i] = "(?, ?, ?, ?, ?)"
+	}
+
+	return queryPrefix + strings.Join(values, ",")
+}
+
 func bulkInsertMySQLWorldsendCharts(ctx context.Context, mysql apirepo.Executor, records []worldsendChartInsertRecord, chunkSize int) error {
 	if len(records) == 0 {
 		return nil
@@ -1062,21 +1078,12 @@ func bulkInsertMySQLWorldsendCharts(ctx context.Context, mysql apirepo.Executor,
 		chunkSize = len(records)
 	}
 
-	const queryPrefix = "INSERT INTO worldsend_charts (song_id, level_star, attribute, notes, notes_designer) VALUES "
-	const querySuffix = ` ON DUPLICATE KEY UPDATE
-        level_star = VALUES(level_star),
-        attribute = VALUES(attribute),
-        notes = COALESCE(VALUES(notes), notes),
-        notes_designer = COALESCE(notes_designer, VALUES(notes_designer))`
-
 	for start := 0; start < len(records); start += chunkSize {
 		end := min(start+chunkSize, len(records))
 
 		chunk := records[start:end]
-		values := make([]string, len(chunk))
-		args := make([]any, 0, len(chunk)*5)
-		for i, rec := range chunk {
-			values[i] = "(?, ?, ?, ?, ?)"
+		args := make([]any, 0, len(chunk)*worldsendChartInsertColumnCount)
+		for _, rec := range chunk {
 			args = append(args,
 				rec.SongID,
 				nullableInt(rec.LevelStar),
@@ -1086,7 +1093,7 @@ func bulkInsertMySQLWorldsendCharts(ctx context.Context, mysql apirepo.Executor,
 			)
 		}
 
-		query := queryPrefix + strings.Join(values, ",") + querySuffix
+		query := buildBulkInsertWorldsendChartsSQL(len(chunk))
 		if _, err := mysql.ExecContext(ctx, query, args...); err != nil {
 			return fmt.Errorf("failed to bulk insert worldsend_charts (%d-%d): %w", start, end, err)
 		}
