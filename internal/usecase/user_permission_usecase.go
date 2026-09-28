@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -31,7 +32,9 @@ func NewUserPermissionUsecase(db repository.Executor, tm TransactionManager, use
 }
 
 // ChangePermission はADMINが指定ユーザーの権限を変更します。
-// 対象行をロックしてから集約の規則を適用するため、同時更新で本人降格の制約が破られません。
+// リクエスト元と対象の行をロックし、実行時点でもリクエスト元がADMINであることを確認します。
+// ADMINは自分を降格できないため、変更後もリクエスト元はADMINのまま残ります。
+// ADMIN同士が同時に互いを降格しても一方は認可に失敗するので、ADMINが0人になりません。
 func (u *userPermissionUsecase) ChangePermission(ctx context.Context, requester *entity.User, username string, permission string) error {
 	if requester == nil || !info.HasRole(requester.AccountTypeID, info.AccountTypeAdmin) {
 		return ErrAdminRequired
@@ -51,12 +54,12 @@ func (u *userPermissionUsecase) ChangePermission(ctx context.Context, requester 
 	}
 
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		lockedTarget, err := u.userRepo.FindByIDForUpdate(ctx, tx, target.ID)
+		lockedRequester, lockedTarget, err := u.lockRequesterAndTarget(ctx, tx, requester.ID, target.ID)
 		if err != nil {
-			if errors.Is(err, repository.ErrUserNotFound) {
-				return ErrUserNotFound
-			}
 			return err
+		}
+		if !info.HasRole(lockedRequester.AccountTypeID, info.AccountTypeAdmin) {
+			return ErrAdminRequired
 		}
 
 		if lockedTarget.AccountTypeID == accountTypeID {
@@ -67,6 +70,28 @@ func (u *userPermissionUsecase) ChangePermission(ctx context.Context, requester 
 		}
 		return u.userRepo.Save(ctx, tx, lockedTarget)
 	})
+}
+
+// lockRequesterAndTarget はリクエスト元と対象のユーザー行をロックして取得します。
+// 同時に互いを変更するリクエストでデッドロックしないよう、常にIDの昇順でロックします。
+func (u *userPermissionUsecase) lockRequesterAndTarget(ctx context.Context, tx repository.Executor, requesterID int, targetID int) (*entity.User, *entity.User, error) {
+	locked := make(map[int]*entity.User, 2)
+	ids := []int{min(requesterID, targetID), max(requesterID, targetID)}
+	for _, id := range slices.Compact(ids) {
+		user, err := u.userRepo.FindByIDForUpdate(ctx, tx, id)
+		if errors.Is(err, repository.ErrUserNotFound) {
+			// 認可確認後にリクエスト元が退会した場合は権限がないものとして扱います。
+			if id == requesterID {
+				return nil, nil, ErrAdminRequired
+			}
+			return nil, nil, ErrUserNotFound
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		locked[id] = user
+	}
+	return locked[requesterID], locked[targetID], nil
 }
 
 func accountTypeIDFromPermission(permission string) (int, error) {
