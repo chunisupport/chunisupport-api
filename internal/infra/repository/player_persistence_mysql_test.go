@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -58,7 +59,7 @@ func TestPlayerPersistenceMySQL_通常更新の完了を待ってバッチが競
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	batch := NewPlayerDataBatchRepository(db)
-	keys, err := batch.ListPlayerKeys(ctx, 0, 1, 10)
+	keys, err := batch.ListPlayerKeys(ctx, 0, 1, 10, masterfingerprint.Compute([]byte("master")))
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 	repo := NewPlayerRepository(db)
@@ -99,7 +100,7 @@ func TestPlayerPersistenceMySQL_バッチ後の通常更新が再計算値を保
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	batch := NewPlayerDataBatchRepository(db)
-	keys, err := batch.ListPlayerKeys(ctx, 0, 1, 10)
+	keys, err := batch.ListPlayerKeys(ctx, 0, 1, 10, masterfingerprint.Compute([]byte("master")))
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 	locked := make(chan struct{})
@@ -114,7 +115,7 @@ func TestPlayerPersistenceMySQL_バッチ後の通常更新が再計算値を保
 			case <-ctx.Done():
 				return domainrepo.PlayerBatchUpdate{}, ctx.Err()
 			}
-			return domainrepo.PlayerBatchUpdate{PlayerRating: 16.5, BestAverage: 16.7, NewAverage: 16.2, Overpower: 12345}, nil
+			return domainrepo.PlayerBatchUpdate{PlayerRating: 16.5, BestAverage: 16.7, NewAverage: 16.2, Overpower: 12345, MasterFingerprint: masterfingerprint.Compute([]byte("master"))}, nil
 		})
 		batchDone <- err
 	}()

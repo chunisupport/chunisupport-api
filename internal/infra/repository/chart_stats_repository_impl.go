@@ -109,6 +109,11 @@ func (r *chartStatsRepository) findChartStatsByChartIDs(ctx context.Context, exe
 
 // FindRatingBands はレーティング帯マスタ一覧を返します。
 func (r *chartStatsRepository) FindRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
+	return findRatingBands(ctx, exec)
+}
+
+// findRatingBands はレーティング帯マスタを表示順に返します。譜面統計の参照と再集計の両方で使います。
+func findRatingBands(ctx context.Context, exec repository.Executor) ([]*ratingband.RatingBand, error) {
 	const query = `
 		SELECT id, label, min_inclusive, max_exclusive, sort_order
 		FROM rating_bands

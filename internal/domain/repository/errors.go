@@ -93,4 +93,7 @@ var (
 
 	// ErrSongBatchJobNotFound は楽曲バッチジョブが見つからない場合に返されます。
 	ErrSongBatchJobNotFound = errors.New("song batch job not found")
+
+	// ErrChartStatsBatchJobNotFound は譜面統計バッチジョブが見つからない場合に返されます。
+	ErrChartStatsBatchJobNotFound = errors.New("chart stats batch job not found")
 )

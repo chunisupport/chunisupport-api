@@ -75,7 +75,18 @@ func (r *PlayerLockedSongRepository) Delete(ctx context.Context, exec domainrepo
 	return wrapPlayerLockedSongRepositoryError("delete", err)
 }
 
+// DeleteBySongID は指定した楽曲の未解禁登録を全プレイヤー分削除します。
+// 未解禁曲はOVER POWERの計算入力であり、この経路ではPlayer集約の保存を通らないため、
+// 削除前に影響するプレイヤーの再計算済み記録を一括で無効にして次回の再計算バッチの対象へ戻します。
+// 楽曲の削除後に復活させるとマスタのフィンガープリントは元に戻るため、ここで無効にしないと再計算が漏れます。
 func (r *PlayerLockedSongRepository) DeleteBySongID(ctx context.Context, exec domainrepo.Executor, songID int) error {
+	const invalidateQuery = `
+		UPDATE players
+		SET recalculated_master_fingerprint = NULL
+		WHERE id IN (SELECT player_id FROM player_locked_songs WHERE song_id = ?)`
+	if _, err := exec.ExecContext(ctx, invalidateQuery, songID); err != nil {
+		return wrapPlayerLockedSongRepositoryError("invalidate recalculation by song id", err)
+	}
 	const q = `DELETE FROM player_locked_songs WHERE song_id = ?`
 	_, err := exec.ExecContext(ctx, q, songID)
 	return wrapPlayerLockedSongRepositoryError("delete by song id", err)

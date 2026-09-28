@@ -9,6 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -568,3 +569,30 @@ func TestPlayerLockedSongMutationsLockPlayerBeforeChildRows(t *testing.T) {
 }
 
 func ptrInt(v int) *int { return &v }
+
+func TestPlayerLockedSongLock_再計算済みの記録を無効にする(t *testing.T) {
+	// Given
+	displayID, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	songRepo := new(MockSongRepository)
+	songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, "0123456789abcdef").
+		Return(&entity.Song{ID: 1, DisplayID: "0123456789abcdef", Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDMaster}}}, nil).Once()
+	fingerprint := masterfingerprint.Compute([]byte("master"))
+	playerRepo := &stubPlayerLockedSongPlayerRepository{player: &entity.Player{ID: 10, RecalculatedMasterFingerprint: &fingerprint}}
+	u := &playerLockedSongUsecase{
+		tm:             &passthroughTransactionManager{},
+		playerRepo:     playerRepo,
+		playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: []*entity.PlayerRecord{}},
+		playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+		songRepo:       songRepo,
+		lockedRepo:     &spyPlayerLockedSongRepository{},
+	}
+
+	// When
+	err = u.Lock(context.Background(), 100, &PlayerLockedSongInput{DisplayID: displayID})
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, playerRepo.saved)
+	assert.Nil(t, playerRepo.saved.RecalculatedMasterFingerprint)
+}

@@ -45,6 +45,7 @@ const (
 	RandomFavoriteHonorTitle                    = "お気に入りからランダム"
 	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
+	PlayerRecalculationLogicVersion             = 1 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
 	StaticDataExportBatchLockName               = "chunisupport:export-static-data"
 	ChartStatsExportBatchLockName               = "chunisupport:export-chart-stats"
 	AllRatingBandID                             = 0
@@ -107,6 +108,12 @@ const (
 	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
 	InternalPublicRateLimitRequests = 60
 	InternalPublicRateLimitWindow   = 1 * time.Minute
+	RatingBadgeIPRateLimitRequests  = 600
+	RatingBadgeSchemaVersion        = 1
+	RatingBadgeLabel                = "CHUNITHM RATING"
+	RatingBadgeColor                = "blue"
+	RatingBadgeNoDataMessage        = "no data"
+	RatingBadgeNoDataColor          = "lightgrey"
 	RegisterDataRateLimitRequests   = 1
 	RegisterDataRateLimitWindow     = 30 * time.Second
 	RecentSignInMaxAge              = 5 * time.Minute

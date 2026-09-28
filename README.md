@@ -8,12 +8,14 @@
 - **APIトークン認証**: 外部クライアント向けに、1ユーザーあたり最大10個の名前付き永続APIキーで保護された `/v1` エンドポイントを提供します。
 - **プレイヤー情報**: ユーザーに紐づくプレイヤー情報を管理します。
 - **楽曲データ**: CHUNITHMの公式楽曲データを元にしたデータベースを提供します。データは同梱の楽曲データ収集バッチ（`cmd/song-batch`）で構築し、ADMINは管理画面からも実行できます。
+- **譜面統計**: ベスト枠平均レーティング帯ごとのランク・ランプ分布とベスト枠採用率を提供します。統計は同梱の譜面統計バッチ（`cmd/chart-stats-batch`）で再構築し、ADMINは管理画面からも実行できます。
 
 ## ドキュメント
 
 - [API仕様書（内部/公開）](docs/API.md)
 - [設定ファイル・環境変数](docs/configuration.md)
 - [楽曲データ収集バッチ](docs/song_batch.md)
+- [譜面統計バッチ](docs/chart_stats_batch.md)
 - [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
@@ -109,7 +111,9 @@ cmd/
 │   └── main.go
 ├── export-static-data/ # 静的データ出力バッチ
 │   └── main.go
-└── song-batch/   # 楽曲データ収集バッチ
+├── song-batch/   # 楽曲データ収集バッチ
+│   └── main.go
+└── chart-stats-batch/ # 譜面統計バッチ
     └── main.go
 internal/         # 共通のドメインロジック・ユースケース・インフラ
 └── ...
@@ -124,6 +128,7 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | プレイヤーデータ再計算バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-recalculate-player-data-linux-amd64 ./cmd/recalculate-player-data` | `go run ./cmd/recalculate-player-data` |
 | 静的データ出力バッチ | `go build -o _chunisupport-export-static-data ./cmd/export-static-data` | `go run ./cmd/export-static-data` |
 | 楽曲データ収集バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-song-batch-linux-amd64 ./cmd/song-batch` | `go run ./cmd/song-batch` |
+| 譜面統計バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-chart-stats-batch-linux-amd64 ./cmd/chart-stats-batch` | `go run ./cmd/chart-stats-batch` |
 
 ## 楽曲データ収集バッチ
 
@@ -134,7 +139,7 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | `go run ./cmd/song-batch` | 通常実行（cron から定期実行） |
 | `go run ./cmd/song-batch --major-update` | 大型アップデート用。公式データと追加楽曲だけで更新し、譜面定数の更新ルールを適用 |
 | `go run ./cmd/song-batch --fill-missing-release-date` | 日付が得られない新規楽曲に実行日（JST）をリリース日として補完 |
-| 管理画面 `/admin/song-batch` | ADMINが上記と同じ処理を任意のタイミングで実行（API プロセス内でバックグラウンド実行） |
+| 管理画面 `/admin/batch`（楽曲バッチタブ） | ADMINが上記と同じ処理を任意のタイミングで実行（API プロセス内でバックグラウンド実行） |
 
 - CLI と管理画面は同じ MySQL アドバイザリロックを使うため、同時に実行される楽曲バッチは常に1つです。
 - 実行結果は `song_batch_jobs` テーブルに記録され、管理画面で確認できます。保持するのは最新50件までです。
@@ -142,15 +147,36 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 
 処理の流れ、必須・補完データソース、実行履歴の状態は [楽曲データ収集バッチ](docs/song_batch.md) を参照してください。
 
+## 譜面統計バッチ
+
+`go run ./cmd/chart-stats-batch` はプレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chart_stats_by_rating_band` / `worldsend_chart_stats_by_rating_band` / `chart_best_slot_stats_by_rating_band` を再構築します。以前は `chunisupport-stat-batch` リポジトリで管理していたものを統合しました。
+
+| 実行方法 | 内容 |
+|---|---|
+| `go run ./cmd/chart-stats-batch` | 通常実行（cron から定期実行）。引数はありません |
+| 管理画面 `/admin/batch/chart-stats`（譜面統計バッチタブ） | ADMINが同じ処理を任意のタイミングで実行（API プロセス内でバックグラウンド実行） |
+
+- CLI と管理画面は同じ MySQL アドバイザリロックを使うため、同時に実行される譜面統計バッチは常に1つです。
+- 3つの統計テーブルは集計後に単一トランザクションで入れ替えるため、実行中や失敗時も直前の統計が参照されます。
+- 実行結果は `chart_stats_batch_jobs` テーブルに記録され、管理画面で確認できます。保持するのは最新50件までです。
+
+旧 stat-batch からの切り替え手順と実行履歴の状態は [譜面統計バッチ](docs/chart_stats_batch.md)、集計規則は [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md) を参照してください。
+
 ## プレイヤーデータ再計算バッチ
 
 `go run ./cmd/recalculate-player-data` は最新マスタに基づいて全プレイヤーのRatingとOVER POWERを再計算します。MySQLアドバイザリロックで多重起動を防ぎ、プレイヤー単位のトランザクションで処理します。運用では07:00前後を避け、cronまたはsystemd timerから1日1回起動してください。
+
+バッチは開始時に、計算に使うマスタ項目（バージョン、楽曲の配信日・削除・WORLD'S END・`official_idx`、譜面の楽曲・難易度名・譜面定数、枠ID）と `info.PlayerRecalculationLogicVersion` からSHA-256のフィンガープリントを求めます。再計算に成功したプレイヤーには `players.recalculated_master_fingerprint` へその値を記録し、次回以降は記録が一致するプレイヤーを処理対象から除外します。登録と未解禁曲の更新は計算値を変更する際に記録を `NULL` に戻し、楽曲削除に伴う未解禁登録の一括削除も影響するプレイヤーの記録を `NULL` に戻すため、次回のバッチで再計算されます。データ引き継ぎで作成したプレイヤーは記録が `NULL` のまま作成されます。Rating・OVER POWER・枠構築の計算結果が変わる修正をした場合は、`info.PlayerRecalculationLogicVersion` の値を上げて全プレイヤーを再計算させてください。緊急時は `UPDATE players SET recalculated_master_fingerprint = NULL` でも全員を再計算対象に戻せます。
+
+APIとバッチは `players.recalculated_master_fingerprint` を読み書きするため、マイグレーション `000055` を適用してから新しいバイナリをデプロイしてください。適用直後はすべての記録が `NULL` のため、初回のバッチは全プレイヤーを再計算します。
+
+枠を再構築するときは、現在の枠との差分（外す譜面と、枠または順位が変わる譜面）だけを更新し、変更のない成績行には書き込みません。終了ログの `slots_unchanged` は、再構築したが枠が変わらなかった件数です。
 
 現行版プレイヤーの正常な公式本枠は保持します。`best` / `new` 本枠の件数超過、`slot_order` の未設定・範囲外・重複を検出した場合は、旧版プレイヤーと同様に対象となる通常譜面のスコアから枠を再構築し、RatingとOVER POWERを更新します。この修復はバッチ失敗として扱わず、再構築した推定枠は次回のプレイヤーデータ登録時に公式枠へ置き換わります。候補枠だけの不正では再構築しません。
 
 Playerの既存データは、同一トランザクション内で更新用検索により集約全体をロックし、集約メソッドで変更して `PlayerRepository.Save` で保存します。関連する成績・未解禁曲の読み書きもPlayerロック取得後に行い、コミットまで保持します。ユーザー行も変更する通常登録は「ユーザー → Player → 関連レコード」の順にロックし、バッチと未解禁曲更新はPlayerから開始してユーザー行をロックしません。
 
-`Save` はプロフィール、公式指標、計算レーティング3項目、OVER POWER値、取得日時、更新日時を保存します。ID・所有ユーザー・作成日時は作成後に変更せず、OVER POWER割合は永続化しない派生値です。公式指標と取得日時は通常登録が変更し、公式指標の履歴も同じトランザクションで保存します。再計算は計算レーティングとOVER POWER値、未解禁曲更新はOVER POWER値を変更し、それ以外はロック後の最新値を維持します。再計算と未解禁曲更新では取得日時・更新日時を変更しません。
+`Save` はプロフィール、公式指標、計算レーティング3項目、OVER POWER値、取得日時、更新日時、再計算済みフィンガープリントを保存します。ID・所有ユーザー・作成日時は作成後に変更せず、OVER POWER割合は永続化しない派生値です。公式指標と取得日時は通常登録が変更し、公式指標の履歴も同じトランザクションで保存します。再計算は計算レーティングとOVER POWER値、未解禁曲更新はOVER POWER値を変更し、それ以外はロック後の最新値を維持します。再計算と未解禁曲更新では取得日時・更新日時を変更しません。
 
 バッチは一覧取得時とPlayerロック取得後の `data_collected_at` を比較し、異なる場合は競合、行がない場合は削除済みとしてスキップします。取得日時を変えない未解禁曲更新は競合扱いにせず、Playerロック取得後の最新状態で再計算します。再計算値が保存済みの値と同じ場合も成功とし、スロットの変更とPlayer保存は一緒にコミットまたはロールバックします。
 

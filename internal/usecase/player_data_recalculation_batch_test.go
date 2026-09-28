@@ -3,10 +3,12 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,7 +84,7 @@ func TestPreparedBatchSnapshot_現行の正常な公式枠を保持する(t *tes
 	// Then
 	require.NoError(t, err)
 	assert.False(t, currentBroken)
-	assert.False(t, update.ResetSlots)
+	assert.Empty(t, update.ClearChartIDs)
 	assert.Empty(t, update.Assignments)
 }
 
@@ -122,7 +124,6 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠を再構築する(t *tes
 			// Then
 			require.NoError(t, err)
 			assert.True(t, currentBroken)
-			assert.True(t, update.ResetSlots)
 			assert.NotEmpty(t, update.Assignments)
 		})
 	}
@@ -143,7 +144,8 @@ func TestPreparedBatchSnapshot_現行の候補枠だけが壊れていても保�
 	// Then
 	require.NoError(t, err)
 	assert.False(t, currentBroken)
-	assert.False(t, update.ResetSlots)
+	assert.Empty(t, update.ClearChartIDs)
+	assert.Empty(t, update.Assignments)
 }
 
 func TestPreparedBatchSnapshot_現行本枠の順位が連番でなくても保持する(t *testing.T) {
@@ -160,7 +162,8 @@ func TestPreparedBatchSnapshot_現行本枠の順位が連番でなくても保�
 	// Then
 	require.NoError(t, err)
 	assert.False(t, currentBroken)
-	assert.False(t, update.ResetSlots)
+	assert.Empty(t, update.ClearChartIDs)
+	assert.Empty(t, update.Assignments)
 }
 
 func TestPreparedBatchSnapshot_現行の壊れた本枠をリリース日で再分類する(t *testing.T) {
@@ -182,9 +185,9 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠をリリース日で再�
 	// Then
 	require.NoError(t, err)
 	assert.True(t, currentBroken)
-	require.Len(t, update.Assignments, 2)
-	assert.Equal(t, []int{snapshot.SlotIDs["best"], snapshot.SlotIDs["new"]},
-		[]int{update.Assignments[0].SlotID, update.Assignments[1].SlotID})
+	// 譜面1はbest1位のまま変わらないため、new枠へ移る譜面2だけを更新します。
+	assert.Empty(t, update.ClearChartIDs)
+	assert.Equal(t, []repository.PlayerBatchSlotAssignment{{ChartID: 2, SlotID: snapshot.SlotIDs["new"], Position: 1}}, update.Assignments)
 }
 
 func TestPreparedBatchSnapshot_現行の壊れた本枠から候補枠と指標も再計算する(t *testing.T) {
@@ -209,9 +212,10 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠から候補枠と指標�
 	// Then
 	require.NoError(t, err)
 	assert.True(t, currentBroken)
-	assert.True(t, update.ResetSlots)
-	require.Len(t, update.Assignments, 31)
-	assert.Equal(t, snapshot.SlotIDs["best_candidate"], update.Assignments[30].SlotID)
+	assert.Empty(t, update.ClearChartIDs)
+	// 譜面1はbest1位のまま変わらないため、残る30件（本枠29件と候補枠1件）だけを更新します。
+	require.Len(t, update.Assignments, 30)
+	assert.Equal(t, repository.PlayerBatchSlotAssignment{ChartID: 31, SlotID: snapshot.SlotIDs["best_candidate"], Position: 1}, update.Assignments[29])
 	assert.Positive(t, update.PlayerRating)
 	assert.Positive(t, update.BestAverage)
 	assert.Positive(t, update.Overpower)
@@ -257,7 +261,7 @@ func TestPlayerDataRecalculationBatchUsecase_現行の壊れた本枠を成功�
 	assert.Equal(t, 1, result.CurrentBrokenRebuilt)
 	assert.Zero(t, result.CurrentPreserved)
 	assert.Zero(t, result.Failed)
-	require.True(t, repo.updates[1].ResetSlots)
+	require.NotEmpty(t, repo.updates[1].Assignments)
 }
 
 func TestPlayerDataRecalculationBatchUsecase_壊れた本枠の保存失敗を再構築成功として数えない(t *testing.T) {
@@ -294,13 +298,13 @@ func TestPlayerDataRecalculationBatchUsecase_バージョン開始時刻で現�
 		lastPlayedAt         time.Time
 		wantCurrentPreserved int
 		wantLegacyRebuilt    int
-		wantResetSlots       bool
+		wantSlotsUnchanged   int
 	}{
 		{
-			name:              "開始直前は旧版",
-			lastPlayedAt:      time.Date(2026, 7, 1, 6, 59, 59, 0, jst),
-			wantLegacyRebuilt: 1,
-			wantResetSlots:    true,
+			name:               "開始直前は旧版",
+			lastPlayedAt:       time.Date(2026, 7, 1, 6, 59, 59, 0, jst),
+			wantLegacyRebuilt:  1,
+			wantSlotsUnchanged: 1,
 		},
 		{
 			name:                 "開始時刻は現行",
@@ -326,7 +330,7 @@ func TestPlayerDataRecalculationBatchUsecase_バージョン開始時刻で現�
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantCurrentPreserved, result.CurrentPreserved)
 			assert.Equal(t, tt.wantLegacyRebuilt, result.LegacyRebuilt)
-			assert.Equal(t, tt.wantResetSlots, repo.updates[1].ResetSlots)
+			assert.Equal(t, tt.wantSlotsUnchanged, result.SlotsUnchanged)
 		})
 	}
 }
@@ -352,6 +356,217 @@ func TestPrepareBatchSnapshot_officialIdxを数値へ変換する(t *testing.T) 
 	assert.Equal(t, uint64(2), prepared.officialIndex[2])
 }
 
+func TestComputeMasterFingerprint_同じマスタからは並び順によらず同じ値になる(t *testing.T) {
+	// Given
+	snapshot := batchSnapshotForSlotTest(3)
+	reordered := batchSnapshotForSlotTest(3)
+	slices.Reverse(reordered.Songs)
+	slices.Reverse(reordered.Charts)
+
+	// When
+	first, err := computeMasterFingerprint(snapshot)
+	require.NoError(t, err)
+	second, err := computeMasterFingerprint(reordered)
+	require.NoError(t, err)
+
+	// Then
+	assert.Equal(t, first, second)
+}
+
+func TestComputeMasterFingerprint_計算に使う項目の変更で値が変わる(t *testing.T) {
+	otherDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name   string
+		change func(s *repository.PlayerDataMasterSnapshot)
+	}{
+		{name: "バージョンID", change: func(s *repository.PlayerDataMasterSnapshot) { s.Version.ID = 2 }},
+		{name: "バージョン開始日", change: func(s *repository.PlayerDataMasterSnapshot) { s.Version.ReleasedAt = otherDate }},
+		{name: "楽曲の追加", change: func(s *repository.PlayerDataMasterSnapshot) {
+			s.Songs = append(s.Songs, repository.BatchSong{ID: 99, OfficialIndex: "99"})
+		}},
+		{name: "楽曲の配信日", change: func(s *repository.PlayerDataMasterSnapshot) { s.Songs[0].ReleasedAt = &otherDate }},
+		{name: "楽曲の配信日がNULL", change: func(s *repository.PlayerDataMasterSnapshot) { s.Songs[0].ReleasedAt = nil }},
+		{name: "楽曲の削除", change: func(s *repository.PlayerDataMasterSnapshot) { s.Songs[0].IsDeleted = true }},
+		{name: "WORLD'S END", change: func(s *repository.PlayerDataMasterSnapshot) { s.Songs[0].IsWorldsend = true }},
+		{name: "official_idx", change: func(s *repository.PlayerDataMasterSnapshot) { s.Songs[0].OfficialIndex = "100" }},
+		{name: "譜面の追加", change: func(s *repository.PlayerDataMasterSnapshot) {
+			s.Charts = append(s.Charts, repository.BatchChart{ID: 99, SongID: 1, DifficultyName: "EXPERT", ChartConst: 13})
+		}},
+		{name: "譜面の楽曲", change: func(s *repository.PlayerDataMasterSnapshot) { s.Charts[0].SongID = 2 }},
+		{name: "譜面の難易度名", change: func(s *repository.PlayerDataMasterSnapshot) { s.Charts[0].DifficultyName = "ULTIMA" }},
+		{name: "譜面定数", change: func(s *repository.PlayerDataMasterSnapshot) { s.Charts[0].ChartConst = 15.1 }},
+		{name: "枠ID", change: func(s *repository.PlayerDataMasterSnapshot) {
+			s.SlotIDs = map[string]int{"none": 1, "best": 3, "best_candidate": 2, "new": 4, "new_candidate": 5}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3))
+			require.NoError(t, err)
+			changed := batchSnapshotForSlotTest(3)
+			tt.change(&changed)
+
+			// When
+			got, err := computeMasterFingerprint(changed)
+
+			// Then
+			require.NoError(t, err)
+			assert.NotEqual(t, base, got)
+		})
+	}
+}
+
+func TestComputeMasterFingerprint_計算に使わない項目の変更では値が変わらない(t *testing.T) {
+	tests := []struct {
+		name   string
+		change func(s *repository.PlayerDataMasterSnapshot)
+	}{
+		{name: "バージョン名", change: func(s *repository.PlayerDataMasterSnapshot) { s.Version.Name = "X-VERSE" }},
+		{name: "譜面定数不明フラグ", change: func(s *repository.PlayerDataMasterSnapshot) { s.Charts[0].IsConstUnknown = true }},
+		{name: "難易度ID", change: func(s *repository.PlayerDataMasterSnapshot) { s.Charts[0].DifficultyID = 9 }},
+		{name: "プレイヤーIDの上限", change: func(s *repository.PlayerDataMasterSnapshot) { s.UpperBound = 1000 }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3))
+			require.NoError(t, err)
+			changed := batchSnapshotForSlotTest(3)
+			tt.change(&changed)
+
+			// When
+			got, err := computeMasterFingerprint(changed)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, base, got)
+		})
+	}
+}
+
+func TestPlayerDataRecalculationBatchUsecase_フィンガープリントで列挙し更新に記録する(t *testing.T) {
+	// Given
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	snapshot := batchSnapshotForSlotTest(2)
+	expected, err := computeMasterFingerprint(snapshot)
+	require.NoError(t, err)
+	repo := &batchRepositoryStub{
+		snapshot: snapshot,
+		keys:     []repository.PlayerBatchKey{{ID: 1}},
+		data:     map[int]repository.PlayerBatchData{1: {ID: 1}},
+	}
+	usecase := NewPlayerDataRecalculationBatchUsecase(repo)
+	usecase.now = func() time.Time { return time.Date(2026, 7, 6, 12, 0, 0, 0, jst) }
+
+	// When
+	result, err := usecase.Execute(context.Background())
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, expected, repo.listFingerprint)
+	assert.Equal(t, expected, repo.updates[1].MasterFingerprint)
+	assert.Equal(t, expected, result.MasterFingerprint)
+}
+
+func TestPlayerDataRecalculationBatchUsecase_運用日が変わってもフィンガープリントは変わらない(t *testing.T) {
+	// Given
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	fingerprints := make([]masterfingerprint.Fingerprint, 0, 2)
+	for _, now := range []time.Time{time.Date(2026, 7, 6, 12, 0, 0, 0, jst), time.Date(2026, 7, 7, 12, 0, 0, 0, jst)} {
+		repo := &batchRepositoryStub{snapshot: batchSnapshotForSlotTest(2)}
+		usecase := NewPlayerDataRecalculationBatchUsecase(repo)
+		usecase.now = func() time.Time { return now }
+
+		// When
+		result, err := usecase.Execute(context.Background())
+
+		require.NoError(t, err)
+		fingerprints = append(fingerprints, result.MasterFingerprint)
+	}
+
+	// Then
+	assert.Equal(t, fingerprints[0], fingerprints[1])
+}
+
+func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新する(t *testing.T) {
+	bestSlotID := validBatchSnapshot().SlotIDs["best"]
+	tests := []struct {
+		name            string
+		records         []repository.PlayerBatchRecord
+		wantClear       []int
+		wantAssignments []repository.PlayerBatchSlotAssignment
+	}{
+		{
+			name: "枠が同じなら更新しない",
+			records: []repository.PlayerBatchRecord{
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
+			},
+			wantClear:       []int{},
+			wantAssignments: []repository.PlayerBatchSlotAssignment{},
+		},
+		{
+			name: "順位だけ変わった譜面は付け替えだけ行う",
+			records: []repository.PlayerBatchRecord{
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+			},
+			wantClear: []int{},
+			wantAssignments: []repository.PlayerBatchSlotAssignment{
+				{ChartID: 1, SlotID: bestSlotID, Position: 1},
+				{ChartID: 2, SlotID: bestSlotID, Position: 2},
+			},
+		},
+		{
+			name: "枠から外れた譜面を外す",
+			records: []repository.PlayerBatchRecord{
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
+				{ChartID: 3, Score: 0, SlotName: "best_candidate", SlotOrder: batchIntPtr(1)},
+			},
+			wantClear:       []int{3},
+			wantAssignments: []repository.PlayerBatchSlotAssignment{},
+		},
+		{
+			name: "noneなのに順位がある譜面を外す",
+			records: []repository.PlayerBatchRecord{
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
+				{ChartID: 3, Score: 0, SlotName: "none", SlotOrder: batchIntPtr(3)},
+			},
+			wantClear:       []int{3},
+			wantAssignments: []repository.PlayerBatchSlotAssignment{},
+		},
+		{
+			name: "枠のない譜面を新しく割り当てる",
+			records: []repository.PlayerBatchRecord{
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "none"},
+			},
+			wantClear:       []int{},
+			wantAssignments: []repository.PlayerBatchSlotAssignment{{ChartID: 2, SlotID: bestSlotID, Position: 2}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			// 譜面3は削除済み楽曲にして枠の対象外にします。
+			snapshot := batchSnapshotForSlotTest(3)
+			snapshot.Songs[2].IsDeleted = true
+			prepared := preparedBatchSnapshotForCustomSnapshot(t, snapshot)
+
+			// When
+			update, _, err := prepared.buildUpdate(repository.PlayerBatchData{ID: 1, Records: tt.records}, false)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantClear, update.ClearChartIDs)
+			assert.Equal(t, tt.wantAssignments, update.Assignments)
+		})
+	}
+}
+
 func validBatchSnapshot() repository.PlayerDataMasterSnapshot {
 	return repository.PlayerDataMasterSnapshot{
 		Version: repository.BatchVersion{ID: 1, Name: "VERSE", ReleasedAt: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)},
@@ -362,6 +577,7 @@ func validBatchSnapshot() repository.PlayerDataMasterSnapshot {
 type batchRepositoryStub struct {
 	snapshot        repository.PlayerDataMasterSnapshot
 	operationalDate time.Time
+	listFingerprint masterfingerprint.Fingerprint
 	keys            []repository.PlayerBatchKey
 	data            map[int]repository.PlayerBatchData
 	updates         map[int]repository.PlayerBatchUpdate
@@ -373,7 +589,8 @@ func (s *batchRepositoryStub) LoadSnapshot(_ context.Context, operationalDate ti
 	return s.snapshot, nil
 }
 
-func (s *batchRepositoryStub) ListPlayerKeys(_ context.Context, afterID, _ int, _ int) ([]repository.PlayerBatchKey, error) {
+func (s *batchRepositoryStub) ListPlayerKeys(_ context.Context, afterID, _ int, _ int, fingerprint masterfingerprint.Fingerprint) ([]repository.PlayerBatchKey, error) {
+	s.listFingerprint = fingerprint
 	if afterID > 0 {
 		return nil, nil
 	}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,7 +212,8 @@ func setupPlayerRepositorySchema(t *testing.T, db *sqlx.DB) {
 			official_overpower_percent REAL NULL,
 			data_collected_at DATETIME NULL,
 			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL
+			updated_at DATETIME NOT NULL,
+			recalculated_master_fingerprint TEXT NULL
 		)`,
 		`CREATE TABLE player_metric_histories (
 			player_id INTEGER NOT NULL,
@@ -281,6 +284,62 @@ func TestPlayerRepository_Save_ポゼッションを保存して復元する(t *
 	saved, err := repo.FindByID(context.Background(), db, 1)
 	require.NoError(t, err)
 	assert.Equal(t, 5, saved.PossessionID)
+}
+
+func TestPlayerRepository_Save_再計算済みフィンガープリントを保存して復元する(t *testing.T) {
+	fingerprint := masterfingerprint.Compute([]byte("master"))
+	tests := []struct {
+		name     string
+		expected *masterfingerprint.Fingerprint
+	}{
+		{name: "記録ありは値を復元する", expected: &fingerprint},
+		{name: "記録なしはnilを復元する", expected: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupPlayerRepositorySQLite(t)
+			seedPlayerWithHonors(t, db, 1, false)
+			_, err := db.Exec(`UPDATE players SET recalculated_master_fingerprint = ? WHERE id = 1`, masterfingerprint.Compute([]byte("old")).String())
+			require.NoError(t, err)
+			repo := &playerRepository{db: db}
+			player, err := repo.FindByID(context.Background(), db, 1)
+			require.NoError(t, err)
+			player.RecalculatedMasterFingerprint = tt.expected
+
+			// When
+			require.NoError(t, repo.Save(context.Background(), db, player))
+
+			// Then
+			byID, err := repo.FindByID(context.Background(), db, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, byID.RecalculatedMasterFingerprint)
+			byUserID, err := repo.FindByUserID(context.Background(), db, 20)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, byUserID.RecalculatedMasterFingerprint)
+			withHonors, err := repo.FindByIDWithHonors(context.Background(), db, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, withHonors.Player.RecalculatedMasterFingerprint)
+		})
+	}
+}
+
+func TestPlayerRepository_Save_新規作成時に再計算済みフィンガープリントを保存する(t *testing.T) {
+	// Given
+	db := setupPlayerRepositorySQLite(t)
+	repo := &playerRepository{db: db}
+	player := entity.NewPlayer(30, playername.MustNewPlayerName("新規"))
+	fingerprint := masterfingerprint.Compute([]byte("master"))
+	player.MarkRecalculated(fingerprint)
+
+	// When
+	require.NoError(t, repo.Save(context.Background(), db, player))
+
+	// Then
+	saved, err := repo.FindByID(context.Background(), db, player.ID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.RecalculatedMasterFingerprint)
+	assert.Equal(t, fingerprint, *saved.RecalculatedMasterFingerprint)
 }
 
 func seedPlayerWithHonors(t *testing.T, db *sqlx.DB, playerID int, withHonors bool) time.Time {

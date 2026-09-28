@@ -49,6 +49,7 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			jacket TEXT,
 			is_worldsend INTEGER NOT NULL DEFAULT 0,
 			is_new INTEGER NOT NULL DEFAULT 0,
+			unlock_required INTEGER NOT NULL DEFAULT 0,
 			is_deleted INTEGER NOT NULL DEFAULT 0,
 			updated_at TEXT,
 			FOREIGN KEY (genre_id) REFERENCES genres(id)

@@ -2,13 +2,15 @@
 
 ## 概要
 
-`chunisupport-stat-batch` は、プレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chunisupport-api` が参照する統計テーブルを再構築する。通常譜面と WORLD'S END 譜面には同じ集計規則を適用する。
+譜面統計バッチ（`cmd/chart-stats-batch`）は、プレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、APIが参照する統計テーブルを再構築する。通常譜面と WORLD'S END 譜面には同じ集計規則を適用する。実行方法と運用は [譜面統計バッチ](chart_stats_batch.md) を参照。
 
 ## 集計単位
 
 通常譜面は `chart_id × rating_band_id`、WORLD'S END 譜面は `worldsend_chart_id × rating_band_id` を集計単位とする。
 
-レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーは対象外とする。
+レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーと、不正利用疑い（`users.is_suspicious = 1`）のユーザーのプレイヤーは対象外とする。削除済み楽曲（`songs.is_deleted = 1`）の譜面も対象外とする。これらの条件は譜面統計・WORLD'S END 譜面統計・ベスト枠採用率のすべてに共通である。
+
+不審フラグの変更は即時には統計へ反映されず、次回の再集計で反映される。
 
 ## 譜面統計
 
@@ -76,13 +78,15 @@
 
 ## ベスト枠採用率統計
 
-通常譜面だけを対象とし、削除済み楽曲と WORLD'S END 譜面を除外する。読み取りは単一の REPEATABLE READ スナップショット内で行う。
+通常譜面だけを対象とし、削除済み楽曲と WORLD'S END 譜面を除外する。
 
 不正利用疑いのないプレイヤーのうち、`best_average_rating` が `NULL` でないプレイヤーを集計対象人数とする。各レーティング帯について、現在の `best` 枠にその譜面を持つ人数を数える。採用率は `best_player_count / eligible_player_count × 100` を小数点以下4桁に丸め、集計対象人数が0人の場合は `NULL` とする。
 
-## 保存先とAPI
+## 読み取りと保存
 
-集計結果は次のテーブルへ保存する。
+譜面統計・WORLD'S END 譜面統計・ベスト枠採用率の集計元は、単一の REPEATABLE READ スナップショット内で読み取る。
+
+集計結果は次のテーブルへ保存する。3つのテーブルは単一トランザクション内で削除・挿入して入れ替えるため、再集計中や失敗時も直前の統計が参照される。
 
 - `chart_stats_by_rating_band`
 - `worldsend_chart_stats_by_rating_band`

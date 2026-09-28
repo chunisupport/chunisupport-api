@@ -15,6 +15,10 @@ import (
 
 type stubChunirecUserUsecase struct{}
 
+func (stubChunirecUserUsecase) GetPublicOfficialRating(context.Context, string) (*float64, error) {
+	return nil, nil
+}
+
 func (stubChunirecUserUsecase) GetUserProfile(context.Context, string, *entity.User) (*usecase.UserProfileOutput, error) {
 	return nil, nil
 }

@@ -3,32 +3,34 @@ package entity
 import (
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
 )
 
 // Player はプレイヤーのエンティティを表します。
 // 称号情報は player_honors テーブルで管理されるため、このエンティティには含まれません。
 type Player struct {
-	ID                       int
-	UserID                   int
-	Name                     playername.PlayerName     // プレイヤー名
-	Level                    int                       // プレイヤーレベル
-	OfficialRating           float64                   // 公式レーティング (official_player_rating)
-	CalculatedRating         *float64                  // 計算レーティング (calculated_player_rating)
-	NewAverageRating         *float64                  // 新曲枠平均レーティング (new_average_rating)
-	BestAverageRating        *float64                  // ベスト枠平均レーティング (best_average_rating)
-	ClassEmblemID            *int                      // クラスエンブレムID
-	ClassEmblemBaseID        *int                      // クラスエンブレムのベースID
-	PossessionID             int                       // ポゼッションID（未指定時は normal）
-	LastPlayedAt             *time.Time                // 最終プレイ日時
-	OverpowerValue           *float64                  // オーバーパワー値
-	OfficialOverpower        float64                   // 公式オーバーパワー値
-	OfficialOverpowerPercent *float64                  // 公式オーバーパワー割合
-	OverpowerPercent         *float64                  // オーバーパワー割合
-	DataCollectedAt          *time.Time                // CHUNITHM-NETからのデータ取得完了日時
-	CreatedAt                time.Time                 // 作成日時
-	UpdatedAt                time.Time                 // 更新日時
-	metricHistoryToAppend    *PlayerMetricHistoryEntry // 今回の集約保存で追記する公式指標履歴
+	ID                            int
+	UserID                        int
+	Name                          playername.PlayerName          // プレイヤー名
+	Level                         int                            // プレイヤーレベル
+	OfficialRating                float64                        // 公式レーティング (official_player_rating)
+	CalculatedRating              *float64                       // 計算レーティング (calculated_player_rating)
+	NewAverageRating              *float64                       // 新曲枠平均レーティング (new_average_rating)
+	BestAverageRating             *float64                       // ベスト枠平均レーティング (best_average_rating)
+	ClassEmblemID                 *int                           // クラスエンブレムID
+	ClassEmblemBaseID             *int                           // クラスエンブレムのベースID
+	PossessionID                  int                            // ポゼッションID（未指定時は normal）
+	LastPlayedAt                  *time.Time                     // 最終プレイ日時
+	OverpowerValue                *float64                       // オーバーパワー値
+	OfficialOverpower             float64                        // 公式オーバーパワー値
+	OfficialOverpowerPercent      *float64                       // 公式オーバーパワー割合
+	OverpowerPercent              *float64                       // オーバーパワー割合
+	DataCollectedAt               *time.Time                     // CHUNITHM-NETからのデータ取得完了日時
+	CreatedAt                     time.Time                      // 作成日時
+	UpdatedAt                     time.Time                      // 更新日時
+	RecalculatedMasterFingerprint *masterfingerprint.Fingerprint // 直近の再計算に使ったマスタと計算ロジックのフィンガープリント（nilは次回の再計算バッチで再計算が必要）
+	metricHistoryToAppend         *PlayerMetricHistoryEntry      // 今回の集約保存で追記する公式指標履歴
 }
 
 // NewPlayer は新規プレイヤーを生成し、永続化に必要な初期状態を設定します。
@@ -104,6 +106,8 @@ func (p *Player) changeProfile(name playername.PlayerName, level int, classEmble
 	}
 	p.PossessionID = possessionID
 	p.LastPlayedAt = lastPlayedAt
+	// 最終プレイ日時は現行版かどうかの判定に使うため、再計算済みの記録を無効にします。
+	p.RecalculatedMasterFingerprint = nil
 }
 
 // ChangeCalculatedRatings は公式指標と取得日時を維持して、再計算した指標だけを反映します。
@@ -111,9 +115,19 @@ func (p *Player) ChangeCalculatedRatings(rating, bestAverage, newAverage float64
 	p.CalculatedRating = &rating
 	p.BestAverageRating = &bestAverage
 	p.NewAverageRating = &newAverage
+	p.RecalculatedMasterFingerprint = nil
 }
 
+// ChangeOverpower はOVER POWER値と割合を反映します。
+// 再計算バッチ以外の経路で計算値が変わった場合に次回の再計算対象へ戻すため、再計算済みの記録を無効にします。
 func (p *Player) ChangeOverpower(value, percent *float64) {
 	p.OverpowerValue = value
 	p.OverpowerPercent = percent
+	p.RecalculatedMasterFingerprint = nil
+}
+
+// MarkRecalculated は指定したマスタと計算ロジックで再計算済みであることを記録します。
+// ChangeCalculatedRatings と ChangeOverpower は記録を無効にするため、再計算バッチはそれらの後に呼び出します。
+func (p *Player) MarkRecalculated(fingerprint masterfingerprint.Fingerprint) {
+	p.RecalculatedMasterFingerprint = &fingerprint
 }

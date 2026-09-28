@@ -6,8 +6,38 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
+
+func TestBulkSyncSongUnlockRequired(t *testing.T) {
+	ctx := context.Background()
+	ws, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer ws.Close()
+
+	base := songInsertRecord{DisplayID: "disp-001", Title: "Song", Artist: "Artist", GenreID: sql.NullInt64{Int64: 1, Valid: true}, OfficialIdx: "OFF001"}
+	require.NoError(t, bulkInsertMySQLSongs(ctx, ws.DB(), []songInsertRecord{base}, 1))
+	var value int
+	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
+	assert.Zero(t, value)
+
+	base.UnlockRequired = sql.NullInt64{Int64: 1, Valid: true}
+	require.NoError(t, bulkUpdateMySQLSongs(ctx, ws.DB(), []songUpdateRecord{{ID: 1, record: base}}, 1))
+	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
+	assert.Equal(t, 1, value)
+
+	base.UnlockRequired = sql.NullInt64{}
+	require.NoError(t, bulkUpdateMySQLSongs(ctx, ws.DB(), []songUpdateRecord{{ID: 1, record: base}}, 1))
+	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
+	assert.Equal(t, 1, value)
+
+	base.UnlockRequired = sql.NullInt64{Int64: 0, Valid: true}
+	require.NoError(t, bulkUpdateMySQLSongs(ctx, ws.DB(), []songUpdateRecord{{ID: 1, record: base}}, 1))
+	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
+	assert.Zero(t, value)
+}
 
 // TestChartKey はチャートキーの生成を確認
 func TestChartKey(t *testing.T) {
@@ -520,14 +550,14 @@ func TestBuildBulkUpdateSongsSQL(t *testing.T) {
 				t.Error("UPDATE songs が含まれていません")
 			}
 
-			for _, col := range []string{"display_id", "title", "wiki_page_title", "reading", "artist", "genre_id", "bpm", "released_at", "jacket", "is_worldsend", "is_new"} {
+			for _, col := range []string{"display_id", "title", "wiki_page_title", "reading", "artist", "genre_id", "bpm", "released_at", "jacket", "is_worldsend", "is_new", "unlock_required"} {
 				if !strings.Contains(sql, col+" = CASE") {
 					t.Errorf("列 %s の CASE ブロックが含まれていません", col)
 				}
 			}
 
 			gotWhen := strings.Count(sql, "WHEN id = ?")
-			wantWhen := 11 * tt.wantWhenCount
+			wantWhen := 12 * tt.wantWhenCount
 			if gotWhen != wantWhen {
 				t.Errorf("WHEN 節の数: got %d, want %d", gotWhen, wantWhen)
 			}

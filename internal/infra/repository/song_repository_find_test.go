@@ -24,6 +24,9 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
+	_, err = db.Exec(`UPDATE songs SET unlock_required = 1 WHERE id = 1`)
+	require.NoError(t, err)
+
 	_, err = db.Exec(`
 		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
 		VALUES
@@ -48,6 +51,7 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, song1.Charts, 2)
 	assert.True(t, song1.IsNew)
+	assert.True(t, song1.UnlockRequired)
 
 	song1ChartsByDifficulty := make(map[int]*entity.Chart, len(song1.Charts))
 	for _, chart := range song1.Charts {
@@ -75,6 +79,7 @@ func TestFindByDisplayIDs_LoadsChartsForEachSong(t *testing.T) {
 	song2, ok := songsByDisplayID["DISPLAY002"]
 	require.True(t, ok)
 	require.Len(t, song2.Charts, 1)
+	assert.False(t, song2.UnlockRequired)
 	assert.Equal(t, 4, song2.Charts[0].DifficultyID)
 	assert.Equal(t, 2, song2.Charts[0].SongID)
 	assert.InDelta(t, 14.3, float64(song2.Charts[0].Const), 0.001)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,4 +143,29 @@ func closedSQLiteExecutor(t *testing.T) domainrepo.Executor {
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 	return db
+}
+
+func TestPlayerLockedSongRepositoryDeleteBySongID_影響するプレイヤーの再計算済み記録を無効にする(t *testing.T) {
+	// Given
+	db := setupPlayerRepositorySQLite(t)
+	fingerprint := masterfingerprint.Compute([]byte("master")).String()
+	for _, id := range []int{1, 2} {
+		seedPlayerForBatchList(t, db, id, fingerprint)
+	}
+	_, err := db.Exec(`CREATE TABLE player_locked_songs (player_id INTEGER NOT NULL, song_id INTEGER NOT NULL, is_ultima BOOLEAN NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES (1, 10, FALSE), (2, 20, FALSE)`)
+	require.NoError(t, err)
+
+	// When
+	err = (&PlayerLockedSongRepository{}).DeleteBySongID(context.Background(), db, 10)
+
+	// Then
+	require.NoError(t, err)
+	var fingerprints []sql.NullString
+	require.NoError(t, db.Select(&fingerprints, `SELECT recalculated_master_fingerprint FROM players ORDER BY id`))
+	assert.Equal(t, []sql.NullString{{}, {String: fingerprint, Valid: true}}, fingerprints)
+	var remaining []int
+	require.NoError(t, db.Select(&remaining, `SELECT song_id FROM player_locked_songs ORDER BY song_id`))
+	assert.Equal(t, []int{20}, remaining)
 }

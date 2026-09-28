@@ -159,6 +159,10 @@ var (
 	ErrSongBatchJobNotFound    = New(CodeSongBatchJobNotFound, http.StatusNotFound)
 	ErrInvalidSongBatchJobID   = New(CodeInvalidSongBatchJobID, http.StatusBadRequest)
 	ErrInvalidSongBatchMode    = New(CodeInvalidSongBatchMode, http.StatusBadRequest)
+
+	ErrChartStatsBatchAlreadyRunning = New(CodeChartStatsBatchAlreadyRunning, http.StatusConflict)
+	ErrChartStatsBatchJobNotFound    = New(CodeChartStatsBatchJobNotFound, http.StatusNotFound)
+	ErrInvalidChartStatsBatchJobID   = New(CodeInvalidChartStatsBatchJobID, http.StatusBadRequest)
 )
 
 // ErrorResponse はエラーレスポンスの構造体です

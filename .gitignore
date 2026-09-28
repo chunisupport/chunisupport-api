@@ -55,7 +55,7 @@ go.work
 
 # バイナリ
 chunisupport-api*
-_chunisupport-api*
+_chunisupport-*
 *.sqlite
 *.db
 *.db-shm

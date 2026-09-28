@@ -15,13 +15,14 @@ type St1027Song struct {
 	Ultima   St1027Chart `json:"ULT"`
 }
 
-// St1027Meta はst1027の楽曲のメタデータを表します（ノーツ数補完に必要な最小限のフィールド）
+// St1027Meta はst1027の楽曲のメタデータを表します。
 type St1027Meta struct {
-	OfficialID string `json:"official_id"`
-	BPM        *int   `json:"bpm"`
+	OfficialID     string `json:"official_id"`
+	BPM            *int   `json:"bpm"`
+	UnlockRequired *int   `json:"unlock_required"`
 }
 
-// St1027Chart はst1027の単一の譜面データを表します（ノーツ数のみ参照）
+// St1027Chart はst1027の単一の譜面データを表します。
 type St1027Chart struct {
 	NotesAll      *int    `json:"notes_all"`
 	Notesdesigner *string `json:"notesdesigner"`

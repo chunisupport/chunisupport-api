@@ -10,6 +10,7 @@ type PlayerLockedSongRepository interface {
 	ListByPlayerID(ctx context.Context, exec Executor, playerID int) ([]*entity.PlayerLockedSong, error)
 	Create(ctx context.Context, exec Executor, lockedSong *entity.PlayerLockedSong) error
 	Delete(ctx context.Context, exec Executor, playerID int, songID int, isUltima bool) error
+	// DeleteBySongID は指定した楽曲の未解禁登録を全プレイヤー分削除し、影響するプレイヤーの再計算済み記録を無効にします。
 	DeleteBySongID(ctx context.Context, exec Executor, songID int) error
 	BulkCreate(ctx context.Context, exec Executor, lockedSongs []*entity.PlayerLockedSong) error
 	BulkDelete(ctx context.Context, exec Executor, playerID int, songIDs []int, isUltimaFlags []bool) error

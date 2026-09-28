@@ -123,6 +123,14 @@ func FromUsecaseError(err error) *APIError {
 		return ErrSongBatchJobNotFound.WithInternal(err)
 	case errors.Is(err, songbatch.ErrInvalidRunMode):
 		return ErrInvalidSongBatchMode.WithInternal(err)
+	case errors.Is(err, usecase.ErrChartStatsBatchUnavailable):
+		return ErrServiceUnavailable.WithInternal(err)
+	case errors.Is(err, usecase.ErrChartStatsBatchAlreadyRunning):
+		return ErrChartStatsBatchAlreadyRunning.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidChartStatsBatchJobID):
+		return ErrInvalidChartStatsBatchJobID.WithInternal(err)
+	case errors.Is(err, repository.ErrChartStatsBatchJobNotFound):
+		return ErrChartStatsBatchJobNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrScoreHistoryTimestampConflict):
 		return ErrConflict.WithInternal(err)
 	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):

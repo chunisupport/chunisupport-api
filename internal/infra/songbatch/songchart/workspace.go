@@ -153,18 +153,19 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 
 		officialSeen[song.OfficialIdx] = struct{}{}
 		rec := songInsertRecord{
-			DisplayID:     song.DisplayID,
-			Title:         song.Title,
-			WikiPageTitle: song.WikiPageTitle,
-			Reading:       song.Reading,
-			Artist:        song.Artist,
-			GenreID:       song.GenreID,
-			BPM:           song.BPM,
-			ReleasedAt:    releasedAt,
-			OfficialIdx:   song.OfficialIdx,
-			Jacket:        song.Jacket,
-			IsWorldsend:   song.IsWorldsend,
-			IsNew:         song.IsNew,
+			DisplayID:      song.DisplayID,
+			Title:          song.Title,
+			WikiPageTitle:  song.WikiPageTitle,
+			Reading:        song.Reading,
+			Artist:         song.Artist,
+			GenreID:        song.GenreID,
+			BPM:            song.BPM,
+			ReleasedAt:     releasedAt,
+			OfficialIdx:    song.OfficialIdx,
+			Jacket:         song.Jacket,
+			IsWorldsend:    song.IsWorldsend,
+			IsNew:          song.IsNew,
+			UnlockRequired: song.UnlockRequired,
 		}
 		if existing, exists := mysqlSongs[song.OfficialIdx]; exists {
 			songsToUpdate = append(songsToUpdate, songUpdateRecord{
@@ -292,20 +293,21 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 }
 
 type workspaceSong struct {
-	ID            int            `db:"id"`
-	DisplayID     string         `db:"display_id"`
-	Title         string         `db:"title"`
-	WikiPageTitle sql.NullString `db:"wiki_page_title"`
-	Reading       sql.NullString `db:"reading"`
-	Artist        string         `db:"artist"`
-	GenreID       sql.NullInt64  `db:"genre_id"`
-	BPM           sql.NullInt64  `db:"bpm"`
-	ReleasedAt    sql.NullString `db:"released_at"`
-	OfficialIdx   string         `db:"official_idx"`
-	Jacket        sql.NullString `db:"jacket"`
-	IsWorldsend   int            `db:"is_worldsend"`
-	IsNew         int            `db:"is_new"`
-	IsDeleted     int            `db:"is_deleted"`
+	ID             int            `db:"id"`
+	DisplayID      string         `db:"display_id"`
+	Title          string         `db:"title"`
+	WikiPageTitle  sql.NullString `db:"wiki_page_title"`
+	Reading        sql.NullString `db:"reading"`
+	Artist         string         `db:"artist"`
+	GenreID        sql.NullInt64  `db:"genre_id"`
+	BPM            sql.NullInt64  `db:"bpm"`
+	ReleasedAt     sql.NullString `db:"released_at"`
+	OfficialIdx    string         `db:"official_idx"`
+	Jacket         sql.NullString `db:"jacket"`
+	IsWorldsend    int            `db:"is_worldsend"`
+	IsNew          int            `db:"is_new"`
+	UnlockRequired sql.NullInt64  `db:"unlock_required"`
+	IsDeleted      int            `db:"is_deleted"`
 }
 
 type workspaceChart struct {
@@ -351,7 +353,7 @@ type mysqlWorldsendChart struct {
 
 func (w *SongChartWorkspace) loadWorkspaceSongs(ctx context.Context) ([]workspaceSong, error) {
 	var songs []workspaceSong
-	if err := w.db.SelectContext(ctx, &songs, `SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted FROM songs ORDER BY id`); err != nil {
+	if err := w.db.SelectContext(ctx, &songs, `SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted FROM songs ORDER BY id`); err != nil {
 		return nil, fmt.Errorf("failed to load workspace songs: %w", err)
 	}
 
@@ -749,18 +751,19 @@ func nullableString(value sql.NullString) any {
 }
 
 type songInsertRecord struct {
-	DisplayID     string
-	Title         string
-	WikiPageTitle sql.NullString
-	Reading       sql.NullString
-	Artist        string
-	GenreID       sql.NullInt64
-	BPM           sql.NullInt64
-	ReleasedAt    sql.NullString
-	OfficialIdx   string
-	Jacket        sql.NullString
-	IsWorldsend   int
-	IsNew         int
+	DisplayID      string
+	Title          string
+	WikiPageTitle  sql.NullString
+	Reading        sql.NullString
+	Artist         string
+	GenreID        sql.NullInt64
+	BPM            sql.NullInt64
+	ReleasedAt     sql.NullString
+	OfficialIdx    string
+	Jacket         sql.NullString
+	IsWorldsend    int
+	IsNew          int
+	UnlockRequired sql.NullInt64
 }
 
 type songUpdateRecord struct {
@@ -768,7 +771,7 @@ type songUpdateRecord struct {
 	record songInsertRecord
 }
 
-const songInsertColumnCount = 13
+const songInsertColumnCount = 14
 
 // buildBulkUpdateSongsSQL は楽曲バルク更新用の CASE 式を含む SQL 文を生成します。
 func buildBulkUpdateSongsSQL(n int) string {
@@ -847,6 +850,8 @@ func buildBulkUpdateSongsSQL(n int) string {
 	writeDirectBlock("is_worldsend")
 	sb.WriteString(",\n")
 	writeDirectBlock("is_new")
+	sb.WriteString(",\n")
+	writeCoalesceBlock("unlock_required")
 
 	sb.WriteString("\nWHERE id IN (")
 	for i := range n {
@@ -865,12 +870,12 @@ func buildBulkUpdateSongsSQL(n int) string {
 func buildBulkInsertSongsSQL(n int) string {
 	const queryPrefix = `
 INSERT INTO songs (
-	display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted
+	display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted
 ) VALUES `
 
 	values := make([]string, n)
 	for i := range n {
-		values[i] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		values[i] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), ?)"
 	}
 
 	return queryPrefix + strings.Join(values, ",")
@@ -904,6 +909,7 @@ func bulkInsertMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 				nullableString(rec.Jacket),
 				rec.IsWorldsend,
 				rec.IsNew,
+				nullableInt(rec.UnlockRequired),
 				0,
 			)
 		}
@@ -931,7 +937,7 @@ func bulkUpdateMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 
 		chunk := records[start:end]
 		query := buildBulkUpdateSongsSQL(len(chunk))
-		args := make([]any, 0, len(chunk)*23)
+		args := make([]any, 0, len(chunk)*25)
 
 		for _, rec := range chunk {
 			args = append(args, rec.ID, rec.record.DisplayID)
@@ -965,6 +971,9 @@ func bulkUpdateMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 		}
 		for _, rec := range chunk {
 			args = append(args, rec.ID, rec.record.IsNew)
+		}
+		for _, rec := range chunk {
+			args = append(args, rec.ID, nullableInt(rec.record.UnlockRequired))
 		}
 		for _, rec := range chunk {
 			args = append(args, rec.ID)

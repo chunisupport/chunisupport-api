@@ -2,6 +2,7 @@ package consolidation
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -18,7 +19,7 @@ const (
 	difficultyUltima   = "ultima"
 )
 
-// St1027Consolidator は st1027 データからノーツ数を補完します。
+// St1027Consolidator は st1027 データを楽曲と譜面へ統合します。
 type St1027Consolidator struct {
 	workspace *songchart.SongChartWorkspace
 	data      *importer.St1027Data
@@ -32,7 +33,7 @@ func NewSt1027Consolidator(workspace *songchart.SongChartWorkspace, data *import
 	}
 }
 
-// Consolidate は st1027 ソースからノーツ数を補完します。
+// Consolidate は st1027 ソースから楽曲と譜面の情報を統合します。
 func (c *St1027Consolidator) Consolidate(ctx context.Context) error {
 	if c.data == nil || len(c.data.Songs) == 0 {
 		slog.Warn("St1027 data is empty; skipping consolidation")
@@ -51,6 +52,9 @@ func (c *St1027Consolidator) Consolidate(ctx context.Context) error {
 		return err
 	}
 	if err := c.bulkUpdateSongBPMs(ctx, officialMap); err != nil {
+		return err
+	}
+	if err := c.bulkUpdateSongUnlockRequired(ctx, officialMap); err != nil {
 		return err
 	}
 
@@ -186,5 +190,26 @@ func (c *St1027Consolidator) bulkUpdateSongBPMs(ctx context.Context, officialMap
 	}
 
 	slog.Info("St1027 songs bpm updated", "count", affected)
+	return nil
+}
+
+func (c *St1027Consolidator) bulkUpdateSongUnlockRequired(ctx context.Context, officialMap map[string]int) error {
+	var records []songUnlockRequiredRecord
+	for _, song := range c.data.Songs {
+		songID, exists := officialMap[strings.TrimSpace(song.Meta.OfficialID)]
+		if !exists || song.Meta.UnlockRequired == nil {
+			continue
+		}
+		if *song.Meta.UnlockRequired != 0 && *song.Meta.UnlockRequired != 1 {
+			return fmt.Errorf("invalid st1027 unlock_required for official_id %s: %d", song.Meta.OfficialID, *song.Meta.UnlockRequired)
+		}
+		records = append(records, songUnlockRequiredRecord{ID: songID, UnlockRequired: *song.Meta.UnlockRequired})
+	}
+
+	affected, err := bulkUpdateSongUnlockRequiredInBatches(ctx, c.workspace.DB(), records)
+	if err != nil {
+		return err
+	}
+	slog.Info("St1027 songs unlock_required updated", "count", affected)
 	return nil
 }

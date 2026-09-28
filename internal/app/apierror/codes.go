@@ -116,4 +116,9 @@ const (
 	CodeSongBatchJobNotFound    = "song_batch_job_not_found"
 	CodeInvalidSongBatchJobID   = "invalid_song_batch_job_id"
 	CodeInvalidSongBatchMode    = "invalid_song_batch_mode"
+
+	// 譜面統計バッチ関連エラー
+	CodeChartStatsBatchAlreadyRunning = "chart_stats_batch_already_running"
+	CodeChartStatsBatchJobNotFound    = "chart_stats_batch_job_not_found"
+	CodeInvalidChartStatsBatchJobID   = "invalid_chart_stats_batch_job_id"
 )

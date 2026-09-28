@@ -40,6 +40,20 @@ CREATE TABLE `chart_best_slot_stats_by_rating_band` (
   CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_2` CHECK (((`best_player_percentage` is null) or (`best_player_percentage` between 0 and 100))),
   CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_3` CHECK ((((`eligible_player_count` = 0) and (`best_player_percentage` is null)) or ((`eligible_player_count` > 0) and (`best_player_percentage` is not null))))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `chart_stats_batch_jobs` (
+  `id` binary(16) NOT NULL,
+  `trigger_type` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `requested_by_user_id` int unsigned DEFAULT NULL,
+  `started_at` datetime(6) NOT NULL,
+  `finished_at` datetime(6) DEFAULT NULL,
+  `error_message` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_chart_stats_batch_jobs_requested_by_user` (`requested_by_user_id`),
+  KEY `idx_chart_stats_batch_jobs_started_at` (`started_at`),
+  KEY `idx_chart_stats_batch_jobs_status` (`status`),
+  CONSTRAINT `fk_chart_stats_batch_jobs_requested_by_user` FOREIGN KEY (`requested_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `chart_stats_by_rating_band` (
   `chart_id` mediumint unsigned NOT NULL,
   `rating_band_id` tinyint unsigned NOT NULL,
@@ -394,6 +408,7 @@ CREATE TABLE `players` (
   `data_collected_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `recalculated_master_fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_players_user_id` (`user_id`),
   KEY `class_emblem_id` (`class_emblem_id`),
@@ -452,6 +467,7 @@ CREATE TABLE `songs` (
   `jacket` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_worldsend` tinyint(1) NOT NULL DEFAULT '0',
   `is_new` tinyint(1) NOT NULL DEFAULT '0',
+  `unlock_required` tinyint(1) NOT NULL DEFAULT '0',
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
