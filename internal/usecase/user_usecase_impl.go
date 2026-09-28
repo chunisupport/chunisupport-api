@@ -352,7 +352,6 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 
 	users, err := s.userRepo.FindAllWithPlayerForAdmin(ctx, s.db, limit, offset, name)
 	if err != nil {
-		slog.Error("failed to fetch user list for admin", "error", err)
 		return nil, err
 	}
 

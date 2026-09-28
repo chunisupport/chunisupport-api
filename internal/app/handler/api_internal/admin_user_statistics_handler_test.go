@@ -65,3 +65,18 @@ func TestAdminUserStatisticsHandler_Get_取得失敗は内部エラー(t *testin
 	// Then
 	assert.ErrorIs(t, err, apierror.ErrInternalError)
 }
+
+func TestAdminUserStatisticsHandler_Get_クライアント切断は原因エラーを保持する(t *testing.T) {
+	// Given
+	handler := NewAdminUserStatisticsHandler(adminUserStatisticsUsecaseStub{err: context.Canceled})
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/internal/admin/user-stats", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := handler.Get(c)
+
+	// Then
+	assert.ErrorIs(t, err, context.Canceled)
+}

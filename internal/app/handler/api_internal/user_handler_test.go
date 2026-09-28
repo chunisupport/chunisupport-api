@@ -677,6 +677,25 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
+func TestAdminUserHandler_GetAllUsers_クライアント切断は原因エラーを保持する(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewAdminUserHandler(mockUsecase)
+	mockUsecase.On("GetAllUsersForAdmin", mock.Anything, 1, info.DefaultUserListLimit, "").Return(nil, context.Canceled).Once()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	// When
+	err := h.GetAllUsers(c)
+
+	// Then
+	assert.ErrorIs(t, err, apierror.ErrInternalError)
+	assert.ErrorIs(t, err, context.Canceled)
+	mockUsecase.AssertExpectations(t)
+}
+
 func TestUserHandler_DeleteUser(t *testing.T) {
 	e := newTestEcho()
 	mockUsecase := new(mockUserUsecase)

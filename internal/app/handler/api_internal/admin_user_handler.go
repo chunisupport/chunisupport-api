@@ -38,8 +38,7 @@ func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 
 	users, err := h.userUsecase.GetAllUsersForAdmin(c.Request().Context(), page, limit, name)
 	if err != nil {
-		// Logged in usecase
-		return apierror.ErrInternalError
+		return apierror.FromUsecaseError(err)
 	}
 
 	result := make([]internaldto.AdminUserListResponse, 0, len(users))

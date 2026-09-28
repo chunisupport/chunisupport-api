@@ -89,7 +89,7 @@ type chartStatsExportScoreRow struct {
 func (q *ChartStatsExportQueryService) Get(ctx context.Context) (*domainrepo.ChartStatsExportSnapshot, error) {
 	tx, err := q.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
-		return nil, fmt.Errorf("%w: begin chart stats export snapshot: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: begin chart stats export snapshot: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	defer tx.Rollback()
 
@@ -102,7 +102,7 @@ func (q *ChartStatsExportQueryService) Get(ctx context.Context) (*domainrepo.Cha
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("%w: commit chart stats export snapshot: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: commit chart stats export snapshot: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	return &domainrepo.ChartStatsExportSnapshot{Charts: charts, WorldsendCharts: worldsendCharts}, nil
 }
@@ -147,7 +147,7 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 	`
 	var rows []chartStatsExportRow
 	if err := exec.SelectContext(ctx, &rows, query, info.AllRatingBandID); err != nil {
-		return nil, fmt.Errorf("%w: list chart stats export rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list chart stats export rows: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	items := make([]domainrepo.ChartStatsExportItem, 0, len(rows))
 	positions := make(map[int]int, len(rows))
@@ -178,7 +178,7 @@ func (q *ChartStatsExportQueryService) getCharts(ctx context.Context, exec domai
 	`
 	var scores []chartStatsExportScoreRow
 	if err := exec.SelectContext(ctx, &scores, scoreQuery); err != nil {
-		return nil, fmt.Errorf("%w: list chart stats score rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list chart stats score rows: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	for _, score := range scores {
 		position := positions[score.ChartID]
@@ -227,7 +227,7 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 	`
 	var rows []worldsendChartStatsExportRow
 	if err := exec.SelectContext(ctx, &rows, query, info.AllRatingBandID); err != nil {
-		return nil, fmt.Errorf("%w: list worldsend chart stats export rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list worldsend chart stats export rows: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	items := make([]domainrepo.WorldsendChartStatsExportItem, 0, len(rows))
 	positions := make(map[int]int, len(rows))
@@ -257,7 +257,7 @@ func (q *ChartStatsExportQueryService) getWorldsendCharts(ctx context.Context, e
 	`
 	var scores []chartStatsExportScoreRow
 	if err := exec.SelectContext(ctx, &scores, scoreQuery); err != nil {
-		return nil, fmt.Errorf("%w: list worldsend chart stats score rows: %v", domainrepo.ErrRepositoryOperationFailed, err)
+		return nil, fmt.Errorf("%w: list worldsend chart stats score rows: %w", domainrepo.ErrRepositoryOperationFailed, err)
 	}
 	for _, score := range scores {
 		position := positions[score.ChartID]
