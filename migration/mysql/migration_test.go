@@ -709,6 +709,30 @@ func TestSchemaMySQL_再計算済みフィンガープリント列を含む(t *t
 	assert.Contains(t, schemaSQL, "`recalculated_master_fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL")
 }
 
+
+func TestRemoveAutoIncrementFromClassEmblemsUp_固定IDマスタにする(t *testing.T) {
+	upSQL := readNormalizedMigrationSQL(t, "000056_remove_auto_increment_from_class_emblems.up.sql")
+
+	assert.Contains(t, upSQL, "ALTER TABLE class_emblems MODIFY COLUMN id TINYINT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "ALTER TABLE class_emblem_bases MODIFY COLUMN id TINYINT UNSIGNED NOT NULL")
+	assert.NotContains(t, upSQL, "AUTO_INCREMENT")
+}
+
+func TestRemoveAutoIncrementFromClassEmblemsDown_自動採番を復元する(t *testing.T) {
+	downSQL := readNormalizedMigrationSQL(t, "000056_remove_auto_increment_from_class_emblems.down.sql")
+
+	assert.Contains(t, downSQL, "ALTER TABLE class_emblem_bases MODIFY COLUMN id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT")
+	assert.Contains(t, downSQL, "ALTER TABLE class_emblems MODIFY COLUMN id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT")
+}
+
+func TestSchemaMySQL_クラスエンブレムIDを固定値として扱う(t *testing.T) {
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	assert.Contains(t, schemaSQL, "CREATE TABLE `class_emblem_bases` ( `id` tinyint unsigned NOT NULL,")
+	assert.Contains(t, schemaSQL, "CREATE TABLE `class_emblems` ( `id` tinyint unsigned NOT NULL,")
+}
+
+
 func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
 	t.Helper()
 
