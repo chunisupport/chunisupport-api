@@ -101,14 +101,14 @@ CREATE TABLE `charts` (
   CONSTRAINT `charts_chk_2` CHECK (((`notes` is null) or (`notes` >= 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `class_emblem_bases` (
-  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `id` tinyint unsigned NOT NULL,
   `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `class_emblems` (
-  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `id` tinyint unsigned NOT NULL,
   `name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
