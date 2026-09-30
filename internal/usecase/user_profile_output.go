@@ -11,7 +11,9 @@ import (
 
 type UserPlayerOutput struct {
 	*entity.Player
-	Honors []*entity.PlayerHonor
+	Honors          []*entity.PlayerHonor
+	ClassEmblem     *string
+	ClassEmblemBase *string
 }
 
 type UserRecordOutput struct {

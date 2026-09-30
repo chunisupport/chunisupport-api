@@ -23,6 +23,12 @@ type AccountTypeMasterProvider interface {
 	GetAccountTypeNameByID(id int) string
 }
 
+// PlayerEmblemMasterProvider はプロフィールの数値IDを表示用のマスタ名へ解決します。
+type PlayerEmblemMasterProvider interface {
+	GetClassEmblemNameByID(id int) string
+	GetClassEmblemBaseNameByID(id int) string
+}
+
 // ChartStatsMasterProvider は譜面統計取得で必要なマスタデータを提供します。
 // Interface Segregation Principleに従い、ChartStatsUsecaseが必要とするメソッドのみを定義します。
 type ChartStatsMasterProvider interface {

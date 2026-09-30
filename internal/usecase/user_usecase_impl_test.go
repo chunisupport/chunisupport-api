@@ -390,7 +390,9 @@ func (s *stubSongRepository) Create(ctx context.Context, exec repository.Executo
 }
 
 type stubSongMasterProvider struct {
-	masters *masterdata.SongMasters
+	masters         *masterdata.SongMasters
+	emblemNames     map[int]string
+	emblemBaseNames map[int]string
 }
 
 func (s *stubSongMasterProvider) SongMasters() *masterdata.SongMasters {
@@ -1838,4 +1840,37 @@ func TestUserUsecase_DeleteUser_成功ログに実行者と対象を記録する
 	assert.Contains(t, logLine, "requester_user_id=99")
 	assert.Contains(t, logLine, "target_user_id=1")
 	assert.Contains(t, logLine, "target_username=testuser")
+}
+
+func (s *stubSongMasterProvider) GetClassEmblemNameByID(id int) string { return s.emblemNames[id] }
+func (s *stubSongMasterProvider) GetClassEmblemBaseNameByID(id int) string {
+	return s.emblemBaseNames[id]
+}
+
+func TestBuildPlayerOutput_マスタ名を解決する(t *testing.T) {
+	id, baseID, unknownID := 42, 17, 99
+	emblem, base := "inf", "3"
+	provider := &stubSongMasterProvider{emblemNames: map[int]string{id: emblem}, emblemBaseNames: map[int]string{baseID: base}}
+	tests := []struct {
+		name         string
+		id, baseID   *int
+		provider     userMasterProvider
+		emblem, base *string
+	}{
+		{name: "IDではなくマスタ名を返す", id: &id, baseID: &baseID, provider: provider, emblem: &emblem, base: &base},
+		{name: "片方のみ設定", baseID: &baseID, provider: provider, base: &base},
+		{name: "未設定", provider: provider},
+		{name: "不明なID", id: &unknownID, baseID: &unknownID, provider: provider},
+		{name: "マスタなし", id: &id, baseID: &baseID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &userUsecase{masterProvider: tt.provider}
+			result := uc.buildPlayerOutput(&repository.PlayerWithHonors{Player: &entity.Player{ClassEmblemID: tt.id, ClassEmblemBaseID: tt.baseID}})
+			assert.Equal(t, tt.emblem, result.ClassEmblem)
+			assert.Equal(t, tt.base, result.ClassEmblemBase)
+			assert.Equal(t, tt.id, result.ClassEmblemID)
+			assert.Equal(t, tt.baseID, result.ClassEmblemBaseID)
+		})
+	}
 }
