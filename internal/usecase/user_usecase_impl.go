@@ -37,6 +37,7 @@ type userUsecase struct {
 type userMasterProvider interface {
 	repository.SongMasterProvider
 	repository.AccountTypeMasterProvider
+	repository.PlayerEmblemMasterProvider
 }
 
 type userProfilePlayerRecords struct {
@@ -893,8 +894,24 @@ func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID 
 	return result, latest, nil
 }
 
-func buildPlayerOutput(playerWithHonors *repository.PlayerWithHonors) *UserPlayerOutput {
-	return &UserPlayerOutput{Player: playerWithHonors.Player, Honors: playerWithHonors.Honors}
+func (s *userUsecase) buildPlayerOutput(playerWithHonors *repository.PlayerWithHonors) *UserPlayerOutput {
+	result := &UserPlayerOutput{Player: playerWithHonors.Player, Honors: playerWithHonors.Honors}
+	if s.masterProvider != nil {
+		result.ClassEmblem = resolveOptionalMasterName(result.ClassEmblemID, s.masterProvider.GetClassEmblemNameByID)
+		result.ClassEmblemBase = resolveOptionalMasterName(result.ClassEmblemBaseID, s.masterProvider.GetClassEmblemBaseNameByID)
+	}
+	return result
+}
+
+func resolveOptionalMasterName(id *int, resolve func(int) string) *string {
+	if id == nil {
+		return nil
+	}
+	name := resolve(*id)
+	if name == "" {
+		return nil
+	}
+	return &name
 }
 
 // initializeSlotMap はスロット別レコードを格納するmapを初期化します。
@@ -967,7 +984,7 @@ func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) 
 		return nil, nil
 	}
 
-	player := buildPlayerOutput(playerWithHonors)
+	player := s.buildPlayerOutput(playerWithHonors)
 	if err := s.applyDynamicOverpowerPercent(ctx, player, *user.PlayerID); err != nil {
 		return nil, err
 	}

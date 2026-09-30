@@ -22,8 +22,8 @@ type PlayerDTO struct {
 	CalculatedRating         *float64    `json:"-"`
 	BestAverageRating        *float64    `json:"-"`
 	NewAverageRating         *float64    `json:"-"`
-	ClassEmblemID            *int        `json:"class_emblem_id"`
-	ClassEmblemBaseID        *int        `json:"class_emblem_base_id"`
+	ClassEmblem              *string     `json:"class_emblem"`
+	ClassEmblemBase          *string     `json:"class_emblem_base"`
 	PossessionID             int         `json:"possession_id"`
 	LastPlayedAt             *time.Time  `json:"last_played_at"`
 	OverpowerValue           *float64    `json:"overpower_value"`
@@ -33,6 +33,10 @@ type PlayerDTO struct {
 	Honors                   []*HonorDTO `json:"honors"` // 称号情報（スロット順）
 	CreatedAt                time.Time   `json:"created_at"`
 	UpdatedAt                time.Time   `json:"updated_at"`
+
+	// v1への変換に必要なIDは内部APIのJSONには公開しません。
+	ClassEmblemID     *int `json:"-"`
+	ClassEmblemBaseID *int `json:"-"`
 }
 
 // ToPlayerDTO はエンティティからDTOへ変換します。

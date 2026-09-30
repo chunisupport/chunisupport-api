@@ -2799,6 +2799,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ---
 
 ### GET `/internal/users/:username`
+- **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。内部APIの `PlayerDTO` に数値IDの2項目は含まれません。プロフィールのみの取得と各 `view` でも同じ形式です。
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
@@ -2818,8 +2819,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "name": "プレイヤー名",
     "level": 217,
     "rating": 17.29,
-    "class_emblem_id": 6,
-    "class_emblem_base_id": 4,
+    "class_emblem": "inf",
+    "class_emblem_base": "4",
     "possession_id": 5,
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
@@ -2906,8 +2907,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "name": "プレイヤー名",
     "level": 50,
     "rating": 16.5,
-    "class_emblem_id": 3,
-    "class_emblem_base_id": 1,
+    "class_emblem": "3",
+    "class_emblem_base": "1",
     "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
@@ -4600,8 +4601,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `versions` | VersionDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
-| `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`PlayerDTO.class_emblem_id` の解決に使用 |
-| `class_emblem_bases` | MasterItemDTO[] | クラスエンブレムベース一覧（sort_order順）。`PlayerDTO.class_emblem_base_id` の解決に使用 |
+| `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`class_emblem` に対応するマスタ名を含む |
+| `class_emblem_bases` | MasterItemDTO[] | クラスエンブレムベース一覧（sort_order順）。`class_emblem_base` に対応するマスタ名を含む |
 | `clear_lamps` | MasterItemDTO[] | クリアランプ一覧（sort_order順）。`PlayerRecordDTO.clear_lamp` の取りうる値 |
 | `combo_lamps` | MasterItemDTO[] | コンボランプ一覧（sort_order順）。`PlayerRecordDTO.combo_lamp` の取りうる値 |
 | `full_chains` | MasterItemDTO[] | フルチェインランプ一覧（sort_order順）。`PlayerRecordDTO.full_chain` の取りうる値 |
@@ -5146,6 +5147,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username`
+- **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。互換性のため `player.class_emblem_id` / `player.class_emblem_base_id` も数値または `null` で返します。
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
@@ -5167,6 +5169,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.50,
     "class_emblem_id": 3,
     "class_emblem_base_id": 1,
+    "class_emblem": "3",
+    "class_emblem_base": "1",
     "possession_id": 5,
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
@@ -5665,8 +5669,8 @@ interface PlayerDTO {
   name: string;
   level: number;
   rating: number;
-  class_emblem_id: number | null;
-  class_emblem_base_id: number | null;
+  class_emblem: string | null;
+  class_emblem_base: string | null;
   possession_id: number;
   last_played_at: string | null;
   overpower_value: number | null;
@@ -5676,6 +5680,11 @@ interface PlayerDTO {
   honors: HonorDTO[];
   created_at: string;
   updated_at: string;
+}
+
+interface V1PlayerDTO extends PlayerDTO {
+  class_emblem_id: number | null;
+  class_emblem_base_id: number | null;
 }
 
 interface HonorDTO {

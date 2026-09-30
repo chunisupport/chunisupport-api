@@ -284,6 +284,8 @@ func toUserPlayerDTO(value *usecase.UserPlayerOutput) *dto.PlayerDTO {
 		return nil
 	}
 	result := dto.ToPlayerDTO(value.Player)
+	result.ClassEmblem = value.ClassEmblem
+	result.ClassEmblemBase = value.ClassEmblemBase
 	result.Honors = make([]*dto.HonorDTO, 0, len(value.Honors))
 	for _, honor := range value.Honors {
 		if honor == nil {
