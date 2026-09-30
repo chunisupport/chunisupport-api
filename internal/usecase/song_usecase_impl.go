@@ -329,6 +329,7 @@ func (s *songUsecaseImpl) convertRequestsToUpdates(requests []*UpdateSongInput, 
 		result = append(result, &repository.SongUpdate{
 			Song:                song,
 			UpdateWikiPageTitle: req.UpdateWikiPageTitle,
+			UnlockRequired:      req.UnlockRequired,
 		})
 	}
 
@@ -422,6 +423,7 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
 	song.IsNew = input.IsNew
+	song.UnlockRequired = input.UnlockRequired
 	song.Charts = charts
 
 	versionRangeMutationMu.Lock()

@@ -3881,6 +3881,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "released_at": "2024-01-01",
   "jacket": "ce21ae87308e7599",
   "is_new": true,
+  "unlock_required": false,
   "charts": [
     {
       "difficulty": "MASTER",
@@ -3905,6 +3906,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
 | `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
 | `is_new` | bool | - | 新曲枠の対象かどうか（省略時はfalse） |
+| `unlock_required` | bool | - | 楽曲のプレイに解禁が必要かどうか（省略時はfalse） |
 | `charts` | array | - | 譜面情報配列（省略可） |
 | `charts[].difficulty` | string | ✅ | 難易度（`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`） |
 | `charts[].const` | float64 | ✅ | 譜面定数（0以上） |
@@ -3944,6 +3946,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
     "is_new": true,
+    "unlock_required": false,
     "charts": {
       "EXPERT": {
         "const": 14.5,
@@ -3970,6 +3973,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
 | `is_new` | bool \| null | | 新曲枠の対象かどうか（省略またはnullの場合はfalseとして更新） |
+| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。楽曲データ収集バッチがst1027から値を取得できた場合は、その値で上書きされる |
 | `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ |
 
 **UpdateChartRequest**:
@@ -4157,6 +4161,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "released_at": "2024-01-01",
   "jacket": "ce21ae87308e7599",
   "is_new": true,
+  "unlock_required": false,
   "chart": {
     "attribute": "red",
     "level_star": 5,
@@ -4178,6 +4183,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string | - | リリース日（`YYYY-MM-DD` 形式、省略可） |
 | `jacket` | string | - | ジャケット画像識別子（最大20文字、拡張子なし、省略可） |
 | `is_new` | bool | - | 最新の2週間ごとの更新で追加された楽曲かどうか（省略時はfalse） |
+| `unlock_required` | bool | - | 楽曲のプレイに解禁が必要かどうか（省略時はfalse） |
 | `chart` | object | - | 譜面情報（省略可、省略時は空行を挿入） |
 | `chart.attribute` | string | - | アトリビュート（省略可） |
 | `chart.level_star` | int | - | レベル星数（1〜5、省略可） |
@@ -4215,6 +4221,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "released_at": "2024-01-01",
     "jacket": "jacket_img_name",
     "is_new": true,
+    "unlock_required": false,
     "charts": {
       "WORLDSEND": {
         "attribute": "狂",
@@ -4241,6 +4248,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
 | `is_new` | bool | ✓ | 最新の2週間ごとの更新で追加された楽曲かどうか |
+| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。楽曲データ収集バッチがst1027から値を取得できた場合は、その値で上書きされる |
 | `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
 
 **UpdateWorldsendChartRequest**:

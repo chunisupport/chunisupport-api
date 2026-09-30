@@ -562,14 +562,14 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 	return nil
 }
 
-// wikiPageTitleUpdateExpr は一括更新時の wiki_page_title の代入式を組み立てます。
-// 更新指定のある楽曲だけを書き換え、それ以外は SQL 上で既存値を維持します。
+// keepExistingUpdateExpr は一括更新時に、更新指定のある楽曲だけを書き換える代入式を組み立てます。
+// 指定のない楽曲は SQL 上で既存値を維持します。
 // 楽曲データ収集バッチによる並行更新を消さないよう、読み取った値の書き戻しは行いません。
-func wikiPageTitleUpdateExpr(cases []string) string {
+func keepExistingUpdateExpr(column string, cases []string) string {
 	if len(cases) == 0 {
-		return "wiki_page_title"
+		return column
 	}
-	return fmt.Sprintf("CASE %s ELSE wiki_page_title END", strings.Join(cases, " "))
+	return fmt.Sprintf("CASE %s ELSE %s END", strings.Join(cases, " "), column)
 }
 
 // bulkUpdateSongs は楽曲情報をCASE式で一括更新します。
@@ -587,8 +587,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（title→wiki_page_title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
-	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
+	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
 
 	for _, update := range updates {
 		song := update.Song
@@ -622,9 +622,14 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 		isNewCases = append(isNewCases, "WHEN id = ? THEN ?")
 		isNewArgs = append(isNewArgs, songID, song.IsNew)
+
+		if update.UnlockRequired != nil {
+			unlockRequiredCases = append(unlockRequiredCases, "WHEN id = ? THEN ?")
+			unlockRequiredArgs = append(unlockRequiredArgs, songID, *update.UnlockRequired)
+		}
 	}
 
-	// SQLの引数順序に合わせて結合: title→wiki_page_title→reading→artist→genre→bpm→released→jacket→is_new→IN句
+	// SQLの引数順序に合わせて結合: title→wiki_page_title→reading→artist→genre→bpm→released→jacket→is_new→unlock_required→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
 	args = append(args, wikiPageTitleArgs...)
@@ -635,6 +640,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, releasedArgs...)
 	args = append(args, jacketArgs...)
 	args = append(args, isNewArgs...)
+	args = append(args, unlockRequiredArgs...)
 
 	// IN句用の引数を追加
 	for _, id := range songIDs {
@@ -656,12 +662,13 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			bpm = CASE %s END,
 			released_at = CASE %s END,
 			jacket = CASE %s END,
-			is_new = CASE %s END
+			is_new = CASE %s END,
+			unlock_required = %s
 		WHERE id IN (%s)
 		  AND is_worldsend = 0
 	`,
 		strings.Join(titleCases, " "),
-		wikiPageTitleUpdateExpr(wikiPageTitleCases),
+		keepExistingUpdateExpr("wiki_page_title", wikiPageTitleCases),
 		strings.Join(readingCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
@@ -669,6 +676,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		strings.Join(releasedCases, " "),
 		strings.Join(jacketCases, " "),
 		strings.Join(isNewCases, " "),
+		keepExistingUpdateExpr("unlock_required", unlockRequiredCases),
 		strings.Join(placeholders, ","),
 	)
 
@@ -773,8 +781,8 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
@@ -787,6 +795,7 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		song.OfficialIdx,
 		song.Jacket,
 		song.IsNew,
+		song.UnlockRequired,
 	)
 	if err != nil {
 		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {

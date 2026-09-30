@@ -266,8 +266,8 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 }
 
 func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, error) {
-	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases []string
-	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs []any
+	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
 	songIDs := make([]int, 0, len(updates))
 
 	for _, update := range updates {
@@ -303,6 +303,11 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 
 		isNewCases = append(isNewCases, "WHEN id = ? THEN ?")
 		isNewArgs = append(isNewArgs, target.SongID, song.IsNew)
+
+		if update.UnlockRequired != nil {
+			unlockRequiredCases = append(unlockRequiredCases, "WHEN id = ? THEN ?")
+			unlockRequiredArgs = append(unlockRequiredArgs, target.SongID, *update.UnlockRequired)
+		}
 	}
 
 	args := make([]any, 0)
@@ -315,6 +320,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	args = append(args, releasedArgs...)
 	args = append(args, jacketArgs...)
 	args = append(args, isNewArgs...)
+	args = append(args, unlockRequiredArgs...)
 
 	placeholders := make([]string, len(songIDs))
 	for i, id := range songIDs {
@@ -332,11 +338,12 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 			bpm = CASE %s END,
 			released_at = CASE %s END,
 			jacket = CASE %s END,
-			is_new = CASE %s END
+			is_new = CASE %s END,
+			unlock_required = %s
 		WHERE is_worldsend = 1 AND id IN (%s)
 	`,
 		strings.Join(titleCases, " "),
-		wikiPageTitleUpdateExpr(wikiPageTitleCases),
+		keepExistingUpdateExpr("wiki_page_title", wikiPageTitleCases),
 		strings.Join(readingCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
@@ -344,6 +351,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		strings.Join(releasedCases, " "),
 		strings.Join(jacketCases, " "),
 		strings.Join(isNewCases, " "),
+		keepExistingUpdateExpr("unlock_required", unlockRequiredCases),
 		strings.Join(placeholders, ","),
 	)
 
@@ -482,8 +490,8 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
 	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
@@ -496,6 +504,7 @@ func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec reposito
 		song.OfficialIdx,
 		song.Jacket,
 		song.IsNew,
+		song.UnlockRequired,
 	)
 	if err != nil {
 		if wrapped := wrapOfficialIdxDuplicateError(err); wrapped != err {
