@@ -130,6 +130,26 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | 楽曲データ収集バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-song-batch-linux-amd64 ./cmd/song-batch` | `go run ./cmd/song-batch` |
 | 譜面統計バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-chart-stats-batch-linux-amd64 ./cmd/chart-stats-batch` | `go run ./cmd/chart-stats-batch` |
 
+## バッチ起動コマンド
+
+いずれのバッチも `APP_ENV`（`.env` でも指定可）と `.config/<APP_ENV>.settings.json`、DB 接続用の環境変数を読み込むため、リポジトリのルート（デプロイ先では API のディレクトリ）で実行してください。
+
+| バッチ | 起動コマンド | Task |
+|---|---|---|
+| 楽曲データ収集バッチ（通常実行） | `go run ./cmd/song-batch` | `task run-song-batch` |
+| 楽曲データ収集バッチ（大型アップデート用） | `go run ./cmd/song-batch --major-update` | - |
+| 楽曲データ収集バッチ（リリース日補完） | `go run ./cmd/song-batch --fill-missing-release-date` | - |
+| 譜面統計バッチ | `go run ./cmd/chart-stats-batch` | `task run-chart-stats-batch` |
+| プレイヤーデータ再計算バッチ | `go run ./cmd/recalculate-player-data` | `task run-recalculate-player-data` |
+| 静的データ出力バッチ（楽曲などの静的データ） | `go run ./cmd/export-static-data` | - |
+| 静的データ出力バッチ（難易度別譜面統計JSON） | `go run ./cmd/export-static-data --chart-stats` | - |
+
+デプロイ先ではビルド済みバイナリを起動します。引数は `go run` の場合と同じです。
+
+```bash
+cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
+```
+
 ## 楽曲データ収集バッチ
 
 `go run ./cmd/song-batch` は公式データ、追加楽曲シート、mainframe などの外部データソースを取得し、`songs` / `charts` / `worldsend_charts` / `courses` を更新します。以前は `chunisupport-song-batch` リポジトリで管理していたものを統合しました。
