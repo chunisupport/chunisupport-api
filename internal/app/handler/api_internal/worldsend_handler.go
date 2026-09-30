@@ -136,17 +136,18 @@ func (h *WorldsendHandler) CreateWorldsendSong(c *echo.Context) error {
 	}
 
 	input := &usecase.CreateWorldsendSongInput{
-		OfficialIdx:   req.OfficialIdx,
-		Title:         req.Title,
-		WikiPageTitle: req.WikiPageTitle,
-		Reading:       req.Reading,
-		Artist:        req.Artist,
-		Genre:         req.Genre,
-		BPM:           req.BPM,
-		ReleasedAt:    req.ReleasedAt.TimePtr(),
-		Jacket:        req.Jacket,
-		IsNew:         req.IsNew,
-		Chart:         chartInput,
+		OfficialIdx:    req.OfficialIdx,
+		Title:          req.Title,
+		WikiPageTitle:  req.WikiPageTitle,
+		Reading:        req.Reading,
+		Artist:         req.Artist,
+		Genre:          req.Genre,
+		BPM:            req.BPM,
+		ReleasedAt:     req.ReleasedAt.TimePtr(),
+		Jacket:         req.Jacket,
+		IsNew:          req.IsNew,
+		UnlockRequired: req.UnlockRequired,
+		Chart:          chartInput,
 	}
 
 	songWithChart, err := h.worldsendUsecase.CreateWorldsendSong(c.Request().Context(), input, masters)
@@ -220,6 +221,7 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 			BPM:                 req.BPM,
 			Jacket:              req.Jacket,
 			IsNew:               *req.IsNew,
+			UnlockRequired:      req.UnlockRequired,
 		}
 
 		if req.ReleasedAt != nil {

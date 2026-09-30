@@ -178,17 +178,18 @@ func (o *OptionalWikiPageTitle) UnmarshalJSON(data []byte) error {
 
 // UpdateSongRequest は楽曲更新リクエストを表します。
 type UpdateSongRequest struct {
-	DisplayID     string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
-	Title         string                         `json:"title" validate:"required"`
-	WikiPageTitle OptionalWikiPageTitle          `json:"wiki_page_title"`
-	Reading       *string                        `json:"reading" validate:"omitempty,max=300"`
-	Artist        string                         `json:"artist" validate:"required"`
-	Genre         *string                        `json:"genre"`
-	BPM           *int                           `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt    *DateOnly                      `json:"released_at"`
-	Jacket        *string                        `json:"jacket"`
-	IsNew         *bool                          `json:"is_new"`
-	Charts        map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
+	DisplayID      string                         `json:"id" validate:"required,len=16,hexadecimal,lowercase"`
+	Title          string                         `json:"title" validate:"required"`
+	WikiPageTitle  OptionalWikiPageTitle          `json:"wiki_page_title"`
+	Reading        *string                        `json:"reading" validate:"omitempty,max=300"`
+	Artist         string                         `json:"artist" validate:"required"`
+	Genre          *string                        `json:"genre"`
+	BPM            *int                           `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt     *DateOnly                      `json:"released_at"`
+	Jacket         *string                        `json:"jacket"`
+	IsNew          *bool                          `json:"is_new"`
+	UnlockRequired *bool                          `json:"unlock_required"`
+	Charts         map[string]*UpdateChartRequest `json:"charts" validate:"dive"`
 }
 
 // CreateChartRequest は譜面追加リクエストを表します。
@@ -202,17 +203,18 @@ type CreateChartRequest struct {
 
 // CreateSongRequest は楽曲追加リクエストを表します。
 type CreateSongRequest struct {
-	OfficialIdx   string                `json:"official_idx" validate:"required,max=10"`
-	Title         string                `json:"title" validate:"required"`
-	WikiPageTitle *string               `json:"wiki_page_title" validate:"omitnil,min=1,max=300"`
-	Reading       *string               `json:"reading" validate:"omitempty,max=300"`
-	Artist        string                `json:"artist" validate:"required"`
-	Genre         string                `json:"genre" validate:"required"`
-	BPM           *int                  `json:"bpm" validate:"omitempty,gt=0"`
-	ReleasedAt    *DateOnly             `json:"released_at"`
-	Jacket        *string               `json:"jacket" validate:"omitempty,max=20"`
-	IsNew         bool                  `json:"is_new"`
-	Charts        []*CreateChartRequest `json:"charts" validate:"dive"`
+	OfficialIdx    string                `json:"official_idx" validate:"required,max=10"`
+	Title          string                `json:"title" validate:"required"`
+	WikiPageTitle  *string               `json:"wiki_page_title" validate:"omitnil,min=1,max=300"`
+	Reading        *string               `json:"reading" validate:"omitempty,max=300"`
+	Artist         string                `json:"artist" validate:"required"`
+	Genre          string                `json:"genre" validate:"required"`
+	BPM            *int                  `json:"bpm" validate:"omitempty,gt=0"`
+	ReleasedAt     *DateOnly             `json:"released_at"`
+	Jacket         *string               `json:"jacket" validate:"omitempty,max=20"`
+	IsNew          bool                  `json:"is_new"`
+	UnlockRequired bool                  `json:"unlock_required"`
+	Charts         []*CreateChartRequest `json:"charts" validate:"dive"`
 }
 
 // ToChartDTO はChartエンティティからChartDTOへ変換します。

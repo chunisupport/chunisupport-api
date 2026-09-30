@@ -11,9 +11,11 @@ import (
 // UpdateWikiPageTitle が false の場合、Song.WikiPageTitle は無視して既存値を維持します。
 // Wiki ページタイトルは楽曲データ収集バッチも書き込むため、読み取った値の書き戻しではなく
 // SQL 上で既存値を維持し、並行更新による消失を防ぎます。
+// UnlockRequired が nil の場合も同じ理由で既存値を維持し、Song.UnlockRequired は参照しません。
 type SongUpdate struct {
 	Song                *entity.Song
 	UpdateWikiPageTitle bool
+	UnlockRequired      *bool
 }
 
 // SongRepository は楽曲に関する永続化を扱うリポジトリです。

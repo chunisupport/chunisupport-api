@@ -29,6 +29,7 @@ type UpdateWorldsendChartInput struct {
 
 // UpdateWorldsendSongInput は WORLD'S END 楽曲更新入力を表します。
 // UpdateWikiPageTitle が false の場合、WikiPageTitle は無視して既存値を維持します。
+// UnlockRequired が nil の場合も既存値を維持します。
 type UpdateWorldsendSongInput struct {
 	DisplayID           string
 	Title               string
@@ -41,6 +42,7 @@ type UpdateWorldsendSongInput struct {
 	ReleasedAt          *time.Time
 	Jacket              *string
 	IsNew               bool
+	UnlockRequired      *bool
 	Charts              map[string]*UpdateWorldsendChartInput
 }
 
@@ -54,17 +56,18 @@ type CreateWorldsendChartInput struct {
 
 // CreateWorldsendSongInput は WORLD'S END 楽曲追加入力を表します。
 type CreateWorldsendSongInput struct {
-	OfficialIdx   string
-	Title         string
-	WikiPageTitle *string
-	Reading       *string
-	Artist        string
-	Genre         string
-	BPM           *int
-	ReleasedAt    *time.Time
-	Jacket        *string
-	IsNew         bool
-	Chart         *CreateWorldsendChartInput
+	OfficialIdx    string
+	Title          string
+	WikiPageTitle  *string
+	Reading        *string
+	Artist         string
+	Genre          string
+	BPM            *int
+	ReleasedAt     *time.Time
+	Jacket         *string
+	IsNew          bool
+	UnlockRequired bool
+	Chart          *CreateWorldsendChartInput
 }
 
 // WorldsendUsecase は WORLD'S END 楽曲に関するユースケースを提供します。
@@ -288,6 +291,7 @@ func convertSingleRequestToUpdate(req *UpdateWorldsendSongInput, masters *domain
 		Song:                updatedSong,
 		Chart:               updatedChart,
 		UpdateWikiPageTitle: req.UpdateWikiPageTitle,
+		UnlockRequired:      req.UnlockRequired,
 	}, nil
 }
 
@@ -347,6 +351,7 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.ReleasedAt = input.ReleasedAt
 	song.Jacket = input.Jacket
 	song.IsNew = input.IsNew
+	song.UnlockRequired = input.UnlockRequired
 	song.IsWorldsend = true
 
 	// 譜面情報の構築（全フィールド任意）

@@ -37,7 +37,7 @@ func ToUpdateSongInputs(requests []*api_internal.UpdateSongRequest) []*usecase.U
 			DisplayID: request.DisplayID, Title: request.Title, Reading: request.Reading,
 			WikiPageTitle: request.WikiPageTitle.Value, UpdateWikiPageTitle: request.WikiPageTitle.Present,
 			Artist: request.Artist, Genre: request.Genre, BPM: request.BPM, ReleasedAt: releasedAt,
-			Jacket: request.Jacket, IsNew: request.IsNew, Charts: charts,
+			Jacket: request.Jacket, IsNew: request.IsNew, UnlockRequired: request.UnlockRequired, Charts: charts,
 		})
 	}
 	return result
