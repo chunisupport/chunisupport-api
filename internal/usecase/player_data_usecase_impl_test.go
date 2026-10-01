@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -202,6 +203,56 @@ func TestValidatePlayerDataPayload_公式OPパーセントの範囲外と小数�
 			var validationErr *PlayerDataValidationError
 			require.ErrorAs(t, err, &validationErr)
 			assert.Equal(t, "overpower.percentage", validationErr.Field)
+		})
+	}
+}
+
+func TestValidatePlayerDataPayload_通常譜面の本枠欠落を拒否する(t *testing.T) {
+	rating := 17.25
+	overpower := 12345.67
+	overpowerPercent := 98.76
+	tests := []struct {
+		name     string
+		slots    []string
+		standard bool
+		wantErr  bool
+	}{
+		{name: "ベスト枠のみあれば登録できる", slots: []string{"best", ""}, standard: true},
+		{name: "新曲枠のみあれば登録できる", slots: []string{"", " NEW "}, standard: true},
+		{name: "通常譜面がなければ検証しない"},
+		{name: "枠が未設定の通常譜面だけならエラー", slots: []string{"", ""}, standard: true, wantErr: true},
+		{name: "候補枠しかなければエラー", slots: []string{"best_candidate", "new_candidate"}, standard: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			standard := make([]PlayerDataScoreEntry, 0, len(tt.slots))
+			for i, slot := range tt.slots {
+				entry := PlayerDataScoreEntry{Diff: "MAS", Idx: strconv.Itoa(i + 1), Score: 1_000_000}
+				if slot != "" {
+					entry.Slot = &slot
+					order := 1
+					entry.Order = &order
+				}
+				standard = append(standard, entry)
+			}
+
+			// When
+			err := validatePlayerDataPayload(&PlayerDataPayload{
+				Rating:    &rating,
+				Overpower: PlayerDataOverpowerPayload{Value: &overpower, Percentage: &overpowerPercent},
+				Scores:    PlayerDataScorePayload{Standard: standard},
+			})
+
+			// Then
+			if !tt.wantErr {
+				assert.NoError(t, err)
+				return
+			}
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, "scores.standard", validationErr.Field)
 		})
 	}
 }
