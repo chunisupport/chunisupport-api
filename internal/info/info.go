@@ -114,7 +114,7 @@ const (
 	RatingBadgeRainbowExColor       = "#3597ed"
 	RatingBadgeRainbowColor         = "#73b2f1"
 	RatingBadgePlatinumColor        = "#ffd99c"
-	RatingBadgeGoldColor            = "#fcb426"
+	RatingBadgeGoldColor            = "#fcd200"
 	RatingBadgeSilverColor          = "#cccccc"
 	RatingBadgeBronzeColor          = "#ff9f5e"
 	RatingBadgePurpleColor          = "#aa56d0"
