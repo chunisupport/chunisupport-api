@@ -70,6 +70,68 @@ func TestPreparedBatchSnapshot_旧版の新曲とベストを排他的に再構�
 		[]int{update.Assignments[0].SlotID, update.Assignments[1].SlotID, update.Assignments[2].SlotID})
 }
 
+func TestPreparedBatchSnapshot_両本枠欠落の修復(t *testing.T) {
+	tests := []struct {
+		name       string
+		slot       string
+		excluded   string
+		noRecords  bool
+		wantBroken bool
+	}{
+		{name: "通常記録から両枠を復元", slot: "none", wantBroken: true},
+		{name: "候補枠だけでも両枠を復元", slot: "best_candidate", wantBroken: true},
+		{name: "記録なし", noRecords: true},
+		{name: "削除済み楽曲のみ", slot: "none", excluded: "deleted"},
+		{name: "WORLD'S ENDのみ", slot: "none", excluded: "worldsend"},
+		{name: "配信前楽曲のみ", slot: "none", excluded: "future"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := batchSnapshotForSlotTest(2)
+			currentDate := snapshot.Version.ReleasedAt
+			snapshot.Songs[1].ReleasedAt = &currentDate
+			for i := range snapshot.Songs {
+				switch tt.excluded {
+				case "deleted":
+					snapshot.Songs[i].IsDeleted = true
+				case "worldsend":
+					snapshot.Songs[i].IsWorldsend = true
+				case "future":
+					date := time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)
+					snapshot.Songs[i].ReleasedAt = &date
+				}
+			}
+			prepared := preparedBatchSnapshotForCustomSnapshot(t, snapshot)
+			data := repository.PlayerBatchData{ID: 1}
+			if !tt.noRecords {
+				data.Records = []repository.PlayerBatchRecord{
+					{ChartID: 1, Score: 1_009_000, SlotName: tt.slot},
+					{ChartID: 2, Score: 1_008_000, SlotName: "none"},
+				}
+			}
+
+			update, broken, err := prepared.buildUpdate(data, true)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantBroken, broken)
+			if tt.wantBroken {
+				assert.Equal(t, []repository.PlayerBatchSlotAssignment{
+					{ChartID: 1, SlotID: snapshot.SlotIDs["best"], Position: 1},
+					{ChartID: 2, SlotID: snapshot.SlotIDs["new"], Position: 1},
+				}, update.Assignments)
+				assert.Equal(t, 17.15, update.BestAverage)
+				assert.Equal(t, 17.05, update.NewAverage)
+				assert.Equal(t, 0.684, update.PlayerRating)
+			} else {
+				assert.Empty(t, update.Assignments)
+				assert.Empty(t, update.ClearChartIDs)
+				assert.Zero(t, update.BestAverage)
+				assert.Zero(t, update.NewAverage)
+			}
+		})
+	}
+}
+
 func TestPreparedBatchSnapshot_現行の正常な公式枠を保持する(t *testing.T) {
 	// Given
 	prepared := preparedBatchSnapshotForSlotTest(t, 2)

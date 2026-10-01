@@ -130,6 +130,26 @@ APIサーバーとバッチジョブは `internal/` 配下のドメイン層・�
 | 楽曲データ収集バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-song-batch-linux-amd64 ./cmd/song-batch` | `go run ./cmd/song-batch` |
 | 譜面統計バッチ | `GOOS=linux GOARCH=amd64 go build -o _chunisupport-chart-stats-batch-linux-amd64 ./cmd/chart-stats-batch` | `go run ./cmd/chart-stats-batch` |
 
+## バッチ起動コマンド
+
+いずれのバッチも `APP_ENV`（`.env` でも指定可）と `.config/<APP_ENV>.settings.json`、DB 接続用の環境変数を読み込むため、リポジトリのルート（デプロイ先では API のディレクトリ）で実行してください。
+
+| バッチ | 起動コマンド | Task |
+|---|---|---|
+| 楽曲データ収集バッチ（通常実行） | `go run ./cmd/song-batch` | `task run-song-batch` |
+| 楽曲データ収集バッチ（大型アップデート用） | `go run ./cmd/song-batch --major-update` | - |
+| 楽曲データ収集バッチ（リリース日補完） | `go run ./cmd/song-batch --fill-missing-release-date` | - |
+| 譜面統計バッチ | `go run ./cmd/chart-stats-batch` | `task run-chart-stats-batch` |
+| プレイヤーデータ再計算バッチ | `go run ./cmd/recalculate-player-data` | `task run-recalculate-player-data` |
+| 静的データ出力バッチ（楽曲などの静的データ） | `go run ./cmd/export-static-data` | - |
+| 静的データ出力バッチ（難易度別譜面統計JSON） | `go run ./cmd/export-static-data --chart-stats` | - |
+
+デプロイ先ではビルド済みバイナリを起動します。引数は `go run` の場合と同じです。
+
+```bash
+cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
+```
+
 ## 楽曲データ収集バッチ
 
 `go run ./cmd/song-batch` は公式データ、追加楽曲シート、mainframe などの外部データソースを取得し、`songs` / `charts` / `worldsend_charts` / `courses` を更新します。以前は `chunisupport-song-batch` リポジトリで管理していたものを統合しました。
@@ -172,7 +192,7 @@ APIとバッチは `players.recalculated_master_fingerprint` を読み書きす�
 
 枠を再構築するときは、現在の枠との差分（外す譜面と、枠または順位が変わる譜面）だけを更新し、変更のない成績行には書き込みません。終了ログの `slots_unchanged` は、再構築したが枠が変わらなかった件数です。
 
-現行版プレイヤーの正常な公式本枠は保持します。`best` / `new` 本枠の件数超過、`slot_order` の未設定・範囲外・重複を検出した場合は、旧版プレイヤーと同様に対象となる通常譜面のスコアから枠を再構築し、RatingとOVER POWERを更新します。この修復はバッチ失敗として扱わず、再構築した推定枠は次回のプレイヤーデータ登録時に公式枠へ置き換わります。候補枠だけの不正では再構築しません。
+現行版プレイヤーの正常な公式本枠は保持します。対象となる通常譜面の記録があるのに `best` / `new` 本枠が両方とも空の場合、または本枠の件数超過、`slot_order` の未設定・範囲外・重複を検出した場合は、旧版プレイヤーと同様に対象となる通常譜面のスコアから枠を再構築し、RatingとOVER POWERを更新します。この修復はバッチ失敗として扱わず、再構築した推定枠は次回のプレイヤーデータ登録時に公式枠へ置き換わります。候補枠だけの不正では再構築しません。
 
 Playerの既存データは、同一トランザクション内で更新用検索により集約全体をロックし、集約メソッドで変更して `PlayerRepository.Save` で保存します。関連する成績・未解禁曲の読み書きもPlayerロック取得後に行い、コミットまで保持します。ユーザー行も変更する通常登録は「ユーザー → Player → 関連レコード」の順にロックし、バッチと未解禁曲更新はPlayerから開始してユーザー行をロックしません。
 
