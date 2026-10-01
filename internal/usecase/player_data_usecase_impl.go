@@ -142,7 +142,23 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		}
 	}
 
+	// CHUNITHM-NETはプレイ済みでなければ閲覧できないため、通常譜面の記録があるのに本枠が両方空になることはない。
+	// 収集中のセッション切れなどで枠ページを取得できなかったpayloadを登録すると、既存の公式枠がすべて解除されてしまうため拒否する。
+	if len(payload.Scores.Standard) > 0 && !slices.ContainsFunc(payload.Scores.Standard, isMainSlotEntry) {
+		return newPlayerDataSlotValidationError("best or new slot is required when standard scores exist")
+	}
+
 	return nil
+}
+
+// isMainSlotEntry は通常譜面のスコアがベスト枠・新曲枠のいずれかに属するかを返します。
+// 判定は登録時のスロット名解決（resolveSlotID）と同じく前後の空白と大文字小文字を無視します。
+func isMainSlotEntry(entry PlayerDataScoreEntry) bool {
+	if entry.Slot == nil {
+		return false
+	}
+	slot := strings.TrimSpace(*entry.Slot)
+	return strings.EqualFold(slot, "best") || strings.EqualFold(slot, "new")
 }
 
 func hasOfficialMetricPrecision(value float64) bool {
