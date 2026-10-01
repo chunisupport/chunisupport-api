@@ -113,7 +113,7 @@ const (
 	RatingBadgeLabel                = "CHUNITHM RATING"
 	RatingBadgeRainbowExColor       = "#3597ed"
 	RatingBadgeRainbowColor         = "#73b2f1"
-	RatingBadgePlatinumColor        = "#ffd99c"
+	RatingBadgePlatinumColor        = "#ffeac9"
 	RatingBadgeGoldColor            = "#fcd200"
 	RatingBadgeSilverColor          = "#cccccc"
 	RatingBadgeBronzeColor          = "#ff9f5e"
