@@ -111,7 +111,16 @@ const (
 	RatingBadgeIPRateLimitRequests  = 600
 	RatingBadgeSchemaVersion        = 1
 	RatingBadgeLabel                = "CHUNITHM RATING"
-	RatingBadgeColor                = "blue"
+	RatingBadgeRainbowExColor       = "#3597ed"
+	RatingBadgeRainbowColor         = "#73b2f1"
+	RatingBadgePlatinumColor        = "#ffd99c"
+	RatingBadgeGoldColor            = "#fcb426"
+	RatingBadgeSilverColor          = "#cccccc"
+	RatingBadgeBronzeColor          = "#ff9f5e"
+	RatingBadgePurpleColor          = "#aa56d0"
+	RatingBadgeRedColor             = "#dd4343"
+	RatingBadgeOrangeColor          = "#d8b800"
+	RatingBadgeGreenColor           = "#67ac09"
 	RatingBadgeNoDataMessage        = "no data"
 	RatingBadgeNoDataColor          = "lightgrey"
 	RegisterDataRateLimitRequests   = 1
