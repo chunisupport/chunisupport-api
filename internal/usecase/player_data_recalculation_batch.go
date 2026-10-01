@@ -264,6 +264,9 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 		}
 	}
 	rebuild := !current || currentBroken
+	mainSlotsMissing := current && !slices.ContainsFunc(data.Records, func(record repository.PlayerBatchRecord) bool {
+		return record.SlotName == "best" || record.SlotName == "new"
+	})
 	best := make([]service.RatingSlotRecord, 0)
 	newRecords := make([]service.RatingSlotRecord, 0)
 	opRecords := make([]service.OverpowerRecord, 0)
@@ -289,6 +292,13 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 		}
 		if song.IsDeleted || song.IsWorldsend || (song.ReleasedAt != nil && databaseDateInLocation(*song.ReleasedAt, p.operationalDate.Location()).After(p.operationalDate)) {
 			continue
+		}
+		if mainSlotsMissing && !rebuild {
+			currentBroken = true
+			rebuild = true
+			slog.Warn("対象記録がある現行プレイヤーの本枠が両方空のため再構築します",
+				"player_id", data.ID,
+				"rebuild_reason", "current_broken_slots")
 		}
 		ratingRecord := service.RatingSlotRecord{ChartID: record.ChartID, Score: record.Score, ChartConst: chart.ChartConst, OfficialIndex: p.officialIndex[song.ID]}
 		if !rebuild {
