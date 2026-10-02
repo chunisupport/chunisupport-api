@@ -251,3 +251,33 @@ func TestTemporaryPlayerDataHandler_CommitTemporaryData_保存済み本文が壊
 	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 	mockUC.AssertExpectations(t)
 }
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_処理中のトークンは409(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	reqBody := `{"uploadToken":"11111111-1111-4111-8111-111111111111"}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", bytes.NewBufferString(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{
+		User:        &entity.User{ID: 1},
+		UploadToken: "11111111-1111-4111-8111-111111111111",
+	}).Return(nil, usecase.ErrTemporaryPlayerDataInProgress).Once()
+
+	// When
+	err := h.CommitTemporaryData(c)
+
+	// Then
+	require.Error(t, err)
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+	mockUC.AssertExpectations(t)
+}

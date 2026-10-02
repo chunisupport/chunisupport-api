@@ -2158,7 +2158,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 一時保存済みデータを、認証済みユーザーに紐づけて確定保存します。
 
-このエンドポイントでは、保存済み本文を `PlayerDataPayload` として解釈し、通常の `/internal/me/register-data` と同じ登録処理を実行します。ただし、一時データは登録処理の開始前に `uploadToken` 単位で消費されます。したがって、登録処理中にエラーになった場合でも同じ `uploadToken` では再試行できず、再アップロードが必要です。
+このエンドポイントでは、保存済み本文を `PlayerDataPayload` として解釈し、通常の `/internal/me/register-data` と同じ登録処理を実行します。一時データは登録処理の間 `uploadToken` 単位で処理中として予約され、登録に成功した時点で削除されます。登録処理がエラーになった場合は予約が解除されるため、有効期限内であれば同じ `uploadToken` で再試行できます。
 
 - **認証**: 必須（Firebase Bearer）
 - **リクエスト**:
@@ -2177,9 +2177,10 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 - `401 Unauthorized`: 未認証
 - `400 Bad Request`: 保存済み本文がJSONとして解釈できない
-- `404 Not Found`: token期限切れ / 未存在
+- `404 Not Found`: token期限切れ / 未存在（登録成功後のtokenを含む）
+- `409 Conflict`: 同じ `uploadToken` の確定処理が実行中
 - `422 Unprocessable Entity`: `uploadToken` の形式不正、プレイヤー名・日時形式・スコア整合性など `PlayerDataPayload` のバリデーション不正
-- `500 Internal Server Error`: DB保存失敗などの想定外エラー（tokenは消費済みのため再アップロードが必要）
+- `500 Internal Server Error`: DB保存失敗などの想定外エラー（有効期限内であれば同じ `uploadToken` で再試行できる）
 
 #### バリデーションの補足
 

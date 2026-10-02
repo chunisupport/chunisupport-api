@@ -67,6 +67,9 @@ var (
 	// ErrTemporaryPlayerDataNotFound は一時プレイヤーデータが見つからない場合に返されるエラーです。
 	ErrTemporaryPlayerDataNotFound = errors.New("temporary player data not found")
 
+	// ErrTemporaryPlayerDataInUse は一時プレイヤーデータが別のリクエストで確定処理中の場合に返されるエラーです。
+	ErrTemporaryPlayerDataInUse = errors.New("temporary player data in use")
+
 	// ErrPlayerLatestUpdateNotFound はプレイヤーの最新登録結果が見つからない場合に返されるエラーです。
 	ErrPlayerLatestUpdateNotFound = errors.New("player latest update not found")
 

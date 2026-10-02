@@ -13,6 +13,7 @@ import (
 type temporaryPlayerDataRepository struct {
 	mu                 sync.Mutex
 	entriesByToken     map[string]*entity.TemporaryPlayerData
+	claimedTokens      map[string]struct{}
 	tokensByIP         map[string]map[string]struct{}
 	expiryItemsByToken map[string]*temporaryPlayerDataExpiryItem
 	expiryHeap         temporaryPlayerDataExpiryHeap
@@ -66,6 +67,7 @@ func (h *temporaryPlayerDataExpiryHeap) Pop() any {
 func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domainrepo.TemporaryPlayerDataRepository {
 	r := &temporaryPlayerDataRepository{
 		entriesByToken:     make(map[string]*entity.TemporaryPlayerData),
+		claimedTokens:      make(map[string]struct{}),
 		tokensByIP:         make(map[string]map[string]struct{}),
 		expiryItemsByToken: make(map[string]*temporaryPlayerDataExpiryItem),
 		maxEntriesPerIP:    maxEntriesPerIP,
@@ -119,7 +121,7 @@ func (r *temporaryPlayerDataRepository) Create(ctx context.Context, _ domainrepo
 	return nil
 }
 
-func (r *temporaryPlayerDataRepository) FindByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
+func (r *temporaryPlayerDataRepository) Claim(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
 	if err := r.lockWithContext(ctx); err != nil {
 		return nil, err
 	}
@@ -135,41 +137,39 @@ func (r *temporaryPlayerDataRepository) FindByToken(ctx context.Context, _ domai
 	if !ok {
 		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
 	}
+	if _, claimed := r.claimedTokens[token]; claimed {
+		return nil, domainrepo.ErrTemporaryPlayerDataInUse
+	}
 
 	copied := *entry
 	copied.Payload = append([]byte(nil), entry.Payload...)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
+	r.claimedTokens[token] = struct{}{}
+
 	return &copied, nil
 }
 
-func (r *temporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
+func (r *temporaryPlayerDataRepository) Release(ctx context.Context, _ domainrepo.Executor, token string) error {
 	if err := r.lockWithContext(ctx); err != nil {
-		return nil, err
+		return err
 	}
 	defer r.mu.Unlock()
 
 	now := time.Now().UTC()
 	r.cleanupExpiredLocked(now)
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	entry, ok := r.entriesByToken[token]
-	if !ok {
-		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
+	if _, ok := r.entriesByToken[token]; !ok {
+		return domainrepo.ErrTemporaryPlayerDataNotFound
 	}
 
-	copied := *entry
-	copied.Payload = append([]byte(nil), entry.Payload...)
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	r.deleteEntryLocked(token, entry)
-
-	return &copied, nil
+	delete(r.claimedTokens, token)
+	return nil
 }
 
 func (r *temporaryPlayerDataRepository) Delete(ctx context.Context, _ domainrepo.Executor, token string) error {
@@ -228,6 +228,7 @@ func (r *temporaryPlayerDataRepository) cleanupExpiredLocked(now time.Time) {
 
 func (r *temporaryPlayerDataRepository) deleteEntryLocked(token string, entry *entity.TemporaryPlayerData) {
 	delete(r.entriesByToken, token)
+	delete(r.claimedTokens, token)
 	if ipTokens, ok := r.tokensByIP[entry.IPAddress]; ok {
 		delete(ipTokens, token)
 		if len(ipTokens) == 0 {
