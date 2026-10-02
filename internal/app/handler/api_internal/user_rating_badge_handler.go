@@ -37,7 +37,28 @@ func (h *UserHandler) GetOfficialRatingBadge(c *echo.Context) error {
 	}
 	if rating != nil {
 		badge.Message = strconv.FormatFloat(*rating, 'f', 2, 64)
-		badge.Color = info.RatingBadgeColor
+		switch {
+		case *rating >= 17.00:
+			badge.Color = info.RatingBadgeRainbowExColor
+		case *rating >= 16.00:
+			badge.Color = info.RatingBadgeRainbowColor
+		case *rating >= 15.25:
+			badge.Color = info.RatingBadgePlatinumColor
+		case *rating >= 14.50:
+			badge.Color = info.RatingBadgeGoldColor
+		case *rating >= 13.25:
+			badge.Color = info.RatingBadgeSilverColor
+		case *rating >= 12.00:
+			badge.Color = info.RatingBadgeBronzeColor
+		case *rating >= 10.00:
+			badge.Color = info.RatingBadgePurpleColor
+		case *rating >= 7.00:
+			badge.Color = info.RatingBadgeRedColor
+		case *rating >= 4.00:
+			badge.Color = info.RatingBadgeOrangeColor
+		default:
+			badge.Color = info.RatingBadgeGreenColor
+		}
 	}
 	return c.JSON(http.StatusOK, badge)
 }
