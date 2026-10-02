@@ -143,8 +143,10 @@ func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c *echo.Context) error 
 	})
 	if err != nil {
 		switch {
-		case err == usecase.ErrTemporaryPlayerDataNotFound:
+		case errors.Is(err, usecase.ErrTemporaryPlayerDataNotFound):
 			return apierror.ErrNotFound.WithInternal(err)
+		case errors.Is(err, usecase.ErrTemporaryPlayerDataInProgress):
+			return apierror.ErrConflict.WithInternal(err)
 		case errors.Is(err, usecase.ErrTempDataPayloadInvalidJSON):
 			return apierror.ErrBadRequest.WithInternal(err)
 		default:

@@ -29,7 +29,7 @@ func TestUserHandler_GetOfficialRatingBadge(t *testing.T) {
 			name:        "公式RATINGを小数第2位まで表示する",
 			rating:      func() *float64 { value := 17.2; return &value }(),
 			wantMessage: "17.20",
-			wantColor:   "blue",
+			wantColor:   "#3597ed",
 		},
 		{
 			name:        "プレイヤー未連携ならno dataを表示する",

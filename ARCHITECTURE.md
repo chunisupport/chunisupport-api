@@ -126,19 +126,15 @@ internal/
 
 ### 集約指向の永続化
 
-リポジトリパターンは、集約単位での操作を基本とします：
+リポジトリパターンは、集約単位での操作を基本とします。以下の `Save(ctx, entity)` とコード例は概念上の表記です。実際の引数は、`exec` の有無を含め各リポジトリのインターフェースに従います。
 
 - **Save(ctx, entity)**: 集約ルートを保存します。内部でINSERT/UPDATE判定を行い、適切なSQL文を実行します。
-- **部分更新の廃止**: `UpdatePrivacy`や`LinkFirebaseUID`相当の特定カラムのみを更新するメソッドは廃止され、エンティティのコマンドメソッド + `Save`パターンに統一されました。
+- **状態変更**: エンティティのコマンドメソッドで状態を変更し、`Save(ctx, entity)`で永続化します。
 
 ```go
-// 推奨されるパターン
 user, _ := repo.FindByID(ctx, userID)
 user.ChangePrivacy(true)
 repo.Save(ctx, user)
-
-// 非推奨（廃止済み）
-// repo.UpdatePrivacy(ctx, userID, true)
 ```
 
 ### Context対応

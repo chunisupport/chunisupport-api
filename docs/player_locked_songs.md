@@ -53,7 +53,7 @@ song_id INT UNSIGNED NOT NULL
 is_ultima BOOLEAN NOT NULL
 ```
 
-日付カラムは持たない。理由は、今回の用途では「現在未解禁かどうか」だけが必要であり、設定日時を追跡するメリットが容量増加に見合わないためである。
+各レコードは現在の未解禁状態を表す。
 
 ### 3.3 制約
 
@@ -63,11 +63,11 @@ FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
 ```
 
-補助インデックスは持たない。プレイヤー単位の一覧取得は `PRIMARY KEY (player_id, song_id, is_ultima)` の左端一致で処理できるため、実測で必要になるまで `player_id` 単独インデックスは作成しない。
+プレイヤー単位の一覧取得は `PRIMARY KEY (player_id, song_id, is_ultima)` の左端一致で処理する。
 
 ### 3.4 削除方針
 
-論理削除は行わない。
+未解禁解除はレコードの物理削除で表す。
 
 - 未解禁登録: INSERT
 - 未解禁解除: DELETE
@@ -106,7 +106,7 @@ down側:
 DROP TABLE IF EXISTS player_locked_songs;
 ```
 
-未解禁曲管理テーブルはMySQLのみを対象にする。RepositoryテストもMySQLを前提にし、SQLite用のDDLやテストスキーマは持たない。
+未解禁曲管理テーブルの本番DDLはMySQLを対象にする。Repositoryの一覧取得・削除・エラー処理のテストにはSQLiteのインメモリDBを使用する。
 
 ---
 
@@ -172,8 +172,6 @@ OP計算ではプレイヤー単位で一括取得してメモリ上のセット
 
 `Delete` は `player_id`, `song_id`, `is_ultima` の複合主キー全項目を条件にして、指定された未解禁状態だけを削除する。対象レコードが存在しない場合も、解除APIの冪等性を保つため成功扱いにする。
 
-Repositoryインターフェースには、用途のない `Exists` は含めない。必要になった時点で用途を明確にして定義する。
-
 削除APIでは、論理削除済み楽曲の未解禁レコードも後から消せる必要があるため、Usecaseで通常の `SongRepository.FindByDisplayID` による楽曲存在確認とエラー判定は行わない。代わりに、削除専用の楽曲ID解決ポートを用意し、`display_id` から `song_id` を解決できた場合だけ `Delete` を呼び出す。`display_id` に該当する楽曲が存在しない場合は、削除対象なしとして成功扱いにする。
 
 削除専用の楽曲ID解決ポートは、`songs.display_id` を条件にし、`songs.is_deleted` / `songs.is_worldsend` では絞り込まない。これは、論理削除済み楽曲に紐づく未解禁レコードを削除可能にするためである。戻り値は `(*int, error)` 相当とし、`display_id` に該当する楽曲が存在しない場合は `nil, nil` を返す。Usecaseは `nil` を削除対象なしとして扱い、`Delete` を呼び出さず成功扱いにする。
@@ -193,9 +191,9 @@ type PlayerLockedSongQueryService interface {
 }
 ```
 
-このRead Model取得ポートは、ドメインエンティティの永続化リポジトリではなく、Usecaseが一覧表示のために利用するQuery用ポートとして扱う。配置は `internal/usecase` 配下、またはQuery用途が明確な専用パッケージとし、`internal/domain/repository` には置かない。
+このRead Model取得ポートは、Usecaseが一覧表示のために利用するQuery用ポートとして `internal/usecase` 配下に定義する。
 
-このRead Model取得は `player_locked_songs` と `songs` をJOINし、`songs.is_deleted = 0` かつ `songs.is_worldsend = 0` のレコードだけを返す。返却順は `songs.display_id ASC, player_locked_songs.is_ultima ASC` とする。JOINを使う理由は、Usecaseで `song_id` ごとに楽曲取得を繰り返すN+1問題を避けるためである。JOIN済みの `songs.title` も同時に取得し、一覧APIレスポンスへ含める。これにより、フロントエンドは未解禁曲一覧表示のためだけに楽曲マスタAPIを別途呼び出す必要がなくなる。JOINを使わない場合でも、関連楽曲は `IN` 句などで一括取得し、1件ずつ `SongRepository` を呼び出さない。
+このRead Model取得は `player_locked_songs` と `songs` をJOINし、`songs.is_deleted = 0` かつ `songs.is_worldsend = 0` のレコードだけを返す。返却順は `songs.display_id ASC, player_locked_songs.is_ultima ASC` とする。JOINを使う理由は、Usecaseで `song_id` ごとに楽曲取得を繰り返すN+1問題を避けるためである。JOIN済みの `songs.title` も同時に取得し、一覧APIレスポンスへ含める。これにより、フロントエンドは未解禁曲一覧表示のためだけに楽曲マスタAPIを別途呼び出す必要がなくなる。
 
 このリポジトリは「未解禁集合」への登録・解除を扱うため、エンティティ全体を `Save` する集約リポジトリとは性質が異なる。`player_locked_songs` は独立した属性を持つ集約ではなく、プレイヤーに紐づく現在状態の集合であるため、`Create` / `Delete` による集合操作を例外的に許容する。
 
@@ -215,7 +213,7 @@ type PlayerLockedSongQueryService interface {
 - `Delete` は `player_id`, `song_id`, `is_ultima` の複合主キー全項目を条件にし、対象なしでも成功扱いにする
 - 削除専用の楽曲ID解決ポートは、`display_id` が存在しない場合に `nil, nil` を返し、Usecaseで削除対象なしとして扱う
 
-管理APIの使いやすさを優先し、登録・解除は冪等操作にする。登録時は通常の `INSERT` を行い、複合主キーの重複エラーだけを成功扱いに変換する。SQLは `ON DUPLICATE KEY UPDATE player_id = player_id` 相当を使ってもよいが、`INSERT IGNORE` は重複以外の制約違反も見えにくくするため使用しない。解除時は `DELETE` の影響行数が0件でも成功扱いにする。
+管理APIの使いやすさを優先し、登録・解除は冪等操作にする。登録時は通常の `INSERT` を行い、複合主キーの重複エラーだけを成功扱いに変換する。一括登録では `ON DUPLICATE KEY UPDATE player_id = player_id` を使う。`INSERT IGNORE` は重複以外の制約違反も見えにくくするため使用しない。解除時は `DELETE` の影響行数が0件でも成功扱いにする。
 
 ---
 
@@ -278,8 +276,7 @@ Usecaseでは一覧時に `UserRepository.FindByUsername` で対象ユーザー�
 
 管理対象はOP計算対象曲であるため、論理削除済み楽曲とWORLD'S END楽曲の登録は拒否する。既存の `SongRepository.FindByDisplayID` は通常楽曲（WORLD'S END除く）だけを取得し、削除済み楽曲も取得する契約である。そのため、WORLD'S END楽曲は `SongRepository.FindByDisplayID` の時点で未検出となり、Usecaseでは `song_not_found` に変換する。取得できた通常楽曲については `song.IsDeleted` を確認し、論理削除済みであれば `song_not_found` に変換する。既に登録済みの曲が後から論理削除された場合は、一覧取得・OP計算のどちらでも `songs.is_deleted = 0` により除外する。ただし削除APIでは、論理削除済み楽曲に紐づく未解禁レコードを消せるようにするため、楽曲の論理削除状態では絞り込まない。
 
-`song_not_found` は `docs/API.md` と `internal/app/apierror/codes.go` で既に楽曲未検出として使われているため、本仕様もこれに合わせる。未解禁設定自体が存在しないケースは、登録・解除を冪等操作にするためAPIエラーにしない。
-`chart_not_found` は `docs/API.md`、`docs/error_code_reason_codes.md`、`internal/app/apierror/codes.go`、`internal/usecase/errors.go` で既に譜面未検出として定義済みであり、指定楽曲にULTIMA譜面が存在しないケースに適用できる。そのため、未解禁曲管理専用のエラーコードは定義しない。
+未解禁設定自体が存在しないケースは、登録・解除を冪等操作にするためAPIエラーにしない。
 
 ### 7.4 登録・解除の扱い
 
@@ -388,8 +385,6 @@ DTOはAPI境界の責務として、Usecase入出力と分離する。
 
 `id` は既存の楽曲APIと同じくパスパラメータまたはJSON文字列として受ける。16文字の小文字16進数として不正な場合は `validation_failed`、形式は正しいが存在しない場合は、登録時には `song_not_found` にする。削除APIは冪等な状態削除として扱うため、形式が正しい `id` であれば通常の楽曲存在確認によるエラー判定を行わず、対象レコードが存在しなくても204を返す。削除済み楽曲やWORLD'S END楽曲を外部から区別できないようにするため、登録時の管理対象外楽曲も同じ404とする。一覧取得時はRead Model取得で通常楽曲かつ未削除の楽曲に絞り込む。
 
-ULTIMA譜面未存在は、既存の `chart_not_found` を使う。既存コードでは `chart_not_found` が譜面未検出の意味で定義済みであり、`docs/API.md` でも指定難易度の譜面が存在しない場合のエラーとして使われているため、この用途に専用エラーコードは定義しない。
-
 ---
 
 ## 9. OP計算APIとの接続方針
@@ -405,7 +400,7 @@ OP計算API本体では、次の順序で対象譜面を絞り込む。
 
 N+1回避のため、未解禁設定は `ListByPlayerID` で一括取得し、`song_id + is_ultima` のセットとして扱う。
 
-API一覧取得では `id` が必要なため、Read Model取得でJOINするか、`song_id` 群に対して `IN` 句によるバルクフェッチを行う。いずれの場合も、未解禁レコード1件ごとに楽曲取得を行ってはいけない。
+API一覧取得では、Read Model取得で `songs` とJOINして `id` と `title` を一括取得し、N+1を避ける。
 
 ---
 
@@ -474,99 +469,3 @@ API一覧取得では `id` が必要なため、Read Model取得でJOINするか
   - `player_locked_songs` のER図
 - `docs/domain_model_specification.md`
   - 未解禁曲管理モデルの責務
-
----
-
-## 12. 設計判断
-
-### 12.1 解除APIの形式
-
-採用:
-
-- `DELETE /internal/me/locked-songs/:id?is_ultima=false`
-
-DELETE bodyに依存しないため、クライアント・プロキシ差異の影響を受けにくい。
-
-### 12.2 登録・解除の冪等性
-
-採用:
-
-- 登録済みを再登録したら成功扱い
-- 未登録を解除しても成功扱い
-
-手動管理UIからの再送や二重クリックに強く、状態管理APIとして扱いやすいため、冪等操作にする。
-
-### 12.3 論理削除済み楽曲の登録可否
-
-採用:
-
-- 登録時に拒否する
-
-ユーザーが実際に管理する必要のない曲を未解禁リストに入れられない方が分かりやすいため、登録時に拒否する。API一覧取得用のRead Modelでも `songs.is_deleted = 0` で除外する。
-
-### 12.4 ULTIMA判定の厳密性
-
-採用:
-
-- `is_ultima = false` は通常譜面群（BASIC / ADVANCED / EXPERT / MASTER）の未解禁として扱い、ULTIMA譜面は除外対象に含めない
-- `is_ultima = true` はULTIMA譜面だけ未解禁として扱う
-- `is_ultima = true` の登録時は、対象楽曲にULTIMA譜面が存在することを検証する
-- 通常譜面群とULTIMA譜面の両方が未解禁の場合は、同一曲に `is_ultima = false` と `is_ultima = true` の2レコードを登録する
-
-`is_ultima = false` が `is_ultima = true` を包含する設計にはしない。CHUNITHM上の通常解禁とULTIMA解禁を別の状態として扱い、両方の状態が必要な場合は2レコードで表現する。
-
-### 12.5 ドメインモデルと一覧表示用データの分離
-
-採用:
-
-- `entity.PlayerLockedSong` は `PlayerID`, `SongID`, `IsUltima` のみ保持する
-- API一覧用の `id` はUsecase出力またはRead Modelで扱う
-- N+1回避が必要な一覧取得はJOINまたは `IN` 句によるバルクフェッチで行う
-
-`id` はAPI契約上必要だが、未解禁状態そのもののドメイン状態ではないため、ドメインエンティティには含めない。
-
-### 12.6 APIで使う楽曲識別子
-
-採用:
-
-- `id`
-
-DB内部では `song_id` を使う。APIでは、既存の楽曲APIが `id` をパスパラメータとして使っているため、フロントエンドから操作する管理APIも `id` を受ける。登録時はUsecaseで通常楽曲であること、論理削除されていないこと、WORLD'S END楽曲ではないことを検証したうえで `song_id` に変換する。解除時は論理削除済み楽曲の未解禁レコードも消せるように、通常の楽曲取得ではなく削除専用の楽曲ID解決ポートで `song_id` を解決する。未解禁リポジトリ自体は `song_id` と `is_ultima` を引数に取る `Delete` を提供し、Repository境界にAPI用の `id` を持ち込まない。
-
-DB内部IDへの依存をAPI契約に出さず、既存の `/internal/songs/:id` と揃えられるため `id` を採用する。
-
-### 12.7 楽曲未検出エラーコード
-
-採用:
-
-- `song_not_found`
-
-既存 `docs/API.md` では通常楽曲API・WORLD'S END楽曲APIともに楽曲未検出を `song_not_found` としている。未解禁設定の登録時に対象楽曲が存在しない場合も同じ意味のため、`player_locked_song_not_found` は採用しない。未解禁設定レコード自体が存在しない場合は、解除操作を冪等にするためエラーにしない。
-
-### 12.8 ULTIMA譜面未検出エラーコード
-
-採用:
-
-- `chart_not_found`
-
-既存 `docs/API.md` では、指定された難易度の譜面が存在しない場合に `chart_not_found` を使っている。`is_ultima = true` の登録時に対象楽曲へULTIMA譜面が存在しないケースも「指定譜面が存在しない」状態であるため、未解禁曲管理専用のエラーコードは定義しない。
-
-### 12.9 解除時の楽曲存在確認
-
-採用:
-
-- 削除APIでは通常の楽曲存在確認によるエラー判定を行わない
-- `id` に該当する楽曲が存在しない場合も204を返す
-- 論理削除済み楽曲に紐づく未解禁レコードも削除できる
-
-存在しない楽曲の削除操作をエラーにすると、楽曲が論理削除された後に未解禁レコードをユーザー操作で消せなくなる。そのため、解除APIは状態削除の冪等操作として扱い、形式が正しい `id` であれば削除対象なしでも成功扱いにする。通常の `SongRepository` で楽曲を事前取得せず、削除専用の楽曲ID解決ポートで `song_id` を解決できた場合だけ `PlayerLockedSongRepository.Delete` で削除する。
-
----
-
-## 13. 結論
-
-今回の未解禁曲管理は、DBには日付・履歴・論理削除を持たせない最小構成で進めるのが妥当である。一方で、一覧APIはフロントエンドの表示利便性を優先し、`id` に加えて `title` も返す。
-
-`player_locked_songs` は `player_id`, `song_id`, `is_ultima` の複合主キーだけを持つことで、容量を抑えつつ、通常譜面群未解禁とULTIMA単独未解禁の両方を表現できる。
-
-OP計算APIでは、プレイヤー単位で未解禁設定を一括取得してセット化することで、N+1を避けながら計算対象の除外に利用する。

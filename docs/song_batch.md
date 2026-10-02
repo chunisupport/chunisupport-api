@@ -1,7 +1,6 @@
 # 楽曲データ収集バッチ（song-batch）
 
 外部データソースから楽曲・譜面データを取得し、MySQL の `songs` / `charts` / `worldsend_charts` / `courses` へ統合するバッチです。
-以前は `chunisupport-song-batch` リポジトリで管理していましたが、API リポジトリへ統合しました。
 
 ## 実行方法
 
@@ -14,10 +13,10 @@ go run ./cmd/song-batch
 | `--major-update` | 大型アップデート用モード。公式データと追加楽曲だけを取得し、定数更新ルールを適用します |
 | `--fill-missing-release-date` | どのデータソースからも日付が得られず、MySQL にも存在しない新規楽曲へ実行日（JST）を `released_at` として補完します |
 
-設定は他のバッチと同じく `config.LoadBatchConfig()` で読み込みます。統合前の song-batch とは次の点が異なります。
+設定は `config.LoadBatchConfig()` で読み込みます。実行には次の設定とDBスキーマが必要です。
 
 - `APP_ENV` が必須です（未設定時に `develop` として扱うことはしません）。`.config/<APP_ENV>.settings.json` と DB 接続用の環境変数も必要なため、cron では API のディレクトリで実行してください。
-- ログの出力先は標準出力固定ではなく、設定ファイルの `logging` に従います。
+- ログの出力先は設定ファイルの `logging` に従います。
 - 実行履歴を `song_batch_jobs` テーブルへ記録するため、マイグレーション `000052` を適用してから新しいバイナリを使ってください。
 
 ### cron の設定例

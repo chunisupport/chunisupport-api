@@ -15,12 +15,12 @@ import (
 )
 
 type stubTemporaryPlayerDataRepository struct {
-	createErr     error
-	findErr       error
-	consumeErr    error
-	deleteErr     error
-	found         *entity.TemporaryPlayerData
-	consumedToken string
+	createErr    error
+	claimErr     error
+	deleteErr    error
+	found        *entity.TemporaryPlayerData
+	claimed      bool
+	claimedToken string
 }
 
 func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, _ domainrepo.Executor, data *entity.TemporaryPlayerData) error {
@@ -31,29 +31,33 @@ func (s *stubTemporaryPlayerDataRepository) Create(_ context.Context, _ domainre
 	return nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) FindByToken(_ context.Context, _ domainrepo.Executor, _ string) (*entity.TemporaryPlayerData, error) {
-	if s.findErr != nil {
-		return nil, s.findErr
+func (s *stubTemporaryPlayerDataRepository) Claim(_ context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
+	if s.claimErr != nil {
+		return nil, s.claimErr
 	}
 	if s.found == nil {
 		return nil, domainrepo.ErrTemporaryPlayerDataNotFound
 	}
+	if s.claimed {
+		return nil, domainrepo.ErrTemporaryPlayerDataInUse
+	}
+	s.claimed = true
+	s.claimedToken = token
 	copyData := *s.found
 	copyData.Payload = append([]byte(nil), s.found.Payload...)
 	return &copyData, nil
 }
 
-func (s *stubTemporaryPlayerDataRepository) ConsumeByToken(ctx context.Context, _ domainrepo.Executor, token string) (*entity.TemporaryPlayerData, error) {
-	if s.consumeErr != nil {
-		return nil, s.consumeErr
+// Release は実リポジトリと同様にキャンセル済みcontextでは解放しません。
+func (s *stubTemporaryPlayerDataRepository) Release(ctx context.Context, _ domainrepo.Executor, _ string) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	s.consumedToken = token
-	entry, err := s.FindByToken(ctx, nil, token)
-	if err != nil {
-		return nil, err
+	if s.found == nil {
+		return domainrepo.ErrTemporaryPlayerDataNotFound
 	}
-	s.found = nil
-	return entry, nil
+	s.claimed = false
+	return nil
 }
 
 func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, _ domainrepo.Executor, _ string) error {
@@ -64,6 +68,7 @@ func (s *stubTemporaryPlayerDataRepository) Delete(_ context.Context, _ domainre
 		return domainrepo.ErrTemporaryPlayerDataNotFound
 	}
 	s.found = nil
+	s.claimed = false
 	return nil
 }
 
@@ -140,27 +145,71 @@ func TestTemporaryPlayerDataUsecase_Commit_登録後に消費される(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "token-1", repo.consumedToken)
+	assert.Equal(t, "token-1", repo.claimedToken)
 	assert.Nil(t, repo.found)
 }
 
-func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は再試行不可になる(t *testing.T) {
+func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は同じトークンで再試行できる(t *testing.T) {
+	// Given
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`)}}
 	expectedErr := errors.New("db error")
+	registerCalls := 0
 	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{registerFn: func(_ context.Context, _ *entity.User, _ *PlayerDataPayload, _ string) (*api_internal.PlayerDataResult, error) {
-		return nil, expectedErr
+		registerCalls++
+		if registerCalls == 1 {
+			return nil, expectedErr
+		}
+		return &api_internal.PlayerDataResult{PlayerID: 10}, nil
+	}}, 5*time.Minute)
+	input := CommitTemporaryPlayerDataInput{User: &entity.User{ID: 10}, UploadToken: "token-1"}
+
+	// When
+	_, firstErr := uc.Commit(context.Background(), input)
+	result, retryErr := uc.Commit(context.Background(), input)
+
+	// Then
+	require.Error(t, firstErr)
+	assert.ErrorIs(t, firstErr, expectedErr)
+	require.NoError(t, retryErr)
+	require.NotNil(t, result)
+	assert.Equal(t, 2, registerCalls)
+	assert.Nil(t, repo.found)
+}
+
+func TestTemporaryPlayerDataUsecase_Commit_クライアント切断時もトークンを解放する(t *testing.T) {
+	// Given
+	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`)}}
+	ctx, cancel := context.WithCancel(context.Background())
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{registerFn: func(ctx context.Context, _ *entity.User, _ *PlayerDataPayload, _ string) (*api_internal.PlayerDataResult, error) {
+		cancel()
+		return nil, ctx.Err()
 	}}, 5*time.Minute)
 
-	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 10}, UploadToken: "token-1"})
+	// When
+	_, err := uc.Commit(ctx, CommitTemporaryPlayerDataInput{User: &entity.User{ID: 10}, UploadToken: "token-1"})
 
+	// Then
 	require.Error(t, err)
-	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, "token-1", repo.consumedToken)
-	assert.Nil(t, repo.found)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.False(t, repo.claimed)
+	assert.NotNil(t, repo.found)
+}
+
+func TestTemporaryPlayerDataUsecase_Commit_処理中のトークンは競合エラーになる(t *testing.T) {
+	// Given
+	repo := &stubTemporaryPlayerDataRepository{claimErr: domainrepo.ErrTemporaryPlayerDataInUse}
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+
+	// When
+	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "token-1"})
+
+	// Then
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrTemporaryPlayerDataInProgress)
 }
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
-	repo := &stubTemporaryPlayerDataRepository{consumeErr: domainrepo.ErrTemporaryPlayerDataNotFound}
+	repo := &stubTemporaryPlayerDataRepository{claimErr: domainrepo.ErrTemporaryPlayerDataNotFound}
 	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})
