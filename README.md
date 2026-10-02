@@ -152,7 +152,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 
 ## 楽曲データ収集バッチ
 
-`go run ./cmd/song-batch` は公式データ、追加楽曲シート、mainframe などの外部データソースを取得し、`songs` / `charts` / `worldsend_charts` / `courses` を更新します。以前は `chunisupport-song-batch` リポジトリで管理していたものを統合しました。
+`go run ./cmd/song-batch` は公式データ、追加楽曲シート、mainframe などの外部データソースを取得し、`songs` / `charts` / `worldsend_charts` / `courses` を更新します。
 
 | 実行方法 | 内容 |
 |---|---|
@@ -169,7 +169,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 
 ## 譜面統計バッチ
 
-`go run ./cmd/chart-stats-batch` はプレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chart_stats_by_rating_band` / `worldsend_chart_stats_by_rating_band` / `chart_best_slot_stats_by_rating_band` を再構築します。以前は `chunisupport-stat-batch` リポジトリで管理していたものを統合しました。
+`go run ./cmd/chart-stats-batch` はプレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chart_stats_by_rating_band` / `worldsend_chart_stats_by_rating_band` / `chart_best_slot_stats_by_rating_band` を再構築します。
 
 | 実行方法 | 内容 |
 |---|---|

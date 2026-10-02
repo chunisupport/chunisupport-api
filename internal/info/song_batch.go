@@ -22,7 +22,7 @@ const (
 )
 
 // song-batch が参照する環境変数名です。
-// 統合前の song-batch と同じ名前を維持し、既存サーバーの環境設定をそのまま使えるようにしています。
+// 既存サーバーの環境設定との互換性を保つため、CHUNISUPPORT_BATCH_ プレフィックスを使用します。
 const (
 	songBatchEnvPrefix = "CHUNISUPPORT_BATCH_"
 
