@@ -190,7 +190,7 @@ def build_build_start_embeds(env: dict) -> list[dict]:
         # 未知の値が来た場合はフォールバックして単独で出す
         return [build_build_start_embed(env | {"TARGET_ARCH_LABEL": f"linux/{target}"})]
 
-    # TARGET_ARCH 未指定時は従来どおり両方（現在は使用されていない）
+    # TARGET_ARCH 未指定時は両アーキテクチャの通知を作成する
     return [
         build_build_start_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
         for arch, label in target_arches()
@@ -256,7 +256,7 @@ def build_build_complete_embeds(env: dict) -> list[dict]:
         # 未知の値が来た場合はフォールバックして単独で出す
         return [build_build_complete_embed(env | {"TARGET_ARCH_LABEL": f"linux/{target}"})]
 
-    # TARGET_ARCH 未指定時は従来どおり両方（現在は使用されていない）
+    # TARGET_ARCH 未指定時は両アーキテクチャの通知を作成する
     return [
         build_build_complete_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
         for arch, label in target_arches()

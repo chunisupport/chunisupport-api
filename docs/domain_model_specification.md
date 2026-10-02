@@ -797,9 +797,11 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 ### リポジトリパターン
 
+この節の `Save(ctx, entity)` は概念上の表記です。実際の引数は、`exec` の有無を含め各リポジトリのインターフェースに従います。
+
 - 集約ルートごとにリポジトリを定義
 - `Save(ctx, entity)` メソッドで集約全体を永続化（INSERT/UPDATE判定は内部で実施）
-- 部分更新メソッド（`UpdatePrivacy`, `LinkFirebaseUID`相当など）は廃止し、集約指向の永続化を推進
+- 状態変更はエンティティのコマンドメソッドで行い、`Save(ctx, entity)` で永続化
 
 ## UserDataTransferSnapshot集約
 
