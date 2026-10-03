@@ -41,26 +41,28 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 
 	// レーティング・OVER POWER計算用の値を取得
 	score := uint32(record.Score)
-	var chartConst chartconstant.ChartConstant
+	var chartConst *chartconstant.ChartConstant
 	var isConstUnknown bool
 	if record.Chart != nil {
-		chartConst = record.Chart.Const
+		chartConst = &record.Chart.Const
 		isConstUnknown = record.Chart.IsConstUnknown
 	}
 
 	dto := &PlayerRecordDTO{
-		Const:            chartConst,
-		IsConstUnknown:   isConstUnknown,
-		IsOPTarget:       record.IsOPTarget,
-		Score:            score,
-		JusticeCount:     calcJusticeCount(score, record.ComboLampID, playerRecordNotes(record)),
-		Rating:           service.CalcSingleRating(score, chartConst.Float64()),
-		Overpower:        service.CalcSingleOverpower(score, chartConst.Float64(), record.ComboLampID),
-		OverpowerPercent: service.CalcSingleOverpowerPercent(score, chartConst.Float64(), record.ComboLampID),
-		ClearLamp:        toMasterNamePtr(record.ClearLamp),
-		ComboLamp:        toMasterNamePtr(record.ComboLamp),
-		FullChain:        toMasterNamePtr(record.FullChain),
-		Slot:             toMasterNamePtr(record.Slot),
+		IsConstUnknown: isConstUnknown,
+		IsOPTarget:     record.IsOPTarget,
+		Score:          score,
+		JusticeCount:   calcJusticeCount(score, record.ComboLampID, playerRecordNotes(record)),
+		ClearLamp:      toMasterNamePtr(record.ClearLamp),
+		ComboLamp:      toMasterNamePtr(record.ComboLamp),
+		FullChain:      toMasterNamePtr(record.FullChain),
+		Slot:           toMasterNamePtr(record.Slot),
+	}
+	if chartConst != nil {
+		dto.Const = *chartConst
+		dto.Rating = service.CalcSingleRating(score, chartConst.Float64())
+		dto.Overpower = service.CalcSingleOverpower(score, chartConst.Float64(), record.ComboLampID)
+		dto.OverpowerPercent = service.CalcSingleOverpowerPercent(score, chartConst.Float64(), record.ComboLampID)
 	}
 	if !record.UpdatedAt.IsZero() {
 		dto.UpdatedAt = &record.UpdatedAt

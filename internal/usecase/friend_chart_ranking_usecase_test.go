@@ -22,7 +22,7 @@ func TestFriendChartRankingUsecase_GetStandard_同点を同順位にする(t *te
 			SongTitle:      "楽曲名",
 			SongArtist:     "アーティスト",
 			Difficulty:     "MASTER",
-			Const:          chartConst,
+			Const:          &chartConst,
 			IsConstUnknown: false,
 			ChartID:        10,
 		},
@@ -104,6 +104,7 @@ func TestFriendChartRankingUsecase_GetWorldsend_スコアとランプで順位�
 	require.Len(t, got.Ranking, 2)
 	assert.Equal(t, "WORLD'S END", got.Chart.Difficulty)
 	assert.True(t, got.Chart.IsWorldsend)
+	assert.Nil(t, got.Chart.Const)
 	assert.Equal(t, &levelStar, got.Chart.LevelStar)
 	assert.Equal(t, &attribute, got.Chart.Attribute)
 	assert.Equal(t, []int{1, 2}, []int{got.Ranking[0].Rank, got.Ranking[1].Rank})

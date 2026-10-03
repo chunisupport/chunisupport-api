@@ -12,7 +12,7 @@ type AdminChartRankingChart struct {
 	SongTitle      string
 	SongArtist     string
 	Difficulty     string
-	Const          chartconstant.ChartConstant
+	Const          *chartconstant.ChartConstant
 	IsConstUnknown bool
 	LevelStar      *int
 	Attribute      *string

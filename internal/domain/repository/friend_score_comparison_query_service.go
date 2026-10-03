@@ -37,7 +37,7 @@ type FriendScoreComparisonChartRecord struct {
 	SongTitle      string
 	SongArtist     string
 	SongJacket     *string
-	ChartConst     chartconstant.ChartConstant
+	ChartConst     *chartconstant.ChartConstant
 	IsConstUnknown bool
 	LevelStar      *int
 	Attribute      *string

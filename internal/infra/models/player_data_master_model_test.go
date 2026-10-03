@@ -30,7 +30,7 @@ func TestPlayerDataChartModelToEntity(t *testing.T) {
 			wantErr:       false,
 		},
 		{
-			name: "0の定数値ならVOに変換される",
+			name: "0の定数値ならエラーになる",
 			model: PlayerDataChartModel{
 				ID:             11,
 				SongID:         101,
@@ -38,8 +38,8 @@ func TestPlayerDataChartModelToEntity(t *testing.T) {
 				Const:          0.0,
 				IsConstUnknown: true,
 			},
-			expectedConst: mustChartConstantForTest(t, 0.0),
-			wantErr:       false,
+			expectedError: "chart_id=11",
+			wantErr:       true,
 		},
 		{
 			name: "負の定数値ならエラーになる",

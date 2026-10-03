@@ -44,6 +44,7 @@ func TestFriendChartRankingQueryService_ListWorldsendRecords_自分と相互承�
 	chart, err := query.FindWorldsendChart(context.Background(), db, "0000000000000002")
 	require.NoError(t, err)
 	require.NotNil(t, chart)
+	assert.Nil(t, chart.Const)
 	require.NotNil(t, chart.LevelStar)
 	require.NotNil(t, chart.Attribute)
 	assert.Equal(t, 5, *chart.LevelStar)

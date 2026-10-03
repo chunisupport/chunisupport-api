@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS charts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     song_id INTEGER NOT NULL,
     difficulty_id INTEGER NOT NULL,
-    const REAL NOT NULL CHECK(const >= 0),
+    const REAL NOT NULL CHECK(const BETWEEN 1.0 AND 16.0),
     is_const_unknown INTEGER NOT NULL DEFAULT 1 CHECK(is_const_unknown IN (0,1)),
     notes INTEGER,
     notes_designer TEXT,

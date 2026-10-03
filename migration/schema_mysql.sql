@@ -97,7 +97,7 @@ CREATE TABLE `charts` (
   KEY `difficulty_id` (`difficulty_id`),
   CONSTRAINT `charts_ibfk_1` FOREIGN KEY (`song_id`) REFERENCES `songs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `charts_ibfk_2` FOREIGN KEY (`difficulty_id`) REFERENCES `difficulties` (`id`),
-  CONSTRAINT `charts_chk_1` CHECK ((`const` >= 0)),
+  CONSTRAINT `charts_chk_1` CHECK ((`const` between 1.0 and 16.0)),
   CONSTRAINT `charts_chk_2` CHECK (((`notes` is null) or (`notes` >= 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `class_emblem_bases` (

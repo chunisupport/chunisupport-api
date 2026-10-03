@@ -69,6 +69,7 @@ func toFriendChartRankingResponse(result *usecase.FriendChartRankingResult) *int
 		},
 		Chart: internaldto.FriendChartRankingChartDTO{
 			Difficulty:  result.Chart.Difficulty,
+			Const:       result.Chart.Const,
 			LevelStar:   result.Chart.LevelStar,
 			Attribute:   result.Chart.Attribute,
 			IsWorldsend: result.Chart.IsWorldsend,
@@ -78,7 +79,6 @@ func toFriendChartRankingResponse(result *usecase.FriendChartRankingResult) *int
 		Total:   result.Total,
 	}
 	if !result.Chart.IsWorldsend {
-		res.Chart.Const = &result.Chart.Const
 		res.Chart.IsConstUnknown = &result.Chart.IsConstUnknown
 	}
 	for _, entry := range result.Ranking {

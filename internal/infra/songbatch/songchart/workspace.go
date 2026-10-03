@@ -829,6 +829,25 @@ func buildBulkUpdateSongsSQL(n int) string {
 		sb.WriteString("\n\tEND")
 	}
 
+	// 現在値が真(1)の場合のみデータソースの値を反映するブロック。
+	// 要解禁フラグは解禁済みの楽曲が要解禁に戻ることがないため、データソースの誤りで
+	// 偽→真に書き換わらないよう、真→偽の変更だけを受け付けます。
+	writeClearOnlyBlock := func(column string) {
+		sb.WriteString("\t")
+		sb.WriteString(column)
+		sb.WriteString(" = CASE\n")
+		for range n {
+			sb.WriteString("\t\tWHEN id = ? AND ")
+			sb.WriteString(column)
+			sb.WriteString(" = 1 THEN COALESCE(?, ")
+			sb.WriteString(column)
+			sb.WriteString(")\n")
+		}
+		sb.WriteString("\t\tELSE ")
+		sb.WriteString(column)
+		sb.WriteString("\n\tEND")
+	}
+
 	writeDisplayIDBlock()
 	sb.WriteString(",\n")
 	writeCoalesceBlock("title")
@@ -851,7 +870,7 @@ func buildBulkUpdateSongsSQL(n int) string {
 	sb.WriteString(",\n")
 	writeDirectBlock("is_new")
 	sb.WriteString(",\n")
-	writeCoalesceBlock("unlock_required")
+	writeClearOnlyBlock("unlock_required")
 
 	sb.WriteString("\nWHERE id IN (")
 	for i := range n {

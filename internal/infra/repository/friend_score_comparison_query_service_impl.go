@@ -34,26 +34,26 @@ type friendScoreComparisonUserRow struct {
 }
 
 type friendScoreComparisonChartRow struct {
-	SongDisplayID       string                      `db:"song_display_id"`
-	SongTitle           string                      `db:"song_title"`
-	SongArtist          string                      `db:"song_artist"`
-	SongJacket          *string                     `db:"song_jacket"`
-	ChartConst          chartconstant.ChartConstant `db:"chart_const"`
-	IsConstUnknown      bool                        `db:"is_const_unknown"`
-	LevelStar           *int                        `db:"level_star"`
-	Attribute           *string                     `db:"attribute"`
-	SelfRecordChartID   *int64                      `db:"self_record_chart_id"`
-	FriendRecordChartID *int64                      `db:"friend_record_chart_id"`
-	SelfScore           sql.NullInt64               `db:"self_score"`
-	SelfClearLamp       sql.NullString              `db:"self_clear_lamp"`
-	SelfComboLamp       sql.NullString              `db:"self_combo_lamp"`
-	SelfFullChain       sql.NullString              `db:"self_full_chain"`
-	SelfUpdatedAt       *time.Time                  `db:"self_updated_at"`
-	FriendScore         sql.NullInt64               `db:"friend_score"`
-	FriendClearLamp     sql.NullString              `db:"friend_clear_lamp"`
-	FriendComboLamp     sql.NullString              `db:"friend_combo_lamp"`
-	FriendFullChain     sql.NullString              `db:"friend_full_chain"`
-	FriendUpdatedAt     *time.Time                  `db:"friend_updated_at"`
+	SongDisplayID       string                       `db:"song_display_id"`
+	SongTitle           string                       `db:"song_title"`
+	SongArtist          string                       `db:"song_artist"`
+	SongJacket          *string                      `db:"song_jacket"`
+	ChartConst          *chartconstant.ChartConstant `db:"chart_const"`
+	IsConstUnknown      bool                         `db:"is_const_unknown"`
+	LevelStar           *int                         `db:"level_star"`
+	Attribute           *string                      `db:"attribute"`
+	SelfRecordChartID   *int64                       `db:"self_record_chart_id"`
+	FriendRecordChartID *int64                       `db:"friend_record_chart_id"`
+	SelfScore           sql.NullInt64                `db:"self_score"`
+	SelfClearLamp       sql.NullString               `db:"self_clear_lamp"`
+	SelfComboLamp       sql.NullString               `db:"self_combo_lamp"`
+	SelfFullChain       sql.NullString               `db:"self_full_chain"`
+	SelfUpdatedAt       *time.Time                   `db:"self_updated_at"`
+	FriendScore         sql.NullInt64                `db:"friend_score"`
+	FriendClearLamp     sql.NullString               `db:"friend_clear_lamp"`
+	FriendComboLamp     sql.NullString               `db:"friend_combo_lamp"`
+	FriendFullChain     sql.NullString               `db:"friend_full_chain"`
+	FriendUpdatedAt     *time.Time                   `db:"friend_updated_at"`
 }
 
 func (q *FriendScoreComparisonQueryService) FindAcceptedFriendPair(
@@ -184,7 +184,7 @@ func (q *FriendScoreComparisonQueryService) ListWorldsendChartRecords(
 			s.title AS song_title,
 			s.artist AS song_artist,
 			s.jacket AS song_jacket,
-			0 AS chart_const,
+			NULL AS chart_const,
 			1 AS is_const_unknown,
 			wc.level_star AS level_star,
 			wc.attribute AS attribute,

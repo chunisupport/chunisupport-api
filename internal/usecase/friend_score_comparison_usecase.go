@@ -33,7 +33,7 @@ type FriendScoreComparisonSong struct {
 
 // FriendScoreComparisonChart は比較対象譜面の公開概要です。
 type FriendScoreComparisonChart struct {
-	Const          chartconstant.ChartConstant
+	Const          *chartconstant.ChartConstant
 	IsConstUnknown bool
 	LevelStar      *int
 	Attribute      *string

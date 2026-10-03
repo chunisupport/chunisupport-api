@@ -61,6 +61,7 @@ func toAdminChartRankingResponse(result *usecase.AdminChartRankingResult) *inter
 		},
 		Chart: internaldto.AdminChartRankingChartDTO{
 			Difficulty:  result.Chart.Difficulty,
+			Const:       result.Chart.Const,
 			LevelStar:   result.Chart.LevelStar,
 			Attribute:   result.Chart.Attribute,
 			IsWorldsend: result.Chart.IsWorldsend,
@@ -69,7 +70,6 @@ func toAdminChartRankingResponse(result *usecase.AdminChartRankingResult) *inter
 		Total:   result.Total,
 	}
 	if !result.Chart.IsWorldsend {
-		response.Chart.Const = &result.Chart.Const
 		response.Chart.IsConstUnknown = &result.Chart.IsConstUnknown
 	}
 

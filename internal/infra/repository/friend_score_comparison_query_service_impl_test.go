@@ -91,6 +91,7 @@ func TestFriendScoreComparisonQueryService_ListChartRecords_指定難易度の�
 	assert.Equal(t, "CLEAR", records[2].Self.ClearLamp)
 	assert.Equal(t, "FULL COMBO", records[2].Self.ComboLamp)
 	assert.Equal(t, "NONE", records[2].Friend.FullChain)
+	require.NotNil(t, records[2].ChartConst)
 	assert.InDelta(t, 14.5, records[2].ChartConst.Float64(), 0.001)
 	assert.True(t, records[2].IsConstUnknown)
 
@@ -153,6 +154,7 @@ func TestFriendScoreComparisonQueryService_ListWorldsendChartRecords_有効譜�
 	assert.Equal(t, []string{"0000000000000010", "0000000000000020", "0000000000000030"}, []string{
 		records[0].SongDisplayID, records[1].SongDisplayID, records[2].SongDisplayID,
 	})
+	assert.Nil(t, records[0].ChartConst)
 	assert.Nil(t, records[0].LevelStar)
 	assert.Nil(t, records[0].Attribute)
 	assert.Nil(t, records[0].Self)

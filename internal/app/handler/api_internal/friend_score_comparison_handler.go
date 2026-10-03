@@ -70,7 +70,7 @@ func toFriendScoreComparisonResponse(result *usecase.FriendScoreComparisonResult
 			chart.LevelStar = &item.Chart.LevelStar
 			chart.Attribute = &item.Chart.Attribute
 		} else {
-			chart.Const = &item.Chart.Const
+			chart.Const = item.Chart.Const
 			chart.IsConstUnknown = &item.Chart.IsConstUnknown
 		}
 		items = append(items, internaldto.FriendScoreComparisonItemDTO{

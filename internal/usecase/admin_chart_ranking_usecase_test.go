@@ -23,7 +23,7 @@ func TestAdminChartRankingUsecase_GetStandard_上位レコードと全プレイ�
 				SongTitle:     "楽曲名",
 				SongArtist:    "アーティスト",
 				Difficulty:    "MASTER",
-				Const:         chartConst,
+				Const:         &chartConst,
 			},
 			Records: []*repository.AdminChartRankingRecord{
 				{Username: "user1", PlayerName: "PLAYER1", Score: 1_009_500, ComboLamp: "ALL JUSTICE", UpdatedAt: updatedAt},
@@ -76,6 +76,7 @@ func TestAdminChartRankingUsecase_GetWorldsend_WORLD送信固有情報を返す(
 	// Then
 	require.NoError(t, err)
 	assert.True(t, got.Chart.IsWorldsend)
+	assert.Nil(t, got.Chart.Const)
 	assert.Equal(t, &levelStar, got.Chart.LevelStar)
 	assert.Equal(t, &attribute, got.Chart.Attribute)
 	assert.Zero(t, got.Ranking[0].Rating)
