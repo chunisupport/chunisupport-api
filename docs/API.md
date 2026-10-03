@@ -3587,7 +3587,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `is_maxop_unknown` | bool | `maxop` が暫定値である可能性があるかどうか。MASTERまたはULTIMAの譜面定数が未判明（`is_const_unknown=true`）の場合に`true` |
 | `op_target_difficulty` | string \| null | `maxop` の算出対象となった譜面の難易度。譜面が存在しない場合は `null` |
 | `is_new` | bool | 新曲枠の対象かどうか |
-| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持 |
+| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持。楽曲データ収集バッチは既存楽曲をtrueからfalseへのみ更新する |
 | `charts` | Map<string, ChartDTO> | 譜面情報のマップ。キーはBASIC, ADVANCED, EXPERT, MASTER, ULTIMA（大文字）の順序で固定されます。譜面が存在しない難易度はnullとなります |
 
 **ChartDTO**:
@@ -3974,7 +3974,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
 | `is_new` | bool \| null | | 新曲枠の対象かどうか（省略またはnullの場合はfalseとして更新） |
-| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。楽曲データ収集バッチがst1027から値を取得できた場合は、その値で上書きされる |
+| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。trueに設定した値は、楽曲データ収集バッチがst1027からfalseを取得できた場合に上書きされる（バッチがfalseからtrueへ更新することはない） |
 | `charts` | Map<string, UpdateChartRequest> | | 更新する譜面情報のマップ |
 
 **UpdateChartRequest**:
@@ -4080,7 +4080,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `jacket` | string \| null | ジャケット画像ファイル名 |
 | `official_idx` | string | 公式インデックス |
 | `is_new` | bool | 最新の2週間ごとの更新で追加された楽曲かどうか |
-| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持 |
+| `unlock_required` | bool | 楽曲のプレイに解禁が必要かどうか。初期値はfalse。st1027から値を取得できない場合は既存値を維持。楽曲データ収集バッチは既存楽曲をtrueからfalseへのみ更新する |
 | `charts` | Map<string, WorldsendChartDTO> | 譜面情報のマップ。キーは "WORLDSEND" 固定（1曲1譜面） |
 
 **WorldsendChartDTO**:
@@ -4249,7 +4249,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `released_at` | string \| null | | リリース日（YYYY-MM-DD形式、nullの場合DBをNULLに更新） |
 | `jacket` | string \| null | | ジャケット画像ファイル名（nullの場合DBをNULLに更新） |
 | `is_new` | bool | ✓ | 最新の2週間ごとの更新で追加された楽曲かどうか |
-| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。楽曲データ収集バッチがst1027から値を取得できた場合は、その値で上書きされる |
+| `unlock_required` | bool \| null | | 楽曲のプレイに解禁が必要かどうか。省略またはnullの場合は既存値を維持。trueに設定した値は、楽曲データ収集バッチがst1027からfalseを取得できた場合に上書きされる（バッチがfalseからtrueへ更新することはない） |
 | `charts` | Map<string, UpdateWorldsendChartRequest> | | 更新する譜面情報のマップ。キーは `WORLDSEND` のみ指定可能 |
 
 **UpdateWorldsendChartRequest**:

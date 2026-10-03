@@ -23,10 +23,14 @@ func TestBulkSyncSongUnlockRequired(t *testing.T) {
 	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
 	assert.Zero(t, value)
 
+	// 解禁済みの楽曲が要解禁に戻ることはないため、既存楽曲の false→true はデータソースの値でも反映しない
 	base.UnlockRequired = sql.NullInt64{Int64: 1, Valid: true}
 	require.NoError(t, bulkUpdateMySQLSongs(ctx, ws.DB(), []songUpdateRecord{{ID: 1, record: base}}, 1))
 	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
-	assert.Equal(t, 1, value)
+	assert.Zero(t, value)
+
+	_, err = ws.DB().ExecContext(ctx, `UPDATE songs SET unlock_required = 1 WHERE id = 1`)
+	require.NoError(t, err)
 
 	base.UnlockRequired = sql.NullInt64{}
 	require.NoError(t, bulkUpdateMySQLSongs(ctx, ws.DB(), []songUpdateRecord{{ID: 1, record: base}}, 1))
