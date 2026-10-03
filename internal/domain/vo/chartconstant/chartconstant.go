@@ -15,11 +15,11 @@ import (
 type ChartConstant float64
 
 // NewChartConstant は新しい ChartConstant を生成します。
-// 譜面定数は0以上である必要があります。
+// 定数なしは呼び出し側で nil として保持し、実在する譜面定数だけを受け付けます。
 // 通常譜面の上限を超える値は許可しません。
 func NewChartConstant(value float64) (ChartConstant, error) {
-	if value < constants.ChartConstValueMin || value > constants.ChartConstMax {
-		return 0, fmt.Errorf("chart constant must be between %.1f and %.1f", constants.ChartConstValueMin, constants.ChartConstMax)
+	if math.IsNaN(value) || value < constants.ChartConstMin || value > constants.ChartConstMax {
+		return 0, fmt.Errorf("chart constant must be between %.1f and %.1f", constants.ChartConstMin, constants.ChartConstMax)
 	}
 
 	tenths := math.Round(value * 10)
@@ -43,6 +43,9 @@ func (c ChartConstant) String() string {
 // Value は driver.Valuer インターフェースを実装します。
 // データベースに値を保存する際に呼び出されます。
 func (c ChartConstant) Value() (driver.Value, error) {
+	if _, err := NewChartConstant(c.Float64()); err != nil {
+		return nil, err
+	}
 	// DECIMAL型との互換性のため、文字列として保存します。
 	return c.String(), nil
 }
@@ -51,12 +54,7 @@ func (c ChartConstant) Value() (driver.Value, error) {
 // データベースから値を読み取る際に呼び出されます。
 func (c *ChartConstant) Scan(value any) error {
 	if value == nil {
-		chartConst, err := NewChartConstant(0)
-		if err != nil {
-			return err
-		}
-		*c = chartConst
-		return nil
+		return fmt.Errorf("chart constant cannot be NULL")
 	}
 
 	switch v := value.(type) {

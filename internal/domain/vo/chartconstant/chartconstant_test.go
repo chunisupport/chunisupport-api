@@ -1,6 +1,9 @@
 package chartconstant
 
 import (
+	"encoding/json"
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +33,7 @@ func TestNewChartConstant(t *testing.T) {
 		{
 			name:        "16.0を超える値ならエラーになる",
 			input:       16.1,
-			expectedErr: "chart constant must be between 0.0 and 16.0",
+			expectedErr: "chart constant must be between 1.0 and 16.0",
 			wantErr:     true,
 		},
 	}
@@ -67,15 +70,15 @@ func TestChartConstantScan(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "0なら読み込める",
-			input:    float64(0),
-			expected: ChartConstant(0),
-			wantErr:  false,
+			name:        "0ならエラーになる",
+			input:       float64(0),
+			expectedErr: "chart constant must be between 1.0 and 16.0",
+			wantErr:     true,
 		},
 		{
 			name:        "負の値ならエラーになる",
 			input:       float64(-1),
-			expectedErr: "chart constant must be between 0.0 and 16.0",
+			expectedErr: "chart constant must be between 1.0 and 16.0",
 			wantErr:     true,
 		},
 	}
@@ -122,7 +125,7 @@ func TestChartConstantUnmarshalJSON(t *testing.T) {
 		{
 			name:        "負の値ならエラーになる",
 			input:       "-0.1",
-			expectedErr: "chart constant must be between 0.0 and 16.0",
+			expectedErr: "chart constant must be between 1.0 and 16.0",
 			wantErr:     true,
 		},
 	}
@@ -150,4 +153,37 @@ func TestChartConstantUnmarshalJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChartConstantRejectsInvalidValues(t *testing.T) {
+	values := []float64{-1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 16.1, math.NaN(), math.Inf(1), math.Inf(-1)}
+	for _, value := range values {
+		t.Run(fmt.Sprint(value), func(t *testing.T) {
+			_, err := NewChartConstant(value)
+			assert.Error(t, err)
+			valid, err := NewChartConstant(1)
+			require.NoError(t, err)
+			assert.Error(t, valid.Scan(value))
+			assert.Equal(t, ChartConstant(1), valid)
+			_, err = ChartConstant(value).Value()
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestChartConstantRejectsMissingValues(t *testing.T) {
+	valid, err := NewChartConstant(1)
+	require.NoError(t, err)
+	assert.Error(t, valid.Scan(nil))
+	assert.Equal(t, ChartConstant(1), valid)
+	for _, data := range []string{"null", "0", "0.5", "0.9"} {
+		assert.Error(t, json.Unmarshal([]byte(data), &valid))
+		assert.Equal(t, ChartConstant(1), valid)
+	}
+}
+
+func TestChartConstantLowerBoundary(t *testing.T) {
+	value, err := NewChartConstant(1)
+	require.NoError(t, err)
+	assert.Equal(t, 1.0, value.Float64())
 }

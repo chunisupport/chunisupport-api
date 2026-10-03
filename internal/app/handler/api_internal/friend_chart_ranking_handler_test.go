@@ -45,6 +45,17 @@ func (stubFriendChartRankingUsecase) GetWorldsend(context.Context, int, string) 
 	return nil, nil
 }
 
+func TestFriendChartRankingResponse_WorldsendOmitsChartConst(t *testing.T) {
+	result := &usecase.FriendChartRankingResult{
+		Chart: usecase.FriendChartRankingChart{Difficulty: "WORLD'S END", IsWorldsend: true},
+	}
+
+	body, err := json.Marshal(toFriendChartRankingResponse(result))
+
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), `"const"`)
+}
+
 func TestFriendChartRankingResponse_内部ユーザーIDを公開しない(t *testing.T) {
 	// Given
 	result := &usecase.FriendChartRankingResult{

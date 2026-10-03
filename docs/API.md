@@ -3910,7 +3910,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `unlock_required` | bool | - | 楽曲のプレイに解禁が必要かどうか（省略時はfalse） |
 | `charts` | array | - | 譜面情報配列（省略可） |
 | `charts[].difficulty` | string | ✅ | 難易度（`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`） |
-| `charts[].const` | float64 | ✅ | 譜面定数（0以上） |
+| `charts[].const` | float64 | ✅ | 譜面定数（1.0～16.0、0.1刻み） |
 | `charts[].is_const_unknown` | bool | ✅ | 定数が不明な場合 `true`（`const` には暫定値を設定） |
 | `charts[].notes` | int | - | ノーツ数（省略可） |
 | `charts[].notes_designer` | string | - | ノーツデザイナー名（最大100文字、省略可） |
@@ -3981,7 +3981,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 必須 | 説明 |
 | ---------- | -- | ---- | ---- |
-| `const` | float | ✓ | 譜面定数（0以上。小数1桁表記を推奨） |
+| `const` | float | ✓ | 譜面定数（1.0～16.0、0.1刻み） |
 | `is_const_unknown` | bool | ✓ | 譜面定数が未確定かどうか |
 | `notes` | int \| null | | ノーツ数（0以上、nullの場合DBをNULLに更新） |
 | `notes_designer` | string \| null | | 譜面製作者名（100文字以下、nullの場合DBをNULLに更新） |

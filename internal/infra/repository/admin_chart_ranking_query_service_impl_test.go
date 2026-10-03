@@ -50,6 +50,7 @@ func TestAdminChartRankingQueryService_ListWorldsendRecords_全ユーザーか�
 	require.NoError(t, err)
 	require.NotNil(t, data)
 	assert.Equal(t, 4, data.Total)
+	assert.Nil(t, data.Chart.Const)
 	require.Len(t, data.Records, 3)
 	assert.Equal(t, []string{"oneway", "friend1", "friend2"}, []string{data.Records[0].Username, data.Records[1].Username, data.Records[2].Username})
 	assert.Equal(t, []uint32{1_010_000, 1_009_700, 1_009_700}, []uint32{data.Records[0].Score, data.Records[1].Score, data.Records[2].Score})

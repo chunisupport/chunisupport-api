@@ -282,7 +282,7 @@ CHUNITHM の楽曲情報を表すエンティティ。
 
 #### 不変条件
 
-- `Const` は0.0～16.0の範囲（通常譜面の場合）
+- `Const` は1.0～16.0の範囲（通常譜面の場合）
 - `Notes` は0以上の整数
 - `SongID` + `DifficultyID` の組み合わせは一意
 
@@ -626,7 +626,11 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 #### 制約
 
 - 型: `float64`
-- 範囲: 通常は0.0～16.0（WORLD'S ENDは例外）
+- 範囲: 1.0～16.0。NaN・無限大は不可
+- WORLD'S ENDなど定数を持たない譜面は `*ChartConstant` の `nil` で区別し、0.0を生成しない
+- `charts.const` は必須。DBでも1.0～16.0を制約とし、範囲外の既存値があると制約の追加は失敗する
+- 制約の適用前は `SELECT id, const FROM charts WHERE const < 1.0 OR const > 16.0;` で確認し、正しい定数を確認して修正する
+- ランキング・スコア比較APIでは、WORLD'S ENDの `const` を省略する
 - 0.1刻みで管理
 
 #### ファクトリメソッド
@@ -637,7 +641,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 
 - `Float64() float64`: float64値を取得
 - `Value() (driver.Value, error)`: 文字列に変換してDB保存
-- `Scan(value any) error`: float64/[]byte/stringからパース
+- `Scan(value any) error`: float64/[]byte/int64から検証付きで読み込む。NULLは拒否
 
 ---
 

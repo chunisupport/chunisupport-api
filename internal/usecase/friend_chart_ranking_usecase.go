@@ -25,7 +25,7 @@ type FriendChartRankingSong struct {
 // FriendChartRankingChart はランキング対象譜面の概要です。
 type FriendChartRankingChart struct {
 	Difficulty     string
-	Const          chartconstant.ChartConstant
+	Const          *chartconstant.ChartConstant
 	IsConstUnknown bool
 	LevelStar      *int
 	Attribute      *string
@@ -141,7 +141,7 @@ func buildFriendChartRankingResult(userID int, chart *repository.FriendChartRank
 		rating := 0.0
 		overpower := 0.0
 		overpowerPercent := 0.0
-		if !chart.IsWorldsend {
+		if !chart.IsWorldsend && chart.Const != nil {
 			rating = service.CalcSingleRating(row.Score, chart.Const.Float64())
 			overpower = service.CalcSingleOverpower(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))
 			overpowerPercent = service.CalcSingleOverpowerPercent(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))

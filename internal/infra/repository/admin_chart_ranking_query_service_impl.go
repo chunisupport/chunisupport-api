@@ -24,16 +24,16 @@ func NewAdminChartRankingQueryService(db *sqlx.DB) *AdminChartRankingQueryServic
 }
 
 type adminChartRankingChartRow struct {
-	SongDisplayID  string                      `db:"song_display_id"`
-	SongTitle      string                      `db:"song_title"`
-	SongArtist     string                      `db:"song_artist"`
-	Difficulty     string                      `db:"difficulty"`
-	Const          chartconstant.ChartConstant `db:"chart_const"`
-	IsConstUnknown bool                        `db:"is_const_unknown"`
-	LevelStar      *int                        `db:"level_star"`
-	Attribute      *string                     `db:"attribute"`
-	ChartID        int                         `db:"chart_id"`
-	IsWorldsend    bool                        `db:"is_worldsend"`
+	SongDisplayID  string                       `db:"song_display_id"`
+	SongTitle      string                       `db:"song_title"`
+	SongArtist     string                       `db:"song_artist"`
+	Difficulty     string                       `db:"difficulty"`
+	Const          *chartconstant.ChartConstant `db:"chart_const"`
+	IsConstUnknown bool                         `db:"is_const_unknown"`
+	LevelStar      *int                         `db:"level_star"`
+	Attribute      *string                      `db:"attribute"`
+	ChartID        int                          `db:"chart_id"`
+	IsWorldsend    bool                         `db:"is_worldsend"`
 }
 
 type adminChartRankingRecordRow struct {
@@ -88,7 +88,7 @@ func (q *AdminChartRankingQueryService) GetWorldsend(ctx context.Context, displa
 			s.title AS song_title,
 			s.artist AS song_artist,
 			'WORLD''S END' AS difficulty,
-			0 AS chart_const,
+			NULL AS chart_const,
 			1 AS is_const_unknown,
 			wc.level_star AS level_star,
 			wc.attribute AS attribute,

@@ -6,7 +6,7 @@
 ## 目的
 
 テストが現在の実装を正しく固定していても、その期待値自体がプロダクト仕様として妥当とは限らない。
-本書では、現在の実装・テスト・仕様書を再検証し、現時点で仕様判断が必要な項目と、仕様は確定したが実装が追従していない項目を記録する。
+本書では、現在の実装・テスト・仕様書を再検証し、現時点で仕様判断が必要な項目と、仕様・実装・検証結果が一致している項目を記録する。
 
 ## 判断が必要な項目
 
@@ -65,26 +65,40 @@
 - `internal/app/router.go`
 - `docs/API.md`
 
-## 仕様は確定したが実装が追従していない項目
+## 仕様・実装・検証結果が一致している項目
 
 ### 譜面定数は必ず`1.0`以上とする
 
-#### 確定した仕様
+#### 現在の仕様と実装
 
-実在する譜面の譜面定数は必ず`1.0`以上である。`0`は実在する譜面定数ではない。
+- 実在する通常譜面の定数は`1.0`～`16.0`の0.1刻みとし、`0.0`～`0.9`、NaN、無限大を受け付けない。
+- `chartconstant.NewChartConstant`は`constants.ChartConstMin = 1.0`を下限に使う。`ChartConstant.Scan(nil)`はエラーを返し、DB保存時の`Value()`も値を検証する。
+- WORLD'S ENDの管理者向け譜面ランキング・フレンド譜面ランキング・フレンドスコア比較は、SQLの`NULL AS chart_const`を`*ChartConstant`の`nil`として読み込む。APIでは従来どおり`const`を省略する。
+- ランキングのレーティング・OVER POWER計算は定数がある場合だけ行う。プレイヤーレコードの関連譜面がない場合も計算を行わず、APIの`const`・レーティング・OVER POWER・達成率は`0`を返す。
+- `CalcSongMaxOP`・`CalcSingleOverpowerPercent`の数値入力に対する`0`以下の判定は維持する。値オブジェクトの生成やWORLD'S ENDの読取には番兵値を使用しない。
+- MySQLのスキーマ定義と楽曲バッチ用SQLiteの`charts.const`は`1.0`～`16.0`を制約とする。既存MySQL DB用の制約追加は`000056_restrict_chart_constant_range`で行う。
 
-#### 実装との差分
+#### 検証結果
 
-- `chartconstant.NewChartConstant`の下限は`constants.ChartConstValueMin = 0.0`であり、`0.0`以上`1.0`未満を受け付ける。
-- `ChartConstant.Scan(nil)`はDBの`NULL`を`0.0`へ変換する。
-- `charts.const`のCHECK制約は`const >= 0`である。
-- WORLD'S END譜面を含むUNIONクエリ（管理者向け譜面ランキング・フレンド譜面ランキング・フレンドスコア比較）は、譜面定数を持たない行を`0 AS chart_const`として値オブジェクトへ読み込んでいる。
-- `CalcSongMaxOP`・`CalcSingleOverpowerPercent`は`0`以下を「譜面定数なし」の番兵値として扱っている。
+- `0.0`～`0.9`を拒否する生成・DB読取・DB保存テスト、NULL・JSONの不正入力を拒否するテスト、下限`1.0`の正常系テストが成功している。
+- WORLD'S ENDのSQL読取で定数が`nil`になること、APIで`const`が省略されること、ランキングのOVER POWERが`0`になることを確認している。
+- 関連譜面がないプレイヤーレコードでは、理論値スコアとALL JUSTICEでもレーティング・OVER POWER・達成率を計算しないことを確認している。
+- 楽曲バッチ用SQLiteで範囲外の定数を拒否するテストが成功している。
+- `go test ./...`、`go vet ./...`、`git diff --check`が成功している。
+- 2026-10-03にローカルDB（`localhost:3306 / chunisupport`）へ直接照会し、全6,868譜面のうち範囲外・NULLは0件だった。MySQLのマイグレーション適用は未検証。
 
-#### 追従に必要な作業
+#### 既存データの確認SQL
 
-1. 譜面定数を持たない行を`0`ではなくNULL許容の型で表し、値オブジェクトの下限を`1.0`へ引き上げる。
-2. 既存データに`1.0`未満の譜面定数がないことを確認したうえで、CHECK制約を`const >= 1.0`へ変更するマイグレーションを追加する。
+```sql
+SELECT id, song_id, difficulty_id, const, is_const_unknown
+FROM charts
+WHERE const IS NULL
+   OR const < 1.0
+   OR const > 16.0
+ORDER BY id;
+```
+
+範囲外の値がある場合は、正しい譜面定数を確認して修正してから制約を追加する。
 
 #### 関連箇所
 
@@ -92,6 +106,11 @@
 - `internal/domain/vo/chartconstant/chartconstant.go`
 - `internal/domain/vo/chartconstant/chartconstant_test.go`
 - `internal/domain/service/rating_service.go`
+- `internal/dto/player_record_dto.go`
+- `internal/dto/player_record_dto_test.go`
 - `internal/infra/repository/admin_chart_ranking_query_service_impl.go`
 - `internal/infra/repository/friend_chart_ranking_query_service_impl.go`
 - `internal/infra/repository/friend_score_comparison_query_service_impl.go`
+- `internal/infra/songbatch/songchart/schema.sql`
+- `internal/infra/songbatch/songchart/constant_range_test.go`
+- `migration/mysql/000056_restrict_chart_constant_range.up.sql`

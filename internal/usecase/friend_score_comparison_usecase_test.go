@@ -234,6 +234,7 @@ func TestFriendScoreComparisonUsecase_GetWorldsend_専用譜面を比較する(t
 	assert.Equal(t, 1, query.worldsendCalls)
 	assert.Zero(t, query.listCalls)
 	require.Len(t, result.Items, 1)
+	assert.Nil(t, result.Items[0].Chart.Const)
 	assert.Equal(t, &levelStar, result.Items[0].Chart.LevelStar)
 	assert.Equal(t, &attribute, result.Items[0].Chart.Attribute)
 	assert.Equal(t, FriendScoreComparisonSelfWin, result.Items[0].Result)
@@ -380,11 +381,11 @@ func playedComparison(score uint32, updatedAt time.Time) *repository.FriendScore
 	}
 }
 
-func mustComparisonChartConst(t *testing.T, value float64) chartconstant.ChartConstant {
+func mustComparisonChartConst(t *testing.T, value float64) *chartconstant.ChartConstant {
 	t.Helper()
 	chartConst, err := chartconstant.NewChartConstant(value)
 	require.NoError(t, err)
-	return chartConst
+	return &chartConst
 }
 
 func TestFriendScoreComparisonUsecase_Get_楽曲のジャケットを返す(t *testing.T) {

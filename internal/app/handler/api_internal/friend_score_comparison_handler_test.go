@@ -63,6 +63,7 @@ func TestFriendScoreComparisonHandler_Worldsend専用の譜面情報を返す(t 
 	assert.Equal(t, "frienduser", stub.username)
 	assert.JSONEq(t, `{"level_star":4,"attribute":"蔵"}`, extractFriendComparisonChartJSON(t, rec.Body.Bytes()))
 	assert.Contains(t, rec.Body.String(), `"difficulty":"WORLD'S END"`)
+	assert.NotContains(t, rec.Body.String(), `"const"`)
 }
 
 func TestFriendScoreComparisonResponse_Worldsend譜面情報未設定はnullを返す(t *testing.T) {
@@ -102,7 +103,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 		Summary:    usecase.FriendScoreComparisonSummary{TotalCharts: 1, SelfWins: 1, SelfPlayed: 1, FriendPlayed: 1, BothPlayed: 1},
 		Items: []usecase.FriendScoreComparisonItem{{
 			Song:            usecase.FriendScoreComparisonSong{ID: "0000000000000001", Title: "楽曲名", Artist: "アーティスト名", Jacket: &jacket},
-			Chart:           usecase.FriendScoreComparisonChart{Const: chartConst, IsConstUnknown: false},
+			Chart:           usecase.FriendScoreComparisonChart{Const: &chartConst, IsConstUnknown: false},
 			Self:            usecase.FriendScoreComparisonRecord{IsPlayed: true, Score: 1009000, ClearLamp: &clearLamp, ComboLamp: &comboLamp, UpdatedAt: &updatedAt},
 			Friend:          usecase.FriendScoreComparisonRecord{IsPlayed: false, Score: 0},
 			ScoreDifference: 1009000,

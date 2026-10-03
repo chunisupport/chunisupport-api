@@ -79,3 +79,14 @@ func TestToPlayerRecordDTO_JusticeCount(t *testing.T) {
 func intPtr(value int) *int {
 	return &value
 }
+
+func TestToPlayerRecordDTO_譜面がない場合は定数による計算を行わない(t *testing.T) {
+	recordScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+	result := ToPlayerRecordDTO(&entity.PlayerRecord{Score: recordScore, ComboLampID: 3})
+	require.NotNil(t, result)
+	assert.Zero(t, result.Const)
+	assert.Zero(t, result.Rating)
+	assert.Zero(t, result.Overpower)
+	assert.Zero(t, result.OverpowerPercent)
+}
