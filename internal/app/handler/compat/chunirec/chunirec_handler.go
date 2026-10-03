@@ -9,10 +9,8 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -20,22 +18,22 @@ import (
 
 // ChunirecHandler はchunirec互換APIのハンドラです
 type ChunirecHandler struct {
-	songUsecase usecase.SongUsecase
-	userUsecase usecase.UserUsecase
-	masterCache *masterdata.Cache
-	location    *time.Location
+	songUsecase     usecase.SongUsecase
+	chunirecUsecase usecase.ChunirecUsecase
+	masterCache     *masterdata.Cache
+	location        *time.Location
 }
 
 // NewChunirecHandler はChunirecHandlerの新しいインスタンスを返します
-func NewChunirecHandler(songUsecase usecase.SongUsecase, userUsecase usecase.UserUsecase, masterCache *masterdata.Cache, location *time.Location) *ChunirecHandler {
+func NewChunirecHandler(songUsecase usecase.SongUsecase, chunirecUsecase usecase.ChunirecUsecase, masterCache *masterdata.Cache, location *time.Location) *ChunirecHandler {
 	if location == nil {
 		location = time.UTC
 	}
 	return &ChunirecHandler{
-		songUsecase: songUsecase,
-		userUsecase: userUsecase,
-		masterCache: masterCache,
-		location:    location,
+		songUsecase:     songUsecase,
+		chunirecUsecase: chunirecUsecase,
+		masterCache:     masterCache,
+		location:        location,
 	}
 }
 
@@ -105,7 +103,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		requester = userEntity
 	}
 
-	result, err := h.userUsecase.GetUserProfileRecordView(ctx, username, requester)
+	result, err := h.chunirecUsecase.GetRecords(ctx, username, requester)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
@@ -122,17 +120,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		}
 	}
 
-	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
-	if err != nil {
-		slog.Error("failed to get songs for chunirec records", "username", username, "error", err)
-		return apierror.ErrInternalError.WithInternal(err)
-	}
-
-	var records []*dto.PlayerRecordDTO
-	if result != nil && result.Records != nil {
-		records = internalhandler.ToPlayerRecordDTOs(result.Records.All)
-	}
-	response := ToRecordsShowAllResponse(records, h.genresBySongID(songs), h.location)
+	response := ToChunirecRecordsResponse(result, h.location)
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -153,8 +141,7 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 		requester = userEntity
 	}
 
-	// ユーザープロファイルとレコードを取得
-	result, err := h.userUsecase.GetUserProfileWithRecords(ctx, validUsername, requester)
+	result, err := h.chunirecUsecase.GetProfile(ctx, validUsername, requester)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
@@ -169,7 +156,7 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	}
 
 	// chunirec互換DTOに変換
-	response := ToChunirecUserDTO(internalhandler.ToUserProfileWithRecordsDTO(result), h.masterCache, h.location)
+	response := ToChunirecProfileDTO(result, h.masterCache, h.location)
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -185,18 +172,4 @@ func (h *ChunirecHandler) resolveTargetUsername(c *echo.Context) (string, *apier
 	}
 
 	return handler.ValidateUsername(username)
-}
-
-func (h *ChunirecHandler) genresBySongID(songs []*entity.Song) map[string]string {
-	genres := make(map[string]string, len(songs))
-	masters := h.masterCache.SongMasters()
-	for _, song := range songs {
-		if song == nil || song.GenreID == nil {
-			continue
-		}
-		if genreName, ok := masters.GenreNamesByID[*song.GenreID]; ok {
-			genres[song.DisplayID] = genreName
-		}
-	}
-	return genres
 }

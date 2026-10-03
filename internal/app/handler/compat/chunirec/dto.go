@@ -8,9 +8,11 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
 // MusicShowAllResponse は全楽曲情報のレスポンスを表します
@@ -334,4 +336,33 @@ func formatRating(rating float64) string {
 // formatFloat は浮動小数点数を指定した小数点以下の桁数で文字列にフォーマットします
 func formatFloat(value float64, precision int) string {
 	return fmt.Sprintf("%.*f", precision, value)
+}
+
+func ToChunirecProfileDTO(profile *repository.ChunirecProfile, masterCache *masterdata.Cache, location *time.Location) *ChunirecUserDTO {
+	if profile == nil {
+		return nil
+	}
+	player := &dto.PlayerDTO{
+		Name: profile.Name, Level: profile.Level, Rating: profile.Rating,
+		ClassEmblemID: profile.ClassEmblemID, ClassEmblemBaseID: profile.ClassEmblemBaseID, UpdatedAt: profile.UpdatedAt,
+	}
+	if profile.Title != nil && profile.TitleRarity != nil {
+		player.Honors = []*dto.HonorDTO{{Slot: 1, Name: *profile.Title, TypeName: *profile.TitleRarity}}
+	}
+	return ToChunirecUserDTO(&api_internal.UserProfileWithRecordsDTO{Player: player}, masterCache, location)
+}
+
+func ToChunirecRecordsResponse(records []*usecase.ChunirecRecordOutput, location *time.Location) *RecordsShowAllResponse {
+	values := make([]*dto.PlayerRecordDTO, 0, len(records))
+	genres := make(map[string]string, len(records))
+	for _, record := range records {
+		values = append(values, &dto.PlayerRecordDTO{
+			ID: record.ID, Title: record.Title, Difficulty: record.Difficulty, Const: record.Const,
+			IsConstUnknown: record.IsConstUnknown, Score: record.Score, Rating: record.Rating,
+			ClearLamp: record.ClearLamp, ComboLamp: record.ComboLamp, FullChain: record.FullChain,
+			UpdatedAt: &record.UpdatedAt, IsPlayed: !record.UpdatedAt.IsZero(),
+		})
+		genres[record.ID] = record.Genre
+	}
+	return ToRecordsShowAllResponse(values, genres, location)
 }
