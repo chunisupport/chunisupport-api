@@ -188,6 +188,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
+	chunirecQuery := infra.NewChunirecQueryService(db)
 	adminUserStatisticsQuery := infra.NewAdminUserStatisticsQueryService(db)
 	courseRepo := infra.NewCourseRepository(db)
 	systemMaintenanceRepo := infra.NewSystemMaintenanceRepository(db)
@@ -204,6 +205,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
+	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
 	if configurable, ok := userUsecase.(interface {
 		SetPhysicalDeletionDependencies(usecase.TransactionManager, repository.GoalRepository)
 	}); ok {
@@ -319,7 +321,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		MetricHistory: api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		V1Course:      api_v1.NewV1CourseHandler(courseUsecase),
 		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, userUsecase, masterCache, cfg.Location),
+		Chunirec: chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
 		// reiwa互換APIハンドラ
 		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterDataUsecase, masterCache),
 	}
