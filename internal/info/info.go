@@ -111,6 +111,7 @@ const (
 	RatingBadgeIPRateLimitRequests  = 600
 	RatingBadgeSchemaVersion        = 1
 	RatingBadgeLabel                = "CHUNITHM RATING"
+	OverpowerBadgeLabel             = "CHUNITHM OVER POWER"
 	RatingBadgeRainbowExColor       = "#3597ed"
 	RatingBadgeRainbowColor         = "#73b2f1"
 	RatingBadgePlatinumColor        = "#ffeac9"
@@ -212,6 +213,15 @@ func HasRole(accountTypeID, requiredRoleID int) bool {
 
 	_, ok = allowedAccountTypes[accountTypeID]
 	return ok
+}
+
+// OverpowerBadgePossessionColors はポゼッションマスタの固定IDに対応する既存のレート色です。
+var OverpowerBadgePossessionColors = map[int]string{
+	1: "grey", // normal
+	2: RatingBadgeSilverColor,
+	3: RatingBadgeGoldColor,
+	4: RatingBadgePlatinumColor,
+	5: RatingBadgeRainbowColor,
 }
 
 // HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブルです。
