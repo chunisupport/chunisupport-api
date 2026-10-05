@@ -66,6 +66,14 @@ type sortedRow struct {
 	SortOrder int    `db:"sort_order"`
 }
 
+// genreRow は超ショート名を含む genres テーブルの行を表します。
+type genreRow struct {
+	ID        int    `db:"id"`
+	Name      string `db:"name"`
+	ShortName string `db:"short_name"`
+	SortOrder int    `db:"sort_order"`
+}
+
 // Preload は固定値が INSERT されているマスタを読み込み、キャッシュを構築します。
 func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	classEmblemRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM class_emblems")
@@ -160,14 +168,14 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		difficultyNamesByID[row.ID] = row.Name
 	}
 
-	genreRows, err := loadSortedRows(ctx, db, "SELECT id, name, sort_order FROM genres")
-	if err != nil {
+	var genreRows []genreRow
+	if err := db.SelectContext(ctx, &genreRows, "SELECT id, name, short_name, sort_order FROM genres"); err != nil {
 		return nil, fmt.Errorf("failed to preload genres: %w", err)
 	}
 	genres := make(map[string]master.Genre, len(genreRows))
 	genreNamesByID := make(map[int]string, len(genreRows))
 	for _, row := range genreRows {
-		genres[row.Name] = master.Genre{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
+		genres[row.Name] = master.Genre{ID: row.ID, Name: row.Name, ShortName: row.ShortName, SortOrder: row.SortOrder}
 		genreNamesByID[row.ID] = row.Name
 	}
 
@@ -180,7 +188,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		accountTypes[row.Name] = master.AccountType{ID: row.ID, Name: row.Name}
 	}
 
-	const versionQuery = `SELECT id, name, released_at FROM versions`
+	const versionQuery = `SELECT id, name, short_name, released_at FROM versions`
 	allVersions, err := loadVersionMasters(ctx, db, versionQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
@@ -239,7 +247,7 @@ func (c *Cache) ReloadVersions(ctx context.Context) error {
 	c.versionsReloadMu.Lock()
 	defer c.versionsReloadMu.Unlock()
 
-	const query = `SELECT id, name, released_at FROM versions`
+	const query = `SELECT id, name, short_name, released_at FROM versions`
 	allVersions, err := loadVersionMasters(ctx, c.db, query)
 	if err != nil {
 		c.versionsMu.Lock()
@@ -473,6 +481,7 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 		versionsByID[k] = domainmasterdata.Version{
 			ID:         v.ID,
 			Name:       v.Name,
+			ShortName:  v.ShortName,
 			ReleasedAt: v.ReleasedAt,
 		}
 	}
@@ -500,6 +509,7 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 		versionsByID[k] = domainmasterdata.Version{
 			ID:         v.ID,
 			Name:       v.Name,
+			ShortName:  v.ShortName,
 			ReleasedAt: v.ReleasedAt,
 		}
 	}

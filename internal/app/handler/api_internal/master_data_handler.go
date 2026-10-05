@@ -32,7 +32,6 @@ func NewMasterDataHandler(masterDataUsecase usecase.MasterDataUsecase) *MasterDa
 func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 	out := h.masterDataUsecase.GetMasterData(c.Request().Context())
 
-	genres := itemsToDTOs(out.Genres)
 	difficulties := itemsToDTOs(out.Difficulties)
 	accountTypes := itemsToDTOs(out.AccountTypes)
 
@@ -50,7 +49,7 @@ func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 	achievementTypes := itemsToDTOs(out.AchievementTypes)
 
 	return c.JSON(http.StatusOK, &dto.MasterDataResponse{
-		Genres:           genres,
+		Genres:           dto.ToGenreDTOs(out.Genres),
 		Difficulties:     difficulties,
 		AccountTypes:     accountTypes,
 		Versions:         dto.ToVersionDTOs(out.Versions),

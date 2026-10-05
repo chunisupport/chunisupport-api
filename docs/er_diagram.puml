@@ -160,6 +160,7 @@ entity "genres" as genres {
   + id: TINYINT [PK]
   --
   name: VARCHAR(30) NOT NULL UNIQUE
+  short_name: VARCHAR(10) NOT NULL UNIQUE
   sort_order: TINYINT NOT NULL
 }
 
@@ -227,6 +228,7 @@ entity "versions" as versions {
   + id: TINYINT [PK]
   --
   name: VARCHAR(50) NOT NULL UNIQUE
+  short_name: VARCHAR(10) NOT NULL UNIQUE
   released_at: DATE NOT NULL
 }
 

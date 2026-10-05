@@ -148,7 +148,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ### マスタテーブル
 
 #### ゲームデータマスタ
-- `genres`: ジャンルマスタ（POPS & ANIME、niconico、東方Project、VARIETY、イロドリミドリ、ゲキマイ、ORIGINAL）。表示順は `sort_order` で管理。
+- `genres`: ジャンルマスタ（POPS & ANIME、niconico、東方Project、VARIETY、イロドリミドリ、ゲキマイ、ORIGINAL）。表示順は `sort_order` で管理。`short_name` にCHUNITHM Wikiの略記（P&A、nico、東方、VAR、イロ、撃舞、ORI）を一意に保持。
 - `difficulties`: 譜面難易度マスタ（BASIC、ADVANCED、EXPERT、MASTER、ULTIMA）。
 - `clear_lamp_types`: クリアランプ種別マスタ。
 - `combo_lamp_types`: コンボランプ種別マスタ。
@@ -160,7 +160,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN、EXTDEV）。
-- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。
+- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。`short_name` に3〜4文字の略記（ORI、CRY+、PAR×、XVSX、MATなど）を一意に保持。
 
 #### ゲームコンテンツマスタ
 - `honors`: 称号マスタ。称号名、称号種別、画像URL等を格納。
@@ -203,6 +203,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000044**: 最上位のレーティング帯を `17.6`（17.6以上17.7未満）と `17.7+`に分割。up/downとも旧区分で集計した統計3表を全削除するため、適用後は統計バッチで再生成する。
 - **000045**: 目標成果種別に `fullchain_count` を追加し、`GOLD` / `PLATINUM` のFULL CHAIN達成譜面数を目標に設定できるようにする。downはユーザー目標を暗黙に削除せず、参照が残る場合は外部キー制約により中止する。
 - **000049**: ポゼッションマスタ（`normal`、`silver`、`gold`、`platina`、`rainbow`）を固定IDで追加し、`players.possession_id` から NOT NULL（既定値 `normal`=1）で参照できるようにする。
+- **000057**: `genres` と `versions` に表示幅を抑えるための超ショート名 `short_name`（NOT NULL・一意）を追加し、既存行へ略記を投入。
 
 #### 000045のロールバック前確認
 

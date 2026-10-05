@@ -737,3 +737,76 @@ func assertPlayerIDReferences(t *testing.T, migrationSQL, columnType string) {
 		assert.Contains(t, migrationSQL, "ALTER TABLE "+ref.tableName+" ADD CONSTRAINT "+ref.constraint+" FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE "+ref.onDelete)
 	}
 }
+
+func TestAddShortNameToGenresAndVersionsUp_Wiki準拠の超ショート名を投入して必須化する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000057_add_short_name_to_genres_and_versions.up.sql")
+	shortNames := []struct {
+		tableName string
+		name      string
+		shortName string
+	}{
+		{"genres", "POPS & ANIME", "P&A"},
+		{"genres", "niconico", "nico"},
+		{"genres", "東方Project", "東方"},
+		{"genres", "VARIETY", "VAR"},
+		{"genres", "イロドリミドリ", "イロ"},
+		{"genres", "ゲキマイ", "撃舞"},
+		{"genres", "ORIGINAL", "ORI"},
+		{"versions", "CHUNITHM", "ORI"},
+		{"versions", "CHUNITHM PLUS", "ORI+"},
+		{"versions", "CHUNITHM AIR", "AIR"},
+		{"versions", "CHUNITHM AIR PLUS", "AIR+"},
+		{"versions", "CHUNITHM STAR", "STR"},
+		{"versions", "CHUNITHM STAR PLUS", "STR+"},
+		{"versions", "CHUNITHM AMAZON", "AMZ"},
+		{"versions", "CHUNITHM AMAZON PLUS", "AMZ+"},
+		{"versions", "CHUNITHM CRYSTAL", "CRY"},
+		{"versions", "CHUNITHM CRYSTAL PLUS", "CRY+"},
+		{"versions", "CHUNITHM PARADISE", "PAR"},
+		{"versions", "CHUNITHM PARADISE LOST", "PAR×"},
+		{"versions", "CHUNITHM NEW", "NEW"},
+		{"versions", "CHUNITHM NEW PLUS", "NEW+"},
+		{"versions", "CHUNITHM SUN", "SUN"},
+		{"versions", "CHUNITHM SUN PLUS", "SUN+"},
+		{"versions", "CHUNITHM LUMINOUS", "LMN"},
+		{"versions", "CHUNITHM LUMINOUS PLUS", "LMN+"},
+		{"versions", "CHUNITHM VERSE", "VRS"},
+		{"versions", "CHUNITHM X-VERSE", "XVRS"},
+		{"versions", "CHUNITHM X-VERSE-X", "XVSX"},
+		{"versions", "CHUNITHM Mate", "MAT"},
+	}
+
+	// Then
+	for _, tableName := range []string{"genres", "versions"} {
+		assert.Contains(t, upSQL, "ALTER TABLE "+tableName+" ADD COLUMN short_name VARCHAR(10) NULL AFTER name")
+		assert.Contains(t, upSQL, "ALTER TABLE "+tableName+" MODIFY COLUMN short_name VARCHAR(10) NOT NULL, ADD UNIQUE KEY uq_"+tableName+"_short_name (short_name)")
+	}
+	for _, sn := range shortNames {
+		assert.Contains(t, upSQL, "UPDATE "+sn.tableName+" SET short_name = '"+sn.shortName+"' WHERE name = '"+sn.name+"'")
+	}
+}
+
+func TestAddShortNameToGenresAndVersionsDown_超ショート名列を削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000057_add_short_name_to_genres_and_versions.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "ALTER TABLE versions DROP INDEX uq_versions_short_name, DROP COLUMN short_name")
+	assert.Contains(t, downSQL, "ALTER TABLE genres DROP INDEX uq_genres_short_name, DROP COLUMN short_name")
+}
+
+func TestSchemaMySQL_ジャンルとバージョンの超ショート名列を含む(t *testing.T) {
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	for _, tableName := range []string{"genres", "versions"} {
+		// 両テーブルの列定義は同一文字列のため、テーブルごとのCREATE TABLE定義内で検証する
+		start := strings.Index(schemaSQL, "CREATE TABLE `"+tableName+"` (")
+		require.NotEqual(t, -1, start)
+		tableSQL, _, found := strings.Cut(schemaSQL[start:], ") ENGINE=")
+		require.True(t, found)
+
+		assert.Contains(t, tableSQL, "`short_name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL")
+		assert.Contains(t, tableSQL, "UNIQUE KEY `uq_"+tableName+"_short_name` (`short_name`)")
+	}
+}

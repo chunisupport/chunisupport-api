@@ -191,9 +191,11 @@ CREATE TABLE `full_chain_types` (
 CREATE TABLE `genres` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `short_name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `sort_order` tinyint unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+  UNIQUE KEY `name` (`name`),
+  UNIQUE KEY `uq_genres_short_name` (`short_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `goal_groups` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
@@ -511,9 +513,11 @@ CREATE TABLE `users` (
 CREATE TABLE `versions` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `short_name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `released_at` date NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+  UNIQUE KEY `name` (`name`),
+  UNIQUE KEY `uq_versions_short_name` (`short_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `worldsend_chart_stats_by_rating_band` (
   `worldsend_chart_id` mediumint unsigned NOT NULL,

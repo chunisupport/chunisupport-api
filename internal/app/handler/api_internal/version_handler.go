@@ -40,7 +40,7 @@ func (h *VersionHandler) Create(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(errors.Join(usecase.ErrInvalidVersionInput, err))
 	}
-	version, err := h.versionUsecase.Create(c.Request().Context(), req.Name, releasedAt)
+	version, err := h.versionUsecase.Create(c.Request().Context(), req.Name, req.ShortName, releasedAt)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -59,7 +59,7 @@ func (h *VersionHandler) Rename(c *echo.Context) error {
 	if req.ReleasedAt != nil {
 		return apierror.ErrValidationFailedBadRequest.WithInternal(errors.New("released_at cannot be changed"))
 	}
-	version, err := h.versionUsecase.Rename(c.Request().Context(), id, req.Name)
+	version, err := h.versionUsecase.Rename(c.Request().Context(), id, req.Name, req.ShortName)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

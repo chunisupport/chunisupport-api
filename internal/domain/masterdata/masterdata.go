@@ -17,7 +17,15 @@ type Item struct {
 type Version struct {
 	ID         uint8
 	Name       string
+	ShortName  string
 	ReleasedAt time.Time
+}
+
+// Genre はジャンルマスタの1件を表します。
+type Genre struct {
+	ID        int
+	Name      string
+	ShortName string
 }
 
 // CommonMasters は複数の集約で共有されるマスタ集合です。

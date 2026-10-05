@@ -22,7 +22,7 @@ func NewVersionRepository() domainrepo.VersionRepository {
 
 func (r *versionRepository) FindAll(ctx context.Context, exec domainrepo.Executor) ([]*entity.Version, error) {
 	rows := []models.VersionModel{}
-	if err := exec.SelectContext(ctx, &rows, `SELECT id, name, released_at FROM versions ORDER BY released_at, id`); err != nil {
+	if err := exec.SelectContext(ctx, &rows, `SELECT id, name, short_name, released_at FROM versions ORDER BY released_at, id`); err != nil {
 		return nil, err
 	}
 	versions := make([]*entity.Version, len(rows))
@@ -33,19 +33,19 @@ func (r *versionRepository) FindAll(ctx context.Context, exec domainrepo.Executo
 }
 
 func (r *versionRepository) FindByID(ctx context.Context, exec domainrepo.Executor, id int) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT id, name, released_at FROM versions WHERE id = ?`, id)
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE id = ?`, id)
 }
 
 func (r *versionRepository) FindByIDForUpdate(ctx context.Context, exec domainrepo.Executor, id int) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT id, name, released_at FROM versions WHERE id = ? FOR UPDATE`, id)
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE id = ? FOR UPDATE`, id)
 }
 
 func (r *versionRepository) FindByName(ctx context.Context, exec domainrepo.Executor, name string) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT id, name, released_at FROM versions WHERE name = ?`, strings.TrimSpace(name))
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE name = ?`, strings.TrimSpace(name))
 }
 
 func (r *versionRepository) FindLatest(ctx context.Context, exec domainrepo.Executor) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT id, name, released_at FROM versions ORDER BY released_at DESC, id DESC LIMIT 1`)
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions ORDER BY released_at DESC, id DESC LIMIT 1`)
 }
 
 func (r *versionRepository) findOne(ctx context.Context, exec domainrepo.Executor, query string, args ...any) (*entity.Version, error) {
@@ -78,7 +78,7 @@ func (r *versionRepository) ExistsSongInRange(ctx context.Context, exec domainre
 
 func (r *versionRepository) Create(ctx context.Context, exec domainrepo.Executor, version *entity.Version) (*entity.Version, error) {
 	model := models.FromVersionEntity(version)
-	result, err := exec.ExecContext(ctx, `INSERT INTO versions (name, released_at) VALUES (?, ?)`, model.Name, model.ReleasedAt)
+	result, err := exec.ExecContext(ctx, `INSERT INTO versions (name, short_name, released_at) VALUES (?, ?, ?)`, model.Name, model.ShortName, model.ReleasedAt)
 	if err != nil {
 		return nil, wrapVersionDuplicateError(err)
 	}
@@ -91,7 +91,7 @@ func (r *versionRepository) Create(ctx context.Context, exec domainrepo.Executor
 
 func (r *versionRepository) Save(ctx context.Context, exec domainrepo.Executor, version *entity.Version) error {
 	model := models.FromVersionEntity(version)
-	result, err := exec.ExecContext(ctx, `UPDATE versions SET name = ? WHERE id = ?`, model.Name, model.ID)
+	result, err := exec.ExecContext(ctx, `UPDATE versions SET name = ?, short_name = ? WHERE id = ?`, model.Name, model.ShortName, model.ID)
 	if err != nil {
 		return wrapVersionDuplicateError(err)
 	}

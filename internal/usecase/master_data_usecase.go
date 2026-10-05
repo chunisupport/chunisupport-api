@@ -19,7 +19,7 @@ type MasterDataUsecase interface {
 // 各スライスはユースケース層で決定されたソート順で返されます。
 type MasterDataOutput struct {
 	// Genres は表示順のジャンル一覧です。
-	Genres []masterdata.Item
+	Genres []masterdata.Genre
 	// Difficulties はゲームの正規表示順（SortOrder昇順）の難易度一覧です。
 	Difficulties []masterdata.Item
 	// AccountTypes はID昇順のアカウントタイプ一覧です。

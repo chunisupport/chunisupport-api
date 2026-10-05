@@ -495,22 +495,32 @@ Shields.io側のキャッシュにより、公式RATINGの更新や非公開設�
 ### バージョン管理 `/internal/admin/versions`
 
 - **認証**: Firebase Bearer（ADMINのみ）
-- **GET**: 未来版を含む全件を `released_at` 昇順、同日はID昇順で返します。レスポンスは `VersionDTO` の配列です。
-- **POST**: バージョンを追加し、201 Createdで作成した `VersionDTO` を返します。未来日を指定できます。
+- **GET**: 未来版を含む全件を `released_at` 昇順、同日はID昇順で返します。レスポンスは管理者向け `VersionDTO` の配列です。
+- **POST**: バージョンを追加し、201 Createdで作成した管理者向け `VersionDTO` を返します。未来日を指定できます。
 
 ```json
 {
   "name": "CHUNITHM Mate",
+  "short_name": "MAT",
   "released_at": "2026-07-02"
 }
 ```
 
-`name` は前後空白除去後1〜50文字かつ `CHUNITHM ` 接頭辞が必要です。`released_at` は `YYYY-MM-DD` 形式で、既存版と同日は指定できません。
+`name` は前後空白除去後1〜50文字かつ `CHUNITHM ` 接頭辞が必要です。`short_name` は表示幅を抑えるための超ショート名（例: `CRY+`、`PAR×`）で、前後空白除去後1〜10文字が必要です。`released_at` は `YYYY-MM-DD` 形式で、既存版と同日は指定できません。`name` または `short_name` が既存版と重複する場合は `version_name_conflict`（409）を返します。
+
+管理者向け `VersionDTO`:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | int | バージョンID |
+| `name` | string | バージョン名称 |
+| `short_name` | string | 超ショート名 |
+| `released_at` | string | リリース日（`YYYY-MM-DD`） |
 
 ### バージョン改名・削除 `/internal/admin/versions/:id`
 
 - **認証**: Firebase Bearer（ADMINのみ）
-- **PUT**: `{"name":"CHUNITHM VERSE"}` の形式で名前だけを変更し、200 OKで変更後の `VersionDTO` を返します。`released_at` を含む要求は拒否します。
+- **PUT**: `{"name":"CHUNITHM VERSE","short_name":"VRS"}` の形式で名前と超ショート名を変更し、200 OKで変更後の管理者向け `VersionDTO` を返します。`name`・`short_name` とも必須で、制約は作成時と同じです。`released_at` を含む要求は拒否します。
 - **DELETE**: 対象が最新版で、そのリリース日以降にリリースされた曲が1件もない場合だけ物理削除し、204 No Contentを返します。`songs.is_deleted` にかかわらず曲ありと判定し、`songs.released_at IS NULL` は対象外です。
 
 主なエラーは `validation_failed`（400、JSONまたはID形式不正）、`invalid_version_input`（422）、`version_not_found`（404）、`version_name_conflict`・`version_not_latest`・`version_in_use`（409）です。
@@ -4508,9 +4518,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```json
 {
   "genres": [
-    { "id": 1, "name": "POPS & ANIME" },
-    { "id": 2, "name": "niconico" },
-    { "id": 3, "name": "東方Project" }
+    { "id": 1, "name": "POPS & ANIME", "short_name": "P&A" },
+    { "id": 2, "name": "niconico", "short_name": "nico" },
+    { "id": 3, "name": "東方Project", "short_name": "東方" }
   ],
   "difficulties": [
     { "id": 1, "name": "BASIC" },
@@ -4526,9 +4536,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     { "id": 4, "name": "EXTDEV" }
   ],
   "versions": [
-    { "id": 1, "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
-    { "id": 2, "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
-    { "id": 3, "name": "CHUNITHM AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+    { "id": 1, "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16T00:00:00+09:00" },
+    { "id": 2, "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04T00:00:00+09:00" },
+    { "id": 3, "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25T00:00:00+09:00" }
   ],
   "rating_bands": [
     { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
@@ -4604,7 +4614,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `genres` | MasterItemDTO[] | ジャンル一覧（表示順） |
+| `genres` | GenreDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
 | `versions` | VersionDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
@@ -4626,12 +4636,21 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `id` | int | マスタID |
 | `name` | string | マスタ名称。`achievement_types` の場合は表示名ではなく成果種別コード |
 
+**GenreDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | int | ジャンルID |
+| `name` | string | ジャンル名称 |
+| `short_name` | string | 表示幅を抑えるための超ショート名（CHUNITHM Wikiの略記。例: `P&A`） |
+
 **VersionDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `id` | int | バージョンID |
 | `name` | string | バージョン名称 |
+| `short_name` | string | 表示幅を抑えるための超ショート名（例: `CRY+`） |
 | `released_at` | string | リリース日時（ISO8601形式） |
 
 **RatingBandDTO**:
@@ -4710,9 +4729,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```json
 {
   "versions": [
-    { "name": "CHUNITHM", "released_at": "2015-07-16T00:00:00+09:00" },
-    { "name": "CHUNITHM PLUS", "released_at": "2016-02-04T00:00:00+09:00" },
-    { "name": "CHUNITHM AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+    { "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16T00:00:00+09:00" },
+    { "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04T00:00:00+09:00" },
+    { "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25T00:00:00+09:00" }
   ]
 }
 ```
@@ -4720,6 +4739,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `versions` | VersionSummaryDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
+
+**VersionSummaryDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `name` | string | バージョン名称 |
+| `short_name` | string | 表示幅を抑えるための超ショート名（例: `CRY+`） |
+| `released_at` | string | リリース日 |
 
 - **主なエラー**:
   - 401 Unauthorized (`missing_token`): APIトークン未指定

@@ -13,5 +13,6 @@ type Item = domainmasterdata.Item
 type Version struct {
 	ID         uint8     `db:"id"`
 	Name       string    `db:"name"`
+	ShortName  string    `db:"short_name"`
 	ReleasedAt time.Time `db:"released_at"`
 }
