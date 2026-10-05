@@ -170,6 +170,26 @@ func TestPreload_AchievementTypesUsesCodeColumn(t *testing.T) {
 	assert.Equal(t, achievementCode, goalMasters.AchievementTypesByID[achievementTypeID])
 }
 
+func TestPreload_ジャンルとバージョンの超ショート名を読み込む(t *testing.T) {
+	// Given
+	db := setupPreloadSQLite(t)
+	insertPreloadMasterRows(t, db, 1, "score_count")
+
+	// When
+	cache, err := Preload(context.Background(), db)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, "P&A", cache.Genres["POPS&ANIME"].ShortName)
+	masterDataMasters := cache.MasterDataMasters()
+	require.NotNil(t, masterDataMasters)
+	assert.Equal(t, "P&A", masterDataMasters.Genres["POPS&ANIME"].ShortName)
+	assert.Equal(t, "VRS", masterDataMasters.Versions[1].ShortName)
+	goalMasters := cache.GoalMasters()
+	require.NotNil(t, goalMasters)
+	assert.Equal(t, "VRS", goalMasters.VersionsByID[1].ShortName)
+}
+
 func setupPreloadSQLite(t *testing.T) *sqlx.DB {
 	t.Helper()
 
@@ -189,9 +209,9 @@ func setupPreloadSQLite(t *testing.T) *sqlx.DB {
 		`CREATE TABLE honor_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
 		`CREATE TABLE possessions (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
 		`CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
-		`CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
+		`CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE account_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
-		`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, released_at DATE NOT NULL)`,
+		`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`,
 		`CREATE TABLE achievement_types (id INTEGER PRIMARY KEY, code TEXT NOT NULL)`,
 	}
 
@@ -221,9 +241,9 @@ func insertPreloadMasterRows(t *testing.T, db *sqlx.DB, achievementTypeID int, a
 		{query: `INSERT INTO honor_types (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO possessions (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO difficulties (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "MASTER", 1}},
-		{query: `INSERT INTO genres (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "POPS&ANIME", 1}},
+		{query: `INSERT INTO genres (id, name, short_name, sort_order) VALUES (?, ?, ?, ?)`, args: []any{1, "POPS&ANIME", "P&A", 1}},
 		{query: `INSERT INTO account_types (id, name) VALUES (?, ?)`, args: []any{1, "PLAYER"}},
-		{query: `INSERT INTO versions (id, name, released_at) VALUES (?, ?, ?)`, args: []any{1, "VERSE", releasedAt}},
+		{query: `INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, args: []any{1, "VERSE", "VRS", releasedAt}},
 		{query: `INSERT INTO achievement_types (id, code) VALUES (?, ?)`, args: []any{achievementTypeID, achievementCode}},
 	}
 
@@ -309,9 +329,9 @@ func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *t
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
-	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO versions (id, name, released_at) VALUES (?, ?, ?)`, 1, "CHUNITHM VERSE", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	cache := &Cache{db: db, now: time.Now, allVersions: map[string]Version{}, allVersionsByID: map[int]Version{}, versionsStale: true}
@@ -320,6 +340,7 @@ func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *t
 
 	require.Contains(t, versions, 1)
 	assert.Equal(t, "CHUNITHM VERSE", versions[1].Name)
+	assert.Equal(t, "VRS", versions[1].ShortName)
 	assert.False(t, cache.versionsStale)
 }
 
@@ -340,7 +361,7 @@ func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate ti
 		{query: `INSERT INTO honor_types (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO possessions (id, name) VALUES (?, ?)`, args: []any{1, "normal"}},
 		{query: `INSERT INTO difficulties (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "MASTER", 1}},
-		{query: `INSERT INTO genres (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "POPS&ANIME", 1}},
+		{query: `INSERT INTO genres (id, name, short_name, sort_order) VALUES (?, ?, ?, ?)`, args: []any{1, "POPS&ANIME", "P&A", 1}},
 		{query: `INSERT INTO account_types (id, name) VALUES (?, ?)`, args: []any{1, "PLAYER"}},
 		{query: `INSERT INTO achievement_types (id, code) VALUES (?, ?)`, args: []any{1, "score_count"}},
 	}
@@ -362,7 +383,7 @@ func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate ti
 	}
 
 	for _, v := range versionStatements {
-		_, err := db.Exec(`INSERT INTO versions (id, name, released_at) VALUES (?, ?, ?)`, v.id, v.name, v.releasedAt)
+		_, err := db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, v.id, v.name, v.name, v.releasedAt)
 		require.NoError(t, err)
 	}
 }

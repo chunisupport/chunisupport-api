@@ -200,9 +200,11 @@ func TestMasterDataUsecase_GetMasterData_VersionContent(t *testing.T) {
 		&masterDataMasterProviderMock{
 			masters: &masterdata.MasterDataMasters{
 				Versions: map[int]masterdata.Version{
-					1: {ID: 1, Name: "CHUNITHM", ReleasedAt: releasedAt},
+					1: {ID: 1, Name: "CHUNITHM", ShortName: "ORI", ReleasedAt: releasedAt},
 				},
-				Genres:           map[string]master.Genre{},
+				Genres: map[string]master.Genre{
+					"POPS & ANIME": {ID: 1, Name: "POPS & ANIME", ShortName: "P&A", SortOrder: 0},
+				},
 				Difficulties:     map[string]master.ChartDifficulty{},
 				AccountTypes:     map[string]master.AccountType{},
 				AchievementTypes: map[string]masterdata.Item{},
@@ -218,7 +220,9 @@ func TestMasterDataUsecase_GetMasterData_VersionContent(t *testing.T) {
 	require.Len(t, out.Versions, 1)
 	assert.Equal(t, uint8(1), out.Versions[0].ID)
 	assert.Equal(t, "CHUNITHM", out.Versions[0].Name)
+	assert.Equal(t, "ORI", out.Versions[0].ShortName)
 	assert.Equal(t, releasedAt, out.Versions[0].ReleasedAt)
+	assert.Equal(t, []masterdata.Genre{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}}, out.Genres)
 }
 
 func TestMasterDataUsecase_GetVersions(t *testing.T) {

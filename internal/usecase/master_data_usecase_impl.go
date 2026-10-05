@@ -3,6 +3,7 @@ package usecase
 import (
 	"cmp"
 	"context"
+	"maps"
 	"slices"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -31,7 +32,7 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	masters := u.masterProvider.MasterDataMasters()
 	if masters == nil {
 		return &MasterDataOutput{
-			Genres:           []masterdata.Item{},
+			Genres:           []masterdata.Genre{},
 			Difficulties:     []masterdata.Item{},
 			AccountTypes:     []masterdata.Item{},
 			Versions:         []masterdata.Version{},
@@ -100,11 +101,17 @@ func (u *masterDataUsecase) GetHonorTypes(_ context.Context) []masterdata.Item {
 	})
 }
 
-// sortedGenresBySortOrder はジャンルをゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。
-func sortedGenresBySortOrder(genres map[string]master.Genre) []masterdata.Item {
-	return sortedBySortOrder(genres, func(g master.Genre) (masterdata.Item, int) {
-		return masterdata.Item{ID: g.ID, Name: g.Name}, g.SortOrder
+// sortedGenresBySortOrder はジャンルをゲームの正規表示順（SortOrder昇順）でソートしたスライスを返します。
+// 超ショート名も返すため、Item へ変換する sortedBySortOrder は使いません。
+func sortedGenresBySortOrder(genres map[string]master.Genre) []masterdata.Genre {
+	sorted := slices.SortedFunc(maps.Values(genres), func(a, b master.Genre) int {
+		return cmp.Compare(a.SortOrder, b.SortOrder)
 	})
+	items := make([]masterdata.Genre, len(sorted))
+	for i, g := range sorted {
+		items[i] = masterdata.Genre{ID: g.ID, Name: g.Name, ShortName: g.ShortName}
+	}
+	return items
 }
 
 // sortedDifficultiesBySortOrder は難易度をゲームの正規表示順（SortOrder昇順）でソートした Item スライスを返します。

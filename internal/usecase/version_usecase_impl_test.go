@@ -91,11 +91,12 @@ func TestVersionUsecase_Create(t *testing.T) {
 	reloader := &versionCacheReloaderStub{}
 	uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-	created, err := uc.Create(context.Background(), " CHUNITHM VERSE ", dateForVersionTest(2025, 1, 1))
+	created, err := uc.Create(context.Background(), " CHUNITHM VERSE ", " VRS ", dateForVersionTest(2025, 1, 1))
 
 	require.NoError(t, err)
 	assert.Equal(t, 3, created.ID)
 	assert.Equal(t, "CHUNITHM VERSE", created.Name)
+	assert.Equal(t, "VRS", created.ShortName)
 	assert.Equal(t, 1, reloader.calls)
 }
 
@@ -104,7 +105,7 @@ func TestVersionUsecase_Create_同日を拒否する(t *testing.T) {
 	reloader := &versionCacheReloaderStub{}
 	uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", dateForVersionTest(2025, 1, 1))
+	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", "VRS", dateForVersionTest(2025, 1, 1))
 
 	assert.ErrorIs(t, err, ErrInvalidVersionInput)
 	assert.Zero(t, reloader.calls)
@@ -123,18 +124,32 @@ func TestVersionUsecase_Create_不正な名前を拒否する(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			uc := NewVersionUsecase(&versionRepositoryStub{}, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
 
-			_, err := uc.Create(context.Background(), tt.input, dateForVersionTest(2025, 1, 1))
+			_, err := uc.Create(context.Background(), tt.input, "VRS", dateForVersionTest(2025, 1, 1))
 
 			assert.ErrorIs(t, err, ErrInvalidVersionInput)
 		})
 	}
 }
 
+func TestVersionUsecase_Create_不正な超ショート名を拒否する(t *testing.T) {
+	// Given
+	repo := &versionRepositoryStub{}
+	uc := NewVersionUsecase(repo, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
+
+	// When
+	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", "", dateForVersionTest(2025, 1, 1))
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidVersionInput)
+	assert.ErrorIs(t, err, entity.ErrInvalidVersion)
+	assert.Nil(t, repo.created)
+}
+
 func TestVersionUsecase_Create_名前重複を返す(t *testing.T) {
 	repo := &versionRepositoryStub{writeErr: repository.ErrVersionConflict}
 	uc := NewVersionUsecase(repo, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
 
-	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", dateForVersionTest(2025, 1, 1))
+	_, err := uc.Create(context.Background(), "CHUNITHM VERSE", "VRS", dateForVersionTest(2025, 1, 1))
 
 	assert.ErrorIs(t, err, repository.ErrVersionConflict)
 }
@@ -145,11 +160,12 @@ func TestVersionUsecase_Rename_稼働日は変えない(t *testing.T) {
 	reloader := &versionCacheReloaderStub{}
 	uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-	updated, err := uc.Rename(context.Background(), 1, "CHUNITHM VERSE")
+	updated, err := uc.Rename(context.Background(), 1, "CHUNITHM VERSE", "VRS")
 
 	require.NoError(t, err)
 	assert.Equal(t, releasedAt, updated.ReleasedAt)
 	assert.Equal(t, "CHUNITHM VERSE", repo.saved.Name)
+	assert.Equal(t, "VRS", repo.saved.ShortName)
 	assert.Equal(t, 1, reloader.calls)
 }
 
@@ -201,14 +217,14 @@ func TestVersionUsecase_コミット後の再読込失敗を操作失敗とし�
 		{
 			name: "作成",
 			operation: func(uc VersionUsecase) error {
-				_, err := uc.Create(context.Background(), "CHUNITHM VERSE", dateForVersionTest(2026, 1, 1))
+				_, err := uc.Create(context.Background(), "CHUNITHM VERSE", "VRS", dateForVersionTest(2026, 1, 1))
 				return err
 			},
 		},
 		{
 			name: "名称変更",
 			operation: func(uc VersionUsecase) error {
-				_, err := uc.Rename(context.Background(), 2, "CHUNITHM VERSE PLUS")
+				_, err := uc.Rename(context.Background(), 2, "CHUNITHM VERSE PLUS", "VRS")
 				return err
 			},
 		},
@@ -248,7 +264,7 @@ func TestVersionUsecase_再読込は要求キャンセルから切り離す(t *t
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := uc.Create(ctx, "CHUNITHM VERSE", dateForVersionTest(2025, 1, 1))
+	_, err := uc.Create(ctx, "CHUNITHM VERSE", "VRS", dateForVersionTest(2025, 1, 1))
 
 	require.NoError(t, err)
 	assert.NoError(t, reloader.ctxErr)
@@ -267,14 +283,14 @@ func TestVersionUsecase_不正な名前はドメインエラーを保持する(t
 		{
 			name: "作成",
 			run: func(uc VersionUsecase) error {
-				_, err := uc.Create(context.Background(), "VERSE", dateForVersionTest(2025, 1, 1))
+				_, err := uc.Create(context.Background(), "VERSE", "VRS", dateForVersionTest(2025, 1, 1))
 				return err
 			},
 		},
 		{
 			name: "名称変更",
 			run: func(uc VersionUsecase) error {
-				_, err := uc.Rename(context.Background(), 1, "VERSE")
+				_, err := uc.Rename(context.Background(), 1, "VERSE", "VRS")
 				return err
 			},
 		},

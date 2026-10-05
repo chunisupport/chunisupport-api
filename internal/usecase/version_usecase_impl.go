@@ -29,8 +29,8 @@ func (u *versionUsecaseImpl) ListAll(ctx context.Context) ([]*entity.Version, er
 	return u.versionRepo.FindAll(ctx, u.exec)
 }
 
-func (u *versionUsecaseImpl) Create(ctx context.Context, name string, releasedAt time.Time) (*entity.Version, error) {
-	version, err := entity.NewVersion(name, releasedAt)
+func (u *versionUsecaseImpl) Create(ctx context.Context, name, shortName string, releasedAt time.Time) (*entity.Version, error) {
+	version, err := entity.NewVersion(name, shortName, releasedAt)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidVersionInput, err)
 	}
@@ -59,7 +59,7 @@ func (u *versionUsecaseImpl) Create(ctx context.Context, name string, releasedAt
 	return created, nil
 }
 
-func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName string) (*entity.Version, error) {
+func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName, newShortName string) (*entity.Version, error) {
 	if id <= 0 {
 		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidVersionInput)
 	}
@@ -73,7 +73,7 @@ func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName string)
 		if err != nil {
 			return err
 		}
-		if err := current.Rename(newName); err != nil {
+		if err := current.Rename(newName, newShortName); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidVersionInput, err)
 		}
 		if err := u.versionRepo.Save(ctx, tx, current); err != nil {

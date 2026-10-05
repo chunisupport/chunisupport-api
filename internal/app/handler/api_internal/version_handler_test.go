@@ -31,19 +31,19 @@ type versionUsecaseMock struct {
 func (m *versionUsecaseMock) ListAll(context.Context) ([]*entity.Version, error) {
 	return m.versions, nil
 }
-func (m *versionUsecaseMock) Create(_ context.Context, name string, releasedAt time.Time) (*entity.Version, error) {
+func (m *versionUsecaseMock) Create(_ context.Context, name, shortName string, releasedAt time.Time) (*entity.Version, error) {
 	m.createCall = true
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
-	return &entity.Version{ID: 1, Name: name, ReleasedAt: releasedAt}, nil
+	return &entity.Version{ID: 1, Name: name, ShortName: shortName, ReleasedAt: releasedAt}, nil
 }
-func (m *versionUsecaseMock) Rename(_ context.Context, id int, name string) (*entity.Version, error) {
+func (m *versionUsecaseMock) Rename(_ context.Context, id int, name, shortName string) (*entity.Version, error) {
 	m.renameCall = true
 	if m.renameErr != nil {
 		return nil, m.renameErr
 	}
-	return &entity.Version{ID: id, Name: name, ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}, nil
+	return &entity.Version{ID: id, Name: name, ShortName: shortName, ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}, nil
 }
 func (m *versionUsecaseMock) Delete(context.Context, int) error {
 	m.deleteCall = true
@@ -51,7 +51,7 @@ func (m *versionUsecaseMock) Delete(context.Context, int) error {
 }
 
 func TestVersionHandler_List(t *testing.T) {
-	uc := &versionUsecaseMock{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERSE", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}}}
+	uc := &versionUsecaseMock{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERSE", ShortName: "VRS", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}}}
 	handler := NewVersionHandler(uc)
 	e := echo.New()
 	rec := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestVersionHandler_List(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `[{"id":1,"name":"CHUNITHM VERSE","released_at":"2025-01-01"}]`, rec.Body.String())
+	assert.JSONEq(t, `[{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}]`, rec.Body.String())
 }
 
 func TestVersionHandler_Create(t *testing.T) {
@@ -69,7 +69,7 @@ func TestVersionHandler_Create(t *testing.T) {
 	handler := NewVersionHandler(uc)
 	e := echo.New()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/internal/admin/versions", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","released_at":"2025-01-01"}`))
+	req := httptest.NewRequest(http.MethodPost, "/internal/admin/versions", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c := e.NewContext(req, rec)
 
@@ -78,6 +78,7 @@ func TestVersionHandler_Create(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.True(t, uc.createCall)
+	assert.JSONEq(t, `{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
 }
 
 func TestVersionHandler_Create_不正JSONは400(t *testing.T) {
@@ -169,6 +170,26 @@ func TestVersionHandler_Create_名前重複は409(t *testing.T) {
 	apiErr := requireVersionAPIError(t, err)
 	assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
 	assert.Equal(t, apierror.CodeVersionNameConflict, apiErr.Code)
+}
+
+func TestVersionHandler_Rename(t *testing.T) {
+	// Given
+	uc := &versionUsecaseMock{}
+	handler := NewVersionHandler(uc)
+	e := echo.New()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/1", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","short_name":"VRS"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+
+	// When
+	err := handler.Rename(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
 }
 
 func TestVersionHandler_Rename_不正IDは400(t *testing.T) {

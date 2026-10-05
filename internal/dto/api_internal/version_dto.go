@@ -10,12 +10,14 @@ import (
 // CreateVersionRequest はバージョン作成リクエストです。
 type CreateVersionRequest struct {
 	Name       string `json:"name"`
+	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
 }
 
 // RenameVersionRequest はバージョン改名リクエストです。
 type RenameVersionRequest struct {
 	Name       string          `json:"name"`
+	ShortName  string          `json:"short_name"`
 	ReleasedAt json.RawMessage `json:"released_at,omitempty"`
 }
 
@@ -23,6 +25,7 @@ type RenameVersionRequest struct {
 type VersionDTO struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
+	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
 }
 
@@ -30,7 +33,7 @@ func ToVersionDTO(version *entity.Version) *VersionDTO {
 	if version == nil {
 		return nil
 	}
-	return &VersionDTO{ID: version.ID, Name: version.Name, ReleasedAt: version.ReleasedAt.Format(time.DateOnly)}
+	return &VersionDTO{ID: version.ID, Name: version.Name, ShortName: version.ShortName, ReleasedAt: version.ReleasedAt.Format(time.DateOnly)}
 }
 
 func ToVersionDTOs(versions []*entity.Version) []*VersionDTO {

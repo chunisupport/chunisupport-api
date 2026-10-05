@@ -37,7 +37,13 @@ type ComboLampType SortedMasterVO
 type FullChainType SortedMasterVO
 
 // Genre はジャンルマスタの値オブジェクトです。
-type Genre SortedMasterVO
+// 表示幅を抑えるための超ショート名（例: P&A）を持つため、SortedMasterVO とは別に定義します。
+type Genre struct {
+	ID        int
+	Name      string
+	ShortName string
+	SortOrder int
+}
 
 // HonorType は称号種類マスタの値オブジェクトです。
 type HonorType BaseMasterVO

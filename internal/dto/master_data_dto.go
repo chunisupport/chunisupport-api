@@ -12,10 +12,27 @@ type MasterItemDTO struct {
 	Name string `json:"name"`
 }
 
+// GenreDTO はジャンルマスタを表します。
+type GenreDTO struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+}
+
+// ToGenreDTOs は []masterdata.Genre を []*GenreDTO に変換します。
+func ToGenreDTOs(genres []masterdata.Genre) []*GenreDTO {
+	dtos := make([]*GenreDTO, len(genres))
+	for i, g := range genres {
+		dtos[i] = &GenreDTO{ID: g.ID, Name: g.Name, ShortName: g.ShortName}
+	}
+	return dtos
+}
+
 // VersionDTO はバージョンマスタを表します。
 type VersionDTO struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
+	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
 }
 
@@ -26,6 +43,7 @@ func ToVersionDTOs(versions []masterdata.Version) []*VersionDTO {
 		dtos[i] = &VersionDTO{
 			ID:         int(v.ID),
 			Name:       v.Name,
+			ShortName:  v.ShortName,
 			ReleasedAt: v.ReleasedAt.Format(time.DateOnly),
 		}
 	}
@@ -35,6 +53,7 @@ func ToVersionDTOs(versions []masterdata.Version) []*VersionDTO {
 // VersionSummaryDTO は専用バージョン一覧API向けのバージョンマスタを表します。
 type VersionSummaryDTO struct {
 	Name       string `json:"name"`
+	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
 }
 
@@ -44,6 +63,7 @@ func ToVersionSummaryDTOs(versions []masterdata.Version) []*VersionSummaryDTO {
 	for i, v := range versions {
 		dtos[i] = &VersionSummaryDTO{
 			Name:       v.Name,
+			ShortName:  v.ShortName,
 			ReleasedAt: v.ReleasedAt.Format(time.DateOnly),
 		}
 	}
@@ -62,7 +82,7 @@ type HonorTypesResponse struct {
 
 // MasterDataResponse はマスタデータ取得APIのレスポンスを表します。
 type MasterDataResponse struct {
-	Genres           []*MasterItemDTO `json:"genres"`
+	Genres           []*GenreDTO      `json:"genres"`
 	Difficulties     []*MasterItemDTO `json:"difficulties"`
 	AccountTypes     []*MasterItemDTO `json:"account_types"`
 	Versions         []*VersionDTO    `json:"versions"`

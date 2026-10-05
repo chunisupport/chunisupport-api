@@ -16,10 +16,10 @@ import (
 
 func TestVersionRepository_FindLatest(t *testing.T) {
 	db := newVersionRepositoryTestDB(t)
-	_, err := db.Exec(`INSERT INTO versions (id, name, released_at) VALUES
-		(1, 'CHUNITHM A', '2025-01-01'),
-		(2, 'CHUNITHM B', '2026-01-01'),
-		(3, 'CHUNITHM C', '2026-01-01')`)
+	_, err := db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES
+		(1, 'CHUNITHM A', 'A', '2025-01-01'),
+		(2, 'CHUNITHM B', 'B', '2026-01-01'),
+		(3, 'CHUNITHM C', 'C', '2026-01-01')`)
 	require.NoError(t, err)
 	repo := NewVersionRepository()
 
@@ -60,16 +60,18 @@ func TestVersionRepository_CRUD(t *testing.T) {
 	db := newVersionRepositoryTestDB(t)
 	repo := NewVersionRepository()
 	ctx := context.Background()
-	version, err := entity.NewVersion("CHUNITHM VERSE", repositoryTestDate(2025, 1, 1))
+	version, err := entity.NewVersion("CHUNITHM VERSE", "VRS", repositoryTestDate(2025, 1, 1))
 	require.NoError(t, err)
 
 	created, err := repo.Create(ctx, db, version)
 	require.NoError(t, err)
 	created.Name = "CHUNITHM VERSE II"
+	created.ShortName = "VRS2"
 	require.NoError(t, repo.Save(ctx, db, created))
 	found, err := repo.FindByID(ctx, db, created.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "CHUNITHM VERSE II", found.Name)
+	assert.Equal(t, "VRS2", found.ShortName)
 	require.NoError(t, repo.Delete(ctx, db, created.ID))
 	_, err = repo.FindByID(ctx, db, created.ID)
 	assert.ErrorIs(t, err, domainrepo.ErrVersionNotFound)
@@ -81,13 +83,18 @@ func TestWrapVersionDuplicateError(t *testing.T) {
 	assert.ErrorIs(t, wrapVersionDuplicateError(err), domainrepo.ErrVersionConflict)
 }
 
+func TestWrapVersionDuplicateError_超ショート名の重複も競合として扱う(t *testing.T) {
+	err := &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry 'VRS' for key 'versions.uq_versions_short_name'"}
+	assert.ErrorIs(t, wrapVersionDuplicateError(err), domainrepo.ErrVersionConflict)
+}
+
 func newVersionRepositoryTestDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
 	_, err = db.Exec(`
-		CREATE TABLE versions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, released_at DATE NOT NULL);
+		CREATE TABLE versions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, short_name TEXT NOT NULL UNIQUE, released_at DATE NOT NULL);
 		CREATE TABLE songs (released_at DATE NULL);
 	`)
 	require.NoError(t, err)

@@ -51,7 +51,7 @@ func TestMasterDataHandler_GetVersions(t *testing.T) {
 
 	releasedAt := time.Date(2025, 10, 30, 15, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	usecaseMock.On("GetVersions", mock.Anything).Return([]masterdata.Version{
-		{ID: 3, Name: "VERSE", ReleasedAt: releasedAt},
+		{ID: 3, Name: "VERSE", ShortName: "VRS", ReleasedAt: releasedAt},
 	}).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/internal/master/versions", nil)
@@ -68,6 +68,7 @@ func TestMasterDataHandler_GetVersions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, response.Versions, 1)
 	assert.Equal(t, "VERSE", response.Versions[0].Name)
+	assert.Equal(t, "VRS", response.Versions[0].ShortName)
 	assert.Equal(t, "2025-10-30", response.Versions[0].ReleasedAt)
 	usecaseMock.AssertExpectations(t)
 }
@@ -108,9 +109,9 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 	releasedAt := time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)
 	usecaseMock.On("GetMasterData", mock.Anything).Return(&usecase.MasterDataOutput{
 		Versions: []masterdata.Version{
-			{ID: 1, Name: "CHUNITHM", ReleasedAt: releasedAt},
+			{ID: 1, Name: "CHUNITHM", ShortName: "ORI", ReleasedAt: releasedAt},
 		},
-		Genres:           []masterdata.Item{},
+		Genres:           []masterdata.Genre{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}},
 		Difficulties:     []masterdata.Item{},
 		AccountTypes:     []masterdata.Item{},
 		RatingBands:      nil,
@@ -132,7 +133,10 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"released_at\":\"2015-07-16\"}]")
+	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"short_name\":\"ORI\",\"released_at\":\"2015-07-16\"}]")
+	var response dto.MasterDataResponse
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	assert.Equal(t, []*dto.GenreDTO{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}}, response.Genres)
 	usecaseMock.AssertExpectations(t)
 }
 
