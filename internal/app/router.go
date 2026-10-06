@@ -388,6 +388,16 @@ func registerRoutes(
 	maintenanceStateProvider usecase.MaintenanceStateProvider,
 	cfg config.Config,
 ) {
+	// 未登録パスへのグループ認証・メンテナンス制限を避け、通常の404応答を維持する。
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			if c.RouteInfo().Method == echo.RouteNotFound {
+				return echo.ErrNotFound
+			}
+			return next(c)
+		}
+	})
+
 	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 	// 一時保存APIの拡張CORSは、メンテナンス503にも適用できるようゲートより先に評価します。
