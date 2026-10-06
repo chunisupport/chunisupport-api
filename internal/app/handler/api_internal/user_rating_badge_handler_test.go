@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -79,4 +80,12 @@ func (m *mockUserUsecase) GetPublicOfficialRating(ctx context.Context, username 
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*float64), args.Error(1)
+}
+
+func (m *mockUserUsecase) GetPublicBadgePlayer(ctx context.Context, username string) (*entity.Player, error) {
+	args := m.Called(ctx, username)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Player), args.Error(1)
 }

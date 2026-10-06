@@ -419,6 +419,9 @@ func registerRoutes(
 		Window:   info.InternalPublicRateLimitWindow,
 	}))
 	badgeGroup.GET("/users/:username/rating", handlers.User.GetOfficialRatingBadge)
+	badgeGroup.GET("/users/:username/rating-calculated", handlers.User.GetCalculatedRatingBadge)
+	badgeGroup.GET("/users/:username/overpower", handlers.User.GetOfficialOverpowerBadge)
+	badgeGroup.GET("/users/:username/overpower-percent", handlers.User.GetOfficialOverpowerPercentBadge)
 	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
 	// APIトークンの更新権限を要求するミドルウェア

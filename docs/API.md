@@ -200,6 +200,9 @@ Content-Type: application/json
 | `/` | GET | 通常時不要 | アプリケーション名とビルド日を返します。メンテナンス中はFirebase認証済みのADMIN / EDITORのみ利用可 |
 | `/healthz` | GET | 不要 | 外部監視向けの軽量な死活チェック |
 | `/badges/users/:username/rating` | GET | 不要 | Shields.io向けの公式RATINGバッジ情報 |
+| `/badges/users/:username/rating-calculated` | GET | 不要 | Shields.io向けの計算RATING（小数4桁）バッジ情報 |
+| `/badges/users/:username/overpower` | GET | 不要 | Shields.io向けの公式OVER POWER絶対値バッジ情報 |
+| `/badges/users/:username/overpower-percent` | GET | 不要 | Shields.io向けの公式OVER POWER割合バッジ情報 |
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得（`read` / `read_write`いずれも可） |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
@@ -346,18 +349,32 @@ Content-Type: application/json
 ## Shields.io向けバッジ
 
 ### GET `/badges/users/:username/rating`
+### GET `/badges/users/:username/rating-calculated`
+### GET `/badges/users/:username/overpower`
+### GET `/badges/users/:username/overpower-percent`
 
 - **認証**: 不要
-- **レートリミット**: 1分間60回/送信元IP・対象ユーザー名。異なるユーザー名のバッジはこの枠を共有しません。濫用防止のため、送信元IP全体にも1分間600回の上限があります。
+- **レートリミット**: 1分間60回/送信元IP・対象ユーザー名。同じユーザー名へのリクエストはバッジの種類を問わずこの枠を共有します。異なるユーザー名のバッジはこの枠を共有しません。濫用防止のため、送信元IP全体にも1分間600回の上限があります。
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: Shields.io Endpoint BadgeのJSON形式。保存済みの公式RATINGを小数第2位まで表示します。プレイヤー未連携の場合は `message: "no data"`、`color: "lightgrey"` を返します。ユーザーが存在しない場合や非公開の場合は同じ404を返します。
+- **レスポンス**: Shields.io Endpoint BadgeのJSON形式。プレイヤー未連携、または対象の値が未取得（`null`）の場合は `message: "no data"`、`color: "lightgrey"` を返します。数値のゼロはデータありとして表示します。ユーザーが存在しない場合や非公開の場合は同じ404を返します。認証情報が付いていても常に匿名閲覧の権限で判定します。
+
+| パス末尾 | 参照する保存値 | `label` | `message` の例 |
+| --- | --- | --- | --- |
+| `/rating` | 公式RATING | `CHUNITHM RATING` | `17.29`（小数2桁固定） |
+| `/rating-calculated` | 計算RATING | `CHUNITHM RATING` | `17.2912`（小数4桁固定） |
+| `/overpower` | 公式OVER POWER絶対値 | `CHUNITHM OVER POWER` | `96120.12`（小数2桁固定） |
+| `/overpower-percent` | 公式OVER POWER割合 | `CHUNITHM OVER POWER` | `76.26%`（小数2桁固定） |
+
+OVER POWERの絶対値・割合にはCHUNITHM-NETから取得した公式値を使い、最新マスタによる再計算は行いません。
+
+RATINGの `color` はそれぞれ表示対象の値に応じたレート色、OVER POWERはポゼッションに応じた色を返します。
 
 ```json
 {
   "schemaVersion": 1,
   "label": "CHUNITHM RATING",
   "message": "17.29",
-  "color": "blue"
+  "color": "#3597ed"
 }
 ```
 
@@ -365,9 +382,12 @@ Shields.ioからの利用例（`example` を対象ユーザー名に置き換え
 
 ```markdown
 ![CHUNITHM RATING](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.chunisupport.net%2Fbadges%2Fusers%2Fexample%2Frating)
+![CHUNITHM RATING 小数4桁](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.chunisupport.net%2Fbadges%2Fusers%2Fexample%2Frating-calculated)
+![CHUNITHM OVER POWER](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.chunisupport.net%2Fbadges%2Fusers%2Fexample%2Foverpower)
+![CHUNITHM OVER POWER 割合](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.chunisupport.net%2Fbadges%2Fusers%2Fexample%2Foverpower-percent)
 ```
 
-Shields.io側のキャッシュにより、公式RATINGの更新や非公開設定の変更がバッジへ反映されるまで時間がかかる場合があります。
+Shields.io側のキャッシュにより、指標・ポゼッションの更新や非公開設定の変更がバッジへ反映されるまで時間がかかる場合があります。
 
 ## 監視用エンドポイント
 

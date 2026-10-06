@@ -25,6 +25,10 @@ func (m *mockV1UserUsecase) GetPublicOfficialRating(context.Context, string) (*f
 	return nil, nil
 }
 
+func (m *mockV1UserUsecase) GetPublicBadgePlayer(context.Context, string) (*entity.Player, error) {
+	return nil, nil
+}
+
 func (m *mockV1UserUsecase) GetUserProfile(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileOutput, error) {
 	return nil, nil
 }
