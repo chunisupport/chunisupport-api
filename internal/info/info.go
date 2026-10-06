@@ -217,7 +217,7 @@ func HasRole(accountTypeID, requiredRoleID int) bool {
 
 // OverpowerBadgePossessionColors はポゼッションマスタの固定IDに対応する既存のレート色です。
 var OverpowerBadgePossessionColors = map[int]string{
-	1: "grey", // normal
+	1: "lightgrey", // normal
 	2: RatingBadgeSilverColor,
 	3: RatingBadgeGoldColor,
 	4: RatingBadgePlatinumColor,
