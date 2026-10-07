@@ -23,8 +23,8 @@ type V1OrderedChartsMap map[string]*V1ChartDTO
 // MarshalJSON はJSONマーシャリング時にchartsのキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順序で出力します。
 // 譜面が存在しない難易度はnullとして出力されます。
+// mapの標準エンコードでは難易度順にならないため、キーの出力順を固定します。
 func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
-	// 難易度の順序を定義（大文字で統一）
 	orderedKeys := []string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 
 	// 手動でJSONを構築して順序を保証
@@ -38,10 +38,8 @@ func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
 		}
 		first = false
 
-		// キーを追加
 		jsonParts = append(jsonParts, `"`+key+`":`)
 
-		// 値をマーシャル（存在しない場合はnull）
 		if chart, exists := o[key]; exists && chart != nil {
 			chartJSON, err := json.Marshal(chart)
 			if err != nil {

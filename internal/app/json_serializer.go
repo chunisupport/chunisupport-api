@@ -16,7 +16,7 @@ var (
 )
 
 // TimezoneJSONSerializer はtime.TimeだけをAPI出力用タイムゾーンへ変換します。
-// 元の値は変更しないため、ドメイン・ユースケース・DBではUTCを維持できます。
+// ドメイン・ユースケース・DBのUTC時刻を変更しないよう、レスポンス用のコピーだけを変換します。
 type TimezoneJSONSerializer struct {
 	location *time.Location
 }

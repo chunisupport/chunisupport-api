@@ -11,10 +11,8 @@ import (
 type DisplayID string
 
 var (
-	// 16進数16文字の正規表現パターン
 	displayIDPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
-	// エラー定義
 	ErrInvalidDisplayIDFormat = errors.New("display ID must be exactly 16 hexadecimal characters (lowercase)")
 )
 

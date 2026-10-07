@@ -108,16 +108,13 @@ func (d *AdditionalSongsDownloader) Download(ctx context.Context) error {
 
 	slog.Info("Fetching additional_songs data from Google Sheets", "sheetID", d.sheetID)
 
-	// 追加楽曲・譜面・コースの各シートを取得
 	sheetNames := []string{"additional_songs", "additional_charts", "additional_songs_charts_we", "courses"}
 
-	// データを一括取得
 	allData, err := d.batchGetSheetData(ctx, sheetNames)
 	if err != nil {
 		return fmt.Errorf("failed to batch get sheet data: %w", err)
 	}
 
-	// データを解析
 	data, err := d.parseSheetData(allData)
 	if err != nil {
 		return fmt.Errorf("failed to parse sheet data: %w", err)
@@ -125,7 +122,6 @@ func (d *AdditionalSongsDownloader) Download(ctx context.Context) error {
 
 	slog.Info("Parsed additional songs data", "songs", len(data.Songs), "charts", len(data.Charts), "we_charts", len(data.WECharts), "courses", len(data.Courses))
 
-	// JSONファイルとして保存
 	filename := "additional_songs.json"
 	filePath := filepath.Join(d.outputDir, filename)
 
@@ -147,7 +143,6 @@ func (d *AdditionalSongsDownloader) Download(ctx context.Context) error {
 func (d *AdditionalSongsDownloader) batchGetSheetData(ctx context.Context, sheetNames []string) (*batchGetResponse, error) {
 	baseURL := fmt.Sprintf("%s/%s/values:batchGet", d.baseURL, d.sheetID)
 
-	// URLパラメータを構築
 	params := url.Values{}
 	params.Set("key", d.apiKey)
 	for _, name := range sheetNames {
@@ -189,7 +184,6 @@ func (d *AdditionalSongsDownloader) parseSheetData(data *batchGetResponse) (*add
 	}
 
 	for _, valueRange := range data.ValueRanges {
-		// rangeからシート名を抽出 (例: "additional_songs!A1:Z1000" -> "additional_songs")
 		sheetName := extractSheetName(valueRange.Range)
 
 		switch sheetName {
@@ -260,12 +254,10 @@ func (d *AdditionalSongsDownloader) parseCoursesSheet(values [][]string) ([]addi
 //	expnt, exp, expuk, masnt, mas, masuk, ultnt, ult, ultuk, img
 func (d *AdditionalSongsDownloader) parseSongsSheet(values [][]string) ([]additionalSongRow, error) {
 	if len(values) < 2 {
-		// ヘッダー行のみまたは空
 		return []additionalSongRow{}, nil
 	}
 
 	songs := make([]additionalSongRow, 0, len(values)-1)
-	// 最初の行はヘッダーなのでスキップ
 	for rowIdx, row := range values[1:] {
 		if len(row) == 0 {
 			continue
@@ -280,40 +272,32 @@ func (d *AdditionalSongsDownloader) parseSongsSheet(values [][]string) ([]additi
 			Release: getString(row, 4),
 		}
 
-		// 必須フィールドチェック
 		if song.ID == "" || song.Title == "" || song.Artist == "" || song.Genre == "" || song.Release == "" {
 			continue
 		}
 
-		// オプションフィールド
 		song.BPM = getIntPtr(row, 5)
 
-		// BASIC
 		song.BasNt = getIntPtr(row, 6)
 		song.Bas = getFloatPtr(row, 7)
 		song.BasUK = getBool(row, 8)
 
-		// ADVANCED
 		song.AdvNt = getIntPtr(row, 9)
 		song.Adv = getFloatPtr(row, 10)
 		song.AdvUK = getBool(row, 11)
 
-		// EXPERT
 		song.ExpNt = getIntPtr(row, 12)
 		song.Exp = getFloatPtr(row, 13)
 		song.ExpUK = getBool(row, 14)
 
-		// MASTER
 		song.MasNt = getIntPtr(row, 15)
 		song.Mas = getFloatPtr(row, 16)
 		song.MasUK = getBool(row, 17)
 
-		// ULTIMA
 		song.UltNt = getIntPtr(row, 18)
 		song.Ult = getFloatPtr(row, 19)
 		song.UltUK = getBool(row, 20)
 
-		// Image
 		song.Img = getString(row, 21)
 
 		// 各難易度の定数チェック（少なくともBASIC〜MASTERの4つは必須）
@@ -333,12 +317,10 @@ func (d *AdditionalSongsDownloader) parseSongsSheet(values [][]string) ([]additi
 // カラム: id, diff, const, csuk, notes
 func (d *AdditionalSongsDownloader) parseChartsSheet(values [][]string) ([]additionalChartRow, error) {
 	if len(values) < 2 {
-		// ヘッダー行のみまたは空
 		return []additionalChartRow{}, nil
 	}
 
 	charts := make([]additionalChartRow, 0, len(values)-1)
-	// 最初の行はヘッダーなのでスキップ
 	for _, row := range values[1:] {
 		if len(row) == 0 {
 			continue
@@ -353,7 +335,6 @@ func (d *AdditionalSongsDownloader) parseChartsSheet(values [][]string) ([]addit
 			Notes: getIntPtr(row, 4),
 		}
 
-		// 必須フィールドチェック
 		if chart.ID == "" || chart.Diff == "" || chart.Const == nil {
 			continue
 		}
@@ -368,12 +349,10 @@ func (d *AdditionalSongsDownloader) parseChartsSheet(values [][]string) ([]addit
 // カラム: id, title, artist, genre, release, we_kanji, we_star, notes, img
 func (d *AdditionalSongsDownloader) parseWEChartsSheet(values [][]string) ([]additionalWEChartRow, error) {
 	if len(values) < 2 {
-		// ヘッダー行のみまたは空
 		return []additionalWEChartRow{}, nil
 	}
 
 	weCharts := make([]additionalWEChartRow, 0, len(values)-1)
-	// 最初の行はヘッダーなのでスキップ
 	for rowIdx, row := range values[1:] {
 		if len(row) == 0 {
 			continue
@@ -392,7 +371,6 @@ func (d *AdditionalSongsDownloader) parseWEChartsSheet(values [][]string) ([]add
 			Img:     getString(row, 8),
 		}
 
-		// 必須フィールドチェック
 		if weChart.ID == "" || weChart.Title == "" || weChart.Artist == "" || weChart.Genre == "" || weChart.Release == "" {
 			slog.Warn("Skipping additional_songs_charts_we row with missing required fields",
 				"row", rowIdx+2, "id", weChart.ID, "title", weChart.Title)
@@ -407,8 +385,6 @@ func (d *AdditionalSongsDownloader) parseWEChartsSheet(values [][]string) ([]add
 
 // extractSheetName はrange文字列からシート名を抽出します
 func extractSheetName(rangeStr string) string {
-	// "additional_songs!A1:Z1000" -> "additional_songs"
-	// "additional_songs" -> "additional_songs"
 	before, _, _ := strings.Cut(rangeStr, "!")
 	return before
 }
@@ -432,7 +408,7 @@ func getIntPtr(row []string, idx int) *int {
 		return nil
 	}
 	if v == 0 {
-		return nil // 0はnullとして扱う
+		return nil
 	}
 	return new(v)
 }
@@ -448,7 +424,7 @@ func getFloatPtr(row []string, idx int) *float64 {
 		return nil
 	}
 	if v == 0 {
-		return nil // 0はnullとして扱う
+		return nil
 	}
 	return new(v)
 }

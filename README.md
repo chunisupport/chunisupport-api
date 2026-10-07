@@ -201,3 +201,5 @@ Playerの既存データは、同一トランザクション内で更新用検�
 バッチは一覧取得時とPlayerロック取得後の `data_collected_at` を比較し、異なる場合は競合、行がない場合は削除済みとしてスキップします。取得日時を変えない未解禁曲更新は競合扱いにせず、Playerロック取得後の最新状態で再計算します。再計算値が保存済みの値と同じ場合も成功とし、スロットの変更とPlayer保存は一緒にコミットまたはロールバックします。
 
 MySQLでの並行更新テストは `PLAYER_PERSISTENCE_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestPlayerPersistenceMySQL -count=1` で実行します。一時データベースの作成・削除と `performance_schema.data_lock_waits` / `data_locks` の参照権限が必要です。テストは作成した専用データベースだけを削除します。
+
+コースの編集・削除・復元の並行更新テストは `COURSE_CONCURRENCY_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestCourseConcurrencyMySQL -count=1` で実行します。同じ権限が必要で、作成した専用データベースだけを削除します。接続先が未設定の場合はスキップします。

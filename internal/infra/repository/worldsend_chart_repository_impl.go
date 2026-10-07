@@ -488,7 +488,6 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 // worldsend_charts は 1 曲 1 行が必須のため、chart が nil の場合でも空行を挿入します。
 // official_idx 重複時は ErrDuplicateOfficialIdx を返します。
 func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
-	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
 		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
@@ -518,7 +517,6 @@ func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec reposito
 		return nil, err
 	}
 
-	// worldsend_charts テーブルに挿入（chart が nil の場合も空行を挿入）
 	var attribute *string
 	var levelStarVal *int
 	var notesVal *int
@@ -549,6 +547,6 @@ func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec reposito
 		return nil, err
 	}
 
-	// DB が付与した updated_at を取得するため再フェッチする
+	// DB側で付与される更新日時を返却エンティティに反映するため再取得します。
 	return r.FindByDisplayID(ctx, exec, song.DisplayID)
 }

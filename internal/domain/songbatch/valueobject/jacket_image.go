@@ -11,7 +11,6 @@ func NewJacketImage(s string) JacketImage {
 	if s == "" {
 		return ""
 	}
-	// 拡張子を除去
 	s, _, _ = strings.CutLast(s, ".")
 	return JacketImage(s)
 }

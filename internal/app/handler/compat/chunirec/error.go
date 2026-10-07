@@ -42,7 +42,6 @@ func getMessageForStatusCode(statusCode int) string {
 	case http.StatusServiceUnavailable:
 		return "service unavailable."
 	default:
-		// 想定外のステータスコードの場合は503として扱う
 		return "service unavailable."
 	}
 }

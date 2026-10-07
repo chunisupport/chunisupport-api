@@ -7,9 +7,9 @@ import (
 
 // V1WorldsendChartDTO は外部API v1 用の WORLD'S END 譜面情報DTOです。
 type V1WorldsendChartDTO struct {
-	Attribute     *string `json:"attribute"`  // WORLD'S END 属性（光、蔵、改、狂、etc.）
-	LevelStar     *int    `json:"level_star"` // WORLD'S END レベル（1～5）
-	Notes         *int    `json:"notes"`      // ノーツ数
+	Attribute     *string `json:"attribute"`
+	LevelStar     *int    `json:"level_star"`
+	Notes         *int    `json:"notes"`
 	NotesDesigner *string `json:"notes_designer"`
 }
 

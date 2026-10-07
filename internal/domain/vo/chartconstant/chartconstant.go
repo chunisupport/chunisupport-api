@@ -40,18 +40,16 @@ func (c ChartConstant) String() string {
 	return fmt.Sprintf("%.1f", c.Float64())
 }
 
-// Value は driver.Valuer インターフェースを実装します。
-// データベースに値を保存する際に呼び出されます。
+// Value は driver.Valuer を実装し、DECIMAL型との互換性を保つため文字列を返します。
 func (c ChartConstant) Value() (driver.Value, error) {
 	if _, err := NewChartConstant(c.Float64()); err != nil {
 		return nil, err
 	}
-	// DECIMAL型との互換性のため、文字列として保存します。
 	return c.String(), nil
 }
 
-// Scan は sql.Scanner インターフェースを実装します。
-// データベースから値を読み取る際に呼び出されます。
+// Scan は sql.Scanner を実装し、DB値を検証済みの ChartConstant に復元します。
+// DECIMAL値はドライバによって []byte または数値で返るため、両方を受け付けます。
 func (c *ChartConstant) Scan(value any) error {
 	if value == nil {
 		return fmt.Errorf("chart constant cannot be NULL")
@@ -59,7 +57,6 @@ func (c *ChartConstant) Scan(value any) error {
 
 	switch v := value.(type) {
 	case []byte:
-		// DECIMAL型は[]byteで返されることがあります。
 		f, err := strconv.ParseFloat(string(v), 64)
 		if err != nil {
 			return fmt.Errorf("failed to convert []byte to float64: %w", err)
@@ -71,7 +68,6 @@ func (c *ChartConstant) Scan(value any) error {
 		*c = chartConst
 		return nil
 	case float64:
-		// 数値型として返される場合。
 		chartConst, err := NewChartConstant(v)
 		if err != nil {
 			return err
@@ -90,11 +86,8 @@ func (c *ChartConstant) Scan(value any) error {
 	}
 }
 
-// MarshalJSON は json.Marshaler インターフェースを実装します。
-// JSON出力時に小数点以下1桁の形式で出力されます。
+// MarshalJSON は json.Marshaler を実装し、ChartConstant をJSON数値として出力します。
 func (c ChartConstant) MarshalJSON() ([]byte, error) {
-	// 小数点以下1桁の数値としてマーシャルします。
-	// String()メソッドの結果を使用して統一的な表現を保証します。
 	return json.Marshal(c.Float64())
 }
 

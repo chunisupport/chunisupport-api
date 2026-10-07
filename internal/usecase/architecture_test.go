@@ -38,7 +38,7 @@ func TestUsecaseStructsDoNotHavePresentationTags(t *testing.T) {
 	files, err := productionGoFiles(".")
 	require.NoError(t, err)
 
-	// 既存の内部JSON処理はARCH-003のAPI DTO依存とは別課題のため、境界型からの分離後に個別移行します。
+	// 既存の内部JSON処理はAPI境界DTOの検証対象と分けるため、ここでは除外します。
 	legacyInternalJSONFiles := map[string]bool{
 		"goal_usecase_impl.go":          true,
 		"overpower_record_converter.go": true,

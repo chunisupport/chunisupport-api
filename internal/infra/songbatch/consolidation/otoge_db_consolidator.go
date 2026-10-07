@@ -41,7 +41,6 @@ func (c *OtogeDbConsolidator) Consolidate(ctx context.Context) error {
 		return nil
 	}
 
-	// official_idxでマッチングするためのマップを構築
 	idxMap, err := c.buildIdxMap(ctx)
 	if err != nil {
 		return err
@@ -69,7 +68,6 @@ func (c *OtogeDbConsolidator) Consolidate(ctx context.Context) error {
 			continue
 		}
 
-		// IDを文字列から整数に変換
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			slog.Debug("Failed to parse otoge-db ID", "id", idStr, "title", song.Title, "error", err)
@@ -80,16 +78,14 @@ func (c *OtogeDbConsolidator) Consolidate(ctx context.Context) error {
 			continue
 		}
 
-		// YYYYMMDD形式をYYYY-MM-DD形式に変換
 		releaseDate := fmt.Sprintf("%s-%s-%s", dateAdded[0:4], dateAdded[4:6], dateAdded[6:8])
 
-		// IDで楽曲を検索
 		songID, exists := idxMap[id]
 		if !exists {
 			continue
 		}
 
-		// リリース日を更新（既存のリリース日がNULLの場合のみ）
+		// 補完データで既存のリリース日を上書きしないよう、NULLの場合だけ更新します。
 		result, err := c.workspace.DB().ExecContext(ctx, `
 UPDATE songs
 SET released_at = ?

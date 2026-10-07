@@ -36,11 +36,9 @@ func (m *mockPlayerUsecase) CreatePlayer(ctx context.Context, userID int, name s
 }
 
 func TestPlayerHandler_CreatePlayer(t *testing.T) {
-	// Setup
 	e := echo.New()
 	e.Validator = app.NewCustomValidator()
 
-	// モックの期待値設定
 	mockUsecase := new(mockPlayerUsecase)
 	name, err := playername.NewPlayerName("太郎")
 	assert.NoError(t, err)

@@ -18,7 +18,6 @@ type PlayerWorldsendRecord struct {
 	FullChainID      int
 	UpdatedAt        time.Time
 
-	// リレーション（取得時に JOIN で設定される）
 	WorldsendChart *WorldsendChart
 	Song           *Song
 	ClearLamp      *ClearLampType
@@ -36,7 +35,7 @@ func (r *PlayerWorldsendRecord) Validate() error {
 		return fmt.Errorf("worldsend_chart_id: WORLD'S END譜面IDは正の整数である必要があります")
 	}
 
-	// Score 値オブジェクトは内部でバリデーション済み
+	// Score は値オブジェクト生成時に範囲検証するため、ここでは必須値かだけを確認します。
 	if r.Score == 0 {
 		return fmt.Errorf("score: スコアは必須です")
 	}

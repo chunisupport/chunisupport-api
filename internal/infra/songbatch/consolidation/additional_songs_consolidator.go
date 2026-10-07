@@ -80,27 +80,23 @@ func (c *AdditionalSongsConsolidator) Consolidate(ctx context.Context) error {
 		return nil
 	}
 
-	// ワークスペースに既に登録されている official_idx を取得
 	existingIdxs, err := c.loadExistingOfficialIdxs(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Step 1: 追加楽曲(songs)の処理 - 公式データに存在しない楽曲のみを追加
 	if len(c.data.Songs) > 0 {
 		if err := c.consolidateSongs(ctx, existingIdxs); err != nil {
 			return err
 		}
 	}
 
-	// Step 2: 追加譜面(charts)の処理 - 既存楽曲へのULTIMA追加など
 	if len(c.data.Charts) > 0 {
 		if err := c.consolidateCharts(ctx, existingIdxs); err != nil {
 			return err
 		}
 	}
 
-	// Step 3: WORLD'S END譜面(we_charts)の処理
 	if len(c.data.WECharts) > 0 {
 		if err := c.consolidateWECharts(ctx, existingIdxs); err != nil {
 			return err
@@ -114,7 +110,6 @@ func (c *AdditionalSongsConsolidator) Consolidate(ctx context.Context) error {
 
 // consolidateSongs は追加楽曲をワークスペースに反映します
 func (c *AdditionalSongsConsolidator) consolidateSongs(ctx context.Context, existingIdxs map[string]struct{}) error {
-	// Step 1: 公式データに存在しない楽曲のみを抽出してUPSERT
 	songsToUpsert, seenOfficialIdx := c.prepareSongsForUpsert(existingIdxs)
 	if len(songsToUpsert) == 0 {
 		slog.Info("No new songs to add from additional_songs data (all songs already exist in official data)")
@@ -126,13 +121,11 @@ func (c *AdditionalSongsConsolidator) consolidateSongs(ctx context.Context, exis
 	}
 	slog.Info("Bulk upserted additional songs", "count", len(songsToUpsert))
 
-	// Step 2: UPSERTした楽曲のIDを取得
 	songIDs, err := FetchSongIDsByOfficialIdx(ctx, c.workspace.DB(), seenOfficialIdx)
 	if err != nil {
 		return err
 	}
 
-	// Step 3: 通常チャート情報を一括でUPSERT（追加楽曲のチャート）
 	chartsToUpsert := c.prepareChartsFromSongsForUpsert(songIDs)
 	if len(chartsToUpsert) > 0 {
 		if err := c.bulkUpsertCharts(ctx, chartsToUpsert); err != nil {
@@ -146,14 +139,12 @@ func (c *AdditionalSongsConsolidator) consolidateSongs(ctx context.Context, exis
 
 // consolidateCharts は追加譜面（既存楽曲へのULTIMA追加など）をワークスペースに反映します
 func (c *AdditionalSongsConsolidator) consolidateCharts(ctx context.Context, existingIdxs map[string]struct{}) error {
-	// 追加譜面の対象となる楽曲IDを取得（公式データに存在するもののみ）
 	chartOfficialIdxs := make(map[string]struct{})
 	for _, chart := range c.data.Charts {
 		officialID := strings.TrimSpace(chart.ID)
 		if officialID == "" {
 			continue
 		}
-		// 公式データに存在するもののみを対象とする
 		if _, exists := existingIdxs[officialID]; exists {
 			chartOfficialIdxs[officialID] = struct{}{}
 		}
@@ -164,19 +155,17 @@ func (c *AdditionalSongsConsolidator) consolidateCharts(ctx context.Context, exi
 		return nil
 	}
 
-	// 楽曲IDを取得
 	songIDs, err := FetchSongIDsByOfficialIdx(ctx, c.workspace.DB(), chartOfficialIdxs)
 	if err != nil {
 		return err
 	}
 
-	// 既存のチャート情報を取得（公式データを尊重するため）
+	// 公式譜面を上書きしないよう、既存チャートを先に取得します。
 	existingCharts, err := c.loadExistingCharts(ctx, songIDs)
 	if err != nil {
 		return err
 	}
 
-	// 追加譜面を準備
 	chartsToUpsert := c.prepareAdditionalChartsForUpsert(songIDs, existingCharts)
 	if len(chartsToUpsert) == 0 {
 		slog.Info("No additional charts to add (all charts already exist)")
@@ -243,7 +232,6 @@ func (c *AdditionalSongsConsolidator) loadExistingCharts(ctx context.Context, so
 		return nil, fmt.Errorf("failed to load existing charts: %w", err)
 	}
 
-	// song_id|difficulty_id をキーとするマップを作成
 	result := make(map[string]struct{}, len(records))
 	for _, r := range records {
 		key := fmt.Sprintf("%d|%d", r.SongID, r.DifficultyID)
@@ -265,7 +253,6 @@ func (c *AdditionalSongsConsolidator) prepareSongsForUpsert(existingIdxs map[str
 			continue
 		}
 
-		// 公式データに既に存在する場合はスキップ
 		if _, exists := existingIdxs[officialID]; exists {
 			skippedCount++
 			continue
@@ -277,14 +264,12 @@ func (c *AdditionalSongsConsolidator) prepareSongsForUpsert(existingIdxs map[str
 			continue
 		}
 
-		// ドメインエンティティを使用してSongを生成
 		songEntity, err := NewSongFromAdditional(&song, genreID)
 		if err != nil {
 			slog.Warn("Skipping invalid additional song", "title", song.Title, "error", err)
 			continue
 		}
 
-		// インフラモデルに変換
 		songModel := models.FromSongEntityForUpsert(songEntity)
 		songsToUpsert = append(songsToUpsert, additionalSongRecordForUpsert{
 			DisplayID:   songModel.DisplayID,
@@ -335,13 +320,13 @@ ON CONFLICT(official_idx) DO UPDATE SET
 func (c *AdditionalSongsConsolidator) prepareChartsFromSongsForUpsert(songIDs map[string]int) []additionalChartRecordForUpsert {
 	var chartsToUpsert []additionalChartRecordForUpsert
 
-	// 難易度とデータ取得関数のマッピング
+	// difficultyGetter は難易度ごとの譜面情報取得関数と有無判定をまとめます。
 	type difficultyGetter struct {
 		name     string
 		getConst func(s *importer.AdditionalSong) float64
 		getUK    func(s *importer.AdditionalSong) bool
 		getNotes func(s *importer.AdditionalSong) *int
-		hasChart func(s *importer.AdditionalSong) bool // 譜面が存在するかの判定
+		hasChart func(s *importer.AdditionalSong) bool
 	}
 
 	difficultyGetters := []difficultyGetter{
@@ -430,7 +415,6 @@ func (c *AdditionalSongsConsolidator) prepareAdditionalChartsForUpsert(songIDs m
 			continue
 		}
 
-		// 難易度をマップ
 		diffName := strings.ToUpper(strings.TrimSpace(chart.Diff))
 		diffID := c.difficultyMap[diffName]
 		if diffID == 0 {
@@ -439,7 +423,6 @@ func (c *AdditionalSongsConsolidator) prepareAdditionalChartsForUpsert(songIDs m
 			continue
 		}
 
-		// 既存チャートがある場合はスキップ（公式データを尊重）
 		chartKey := fmt.Sprintf("%d|%d", songID, diffID)
 		if _, exists := existingCharts[chartKey]; exists {
 			slog.Debug("Skipping additional chart (already exists in official data)",
@@ -477,7 +460,6 @@ ON CONFLICT(song_id, difficulty_id) DO UPDATE SET
 
 // consolidateWECharts はWORLD'S END譜面をワークスペースに反映します
 func (c *AdditionalSongsConsolidator) consolidateWECharts(ctx context.Context, existingIdxs map[string]struct{}) error {
-	// WORLD'S END楽曲を準備してUPSERT
 	weRecords, seenOfficialIdx := c.prepareWESongsForUpsert(existingIdxs)
 	if len(weRecords) == 0 {
 		slog.Info("No new WORLD'S END songs to add")
@@ -489,13 +471,11 @@ func (c *AdditionalSongsConsolidator) consolidateWECharts(ctx context.Context, e
 	}
 	slog.Info("Bulk upserted WORLD'S END songs", "count", len(weRecords))
 
-	// UPSERTした楽曲のIDを取得
 	songIDs, err := FetchSongIDsByOfficialIdx(ctx, c.workspace.DB(), seenOfficialIdx)
 	if err != nil {
 		return err
 	}
 
-	// WORLD'S END譜面情報をUPSERT
 	weChartsToUpsert := c.prepareWEChartsForUpsert(songIDs)
 	if len(weChartsToUpsert) > 0 {
 		if err := c.bulkUpsertWECharts(ctx, weChartsToUpsert); err != nil {
@@ -520,7 +500,6 @@ func (c *AdditionalSongsConsolidator) prepareWESongsForUpsert(existingIdxs map[s
 			continue
 		}
 
-		// 既に存在する場合はスキップ
 		if _, exists := existingIdxs[officialID]; exists {
 			skippedCount++
 			continue
@@ -532,7 +511,6 @@ func (c *AdditionalSongsConsolidator) prepareWESongsForUpsert(existingIdxs map[s
 			continue
 		}
 
-		// ドメインの値オブジェクトを使用
 		displayID, err := vo.NewDisplayID()
 		if err != nil {
 			slog.Warn("Failed to generate display ID for WORLD'S END song", "title", weChart.Title, "error", err)
@@ -541,7 +519,6 @@ func (c *AdditionalSongsConsolidator) prepareWESongsForUpsert(existingIdxs map[s
 
 		jacket := vo.NewJacketImage(weChart.Img)
 
-		// リリース日をパース（値オブジェクトを使用）
 		releasedAt, err := vo.ParseReleaseDate(weChart.Release)
 		if err != nil && weChart.Release != "" {
 			slog.Warn("Failed to parse release date for WORLD'S END song", "release", weChart.Release, "title", weChart.Title, "error", err)
@@ -552,11 +529,11 @@ func (c *AdditionalSongsConsolidator) prepareWESongsForUpsert(existingIdxs map[s
 			Title:       strings.TrimSpace(weChart.Title),
 			Artist:      strings.TrimSpace(weChart.Artist),
 			GenreID:     genreID,
-			BPM:         nil, // WORLD'S ENDはBPM情報なし
+			BPM:         nil,
 			ReleasedAt:  releasedAt.StringPtr(),
 			OfficialIdx: officialID,
 			Jacket:      jacket.NullableString(),
-			IsWorldsEnd: 1, // WORLD'S ENDフラグ
+			IsWorldsEnd: 1,
 		})
 		seenOfficialIdx[officialID] = struct{}{}
 	}
@@ -587,7 +564,6 @@ func (c *AdditionalSongsConsolidator) prepareWEChartsForUpsert(songIDs map[strin
 			continue
 		}
 
-		// attributeをポインタ型に変換
 		var attribute *string
 		kanjiStr := strings.TrimSpace(weChart.WEKanji)
 		if kanjiStr != "" {

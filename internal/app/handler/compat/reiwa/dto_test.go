@@ -117,7 +117,7 @@ func TestToChunithmRecordOriginalResponse_Basic(t *testing.T) {
 	assert.Equal(t, "5", r0.Idx)
 	assert.Equal(t, 200, r0.BPM)
 	assert.Equal(t, "PARADISE", r0.Version)
-	// 2020-01-15 00:00:00 JST = 2019-01-14 15:00:00 UTC = 1579014000 / 100 = 15790140
+	// 2020-01-15 00:00:00 JST = 2020-01-14 15:00:00 UTC = 1579014000 / 100 = 15790140
 	assert.Equal(t, int64(15790140), r0.Release)
 
 	r1 := result[1]
@@ -218,7 +218,7 @@ func TestToChunithmRecordOriginalResponse_SortOrder(t *testing.T) {
 	result := ToChunithmRecordOriginalResponse(songs, nil)
 	assert.Len(t, result, 4)
 
-	// idx: "2" (numerically 2) < "10" (numerically 10)
+	// idxは文字列順ではなく数値順で "2" が "10" より先になる。
 	assert.Equal(t, "2", result[0].Idx)
 	assert.Equal(t, "BAS", result[0].Diff)
 	assert.Equal(t, "2", result[1].Idx)

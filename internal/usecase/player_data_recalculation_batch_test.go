@@ -247,7 +247,6 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠をリリース日で再�
 	// Then
 	require.NoError(t, err)
 	assert.True(t, currentBroken)
-	// 譜面1はbest1位のまま変わらないため、new枠へ移る譜面2だけを更新します。
 	assert.Empty(t, update.ClearChartIDs)
 	assert.Equal(t, []repository.PlayerBatchSlotAssignment{{ChartID: 2, SlotID: snapshot.SlotIDs["new"], Position: 1}}, update.Assignments)
 }
@@ -275,7 +274,6 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠から候補枠と指標�
 	require.NoError(t, err)
 	assert.True(t, currentBroken)
 	assert.Empty(t, update.ClearChartIDs)
-	// 譜面1はbest1位のまま変わらないため、残る30件（本枠29件と候補枠1件）だけを更新します。
 	require.Len(t, update.Assignments, 30)
 	assert.Equal(t, repository.PlayerBatchSlotAssignment{ChartID: 31, SlotID: snapshot.SlotIDs["best_candidate"], Position: 1}, update.Assignments[29])
 	assert.Positive(t, update.PlayerRating)
@@ -613,7 +611,6 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			// 譜面3は削除済み楽曲にして枠の対象外にします。
 			snapshot := batchSnapshotForSlotTest(3)
 			snapshot.Songs[2].IsDeleted = true
 			prepared := preparedBatchSnapshotForCustomSnapshot(t, snapshot)

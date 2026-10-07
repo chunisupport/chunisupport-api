@@ -60,7 +60,7 @@ func TestToMusicShowResponse(t *testing.T) {
 			{
 				ID:             1,
 				SongID:         1,
-				DifficultyID:   1, // BASIC
+				DifficultyID:   1,
 				Const:          chartConstBAS,
 				IsConstUnknown: false,
 				Notes:          &notesVal,
@@ -68,7 +68,7 @@ func TestToMusicShowResponse(t *testing.T) {
 			{
 				ID:             2,
 				SongID:         1,
-				DifficultyID:   4, // MASTER
+				DifficultyID:   4,
 				Const:          chartConstMAS,
 				IsConstUnknown: false,
 				Notes:          &notesVal,
@@ -82,10 +82,8 @@ func TestToMusicShowResponse(t *testing.T) {
 		},
 	}
 
-	// 変換実行
 	result := ToMusicShowResponse(song, masters)
 
-	// 検証
 	assert.NotNil(t, result)
 	assert.Equal(t, "test-song-001", result.Meta.ID)
 	assert.Equal(t, "テスト楽曲", result.Meta.Title)
@@ -97,7 +95,6 @@ func TestToMusicShowResponse(t *testing.T) {
 	assert.NotNil(t, result.Meta.Release)
 	assert.Equal(t, "2023-04-13", *result.Meta.Release)
 
-	// 譜面データの検証
 	assert.NotNil(t, result.Data.BAS)
 	assert.Equal(t, 8.0, result.Data.BAS.Level)
 	assert.Equal(t, 8.0, result.Data.BAS.Const)

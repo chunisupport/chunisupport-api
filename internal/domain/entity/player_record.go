@@ -28,12 +28,11 @@ type PlayerRecord struct {
 	ChartDifficulty *ChartDifficulty
 }
 
-// IsRanked はこのレコードがランキング対象（スロット指定あり）かを判定します。
+// IsRanked はスロット名が空でも "none" でもないレコードをランキング対象と判定します。
 func (r *PlayerRecord) IsRanked() bool {
 	if r.Slot == nil {
 		return false
 	}
-	// "none" スロットはランキング対象外
 	return r.Slot.Name != "" && r.Slot.Name != "none"
 }
 

@@ -9,9 +9,9 @@ import (
 // DisplayID はマスタデータの表示用IDを表す値オブジェクト
 type DisplayID string
 
-// NewDisplayID は新しいDisplayIDを生成します（crypto/rand使用）
+// NewDisplayID はランダムな16文字の16進数IDを生成します。
 func NewDisplayID() (DisplayID, error) {
-	b := make([]byte, 8) // 16文字の16進数
+	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("failed to generate display ID: %w", err)
 	}

@@ -19,9 +19,9 @@ const (
 	CodeRecentSignInRequired     = "recent_sign_in_required"
 
 	// ユーザー関連エラー
-	CodeRegistrationFailed = "registration_failed" // ユーザー登録失敗（詳細を隠蔽）
-	CodeUserNotFound       = "user_not_found"      // ユーザーが見つからない（private含む）
-	CodeOperationFailed    = "operation_failed"    // 操作失敗（詳細を隠蔽）
+	CodeRegistrationFailed = "registration_failed"
+	CodeUserNotFound       = "user_not_found"
+	CodeOperationFailed    = "operation_failed"
 
 	// プレイヤー関連エラー
 	CodePlayerNotLinked             = "player_not_linked"
@@ -42,8 +42,8 @@ const (
 	CodeChartNotFound                     = "chart_not_found"
 	CodeInvalidGenreID                    = "invalid_genre_id"
 	CodeInvalidDifficultyID               = "invalid_difficulty_id"
-	CodeInvalidDifficulty                 = "invalid_difficulty"     // 無効な難易度パラメータ
-	CodeDuplicateOfficialIdx              = "duplicate_official_idx" // official_idx 重複
+	CodeInvalidDifficulty                 = "invalid_difficulty"
+	CodeDuplicateOfficialIdx              = "duplicate_official_idx"
 	CodeScoreHistoryNotFound              = "score_history_not_found"
 	CodeScoreHistoryUnsupportedDifficulty = "score_history_unsupported_difficulty"
 

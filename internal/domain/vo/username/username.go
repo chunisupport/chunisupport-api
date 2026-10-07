@@ -67,7 +67,7 @@ func (u *UserName) Scan(src any) error {
 
 // MarshalJSON は json.Marshaler を実装します
 func (u UserName) MarshalJSON() ([]byte, error) {
-	// エスケープを適切に処理するためにjson.Marshalを使用
+	// 手動でJSON文字列を組み立てず、json.Marshal にエスケープを任せます。
 	return json.Marshal(u.value)
 }
 

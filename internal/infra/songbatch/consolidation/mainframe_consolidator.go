@@ -53,7 +53,6 @@ func (c *MainframeConsolidator) Consolidate(ctx context.Context) error {
 			continue
 		}
 
-		// タイトル、ジャンル、難易度を正規化してマッチングキーを作成
 		normalizedTitle := normalizer(title)
 		normalizedGenre := normalizer(genre)
 		matchKey := fmt.Sprintf("%s|%s|%d", normalizedTitle, normalizedGenre, diffID)
@@ -102,11 +101,9 @@ func (c *MainframeConsolidator) buildChartMap(ctx context.Context) (map[string]i
 
 	result := make(map[string]int, len(rows))
 	for _, row := range rows {
-		// タイトルとジャンルを正規化
 		normalizedTitle := normalizer(row.Title)
 		normalizedGenre := normalizer(row.GenreName)
 
-		// タイトル+ジャンル+難易度のキー
 		key := fmt.Sprintf("%s|%s|%d", normalizedTitle, normalizedGenre, row.DifficultyID)
 		result[key] = row.SongID
 	}
@@ -116,31 +113,25 @@ func (c *MainframeConsolidator) buildChartMap(ctx context.Context) (map[string]i
 // normalizer はタイトル文字列を正規化します。
 // NFKC正規化を行い、特殊文字を統一し、空白・制御文字・フォーマット文字を削除し、小文字に変換します。
 func normalizer(title string) string {
-	// JSONエスケープシーケンスを除去
-	title = strings.ReplaceAll(title, `\"`, `"`) // \" → "
-	title = strings.ReplaceAll(title, `\'`, `'`) // \' → '
+	title = strings.ReplaceAll(title, `\"`, `"`)
+	title = strings.ReplaceAll(title, `\'`, `'`)
 
-	// NFKC正規化（全角英数字を半角に、全角カナを半角に統一）
-	// これにより全角の１→1、ＡＢＣ→ABCなどが変換される
 	normalized := norm.NFKC.String(title)
 
-	// 引用符と波線を統一 (NFKC正規化後に実施)
-	normalized = strings.ReplaceAll(normalized, "\u201C", `"`) // " (LEFT DOUBLE QUOTATION MARK) → "
-	normalized = strings.ReplaceAll(normalized, "\u201D", `"`) // " (RIGHT DOUBLE QUOTATION MARK) → "
-	normalized = strings.ReplaceAll(normalized, "\u2018", `'`) // ' (LEFT SINGLE QUOTATION MARK) → '
-	normalized = strings.ReplaceAll(normalized, "\u2019", `'`) // ' (RIGHT SINGLE QUOTATION MARK) → '
-	normalized = strings.ReplaceAll(normalized, "\u301C", `~`) // 〜 (WAVE DASH) → ~
-	normalized = strings.ReplaceAll(normalized, "\uFF5E", `~`) // ～ (FULLWIDTH TILDE) → ~
+	// NFKC正規化では引用符や波線が統一されないため、正規化後に置換します。
+	normalized = strings.ReplaceAll(normalized, "\u201C", `"`)
+	normalized = strings.ReplaceAll(normalized, "\u201D", `"`)
+	normalized = strings.ReplaceAll(normalized, "\u2018", `'`)
+	normalized = strings.ReplaceAll(normalized, "\u2019", `'`)
+	normalized = strings.ReplaceAll(normalized, "\u301C", `~`)
+	normalized = strings.ReplaceAll(normalized, "\uFF5E", `~`)
 
-	// 空白・制御文字・フォーマット文字を削除
 	var builder strings.Builder
 	for _, r := range normalized {
-		// 空白、制御文字、フォーマット文字（U+202A等）を除外
 		if !unicode.IsSpace(r) && !unicode.IsControl(r) && !unicode.Is(unicode.Cf, r) {
 			builder.WriteRune(r)
 		}
 	}
 
-	// 小文字に変換
 	return strings.ToLower(builder.String())
 }

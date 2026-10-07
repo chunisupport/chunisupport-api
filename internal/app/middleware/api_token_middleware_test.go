@@ -126,7 +126,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("クエリパラメータのみでトークンが指定されている場合も401", func(t *testing.T) {
-		// SEC-005対応: クエリパラメータでのトークン受け渡しはセキュリティリスクがあるため無効化
+		// クエリパラメータで渡されたトークンでは認証しない。
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs?token=querytoken", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)

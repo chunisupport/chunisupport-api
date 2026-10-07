@@ -54,13 +54,14 @@ type CourseUsecase interface {
 
 type courseUsecase struct {
 	db             repository.Executor
+	tm             TransactionManager
 	repo           repository.CourseRepository
 	userRepo       repository.UserRepository
 	friendshipRepo repository.FriendshipRepository
 }
 
-func NewCourseUsecase(db repository.Executor, repo repository.CourseRepository, userRepo repository.UserRepository, friendshipRepo repository.FriendshipRepository) CourseUsecase {
-	return &courseUsecase{db: db, repo: repo, userRepo: userRepo, friendshipRepo: friendshipRepo}
+func NewCourseUsecase(db repository.Executor, tm TransactionManager, repo repository.CourseRepository, userRepo repository.UserRepository, friendshipRepo repository.FriendshipRepository) CourseUsecase {
+	return &courseUsecase{db: db, tm: tm, repo: repo, userRepo: userRepo, friendshipRepo: friendshipRepo}
 }
 
 func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*CourseOutput, error) {
@@ -130,32 +131,41 @@ func (u *courseUsecase) Update(ctx context.Context, displayID string, input Upda
 	if strings.TrimSpace(input.Name) == "" {
 		return nil, ErrInvalidCourseInput
 	}
-	course, err := u.repo.FindByDisplayID(ctx, u.db, displayID, true)
-	if errors.Is(err, repository.ErrCourseNotFound) {
-		return nil, ErrCourseNotFound
-	}
+	var output *CourseOutput
+	err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		course, err := u.repo.FindByDisplayIDForUpdate(ctx, tx, displayID)
+		if errors.Is(err, repository.ErrCourseNotFound) {
+			return ErrCourseNotFound
+		}
+		if err != nil {
+			return err
+		}
+		class, err := u.repo.FindClassByName(ctx, tx, normalizeCourseClass(input.Class))
+		if err != nil {
+			return err
+		}
+		course.Name = strings.TrimSpace(input.Name)
+		course.CourseClassID = class.ID
+		course.CourseClass = class
+		if err := course.Validate(); err != nil {
+			return errors.Join(ErrInvalidCourseInput, err)
+		}
+		if err := u.repo.Save(ctx, tx, course); err != nil {
+			return err
+		}
+		updated, err := u.repo.FindByOfficialIdx(ctx, tx, course.OfficialIdx, true)
+		if err != nil {
+			return err
+		}
+		output = toCourseOutput(updated, true)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	class, err := u.repo.FindClassByName(ctx, u.db, normalizeCourseClass(input.Class))
-	if err != nil {
-		return nil, err
-	}
-	course.Name = strings.TrimSpace(input.Name)
-	course.CourseClassID = class.ID
-	course.CourseClass = class
-	if err := course.Validate(); err != nil {
-		return nil, errors.Join(ErrInvalidCourseInput, err)
-	}
-	if err := u.repo.Save(ctx, u.db, course); err != nil {
-		return nil, err
-	}
-	updated, err := u.repo.FindByOfficialIdx(ctx, u.db, course.OfficialIdx, true)
-	if err != nil {
-		return nil, err
-	}
-	return toCourseOutput(updated, true), nil
+	return output, nil
 }
+
 func (u *courseUsecase) Delete(ctx context.Context, displayID string) error {
 	return u.setDeleted(ctx, displayID, true)
 }
@@ -163,15 +173,21 @@ func (u *courseUsecase) Restore(ctx context.Context, displayID string) error {
 	return u.setDeleted(ctx, displayID, false)
 }
 func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, deleted bool) error {
-	course, err := u.repo.FindByDisplayID(ctx, u.db, displayID, true)
-	if errors.Is(err, repository.ErrCourseNotFound) {
-		return ErrCourseNotFound
-	}
-	if err != nil {
-		return err
-	}
-	course.IsDeleted = deleted
-	return u.repo.Save(ctx, u.db, course)
+	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		course, err := u.repo.FindByDisplayIDForUpdate(ctx, tx, displayID)
+		if errors.Is(err, repository.ErrCourseNotFound) {
+			return ErrCourseNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if deleted {
+			course.Delete()
+		} else {
+			course.Restore()
+		}
+		return u.repo.Save(ctx, tx, course)
+	})
 }
 
 // GetUserRecords はユーザーのコースレコード一覧を返す。

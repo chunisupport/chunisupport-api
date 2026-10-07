@@ -44,7 +44,6 @@ func (h *SongHandler) GetSongs(c *echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
-	// DTOに変換
 	songDTOs := h.convertToSongDTOs(songsWithCharts)
 
 	result := &api_internal.SongsResponse{
@@ -78,7 +77,6 @@ func (h *SongHandler) GetSong(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// DTOに変換
 	songDTO := h.convertToSongDTO(song)
 
 	return c.JSON(http.StatusOK, songDTO)
@@ -120,7 +118,6 @@ func (h *SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 	}
 	difficultyPath := c.Param("difficulty")
 
-	// パスパラメータを内部難易度名に変換
 	difficultyName, ok := handler.ParseDifficultyPath(difficultyPath)
 	if !ok {
 		return apierror.ErrInvalidDifficulty
@@ -132,7 +129,6 @@ func (h *SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// rating_bandsはキャッシュから取得
 	ratingBands := h.staticMasterCache.RatingBands
 
 	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
@@ -230,7 +226,6 @@ func (h *SongHandler) UpdateSongs(c *echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests: must be array, not null"))
 	}
 
-	// バリデーション
 	for idx, req := range requests {
 		if req == nil {
 			return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("requests[%d]: request is null", idx))
@@ -245,7 +240,6 @@ func (h *SongHandler) UpdateSongs(c *echo.Context) error {
 		}
 	}
 
-	// ユースケース層での更新処理
 	if err := h.songUsecase.UpdateSongs(c.Request().Context(), handler.ToUpdateSongInputs(requests)); err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -269,7 +263,6 @@ func (h *SongHandler) convertToSongDTO(song *entity.Song) *api_internal.SongDTO 
 	maxOP := h.songUsecase.CalcSongMaxOP(song)
 	songDTO := api_internal.ToSongDTO(song, h.masterCache.GenreNamesByID, maxOP)
 
-	// 難易度IDから名称へのマッピング（マスタデータから取得）
 	difficultyNames := h.masterCache.DifficultyNamesByID
 
 	songDTO.Charts = handler.BuildChartsMap(song.Charts, difficultyNames, func(chart *entity.Chart) *api_internal.ChartDTO {

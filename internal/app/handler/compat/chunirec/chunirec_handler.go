@@ -42,13 +42,11 @@ func NewChunirecHandler(songUsecase usecase.SongUsecase, chunirecUsecase usecase
 func (h *ChunirecHandler) GetMusicShowAll(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	// 楽曲を取得 (削除済みを含まない、requesterAccountTypeIDはnil)
 	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
 		return err
 	}
 
-	// DTOに変換
 	masters := h.masterCache.SongMasters()
 	response := ToMusicShowAllResponse(songs, masters)
 
@@ -60,7 +58,6 @@ func (h *ChunirecHandler) GetMusicShowAll(c *echo.Context) error {
 func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	// クエリパラメータ id を取得
 	displayID := c.QueryParam("id")
 	if displayID == "" {
 		return apierror.ErrValidationFailed
@@ -70,7 +67,6 @@ func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 		return apiErr
 	}
 
-	// 楽曲を取得
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	song, err := h.songUsecase.GetSongByDisplayID(ctx, validDisplayID, requesterAccountTypeID)
 	if err != nil {
@@ -81,7 +77,6 @@ func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
-	// DTOに変換
 	masters := h.masterCache.SongMasters()
 	response := ToMusicShowResponse(song, masters)
 
@@ -155,7 +150,6 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 		}
 	}
 
-	// chunirec互換DTOに変換
 	response := ToChunirecProfileDTO(result, h.masterCache, h.location)
 
 	return c.JSON(http.StatusOK, response)

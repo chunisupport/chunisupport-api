@@ -142,7 +142,6 @@ func (d *Downloader) downloadDatasource(ctx context.Context, ds Datasource) erro
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// fix_songs_charts データソースの場合、APIレスポンスのsuccessフラグをチェック
 	if ds.Type == "fix_songs_charts" {
 		var apiResponse struct {
 			Success bool `json:"success"`
@@ -156,7 +155,6 @@ func (d *Downloader) downloadDatasource(ctx context.Context, ds Datasource) erro
 		}
 	}
 
-	// JSONをminifyして不要な空白を削除
 	originalSize := len(data)
 	var minified bytes.Buffer
 	if err := json.Compact(&minified, data); err != nil {
@@ -211,7 +209,6 @@ func (d *Downloader) buildURL(baseURL string, params any) (string, error) {
 
 // downloadMainframe はmainframeデータソース(Googleスプレッドシート)から専用の方法でダウンロードします
 func (d *Downloader) downloadMainframe(ctx context.Context, ds Datasource) error {
-	// paramsからapiKeyとsheetIDを取得
 	paramsMap, ok := ds.Params.(map[string]string)
 	if !ok {
 		return fmt.Errorf("mainframe params must be map[string]string, got %T", ds.Params)
@@ -240,7 +237,6 @@ func (d *Downloader) downloadMainframe(ctx context.Context, ds Datasource) error
 
 // downloadAdditionalSongs はadditional_songsデータソース(Googleスプレッドシート)から専用の方法でダウンロードします
 func (d *Downloader) downloadAdditionalSongs(ctx context.Context, ds Datasource) error {
-	// paramsからapiKeyとsheetIDを取得
 	paramsMap, ok := ds.Params.(map[string]string)
 	if !ok {
 		return fmt.Errorf("additional_songs params must be map[string]string, got %T", ds.Params)

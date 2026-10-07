@@ -163,7 +163,6 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	difficulties := make(map[string]master.ChartDifficulty, len(difficultyRows))
 	difficultyNamesByID := make(map[int]string, len(difficultyRows))
 	for _, row := range difficultyRows {
-		// 難易度名はデータベースの大文字表記をそのまま使用
 		difficulties[row.Name] = master.ChartDifficulty{ID: row.ID, Name: row.Name, SortOrder: row.SortOrder}
 		difficultyNamesByID[row.ID] = row.Name
 	}

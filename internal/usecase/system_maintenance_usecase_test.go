@@ -34,7 +34,6 @@ func TestNewSystemMaintenanceUsecase_起動時の状態を読み込む(t *testin
 		UpdatedAt: updatedAt,
 	}, maintenanceUsecase.Current())
 
-	// リポジトリが返した可変エンティティから公開中の状態を変更できないことを確認します。
 	initial.Enabled = false
 	initial.UpdatedAt = updatedAt.Add(time.Hour)
 	assert.True(t, maintenanceUsecase.Current().Enabled)

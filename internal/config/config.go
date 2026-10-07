@@ -77,16 +77,16 @@ type Config struct {
 	// Location は検証済みのAPI出力用タイムゾーンです。
 	Location *time.Location `json:"-"`
 	// ShutdownTimeoutSeconds はシャットダウンのタイムアウト秒数
-	ShutdownTimeoutSeconds int             `json:"shutdown_timeout_seconds"`
-	CORS                   CORS            `json:"cors"`
-	ClientIP               ClientIP        `json:"client_ip"`
-	TempData               TempData        `json:"temp_data"`
-	UsernamePolicy         UsernamePolicy  `json:"-"`
-	DataTransferHMACSecret []byte          `json:"-"`
-	Firebase               Firebase        // 環境変数から読み込み
-	Turnstile              Turnstile       // 環境変数から読み込み
-	Database               Database        // 環境変数から読み込み
-	SongBatch              SongBatchConfig `json:"-"` // 環境変数から読み込み
+	ShutdownTimeoutSeconds int            `json:"shutdown_timeout_seconds"`
+	CORS                   CORS           `json:"cors"`
+	ClientIP               ClientIP       `json:"client_ip"`
+	TempData               TempData       `json:"temp_data"`
+	UsernamePolicy         UsernamePolicy `json:"-"`
+	DataTransferHMACSecret []byte         `json:"-"`
+	Firebase               Firebase
+	Turnstile              Turnstile
+	Database               Database
+	SongBatch              SongBatchConfig `json:"-"`
 	loggingSet             bool
 }
 
@@ -166,10 +166,8 @@ func LoadBatchConfig() (Config, error) {
 func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	var config Config
 
-	// .envファイルを読み込み(存在しない場合はスキップ)
 	_ = godotenv.Load()
 
-	// 環境変数APP_ENVから環境名を取得
 	env := os.Getenv("APP_ENV")
 	if env == "" {
 		return config, fmt.Errorf("APP_ENV environment variable is required (e.g., develop, staging, production)")
@@ -179,7 +177,6 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		return config, err
 	}
 
-	// JSONファイルから基本設定を読み込み
 	path := filepath.Join(info.ConfigDir, env+".settings.json")
 	configFile, err := os.Open(path) // #nosec G703 G304 APP_ENVはvalidateEnvで許可値に限定済み
 	if err != nil {
@@ -201,7 +198,6 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 	var errors []string
 
-	// 設定ファイルの検証
 	if config.ShutdownTimeoutSeconds <= 0 {
 		errors = append(errors, "shutdown_timeout_seconds must be greater than 0")
 	}
@@ -226,12 +222,10 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	}
 
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
-		// normalizeAndValidateDatabasePoolConfigが返すエラーからプレフィックスを削除して個別のエラーとして追加
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
 		if strings.HasPrefix(errMsg, prefix) {
 			errMsg = strings.TrimPrefix(errMsg, prefix)
-			// セミコロンで分割して個別のエラーとして追加
 			for _, msg := range strings.Split(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
@@ -241,12 +235,10 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	}
 
 	if err := normalizeAndValidateDatabaseStartupConfig(&config.Database.Startup); err != nil {
-		// normalizeAndValidateDatabaseStartupConfigが返すエラーからプレフィックスを削除して個別のエラーとして追加
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
 		if strings.HasPrefix(errMsg, prefix) {
 			errMsg = strings.TrimPrefix(errMsg, prefix)
-			// セミコロンで分割して個別のエラーとして追加
 			for _, msg := range strings.Split(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
@@ -275,7 +267,6 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 	config.SongBatch = loadSongBatchConfigFromEnv()
 
-	// データベース設定を環境変数から取得
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
 		errors = append(errors, "DB_NAME environment variable is required")
@@ -308,7 +299,6 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		errors = append(errors, "DB_PASS environment variable is required")
 	}
 
-	// すべてのエラーをまとめて返す
 	if len(errors) > 0 {
 		return config, fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
@@ -483,7 +473,6 @@ func normalizeAndValidateDatabaseStartupConfig(startup *DatabaseStartupConfig) e
 func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 	var errors []string
 
-	// 必須フィールドのチェック
 	if pool.MaxOpenConns == nil {
 		errors = append(errors, "database.pool.max_open_conns is required")
 	}
@@ -497,7 +486,6 @@ func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 		errors = append(errors, "database.pool.conn_max_idle_time_sec is required")
 	}
 
-	// 必須フィールドが欠けている場合はここで返す
 	if len(errors) > 0 {
 		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
@@ -507,7 +495,6 @@ func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 	connMaxLifetimeSec := *pool.ConnMaxLifetimeSec
 	connMaxIdleTimeSec := *pool.ConnMaxIdleTimeSec
 
-	// 値の範囲チェック
 	if maxOpenConns < 0 {
 		errors = append(errors, "database.pool.max_open_conns must be 0 or greater")
 	}
@@ -525,7 +512,6 @@ func normalizeAndValidateDatabasePoolConfig(pool *DatabasePoolConfig) error {
 		return fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
 	}
 
-	// MaxIdleがMaxOpenより大きい場合の調整
 	if maxOpenConns > 0 && maxIdleConns > maxOpenConns {
 		maxIdleConns = maxOpenConns
 	}

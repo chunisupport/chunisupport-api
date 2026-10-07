@@ -14,7 +14,6 @@ func NewWeKanji(s string) WeKanji {
 	if s == "" {
 		return ""
 	}
-	// 複数文字の場合は最初の1文字のみ使用
 	r, _ := utf8.DecodeRuneInString(s)
 	if r == utf8.RuneError {
 		return ""

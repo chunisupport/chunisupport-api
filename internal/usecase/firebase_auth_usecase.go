@@ -77,8 +77,6 @@ func (u *firebaseAuthUsecase) authenticate(ctx context.Context, idToken string, 
 		return nil, errors.Join(ErrInternalError, errors.New("token verifier is nil"))
 	}
 
-	// Firebase 側で invalid / revoked / disabled と判定されたトークンは、
-	// DB 参照に進む前に tokenVerifier が ErrInvalidIDToken として拒否します。
 	uid, err := u.tokenVerifier.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		switch {

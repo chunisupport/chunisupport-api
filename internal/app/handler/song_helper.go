@@ -19,14 +19,13 @@ func ParseDifficultyPath(path string) (difficultyName string, ok bool) {
 	return info.ParseDifficultyPath(path)
 }
 
-// BuildChartsMap creates a map of charts keyed by difficulty name.
-// T is the type of the Chart DTO (e.g., *dto.ChartDTO or *dto.V1ChartDTO).
+// BuildChartsMap は難易度名をキーとする譜面マップを生成します。
+// Tには譜面DTOの型を指定します。存在しない難易度の値はTのゼロ値です。
 func BuildChartsMap[T any](
 	charts []*entity.Chart,
 	difficultyNames map[int]string,
 	converter func(*entity.Chart) T,
 ) map[string]T {
-	// Initialize map with nil for all difficulty levels
 	chartsMap := make(map[string]T)
 	for diffID, diffName := range difficultyNames {
 		if diffID >= MinDifficultyID && diffID <= MaxDifficultyID {
@@ -35,7 +34,6 @@ func BuildChartsMap[T any](
 		}
 	}
 
-	// Populate map with actual chart data
 	for _, chart := range charts {
 		if diffName, ok := difficultyNames[chart.DifficultyID]; ok {
 			chartsMap[diffName] = converter(chart)

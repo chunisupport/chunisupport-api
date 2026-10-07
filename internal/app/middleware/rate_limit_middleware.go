@@ -22,9 +22,9 @@ type RateLimitConfig struct {
 
 // rateLimitEntry はFixed Window方式のレートリミット情報を保持します
 type rateLimitEntry struct {
-	Count       int       // 現在のウィンドウ内でのリクエスト数
-	WindowStart time.Time // 現在のウィンドウの開始時刻
-	Limit       int       // このエントリの制限数（ADMIN: 150000, EDITOR/EXTDEV: 3000, その他: 150）
+	Count       int
+	WindowStart time.Time
+	Limit       int
 }
 
 // FixedWindowStore はFixed Window方式のレートリミットストアです
@@ -88,7 +88,6 @@ func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, re
 	now := time.Now()
 	entry, exists := s.entries[identifier]
 
-	// エントリが存在しない、またはウィンドウが終了している場合は新規作成
 	if !exists || now.Sub(entry.WindowStart) >= s.window {
 		entry = &rateLimitEntry{
 			Count:       0,
@@ -98,15 +97,12 @@ func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, re
 		s.entries[identifier] = entry
 	}
 
-	// リセット時刻を計算
 	resetTime = entry.WindowStart.Add(s.window)
 
-	// 制限チェック
 	if entry.Count >= entry.Limit {
 		return false, 0, resetTime
 	}
 
-	// リクエストを許可
 	entry.Count++
 	remaining = entry.Limit - entry.Count
 
@@ -135,7 +131,6 @@ func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window tim
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			// ユーザーエンティティを取得
 			userObj := c.Get("userEntity")
 			if userObj == nil {
 				return apierror.ErrUnauthorized
@@ -145,10 +140,8 @@ func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window tim
 				return apierror.ErrUnauthorized
 			}
 
-			// ユーザーIDを識別子として使用
 			identifier := strconv.Itoa(user.ID)
 
-			// アカウントタイプに応じて制限数を変更
 			limit := normalLimit
 			switch user.AccountTypeID {
 			case info.AccountTypeAdmin:
@@ -157,10 +150,8 @@ func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window tim
 				limit = editorLimit
 			}
 
-			// レートリミットチェック
 			allowed, remaining, resetTime := store.Allow(identifier, limit)
 
-			// ヘッダーを設定
 			c.Response().Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
 			c.Response().Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 			c.Response().Header().Set("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
@@ -182,10 +173,8 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			// IPアドレスを識別子として使用
 			identifier := c.RealIP()
 
-			// レートリミットチェック
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 
 			if !allowed {
@@ -209,10 +198,8 @@ func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 				return apierror.ErrUnauthorized
 			}
 
-			// ユーザーIDを識別子として使用
 			identifier := strconv.Itoa(user.ID)
 
-			// レートリミットチェック
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 			if !allowed {
 				return apierror.ErrTooManyRequests
@@ -237,10 +224,8 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 				return next(c)
 			}
 
-			// IPアドレスを識別子として使用
 			identifier := c.RealIP()
 
-			// レートリミットチェック
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 			if !allowed {
 				return apierror.ErrTooManyRequests

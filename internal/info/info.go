@@ -96,21 +96,22 @@ const (
 	TheoreticalOverpowerBonus   = 5.0
 
 	// レートリミット設定: 外部API v1
-	APIRateLimitRequests       = 150              // 一般ユーザーのリクエスト制限（15分間）
-	APIRateLimitEditorRequests = 3000             // EDITOR/EXTDEV共用のリクエスト制限（15分間）
-	APIRateLimitAdminRequests  = 150000           // ADMINユーザーのリクエスト制限（15分間）
-	APIRateLimitWindow         = 15 * time.Minute // レートリミットのウィンドウ期間
+	APIRateLimitRequests       = 150
+	APIRateLimitEditorRequests = 3000
+	APIRateLimitAdminRequests  = 150000
+	APIRateLimitWindow         = 15 * time.Minute
 
 	// レートリミット設定: 認証エンドポイント（IPベース）
-	LoginRateLimitRequests          = 10              // ログインエンドポイントのリクエスト制限（1分間）
-	LoginRateLimitWindow            = 1 * time.Minute // ログインレートリミットのウィンドウ期間
-	RegisterRateLimitRequests       = 5               // 登録エンドポイントのリクエスト制限（1分間）
-	RegisterRateLimitWindow         = 1 * time.Minute // 登録レートリミットのウィンドウ期間
+	LoginRateLimitRequests          = 10
+	LoginRateLimitWindow            = 1 * time.Minute
+	RegisterRateLimitRequests       = 5
+	RegisterRateLimitWindow         = 1 * time.Minute
 	InternalPublicRateLimitRequests = 60
 	InternalPublicRateLimitWindow   = 1 * time.Minute
 	RatingBadgeIPRateLimitRequests  = 600
 	RatingBadgeSchemaVersion        = 1
 	RatingBadgeLabel                = "CHUNITHM RATING"
+	OverpowerBadgeLabel             = "CHUNITHM OVER POWER"
 	RatingBadgeRainbowExColor       = "#3597ed"
 	RatingBadgeRainbowColor         = "#73b2f1"
 	RatingBadgePlatinumColor        = "#ffeac9"
@@ -138,10 +139,10 @@ const (
 	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
 	// アカウントタイプ定数
-	AccountTypePlayer = constants.AccountTypePlayer // 一般ユーザー
-	AccountTypeEditor = constants.AccountTypeEditor // 編集者
-	AccountTypeAdmin  = constants.AccountTypeAdmin  // 管理者
-	AccountTypeExtDev = constants.AccountTypeExtDev // 外部API開発者
+	AccountTypePlayer = constants.AccountTypePlayer
+	AccountTypeEditor = constants.AccountTypeEditor
+	AccountTypeAdmin  = constants.AccountTypeAdmin
+	AccountTypeExtDev = constants.AccountTypeExtDev
 
 	// リクエストボディサイズ上限
 	RequestBodyLimit                      = 5 * 1024 * 1024
@@ -171,8 +172,8 @@ const (
 )
 
 var (
-	BuildDate = "dev"  // ビルド日: YYYYMMDD
-	Revision  = "none" // Git短縮ハッシュ: a1b2c3d。開発起動時はnone
+	BuildDate = "dev"  // ビルド日: YYYYMMDD。開発起動時はdev
+	Revision  = "none" // Git短縮ハッシュ。開発起動時はnone
 )
 
 var (
@@ -190,7 +191,7 @@ var (
 		AccountTypeAdmin: {
 			AccountTypeAdmin: {},
 		},
-		// EXTDEVはPLAYERの操作を利用できる一方、専用ゲートではEXTDEV自身だけを許可する。
+		// EXTDEVはPLAYER要件も満たしますが、この専用要件をほかのロールへ開放しないため、EXTDEVだけを許可します。
 		AccountTypeExtDev: {
 			AccountTypeExtDev: {},
 		},
@@ -212,6 +213,15 @@ func HasRole(accountTypeID, requiredRoleID int) bool {
 
 	_, ok = allowedAccountTypes[accountTypeID]
 	return ok
+}
+
+// OverpowerBadgePossessionColors はポゼッションマスタの固定IDに対応する既存のレート色です。
+var OverpowerBadgePossessionColors = map[int]string{
+	1: "lightgrey",
+	2: RatingBadgeSilverColor,
+	3: RatingBadgeGoldColor,
+	4: RatingBadgePlatinumColor,
+	5: RatingBadgeRainbowColor,
 }
 
 // HardLampAbbrevToName はAPI略称→マスタ名（clear_lamp_types.name）への変換テーブルです。

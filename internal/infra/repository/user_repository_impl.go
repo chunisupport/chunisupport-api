@@ -179,7 +179,6 @@ func (r *userRepository) Save(ctx context.Context, exec repository.Executor, use
 	userModel := models.FromUserEntity(user)
 
 	if user.ID == 0 {
-		// 新規作成
 		query := `INSERT INTO users (username, firebase_uid, created_at, updated_at, player_id, account_type_id, is_suspicious, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 		result, err := exec.ExecContext(ctx, query, userModel.Username, userModel.FirebaseUID, userModel.CreatedAt, userModel.UpdatedAt, userModel.PlayerID, userModel.AccountTypeID, userModel.IsSuspicious, userModel.IsPrivate)
 		if err != nil {

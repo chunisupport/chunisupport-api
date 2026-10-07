@@ -11,6 +11,9 @@ type UserUsecase interface {
 	// GetPublicOfficialRating は外部バッジへ認証情報を渡さずに済むよう匿名閲覧可能な公式RATINGだけを取得します。
 	GetPublicOfficialRating(ctx context.Context, username string) (*float64, error)
 
+	// GetPublicBadgePlayer は外部バッジ向けに匿名閲覧可能なプレイヤーの保存値を取得します。
+	GetPublicBadgePlayer(ctx context.Context, username string) (*entity.Player, error)
+
 	// GetUserProfile はユーザー名をキーにプロファイル（username + player）のみを軽量に取得します。
 	// 対象ユーザーが非公開設定の場合、閲覧者が本人または承認済みフレンドでなければ ErrUserPrivate を返します。
 	GetUserProfile(ctx context.Context, username string, requester *entity.User) (*UserProfileOutput, error)
