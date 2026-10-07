@@ -288,7 +288,6 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 
 			ctx := context.Background()
 
-			// 期待されるリポジトリの呼び出し
 			expectedSongs := []*entity.Song{
 				{
 					ID:          1,
@@ -299,7 +298,6 @@ func TestGetAllSongsExcludingWorldsend_WithDeletedSongs_RequiresEditorPermission
 				},
 			}
 
-			// tt.expectedIncludeDeleted に基づいてリポジトリが呼び出されることを期待
 			mockRepo.On("FindAllExcludingWorldsend", ctx, mockExec, tt.expectedIncludeDeleted).Return(expectedSongs, nil)
 
 			// When

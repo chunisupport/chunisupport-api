@@ -33,7 +33,6 @@ func (oi *OtogeDbImporter) Import(filePath string) (*songbatch.ImportedSource, e
 		return nil, fmt.Errorf("failed to read otoge-db data file %s: %w", filePath, err)
 	}
 
-	// BOMを除去
 	data = removeBOM(data)
 
 	var otogeDbData OtogeDbData
@@ -41,7 +40,6 @@ func (oi *OtogeDbImporter) Import(filePath string) (*songbatch.ImportedSource, e
 		return nil, fmt.Errorf("failed to unmarshal otoge-db JSON: %w", err)
 	}
 
-	// すべてのフィールドの前後の空白を除去
 	for i := range otogeDbData {
 		otogeDbData[i].ID = strings.TrimSpace(otogeDbData[i].ID)
 		otogeDbData[i].Title = strings.TrimSpace(otogeDbData[i].Title)

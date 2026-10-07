@@ -94,7 +94,7 @@ type fakeChartStatsBatchRunner struct {
 func (r *fakeChartStatsBatchRunner) Execute(ctx context.Context) (ChartStatsBatchResult, error) {
 	r.called = true
 	if r.cancel != nil {
-		// 実行中に停止シグナルを受けた状況を再現する。err を指定した場合は、キャンセルと同時に別のエラーで失敗した状況になる
+		// err がある場合は、キャンセルと同時に別のエラーも返すケースを再現します。
 		r.cancel()
 		if r.err != nil {
 			return ChartStatsBatchResult{}, r.err

@@ -32,7 +32,6 @@ func (oi *OfficialImporter) Import(filePath string) (*songbatch.ImportedSource, 
 		return nil, fmt.Errorf("failed to read official data file %s: %w", filePath, err)
 	}
 
-	// BOMを除去
 	data = removeBOM(data)
 
 	var officialData OfficialData
@@ -40,7 +39,6 @@ func (oi *OfficialImporter) Import(filePath string) (*songbatch.ImportedSource, 
 		return nil, fmt.Errorf("failed to unmarshal official JSON: %w", err)
 	}
 
-	// すべてのフィールドの前後の空白を除去
 	for i := range officialData {
 		officialData[i].ID = strings.TrimSpace(officialData[i].ID)
 		officialData[i].Catname = strings.TrimSpace(officialData[i].Catname)
@@ -64,7 +62,6 @@ func (oi *OfficialImporter) Import(filePath string) (*songbatch.ImportedSource, 
 		return nil, fmt.Errorf("%w: official must contain at least one song", songbatch.ErrSourceValidation)
 	}
 
-	// WORLD'S END楽曲と通常楽曲をカウント
 	var normalCount, worldsEndCount int
 	for _, song := range officialData {
 		if song.WeKanji != "" || song.WeStar != "" {

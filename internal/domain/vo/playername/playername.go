@@ -13,8 +13,7 @@ type PlayerName struct {
 	value string
 }
 
-// NewPlayerName はバリデーション付きで新しいPlayerNameを作成します
-// プレイヤー名は全角8文字以下である必要があります
+// NewPlayerName は空文字・半角英数字・半角カタカナを拒否し、Unicodeコードポイント数が8以下の名前を生成します。
 func NewPlayerName(value string) (PlayerName, error) {
 	if err := validatePlayerName(value); err != nil {
 		return PlayerName{}, err
@@ -55,7 +54,7 @@ func (p *PlayerName) Scan(src any) error {
 
 // MarshalJSON は json.Marshaler を実装します
 func (p PlayerName) MarshalJSON() ([]byte, error) {
-	// エスケープを適切に処理するためにjson.Marshalを使用
+	// 手動でJSON文字列を組み立てず、json.Marshal にエスケープを任せます。
 	return json.Marshal(p.value)
 }
 
@@ -74,19 +73,16 @@ func (p *PlayerName) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// validatePlayerName はプレイヤー名が全角8文字以下であることを検証します
+// validatePlayerName は半角英数字・半角カタカナを拒否し、Unicodeコードポイント数を8文字以下に制限します。
 func validatePlayerName(value string) error {
 	if value == "" {
 		return errors.New("player name cannot be empty")
 	}
 
-	// 半角英数字と半角カタカナが含まれていないことを検証
 	for _, r := range value {
-		// 半角英数字のチェック
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
 			return errors.New("player name must not contain half-width alphanumeric characters")
 		}
-		// 半角カタカナのチェック (U+FF61〜U+FF9F)
 		if r >= 0xFF61 && r <= 0xFF9F {
 			return errors.New("player name must not contain half-width katakana")
 		}

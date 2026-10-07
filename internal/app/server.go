@@ -33,7 +33,7 @@ type Server struct {
 
 // NewServer は永続化済みの運用状態を読み込んでServerインスタンスを作成します。
 func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*Server, error) {
-	// 管理画面から起動したバッチは、停止シグナルに加えて Shutdown でもキャンセルできるようにする
+	// 管理画面から起動したバッチを、停止シグナルに加えて Shutdown でもキャンセルできるようにします。
 	routerCtx, cancelBatchJobs := context.WithCancel(ctx)
 	router, batchJobs, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
 	if err != nil {
@@ -94,7 +94,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	if len(s.batchJobs) > 0 {
-		// 実行中のバッチをキャンセルし、ロールバックと中断の記録が終わってから DB 接続を閉じる
+		// ロールバックと中断の記録にDB接続が必要なため、バッチの終了を待ってから接続を閉じます。
 		s.cancelBatchJobs()
 		done := make(chan struct{})
 		go func() {

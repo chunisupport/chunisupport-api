@@ -104,9 +104,8 @@ func (u *chartStatsUsecaseImpl) GetSongStatsByDisplayID(ctx context.Context, dis
 		return nil, err
 	}
 
-	// 削除済み楽曲は権限に応じて公開可否を制御する。
+	// 削除済み楽曲の存在を隠すため、権限がなければ未検出として扱います。
 	if !song.IsActive() {
-		// EDITOR以上の権限を持たない場合は404を返す。
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -240,7 +239,7 @@ func (u *chartStatsUsecaseImpl) getWorldsendSingleChartStats(ctx context.Context
 		return nil, err
 	}
 
-	// 削除済み楽曲は権限に応じて公開可否を制御する。
+	// 削除済み楽曲の存在を隠すため、権限がなければ未検出として扱います。
 	if !worldsend.Song.IsActive() {
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound

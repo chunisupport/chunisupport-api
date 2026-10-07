@@ -13,7 +13,7 @@ type UserProfileWithRecordsDTO struct {
 	Username  string                     `json:"username"`
 	Player    *dto.PlayerDTO             `json:"player"`
 	Records   *dto.UserRecordResponseDTO `json:"records"`
-	UpdatedAt *time.Time                 `json:"updated_at"` // プレイヤーデータの最終更新日時
+	UpdatedAt *time.Time                 `json:"updated_at"`
 }
 
 // UserRatingRecordResponseDTO はレーティング関連のレコードDTOです。
@@ -68,7 +68,7 @@ type UserProfileRatingViewDTO struct {
 	Username  string                       `json:"username"`
 	Player    *dto.PlayerDTO               `json:"player"`
 	Records   *UserRatingRecordResponseDTO `json:"records"`
-	UpdatedAt *time.Time                   `json:"updated_at"` // プレイヤーデータの最終更新日時
+	UpdatedAt *time.Time                   `json:"updated_at"`
 }
 
 // UserProfileRecordViewDTO はレコードビュー用のユーザープロファイルDTOです。
@@ -76,7 +76,7 @@ type UserProfileRecordViewDTO struct {
 	Username  string                     `json:"username"`
 	Player    *dto.PlayerDTO             `json:"player"`
 	Records   *UserRecordViewResponseDTO `json:"records"`
-	UpdatedAt *time.Time                 `json:"updated_at"` // プレイヤーデータの最終更新日時
+	UpdatedAt *time.Time                 `json:"updated_at"`
 }
 
 // UserProfileDTO はユーザー名とプレイヤー情報のみを含む軽量なプロファイルDTOです。
@@ -90,8 +90,8 @@ type UserProfileDTO struct {
 type UserDTO struct {
 	Username        string     `json:"username"`
 	AccountType     string     `json:"account_type"`
-	IsPrivate       bool       `json:"is_private"`        // 非公開設定
-	LastScoreUpdate *time.Time `json:"last_score_update"` // プレイヤースコアの最終更新日時
+	IsPrivate       bool       `json:"is_private"`
+	LastScoreUpdate *time.Time `json:"last_score_update"`
 }
 
 // ToUserDTO はエンティティからDTOへ変換します。

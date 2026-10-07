@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	maxPlayerDataPayloadSize = 5 * 1024 * 1024 // 5MB
+	maxPlayerDataPayloadSize = 5 * 1024 * 1024
 )
 
 // MeHandler は認証済みユーザー向けエンドポイントを扱います。
@@ -85,7 +85,6 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 		return apierror.ErrUnauthorized
 	}
 
-	// クエリパラメータでフォーマットを確認
 	format := c.QueryParam("format")
 
 	limitedReader := io.LimitReader(c.Request().Body, maxPlayerDataPayloadSize+1)
@@ -104,29 +103,26 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 	var hash [32]byte
 
 	if format == "json" {
-		// 生JSON形式（デバッグ用）
 		jsonData = raw
 		hash = sha256.Sum256(raw)
 	} else {
-		// デフォルト: base64+gzip形式
-		// ハッシュは圧縮前のJSONデータに対して計算
 		decompressed, err := decodeAndDecompressGzipBase64(raw)
 		if err != nil {
 			return apierror.ErrBadRequest.WithInternal(err)
 		}
 
-		// 解凍後のサイズチェック
 		if len(decompressed) > maxPlayerDataPayloadSize {
 			return apierror.ErrPayloadTooLarge
 		}
 
 		jsonData = decompressed
+		// format=json と同じ内容を同じハッシュで扱えるよう、圧縮前のJSONに対して計算します。
 		hash = sha256.Sum256(decompressed)
 	}
 
 	hashText := hex.EncodeToString(hash[:])
 
-	// 公式エクスポートJSONの前方互換性を保つため、未知フィールドは警告ログへ記録して登録を継続する
+	// 公式エクスポートJSONの前方互換性を保つため、未知フィールドは警告ログへ記録して登録を継続します。
 	unknownFields, err := unknownPlayerDataFields(jsonData)
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
@@ -166,7 +162,6 @@ func (h *MeHandler) DeletePlayerData(c *echo.Context) error {
 
 // decodeAndDecompressGzipBase64 はbase64エンコードされたgzip圧縮データをデコード・解凍します。
 func decodeAndDecompressGzipBase64(data []byte) ([]byte, error) {
-	// Base64デコード
 	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
 	n, err := base64.StdEncoding.Decode(decoded, data)
 	if err != nil {
@@ -174,7 +169,6 @@ func decodeAndDecompressGzipBase64(data []byte) ([]byte, error) {
 	}
 	decoded = decoded[:n]
 
-	// Gzip解凍（Gzip Bomb対策: 解凍後サイズに上限を設定）
 	gzipReader, err := gzip.NewReader(bytes.NewReader(decoded))
 	if err != nil {
 		return nil, err

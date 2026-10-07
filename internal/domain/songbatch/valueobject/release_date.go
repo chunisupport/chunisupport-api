@@ -17,10 +17,8 @@ func ParseReleaseDate(s string) (ReleaseDate, error) {
 		return "", nil
 	}
 
-	// YYYY/MM/DD → YYYY-MM-DD に正規化
 	normalized := strings.ReplaceAll(s, "/", "-")
 
-	// フォーマット検証
 	if _, err := time.Parse("2006-01-02", normalized); err != nil {
 		return "", fmt.Errorf("invalid release date format %q: %w", s, err)
 	}

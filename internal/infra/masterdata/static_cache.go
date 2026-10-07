@@ -82,7 +82,7 @@ func (c *StaticCache) RatingBandsSnapshot() []*ratingband.RatingBand {
 			continue
 		}
 		copied := *band
-		// Deep copy pointer fields to prevent mutation of cached values
+		// キャッシュ値の変更を防ぐため、ポインタフィールドも深くコピーします。
 		if band.MinInclusive != nil {
 			minVal := *band.MinInclusive
 			copied.MinInclusive = &minVal

@@ -61,7 +61,6 @@ func (q *FriendScoreComparisonQueryService) FindAcceptedFriendPair(
 	selfUserID int,
 	friendUsername string,
 ) (*domainrepo.FriendScoreComparisonUsers, error) {
-	// 双方向 accepted が2件ある場合だけ返す。不存在・片方向・申請中・自分自身は同じ未検出にする。
 	const query = `
 		SELECT
 			self_u.username AS self_username,
@@ -123,7 +122,6 @@ func (q *FriendScoreComparisonQueryService) ListChartRecords(
 	friendPlayerID int,
 	difficulty string,
 ) ([]*domainrepo.FriendScoreComparisonChartRecord, error) {
-	// 譜面マスタを起点に両者のレコードを1クエリでLEFT JOINする。未プレイの疑似レコードは作らない。
 	const query = `
 		SELECT
 			s.display_id AS song_display_id,

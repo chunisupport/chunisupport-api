@@ -98,10 +98,9 @@ var ValidDifficultyPaths = []string{
 	string(DifficultyPathWorldsend),
 }
 
-// ParseDifficultyPath はパスパラメータを内部難易度名に変換します。
+// ParseDifficultyPath は大文字小文字を区別せず、パスパラメータを内部難易度名に変換します。
 // 無効なパラメータの場合は空文字とfalseを返します。
 func ParseDifficultyPath(path string) (difficultyName string, ok bool) {
-	// パスパラメータは小文字で正規化して検索
 	name, ok := difficultyPathToName[strings.ToLower(path)]
 	return name, ok
 }

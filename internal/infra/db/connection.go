@@ -71,7 +71,6 @@ func Connect(dbConfig config.DbConfig) (*sqlx.DB, error) {
 
 // ConnectContext はデータベースへの接続を確立し、*sqlx.DBを返します。
 func ConnectContext(ctx context.Context, dbConfig config.DbConfig) (*sqlx.DB, error) {
-	// DSN (Data Source Name) を構築
 	// clientFoundRows=true: UPDATE時に「変更された行数」ではなく「マッチした行数」を返すようにする。
 	// これにより、値が変わらないUPDATEでもRowsAffected>=1となり、
 	// Save/SaveSongのRowsAffected==0チェック（存在確認）が正しく動作する。

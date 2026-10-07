@@ -25,16 +25,13 @@ func NewPlayerUsecase(db repository.Executor, playerRepo repository.PlayerReposi
 
 // CreatePlayer は新しいプレイヤーを作成し、永続化後のエンティティを返します。
 func (us *playerUsecase) CreatePlayer(ctx context.Context, userID int, name string) (*entity.Player, error) {
-	// 値オブジェクトを生成
 	playerNameVO, err := playername.NewPlayerName(name)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPlayerName, err)
 	}
 
-	// 新しいプレイヤーエンティティを作成
 	player := entity.NewPlayer(userID, playerNameVO)
 
-	// プレイヤーを永続化
 	if err := us.playerRepo.Save(ctx, us.db, player); err != nil {
 		return nil, err
 	}

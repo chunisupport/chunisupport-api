@@ -360,8 +360,6 @@ func (h *UserHandler) DeleteUser(c *echo.Context) error {
 	}
 	requester, ok := c.Get("userEntity").(*entity.User)
 	if !ok {
-		// 認証ミドルウェアが正しく機能していれば、この分岐に入ることはありません。
-		// 安全のため、不正なリクエストとして処理します。
 		return apierror.ErrUnauthorized
 	}
 

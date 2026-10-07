@@ -35,7 +35,6 @@ func (mi *MainframeImporter) Import(filePath string) (*songbatch.ImportedSource,
 		return nil, fmt.Errorf("failed to read mainframe data file %s: %w", filePath, err)
 	}
 
-	// BOMを除去
 	data = removeBOM(data)
 
 	var mainframeData MainframeData
@@ -43,7 +42,6 @@ func (mi *MainframeImporter) Import(filePath string) (*songbatch.ImportedSource,
 		return nil, fmt.Errorf("failed to unmarshal mainframe JSON: %w", err)
 	}
 
-	// すべてのフィールドの前後の空白を除去
 	for i := range mainframeData {
 		mainframeData[i].Title = strings.TrimSpace(mainframeData[i].Title)
 		mainframeData[i].Diff = strings.TrimSpace(mainframeData[i].Diff)

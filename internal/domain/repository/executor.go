@@ -7,13 +7,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Executor は *sqlx.DB と *sqlx.Tx の両方を扱うためのインターフェースです。
-// これにより、リポジトリのメソッドはトランザクションの内外で再利用可能になります。
-// Clean Architectureの原則に従い、このインターフェースはdomain層に配置され、
-// infra層の実装詳細（sqlx）に依存していますが、domain層がリポジトリの契約を定義する責務を持つため、
-// ここに配置されています。
-//
-// 全てのメソッドはContext対応版を使用し、リクエストのキャンセルやタイムアウトを適切に伝播します。
+// Executor は *sqlx.DB と *sqlx.Tx に共通するSQL実行インターフェースです。
+// Context対応メソッドを通じて、キャンセルやタイムアウトを伝播します。
+// リポジトリの契約はdomain層が定義する責務を持つため、sqlxへの依存を例外的に許容してここに配置しています。
 type Executor interface {
 	GetContext(ctx context.Context, dest any, query string, args ...any) error
 	SelectContext(ctx context.Context, dest any, query string, args ...any) error
@@ -25,6 +21,5 @@ type Executor interface {
 	QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row
 }
 
-// *sqlx.DB と *sqlx.Tx が Executor インターフェースを実装していることを確認します。
 var _ Executor = (*sqlx.DB)(nil)
 var _ Executor = (*sqlx.Tx)(nil)

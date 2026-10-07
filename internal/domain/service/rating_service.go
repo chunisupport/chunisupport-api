@@ -46,40 +46,29 @@ func calcSingleRatingHundredths(score uint32, chartConst float64) int64 {
 
 	switch {
 	case score >= 1_009_000:
-		// SSS+: 譜面定数 + 2.15（上限）
 		rating = base + 215
 	case score >= 1_007_500:
-		// SSS: 譜面定数 + 2.0、100点毎に+0.01
 		rating = base + 200 + int64(score-1_007_500)/100
 	case score >= 1_005_000:
-		// SS+: 譜面定数 + 1.5、50点毎に+0.01
 		rating = base + 150 + int64(score-1_005_000)/50
 	case score >= 1_000_000:
-		// SS: 譜面定数 + 1.0、100点毎に+0.01
 		rating = base + 100 + int64(score-1_000_000)/100
 	case score >= 990_000:
-		// S+: 譜面定数 + 0.6、250点毎に+0.01
 		rating = base + 60 + int64(score-990_000)/250
 	case score >= 975_000:
-		// S: 譜面定数、250点毎に+0.01
 		rating = base + int64(score-975_000)/250
 	case score >= 950_000:
-		// AAA: 譜面定数 - 1.67、150点毎に+0.01
 		rating = base - 167 + int64(score-950_000)/150
 	case score >= 925_000:
-		// AA: 譜面定数 - 3.34、150点毎に+0.01
 		rating = base - 334 + int64(score-925_000)/150
 	case score >= 900_000:
-		// A: 譜面定数 - 5.0、150点毎に+0.01
 		rating = base - 500 + int64(score-900_000)/150
 	case score >= 800_000:
-		// BBB: (譜面定数 - 5.0) / 2 から線形増加
 		diff := constTenths - 50
 		if diff > 0 {
 			rating = diff*5 + int64(score-800_000)*diff/20_000
 		}
 	case score >= 500_000:
-		// C: 0から(譜面定数 - 5.0) / 2まで線形増加
 		diff := constTenths - 50
 		if diff > 0 {
 			rating = int64(score-500_000) * diff / 60_000
@@ -102,7 +91,7 @@ func calcSingleRatingHundredths(score uint32, chartConst float64) int64 {
 // コンボランプ補正:
 //   - FULL COMBO: +0.5
 //   - ALL JUSTICE: +1.0
-//   - 理論値（1,010,000点）: +1.25
+//   - 理論値（1,010,000点）: ランプにかかわらず+1.25
 //
 // 計算中は0.001単位の整数を使用し、S以上は0.005、S未満は0.05単位で切り捨てます。
 func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) float64 {
@@ -115,28 +104,21 @@ func calcSingleOverpowerThousandths(score uint32, chartConst float64, comboLampI
 
 	switch {
 	case score >= 1_007_500:
-		// SSS以上: (譜面定数 + 2) × 5 + スコア補正
 		overpower = (constTenths+20)*500 + int64(score-1_007_500)*3/2
 	case score >= 1_005_000:
-		// SS+: (譜面定数 + 1.5) × 5 + スコア補正
 		overpower = (constTenths+15)*500 + int64(score-1_005_000)
 	case score >= 1_000_000:
-		// SS: (譜面定数 + 1) × 5 + スコア補正
 		overpower = (constTenths+10)*500 + int64(score-1_000_000)/2
 	case score >= 975_000:
-		// S～S+: 譜面定数 × 5 + スコア補正
 		overpower = constTenths*500 + int64(score-975_000)/5
 	case score >= 900_000:
-		// A～AAA: (譜面定数 - 5) × 5 + スコア補正
 		overpower = (constTenths-50)*500 + int64(score-900_000)/3
 	case score >= 800_000:
-		// BBB: (譜面定数 - 5) / 2 × 5から線形増加
 		diff := constTenths - 50
 		if diff > 0 {
 			overpower = diff*250 + int64(score-800_000)*diff/400
 		}
 	case score >= 500_000:
-		// C: 0から(譜面定数 - 5) / 2 × 5まで線形増加
 		diff := constTenths - 50
 		if diff > 0 {
 			overpower = int64(score-500_000) * diff / 1_200
@@ -144,20 +126,16 @@ func calcSingleOverpowerThousandths(score uint32, chartConst float64, comboLampI
 	}
 
 	if score == constants.TheoreticalScore {
-		// 理論値ではコンボランプ補正の代わりに+1.25する
 		overpower += 1_250
 	} else {
 		switch comboLampID {
 		case comboLampAllJustice:
-			// ALL JUSTICE: +1.0
 			overpower += 1_000
 		case comboLampFullCombo:
-			// FULL COMBO: +0.5
 			overpower += 500
 		}
 	}
 
-	// S以上は0.005単位、S未満は0.05単位で切り捨てる
 	unit := int64(50)
 	if score >= 975_000 {
 		unit = 5
@@ -203,9 +181,8 @@ type RatingStats struct {
 	NewAverage   float64
 }
 
-// CalcRatingStats はレコードリストからプレイヤーレーティング統計を一括計算します。
+// CalcRatingStats は BEST 上位30件と NEW 上位20件の平均、50枠固定のプレイヤーレーティングを計算します。各値は小数点以下4桁で切り捨てます。
 func CalcRatingStats(records []RatingRecord) RatingStats {
-	// 1. 単曲レーティングをBEST枠とNEW枠に分けて計算する
 	bestRatings := make([]int64, 0, len(records))
 	newRatings := make([]int64, 0, len(records))
 	for _, rec := range records {
@@ -217,17 +194,14 @@ func CalcRatingStats(records []RatingRecord) RatingStats {
 		}
 	}
 
-	// 2. BEST系レコードから単曲レーティング上位30曲を選ぶ
 	slices.SortFunc(bestRatings, func(a, b int64) int { return cmp.Compare(b, a) })
 	bestCount := min(30, len(bestRatings))
 	bestSum := sumRatings(bestRatings[:bestCount])
 
-	// 3. NEW系レコードから単曲レーティング上位20曲を選ぶ
 	slices.SortFunc(newRatings, func(a, b int64) int { return cmp.Compare(b, a) })
 	newCount := min(20, len(newRatings))
 	newSum := sumRatings(newRatings[:newCount])
 
-	// 4. 各平均と、50枠固定のプレイヤーレーティングを小数点以下4桁で切り捨てる
 	return RatingStats{
 		PlayerRating: scaledAverage(bestSum+newSum, playerRatingSlotCount),
 		BestAverage:  scaledAverage(bestSum, bestCount),

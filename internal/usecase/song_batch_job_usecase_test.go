@@ -122,7 +122,6 @@ func (r *fakeSongBatchRunner) Execute(ctx context.Context, req songbatch.RunRequ
 	r.called = true
 	r.request = req
 	if r.cancel != nil {
-		// 実行中に停止シグナルを受けた状況を再現する
 		r.cancel()
 		return r.result, ctx.Err()
 	}

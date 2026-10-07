@@ -8,9 +8,9 @@ import (
 // APIError はAPIエラーレスポンスを表す構造体
 // クライアントにはCodeのみを返し、詳細はサーバーログに記録する
 type APIError struct {
-	Code       string // 機械処理用エラーコード (例: "invalid_token")
-	HTTPStatus int    // HTTPステータスコード
-	Internal   error  // 内部エラー（ログ用、レスポンスには含めない）
+	Code       string
+	HTTPStatus int
+	Internal   error // 詳細をクライアントへ漏らさないため、ログにだけ使用します。
 }
 
 // Error はerrorインターフェースを実装
@@ -77,9 +77,9 @@ var (
 	ErrRecentSignInRequired     = New(CodeRecentSignInRequired, http.StatusUnauthorized)
 
 	// ユーザー関連エラー
-	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest) // 409→400に変更
-	ErrUserNotFound       = New(CodeUserNotFound, http.StatusNotFound)         // private含む
-	ErrOperationFailed    = New(CodeOperationFailed, http.StatusBadRequest)    // 削除系操作失敗
+	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest)
+	ErrUserNotFound       = New(CodeUserNotFound, http.StatusNotFound)
+	ErrOperationFailed    = New(CodeOperationFailed, http.StatusBadRequest)
 
 	// プレイヤー関連エラー
 	ErrPlayerNotLinked             = New(CodePlayerNotLinked, http.StatusNotFound)

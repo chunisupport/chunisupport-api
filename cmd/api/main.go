@@ -30,7 +30,6 @@ func run() int {
 		return 1
 	}
 
-	// アプリのロガーを設定
 	loggerHandler, err := logger.NewHandler(cfg.Logging)
 	if err != nil {
 		slog.Error("Failed to create app logger", "error", err)
@@ -113,7 +112,6 @@ func run() int {
 		return 1
 	}
 
-	// サーバーの作成と起動
 	if err := signalCtx.Err(); err != nil {
 		if closeErr := database.Close(); closeErr != nil {
 			slog.Error("Failed to close database after startup cancellation", "error", closeErr)

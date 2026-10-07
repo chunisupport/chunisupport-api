@@ -19,9 +19,9 @@ func ChunirecErrorHandlerMiddleware() echo.MiddlewareFunc {
 		return func(c *echo.Context) error {
 			err := next(c)
 			if err != nil {
-				// エラーをchunirec互換形式で処理
 				handleChunirecError(err, c)
-				return nil // エラーを握りつぶして、デフォルトのエラーハンドラーに渡さない
+				// 互換形式で応答済みのため、Echo標準ハンドラーへエラーを渡しません。
+				return nil
 			}
 			return nil
 		}
@@ -33,7 +33,6 @@ func handleChunirecError(err error, c *echo.Context) {
 	var httpStatus int
 	var additionalMessage string
 
-	// レスポンスがすでに送信されている場合は何もしない
 	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
 	}
@@ -57,18 +56,15 @@ func handleChunirecError(err error, c *echo.Context) {
 	var apiErr *apierror.APIError
 	if errors.As(err, &apiErr) {
 		httpStatus = apiErr.HTTPStatus
-		// APIErrorのコードを追加メッセージとして使用（オプション）
 		additionalMessage = ""
 	} else if he, ok := err.(*echo.HTTPError); ok {
 		httpStatus = he.Code
 		additionalMessage = ""
 	} else {
-		// その他のエラーは503として扱う
 		httpStatus = http.StatusServiceUnavailable
 		additionalMessage = ""
 	}
 
-	// エラーログの出力（詳細情報を含む）
 	logChunirecError(httpStatus, err, c)
 
 	// chunirec互換形式でエラーレスポンスを送信
@@ -90,7 +86,6 @@ func handleChunirecError(err error, c *echo.Context) {
 	case http.StatusServiceUnavailable:
 		errorResponse = NewServiceUnavailableError(additionalMessage)
 	default:
-		// 想定外のステータスコードは503として扱う
 		httpStatus = http.StatusServiceUnavailable
 		errorResponse = NewServiceUnavailableError(additionalMessage)
 	}
@@ -110,7 +105,6 @@ func logChunirecError(status int, err error, c *echo.Context) {
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 
-	// 5xx系エラーはERRORログ
 	if status >= 500 {
 		logger.Error("Chunirec HTTP error",
 			"status", status,
@@ -119,7 +113,6 @@ func logChunirecError(status int, err error, c *echo.Context) {
 		return
 	}
 
-	// 4xx系エラーはWARNログ
 	logger.Warn("Chunirec HTTP client error",
 		"status", status,
 		"error", errorMessage,

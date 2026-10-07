@@ -39,7 +39,6 @@ func ToPlayerRecordDTO(record *entity.PlayerRecord) *PlayerRecordDTO {
 		return nil
 	}
 
-	// レーティング・OVER POWER計算用の値を取得
 	score := uint32(record.Score)
 	var chartConst *chartconstant.ChartConstant
 	var isConstUnknown bool
@@ -143,6 +142,6 @@ type UserRecordResponseDTO struct {
 	New           []*PlayerRecordDTO    `json:"new"`
 	NewCandidate  []*PlayerRecordDTO    `json:"new_candidate"`
 	All           []*PlayerRecordDTO    `json:"standard"`
-	WorldsEnd     []*WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
+	WorldsEnd     []*WorldsendRecordDTO `json:"worldsend"`
 	Courses       []*CourseRecordDTO    `json:"course"`
 }

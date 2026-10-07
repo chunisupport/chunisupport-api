@@ -20,21 +20,17 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	errorMessage := ""
 	var errorDetails []apierror.ValidationErrorDetail
 
-	// APIErrorの場合
 	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok {
 		httpStatus = apiErr.HTTPStatus
 		errorCode = apiErr.Code
 		errorMessage, errorDetails = buildClientErrorInfo(apiErr)
 	} else if httpStatus = echo.StatusCode(err); httpStatus != 0 {
-		// EchoネイティブのHTTPエラー（*httpError / *HTTPError 両対応）
 		errorCode = httpStatusToErrorCode(httpStatus)
 	} else {
-		// その他のエラー
 		httpStatus = http.StatusInternalServerError
 		errorCode = apierror.CodeInternalError
 	}
 
-	// レスポンスがすでに送信されている場合は何もしない
 	if response, _ := echo.UnwrapResponse(c.Response()); response != nil && response.Committed {
 		return
 	}
@@ -59,10 +55,8 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 		setMaintenanceResponseHeaders(c)
 	}
 
-	// エラーログの出力（詳細情報を含む）
 	logError(httpStatus, errorCode, err, c)
 
-	// エラーレスポンスの送信（コードとステータス）
 	if err := c.JSON(httpStatus, apierror.ErrorResponse{
 		Error: struct {
 			Status  int                              `json:"status"`
@@ -140,7 +134,6 @@ func logError(status int, code string, err error, c *echo.Context) {
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
 
-	// 4xx系は警告、5xx系はエラーとして出力
 	if status >= 500 {
 		logger.Error("HTTP error occurred",
 			"status", status,

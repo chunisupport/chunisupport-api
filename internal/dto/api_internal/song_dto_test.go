@@ -38,7 +38,6 @@ func TestToSongDTO(t *testing.T) {
 
 // TestToChartDTO はToChartDTO関数の基本的な変換をテストします。
 func TestToChartDTO(t *testing.T) {
-	// テストデータの準備
 	notesValue := 1234
 	notesObj, err := notes.NewNotes(notesValue)
 	if err != nil {
@@ -51,17 +50,15 @@ func TestToChartDTO(t *testing.T) {
 	}
 
 	chart := &entity.Chart{
-		DifficultyID:   3, // expert
+		DifficultyID:   3,
 		Const:          chartConst,
 		IsConstUnknown: false,
 		Notes:          &notesObj,
 		NotesDesigner:  stringPtr("譜面作者A"),
 	}
 
-	// 変換実行
 	dto := ToChartDTO(chart)
 
-	// アサーション
 	if dto == nil {
 		require.Fail(t, "ToChartDTO returned nil")
 	}
@@ -90,7 +87,6 @@ func TestToChartDTO(t *testing.T) {
 // charts内のキー順序がBASIC→ADVANCED→EXPERT→MASTER→ULTIMAであること、
 // constが小数点以下1桁表記であることを確認します。
 func TestSongDTO_JSONMarshal(t *testing.T) {
-	// テストデータの準備
 	releaseDate := "2024-01-15"
 	jacket := "jacket123"
 	bpm := 180
@@ -122,7 +118,6 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		},
 	}
 
-	// JSONマーシャル
 	jsonBytes, err := json.Marshal(songDTO)
 	if err != nil {
 		require.Failf(t, "前提条件失敗", "json.Marshal failed: %v", err)

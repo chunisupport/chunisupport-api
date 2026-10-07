@@ -2,8 +2,7 @@ package utils
 
 import "strings"
 
-// EscapeLike escapes special characters in a string for use in a SQL LIKE clause.
-// It escapes '%', '_', and '\'.
+// EscapeLike はSQLのLIKE句で使う文字列の '%', '_', '\' をエスケープします。
 func EscapeLike(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "%", "\\%")

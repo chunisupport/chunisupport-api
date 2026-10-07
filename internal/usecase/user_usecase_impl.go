@@ -344,7 +344,7 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 		page = 1
 	}
 	if limit < 1 {
-		limit = 100 // default fallback if 0
+		limit = 100
 	}
 	offset := (page - 1) * limit
 
@@ -389,7 +389,6 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		return err
 	}
 
-	// 1. ユーザーを取得
 	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {

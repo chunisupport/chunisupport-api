@@ -67,12 +67,10 @@ func (c *OfficialConsolidator) Consolidate(ctx context.Context) error {
 		return err
 	}
 
-	// official_idx の大規模変更を検知
 	if err := c.detectMassiveIdxChange(ctx, existingActiveSongs); err != nil {
 		return err
 	}
 
-	// Step 1: 楽曲情報を一括でUPSERT
 	songsToUpsert, seenOfficialIdx := c.prepareSongsForUpsert()
 	if len(songsToUpsert) == 0 {
 		slog.Warn("No valid songs to process from official data")
@@ -84,13 +82,11 @@ func (c *OfficialConsolidator) Consolidate(ctx context.Context) error {
 	}
 	slog.Info("Bulk upserted songs", "count", len(songsToUpsert))
 
-	// Step 2: UPSERTした楽曲のIDを取得
 	songIDs, err := FetchSongIDsByOfficialIdx(ctx, c.workspace.DB(), seenOfficialIdx)
 	if err != nil {
 		return err
 	}
 
-	// Step 3: 通常チャート情報を一括でUPSERT
 	chartsToUpsert := c.prepareChartsForUpsert(songIDs)
 	if len(chartsToUpsert) > 0 {
 		if err := c.bulkUpsertCharts(ctx, chartsToUpsert); err != nil {
@@ -99,7 +95,6 @@ func (c *OfficialConsolidator) Consolidate(ctx context.Context) error {
 		slog.Info("Bulk upserted charts", "count", len(chartsToUpsert))
 	}
 
-	// Step 4: World's End チャート情報を一括でUPSERT
 	worldsendChartsToUpsert := c.prepareWorldsendChartsForUpsert(songIDs)
 	if len(worldsendChartsToUpsert) > 0 {
 		if err := c.bulkUpsertWorldsendCharts(ctx, worldsendChartsToUpsert); err != nil {
@@ -129,7 +124,6 @@ func (c *OfficialConsolidator) prepareSongsForUpsert() ([]*models.SongModelForUp
 			continue
 		}
 
-		// ドメインエンティティを使用してSongを生成
 		song, err := NewSongFromOfficial(&officialSong, genreID)
 		if err != nil {
 			slog.Warn("Skipping invalid official song", "title", officialSong.Title, "error", err)
@@ -172,7 +166,6 @@ ON CONFLICT(official_idx) DO UPDATE SET
 // detectMassiveIdxChange は official_idx の大規模変更を検知します。
 // 既存楽曲の多くが official_idx でマッチしない場合、エラーを返します。
 func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, existingActiveSongs map[string]int) error {
-	// 既存の楽曲一覧を取得（削除されていないもののみ）
 	var existingSongs []struct {
 		ID          int    `db:"id"`
 		Title       string `db:"title"`
@@ -181,7 +174,6 @@ func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, exist
 		IsWorldsEnd int    `db:"is_worldsend"`
 	}
 
-	// 既存楽曲が少ない場合はDBから再取得（より多くの情報を含む）
 	if len(existingActiveSongs) < 10 {
 		slog.Debug("Skipping idx change detection due to small dataset", "existing_count", len(existingActiveSongs))
 		return nil
@@ -197,14 +189,11 @@ func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, exist
 		return fmt.Errorf("failed to build query for idx change detection: %w", err)
 	}
 
-	// ExtendedDBExecutor インターフェースを通じて MySQL から楽曲詳細を取得
 	if err := c.db.SelectContext(ctx, &existingSongs, c.db.Rebind(query), args...); err != nil {
 		return fmt.Errorf("failed to load existing songs for idx change detection: %w", err)
 	}
 
-	// 新しいデータの official_idx のセットを構築
 	newOfficialIdxSet := make(map[string]struct{}, len(*c.data))
-	// title+artist のマップも構築（マッチング用）
 	newSongsByTitleArtist := make(map[string]string, len(*c.data))
 
 	for _, song := range *c.data {
@@ -223,20 +212,17 @@ func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, exist
 		newSongsByTitleArtist[key] = officialID
 	}
 
-	// マッチング状況を分析
-	var missingByIdx int           // official_idx でマッチしない数
-	var matchByTitleArtist int     // title+artist でマッチする数
-	var suspiciousChanges []string // 疑わしい変更のリスト
+	var missingByIdx int
+	var matchByTitleArtist int
+	var suspiciousChanges []string
 
 	for _, existing := range existingSongs {
-		// official_idx でマッチするかチェック
 		if _, found := newOfficialIdxSet[existing.OfficialIdx]; found {
-			continue // 正常にマッチ
+			continue
 		}
 
 		missingByIdx++
 
-		// title+artist でマッチするかチェック
 		key := fmt.Sprintf("%s|||%s|||%d", existing.Title, existing.Artist, existing.IsWorldsEnd)
 		if newIdx, found := newSongsByTitleArtist[key]; found {
 			matchByTitleArtist++
@@ -246,21 +232,18 @@ func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, exist
 		}
 	}
 
-	// 閾値判定
-	const absoluteThreshold = 10    // 絶対数での閾値
-	const percentageThreshold = 0.2 // 20%の閾値
+	const absoluteThreshold = 10
+	const percentageThreshold = 0.2
 
 	changedPercentage := float64(matchByTitleArtist) / float64(len(existingSongs))
 
 	if matchByTitleArtist >= absoluteThreshold || changedPercentage >= percentageThreshold {
-		// 異常検知：大規模な official_idx 変更
 		slog.Error("Massive official_idx change detected",
 			"existing_songs", len(existingSongs),
 			"missing_by_idx", missingByIdx,
 			"match_by_title_artist", matchByTitleArtist,
 			"changed_percentage", fmt.Sprintf("%.1f%%", changedPercentage*100))
 
-		// 変更の詳細を出力（最大20件）
 		if len(suspiciousChanges) > 0 {
 			displayCount := min(len(suspiciousChanges), 20)
 			slog.Error("Detected official_idx changes (showing first 20):")
@@ -278,7 +261,6 @@ func (c *OfficialConsolidator) detectMassiveIdxChange(ctx context.Context, exist
 			matchByTitleArtist, changedPercentage*100)
 	}
 
-	// 少数の変更は警告のみ
 	if matchByTitleArtist > 0 {
 		slog.Warn("Detected minor official_idx changes",
 			"count", matchByTitleArtist,
@@ -309,7 +291,6 @@ func (c *OfficialConsolidator) prepareChartsForUpsert(songIDs map[string]int) []
 			continue
 		}
 
-		// ドメインエンティティを使用してWORLD'S END判定
 		if DetermineIsWorldsEnd(&song) {
 			continue
 		}
@@ -326,14 +307,12 @@ func (c *OfficialConsolidator) prepareChartsForUpsert(songIDs map[string]int) []
 				continue
 			}
 
-			// 値オブジェクトを使用してレベルをパース
 			level, err := vo.ParseLevel(levelStr)
 			if err != nil {
 				slog.Warn("Failed to parse official level", "level", levelStr, "difficulty", diffName, "error", err)
 				continue
 			}
 
-			// ドメインエンティティを作成してモデルに変換
 			chart := entity.NewChart(songID, diffIDToDomainDifficultyID(diffID), level, level.IsConstUnknown())
 			chartsToUpsert = append(chartsToUpsert, models.FromChartEntityForUpsert(chart))
 		}
@@ -366,12 +345,10 @@ func (c *OfficialConsolidator) prepareWorldsendChartsForUpsert(songIDs map[strin
 			continue
 		}
 
-		// ドメインエンティティを使用してWORLD'S END判定
 		if !DetermineIsWorldsEnd(&song) {
 			continue
 		}
 
-		// 値オブジェクトを使用してWE星数とWE漢字を処理
 		weStar, err := vo.ParseWeStarFromOfficial(song.WeStar)
 		if err != nil {
 			slog.Warn("Failed to parse we_star", "we_star", song.WeStar, "song", song.Title, "error", err)
@@ -382,7 +359,6 @@ func (c *OfficialConsolidator) prepareWorldsendChartsForUpsert(songIDs map[strin
 			slog.Warn("we_kanji longer than 1 character, truncating", "we_kanji", song.WeKanji, "song", song.Title)
 		}
 
-		// ドメインエンティティを作成してモデルに変換
 		weChart := entity.NewWorldsEndChart(songID, weStar, weKanji)
 		chartsToUpsert = append(chartsToUpsert, models.FromWorldsEndChartEntityForUpsert(weChart))
 	}

@@ -194,7 +194,6 @@ func TestUpdateSongs(t *testing.T) {
 
 // TestGetSongs はGetSongsハンドラーの基本動作をテストします。
 func TestGetSongs(t *testing.T) {
-	// マスタデータキャッシュの準備
 	masterCache := &masterdata.Cache{
 		GenreNamesByID: map[int]string{
 			1: "POPS & ANIME",
@@ -205,7 +204,6 @@ func TestGetSongs(t *testing.T) {
 		},
 	}
 
-	// テストデータの準備
 	genreID := 1
 	bpm := 180
 	notes1Value := 500
@@ -231,32 +229,27 @@ func TestGetSongs(t *testing.T) {
 		},
 	}
 
-	// モックUsecaseの準備
 	mockUsecase := &testutil.MockSongUsecase{
 		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 			return testSongs, nil
 		},
 	}
 
-	// ハンドラーの準備
 	staticMasterCache := &masterdata.StaticCache{
 		RatingBands: []*ratingband.RatingBand{},
 	}
 	handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, masterCache, staticMasterCache)
 
-	// リクエストの作成
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/internal/songs", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	// テスト実行
 	err := handler.GetSongs(c)
 	if err != nil {
 		require.Failf(t, "前提条件失敗", "GetSongs returned error: %v", err)
 	}
 
-	// レスポンスの確認
 	if rec.Code != http.StatusOK {
 		assert.Failf(t, "アサーション失敗", "Status code = %d, want %d", rec.Code, http.StatusOK)
 	}

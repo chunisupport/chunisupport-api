@@ -21,7 +21,7 @@ func NewAdminUserHandler(userUsecase usecase.UserUsecase) *AdminUserHandler {
 	return &AdminUserHandler{userUsecase: userUsecase}
 }
 
-// GetAllUsers handles GET /internal/users/
+// GetAllUsers は GET /internal/users/ のユーザー一覧を返します。
 // ADMIN専用で、プライベート・削除済み・プレイヤー未紐付けアカウントを含むすべてのユーザーを返します。
 func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 	pageParam := c.QueryParam("page")

@@ -12,7 +12,6 @@ import (
 func RequireRole(requiredRoleID int) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			// Contextからログインユーザー情報を取得
 			userObj := c.Get("userEntity")
 			if userObj == nil {
 				return apierror.ErrUnauthorized
@@ -23,7 +22,6 @@ func RequireRole(requiredRoleID int) echo.MiddlewareFunc {
 				return apierror.ErrUnauthorized
 			}
 
-			// 権限チェック（未知ロールIDは拒否）
 			if !info.HasRole(user.AccountTypeID, requiredRoleID) {
 				return apierror.ErrForbidden
 			}

@@ -62,7 +62,6 @@ type chartRow struct {
 // includeDeletedがfalseの場合、削除済み楽曲は除外されます。
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
-	// 1. WORLD'S END以外の楽曲を取得
 	songsQuery := `
 		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
@@ -82,7 +81,6 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		return []*entity.Song{}, nil
 	}
 
-	// 2. 取得した楽曲のIDを収集
 	songIDs := make([]int, len(songRows))
 	songIDToIndex := make(map[int]int, len(songRows))
 	for i, s := range songRows {
@@ -107,7 +105,6 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		return nil, err
 	}
 
-	// 4. 結果を構築
 	results := make([]*entity.Song, len(songRows))
 	for i, sr := range songRows {
 		song := r.toSongEntity(&sr)
@@ -115,7 +112,6 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		results[i] = song
 	}
 
-	// 5. 譜面を楽曲に紐付け
 	for _, cr := range chartRows {
 		idx, ok := songIDToIndex[cr.SongID]
 		if !ok {
@@ -128,7 +124,6 @@ func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec rep
 		results[idx].Charts = append(results[idx].Charts, chart)
 	}
 
-	// 6. ドメインサービスで譜面集約を適用
 	for _, song := range results {
 		service.ApplyAggregation(song)
 	}
@@ -260,7 +255,6 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		return []*entity.Song{}, nil
 	}
 
-	// 2. 取得した楽曲のIDを収集
 	songIDs := make([]int, len(songRows))
 	songIDToIndex := make(map[int]int, len(songRows))
 	for i, s := range songRows {
@@ -285,7 +279,6 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		return nil, err
 	}
 
-	// 4. 結果を構築
 	songs := make([]*entity.Song, len(songRows))
 	for i, sr := range songRows {
 		song := r.toSongEntity(&sr)
@@ -293,7 +286,6 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		songs[i] = song
 	}
 
-	// 5. 譜面を楽曲に紐付け
 	for _, cr := range chartRows {
 		idx, ok := songIDToIndex[cr.SongID]
 		if !ok {
@@ -306,7 +298,6 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 		songs[idx].Charts = append(songs[idx].Charts, chart)
 	}
 
-	// 6. ドメインサービスで譜面集約を適用
 	for _, song := range songs {
 		service.ApplyAggregation(song)
 	}
@@ -391,7 +382,6 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 		return nil, fmt.Errorf("unsupported song identifier column: %s", column)
 	}
 
-	// 1. 楽曲を取得
 	songQuery := fmt.Sprintf(`
 		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
 		FROM songs
@@ -407,7 +397,6 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 
 	song := r.toSongEntity(&songRow)
 
-	// 2. 譜面を取得
 	chartsQuery := `
 		SELECT id, song_id, difficulty_id, const, is_const_unknown, notes, notes_designer, updated_at
 		FROM charts
@@ -430,7 +419,6 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 
 	song.Charts = charts
 
-	// 3. ドメインサービスで譜面集約を適用
 	service.ApplyAggregation(song)
 
 	return song, nil
@@ -509,27 +497,22 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		return err
 	}
 
-	// 2. 既存楽曲を一括取得（存在確認とID取得、譜面情報も含む）
 	existingSongs, err := r.FindByDisplayIDs(ctx, exec, displayIDs)
 	if err != nil {
 		return fmt.Errorf("failed to find songs by display IDs: %w", err)
 	}
 
-	// 3. DisplayID → SongID のマッピング作成
 	displayIDToSongID := make(map[string]int, len(existingSongs))
 	for _, song := range existingSongs {
 		displayIDToSongID[song.DisplayID] = song.ID
 	}
 
-	// 4. リクエスト内の全DisplayIDが存在するか確認
 	for _, displayID := range displayIDs {
 		if _, ok := displayIDToSongID[displayID]; !ok {
 			return fmt.Errorf("song with display_id '%s' not found", displayID)
 		}
 	}
 
-	// 5. 既存譜面の存在確認用マップを作成: "songID-difficultyID" -> true
-	// FindByDisplayIDsで既にChartsが含まれているので、そこから取得する
 	chartExistsMap := make(map[string]bool)
 	for _, song := range existingSongs {
 		for _, chart := range song.Charts {
@@ -538,7 +521,6 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		}
 	}
 
-	// 6. 更新対象の譜面が全て存在するか確認
 	for _, song := range songs {
 		songID := displayIDToSongID[song.DisplayID]
 		for _, chart := range song.Charts {
@@ -549,12 +531,10 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		}
 	}
 
-	// 7. 楽曲を一括更新（CASE式を使用）
 	if err := r.bulkUpdateSongs(ctx, exec, updates, displayIDToSongID); err != nil {
 		return fmt.Errorf("failed to bulk update songs: %w", err)
 	}
 
-	// 8. 譜面を一括更新（CASE式を使用）
 	if err := r.bulkUpdateCharts(ctx, exec, songs, displayIDToSongID); err != nil {
 		return fmt.Errorf("failed to bulk update charts: %w", err)
 	}
@@ -578,13 +558,11 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		return nil
 	}
 
-	// 更新対象のsongIDリストを作成
 	songIDs := make([]int, 0, len(updates))
 	for _, update := range updates {
 		songIDs = append(songIDs, displayIDToSongID[update.Song.DisplayID])
 	}
 
-	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（title→wiki_page_title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
 	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
@@ -629,7 +607,6 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		}
 	}
 
-	// SQLの引数順序に合わせて結合: title→wiki_page_title→reading→artist→genre→bpm→released→jacket→is_new→unlock_required→IN句
 	args := make([]any, 0)
 	args = append(args, titleArgs...)
 	args = append(args, wikiPageTitleArgs...)
@@ -642,7 +619,6 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, isNewArgs...)
 	args = append(args, unlockRequiredArgs...)
 
-	// IN句用の引数を追加
 	for _, id := range songIDs {
 		args = append(args, id)
 	}
@@ -686,7 +662,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 // bulkUpdateCharts は譜面情報をCASE式で一括更新します。
 func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.Executor, songs []*entity.Song, displayIDToSongID map[string]int) error {
-	// 全譜面データを収集
+	// chartUpdate は一括更新に必要な譜面の値を保持します。
 	type chartUpdate struct {
 		SongID         int
 		DifficultyID   int
@@ -720,7 +696,6 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 		return nil
 	}
 
-	// CASE式を構築
 	// 注意: SQLの引数順序はCASE式の出現順（const→is_const_unknown→notes→WHERE）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
 	var constCases, unknownCases, notesCases, notesDesignerCases []string
@@ -740,14 +715,12 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 		notesDesignerArgs = append(notesDesignerArgs, u.SongID, u.DifficultyID, u.NotesDesigner)
 	}
 
-	// WHERE句用: (song_id, difficulty_id) の組み合わせ
 	var wherePairs []string
 	for _, u := range updates {
 		wherePairs = append(wherePairs, "(song_id = ? AND difficulty_id = ?)")
 		whereArgs = append(whereArgs, u.SongID, u.DifficultyID)
 	}
 
-	// SQLの引数順序に合わせて結合: const→is_const_unknown→notes→notes_designer→WHERE
 	args := make([]any, 0)
 	args = append(args, constArgs...)
 	args = append(args, unknownArgs...)
@@ -779,7 +752,6 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 // display_id は呼び出し元（usecase）で生成済みのものを使用します。
 // official_idx 重複時は ErrDuplicateOfficialIdx を返します。
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
-	// songs テーブルに挿入
 	songResult, err := exec.ExecContext(ctx, `
 		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0)
@@ -809,7 +781,6 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		return nil, err
 	}
 
-	// charts テーブルに挿入（譜面が存在する場合のみ）
 	for _, chart := range song.Charts {
 		constVal, err := chart.Const.Value()
 		if err != nil {
@@ -837,6 +808,6 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		}
 	}
 
-	// DB が付与した updated_at を取得するため再フェッチする
+	// DB側で付与される更新日時を返却エンティティに反映するため再取得します。
 	return r.FindByDisplayID(ctx, exec, song.DisplayID)
 }

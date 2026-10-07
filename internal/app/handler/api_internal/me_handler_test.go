@@ -219,13 +219,11 @@ func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
 }
 
 func TestMeHandler_RegisterData(t *testing.T) {
-	// Setup
 	e := echo.New()
 	e.Validator = app.NewCustomValidator()
 
 	mockUsecase := new(mockPlayerDataUsecase)
 
-	// テスト用のプレイヤーデータ
 	testPayload := &usecase.PlayerDataPayload{
 		AppVersion: "1.0.0",
 		Name:       "テストプレイヤー",
@@ -247,24 +245,19 @@ func TestMeHandler_RegisterData(t *testing.T) {
 	h := api_internal.NewMeHandler(mockUsecase)
 
 	t.Run("ハッピーパス: base64+gzip形式でのデータ登録", func(t *testing.T) {
-		// JSONを作成
 		jsonData, err := json.Marshal(testPayload)
 		assert.NoError(t, err)
 
-		// gzip圧縮 + base64エンコード
 		base64Data, err := compressAndEncodeGzipBase64(jsonData)
 		assert.NoError(t, err)
 
-		// リクエスト作成
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/register-data", bytes.NewBufferString(base64Data))
 		req.Header.Set(echo.HeaderContentType, "application/octet-stream")
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		// ユーザー情報をコンテキストにセット
 		c.Set("userEntity", testUser)
 
-		// ハンドラ実行
 		err = h.RegisterData(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -278,20 +271,16 @@ func TestMeHandler_RegisterData(t *testing.T) {
 	})
 
 	t.Run("ハッピーパス: format=jsonでの生JSON形式データ登録", func(t *testing.T) {
-		// JSONを作成
 		jsonData, err := json.Marshal(testPayload)
 		assert.NoError(t, err)
 
-		// リクエスト作成（クエリパラメータ付き）
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/register-data?format=json", bytes.NewBuffer(jsonData))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		// ユーザー情報をコンテキストにセット
 		c.Set("userEntity", testUser)
 
-		// ハンドラ実行
 		err = h.RegisterData(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -318,16 +307,13 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		jsonData, err := json.Marshal(payloadWithUnknownFields)
 		assert.NoError(t, err)
 
-		// リクエスト作成（format=json形式）
 		req := httptest.NewRequest(http.MethodPost, "/internal/me/register-data?format=json", bytes.NewBuffer(jsonData))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		// ユーザー情報をコンテキストにセット
 		c.Set("userEntity", testUser)
 
-		// ハンドラ実行（エラーにならないことを確認）
 		err = h.RegisterData(c)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)

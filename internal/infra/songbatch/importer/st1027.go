@@ -32,7 +32,6 @@ func (si *St1027Importer) Import(filePath string) (*songbatch.ImportedSource, er
 		return nil, fmt.Errorf("failed to read st1027 data file %s: %w", filePath, err)
 	}
 
-	// BOMを除去
 	data = removeBOM(data)
 
 	var st1027Data St1027Data

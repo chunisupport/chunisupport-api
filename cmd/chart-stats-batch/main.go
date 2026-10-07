@@ -21,7 +21,7 @@ func main() {
 }
 
 // validateArgs は引数がないことを確認します。
-// 旧 stat-batch の --dry-run などを付けたまま実行すると統計を書き換えてしまうため、未知の引数は無視せずエラーにします。
+// --dry-run などの未知の引数を無視すると、更新されないと誤認したまま統計を書き換えるおそれがあるため、エラーにします。
 func validateArgs(args []string) error {
 	if len(args) != 0 {
 		return fmt.Errorf("unexpected arguments: %v", args)

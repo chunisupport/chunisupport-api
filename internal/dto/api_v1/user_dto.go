@@ -87,7 +87,7 @@ type V1UserRecordResponseDTO struct {
 	New           []*V1PlayerRecordDTO    `json:"new"`
 	NewCandidate  []*V1PlayerRecordDTO    `json:"new_candidate"`
 	All           []*V1PlayerRecordDTO    `json:"standard"`
-	WorldsEnd     []*V1WorldsendRecordDTO `json:"worldsend"` // WORLD'S END レコード（全件）
+	WorldsEnd     []*V1WorldsendRecordDTO `json:"worldsend"`
 	Courses       []*V1CourseRecordDTO    `json:"course"`
 }
 

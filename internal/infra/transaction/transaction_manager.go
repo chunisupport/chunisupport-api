@@ -34,15 +34,15 @@ func (tm *transactionManager) Transactional(ctx context.Context, f func(tx repos
 			if rbErr := tx.Rollback(); rbErr != nil {
 				slog.Error("Failed to rollback transaction after panic", "error", rbErr)
 			}
-			panic(p) // re-throw panic after Rollback
+			panic(p)
 		} else if err != nil {
 			slog.Debug("Rolling back transaction due to error", "error", err)
 			if rbErr := tx.Rollback(); rbErr != nil {
 				slog.Error("Failed to rollback transaction", "error", rbErr)
-			} // err is non-nil; don't change it
+			}
 		} else {
 			slog.Debug("Committing transaction")
-			err = tx.Commit() // if Commit returns error, update err
+			err = tx.Commit()
 			if err == nil {
 				slog.Debug("Transaction committed successfully")
 			}

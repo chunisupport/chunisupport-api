@@ -21,7 +21,6 @@ func NewSongFromOfficial(official *importer.OfficialSong, genreID int) (*entity.
 		return nil, err
 	}
 
-	// WORLD'S END判定はエンティティ生成時に行う
 	isWorldsEnd := strings.TrimSpace(official.WeKanji) != "" ||
 		strings.TrimSpace(official.WeStar) != ""
 
@@ -34,7 +33,6 @@ func NewSongFromOfficial(official *importer.OfficialSong, genreID int) (*entity.
 		isWorldsEnd,
 	)
 
-	// ジャケット画像を設定
 	jacket := vo.NewJacketImage(official.Image)
 	song.SetJacket(jacket)
 
@@ -59,19 +57,16 @@ func NewSongFromAdditional(additional *importer.AdditionalSong, genreID int) (*e
 		strings.TrimSpace(additional.Artist),
 		genreID,
 		officialIdx,
-		false, // 追加楽曲はWorld's Endではない
+		false,
 	)
 
-	// ジャケット画像を設定
 	jacket := vo.NewJacketImage(additional.Img)
 	song.SetJacket(jacket)
 
-	// BPMを設定
 	if additional.BPM != nil && *additional.BPM > 0 {
 		song.SetBPM(*additional.BPM)
 	}
 
-	// リリース日を設定
 	if additional.Release != "" {
 		releasedAt, err := vo.ParseReleaseDate(additional.Release)
 		if err == nil {

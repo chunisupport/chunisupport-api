@@ -37,7 +37,6 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	// 既存DTOから V1DTO へ変換
 	return c.JSON(http.StatusOK, api_v1.ToV1UserProfileDTO(internalhandler.ToUserProfileWithRecordsDTO(result)))
 }
 

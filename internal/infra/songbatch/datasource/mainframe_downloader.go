@@ -71,7 +71,6 @@ func (d *MainframeDownloader) Download(ctx context.Context) error {
 
 	slog.Info("Fetching mainframe data from Google Sheets", "sheetID", d.sheetID)
 
-	// Step 1: シート一覧を取得
 	sheetNames, err := d.getSheetNames(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get sheet names: %w", err)
@@ -79,18 +78,15 @@ func (d *MainframeDownloader) Download(ctx context.Context) error {
 
 	slog.Info("Retrieved sheet names", "count", len(sheetNames))
 
-	// Step 2: すべてのシートのデータを一括取得
 	allData, err := d.batchGetSheetData(ctx, sheetNames)
 	if err != nil {
 		return fmt.Errorf("failed to batch get sheet data: %w", err)
 	}
 
-	// Step 3: データを解析
 	charts := d.parseSheetData(allData)
 
 	slog.Info("Parsed mainframe chart data", "count", len(charts))
 
-	// Step 4: JSONファイルとして保存（minify版）
 	filename := "mainframe.json"
 	filePath := filepath.Join(d.outputDir, filename)
 
@@ -145,7 +141,6 @@ func (d *MainframeDownloader) getSheetNames(ctx context.Context) ([]string, erro
 func (d *MainframeDownloader) batchGetSheetData(ctx context.Context, sheetNames []string) (*batchGetResponse, error) {
 	baseURL := fmt.Sprintf("%s/%s/values:batchGet", d.baseURL, d.sheetID)
 
-	// URLパラメータを構築
 	params := url.Values{}
 	params.Set("key", d.apiKey)
 	for _, name := range sheetNames {
@@ -192,7 +187,6 @@ func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []Mainframe
 					continue
 				}
 
-				// タイトル: colIdx - 1
 				if colIdx-1 < 0 || colIdx-1 >= len(row) {
 					continue
 				}
@@ -201,13 +195,11 @@ func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []Mainframe
 					continue
 				}
 
-				// ジャンル: colIdx + 1
 				if colIdx+1 >= len(row) {
 					continue
 				}
 				genre := row[colIdx+1]
 
-				// 定数: colIdx + 3
 				if colIdx+3 >= len(row) {
 					continue
 				}
@@ -241,7 +233,6 @@ func (d *MainframeDownloader) parseSheetData(data *batchGetResponse) []Mainframe
 		slog.Warn("Failed to parse some mainframe constant values; skipped those chart entries", "count", skippedInvalidConst)
 	}
 
-	// mapをスライスに変換
 	result := make([]MainframeChartData, 0, len(resultMap))
 	for _, chart := range resultMap {
 		result = append(result, chart)

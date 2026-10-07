@@ -31,7 +31,6 @@ func (ai *AdditionalSongsImporter) Import(filePath string) (*songbatch.ImportedS
 		return nil, fmt.Errorf("failed to read additional_songs data file %s: %w", filePath, err)
 	}
 
-	// BOMを除去
 	data = removeBOM(data)
 
 	var songsData AdditionalSongsData

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 
-# .pyc / __pycache__ の生成を完全に抑制（CI 実行時にディレクトリを汚さないため）
+# CIの作業ディレクトリにバイトコードを残さないため、生成を抑制します。
 sys.dont_write_bytecode = True
 
 """
@@ -67,7 +67,7 @@ def send_discord(webhook_url: str, payload: dict) -> None:
         with urlopen(req, timeout=10) as resp:
             print(f"Sent Discord notification (HTTP {resp.status})")
     except HTTPError as e:
-        # Discord 側で 400/429 などが返る場合も CI は止めない
+        # 通知の失敗でビルド結果を変えないため、例外はログに記録して処理を継続します。
         print(f"Failed to send Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
         print(f"Failed to send Discord notification; continuing: {e.reason}", file=sys.stderr)
@@ -98,7 +98,7 @@ def send_discord_and_get_message_id(webhook_url: str, payload: dict) -> str:
             print(f"Sent Discord notification (HTTP {resp.status})")
             return message_id
     except HTTPError as e:
-        # Discord 側で 400/429 などが返る場合も CI は止めない
+        # 通知の失敗でビルド結果を変えないため、例外はログに記録して処理を継続します。
         print(f"Failed to send Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
         print(f"Failed to send Discord notification; continuing: {e.reason}", file=sys.stderr)
@@ -124,7 +124,7 @@ def update_discord_message(webhook_url: str, message_id: str, payload: dict) -> 
             print(f"Updated Discord notification (HTTP {resp.status})")
             return True
     except HTTPError as e:
-        # Discord 側で 400/429 などが返る場合も CI は止めない
+        # 通知の失敗でビルド結果を変えないため、例外はログに記録して処理を継続します。
         print(f"Failed to update Discord notification; continuing: {e.code} {e.reason}", file=sys.stderr)
     except URLError as e:
         print(f"Failed to update Discord notification; continuing: {e.reason}", file=sys.stderr)
@@ -147,7 +147,7 @@ def commit_link(env: dict, short_sha: str) -> str:
 def build_commit_section(env: dict) -> str:
     """「Commit: {短縮ハッシュ}(リンク)」行とその下にコミットメッセージを表示する文字列を返す。
 
-    Discord通知の「Commit:」行の下にコミットメッセージを追加する（ユーザーリクエスト）。
+    Discord通知の「Commit:」行の下にコミットメッセージを表示する。
     コミットメッセージが空または 'N/A' の場合はハッシュ行のみとする。
     """
     sha = env.get("SHA", "unknown")
@@ -187,10 +187,8 @@ def build_build_start_embeds(env: dict) -> list[dict]:
         for arch, label in target_arches():
             if arch == target:
                 return [build_build_start_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})]
-        # 未知の値が来た場合はフォールバックして単独で出す
         return [build_build_start_embed(env | {"TARGET_ARCH_LABEL": f"linux/{target}"})]
 
-    # TARGET_ARCH 未指定時は両アーキテクチャの通知を作成する
     return [
         build_build_start_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
         for arch, label in target_arches()
@@ -253,10 +251,8 @@ def build_build_complete_embeds(env: dict) -> list[dict]:
         for arch, label in target_arches():
             if arch == target:
                 return [build_build_complete_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})]
-        # 未知の値が来た場合はフォールバックして単独で出す
         return [build_build_complete_embed(env | {"TARGET_ARCH_LABEL": f"linux/{target}"})]
 
-    # TARGET_ARCH 未指定時は両アーキテクチャの通知を作成する
     return [
         build_build_complete_embed(env | {"TARGET_ARCH": arch, "TARGET_ARCH_LABEL": label})
         for arch, label in target_arches()
@@ -273,7 +269,6 @@ def main() -> int:
 
     mode = get_env("DISCORD_NOTIFY_MODE", "build-start")
 
-    # 環境変数から必要な値だけを辞書にまとめて関数に渡す（テスト容易性も考慮）
     env = {
         "REPO": get_env("REPO"),
         "BRANCH": get_env("BRANCH"),

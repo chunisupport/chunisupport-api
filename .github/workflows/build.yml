@@ -22,7 +22,6 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Discord Notification (Build Start)
-        # 各アーキテクチャごとに独立した「開始」メッセージを即時投稿
         if: always()
         env:
           DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || secrets.DISCORD_WEBHOOK_URL_STAGING }}
@@ -102,7 +101,6 @@ jobs:
           retention-days: 3
 
       - name: Discord Notification (Build Complete)
-        # 各アーキテクチャごとの開始メッセージを「完了/失敗」に編集
         if: always()
         env:
           DISCORD_WEBHOOK_URL: ${{ github.ref_name == 'main' && secrets.DISCORD_WEBHOOK_URL_PRODUCTION || secrets.DISCORD_WEBHOOK_URL_STAGING }}
@@ -117,11 +115,3 @@ jobs:
           TARGET_ARCH: ${{ matrix.goarch }}
           DISCORD_MESSAGE_ID_PATH: .discord/message_id
         run: python .github/scripts/discord_webhook.py
-
-  # ------------------------------------------------------------
-  # Discord 通知
-  # - amd64 と arm64 はそれぞれ完全に独立した Discord メッセージを投稿する
-  # - 実際の通知送信処理は .github/scripts/discord_webhook.py に委譲（urllibのみで依存なし）
-  # - 対象ブランチ用の Discord Webhook Secret が未設定の場合はスクリプト側で自動スキップ
-  # ------------------------------------------------------------
-

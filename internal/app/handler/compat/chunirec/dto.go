@@ -191,7 +191,6 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 		Data: MusicDataDTO{},
 	}
 
-	// Nullable fields handling
 	if s.GenreID != nil {
 		if genreName, ok := genres[*s.GenreID]; ok {
 			genreName = compatibleGenreName(genreName)
@@ -207,7 +206,6 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 		item.Meta.BPM = &bpmVal
 	}
 
-	// Charts handling
 	for _, c := range s.Charts {
 		chartDTO := &ChartDataDTO{
 			Const:          c.Const.Float64(),
@@ -221,15 +219,15 @@ func toMusicItemDTO(s *entity.Song, genres map[int]string) *MusicItemDTO {
 		}
 
 		switch c.DifficultyID {
-		case 1: // Basic
+		case 1:
 			item.Data.BAS = chartDTO
-		case 2: // Advanced
+		case 2:
 			item.Data.ADV = chartDTO
-		case 3: // Expert
+		case 3:
 			item.Data.EXP = chartDTO
-		case 4: // Master
+		case 4:
 			item.Data.MAS = chartDTO
-		case 5: // Ultima
+		case 5:
 			item.Data.ULT = chartDTO
 		}
 	}
@@ -286,14 +284,12 @@ func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCa
 		UpdatedAt:    profile.Player.UpdatedAt.In(location).Format("2006-01-02T15:04:05-07:00"),
 	}
 
-	// Rating を文字列化（nullならnullのまま）
 	if profile.Player.Rating != nil {
 		ratingStr := formatRating(*profile.Player.Rating)
 		dto.Rating = &ratingStr
-		dto.RatingMax = &ratingStr // rating_max は rating と同じ
+		dto.RatingMax = &ratingStr
 	}
 
-	// ClassEmblem の名前を取得
 	if profile.Player.ClassEmblemID != nil && masterCache != nil {
 		emblemName := masterCache.GetClassEmblemNameByID(*profile.Player.ClassEmblemID)
 		if emblemName != "" {
@@ -301,7 +297,6 @@ func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCa
 		}
 	}
 
-	// ClassEmblemBase の名前を取得
 	if profile.Player.ClassEmblemBaseID != nil && masterCache != nil {
 		emblemBaseName := masterCache.GetClassEmblemBaseNameByID(*profile.Player.ClassEmblemBaseID)
 		if emblemBaseName != "" {
@@ -309,12 +304,10 @@ func ToChunirecUserDTO(profile *api_internal.UserProfileWithRecordsDTO, masterCa
 		}
 	}
 
-	// 1番目の称号（スロット1）を取得
 	if len(profile.Player.Honors) > 0 {
 		for _, honor := range profile.Player.Honors {
 			if honor.Slot == 1 {
 				dto.Title = &honor.Name
-				// "platina" のみ "platinum" に変換
 				rarity := honor.TypeName
 				if rarity == "platina" {
 					rarity = "platinum"

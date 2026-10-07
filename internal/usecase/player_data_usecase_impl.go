@@ -95,12 +95,10 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		return &PlayerDataValidationError{Field: "overpower.percentage", Message: "overpower.percentage must have at most 2 decimal places"}
 	}
 
-	// スコアデータの整合性検証
 	errorCount := 0
 	maxErrorsToReport := 10
 	errorMessages := make([]string, 0, maxErrorsToReport)
 
-	// 通常譜面のスコア検証
 	for i, entry := range payload.Scores.Standard {
 		if errorCount >= maxErrorsToReport {
 			break
@@ -111,7 +109,6 @@ func validatePlayerDataPayload(payload *PlayerDataPayload) error {
 		}
 	}
 
-	// WORLD'S END譜面のスコア検証
 	for i, entry := range payload.Scores.Worldsend {
 		if errorCount >= maxErrorsToReport {
 			break
@@ -352,8 +349,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, err
 	}
 
-	// トランザクション開始前にペイロードの事前検証を実行
-	// 明らかに不正なデータがある場合はここで拒否する
 	if err := validatePlayerDataPayload(payload); err != nil {
 		slog.Warn("player data validation failed", "user_id", user.ID, "error", err.Error())
 		return nil, fmt.Errorf("invalid player data: %w", err)
@@ -440,7 +435,6 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		}
 		result.PlayerID = playerID
 
-		// レーティングを再計算して更新
 		ratingStats, ratingErr := us.calculateAndUpdateRatings(ctx, tx, playerID)
 		if ratingErr != nil {
 			return ratingErr
@@ -664,7 +658,7 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 			v := item.ID
 			classID = &v
 		}
-		// 見つからなくてもエラーにしない（classIDはnilのまま）
+		// クラスエンブレム未登録で他の情報の登録を失敗させないよう、未解決時は nil のままにします。
 	}
 
 	baseKey := normalizeClassEmblemKey(payload.BaseClass)
@@ -673,7 +667,7 @@ func resolveClassEmblemIDs(payload PlayerDataClassPayload, masters *playerDataMa
 			v := item.ID
 			baseID = &v
 		}
-		// 見つからなくてもエラーにしない（baseIDはnilのまま）
+		// クラスエンブレムベース未登録で他の情報の登録を失敗させないよう、未解決時は nil のままにします。
 	}
 
 	return classID, baseID, nil
@@ -721,13 +715,11 @@ func normalizeClassEmblemKey(raw string) string {
 // ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。
 // プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDと更新前状態を返します。
 func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, *entity.Player, error) {
-	// ユーザーに紐づくプレイヤーを検索
 	existingPlayer, err := us.playerRepo.FindByUserIDForUpdate(ctx, tx, user.ID)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	// PlayerNameのバリデーション
 	playerName, err := playername.NewPlayerName(summary.Name)
 	if err != nil {
 		return 0, nil, fmt.Errorf("invalid player name: %w", err)
@@ -748,12 +740,10 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 		return 0, nil, &PlayerDataConflictError{Reason: err.Error(), Err: err}
 	}
 
-	// 保存（IDがなければINSERT、それ以外はUPDATE）
 	if err := us.playerRepo.Save(ctx, tx, player); err != nil {
 		return 0, nil, err
 	}
 
-	// ユーザーとプレイヤーのリンク
 	if user.PlayerID == nil || *user.PlayerID != player.ID {
 		user.LinkPlayer(player.ID)
 		if err := us.userRepo.Save(ctx, tx, user); err != nil {
@@ -778,7 +768,6 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 		return skipped, registered, err
 	}
 
-	// バリデーション済みの称号情報を収集
 	assignments := make([]repository.HonorAssignment, 0, len(honors))
 
 	for slotKey, honor := range honors {
@@ -860,10 +849,8 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 		})
 	}
 
-	// player_honors への一括挿入（Repository経由で実行）
 	if len(assignments) > 0 {
 		if err := us.honorRepo.BulkAssignHonors(ctx, tx, assignments); err != nil {
-			// バルクINSERTが失敗した場合、すべての称号をスキップ扱いにする
 			for _, a := range assignments {
 				skipped = append(skipped, api_internal.SkippedRecord{
 					RecordType: "honor",
@@ -941,8 +928,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		}
 	}
 
-	// 差分は保存前状態とupsert予定値から算出するため、理論上は同一プレイヤーの同時リクエストで正しく出力されない場合がある。
-	// ただし通常利用では同時登録が起きない前提のため許容し、発生した場合はユーザの責任として扱う。
+	// Registerが同一ユーザーの登録をユーザー行ロックで直列化するため、ここではロックを追加せず保存前状態から差分を求めます。
 	fullRecordChanges := computeFullRecordChanges(ctx, fullBefore, fullRecordsToUpsert, masters)
 	worldsendRecordChanges := computeWorldsendRecordChanges(ctx, worldsendBefore, worldsendRecordsToUpsert, masters)
 	lampLookup := newLampNameLookup(masters)
@@ -1909,9 +1895,7 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 	}
 	var name string
 	// 外部プレイヤーデータ側の過去実装との後方互換性を維持するため、
-	// fch_lv の 2/3 は一般的な GOLD/PLATINUM の順序と逆で解釈する。
-	// - 2 -> FULL CHAIN PLATINUM
-	// - 3 -> FULL CHAIN GOLD
+	// fch_lv の 2/3 は一般的な GOLD/PLATINUM の順序と逆に、2 を FULL CHAIN PLATINUM、3 を FULL CHAIN GOLD として扱います。
 	switch value {
 	case 1:
 		name = "none"
@@ -1952,7 +1936,6 @@ func (us *playerDataUsecase) calculateAndUpdateRatings(ctx context.Context, tx r
 		return service.RatingStats{}, err
 	}
 
-	// レーティング計算対象のレコードを取得（slot='none'のレコードは除外）
 	records, err := us.playerRecRepo.FindByPlayerIDForRating(ctx, tx, playerID)
 	if err != nil {
 		return service.RatingStats{}, fmt.Errorf("failed to fetch player records: %w", err)

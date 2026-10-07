@@ -115,7 +115,6 @@ func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository,
 // GetAllWorldsendSongs は全 WORLD'S END 楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error) {
-	// 削除済み楽曲を含める場合はEDITOR権限が必要
 	if includeDeleted {
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			includeDeleted = false
@@ -143,9 +142,8 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 		return nil, err
 	}
 
-	// 削除済み楽曲の権限チェック
+	// 削除済み楽曲の存在を隠すため、権限がなければ未検出として扱います。
 	if !songWithChart.Song.IsActive() {
-		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -199,7 +197,6 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 	versionRangeMutationMu.Lock()
 	defer versionRangeMutationMu.Unlock()
 
-	// リポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.worldsendChartRepo.UpdateSongs(ctx, tx, updates)
 	}); err != nil {
@@ -327,7 +324,6 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 		return nil, fmt.Errorf("%w: masters is nil", ErrInternalError)
 	}
 
-	// ジャンル名の検証とID変換（UpdateWorldsendSongs と同様のパターン）
 	genreItem, ok := masters.Genres[input.Genre]
 	if !ok {
 		return nil, fmt.Errorf("%w: invalid genre=%s", ErrInvalidWorldsendInput, input.Genre)
@@ -354,7 +350,6 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 	song.UnlockRequired = input.UnlockRequired
 	song.IsWorldsend = true
 
-	// 譜面情報の構築（全フィールド任意）
 	var chart *entity.WorldsendChart
 	if input.Chart != nil {
 		var levelStarVO *levelstar.LevelStar

@@ -84,7 +84,6 @@ func NewSongUsecaseWithCascadeDelete(
 // GetAllSongsExcludingWorldsend はWORLD'S END以外の全楽曲を取得します。
 // includeDeleted が true かつ requesterAccountTypeID が EDITOR 権限を満たさない場合、削除済み楽曲は除外されます。
 func (s *songUsecaseImpl) GetAllSongsExcludingWorldsend(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
-	// 削除済み楽曲を含める場合はEDITOR権限が必要
 	if includeDeleted {
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			includeDeleted = false
@@ -102,9 +101,8 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 		return nil, err
 	}
 
-	// 削除済み楽曲の権限チェック
+	// 削除済み楽曲の存在を隠すため、権限がなければ未検出として扱います。
 	if !song.IsActive() {
-		// EDITOR以上の権限を持たない場合は404を返す
 		if requesterAccountTypeID == nil || !info.HasRole(*requesterAccountTypeID, info.AccountTypeEditor) {
 			return nil, repository.ErrSongNotFound
 		}
@@ -171,13 +169,11 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 		return nil
 	}
 
-	// マスターデータ検証
 	masters := s.masterCache.SongMasters()
 	if masters == nil {
 		return fmt.Errorf("master cache is not initialized")
 	}
 
-	// DTOから更新情報へ変換
 	updates, err := s.convertRequestsToUpdates(requests, masters)
 	if err != nil {
 		return fmt.Errorf("failed to convert requests to entities: %w", err)
@@ -186,7 +182,6 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 	versionRangeMutationMu.Lock()
 	defer versionRangeMutationMu.Unlock()
 
-	// トランザクション内でリポジトリに委譲
 	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		return s.songRepo.UpdateSongs(ctx, tx, updates)
 	}); err != nil {
@@ -269,7 +264,6 @@ func (s *songUsecaseImpl) convertRequestsToUpdates(requests []*UpdateSongInput, 
 	for _, req := range requests {
 		var genreID *int
 		if req.Genre != nil {
-			// ジャンル名の検証とID変換
 			if item, ok := masters.Genres[*req.Genre]; ok {
 				genreID = &item.ID
 			} else {
@@ -293,7 +287,6 @@ func (s *songUsecaseImpl) convertRequestsToUpdates(requests []*UpdateSongInput, 
 
 		charts := make([]*entity.Chart, 0, len(req.Charts))
 		for diffName, chartReq := range req.Charts {
-			// 難易度名の検証とID変換（大文字に変換してチェック）
 			diffKey := strings.ToUpper(diffName)
 			item, ok := masters.Difficulties[diffKey]
 			if !ok {
@@ -358,16 +351,13 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 		return nil, fmt.Errorf("master cache is not initialized")
 	}
 
-	// ジャンル名の検証とID変換
 	genreItem, ok := masters.Genres[input.Genre]
 	if !ok {
 		return nil, fmt.Errorf("%w: genre=%s", ErrInvalidDifficulty, input.Genre)
 	}
 	genreID := genreItem.ID
 
-	// 難易度の重複チェック
 	seen := make(map[string]struct{}, len(input.Charts))
-	// 譜面の変換
 	charts := make([]*entity.Chart, 0, len(input.Charts))
 	for _, chartInput := range input.Charts {
 		if chartInput == nil {

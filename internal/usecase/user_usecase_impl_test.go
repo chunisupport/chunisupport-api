@@ -33,10 +33,8 @@ type stubUserRepository struct {
 	savedUser       *entity.User
 	deletedUserID   int
 	deleteByID      func(context.Context, repository.Executor, int) error
-	// usersByID は FindByIDForUpdate が返すユーザーです。
-	usersByID map[int]*entity.User
-	// lockedIDs は FindByIDForUpdate でロックしたユーザーIDを呼び出し順に記録します。
-	lockedIDs []int
+	usersByID       map[int]*entity.User
+	lockedIDs       []int
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -738,7 +736,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 		},
 	}
 
-	playerUpdatedAt := now.Add(-time.Hour) // プレイヤーのupdated_atはレコードより前の時刻
+	playerUpdatedAt := now.Add(-time.Hour)
 	rating := 15.0
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 100, OfficialRating: rating, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
@@ -748,10 +746,8 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.UserID)
 
-	// updated_atの検証
 	assert.True(t, result.Records.UpdatedAt.Equal(now))
 
-	// 各スロットの長さを検証
 	require.Len(t, result.Records.Best, 1)
 	assert.Len(t, result.Records.NewCandidate, 1)
 	assert.Empty(t, result.Records.BestCandidate)
@@ -1469,7 +1465,6 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 
 	require.Len(t, list, 2)
 
-	// Verify User 1
 	assert.Equal(t, "user1", list[0].UserName)
 	assert.Equal(t, "ADMIN", list[0].AccountType)
 	assert.True(t, list[0].CreatedAt.Equal(createdAt1))
@@ -1482,7 +1477,6 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	require.NotNil(t, list[0].OverPowerValue)
 	assert.Equal(t, 10.0, *list[0].OverPowerValue)
 
-	// Verify User 2 (No player)
 	assert.Equal(t, "user2", list[1].UserName)
 	assert.Equal(t, "PLAYER", list[1].AccountType)
 	assert.True(t, list[1].CreatedAt.Equal(createdAt2))

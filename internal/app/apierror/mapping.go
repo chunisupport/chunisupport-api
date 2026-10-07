@@ -34,7 +34,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrConflict.WithInternal(err)
 	}
 
-	// usecase層の既知エラーをマッピング
 	// セキュリティ上の理由により、詳細なエラーは汎用的なエラーにマッピングされます
 	switch {
 	case errors.Is(err, usecase.ErrUsernameChangeConflict):
@@ -42,7 +41,7 @@ func FromUsecaseError(err error) *APIError {
 	case errors.Is(err, usecase.ErrUsernameChangeForbidden):
 		return ErrUsernameForbidden.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameTaken):
-		return ErrRegistrationFailed.WithInternal(err) // 409 Conflict → 400 Bad Request
+		return ErrRegistrationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameForbidden):
 		return ErrRegistrationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidCredentials):
@@ -108,7 +107,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrAPITokenLimitExceeded.WithInternal(err)
 	case errors.Is(err, usecase.ErrAPITokenNameConflict):
 		return ErrAPITokenNameConflict.WithInternal(err)
-	// 楽曲関連エラー
 	case errors.Is(err, repository.ErrSongNotFound):
 		return ErrSongNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrDuplicateOfficialIdx):
@@ -155,7 +153,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrConflict.WithInternal(err)
 	case errors.Is(err, repository.ErrPlayerMetricHistoryTimestampConflict):
 		return ErrConflict.WithInternal(err)
-	// 難易度関連エラー
 	case errors.Is(err, usecase.ErrInvalidDifficulty):
 		return ErrInvalidDifficulty.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidRatingBand):
@@ -174,7 +171,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidHonorInput):
 		return ErrValidationFailed.WithInternal(err)
-	// ユーザー名バリデーションエラー
 	case errors.Is(err, usecase.ErrUsernameEmpty):
 		return ErrUsernameEmpty.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameTooShort):
@@ -233,6 +229,5 @@ func FromUsecaseError(err error) *APIError {
 		return ErrValidationFailedBadRequest.WithInternal(err)
 	}
 
-	// 未知のエラーは内部エラーとして扱う
 	return ErrInternalError.WithInternal(err)
 }

@@ -13,7 +13,7 @@ import (
 type ChartStatsCalculator struct {
 	ratingBands    []*ratingband.RatingBand
 	currentChartID int
-	// current は現在の譜面の集計で、ratingBands と同じ添字を使います。記録のない帯は nil です。
+	// current は ratingBands と同じ添字で帯ごとの集計を保持し、記録のない帯は nil です。
 	current     []*chartStatsAccumulator
 	results     []*entity.ChartStatsByRatingBand
 	recordCount int
@@ -71,7 +71,7 @@ func (c *ChartStatsCalculator) flush() {
 type chartStatsAccumulator struct {
 	stats             entity.ChartStatsByRatingBand
 	clearedScoreTotal int64
-	// clearedScores は中央値の計算用です。
+	// 合計と件数だけでは中央値を求められないため、個々のクリア済みスコアを保持します。
 	clearedScores []int
 }
 

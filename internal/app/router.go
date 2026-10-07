@@ -61,7 +61,6 @@ func validateUsername(fl validator.FieldLevel) bool {
 // Validate は与えられた構造体を検証します。
 func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
-		// 詳細なエラーはログに出力し、クライアントには汎用的なエラーコードを返す
 		slog.Warn("Validation error", "error", err.Error())
 		var validationErrors validator.ValidationErrors
 		if ok := errors.As(err, &validationErrors); ok {
@@ -144,11 +143,8 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
 
-	// カスタムエラーハンドラーの設定
 	e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
 
-	// ミドルウェアの設定
-	// Echoのロガーを設定
 	if echoLogWriter != nil {
 		e.Logger = slog.New(slog.NewTextHandler(echoLogWriter, nil))
 		e.Use(echoMiddleware.RequestLogger())
@@ -157,10 +153,8 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	e.Use(echoMiddleware.Recover())
 	e.Use(newRequestBodyLimitMiddleware())
 
-	// CORS設定を適用
 	e.Use(echoMiddleware.CORSWithConfig(newDefaultCORSConfig(cfg)))
 
-	// DI - Services
 	userRepo := infra.NewUserRepository(db)
 	playerRepo := infra.NewPlayerRepository(db)
 	playerRecordRepo := infra.NewPlayerRecordRepository(db)
@@ -270,7 +264,6 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		usecase.NewChartStatsBatchUsecase(infra.NewChartStatsBatchRepository(db)),
 	)
 
-	// DI - Handlers
 	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
@@ -312,21 +305,17 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
 		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
-		// 外部API v1 用ハンドラ
-		V1Song:        api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
-		V1Worldsend:   api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
-		V1User:        api_v1.NewV1UserHandler(userUsecase),
-		V1Version:     api_v1.NewV1VersionHandler(masterDataUsecase),
-		ScoreHistory:  api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
-		MetricHistory: api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
-		V1Course:      api_v1.NewV1CourseHandler(courseUsecase),
-		// chunirec互換APIハンドラ
-		Chunirec: chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
-		// reiwa互換APIハンドラ
-		Reiwa: reiwa.NewReiwaHandler(songUsecase, masterDataUsecase, masterCache),
+		V1Song:                api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
+		V1Worldsend:           api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
+		V1User:                api_v1.NewV1UserHandler(userUsecase),
+		V1Version:             api_v1.NewV1VersionHandler(masterDataUsecase),
+		ScoreHistory:          api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
+		MetricHistory:         api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
+		V1Course:              api_v1.NewV1CourseHandler(courseUsecase),
+		Chunirec:              chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
+		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, masterDataUsecase, masterCache),
 	}
 
-	// ルートの設定
 	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
 	firebaseMaintenance := middleware.FirebaseMaintenanceMiddleware(systemMaintenanceUsecase, firebaseAuthUsecaseStrict)
 	apiTokenMaintenance := middleware.APITokenMaintenanceMiddleware(systemMaintenanceUsecase, apiTokenUsecase)
@@ -337,7 +326,6 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	e.GET("/", handleRoot, firebaseMaintenance)
 	e.GET("/version", handleVersion, apiTokenMaintenance, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
 
-	// ルートの登録
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
 	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, nil
@@ -398,13 +386,11 @@ func registerRoutes(
 		}
 	})
 
-	// api.chunisupport.net/internal
 	internal := e.Group("/internal")
 	// 一時保存APIの拡張CORSは、メンテナンス503にも適用できるようゲートより先に評価します。
 	internal.Use(echoMiddleware.CORSWithConfig(newTemporaryPlayerDataCORSConfig(cfg)))
 	internal.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
 
-	// Firebase認証ミドルウェア
 	firebaseAuthStrict := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorStrict)
 	// 読み取り専用GETは失効確認（Firebaseへの問い合わせ）を省き、応答遅延とクライアント切断を減らします。
 	firebaseAuthReadOptimized := middleware.FirebaseIDTokenMiddleware(firebaseAuthenticatorReadOptimized)
@@ -432,24 +418,19 @@ func registerRoutes(
 	badgeGroup.GET("/users/:username/rating-calculated", handlers.User.GetCalculatedRatingBadge)
 	badgeGroup.GET("/users/:username/overpower", handlers.User.GetOfficialOverpowerBadge)
 	badgeGroup.GET("/users/:username/overpower-percent", handlers.User.GetOfficialOverpowerPercentBadge)
-	// EDITOR以上の権限を要求するミドルウェア
 	requireEditor := middleware.RequireRole(info.AccountTypeEditor)
-	// APIトークンの更新権限を要求するミドルウェア
 	requireAPITokenWrite := middleware.RequireAPITokenWrite()
 
-	// ADMIN以上の権限を要求するミドルウェア
 	requireAdmin := middleware.RequireRole(info.AccountTypeAdmin)
 
 	internal.GET("/system/status", handlers.SystemMaintenance.Status, echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg)))
 
-	// api.chunisupport.net/internal/auth
 	authGroup := internal.Group("/auth")
 	{
 		authGroup.POST("/login", handlers.Login.Login, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.LoginRateLimitRequests,
 			Window:   info.LoginRateLimitWindow,
 		}))
-		// Firebase経由の初回登録: 1分間に5回まで
 		authGroup.POST("/signup", handlers.Signup.Signup, middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterRateLimitRequests,
 			Window:   info.RegisterRateLimitWindow,
@@ -460,7 +441,6 @@ func registerRoutes(
 		authGroup.DELETE("/api-tokens/:id", handlers.APIToken.Delete, firebaseAuthStrict)
 	}
 
-	// api.chunisupport.net/internal/me
 	meReadGroup := internal.Group("/me")
 	meReadGroup.Use(firebaseAuthReadOptimized)
 	{
@@ -549,7 +529,6 @@ func registerRoutes(
 		Window:   info.RegisterDataRateLimitWindow,
 	}))
 
-	// api.chunisupport.net/internal/users
 	publicUsersGroup := internal.Group("/users")
 	publicUsersGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
@@ -598,7 +577,6 @@ func registerRoutes(
 		adminGroup.GET("/chart-stats-batch/jobs/:id", handlers.ChartStatsBatch.Get)
 	}
 
-	// api.chunisupport.net/internal/honors
 	honorsGroup := internal.Group("/honors")
 	honorsGroup.Use(firebaseAuthStrict, requireAdmin)
 	{
@@ -609,7 +587,6 @@ func registerRoutes(
 		honorsGroup.DELETE("/:id", handlers.Honor.DeleteHonor)
 	}
 
-	// api.chunisupport.net/internal/songs
 	publicSongsGroup := internal.Group("/songs")
 	publicSongsGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
@@ -626,7 +603,6 @@ func registerRoutes(
 		bestSlotRankingGroup.GET("", handlers.BestSlotStats.GetRanking)
 	}
 
-	// api.chunisupport.net/internal/worldsend-songs
 	publicWorldsendGroup := internal.Group("/worldsend-songs")
 	publicWorldsendGroup.Use(optionalFirebaseAuthReadOptimized, anonymousRateLimit)
 	{
@@ -688,7 +664,6 @@ func registerRoutes(
 		editorCoursesGroup.GET("/:id", handlers.Course.GetEditor)
 	}
 
-	// api.chunisupport.net/internal/master
 	masterGroup := internal.Group("/master")
 	{
 		masterGroup.GET("", handlers.MasterData.GetMasterData)
@@ -700,12 +675,9 @@ func registerRoutes(
 		masterGroup.GET("/honor-types", handlers.MasterData.GetHonorTypes)
 	}
 
-	// 外部APIルートの登録
-	// api.chunisupport.net/v1
 	apiV1 := e.Group("/v1")
 	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
-	// レートリミット: ADMINは15分150,000回、EDITOR/EXTDEVは15分3,000回、その他は15分150回
 	apiV1.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
 		info.APIRateLimitEditorRequests,
@@ -731,14 +703,11 @@ func registerRoutes(
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 
-	// chunirec互換APIルートの登録
-	// api.chunisupport.net/compat/chunirec/2.0
 	chunirecGroup := e.Group("/compat/chunirec/2.0")
-	// chunirec専用エラーハンドリング（最初に適用）
+	// 後続ミドルウェアのエラーも互換形式で返すため、最初に適用します。
 	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
 	chunirecGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
-	// レートリミットはv1と同じ設定を適用
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
 		info.APIRateLimitRequests,
 		info.APIRateLimitEditorRequests,
@@ -752,7 +721,6 @@ func registerRoutes(
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
 	}
 
-	// reiwa互換APIルートの登録
 	reiwaGroup := e.Group("/compat/reiwa/1")
 	reiwaGroup.Use(reiwa.ReiwaErrorHandlerMiddleware())
 	reiwaGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))

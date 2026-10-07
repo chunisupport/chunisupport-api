@@ -248,7 +248,6 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 		return err
 	}
 
-	// WORLD'S END charts の同期
 	var worldsendChartsToInsert []worldsendChartInsertRecord
 	var worldsendChartsToUpdate []worldsendChartUpdateRecord
 
@@ -459,7 +458,6 @@ func buildBulkUpdateChartsSQL(n int) string {
 
 	sb.WriteString("UPDATE charts\nSET\n")
 
-	// CASE ブロックを列ごとに生成するクロージャ
 	writeCaseBlock := func(column, elseExpr string) {
 		sb.WriteString("\t")
 		sb.WriteString(column)
@@ -508,19 +506,19 @@ func bulkUpdateMySQLCharts(ctx context.Context, mysql apirepo.Executor, records 
 		query := buildBulkUpdateChartsSQL(len(chunk))
 
 		var args []any
-		for _, rec := range chunk { // const
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, rec.DifficultyID, rec.Const)
 		}
-		for _, rec := range chunk { // is_const_unknown
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, rec.DifficultyID, utils.BoolToInt(rec.TargetUnknown))
 		}
-		for _, rec := range chunk { // notes
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, rec.DifficultyID, nullableInt(rec.Notes))
 		}
-		for _, rec := range chunk { // notes_designer
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, rec.DifficultyID, nullableString(rec.NotesDesigner))
 		}
-		for _, rec := range chunk { // WHERE IN
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, rec.DifficultyID)
 		}
 
@@ -549,7 +547,6 @@ func buildBulkUpdateWorldsendChartsSQL(n int) string {
 
 	sb.WriteString("UPDATE worldsend_charts\nSET\n")
 
-	// CASE ブロックを列ごとに生成するクロージャ
 	writeCaseBlock := func(column, coalesceExpr string) {
 		sb.WriteString("\t")
 		sb.WriteString(column)
@@ -600,19 +597,19 @@ func bulkUpdateMySQLWorldsendCharts(ctx context.Context, mysql apirepo.Executor,
 		query := buildBulkUpdateWorldsendChartsSQL(len(chunk))
 
 		var args []any
-		for _, rec := range chunk { // level_star
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, nullableInt(rec.LevelStar))
 		}
-		for _, rec := range chunk { // attribute
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, nullableString(rec.Attribute))
 		}
-		for _, rec := range chunk { // notes
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, nullableInt(rec.Notes))
 		}
-		for _, rec := range chunk { // notes_designer
+		for _, rec := range chunk {
 			args = append(args, rec.SongID, nullableString(rec.NotesDesigner))
 		}
-		for _, rec := range chunk { // WHERE IN
+		for _, rec := range chunk {
 			args = append(args, rec.SongID)
 		}
 
@@ -639,7 +636,6 @@ const (
 
 func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, opts SyncOptions) (float64, bool, sql.NullInt64, sql.NullString, syncAction) {
 	if !exists {
-		// 挿入ロジック
 		tConst := chart.Const
 		tUnknown := chart.IsConstUnknown
 		if opts.MajorUpdate {
@@ -652,7 +648,6 @@ func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, 
 		return tConst, tUnknown, chart.Notes, chart.NotesDesigner, actionInsert
 	}
 
-	// 更新ロジック
 	finalConst := existing.Const
 	finalUnknown := existing.IsConstUnknown
 	finalNotes := existing.Notes
@@ -668,7 +663,6 @@ func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, 
 			}
 		} else {
 			finalUnknown = true
-			// 矛盾チェック
 			rangeStart := chart.Const
 			rangeEnd := chart.Const + majorUpdateLevelRange
 			if existing.Const < rangeStart || existing.Const >= rangeEnd {
@@ -681,7 +675,6 @@ func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, 
 			}
 		}
 
-		// MajorUpdate用のノーツチェック
 		if !shouldUpdate {
 			if !existing.Notes.Valid && chart.Notes.Valid {
 				shouldUpdate = true
@@ -691,9 +684,7 @@ func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, 
 			}
 		}
 	} else {
-		// 通常ロジック
 
-		// 1. 詳細化 (不明 -> 既知) - 常に許可、定数を更新
 		if existing.IsConstUnknown && !chart.IsConstUnknown {
 			finalConst = chart.Const
 			finalUnknown = false
