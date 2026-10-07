@@ -24,6 +24,9 @@ type CourseRecordForUpsert struct {
 type CourseRepository interface {
 	FindAll(ctx context.Context, exec Executor, includeDeleted bool) ([]*entity.Course, error)
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string, includeDeleted bool) (*entity.Course, error)
+	// FindByDisplayIDForUpdate は削除済みを含めてコースを行ロック付きで取得します。
+	// 保存まで同じトランザクションを使用し、競合する変更による上書きを防ぎます。
+	FindByDisplayIDForUpdate(ctx context.Context, exec Executor, displayID string) (*entity.Course, error)
 	FindByOfficialIdx(ctx context.Context, exec Executor, officialIdx string, includeDeleted bool) (*entity.Course, error)
 	FindByOfficialIdxList(ctx context.Context, exec Executor, officialIdxList []string) (map[string]*entity.Course, error)
 	FindClassByName(ctx context.Context, exec Executor, name string) (*entity.CourseClass, error)

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,4 +125,65 @@ func TestCourseRepository_FindLatestUpdatedAt_コースが無い場合はnil(t *
 	// Then
 	require.NoError(t, err)
 	assert.Nil(t, result)
+}
+
+type courseLockQueryExecutor struct {
+	domainrepo.Executor
+	query string
+	args  []any
+}
+
+func (e *courseLockQueryExecutor) GetContext(ctx context.Context, dest any, query string, args ...any) error {
+	e.query, e.args = query, args
+	// SQLiteは行ロック構文に対応しないため、検証対象の句を記録してから除去する。
+	return e.Executor.GetContext(ctx, dest, strings.TrimSuffix(query, " FOR UPDATE"), args...)
+}
+
+func TestCourseRepository_FindByDisplayIDForUpdate(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		id       string
+		canceled bool
+		// Then
+		wantErr error
+	}{
+		{name: "削除済みコースも行ロック付きで取得する", id: "0000000000000011"},
+		{name: "存在しないコースは未検出エラーを返す", id: "ffffffffffffffff", wantErr: domainrepo.ErrCourseNotFound},
+		{name: "キャンセル済みのコンテキストではキャンセルエラーを返す", id: "0000000000000011", canceled: true, wantErr: context.Canceled},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := setupCourseRepositoryDB(t)
+			tx, err := repo.db.Beginx()
+			require.NoError(t, err)
+			defer tx.Rollback()
+			exec := &courseLockQueryExecutor{Executor: tx}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.canceled {
+				cancel()
+			}
+
+			// When
+			course, err := repo.FindByDisplayIDForUpdate(ctx, exec, tt.id)
+
+			// Then
+			assert.True(t, strings.HasSuffix(exec.query, " FOR UPDATE"))
+			assert.NotContains(t, exec.query, "is_deleted = FALSE")
+			assert.Equal(t, []any{tt.id}, exec.args)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, course)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, course)
+			assert.True(t, course.IsDeleted)
+			assert.Equal(t, "削除コース", course.Name)
+			assert.Equal(t, "extra", course.CourseClass.Name)
+		})
+	}
 }

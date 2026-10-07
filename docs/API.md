@@ -3337,6 +3337,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### PUT `/internal/courses/:id`
 - **認証**: Firebase Bearer (EDITOR+)
 - **概要**: コース名称とクラスを更新します。`idx` は変更できません。
+- **並行更新**: 同じコースの編集・削除・復元は行ロックの取得順に処理します。名称・クラスの編集は削除状態を保持し、削除・復元は名称・クラスを保持します。
 - **リクエストボディ**: `{ "name": "...", "class": "..." }`
 - **レスポンス**: 200 OK
 - **主なエラー**:
@@ -3346,6 +3347,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### DELETE `/internal/courses/:id`
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: コースを論理削除します。
+- **並行更新**: 同じコースの編集・復元とは行ロックの取得順に処理します。削除は名称・クラスを保持します。
 - **レスポンス**: 204 No Content
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない
@@ -3353,6 +3355,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### POST `/internal/courses/:id/restore`
 - **認証**: Firebase Bearer (EDITOR+)
 - **概要**: 論理削除したコースを復元します。
+- **並行更新**: 同じコースの編集・削除とは行ロックの取得順に処理します。復元は名称・クラスを保持します。
 - **レスポンス**: 204 No Content
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない

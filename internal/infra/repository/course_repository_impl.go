@@ -83,6 +83,18 @@ func (r *courseRepository) FindByDisplayID(ctx context.Context, exec domainrepo.
 	return row.ToEntity()
 }
 
+func (r *courseRepository) FindByDisplayIDForUpdate(ctx context.Context, exec domainrepo.Executor, displayID string) (*entity.Course, error) {
+	query := `SELECT ` + courseColumns + ` FROM courses c INNER JOIN course_classes cc ON cc.id = c.course_class_id WHERE c.display_id = ? FOR UPDATE`
+	var row models.CourseModel
+	if err := exec.GetContext(ctx, &row, query, displayID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domainrepo.ErrCourseNotFound
+		}
+		return nil, fmt.Errorf("failed to lock course by display_id: %w", err)
+	}
+	return row.ToEntity()
+}
+
 func (r *courseRepository) FindByOfficialIdx(ctx context.Context, exec domainrepo.Executor, idx string, includeDeleted bool) (*entity.Course, error) {
 	if exec == nil {
 		exec = r.db
