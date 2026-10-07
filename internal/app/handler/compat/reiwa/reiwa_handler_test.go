@@ -63,3 +63,7 @@ func (s stubReiwaMasterDataUsecase) GetPermissions(context.Context) []string {
 func (m stubReiwaMasterDataUsecase) GetNameFolders(context.Context) []domainmasterdata.NameFolder {
 	return []domainmasterdata.NameFolder{}
 }
+
+func (m stubReiwaMasterDataUsecase) GetGenres(context.Context) []domainmasterdata.Genre {
+	return []domainmasterdata.Genre{}
+}

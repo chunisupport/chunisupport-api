@@ -28,6 +28,11 @@ func ToGenreDTOs(genres []masterdata.Genre) []*GenreDTO {
 	return dtos
 }
 
+// GenresResponse はジャンル一覧取得APIのレスポンスを表します。
+type GenresResponse struct {
+	Genres []*GenreDTO `json:"genres"`
+}
+
 // VersionDTO はバージョンマスタを表します。
 type VersionDTO struct {
 	ID         int    `json:"id"`

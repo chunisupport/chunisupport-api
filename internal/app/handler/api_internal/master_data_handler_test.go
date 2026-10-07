@@ -160,3 +160,32 @@ func TestMasterDataHandler_GetPermissions(t *testing.T) {
 func (m *mockMasterDataUsecase) GetNameFolders(context.Context) []masterdata.NameFolder {
 	return []masterdata.NameFolder{}
 }
+
+func (m *mockMasterDataUsecase) GetGenres(ctx context.Context) []masterdata.Genre {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]masterdata.Genre)
+}
+
+func TestMasterDataHandler_GetGenres(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	usecaseMock := new(mockMasterDataUsecase)
+	handler := api_internal.NewMasterDataHandler(usecaseMock)
+	usecaseMock.On("GetGenres", mock.Anything).Return([]masterdata.Genre{
+		{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"},
+		{ID: 2, Name: "niconico", ShortName: "nico"},
+	}).Once()
+	rec := httptest.NewRecorder()
+
+	// When
+	err := handler.GetGenres(e.NewContext(httptest.NewRequest(http.MethodGet, "/internal/master/genres", nil), rec))
+
+	// Then
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"genres":[{"id":1,"name":"POPS & ANIME","short_name":"P&A"},{"id":2,"name":"niconico","short_name":"nico"}]}`, rec.Body.String())
+	usecaseMock.AssertExpectations(t)
+}

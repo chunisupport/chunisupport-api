@@ -79,3 +79,7 @@ func (m *mockV1MasterDataUsecase) GetPermissions(context.Context) []string {
 func (m *mockV1MasterDataUsecase) GetNameFolders(context.Context) []masterdata.NameFolder {
 	return []masterdata.NameFolder{}
 }
+
+func (m *mockV1MasterDataUsecase) GetGenres(context.Context) []masterdata.Genre {
+	return []masterdata.Genre{}
+}
