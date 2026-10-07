@@ -33,6 +33,7 @@ type GoalTargetFilter struct {
 	DifficultyIDs                  []int
 	GenreIDs                       []int
 	VersionRanges                  []VersionRange
+	NameFolderIDs                  []int
 	ConstMin                       *float64
 	ConstMax                       *float64
 	MinTheoreticalRatingHundredths *int64

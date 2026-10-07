@@ -79,6 +79,7 @@ type GoalMasters struct {
 	DifficultyNamesByID    map[int]string
 	GenreNamesByID         map[int]string
 	VersionsByID           map[int]Version
+	NameFoldersByCode      map[string]NameFolder
 	ClearLampNamesByID     map[int]string
 	ComboLampNamesByID     map[int]string
 }

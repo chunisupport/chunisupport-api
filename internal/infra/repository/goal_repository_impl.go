@@ -269,6 +269,10 @@ func buildGoalTargetStatsQuery(filter repository.GoalTargetFilter) (string, []an
 		}
 		where = append(where, "("+strings.Join(versionWhere, " OR ")+")")
 	}
+	if len(filter.NameFolderIDs) > 0 {
+		where = append(where, "s.name_folder_id IN (?)")
+		args = append(args, filter.NameFolderIDs)
+	}
 	if filter.ConstMin != nil {
 		where = append(where, "c.const >= ?")
 		args = append(args, *filter.ConstMin)
