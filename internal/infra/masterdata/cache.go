@@ -17,6 +17,7 @@ import (
 
 // Cache は起動時にプリロードされるマスタのセットです。
 type Cache struct {
+	NameFolders          map[string]domainmasterdata.NameFolder
 	versionsMu           sync.RWMutex
 	versionsReloadMu     sync.Mutex
 	db                   *sqlx.DB
@@ -178,6 +179,15 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		genreNamesByID[row.ID] = row.Name
 	}
 
+	var nameFolderRows []nameFolderRow
+	if err := db.SelectContext(ctx, &nameFolderRows, "SELECT id, code, name, sort_order FROM name_folders"); err != nil {
+		return nil, fmt.Errorf("failed to preload name_folders: %w", err)
+	}
+	nameFolders := make(map[string]domainmasterdata.NameFolder, len(nameFolderRows))
+	for _, row := range nameFolderRows {
+		nameFolders[row.Code] = domainmasterdata.NameFolder{ID: row.ID, Code: row.Code, Name: row.Name, SortOrder: row.SortOrder}
+	}
+
 	accountTypeRows, err := loadNamedRows(ctx, db, "SELECT id, name FROM account_types")
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload account_types: %w", err)
@@ -210,6 +220,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 	}
 
 	return &Cache{
+		NameFolders:          nameFolders,
 		db:                   db,
 		now:                  time.Now,
 		allVersions:          allVersions,
@@ -514,6 +525,7 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 	}
 
 	return &domainmasterdata.MasterDataMasters{
+		NameFolders:      maps.Clone(c.NameFolders),
 		Genres:           maps.Clone(c.Genres),
 		Difficulties:     maps.Clone(c.Difficulties),
 		AccountTypes:     maps.Clone(c.AccountTypes),
@@ -528,4 +540,12 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 		HonorTypes:       maps.Clone(c.HonorTypes),
 		Possessions:      maps.Clone(c.Possessions),
 	}
+}
+
+// nameFolderRow は名前順フォルダマスタの永続化モデルです。
+type nameFolderRow struct {
+	ID        int    `db:"id"`
+	Code      string `db:"code"`
+	Name      string `db:"name"`
+	SortOrder int    `db:"sort_order"`
 }

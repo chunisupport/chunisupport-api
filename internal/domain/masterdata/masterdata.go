@@ -85,6 +85,7 @@ type GoalMasters struct {
 
 // MasterDataMasters はマスタデータAPIで必要になるマスタ集合です。
 type MasterDataMasters struct {
+	NameFolders      map[string]NameFolder
 	Genres           map[string]master.Genre
 	Difficulties     map[string]master.ChartDifficulty
 	AccountTypes     map[string]master.AccountType
@@ -98,4 +99,12 @@ type MasterDataMasters struct {
 	Slots            map[string]master.Slot
 	HonorTypes       map[string]master.HonorType
 	Possessions      map[string]master.Possession
+}
+
+// NameFolder は楽曲名順フォルダのマスタ項目です。
+type NameFolder struct {
+	ID        int
+	Code      string
+	Name      string
+	SortOrder int
 }

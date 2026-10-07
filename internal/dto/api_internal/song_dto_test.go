@@ -19,6 +19,7 @@ func TestToSongDTO(t *testing.T) {
 	song := &entity.Song{
 		GenreID:              &genreID,
 		ReleasedAt:           &releaseDate,
+		NameFolderCode:       "ABCD",
 		OpTargetDifficultyID: 5,
 		UnlockRequired:       true,
 	}
@@ -33,6 +34,7 @@ func TestToSongDTO(t *testing.T) {
 	require.NotNil(t, dto.OpTargetDifficulty)
 	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
 	assert.True(t, dto.UnlockRequired)
+	assert.Equal(t, "ABCD", dto.NameFolderCode)
 	assert.NotNil(t, dto.Charts)
 }
 
@@ -102,6 +104,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		DisplayID:          "92eaa42ee1d1a70f",
 		Title:              "テスト楽曲",
 		Reading:            &reading,
+		NameFolderCode:     "ABCD",
 		Artist:             "テストアーティスト",
 		Genre:              &genre,
 		BPM:                &bpm,
@@ -149,6 +152,9 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 
 	if !strings.Contains(jsonString, `"reading":"テストガッキョク"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
+	}
+	if !strings.Contains(jsonString, `"name_folder_code":"ABCD"`) {
+		assert.Failf(t, "アサーション失敗", "JSON should contain name_folder_code field, got: %s", jsonString)
 	}
 
 	// constが小数点以下1桁表記であることを確認

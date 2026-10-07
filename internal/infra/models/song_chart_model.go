@@ -24,6 +24,7 @@ type SongModel struct {
 	Jacket         *string    `db:"jacket"`
 	IsWorldsend    bool       `db:"is_worldsend"`
 	IsNew          bool       `db:"is_new"`
+	NameFolderCode string     `db:"name_folder_code"`
 	UnlockRequired bool       `db:"unlock_required"`
 	IsDeleted      bool       `db:"is_deleted"`
 	UpdatedAt      *time.Time `db:"updated_at"`
@@ -45,6 +46,7 @@ func (m *SongModel) ToEntity() *entity.Song {
 	song.Jacket = m.Jacket
 	song.IsWorldsend = m.IsWorldsend
 	song.IsNew = m.IsNew
+	song.NameFolderCode = m.NameFolderCode
 	song.UnlockRequired = m.UnlockRequired
 	song.IsDeleted = m.IsDeleted
 	song.UpdatedAt = m.UpdatedAt
@@ -67,6 +69,7 @@ func FromSongEntity(e *entity.Song) *SongModel {
 		Jacket:         e.Jacket,
 		IsWorldsend:    e.IsWorldsend,
 		IsNew:          e.IsNew,
+		NameFolderCode: e.NameFolderCode,
 		UnlockRequired: e.UnlockRequired,
 		IsDeleted:      e.IsDeleted,
 		UpdatedAt:      e.UpdatedAt,

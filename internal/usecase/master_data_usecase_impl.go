@@ -27,11 +27,13 @@ func NewMasterDataUsecase(masterProvider repository.MasterDataMasterProvider, ra
 // GetMasterData はソート済みのマスタデータ一覧を返します。
 // 難易度とジャンルはゲームの正規表示順（SortOrder昇順）でソートされます。
 // バージョンはリリース日昇順でソートされます。
+// 名前順フォルダはSortOrder昇順でソートされます。
 // その他のマスタはID昇順でソートされます。
 func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	masters := u.masterProvider.MasterDataMasters()
 	if masters == nil {
 		return &MasterDataOutput{
+			NameFolders:      []masterdata.NameFolder{},
 			Genres:           []masterdata.Genre{},
 			Difficulties:     []masterdata.Item{},
 			AccountTypes:     []masterdata.Item{},
@@ -50,6 +52,7 @@ func (u *masterDataUsecase) GetMasterData(_ context.Context) *MasterDataOutput {
 	}
 
 	return &MasterDataOutput{
+		NameFolders:      sortedNameFolders(masters.NameFolders),
 		Genres:           sortedGenresBySortOrder(masters.Genres),
 		Difficulties:     sortedDifficultiesBySortOrder(masters.Difficulties),
 		AccountTypes:     sortedByID(masters.AccountTypes, func(a master.AccountType) masterdata.Item { return masterdata.Item{ID: a.ID, Name: a.Name} }),
@@ -183,4 +186,25 @@ func (u *masterDataUsecase) GetPermissions(_ context.Context) []string {
 		names[i] = item.Name
 	}
 	return names
+}
+
+// GetNameFolders は名前順フォルダを表示順で返します。
+func (u *masterDataUsecase) GetNameFolders(_ context.Context) []masterdata.NameFolder {
+	masters := u.masterProvider.MasterDataMasters()
+	if masters == nil {
+		return []masterdata.NameFolder{}
+	}
+	return sortedNameFolders(masters.NameFolders)
+}
+
+// sortedNameFolders はマスタの表示順を保持した一覧を返します。
+func sortedNameFolders(folders map[string]masterdata.NameFolder) []masterdata.NameFolder {
+	items := make([]masterdata.NameFolder, 0, len(folders))
+	for _, folder := range folders {
+		items = append(items, folder)
+	}
+	slices.SortFunc(items, func(a, b masterdata.NameFolder) int {
+		return cmp.Or(cmp.Compare(a.SortOrder, b.SortOrder), cmp.Compare(a.Code, b.Code))
+	})
+	return items
 }

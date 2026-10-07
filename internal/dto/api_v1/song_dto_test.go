@@ -18,6 +18,7 @@ func TestToV1SongDTO(t *testing.T) {
 	song := &entity.Song{
 		GenreID:              &genreID,
 		ReleasedAt:           &releaseDate,
+		NameFolderCode:       "ABCD",
 		OpTargetDifficultyID: 5,
 		UnlockRequired:       true,
 	}
@@ -29,6 +30,7 @@ func TestToV1SongDTO(t *testing.T) {
 	assert.Equal(t, "niconico", *dto.Genre)
 	require.NotNil(t, dto.Release)
 	assert.Equal(t, "2023-12-31", *dto.Release)
+	assert.Equal(t, "ABCD", dto.NameFolderCode)
 	require.NotNil(t, dto.OpTargetDifficulty)
 	assert.Equal(t, "ULTIMA", *dto.OpTargetDifficulty)
 	assert.NotNil(t, dto.Charts)
@@ -100,6 +102,7 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 		DisplayID:          "v1abc123456789ab",
 		Title:              "V1テスト楽曲",
 		Reading:            &reading,
+		NameFolderCode:     "ABCD",
 		Artist:             "V1アーティスト",
 		Genre:              &genre,
 		BPM:                &bpm,
@@ -145,6 +148,9 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 
 	if !containsString(jsonString, `"reading":"ブイワンテスト"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
+	}
+	if !containsString(jsonString, `"name_folder_code":"ABCD"`) {
+		assert.Failf(t, "アサーション失敗", "JSON should contain name_folder_code field, got: %s", jsonString)
 	}
 
 	// 全ての難易度キーが含まれることを確認

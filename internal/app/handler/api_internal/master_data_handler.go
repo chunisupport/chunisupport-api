@@ -49,6 +49,7 @@ func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 	achievementTypes := itemsToDTOs(out.AchievementTypes)
 
 	return c.JSON(http.StatusOK, &dto.MasterDataResponse{
+		NameFolders:      dto.ToNameFolderDTOs(out.NameFolders),
 		Genres:           dto.ToGenreDTOs(out.Genres),
 		Difficulties:     difficulties,
 		AccountTypes:     accountTypes,
@@ -84,5 +85,12 @@ func (h *MasterDataHandler) GetHonorTypes(c *echo.Context) error {
 func (h *MasterDataHandler) GetPermissions(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &dto.PermissionsResponse{
 		Permissions: h.masterDataUsecase.GetPermissions(c.Request().Context()),
+	})
+}
+
+// GetNameFolders は全マスタ取得を必要としない画面向けに選択肢だけを返します。
+func (h *MasterDataHandler) GetNameFolders(c *echo.Context) error {
+	return c.JSON(http.StatusOK, &dto.NameFoldersResponse{
+		NameFolders: dto.ToNameFolderDTOs(h.masterDataUsecase.GetNameFolders(c.Request().Context())),
 	})
 }

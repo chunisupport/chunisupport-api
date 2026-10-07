@@ -200,6 +200,7 @@ func setupPreloadSQLite(t *testing.T) *sqlx.DB {
 	})
 
 	schema := []string{
+		`CREATE TABLE name_folders (id INTEGER PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE class_emblems (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE class_emblem_bases (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE clear_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,

@@ -10,6 +10,7 @@ import (
 // MasterDataUsecase はマスタデータAPIのユースケースです。
 type MasterDataUsecase interface {
 	GetMasterData(ctx context.Context) *MasterDataOutput
+	GetNameFolders(ctx context.Context) []masterdata.NameFolder
 	GetVersions(ctx context.Context) []masterdata.Version
 	GetPermissions(ctx context.Context) []string
 	GetHonorTypes(ctx context.Context) []masterdata.Item
@@ -18,6 +19,7 @@ type MasterDataUsecase interface {
 // MasterDataOutput はマスタデータAPIの出力です。
 // 各スライスはユースケース層で決定されたソート順で返されます。
 type MasterDataOutput struct {
+	NameFolders []masterdata.NameFolder
 	// Genres は表示順のジャンル一覧です。
 	Genres []masterdata.Genre
 	// Difficulties はゲームの正規表示順（SortOrder昇順）の難易度一覧です。

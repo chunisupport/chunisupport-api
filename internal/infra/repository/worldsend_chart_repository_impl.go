@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/levelstar"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
@@ -28,7 +29,7 @@ func NewWorldsendChartRepository(db *sqlx.DB) repository.WorldsendChartRepositor
 func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.unlock_required, s.is_deleted, s.updated_at,
+			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.unlock_required, s.is_deleted, s.updated_at, nf.code AS name_folder_code,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
@@ -37,6 +38,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 			wc.notes_designer AS 'worldsend_charts.notes_designer',
 			wc.updated_at AS 'worldsend_charts.updated_at'
 		FROM songs s
+		INNER JOIN name_folders nf ON nf.id = s.name_folder_id
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.is_worldsend = 1`
 	if !includeDeleted {
@@ -58,7 +60,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 		err := rows.Scan(
 			&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.WikiPageTitle,
 			&songModel.Reading, &songModel.Artist, &songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
-			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.UnlockRequired, &songModel.IsDeleted, &songModel.UpdatedAt,
+			&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.UnlockRequired, &songModel.IsDeleted, &songModel.UpdatedAt, &songModel.NameFolderCode,
 			&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
 		)
 		if err != nil {
@@ -78,7 +80,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
-			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.unlock_required, s.is_deleted, s.updated_at,
+			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.unlock_required, s.is_deleted, s.updated_at, nf.code AS name_folder_code,
 			wc.id AS 'worldsend_charts.id',
 			wc.song_id AS 'worldsend_charts.song_id',
 			wc.level_star AS 'worldsend_charts.level_star',
@@ -87,6 +89,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 			wc.notes_designer AS 'worldsend_charts.notes_designer',
 			wc.updated_at AS 'worldsend_charts.updated_at'
 		FROM songs s
+		INNER JOIN name_folders nf ON nf.id = s.name_folder_id
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.display_id = ? AND s.is_worldsend = 1`
 
@@ -96,7 +99,7 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 	err := exec.QueryRowxContext(ctx, query, displayID).Scan(
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.WikiPageTitle,
 		&songModel.Reading, &songModel.Artist, &songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
-		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.UnlockRequired, &songModel.IsDeleted, &songModel.UpdatedAt,
+		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.UnlockRequired, &songModel.IsDeleted, &songModel.UpdatedAt, &songModel.NameFolderCode,
 		&chartModel.ID, &chartModel.SongID, &chartModel.LevelStar, &chartModel.Attribute, &chartModel.Notes, &chartModel.NotesDesigner, &chartModel.UpdatedAt,
 	)
 	if err != nil {
@@ -115,9 +118,10 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 // SaveSong は WORLD'S END 楽曲エンティティの現在の状態を永続化します。
 // 対象が存在しない場合は ErrSongNotFound を返します。
 func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_new = ?, is_deleted = ?
+		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, name_folder_id = (SELECT id FROM name_folders WHERE code = ?), artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_new = ?, is_deleted = ?
 		WHERE id = ? AND is_worldsend = 1
 	`
 	result, err := exec.ExecContext(
@@ -127,6 +131,7 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 		song.Title,
 		song.WikiPageTitle,
 		song.Reading,
+		nameFolderCode,
 		song.Artist,
 		song.GenreID,
 		song.BPM,
@@ -148,6 +153,7 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 	if rowsAffected == 0 {
 		return repository.ErrSongNotFound
 	}
+	song.NameFolderCode = nameFolderCode
 
 	return nil
 }
@@ -266,8 +272,8 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 }
 
 func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate, targets map[string]worldsendUpdateTarget) (int64, error) {
-	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
-	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
+	var titleCases, wikiPageTitleCases, readingCases, nameFolderCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, nameFolderArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
 	songIDs := make([]int, 0, len(updates))
 
 	for _, update := range updates {
@@ -285,6 +291,11 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 
 		readingCases = append(readingCases, "WHEN id = ? THEN ?")
 		readingArgs = append(readingArgs, target.SongID, song.Reading)
+
+		nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
+		song.NameFolderCode = nameFolderCode
+		nameFolderCases = append(nameFolderCases, "WHEN id = ? THEN (SELECT id FROM name_folders WHERE code = ?)")
+		nameFolderArgs = append(nameFolderArgs, target.SongID, nameFolderCode)
 
 		artistCases = append(artistCases, "WHEN id = ? THEN ?")
 		artistArgs = append(artistArgs, target.SongID, song.Artist)
@@ -314,6 +325,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	args = append(args, titleArgs...)
 	args = append(args, wikiPageTitleArgs...)
 	args = append(args, readingArgs...)
+	args = append(args, nameFolderArgs...)
 	args = append(args, artistArgs...)
 	args = append(args, genreArgs...)
 	args = append(args, bpmArgs...)
@@ -333,6 +345,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 			title = CASE %s END,
 			wiki_page_title = %s,
 			reading = CASE %s END,
+			name_folder_id = CASE %s ELSE name_folder_id END,
 			artist = CASE %s END,
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
@@ -345,6 +358,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		strings.Join(titleCases, " "),
 		keepExistingUpdateExpr("wiki_page_title", wikiPageTitleCases),
 		strings.Join(readingCases, " "),
+		strings.Join(nameFolderCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
 		strings.Join(bpmCases, " "),
@@ -488,14 +502,16 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 // worldsend_charts は 1 曲 1 行が必須のため、chart が nil の場合でも空行を挿入します。
 // official_idx 重複時は ErrDuplicateOfficialIdx を返します。
 func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec repository.Executor, song *entity.Song, chart *entity.WorldsendChart) (*entity.WorldsendSongWithChart, error) {
+	nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, name_folder_id, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
+		VALUES (?, ?, ?, ?, (SELECT id FROM name_folders WHERE code = ?), ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
 		song.WikiPageTitle,
 		song.Reading,
+		nameFolderCode,
 		song.Artist,
 		song.GenreID,
 		song.BPM,
@@ -511,6 +527,7 @@ func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec reposito
 		}
 		return nil, err
 	}
+	song.NameFolderCode = nameFolderCode
 
 	songID, err := songResult.LastInsertId()
 	if err != nil {

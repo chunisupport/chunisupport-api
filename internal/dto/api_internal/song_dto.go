@@ -119,6 +119,7 @@ type SongDTO struct {
 	Title              string           `json:"title"`
 	WikiPageTitle      *string          `json:"wiki_page_title"`
 	Reading            *string          `json:"reading"`
+	NameFolderCode     string           `json:"name_folder_code"`
 	Artist             string           `json:"artist"`
 	Genre              *string          `json:"genre"`
 	BPM                *int             `json:"bpm"`
@@ -285,6 +286,7 @@ func ToSongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64) 
 		Title:              song.Title,
 		WikiPageTitle:      song.WikiPageTitle,
 		Reading:            song.Reading,
+		NameFolderCode:     song.NameFolderCode,
 		Artist:             song.Artist,
 		Genre:              genrePtr,
 		BPM:                song.BPM,

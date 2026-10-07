@@ -16,17 +16,18 @@ type V1WorldsendChartDTO struct {
 // V1WorldsendSongDTO は外部API v1 用の WORLD'S END 楽曲情報DTOです。
 // WORLD'S END はレーティング対象外のため、charts は "WORLDSEND" キーのみを持ち maxop フィールドは存在しません。
 type V1WorldsendSongDTO struct {
-	DisplayID   string                          `json:"id"`
-	Title       string                          `json:"title"`
-	Reading     *string                         `json:"reading"`
-	Artist      string                          `json:"artist"`
-	Genre       *string                         `json:"genre"`
-	BPM         *int                            `json:"bpm"`
-	Release     *string                         `json:"release"`
-	Jacket      *string                         `json:"jacket"`
-	OfficialIdx string                          `json:"official_idx"`
-	IsNew       bool                            `json:"is_new"`
-	Charts      map[string]*V1WorldsendChartDTO `json:"charts"`
+	DisplayID      string                          `json:"id"`
+	Title          string                          `json:"title"`
+	Reading        *string                         `json:"reading"`
+	NameFolderCode string                          `json:"name_folder_code"`
+	Artist         string                          `json:"artist"`
+	Genre          *string                         `json:"genre"`
+	BPM            *int                            `json:"bpm"`
+	Release        *string                         `json:"release"`
+	Jacket         *string                         `json:"jacket"`
+	OfficialIdx    string                          `json:"official_idx"`
+	IsNew          bool                            `json:"is_new"`
+	Charts         map[string]*V1WorldsendChartDTO `json:"charts"`
 }
 
 // V1WorldsendSongsResponse は外部API v1 用の WORLD'S END 楽曲一覧レスポンスです。
@@ -72,16 +73,17 @@ func ToV1WorldsendSongDTO(song *entity.Song, chart *entity.WorldsendChart, genre
 	charts["WORLDSEND"] = ToV1WorldsendChartDTO(chart)
 
 	return &V1WorldsendSongDTO{
-		DisplayID:   song.DisplayID,
-		Title:       song.Title,
-		Reading:     song.Reading,
-		Artist:      song.Artist,
-		Genre:       genrePtr,
-		BPM:         song.BPM,
-		Release:     releaseDateStr,
-		Jacket:      song.Jacket,
-		OfficialIdx: song.OfficialIdx,
-		IsNew:       song.IsNew,
-		Charts:      charts,
+		DisplayID:      song.DisplayID,
+		Title:          song.Title,
+		Reading:        song.Reading,
+		NameFolderCode: song.NameFolderCode,
+		Artist:         song.Artist,
+		Genre:          genrePtr,
+		BPM:            song.BPM,
+		Release:        releaseDateStr,
+		Jacket:         song.Jacket,
+		OfficialIdx:    song.OfficialIdx,
+		IsNew:          song.IsNew,
+		Charts:         charts,
 	}
 }

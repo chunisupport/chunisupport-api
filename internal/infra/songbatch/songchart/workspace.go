@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	apirepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"log/slog"
 	"strings"
 	"time"
 
+	apirepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/utils"
 
@@ -111,6 +112,10 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 	if err != nil {
 		return err
 	}
+	nameFolderIDs, err := loadMySQLNameFolderIDs(ctx, mysql)
+	if err != nil {
+		return err
+	}
 	mysqlCharts, err := loadMySQLCharts(ctx, mysql)
 	if err != nil {
 		return err
@@ -152,6 +157,10 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 		}
 
 		officialSeen[song.OfficialIdx] = struct{}{}
+		nameFolderID, err := resolveSongNameFolderID(song.Title, song.Reading, nameFolderIDs)
+		if err != nil {
+			return fmt.Errorf("failed to resolve name folder for official_idx %s: %w", song.OfficialIdx, err)
+		}
 		rec := songInsertRecord{
 			DisplayID:      song.DisplayID,
 			Title:          song.Title,
@@ -166,6 +175,7 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 			IsWorldsend:    song.IsWorldsend,
 			IsNew:          song.IsNew,
 			UnlockRequired: song.UnlockRequired,
+			NameFolderID:   nameFolderID,
 		}
 		if existing, exists := mysqlSongs[song.OfficialIdx]; exists {
 			songsToUpdate = append(songsToUpdate, songUpdateRecord{
@@ -186,6 +196,9 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 	}
 	if err := bulkUpdateMySQLSongs(ctx, mysql, songsToUpdate, info.SongBatchBulkInsertChunkSize); err != nil {
 		return err
+	}
+	if err := syncMySQLSongNameFolderIDs(ctx, mysql, nameFolderIDs, info.SongBatchBulkInsertChunkSize); err != nil {
+		return fmt.Errorf("failed to synchronize mysql song name folders: %w", err)
 	}
 
 	mysqlSongs, err = loadMySQLSongs(ctx, mysql)
@@ -396,6 +409,131 @@ func loadMySQLSongs(ctx context.Context, mysql apirepo.Executor) (map[string]mys
 		return nil, fmt.Errorf("mysql songs iteration error: %w", err)
 	}
 	return result, nil
+}
+
+func loadMySQLNameFolderIDs(ctx context.Context, mysql apirepo.Executor) (map[string]int, error) {
+	rows, err := mysql.QueryContext(ctx, `SELECT id, code FROM name_folders`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mysql name folders: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var code string
+		if err := rows.Scan(&id, &code); err != nil {
+			return nil, fmt.Errorf("failed to scan mysql name folder: %w", err)
+		}
+		result[code] = id
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("mysql name folders iteration error: %w", err)
+	}
+	return result, nil
+}
+
+func resolveSongNameFolderID(title string, songReading sql.NullString, idsByCode map[string]int) (int, error) {
+	var reading *string
+	if songReading.Valid {
+		reading = &songReading.String
+	}
+
+	code := domainservice.ResolveNameFolderCode(title, reading)
+	id, ok := idsByCode[code]
+	if !ok {
+		return 0, fmt.Errorf("name folder code %q was not found", code)
+	}
+	return id, nil
+}
+
+type mysqlSongNameFolder struct {
+	ID           int
+	Title        string
+	Reading      sql.NullString
+	NameFolderID int
+}
+
+type songNameFolderUpdate struct {
+	ID           int
+	NameFolderID int
+}
+
+func syncMySQLSongNameFolderIDs(ctx context.Context, mysql apirepo.Executor, idsByCode map[string]int, chunkSize int) error {
+	query := "SELECT id, title, reading, name_folder_id FROM songs ORDER BY id"
+	// 読みの同時更新を古いスナップショットの所属で上書きしないよう、MySQLでは最新行をロックして読みます。
+	if driver, ok := mysql.(interface{ DriverName() string }); ok && driver.DriverName() == "mysql" {
+		query += " FOR UPDATE"
+	}
+	rows, err := mysql.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to load mysql song name folder data: %w", err)
+	}
+	defer rows.Close()
+
+	var updates []songNameFolderUpdate
+	for rows.Next() {
+		var song mysqlSongNameFolder
+		if err := rows.Scan(&song.ID, &song.Title, &song.Reading, &song.NameFolderID); err != nil {
+			return fmt.Errorf("failed to scan mysql song name folder data: %w", err)
+		}
+		nameFolderID, err := resolveSongNameFolderID(song.Title, song.Reading, idsByCode)
+		if err != nil {
+			return fmt.Errorf("failed to resolve name folder for mysql song id %d: %w", song.ID, err)
+		}
+		if song.NameFolderID != nameFolderID {
+			updates = append(updates, songNameFolderUpdate{ID: song.ID, NameFolderID: nameFolderID})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("mysql song name folder iteration error: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close mysql song name folder rows: %w", err)
+	}
+	return bulkUpdateMySQLSongNameFolderIDs(ctx, mysql, updates, chunkSize)
+}
+
+func buildBulkUpdateMySQLSongNameFolderIDsSQL(n int) string {
+	var sb strings.Builder
+	sb.WriteString("UPDATE songs SET name_folder_id = CASE id\n")
+	for range n {
+		sb.WriteString("WHEN ? THEN ?\n")
+	}
+	sb.WriteString("ELSE name_folder_id END WHERE id IN (")
+	for i := range n {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		sb.WriteByte('?')
+	}
+	sb.WriteByte(')')
+	return sb.String()
+}
+
+func bulkUpdateMySQLSongNameFolderIDs(ctx context.Context, mysql apirepo.Executor, records []songNameFolderUpdate, chunkSize int) error {
+	if len(records) == 0 {
+		return nil
+	}
+	if chunkSize <= 0 {
+		chunkSize = len(records)
+	}
+
+	for start := 0; start < len(records); start += chunkSize {
+		end := min(start+chunkSize, len(records))
+		chunk := records[start:end]
+		args := make([]any, 0, len(chunk)*3)
+		for _, rec := range chunk {
+			args = append(args, rec.ID, rec.NameFolderID)
+		}
+		for _, rec := range chunk {
+			args = append(args, rec.ID)
+		}
+		if _, err := mysql.ExecContext(ctx, buildBulkUpdateMySQLSongNameFolderIDsSQL(len(chunk)), args...); err != nil {
+			return fmt.Errorf("failed to bulk update mysql song name folders (%d-%d): %w", start, end, err)
+		}
+	}
+	return nil
 }
 
 func loadMySQLCharts(ctx context.Context, mysql apirepo.Executor) (map[string]mysqlChart, error) {
@@ -755,6 +893,7 @@ type songInsertRecord struct {
 	IsWorldsend    int
 	IsNew          int
 	UnlockRequired sql.NullInt64
+	NameFolderID   int
 }
 
 type songUpdateRecord struct {
@@ -762,7 +901,7 @@ type songUpdateRecord struct {
 	record songInsertRecord
 }
 
-const songInsertColumnCount = 14
+const songInsertColumnCount = 15
 
 // buildBulkUpdateSongsSQL は楽曲バルク更新用の CASE 式を含む SQL 文を生成します。
 func buildBulkUpdateSongsSQL(n int) string {
@@ -847,6 +986,8 @@ func buildBulkUpdateSongsSQL(n int) string {
 	sb.WriteString(",\n")
 	writeDirectBlock("reading")
 	sb.WriteString(",\n")
+	writeDirectBlock("name_folder_id")
+	sb.WriteString(",\n")
 	writeCoalesceBlock("artist")
 	sb.WriteString(",\n")
 	writeCoalesceBlock("genre_id")
@@ -880,12 +1021,12 @@ func buildBulkUpdateSongsSQL(n int) string {
 func buildBulkInsertSongsSQL(n int) string {
 	const queryPrefix = `
 INSERT INTO songs (
-	display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted
+	display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, name_folder_id
 ) VALUES `
 
 	values := make([]string, n)
 	for i := range n {
-		values[i] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), ?)"
+		values[i] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), ?, ?)"
 	}
 
 	return queryPrefix + strings.Join(values, ",")
@@ -921,6 +1062,7 @@ func bulkInsertMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 				rec.IsNew,
 				nullableInt(rec.UnlockRequired),
 				0,
+				rec.NameFolderID,
 			)
 		}
 
@@ -947,7 +1089,7 @@ func bulkUpdateMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 
 		chunk := records[start:end]
 		query := buildBulkUpdateSongsSQL(len(chunk))
-		args := make([]any, 0, len(chunk)*25)
+		args := make([]any, 0, len(chunk)*27)
 
 		for _, rec := range chunk {
 			args = append(args, rec.ID, rec.record.DisplayID)
@@ -960,6 +1102,9 @@ func bulkUpdateMySQLSongs(ctx context.Context, mysql apirepo.Executor, records [
 		}
 		for _, rec := range chunk {
 			args = append(args, rec.ID, nullableString(rec.record.Reading))
+		}
+		for _, rec := range chunk {
+			args = append(args, rec.ID, rec.record.NameFolderID)
 		}
 		for _, rec := range chunk {
 			args = append(args, rec.ID, rec.record.Artist)

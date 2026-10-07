@@ -66,6 +66,7 @@ type V1SongDTO struct {
 	DisplayID          string             `json:"id"`
 	Title              string             `json:"title"`
 	Reading            *string            `json:"reading"`
+	NameFolderCode     string             `json:"name_folder_code"`
 	Artist             string             `json:"artist"`
 	Genre              *string            `json:"genre"`
 	BPM                *int               `json:"bpm"`
@@ -168,6 +169,7 @@ func ToV1SongDTO(song *entity.Song, genreNamesByID map[int]string, maxOP float64
 		DisplayID:          song.DisplayID,
 		Title:              song.Title,
 		Reading:            song.Reading,
+		NameFolderCode:     song.NameFolderCode,
 		Artist:             song.Artist,
 		Genre:              genrePtr,
 		BPM:                song.BPM,
