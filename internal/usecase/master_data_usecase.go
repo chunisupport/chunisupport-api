@@ -11,6 +11,7 @@ import (
 type MasterDataUsecase interface {
 	GetMasterData(ctx context.Context) *MasterDataOutput
 	GetNameFolders(ctx context.Context) []masterdata.NameFolder
+	GetGenres(ctx context.Context) []masterdata.Genre
 	GetVersions(ctx context.Context) []masterdata.Version
 	GetPermissions(ctx context.Context) []string
 	GetHonorTypes(ctx context.Context) []masterdata.Item

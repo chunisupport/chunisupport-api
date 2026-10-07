@@ -272,6 +272,53 @@ func TestMasterDataUsecase_GetVersions(t *testing.T) {
 	}
 }
 
+func TestMasterDataUsecase_GetGenres(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		masters *masterdata.MasterDataMasters
+		// Then
+		want []masterdata.Genre
+	}{
+		{
+			name: "SortOrder昇順で超ショート名を含めて返る",
+			masters: &masterdata.MasterDataMasters{
+				Genres: map[string]master.Genre{
+					"ORIGINAL":     {ID: 7, Name: "ORIGINAL", ShortName: "ORI", SortOrder: 6},
+					"POPS & ANIME": {ID: 1, Name: "POPS & ANIME", ShortName: "P&A", SortOrder: 0},
+					"niconico":     {ID: 2, Name: "niconico", ShortName: "nico", SortOrder: 1},
+				},
+			},
+			want: []masterdata.Genre{
+				{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"},
+				{ID: 2, Name: "niconico", ShortName: "nico"},
+				{ID: 7, Name: "ORIGINAL", ShortName: "ORI"},
+			},
+		},
+		{
+			name:    "mastersがnilなら空スライスを返す",
+			masters: nil,
+			want:    []masterdata.Genre{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := usecase.NewMasterDataUsecase(
+				&masterDataMasterProviderMock{masters: tt.masters},
+				&chartStatsMasterProviderMock{},
+			)
+
+			// When
+			got := uc.GetGenres(context.Background())
+
+			// Then
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestMasterDataUsecase_GetHonorTypes(t *testing.T) {
 	tests := []struct {
 		name string

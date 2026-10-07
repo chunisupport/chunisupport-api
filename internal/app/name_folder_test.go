@@ -40,3 +40,26 @@ func TestRegisterRoutes_NameFolders(t *testing.T) {
 		})
 	}
 }
+
+type genreMasterStub struct{ usecase.MasterDataUsecase }
+
+func (genreMasterStub) GetGenres(context.Context) []masterdata.Genre {
+	return []masterdata.Genre{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}}
+}
+
+func TestRegisterRoutes_Genres(t *testing.T) {
+	// Given
+	handlers := newAuthorizationTestHandlers()
+	handlers.MasterData = internalhandler.NewMasterDataHandler(genreMasterStub{})
+	e := echo.New()
+	auth := permissionAuthenticator{}
+	registerRoutes(e, handlers, auth, auth, nil, stubMaintenanceUsecase{}, config.Config{})
+	rec := httptest.NewRecorder()
+
+	// When
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/internal/master/genres", nil))
+
+	// Then
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"genres":[{"id":1,"name":"POPS & ANIME","short_name":"P&A"}]}`, rec.Body.String())
+}

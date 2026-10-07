@@ -74,6 +74,13 @@ func (h *MasterDataHandler) GetVersions(c *echo.Context) error {
 	})
 }
 
+// GetGenres は全マスタ取得を必要としない画面向けにジャンル一覧を表示順で返却します。
+func (h *MasterDataHandler) GetGenres(c *echo.Context) error {
+	return c.JSON(http.StatusOK, &dto.GenresResponse{
+		Genres: dto.ToGenreDTOs(h.masterDataUsecase.GetGenres(c.Request().Context())),
+	})
+}
+
 // GetHonorTypes は称号タイプ一覧を返却します。
 func (h *MasterDataHandler) GetHonorTypes(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &dto.HonorTypesResponse{

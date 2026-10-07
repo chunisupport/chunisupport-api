@@ -320,6 +320,7 @@ Content-Type: application/json
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
 | `/internal/master/name-folders` | GET | 不要 | 楽曲名順フォルダ一覧取得 |
+| `/internal/master/genres` | GET | 不要 | ジャンル一覧取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
@@ -4762,6 +4763,29 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | NUMBER | 数字 |
 
 通常楽曲と WORLD'S END 楽曲は必ず1つのフォルダに所属し、楽曲レスポンスでは `name_folder_code` を返します。この項目は読み取り専用で、楽曲の登録・更新リクエストには含めません。所属は楽曲の登録時と `title` / `reading` の変更時に自動判定し、楽曲収集バッチによる更新時も同期します。DBの初期値は「数字」フォルダです。既存楽曲の初回設定も通常の楽曲収集バッチで行い、読み・曲名が変わらない楽曲も正しい所属へ更新します。`reading` の前後空白を除去した結果が空なら `title` を使い、選んだ文字列の前後空白を除去して NFKC 正規化した先頭文字で判定します。API 起動時に既存楽曲の所属を補完しません。
+
+### GET `/internal/master/genres`
+
+- **認証**: 不要
+- **概要**: `/internal/master` の `genres` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、ジャンル一覧だけを分離取得するためのエンドポイントです。ゲームの正規表示順（`sort_order` 昇順）で返します。
+- **レスポンス**: 200 OK。データがない場合は `{"genres": []}` を返します。
+
+```json
+{
+  "genres": [
+    { "id": 1, "name": "POPS & ANIME", "short_name": "P&A" },
+    { "id": 2, "name": "niconico", "short_name": "nico" },
+    { "id": 3, "name": "東方Project", "short_name": "東方" }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `genres` | GenreDTO[] | ジャンル一覧（表示順）。GenreDTO は `GET /internal/master` と同一 |
+
+- **主なエラー**:
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
 ### GET `/internal/master/versions`
 
