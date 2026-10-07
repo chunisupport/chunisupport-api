@@ -671,6 +671,7 @@ func registerRoutes(
 
 	{
 		masterGroup.GET("/permissions", handlers.MasterData.GetPermissions, firebaseAuthStrict, requireAdmin)
+		masterGroup.GET("/name-folders", handlers.MasterData.GetNameFolders)
 		masterGroup.GET("/versions", handlers.MasterData.GetVersions)
 		masterGroup.GET("/honor-types", handlers.MasterData.GetHonorTypes)
 	}

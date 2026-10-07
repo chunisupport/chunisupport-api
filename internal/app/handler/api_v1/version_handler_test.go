@@ -75,3 +75,7 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 func (m *mockV1MasterDataUsecase) GetPermissions(context.Context) []string {
 	return nil
 }
+
+func (m *mockV1MasterDataUsecase) GetNameFolders(context.Context) []masterdata.NameFolder {
+	return []masterdata.NameFolder{}
+}

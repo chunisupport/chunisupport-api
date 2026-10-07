@@ -156,3 +156,7 @@ func TestMasterDataHandler_GetPermissions(t *testing.T) {
 	assert.JSONEq(t, `{"permissions":["PLAYER","EDITOR","ADMIN","EXTDEV"]}`, rec.Body.String())
 	uc.AssertExpectations(t)
 }
+
+func (m *mockMasterDataUsecase) GetNameFolders(context.Context) []masterdata.NameFolder {
+	return []masterdata.NameFolder{}
+}

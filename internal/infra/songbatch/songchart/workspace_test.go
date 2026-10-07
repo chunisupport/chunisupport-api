@@ -16,8 +16,10 @@ func TestBulkSyncSongUnlockRequired(t *testing.T) {
 	ws, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
 	require.NoError(t, err)
 	defer ws.Close()
+	_, err = ws.DB().ExecContext(ctx, `ALTER TABLE songs ADD COLUMN name_folder_id INTEGER NOT NULL DEFAULT 17`)
+	require.NoError(t, err)
 
-	base := songInsertRecord{DisplayID: "disp-001", Title: "Song", Artist: "Artist", GenreID: sql.NullInt64{Int64: 1, Valid: true}, OfficialIdx: "OFF001"}
+	base := songInsertRecord{DisplayID: "disp-001", Title: "Song", Artist: "Artist", GenreID: sql.NullInt64{Int64: 1, Valid: true}, OfficialIdx: "OFF001", NameFolderID: 1}
 	require.NoError(t, bulkInsertMySQLSongs(ctx, ws.DB(), []songInsertRecord{base}, 1))
 	var value int
 	require.NoError(t, ws.DB().GetContext(ctx, &value, `SELECT unlock_required FROM songs WHERE id = 1`))
@@ -554,14 +556,14 @@ func TestBuildBulkUpdateSongsSQL(t *testing.T) {
 				t.Error("UPDATE songs が含まれていません")
 			}
 
-			for _, col := range []string{"display_id", "title", "wiki_page_title", "reading", "artist", "genre_id", "bpm", "released_at", "jacket", "is_worldsend", "is_new", "unlock_required"} {
+			for _, col := range []string{"display_id", "title", "wiki_page_title", "reading", "name_folder_id", "artist", "genre_id", "bpm", "released_at", "jacket", "is_worldsend", "is_new", "unlock_required"} {
 				if !strings.Contains(sql, col+" = CASE") {
 					t.Errorf("列 %s の CASE ブロックが含まれていません", col)
 				}
 			}
 
 			gotWhen := strings.Count(sql, "WHEN id = ?")
-			wantWhen := 12 * tt.wantWhenCount
+			wantWhen := 13 * tt.wantWhenCount
 			if gotWhen != wantWhen {
 				t.Errorf("WHEN 節の数: got %d, want %d", gotWhen, wantWhen)
 			}
@@ -816,6 +818,9 @@ func TestBulkUpdateMySQLSongs_PreservesExistingWikiPageTitle(t *testing.T) {
 		t.Fatalf("ワークスペースの作成に失敗しました: %v", err)
 	}
 	defer ws.Close()
+	if _, err := ws.DB().ExecContext(ctx, `ALTER TABLE songs ADD COLUMN name_folder_id INTEGER NOT NULL DEFAULT 17`); err != nil {
+		t.Fatalf("名前順フォルダ列の追加に失敗しました: %v", err)
+	}
 
 	if _, err := ws.DB().ExecContext(ctx, `
 		INSERT INTO songs (id, display_id, title, wiki_page_title, artist, genre_id, official_idx, is_worldsend, is_deleted)
@@ -828,8 +833,8 @@ func TestBulkUpdateMySQLSongs_PreservesExistingWikiPageTitle(t *testing.T) {
 
 	incoming := sql.NullString{String: "Incoming Title", Valid: true}
 	records := []songUpdateRecord{
-		{ID: 1, record: songInsertRecord{DisplayID: "existing", Title: "Existing", Artist: "Artist", OfficialIdx: "1", WikiPageTitle: incoming}},
-		{ID: 2, record: songInsertRecord{DisplayID: "missing", Title: "Missing", Artist: "Artist", OfficialIdx: "2", WikiPageTitle: incoming}},
+		{ID: 1, record: songInsertRecord{DisplayID: "existing", Title: "Existing", Artist: "Artist", OfficialIdx: "1", WikiPageTitle: incoming, NameFolderID: 1}},
+		{ID: 2, record: songInsertRecord{DisplayID: "missing", Title: "Missing", Artist: "Artist", OfficialIdx: "2", WikiPageTitle: incoming, NameFolderID: 1}},
 	}
 	if err := bulkUpdateMySQLSongs(ctx, ws.DB(), records, len(records)); err != nil {
 		t.Fatalf("楽曲の更新に失敗しました: %v", err)
@@ -845,4 +850,61 @@ func TestBulkUpdateMySQLSongs_PreservesExistingWikiPageTitle(t *testing.T) {
 	if got, want := titles[1].String, "Incoming Title"; got != want {
 		t.Errorf("未設定のWikiページタイトル: got %q, want %q", got, want)
 	}
+}
+
+func TestSyncToMySQLResolvesNameFolderIDsFromDatabase(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	source, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "_source?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer source.Close()
+
+	target, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "_target?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer target.Close()
+
+	_, err = target.DB().ExecContext(ctx, `ALTER TABLE songs ADD COLUMN name_folder_id INTEGER NOT NULL DEFAULT 17`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `CREATE TABLE name_folders (id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE)`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `INSERT INTO name_folders (id, code) VALUES (9, 'KA'), (1, 'ABCD'), (6, 'UVWXYZ'), (17, 'NUMBER')`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, official_idx, is_worldsend, is_deleted)
+		VALUES ('existing', 'Old title', NULL, 'Artist', 1, 'UPDATE-1', 0, 0);
+	`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, official_idx, is_worldsend, is_deleted)
+		VALUES ('deleted-we', 'Z song', NULL, 'Artist', 1, 'DELETED-WE', 1, 1);
+	`)
+	require.NoError(t, err)
+	_, err = source.DB().ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, reading, artist, genre_id, official_idx, is_worldsend, is_deleted)
+		VALUES
+			('existing', 'BETA title', 'カキクケコ', 'Artist', 1, 'UPDATE-1', 0, 0),
+			('new', 'A new song', NULL, 'Artist', 1, 'INSERT-1', 0, 0);
+	`)
+	require.NoError(t, err)
+
+	err = source.SyncToMySQL(ctx, target.DB(), SyncOptions{})
+	require.NoError(t, err)
+
+	rows, err := target.DB().QueryContext(ctx, `SELECT official_idx, name_folder_id FROM songs`)
+	require.NoError(t, err)
+	defer rows.Close()
+	got := make(map[string]int)
+	for rows.Next() {
+		var officialIdx string
+		var nameFolderID int
+		require.NoError(t, rows.Scan(&officialIdx, &nameFolderID))
+		got[officialIdx] = nameFolderID
+	}
+	require.NoError(t, rows.Err())
+	assert.Equal(t, map[string]int{
+		"UPDATE-1":   9,
+		"INSERT-1":   1,
+		"DELETED-WE": 6,
+	}, got)
 }

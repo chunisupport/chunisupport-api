@@ -35,12 +35,21 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 		INSERT INTO difficulties (id, name) VALUES 
 			(1, 'BASIC'), (2, 'ADVANCED'), (3, 'EXPERT'), (4, 'MASTER'), (5, 'ULTIMA');
 
+		CREATE TABLE IF NOT EXISTS name_folders (
+			id INTEGER PRIMARY KEY,
+			code TEXT NOT NULL UNIQUE
+		);
+		INSERT INTO name_folders (id, code) VALUES
+			(1, 'ABCD'), (2, 'EFGH'), (3, 'IJKL'), (4, 'MNOP'), (5, 'QRST'), (6, 'UVWXYZ'),
+			(7, 'A'), (8, 'KA'), (9, 'SA'), (10, 'TA'), (11, 'NA'), (12, 'HA'), (13, 'MA'), (14, 'YA'), (15, 'RA'), (16, 'WA'), (17, 'NUMBER');
+
 		CREATE TABLE IF NOT EXISTS songs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			display_id TEXT UNIQUE NOT NULL,
 			title TEXT NOT NULL,
 			wiki_page_title TEXT,
 			reading TEXT,
+			name_folder_id INTEGER NOT NULL DEFAULT 17,
 			artist TEXT NOT NULL,
 			genre_id INTEGER NOT NULL,
 			bpm INTEGER,
@@ -52,7 +61,8 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			unlock_required INTEGER NOT NULL DEFAULT 0,
 			is_deleted INTEGER NOT NULL DEFAULT 0,
 			updated_at TEXT,
-			FOREIGN KEY (genre_id) REFERENCES genres(id)
+			FOREIGN KEY (genre_id) REFERENCES genres(id),
+			FOREIGN KEY (name_folder_id) REFERENCES name_folders(id)
 		);
 
 		CREATE TABLE IF NOT EXISTS charts (

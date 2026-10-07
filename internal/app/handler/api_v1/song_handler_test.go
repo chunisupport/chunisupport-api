@@ -113,11 +113,12 @@ func TestV1SongHandler_UpdateChartConstant(t *testing.T) {
 	e.Validator = &testValidator{validator: validator.New()}
 	var got usecase.UpdateChartConstantInput
 	updatedSong := &entity.Song{
-		DisplayID:   "display-id",
-		OfficialIdx: "123",
-		Title:       "更新対象楽曲",
-		Artist:      "アーティスト",
-		Charts:      []*entity.Chart{},
+		DisplayID:      "display-id",
+		OfficialIdx:    "123",
+		Title:          "更新対象楽曲",
+		NameFolderCode: "ABCD",
+		Artist:         "アーティスト",
+		Charts:         []*entity.Chart{},
 	}
 	h := NewV1SongHandler(&testutil.MockSongUsecase{
 		UpdateChartConstantFunc: func(_ context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
@@ -142,6 +143,7 @@ func TestV1SongHandler_UpdateChartConstant(t *testing.T) {
 		"id":"display-id",
 		"title":"更新対象楽曲",
 		"reading":null,
+		"name_folder_code":"ABCD",
 		"artist":"アーティスト",
 		"genre":null,
 		"bpm":null,

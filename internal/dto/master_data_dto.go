@@ -82,6 +82,7 @@ type HonorTypesResponse struct {
 
 // MasterDataResponse はマスタデータ取得APIのレスポンスを表します。
 type MasterDataResponse struct {
+	NameFolders      []*NameFolderDTO `json:"name_folders"`
 	Genres           []*GenreDTO      `json:"genres"`
 	Difficulties     []*MasterItemDTO `json:"difficulties"`
 	AccountTypes     []*MasterItemDTO `json:"account_types"`
@@ -110,4 +111,25 @@ type RatingBandDTO struct {
 // PermissionsResponse は数値IDを公開せず、権限変更にそのまま利用できる名前を返します。
 type PermissionsResponse struct {
 	Permissions []string `json:"permissions"`
+}
+
+// NameFolderDTO は内部IDを公開せず選択肢を識別する名前順フォルダです。
+type NameFolderDTO struct {
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	SortOrder int    `json:"sort_order"`
+}
+
+// NameFoldersResponse は名前順フォルダ一覧取得APIのレスポンスです。
+type NameFoldersResponse struct {
+	NameFolders []*NameFolderDTO `json:"name_folders"`
+}
+
+// ToNameFolderDTOs は名前順フォルダをAPI公開用に変換します。
+func ToNameFolderDTOs(folders []masterdata.NameFolder) []*NameFolderDTO {
+	items := make([]*NameFolderDTO, len(folders))
+	for i, folder := range folders {
+		items[i] = &NameFolderDTO{Code: folder.Code, Name: folder.Name, SortOrder: folder.SortOrder}
+	}
+	return items
 }

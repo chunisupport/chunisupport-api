@@ -1,4 +1,4 @@
-﻿CREATE TABLE `account_types` (
+CREATE TABLE `account_types` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
@@ -246,6 +246,16 @@ CREATE TABLE `honors` (
   KEY `honor_type_id` (`honor_type_id`),
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `name_folders` (
+  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(10) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_name_folders_code` (`code`),
+  UNIQUE KEY `uq_name_folders_name` (`name`),
+  UNIQUE KEY `uq_name_folders_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_course_records` (
   `player_id` int unsigned NOT NULL,
   `course_id` mediumint unsigned NOT NULL,
@@ -461,6 +471,7 @@ CREATE TABLE `songs` (
   `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
   `reading` varchar(300) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name_folder_id` tinyint unsigned NOT NULL DEFAULT '17',
   `artist` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
   `genre_id` tinyint unsigned NOT NULL,
   `bpm` int DEFAULT NULL,
@@ -477,6 +488,8 @@ CREATE TABLE `songs` (
   UNIQUE KEY `official_idx` (`official_idx`),
   KEY `genre_id` (`genre_id`),
   KEY `idx_songs_worldsend_deleted` (`is_worldsend`,`is_deleted`),
+  KEY `idx_songs_name_folder_id` (`name_folder_id`),
+  CONSTRAINT `fk_songs_name_folder` FOREIGN KEY (`name_folder_id`) REFERENCES `name_folders` (`id`),
   CONSTRAINT `songs_ibfk_1` FOREIGN KEY (`genre_id`) REFERENCES `genres` (`id`),
   CONSTRAINT `songs_chk_1` CHECK (((`bpm` is null) or (`bpm` > 0)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

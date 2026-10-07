@@ -319,6 +319,7 @@ Content-Type: application/json
 | `/internal/users/:username/record/courses/:id` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
+| `/internal/master/name-folders` | GET | 不要 | 楽曲名順フォルダ一覧取得 |
 | `/internal/master/versions` | GET | 不要 | バージョン一覧取得 |
 | `/internal/master/honor-types` | GET | 不要 | 称号タイプ一覧取得 |
 | `/v1/songs` | GET | APIトークン | 全楽曲一覧取得（WORLD'S END除く） |
@@ -3566,6 +3567,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "title": "楽曲名",
       "wiki_page_title": "楽曲名",
       "reading": "ガッキョクメイ",
+      "name_folder_code": "NUMBER",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -3610,6 +3612,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `title` | string | 楽曲名 |
 | `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
+| `name_folder_code` | string | 楽曲名順フォルダのコード。`reading` または `title` から自動判定される読み取り専用項目 |
 | `artist` | string | アーティスト名 |
 | `genre` | string | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM（未設定の場合null） |
@@ -4078,6 +4081,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "title": "楽曲名",
       "wiki_page_title": "楽曲名(WORLD'S END)",
       "reading": "ガッキョクメイ",
+      "name_folder_code": "NUMBER",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -4106,6 +4110,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `title` | string | 楽曲名 |
 | `wiki_page_title` | string \| null | Wikiのページタイトル（未設定の場合null） |
 | `reading` | string \| null | 楽曲名の読み |
+| `name_folder_code` | string | 楽曲名順フォルダのコード。`reading` または `title` から自動判定される読み取り専用項目 |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |
@@ -4437,7 +4442,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorSongDTO**:
 
-`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
+`EditorSongDTO` は `SongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `SongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `name_folder_code`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `maxop`, `is_maxop_unknown`, `op_target_difficulty`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および譜面ごとの `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4489,7 +4494,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 **EditorWorldsendSongDTO**:
 
-`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
+`EditorWorldsendSongDTO` は `WorldsendSongDTO` を embed（埋め込み）したDTOです。レスポンスJSONでは `WorldsendSongDTO` の全フィールド（`id`, `title`, `wiki_page_title`, `reading`, `name_folder_code`, `artist`, `genre`, `bpm`, `release`, `jacket`, `official_idx`, `is_new`, `unlock_required`）がトップレベルにそのまま展開されます。さらに編集者向けとして、楽曲自体の `updated_at`、論理削除状態を表す `is_deleted`、および WORLD'S END 譜面の `updated_at` を含む `charts` を返します。
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
@@ -4534,12 +4539,16 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/master`
 
 - **認証**: 不要
-- **概要**: フロントエンド向けにマスタデータ（ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ、ポゼッション）を返却します。
+- **概要**: フロントエンド向けにマスタデータ（楽曲名順フォルダ、ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ、ポゼッション）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
 - **レスポンス**: 200 OK
 
 ```json
 {
+  "name_folders": [
+    { "code": "ABCD", "name": "ABCD", "sort_order": 1 },
+    { "code": "EFGH", "name": "EFGH", "sort_order": 2 }
+  ],
   "genres": [
     { "id": 1, "name": "POPS & ANIME", "short_name": "P&A" },
     { "id": 2, "name": "niconico", "short_name": "nico" },
@@ -4637,6 +4646,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
+| `name_folders` | NameFolderDTO[] | 楽曲名順フォルダ一覧（sort_order昇順）。内部数値IDは返さない |
 | `genres` | GenreDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
@@ -4705,6 +4715,53 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 403 Forbidden (`forbidden`): ADMIN権限が不足
+
+### GET `/internal/master/name-folders`
+
+- **認証**: 不要
+- **概要**: 楽曲名順フォルダマスタを `sort_order` 昇順で返します。`GET /internal/master` の `name_folders` と同じ一覧です。
+- **レスポンス**: 200 OK。データがない場合は `{"name_folders": []}` を返します。
+
+```json
+{
+  "name_folders": [
+    { "code": "ABCD", "name": "ABCD", "sort_order": 1 },
+    { "code": "EFGH", "name": "EFGH", "sort_order": 2 }
+  ]
+}
+```
+
+**NameFolderDTO**:
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `code` | string | 大文字の固定識別コード。内部数値IDは公開しない |
+| `name` | string | 表示名 |
+| `sort_order` | int | 表示順（1〜17） |
+
+コードと表示名は、表示順に以下の17件です。
+
+| code | name |
+| ---- | ---- |
+| ABCD | ABCD |
+| EFGH | EFGH |
+| IJKL | IJKL |
+| MNOP | MNOP |
+| QRST | QRST |
+| UVWXYZ | UVWXYZ |
+| A | あ行 |
+| KA | か行 |
+| SA | さ行 |
+| TA | た行 |
+| NA | な行 |
+| HA | は行 |
+| MA | ま行 |
+| YA | や行 |
+| RA | ら行 |
+| WA | わ行 |
+| NUMBER | 数字 |
+
+通常楽曲と WORLD'S END 楽曲は必ず1つのフォルダに所属し、楽曲レスポンスでは `name_folder_code` を返します。この項目は読み取り専用で、楽曲の登録・更新リクエストには含めません。所属は楽曲の登録時と `title` / `reading` の変更時に自動判定し、楽曲収集バッチによる更新時も同期します。DBの初期値は「数字」フォルダです。既存楽曲の初回設定も通常の楽曲収集バッチで行い、読み・曲名が変わらない楽曲も正しい所属へ更新します。`reading` の前後空白を除去した結果が空なら `title` を使い、選んだ文字列の前後空白を除去して NFKC 正規化した先頭文字で判定します。API 起動時に既存楽曲の所属を補完しません。
 
 ### GET `/internal/master/versions`
 
@@ -4788,6 +4845,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "id": "0000000000000001",
       "title": "楽曲名",
       "reading": "ガッキョクメイ",
+      "name_folder_code": "NUMBER",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -4823,6 +4881,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `songs[].id` | string | 楽曲の識別ID（16桁） |
 | `songs[].title` | string | 楽曲名 |
 | `songs[].reading` | string\|null | 楽曲名の読み |
+| `songs[].name_folder_code` | string | 楽曲名順フォルダのコード |
 | `songs[].artist` | string | アーティスト名 |
 | `songs[].genre` | string\|null | ジャンル名 |
 | `songs[].bpm` | number\|null | BPM |
@@ -4924,6 +4983,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "id": "0123456789abcdef",
       "title": "楽曲名",
       "reading": "ガッキョクメイ",
+      "name_folder_code": "NUMBER",
       "artist": "アーティスト名",
       "genre": "ジャンル名",
       "bpm": 180,
@@ -4950,6 +5010,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `id` | string | 楽曲ID |
 | `title` | string | 楽曲名 |
 | `reading` | string \| null | 楽曲名の読み |
+| `name_folder_code` | string | 楽曲名順フォルダのコード |
 | `artist` | string | アーティスト名 |
 | `genre` | string \| null | ジャンル名（IDではなく名称） |
 | `bpm` | int \| null | BPM |

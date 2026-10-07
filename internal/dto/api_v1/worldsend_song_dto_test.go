@@ -20,7 +20,7 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	attribute := "光"
 	chartNotes, err := notes.NewNotes(2000)
 	require.NoError(t, err)
-	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt, IsNew: true}
+	song := &entity.Song{GenreID: &genreID, ReleasedAt: &releasedAt, NameFolderCode: "ABCD", IsNew: true}
 	chart := &entity.WorldsendChart{
 		LevelStar: &level,
 		Attribute: &attribute,
@@ -34,6 +34,7 @@ func TestToV1WorldsendSongDTO(t *testing.T) {
 	assert.Equal(t, "niconico", *dto.Genre)
 	require.NotNil(t, dto.Release)
 	assert.Equal(t, "2023-12-31", *dto.Release)
+	assert.Equal(t, "ABCD", dto.NameFolderCode)
 	assert.True(t, dto.IsNew)
 	require.Contains(t, dto.Charts, "WORLDSEND")
 	require.NotNil(t, dto.Charts["WORLDSEND"])
@@ -63,15 +64,16 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 	notesDesigner := "譜面作者B"
 
 	songDTO := &V1WorldsendSongDTO{
-		DisplayID:   "v1we123456789012",
-		Title:       "V1 WE テスト",
-		Reading:     &reading,
-		Artist:      "V1 WE アーティスト",
-		Genre:       &genre,
-		BPM:         &bpm,
-		Release:     &releaseDate,
-		Jacket:      &jacket,
-		OfficialIdx: "789",
+		DisplayID:      "v1we123456789012",
+		Title:          "V1 WE テスト",
+		Reading:        &reading,
+		NameFolderCode: "ABCD",
+		Artist:         "V1 WE アーティスト",
+		Genre:          &genre,
+		BPM:            &bpm,
+		Release:        &releaseDate,
+		Jacket:         &jacket,
+		OfficialIdx:    "789",
 		Charts: map[string]*V1WorldsendChartDTO{
 			"WORLDSEND": {
 				Attribute:     &attribute,
@@ -96,6 +98,9 @@ func TestV1WorldsendSongDTO_JSONMarshal(t *testing.T) {
 
 	if !containsString(jsonString, `"reading":"ブイワンワールドエンドテスト"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
+	}
+	if !containsString(jsonString, `"name_folder_code":"ABCD"`) {
+		assert.Failf(t, "アサーション失敗", "JSON should contain name_folder_code field, got: %s", jsonString)
 	}
 
 	// genre がジャンル名であることを確認

@@ -203,3 +203,16 @@ Playerの既存データは、同一トランザクション内で更新用検�
 MySQLでの並行更新テストは `PLAYER_PERSISTENCE_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestPlayerPersistenceMySQL -count=1` で実行します。一時データベースの作成・削除と `performance_schema.data_lock_waits` / `data_locks` の参照権限が必要です。テストは作成した専用データベースだけを削除します。
 
 コースの編集・削除・復元の並行更新テストは `COURSE_CONCURRENCY_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestCourseConcurrencyMySQL -count=1` で実行します。同じ権限が必要で、作成した専用データベースだけを削除します。接続先が未設定の場合はスキップします。
+
+## 楽曲名順フォルダの所属設定
+
+`songs.name_folder_id` は NOT NULL で、初期値は「数字」フォルダです。通常の楽曲バッチが全楽曲の読みから所属を再判定し、正しい所属へ設定・補正します。読み・曲名に変更がない楽曲、削除済み楽曲、WORLD'S ENDも対象です。API起動時には補完しません。
+
+既存データがある環境では、APIと定期実行中の楽曲バッチを停止して、次の順に実行してください。`<DATABASE_URL>` は対象DBのMySQL接続URL、`<APP_ENV>` は対象環境です。マイグレーションの接続URLと、楽曲バッチが使用するDB設定が同じDBを指すことを確認してください。
+
+```bash
+migrate -database "<DATABASE_URL>" -path migration/mysql up
+APP_ENV="<APP_ENV>" go run ./cmd/song-batch
+```
+
+楽曲バッチには対象環境の通常実行オプションを指定してください。マイグレーション適用直後からバッチが完了するまでは、既存楽曲の所属が初期値の「数字」になります。バッチ実行後にAPIと定期実行を再開し、楽曲JSONを配信する静的データも再生成してください。

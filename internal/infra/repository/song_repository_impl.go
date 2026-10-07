@@ -41,6 +41,7 @@ type songRow struct {
 	Jacket         *string    `db:"jacket"`
 	IsWorldsend    bool       `db:"is_worldsend"`
 	IsNew          bool       `db:"is_new"`
+	NameFolderCode string     `db:"name_folder_code"`
 	UnlockRequired bool       `db:"unlock_required"`
 	IsDeleted      bool       `db:"is_deleted"`
 	UpdatedAt      *time.Time `db:"updated_at"`
@@ -63,14 +64,15 @@ type chartRow struct {
 // N+1問題を回避するため、楽曲と譜面を別々のクエリで取得し、メモリ上で結合します。
 func (r *songRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	songsQuery := `
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
+		SELECT songs.id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at, name_folders.code AS name_folder_code
 		FROM songs
+		INNER JOIN name_folders ON name_folders.id = songs.name_folder_id
 		WHERE is_worldsend = 0`
 	if !includeDeleted {
 		songsQuery += ` AND is_deleted = 0`
 	}
 	songsQuery += `
-		ORDER BY id
+		ORDER BY songs.id
 	`
 	var songRows []songRow
 	if err := exec.SelectContext(ctx, &songRows, songsQuery); err != nil {
@@ -194,6 +196,7 @@ func (r *songRepository) toSongEntity(row *songRow) *entity.Song {
 	song.Jacket = row.Jacket
 	song.IsWorldsend = row.IsWorldsend
 	song.IsNew = row.IsNew
+	song.NameFolderCode = row.NameFolderCode
 	song.UnlockRequired = row.UnlockRequired
 	song.IsDeleted = row.IsDeleted
 	song.UpdatedAt = row.UpdatedAt
@@ -236,8 +239,9 @@ func (r *songRepository) FindByDisplayIDs(ctx context.Context, exec repository.E
 	}
 
 	query, args, err := sqlx.In(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
+		SELECT songs.id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at, name_folders.code AS name_folder_code
 		FROM songs
+		INNER JOIN name_folders ON name_folders.id = songs.name_folder_id
 		WHERE display_id IN (?)
 		  AND is_worldsend = 0
 	`, displayIDs)
@@ -334,8 +338,9 @@ func (r *songRepository) findByIdentifierForUpdate(ctx context.Context, exec rep
 	}
 
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
+		SELECT songs.id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at, name_folders.code AS name_folder_code
 		FROM songs
+		INNER JOIN name_folders ON name_folders.id = songs.name_folder_id
 		WHERE %s = ? AND is_worldsend = 0
 		FOR UPDATE
 	`, column)
@@ -383,8 +388,9 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 	}
 
 	songQuery := fmt.Sprintf(`
-		SELECT id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at
+		SELECT songs.id, display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted, updated_at, name_folders.code AS name_folder_code
 		FROM songs
+		INNER JOIN name_folders ON name_folders.id = songs.name_folder_id
 		WHERE %s = ? AND is_worldsend = 0
 	`, column)
 	var songRow songRow
@@ -428,9 +434,10 @@ func (r *songRepository) findByIdentifier(ctx context.Context, exec repository.E
 // 譜面の追加・削除は行いません。
 // 対象が存在しない場合は ErrSongNotFound を返します。
 func (r *songRepository) Save(ctx context.Context, exec repository.Executor, song *entity.Song) error {
+	nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
 	query := `
 		UPDATE songs
-		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, unlock_required = ?, is_deleted = ?
+		SET display_id = ?, title = ?, wiki_page_title = ?, reading = ?, name_folder_id = (SELECT id FROM name_folders WHERE code = ?), artist = ?, genre_id = ?, bpm = ?, released_at = ?, official_idx = ?, jacket = ?, is_worldsend = ?, is_new = ?, unlock_required = ?, is_deleted = ?
 		WHERE id = ?
 	`
 	result, err := exec.ExecContext(
@@ -440,6 +447,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 		song.Title,
 		song.WikiPageTitle,
 		song.Reading,
+		nameFolderCode,
 		song.Artist,
 		song.GenreID,
 		song.BPM,
@@ -469,6 +477,7 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 			return repository.ErrSongNotFound
 		}
 	}
+	song.NameFolderCode = nameFolderCode
 
 	return r.bulkUpdateCharts(ctx, exec, []*entity.Song{song}, map[string]int{
 		song.DisplayID: song.ID,
@@ -565,8 +574,8 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 	// 注意: SQLの引数順序はCASE式の出現順（title→wiki_page_title→reading→artist→genre→...→IN句）であるため、
 	// 各フィールドの引数を別々に蓄積し、最後に正しい順序で結合する必要がある
-	var titleCases, wikiPageTitleCases, readingCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
-	var titleArgs, wikiPageTitleArgs, readingArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
+	var titleCases, wikiPageTitleCases, readingCases, nameFolderCases, artistCases, genreCases, bpmCases, releasedCases, jacketCases, isNewCases, unlockRequiredCases []string
+	var titleArgs, wikiPageTitleArgs, readingArgs, nameFolderArgs, artistArgs, genreArgs, bpmArgs, releasedArgs, jacketArgs, isNewArgs, unlockRequiredArgs []any
 
 	for _, update := range updates {
 		song := update.Song
@@ -582,6 +591,11 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 
 		readingCases = append(readingCases, "WHEN id = ? THEN ?")
 		readingArgs = append(readingArgs, songID, song.Reading)
+
+		nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
+		song.NameFolderCode = nameFolderCode
+		nameFolderCases = append(nameFolderCases, "WHEN id = ? THEN (SELECT id FROM name_folders WHERE code = ?)")
+		nameFolderArgs = append(nameFolderArgs, songID, nameFolderCode)
 
 		artistCases = append(artistCases, "WHEN id = ? THEN ?")
 		artistArgs = append(artistArgs, songID, song.Artist)
@@ -611,6 +625,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, titleArgs...)
 	args = append(args, wikiPageTitleArgs...)
 	args = append(args, readingArgs...)
+	args = append(args, nameFolderArgs...)
 	args = append(args, artistArgs...)
 	args = append(args, genreArgs...)
 	args = append(args, bpmArgs...)
@@ -633,6 +648,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			title = CASE %s END,
 			wiki_page_title = %s,
 			reading = CASE %s END,
+			name_folder_id = CASE %s ELSE name_folder_id END,
 			artist = CASE %s END,
 			genre_id = CASE %s END,
 			bpm = CASE %s END,
@@ -646,6 +662,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		strings.Join(titleCases, " "),
 		keepExistingUpdateExpr("wiki_page_title", wikiPageTitleCases),
 		strings.Join(readingCases, " "),
+		strings.Join(nameFolderCases, " "),
 		strings.Join(artistCases, " "),
 		strings.Join(genreCases, " "),
 		strings.Join(bpmCases, " "),
@@ -752,14 +769,16 @@ func (r *songRepository) bulkUpdateCharts(ctx context.Context, exec repository.E
 // display_id は呼び出し元（usecase）で生成済みのものを使用します。
 // official_idx 重複時は ErrDuplicateOfficialIdx を返します。
 func (r *songRepository) Create(ctx context.Context, exec repository.Executor, song *entity.Song) (*entity.Song, error) {
+	nameFolderCode := service.ResolveNameFolderCode(song.Title, song.Reading)
 	songResult, err := exec.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, wiki_page_title, reading, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0)
+		INSERT INTO songs (display_id, title, wiki_page_title, reading, name_folder_id, artist, genre_id, bpm, released_at, official_idx, jacket, is_worldsend, is_new, unlock_required, is_deleted)
+		VALUES (?, ?, ?, ?, (SELECT id FROM name_folders WHERE code = ?), ?, ?, ?, ?, ?, ?, 0, ?, ?, 0)
 	`,
 		song.DisplayID,
 		song.Title,
 		song.WikiPageTitle,
 		song.Reading,
+		nameFolderCode,
 		song.Artist,
 		song.GenreID,
 		song.BPM,
@@ -775,6 +794,7 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		}
 		return nil, err
 	}
+	song.NameFolderCode = nameFolderCode
 
 	songID, err := songResult.LastInsertId()
 	if err != nil {
