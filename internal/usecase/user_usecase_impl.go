@@ -159,9 +159,7 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 
 	lastScoreUpdate, err := s.playerRecordRepo.GetLastScoreUpdate(ctx, s.db, *user.PlayerID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to get last score update due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to get last score update", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
@@ -287,18 +285,14 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 
 	records, err := s.playerRecordRepo.FindByPlayerIDForRating(ctx, s.db, *user.PlayerID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player rating records due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find player rating records", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
 	opTargetCandidates, err := s.playerRecordRepo.FindOPTargetCandidatesByPlayerID(ctx, s.db, *user.PlayerID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player record OP target candidates due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find player record OP target candidates", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
@@ -394,7 +388,9 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
-		slog.Error("failed to find user by username", "username", username, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find user by username", "username", username, "error", err)
+		}
 		return err
 	}
 	if user.ID == requester.ID {
@@ -458,7 +454,9 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, requester
 		if errors.Is(err, ErrUserNotFound) || errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
-		slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
+		}
 		return err
 	}
 	return nil
@@ -646,9 +644,7 @@ func filterPlayerRecordsByDifficultyID(records []*entity.PlayerRecord, difficult
 func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID int) (*userProfilePlayerRecords, error) {
 	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, playerID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player records due to context canceled", "player_id", playerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find player records", "player_id", playerID, "error", err)
 		}
 		return nil, err
@@ -783,9 +779,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 
 	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find songs for no-play completion due to context canceled", "player_id", playerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
 		}
 		return nil, err
@@ -811,9 +805,7 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 
 	records, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, playerID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find worldsend records due to context canceled", "player_id", playerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find worldsend records", "player_id", playerID, "error", err)
 		}
 		return nil, err
@@ -834,7 +826,9 @@ func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int
 
 	worldsendSongs, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
 	if err != nil {
-		slog.Error("failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
+		}
 		return nil, err
 	}
 
@@ -938,7 +932,9 @@ func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, re
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, ErrUserNotFound
 		}
-		slog.Error("failed to find user by username", "username", username, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find user by username", "username", username, "error", err)
+		}
 		return nil, err
 	}
 
@@ -971,9 +967,7 @@ func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) 
 		if errors.Is(err, repository.ErrPlayerNotFound) {
 			return nil, nil
 		}
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to find player due to context canceled", "player_id", *user.PlayerID, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to find player", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err

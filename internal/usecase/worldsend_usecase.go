@@ -123,7 +123,9 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
-		slog.Error("failed to find all worldsend songs", "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find all worldsend songs", "error", err)
+		}
 		return nil, err
 	}
 
@@ -138,7 +140,9 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return nil, repository.ErrSongNotFound
 		}
-		slog.Error("failed to find worldsend song by display_id", "display_id", displayID, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find worldsend song by display_id", "display_id", displayID, "error", err)
+		}
 		return nil, err
 	}
 
@@ -203,7 +207,9 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		if errors.Is(err, repository.ErrDuplicateDisplayID) {
 			return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
 		}
-		slog.Error("failed to update worldsend songs", "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to update worldsend songs", "error", err)
+		}
 		return err
 	}
 
