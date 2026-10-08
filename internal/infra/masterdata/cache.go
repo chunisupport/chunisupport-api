@@ -502,6 +502,7 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 		DifficultyNamesByID:    maps.Clone(c.DifficultyNamesByID),
 		GenreNamesByID:         maps.Clone(c.GenreNamesByID),
 		VersionsByID:           versionsByID,
+		NameFoldersByCode:      maps.Clone(c.NameFolders),
 		ClearLampNamesByID:     maps.Clone(c.ClearLampNamesByID),
 		ComboLampNamesByID:     maps.Clone(c.ComboLampNamesByID),
 	}

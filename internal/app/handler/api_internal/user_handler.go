@@ -190,9 +190,7 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 		// セキュリティ: 非公開と未発見を区別しない
 		return apierror.ErrUserNotFound
 	default:
-		if errors.Is(err, context.Canceled) {
-			slog.Warn("failed to get "+contextDescription+" due to context canceled", "username", username, "error", err)
-		} else {
+		if !errors.Is(err, context.Canceled) {
 			slog.Error("failed to get "+contextDescription, "username", username, "error", err)
 		}
 		return apierror.ErrInternalError.WithInternal(err)
@@ -364,7 +362,7 @@ func (h *UserHandler) DeleteUser(c *echo.Context) error {
 	}
 
 	if err := h.userUsecase.DeleteUser(c.Request().Context(), requester, username); err != nil {
-		if !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrCannotDeleteSelf) && !errors.Is(err, usecase.ErrUserNotFound) {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrCannotDeleteSelf) && !errors.Is(err, usecase.ErrUserNotFound) {
 			slog.Error("failed to delete user", "username", username, "error", err)
 		}
 		return apierror.FromUsecaseError(err)

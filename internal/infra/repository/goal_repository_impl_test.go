@@ -49,6 +49,7 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 			id INTEGER PRIMARY KEY,
 			genre_id INTEGER NULL,
 			released_at TEXT NULL,
+			name_folder_id INTEGER NOT NULL DEFAULT 17,
 			is_deleted INTEGER NOT NULL
 		)`,
 		`CREATE TABLE charts (
@@ -253,6 +254,25 @@ func TestGoalRepository_GetTargetStatsOPTargetOnly(t *testing.T) {
 	assert.Equal(t, 2, stats.ChartCount)
 	assert.Equal(t, 1, stats.SongCount)
 	assert.InDelta(t, 29.5, stats.TotalChartConst, 0.0001)
+}
+
+func TestGoalRepository_GetTargetStatsFiltersByNameFolder(t *testing.T) {
+	// Given
+	db := setupGoalRepositorySQLite(t)
+	repo := &goalRepository{db: db}
+	_, err := db.Exec(`UPDATE songs SET name_folder_id = 1 WHERE id = 2`)
+	require.NoError(t, err)
+
+	// When
+	stats, err := repo.GetTargetStats(context.Background(), db, domainrepo.GoalTargetFilter{
+		NameFolderIDs: []int{1},
+	})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.ChartCount)
+	assert.Equal(t, 0, stats.SongCount)
+	assert.InDelta(t, 29.0, stats.TotalChartConst, 0.0001)
 }
 
 func TestGoalRepository_GetTargetStatsOPTargetOnlyWithConstFilter(t *testing.T) {

@@ -171,6 +171,11 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
 		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
 		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		NameFoldersByCode: map[string]domainmasterdata.NameFolder{
+			"ABCD":   {ID: 1, Code: "ABCD", Name: "ABCD", SortOrder: 1},
+			"A":      {ID: 7, Code: "A", Name: "あ行", SortOrder: 7},
+			"NUMBER": {ID: 17, Code: "NUMBER", Name: "数字", SortOrder: 17},
+		},
 	}
 }
 
@@ -479,6 +484,42 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			expectError:        false,
 		},
 		{
+			name:               "楽曲名順を単一コードで指定できる",
+			attributes:         []byte(`{"name_folder":"A"}`),
+			expectedAttributes: map[string]any{"name_folder": "A"},
+			expectError:        false,
+		},
+		{
+			name:               "楽曲名順の配列は重複除去され表示順に正規化される",
+			attributes:         []byte(`{"name_folder":["NUMBER","A","ABCD","A"]}`),
+			expectedAttributes: map[string]any{"name_folder": []any{"ABCD", "A", "NUMBER"}},
+			expectError:        false,
+		},
+		{
+			name:               "楽曲名順の単一要素配列はスカラーに正規化される",
+			attributes:         []byte(`{"name_folder":["A"]}`),
+			expectedAttributes: map[string]any{"name_folder": "A"},
+			expectError:        false,
+		},
+		{
+			name:               "存在しない楽曲名順コードはエラーになる",
+			attributes:         []byte(`{"name_folder":["A","ZZZ"]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "空の楽曲名順配列はエラーになる",
+			attributes:         []byte(`{"name_folder":[]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "楽曲名順を数値IDで指定するとエラーになる",
+			attributes:         []byte(`{"name_folder":1}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
 			name:               "難易度配列の重複は除去されスカラーに正規化される",
 			attributes:         []byte(`{"diff":[4,4]}`),
 			expectedAttributes: map[string]any{"diff": float64(4)},
@@ -527,6 +568,24 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			assert.Equal(t, tt.expectedAttributes, out.Attributes)
 		})
 	}
+}
+
+func TestGoalUsecase_CreatePassesNameFolderIDsToTargetFilter(t *testing.T) {
+	// Given
+	repo := &stubGoalRepo{}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When
+	_, err := u.Create(context.Background(), 1, &GoalInput{
+		Title:             "楽曲名順",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"name_folder":["NUMBER","ABCD"]}`),
+	})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 17}, repo.lastFilter.NameFolderIDs)
 }
 
 func TestGoalUsecase_CreateAcceptsOPTargetAttribute(t *testing.T) {

@@ -73,7 +73,9 @@ func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 		if errors.Is(err, repository.ErrSongNotFound) {
 			return apierror.ErrSongNotFound
 		}
-		slog.Error("failed to get song", "displayID", displayID, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to get song", "displayID", displayID, "error", err)
+		}
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 
@@ -106,9 +108,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		case errors.Is(err, usecase.ErrUserPrivate):
 			return apierror.ErrUserNotFound
 		default:
-			if errors.Is(err, context.Canceled) {
-				slog.Warn("failed to get user records due to context canceled", "username", username, "error", err)
-			} else {
+			if !errors.Is(err, context.Canceled) {
 				slog.Error("failed to get user records", "username", username, "error", err)
 			}
 			return apierror.ErrInternalError.WithInternal(err)
@@ -145,7 +145,9 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 			// セキュリティ: 非公開と未発見を区別しない
 			return apierror.ErrUserNotFound
 		default:
-			slog.Error("failed to get user profile", "username", validUsername, "error", err)
+			if !errors.Is(err, context.Canceled) {
+				slog.Error("failed to get user profile", "username", validUsername, "error", err)
+			}
 			return apierror.ErrInternalError.WithInternal(err)
 		}
 	}

@@ -102,7 +102,9 @@ func (u *firebaseAuthUsecase) authenticate(ctx context.Context, idToken string, 
 			return nil, ErrInvalidIDToken
 		}
 
-		slog.Error("failed to find user by firebase uid", "firebase_uid", uid, "error", err)
+		if !errors.Is(err, context.Canceled) {
+			slog.Error("failed to find user by firebase uid", "firebase_uid", uid, "error", err)
+		}
 		return nil, err
 	}
 	if user == nil {

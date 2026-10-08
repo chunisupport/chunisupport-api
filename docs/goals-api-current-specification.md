@@ -506,6 +506,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `const`
 - `genre`
 - `ver`
+- `name_folder`
 - `chart_target`
 
 未知キーが1つでもあると `goal_invalid_attributes` です。
@@ -653,6 +654,42 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 }
 ```
 
+### 8.6 `name_folder`
+
+楽曲名順フォルダのコードです（マスタデータ `name_folders[].code`）。
+
+許可される入力形式:
+
+- 単一文字列
+- 文字列配列
+
+制約:
+
+- 空配列は不可
+- `null` は不可
+- 数値は不可
+- マスタに存在するコードのみ可（完全一致）
+
+正規化仕様:
+
+- 重複は除去されます
+- 楽曲名順フォルダマスタの `sort_order` 昇順に並べ替えられます
+- 1件だけならスカラーに正規化されます
+
+例:
+
+入力:
+
+```json
+{ "name_folder": ["KA", "A", "A"] }
+```
+
+保存・返却:
+
+```json
+{ "name_folder": ["A", "KA"] }
+```
+
 ## 9. 正規化ルール
 
 このAPIは入力JSONをそのまま保存しません。
@@ -664,6 +701,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 - `title` は前後空白を trim
 - `attributes.diff` / `genre` / `ver` はソート・重複除去
+- `attributes.name_folder` は重複除去し、楽曲名順フォルダマスタの `sort_order` 順へ並べ替え
 - 単要素配列はスカラーへ変換
 - `attributes.const.min` / `max` は省略時に既定値補完
 - `attributes` 未指定時は `{}` として保存
@@ -678,6 +716,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `diff`
 - `genre`
 - `ver`
+- `name_folder`（`songs.name_folder_id`）
 - `const`
 
 で絞り込まれます。
@@ -791,7 +830,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 フロントエンド実装で注意すべき点は以下です。
 
 - `attributes` は常に object で返ります。未指定入力でもレスポンスでは `{}` です。
-- `diff` / `genre` / `ver` は、入力時に配列でも返却時はスカラーになる場合があります。
+- `diff` / `genre` / `ver` / `name_folder` は、入力時に配列でも返却時はスカラーになる場合があります。
 - `created_at` は常に文字列で返り、UNIX時刻ではありません。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
 - `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。また `remaining` / `percent` が代わりに指定されている場合もあります。受信側は欠落・`null` を許容してください。
@@ -828,6 +867,8 @@ type GoalAttributes = {
   };
   genre?: number | number[];
   ver?: number | number[];
+  /** 楽曲名順フォルダのコード（マスタの name_folders[].code） */
+  name_folder?: string | string[];
 };
 
 type GoalRequest = {

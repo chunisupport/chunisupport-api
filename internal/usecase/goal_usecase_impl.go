@@ -266,6 +266,7 @@ type goalAttributeFilter struct {
 	ConstMax      *float64
 	GenreIDs      []int
 	VersionRanges []repository.VersionRange
+	NameFolderIDs []int
 	OPTargetOnly  bool
 }
 
@@ -335,7 +336,7 @@ func validateAttributes(
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
-	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true, "chart_target": true}
+	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true, "name_folder": true, "chart_target": true}
 	for k := range attrs {
 		if !allowed[k] {
 			return nil, nil, ErrInvalidGoalAttributes
@@ -432,6 +433,11 @@ func validateAttributes(
 		}
 		result.VersionRanges = ranges
 	}
+	if ids, ok, err := validateAndNormalizeNameFolderCodes(attrs, masters.NameFoldersByCode); err != nil {
+		return nil, nil, err
+	} else if ok {
+		result.NameFolderIDs = ids
+	}
 	canon, err := json.Marshal(attrs)
 	if err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
@@ -510,6 +516,51 @@ func validateAndNormalizeAttributeIDs(attrs map[string]json.RawMessage, key stri
 		return nil, false, ErrInvalidGoalAttributes
 	}
 	attrs[key] = normalized
+	return ids, true, nil
+}
+
+// validateAndNormalizeNameFolderCodes は楽曲名順フォルダのコード指定を検証し、表示順に正規化します。
+// 戻り値は絞り込みに使う内部ID、キーの有無、検証エラーです。
+func validateAndNormalizeNameFolderCodes(attrs map[string]json.RawMessage, nameFolders map[string]domainmasterdata.NameFolder) ([]int, bool, error) {
+	v, ok := attrs["name_folder"]
+	if !ok {
+		return nil, false, nil
+	}
+
+	var codes []string
+	var single string
+	if err := json.Unmarshal(v, &single); err == nil {
+		codes = []string{single}
+	} else if err := json.Unmarshal(v, &codes); err != nil || len(codes) == 0 {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+
+	folders := make([]domainmasterdata.NameFolder, 0, len(codes))
+	for _, code := range codes {
+		folder, exists := nameFolders[code]
+		if !exists {
+			return nil, false, ErrInvalidGoalAttributes
+		}
+		folders = append(folders, folder)
+	}
+	slices.SortFunc(folders, func(a, b domainmasterdata.NameFolder) int { return a.SortOrder - b.SortOrder })
+	folders = slices.CompactFunc(folders, func(a, b domainmasterdata.NameFolder) bool { return a.Code == b.Code })
+
+	ids := make([]int, 0, len(folders))
+	normalizedCodes := make([]string, 0, len(folders))
+	for _, folder := range folders {
+		ids = append(ids, folder.ID)
+		normalizedCodes = append(normalizedCodes, folder.Code)
+	}
+	var normalized any = normalizedCodes
+	if len(normalizedCodes) == 1 {
+		normalized = normalizedCodes[0]
+	}
+	encoded, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	attrs["name_folder"] = encoded
 	return ids, true, nil
 }
 
@@ -826,6 +877,7 @@ func goalTargetFilter(attrs *goalAttributeFilter, achievementType string, params
 		DifficultyIDs: attrs.DifficultyIDs,
 		GenreIDs:      attrs.GenreIDs,
 		VersionRanges: attrs.VersionRanges,
+		NameFolderIDs: attrs.NameFolderIDs,
 		ConstMin:      attrs.ConstMin,
 		ConstMax:      attrs.ConstMax,
 		OPTargetOnly:  attrs.OPTargetOnly,

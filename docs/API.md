@@ -2446,7 +2446,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `remaining` | `integer \| null` | null または 0〜対象楽曲数 | 動的上限から差し引く残り楽曲数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
-`attributes`は`genre`と`ver`のみ指定できます。`diff`、`const`、`chart_target`は指定できません。削除済み楽曲とBASIC〜MASTERのいずれかが存在しない楽曲は、対象楽曲数から除外します。固定`count`で保存済みの目標は、後から対象楽曲数が減少しても自動補正しません。
+`attributes`は`genre`、`ver`、`name_folder`のみ指定できます。`diff`、`const`、`chart_target`は指定できません。削除済み楽曲とBASIC〜MASTERのいずれかが存在しない楽曲は、対象楽曲数から除外します。固定`count`で保存済みの目標は、後から対象楽曲数が減少しても自動補正しません。
 
 #### `total_score`
 
@@ -2488,14 +2488,15 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 対象譜面の絞り込み条件です。省略したフィールドは条件なし（全譜面対象）とみなします。空オブジェクト `{}` は全譜面が対象です。
 
-**許可キーは `diff` / `chart_target` / `const` / `genre` / `ver` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
+**許可キーは `diff` / `chart_target` / `const` / `genre` / `ver` / `name_folder` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
 
 ```json
 {
   "chart_target": "OP_TARGET",
   "const": { "min": 14.0, "max": 14.4 },
   "genre": [1, 2],
-  "ver": [20, 21]
+  "ver": [20, 21],
+  "name_folder": ["A", "KA"]
 }
 ```
 
@@ -2506,6 +2507,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 16.0`。省略時は定数条件なし |
 | `genre` | `integer \| integer[]` | 任意 | ジャンルマスタID。単一値または配列で指定可能。省略時は全ジャンル対象 |
 | `ver` | `integer \| integer[]` | 任意 | バージョンマスタID。単一値または配列で指定可能。省略時は全バージョン対象 |
+| `name_folder` | `string \| string[]` | 任意 | 楽曲名順フォルダのコード（マスタデータの `name_folders[].code`）。単一値または配列で指定可能。省略時は全楽曲名順対象 |
 
 **難易度IDの対応**:
 
@@ -2520,6 +2522,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 **マスタ整合**:
 - `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可。存在しないIDは `goal_invalid_attributes` エラー。
 - `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
+- `name_folder` は楽曲名順フォルダマスタに存在するコードのみ許可（完全一致）。存在しないコードや数値は `goal_invalid_attributes` エラー。
 - `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
 - `chart_target` は `"OP_TARGET"` のみ許可。`diff` と同時指定した場合は `goal_invalid_attributes` エラー。
 
@@ -2527,6 +2530,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - `diff` / `genre` / `ver` は単一値（例: `"diff": 4`）と配列（例: `"diff": [3, 4]`）の両方を受け付けます。
 - 配列は重複除去 + 昇順ソートで正規化されます。
 - 要素数1の配列は単一値に正規化されます（例: `"diff": [4]` → `"diff": 4`）。
+- `name_folder` は単一値（例: `"name_folder": "A"`）と配列（例: `"name_folder": ["A", "KA"]`）の両方を受け付け、配列は重複除去 + マスタの `sort_order` 昇順で正規化されます。要素数1の配列は単一値に正規化されます。
 - 配列の実質上限は、対応するマスタデータの全件数です。
 - レスポンスの `attributes` は正規化後の形式で返却されます（要素1ならスカラー、複数なら配列）。
 
@@ -2540,7 +2544,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` の `count` ≤ 対象譜面数
