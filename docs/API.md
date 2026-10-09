@@ -2737,7 +2737,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### POST `/internal/me/record-filters`
 
-レコードフィルタを新規保存します。1ユーザーあたり最大100件です。
+レコードフィルタを新規保存します。1ユーザーあたり最大100件です。同じユーザーから同時に作成しても上限を超えません。
 
 **リクエストボディ**
 
@@ -2757,7 +2757,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/internal/me/record-filters/:id`
 
-指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。更新中に同じフィルタが削除された場合も `record_filter_not_found` を返し、削除済みのフィルタを作り直しません。
 
 **リクエストボディ**: POST と同じ
 
