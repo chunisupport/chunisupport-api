@@ -32,7 +32,10 @@ func NewWorldsendHandler(worldsendUsecase usecase.WorldsendUsecase, masterCache 
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
 // ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
 func (h *WorldsendHandler) GetWorldsendSongs(c *echo.Context) error {
-	includeDeleted := c.QueryParam("include_deleted") == "true"
+	includeDeleted, apiErr := handler.ParseBoolQuery("include_deleted", c.QueryParam("include_deleted"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 	songsWithCharts, err := h.worldsendUsecase.GetAllWorldsendSongs(c.Request().Context(), includeDeleted, requesterAccountTypeID)
 	if err != nil {

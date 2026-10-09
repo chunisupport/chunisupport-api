@@ -36,7 +36,10 @@ func NewSongHandler(songUsecase usecase.SongUsecase, statsUsecase usecase.ChartS
 // クエリパラメータ include_deleted=true で削除済み楽曲も含めることができます。
 // ただし、EDITOR 権限未満のユーザーの場合、削除済み楽曲は自動的に除外されます。
 func (h *SongHandler) GetSongs(c *echo.Context) error {
-	includeDeleted := c.QueryParam("include_deleted") == "true"
+	includeDeleted, apiErr := handler.ParseBoolQuery("include_deleted", c.QueryParam("include_deleted"))
+	if apiErr != nil {
+		return apiErr
+	}
 	requesterAccountTypeID := handler.GetRequesterAccountTypeID(c)
 
 	songsWithCharts, err := h.songUsecase.GetAllSongsExcludingWorldsend(c.Request().Context(), includeDeleted, requesterAccountTypeID)

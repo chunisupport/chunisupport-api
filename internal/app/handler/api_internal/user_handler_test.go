@@ -605,6 +605,27 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
+func TestUserHandler_GetUserProfileWithRecords_不正なviewは検証エラー(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewUserHandler(mockUsecase)
+	req := httptest.NewRequest(http.MethodGet, "/users/testuser?view=all", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+
+	// When
+	err := h.GetUserProfileWithRecords(c)
+
+	// Then: 全件表示へフォールバックせず、取得処理を呼ばない
+	var apiErr *apierror.APIError
+	if assert.ErrorAs(t, err, &apiErr) {
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+	}
+	mockUsecase.AssertNotCalled(t, "GetUserProfileWithRecords", mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	e := newTestEcho()
 	mockUsecase := new(mockUserUsecase)

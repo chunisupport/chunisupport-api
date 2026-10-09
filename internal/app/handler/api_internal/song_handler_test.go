@@ -469,3 +469,54 @@ func TestSongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
 func stringPtr(value string) *string {
 	return &value
 }
+
+func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		query string
+		// Then
+		wantCalled         bool
+		wantIncludeDeleted bool
+		wantErrCode        string
+	}{
+		{name: "trueは削除済みを含めて取得する", query: "?include_deleted=true", wantCalled: true, wantIncludeDeleted: true},
+		{name: "falseは削除済みを除いて取得する", query: "?include_deleted=false", wantCalled: true, wantIncludeDeleted: false},
+		{name: "不正値は既定値にせず検証エラーを返す", query: "?include_deleted=yes", wantErrCode: apierror.CodeValidationFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			called := false
+			var gotIncludeDeleted bool
+			mockUsecase := &testutil.MockSongUsecase{
+				GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+					called = true
+					gotIncludeDeleted = includeDeleted
+					return []*entity.Song{}, nil
+				},
+			}
+			handler := NewSongHandler(mockUsecase, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/internal/songs"+tt.query, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			// When
+			err := handler.GetSongs(c)
+
+			// Then
+			assert.Equal(t, tt.wantCalled, called)
+			if tt.wantErrCode != "" {
+				var apiErr *apierror.APIError
+				if assert.ErrorAs(t, err, &apiErr) {
+					assert.Equal(t, tt.wantErrCode, apiErr.Code)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantIncludeDeleted, gotIncludeDeleted)
+		})
+	}
+}

@@ -169,6 +169,10 @@ const (
 
 	// フレンド機能
 	FriendshipMaxOutgoingActive = 100
+
+	// ユーザープロフィール取得APIの view クエリで指定できる表示形式
+	UserProfileViewRating = "rating"
+	UserProfileViewRecord = "record"
 )
 
 var (

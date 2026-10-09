@@ -325,3 +325,53 @@ func TestWorldsendHandler_DeleteWorldsendSongRejectsInvalidDisplayID(t *testing.
 	}
 	assert.False(t, called)
 }
+
+func TestWorldsendHandler_GetWorldsendSongs_IncludeDeleted(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		query string
+		// Then
+		wantCalled         bool
+		wantIncludeDeleted bool
+		wantErrCode        string
+	}{
+		{name: "trueは削除済みを含めて取得する", query: "?include_deleted=true", wantCalled: true, wantIncludeDeleted: true},
+		{name: "未指定は削除済みを除いて取得する", query: "", wantCalled: true, wantIncludeDeleted: false},
+		{name: "不正値は既定値にせず検証エラーを返す", query: "?include_deleted=1", wantErrCode: apierror.CodeValidationFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			called := false
+			var gotIncludeDeleted bool
+			handler := NewWorldsendHandler(&testutil.MockWorldsendUsecase{
+				GetAllWorldsendSongsFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.WorldsendSongWithChart, error) {
+					called = true
+					gotIncludeDeleted = includeDeleted
+					return []*entity.WorldsendSongWithChart{}, nil
+				},
+			}, &masterdata.Cache{})
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/internal/worldsend-songs"+tt.query, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			// When
+			err := handler.GetWorldsendSongs(c)
+
+			// Then
+			assert.Equal(t, tt.wantCalled, called)
+			if tt.wantErrCode != "" {
+				var apiErr *apierror.APIError
+				if assert.ErrorAs(t, err, &apiErr) {
+					assert.Equal(t, tt.wantErrCode, apiErr.Code)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantIncludeDeleted, gotIncludeDeleted)
+		})
+	}
+}
