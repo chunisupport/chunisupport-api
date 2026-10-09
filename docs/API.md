@@ -2737,7 +2737,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### POST `/internal/me/record-filters`
 
-レコードフィルタを新規保存します。1ユーザーあたり最大100件です。
+レコードフィルタを新規保存します。1ユーザーあたり最大100件です。同じユーザーから同時に作成しても上限を超えません。
 
 **リクエストボディ**
 
@@ -2757,7 +2757,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### PUT `/internal/me/record-filters/:id`
 
-指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。
+指定IDの保存済みレコードフィルタを完全上書き更新します。他ユーザーのフィルタを指定した場合は `record_filter_not_found` を返します。更新中に同じフィルタが削除された場合も `record_filter_not_found` を返し、削除済みのフィルタを作り直しません。
 
 **リクエストボディ**: POST と同じ
 
@@ -2841,7 +2841,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **クエリパラメータ**:
-    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend`/`course` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend`/`course` のみを返します。
+    - `view` (任意): `rating` を指定すると、`records` は `updated_at`/`best`/`best_candidate`/`new`/`new_candidate` のみを返します（`standard`/`worldsend`/`course` は返しません）。`record` を指定すると、`records` は `updated_at`/`standard`/`worldsend`/`course` のみを返します。省略時は全レコードを返します。それ以外の値は 422 Unprocessable Entity (`validation_failed`) を返します。
 - **レスポンス**: ユーザープロファイルとプレイヤーレコードを一括で返します。`view=rating` 以外では、`records.standard` と `records.worldsend` に未プレイ譜面を、`records.course` に未プレイコースを常に補完します。未プレイ補完データは `is_played=false` となり、`updated_at` / `clear_lamp` は `null` になります。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
   - `player.overpower_value` は保存済みの楽曲OP合計です。
   - `player.overpower_percent` はレスポンス時点の通常楽曲マスタとプレイヤーの未解禁設定から随時計算されます。曲追加、削除状態変更、譜面定数変更により、プレイヤーデータ再登録なしで割合のみ変動する場合があります。
@@ -3560,7 +3560,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **レートリミット**: 認証なしは1分60回/IP
 - **概要**: WORLD'S END以外の全楽曲を譜面情報付きで取得します。デフォルトでは削除済み楽曲は除外されます。
 - **クエリパラメータ**:
-  - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
+  - `include_deleted` (bool, optional): `true` で削除済み楽曲も含めます。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`。`true` / `false` 以外の値は 422 Unprocessable Entity (`validation_failed`) を返します。
 - **レスポンス**: 200 OK
 
 **レスポンス例**:
@@ -4074,7 +4074,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
 - **クエリパラメータ**: 
-  - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`
+  - `include_deleted` (bool, optional): `true` を指定すると削除済み楽曲も含めて取得。ただし、EDITOR 権限が必要です。権限がない場合は自動的に `false` として処理されます。デフォルト: `false`。`true` / `false` 以外の値は 422 Unprocessable Entity (`validation_failed`) を返します。
 - **概要**: 全 WORLD'S END 楽曲を譜面情報付きで取得します。WORLD'S END は1曲1譜面が保証されています。
 - **レスポンス**: 200 OK
 

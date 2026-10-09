@@ -17,13 +17,26 @@ import (
 
 type stubRecordFilterRepository struct {
 	filters map[string]*entity.RecordFilter
+	// calls は件数確認と保存が同じトランザクションで行われたことを検証するため、呼び出し順と実行先を記録します。
+	calls []recordFilterRepositoryCall
+	// afterFind は取得直後に別リクエストの変更が割り込む状況を再現します。
+	afterFind func()
+}
+
+type recordFilterRepositoryCall struct {
+	name string
+	exec repository.Executor
 }
 
 func newStubRecordFilterRepository() *stubRecordFilterRepository {
 	return &stubRecordFilterRepository{filters: map[string]*entity.RecordFilter{}}
 }
 
-func (s *stubRecordFilterRepository) ListByUserID(ctx context.Context, userID int) ([]*entity.RecordFilter, error) {
+func (s *stubRecordFilterRepository) record(name string, exec repository.Executor) {
+	s.calls = append(s.calls, recordFilterRepositoryCall{name: name, exec: exec})
+}
+
+func (s *stubRecordFilterRepository) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.RecordFilter, error) {
 	filters := make([]*entity.RecordFilter, 0, len(s.filters))
 	for _, filter := range s.filters {
 		if filter.UserID() == userID {
@@ -33,15 +46,31 @@ func (s *stubRecordFilterRepository) ListByUserID(ctx context.Context, userID in
 	return filters, nil
 }
 
-func (s *stubRecordFilterRepository) FindByIDAndUserID(ctx context.Context, id []byte, userID int) (*entity.RecordFilter, error) {
+func (s *stubRecordFilterRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id []byte, userID int) (*entity.RecordFilter, error) {
 	filter, ok := s.filters[string(id)]
 	if !ok || filter.UserID() != userID {
 		return nil, repository.ErrRecordFilterNotFound
 	}
+	if s.afterFind != nil {
+		s.afterFind()
+	}
 	return filter, nil
 }
 
-func (s *stubRecordFilterRepository) Save(ctx context.Context, filter *entity.RecordFilter) error {
+func (s *stubRecordFilterRepository) Create(ctx context.Context, exec repository.Executor, filter *entity.RecordFilter) error {
+	s.record("Create", exec)
+	return s.store(filter)
+}
+
+func (s *stubRecordFilterRepository) Update(ctx context.Context, exec repository.Executor, filter *entity.RecordFilter) error {
+	existing, ok := s.filters[string(filter.ID())]
+	if !ok || existing.UserID() != filter.UserID() {
+		return repository.ErrRecordFilterNotFound
+	}
+	return s.store(filter)
+}
+
+func (s *stubRecordFilterRepository) store(filter *entity.RecordFilter) error {
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	createdAt := filter.CreatedAt()
 	if createdAt.IsZero() {
@@ -55,7 +84,7 @@ func (s *stubRecordFilterRepository) Save(ctx context.Context, filter *entity.Re
 	return nil
 }
 
-func (s *stubRecordFilterRepository) DeleteByIDAndUserID(ctx context.Context, id []byte, userID int) error {
+func (s *stubRecordFilterRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id []byte, userID int) error {
 	filter, ok := s.filters[string(id)]
 	if !ok || filter.UserID() != userID {
 		return repository.ErrRecordFilterNotFound
@@ -64,7 +93,8 @@ func (s *stubRecordFilterRepository) DeleteByIDAndUserID(ctx context.Context, id
 	return nil
 }
 
-func (s *stubRecordFilterRepository) CountByUserID(ctx context.Context, userID int) (int, error) {
+func (s *stubRecordFilterRepository) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {
+	s.record("CountByUserID", exec)
 	count := 0
 	for _, filter := range s.filters {
 		if filter.UserID() == userID {
@@ -74,11 +104,42 @@ func (s *stubRecordFilterRepository) CountByUserID(ctx context.Context, userID i
 	return count, nil
 }
 
+// recordFilterTx はトランザクション内で渡される実行先を識別するための値です。
+type recordFilterTx struct {
+	repository.Executor
+}
+
+type recordFilterTransactionManager struct {
+	tx *recordFilterTx
+}
+
+func (m *recordFilterTransactionManager) Transactional(ctx context.Context, f func(repository.Executor) error) error {
+	return f(m.tx)
+}
+
+type recordFilterUserRepository struct {
+	repository.UserRepository
+	repo    *stubRecordFilterRepository
+	lockErr error
+}
+
+func (r *recordFilterUserRepository) FindByIDForUpdate(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
+	r.repo.record("LockUser", exec)
+	if r.lockErr != nil {
+		return nil, r.lockErr
+	}
+	return &entity.User{ID: id}, nil
+}
+
+func newRecordFilterUsecaseForTest(repo *stubRecordFilterRepository) RecordFilterUsecase {
+	return NewRecordFilterUsecase(nil, &recordFilterTransactionManager{tx: &recordFilterTx{}}, repo, &recordFilterUserRepository{repo: repo})
+}
+
 func TestRecordFilterUsecase_CreateListUpdateDelete(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	repo := newStubRecordFilterRepository()
-	uc := NewRecordFilterUsecase(repo)
+	uc := newRecordFilterUsecaseForTest(repo)
 
 	created, err := uc.Create(ctx, 10, &RecordFilterInput{
 		Name:          " 高難度 ",
@@ -125,7 +186,7 @@ func TestRecordFilterUsecase_CreateListUpdateDelete(t *testing.T) {
 
 func TestRecordFilterUsecase_CreateRejectsInvalidInput(t *testing.T) {
 	ctx := context.Background()
-	uc := NewRecordFilterUsecase(newStubRecordFilterRepository())
+	uc := newRecordFilterUsecaseForTest(newStubRecordFilterRepository())
 	largeValue := make([]byte, info.RecordFilterMaxPayloadBytes+1)
 	for i := range largeValue {
 		largeValue[i] = 'a'
@@ -202,7 +263,7 @@ func TestRecordFilterUsecase_CreateRejectsWhenLimitExceeded(t *testing.T) {
 		repo.filters[string(id[:])] = filter
 	}
 
-	uc := NewRecordFilterUsecase(repo)
+	uc := newRecordFilterUsecaseForTest(repo)
 	_, err := uc.Create(ctx, 10, &RecordFilterInput{
 		Name:          "追加条件",
 		FilterType:    RecordFilterTypeStandard,
@@ -214,7 +275,7 @@ func TestRecordFilterUsecase_CreateRejectsWhenLimitExceeded(t *testing.T) {
 
 func TestRecordFilterUsecase_CreatePreservesFilterNumberExpression(t *testing.T) {
 	ctx := context.Background()
-	uc := NewRecordFilterUsecase(newStubRecordFilterRepository())
+	uc := newRecordFilterUsecaseForTest(newStubRecordFilterRepository())
 
 	created, err := uc.Create(ctx, 10, &RecordFilterInput{
 		Name:          "数値条件",
@@ -228,7 +289,7 @@ func TestRecordFilterUsecase_CreatePreservesFilterNumberExpression(t *testing.T)
 }
 
 func TestRecordFilterUsecase_UpdateRejectsInvalidID(t *testing.T) {
-	uc := NewRecordFilterUsecase(newStubRecordFilterRepository())
+	uc := newRecordFilterUsecaseForTest(newStubRecordFilterRepository())
 
 	_, err := uc.Update(context.Background(), 10, "not-uuid", &RecordFilterInput{
 		Name:          "条件",
@@ -238,4 +299,76 @@ func TestRecordFilterUsecase_UpdateRejectsInvalidID(t *testing.T) {
 	})
 
 	assert.True(t, errors.Is(err, ErrInvalidRecordFilterID))
+}
+
+func TestRecordFilterUsecase_CreateCountsAndSavesWhileUserIsLocked(t *testing.T) {
+	// Given
+	repo := newStubRecordFilterRepository()
+	tx := &recordFilterTx{}
+	uc := NewRecordFilterUsecase(nil, &recordFilterTransactionManager{tx: tx}, repo, &recordFilterUserRepository{repo: repo})
+
+	// When
+	_, err := uc.Create(context.Background(), 10, &RecordFilterInput{
+		Name:          "条件",
+		FilterType:    RecordFilterTypeStandard,
+		SchemaVersion: 3,
+		Filter:        []byte(`{"title":""}`),
+	})
+
+	// Then: 同時作成を直列化するため、ユーザー行のロック後に同じトランザクションで件数確認と保存を行う
+	require.NoError(t, err)
+	assert.Equal(t, []recordFilterRepositoryCall{
+		{name: "LockUser", exec: tx},
+		{name: "CountByUserID", exec: tx},
+		{name: "Create", exec: tx},
+	}, repo.calls)
+}
+
+func TestRecordFilterUsecase_UpdateDoesNotRecreateConcurrentlyDeletedFilter(t *testing.T) {
+	// Given: 更新対象の取得直後に、別リクエストが同じフィルタを削除する
+	ctx := context.Background()
+	repo := newStubRecordFilterRepository()
+	uc := newRecordFilterUsecaseForTest(repo)
+	created, err := uc.Create(ctx, 10, &RecordFilterInput{
+		Name:          "条件",
+		FilterType:    RecordFilterTypeStandard,
+		SchemaVersion: 3,
+		Filter:        []byte(`{"title":""}`),
+	})
+	require.NoError(t, err)
+	repo.afterFind = func() {
+		repo.afterFind = nil
+		require.NoError(t, uc.Delete(ctx, 10, created.ID))
+	}
+
+	// When
+	_, err = uc.Update(ctx, 10, created.ID, &RecordFilterInput{
+		Name:          "更新後",
+		FilterType:    RecordFilterTypeStandard,
+		SchemaVersion: 3,
+		Filter:        []byte(`{"title":""}`),
+	})
+
+	// Then: 削除を取り消さず、未検出として扱う
+	assert.ErrorIs(t, err, ErrRecordFilterNotFound)
+	assert.Empty(t, repo.filters)
+}
+
+func TestRecordFilterUsecase_CreateReturnsUserNotFoundWhenUserIsDeleted(t *testing.T) {
+	// Given: 認証後、作成処理がユーザー行をロックする前に退会している
+	repo := newStubRecordFilterRepository()
+	userRepo := &recordFilterUserRepository{repo: repo, lockErr: repository.ErrUserNotFound}
+	uc := NewRecordFilterUsecase(nil, &recordFilterTransactionManager{tx: &recordFilterTx{}}, repo, userRepo)
+
+	// When
+	_, err := uc.Create(context.Background(), 10, &RecordFilterInput{
+		Name:          "条件",
+		FilterType:    RecordFilterTypeStandard,
+		SchemaVersion: 3,
+		Filter:        []byte(`{"title":""}`),
+	})
+
+	// Then: 内部エラーではなくユーザー未検出として扱い、保存しない
+	assert.ErrorIs(t, err, ErrUserNotFound)
+	assert.Empty(t, repo.filters)
 }

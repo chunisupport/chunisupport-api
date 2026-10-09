@@ -39,22 +39,22 @@ func setupRecordFilterRepositorySQLite(t *testing.T) *sqlx.DB {
 	return db
 }
 
-func TestRecordFilterRepository_SaveFindListCountAndDelete(t *testing.T) {
+func TestRecordFilterRepository_CreateFindListCountUpdateAndDelete(t *testing.T) {
 	ctx := context.Background()
 	db := setupRecordFilterRepositorySQLite(t)
-	repo := NewRecordFilterRepository(db)
+	repo := NewRecordFilterRepository()
 	id := []byte("1234567890123456")
 	filter, err := entity.NewRecordFilter(id, 10, "通常枠", []byte{0x1f, 0x8b, 0x08}, false)
 	require.NoError(t, err)
 
-	err = repo.Save(ctx, filter)
+	err = repo.Create(ctx, db, filter)
 	require.NoError(t, err)
 
-	count, err := repo.CountByUserID(ctx, 10)
+	count, err := repo.CountByUserID(ctx, db, 10)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	found, err := repo.FindByIDAndUserID(ctx, id, 10)
+	found, err := repo.FindByIDAndUserID(ctx, db, id, 10)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, id, found.ID())
@@ -68,50 +68,74 @@ func TestRecordFilterRepository_SaveFindListCountAndDelete(t *testing.T) {
 	require.NoError(t, found.ChangeName("ワールズエンド枠"))
 	require.NoError(t, found.ChangeFilterValueGzip([]byte{0x1f, 0x8b, 0x09}))
 	found.ChangeWorldsend(true)
-	err = repo.Save(ctx, found)
+	err = repo.Update(ctx, db, found)
 	require.NoError(t, err)
 
-	filters, err := repo.ListByUserID(ctx, 10)
+	filters, err := repo.ListByUserID(ctx, db, 10)
 	require.NoError(t, err)
 	require.Len(t, filters, 1)
 	assert.Equal(t, "ワールズエンド枠", filters[0].Name())
 	assert.Equal(t, []byte{0x1f, 0x8b, 0x09}, filters[0].FilterValueGzip())
 	assert.True(t, filters[0].IsWorldsend())
 
-	err = repo.DeleteByIDAndUserID(ctx, id, 10)
+	err = repo.DeleteByIDAndUserID(ctx, db, id, 10)
 	require.NoError(t, err)
 
-	_, err = repo.FindByIDAndUserID(ctx, id, 10)
+	_, err = repo.FindByIDAndUserID(ctx, db, id, 10)
 	assert.True(t, errors.Is(err, domainrepo.ErrRecordFilterNotFound))
 }
 
 func TestRecordFilterRepository_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	db := setupRecordFilterRepositorySQLite(t)
-	repo := NewRecordFilterRepository(db)
+	repo := NewRecordFilterRepository()
 	id := []byte("1234567890123456")
 	filter, err := entity.NewRecordFilter(id, 10, "自分のフィルタ", []byte{0x1f, 0x8b, 0x08}, false)
 	require.NoError(t, err)
-	require.NoError(t, repo.Save(ctx, filter))
+	require.NoError(t, repo.Create(ctx, db, filter))
 
-	_, err = repo.FindByIDAndUserID(ctx, id, 20)
+	_, err = repo.FindByIDAndUserID(ctx, db, id, 20)
 	assert.True(t, errors.Is(err, domainrepo.ErrRecordFilterNotFound))
 
 	otherUserFilter, err := entity.NewRecordFilter(id, 20, "他ユーザーの更新", []byte{0x1f, 0x8b, 0x09}, true)
 	require.NoError(t, err)
-	err = repo.Save(ctx, otherUserFilter)
+	err = repo.Update(ctx, db, otherUserFilter)
 	assert.ErrorIs(t, err, domainrepo.ErrRecordFilterNotFound)
 
-	found, err := repo.FindByIDAndUserID(ctx, id, 10)
+	found, err := repo.FindByIDAndUserID(ctx, db, id, 10)
 	require.NoError(t, err)
 	assert.Equal(t, "自分のフィルタ", found.Name())
 	assert.False(t, found.IsWorldsend())
 }
 
+func TestRecordFilterRepository_UpdateDoesNotRecreateDeletedFilter(t *testing.T) {
+	// Given: 更新前に取得したフィルタが、別リクエストにより削除されている
+	ctx := context.Background()
+	db := setupRecordFilterRepositorySQLite(t)
+	repo := NewRecordFilterRepository()
+	id := []byte("1234567890123456")
+	filter, err := entity.NewRecordFilter(id, 10, "削除前", []byte{0x1f, 0x8b, 0x08}, false)
+	require.NoError(t, err)
+	require.NoError(t, repo.Create(ctx, db, filter))
+	found, err := repo.FindByIDAndUserID(ctx, db, id, 10)
+	require.NoError(t, err)
+	require.NoError(t, repo.DeleteByIDAndUserID(ctx, db, id, 10))
+	require.NoError(t, found.ChangeName("削除後の更新"))
+
+	// When
+	err = repo.Update(ctx, db, found)
+
+	// Then: 削除済みとして扱い、同じIDで作り直さない
+	assert.ErrorIs(t, err, domainrepo.ErrRecordFilterNotFound)
+	count, err := repo.CountByUserID(ctx, db, 10)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+}
+
 func TestRecordFilterRepository_FindByIDAndUserID_ReturnsErrorWhenStoredDataIsInvalid(t *testing.T) {
 	ctx := context.Background()
 	db := setupRecordFilterRepositorySQLite(t)
-	repo := NewRecordFilterRepository(db)
+	repo := NewRecordFilterRepository()
 	id := []byte("1234567890123456")
 
 	_, err := db.Exec(
@@ -123,7 +147,7 @@ func TestRecordFilterRepository_FindByIDAndUserID_ReturnsErrorWhenStoredDataIsIn
 	)
 	require.NoError(t, err)
 
-	_, err = repo.FindByIDAndUserID(ctx, id, 10)
+	_, err = repo.FindByIDAndUserID(ctx, db, id, 10)
 	assert.ErrorIs(t, err, domainrepo.ErrRepositoryOperationFailed)
 	assert.ErrorIs(t, err, entity.ErrRecordFilterNameRequired)
 }

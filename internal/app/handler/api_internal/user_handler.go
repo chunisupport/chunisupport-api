@@ -12,6 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 )
@@ -153,12 +154,15 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	view := c.QueryParam("view")
+	view, apiErr := handler.ParseEnumQuery("view", c.QueryParam("view"), info.UserProfileViewRating, info.UserProfileViewRecord)
+	if apiErr != nil {
+		return apiErr
+	}
 	var requester *entity.User
 	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
 		requester = userEntity
 	}
-	if view == "rating" {
+	if view == info.UserProfileViewRating {
 		result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 		if err != nil {
 			return h.handleUserProfileError(err, username, "user profile rating view")
@@ -166,7 +170,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 		return c.JSON(http.StatusOK, toUserProfileRatingViewDTO(result))
 	}
 
-	if view == "record" {
+	if view == info.UserProfileViewRecord {
 		result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 		if err != nil {
 			return h.handleUserProfileError(err, username, "user profile record view")

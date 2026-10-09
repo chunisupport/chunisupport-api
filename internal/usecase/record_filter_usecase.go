@@ -50,7 +50,10 @@ type RecordFilterOutput struct {
 }
 
 type recordFilterUsecase struct {
-	repo repository.RecordFilterRepository
+	db       repository.Executor
+	tm       TransactionManager
+	repo     repository.RecordFilterRepository
+	userRepo repository.UserRepository
 }
 
 type recordFilterPayload struct {
@@ -65,8 +68,8 @@ type validatedRecordFilterInput struct {
 }
 
 // NewRecordFilterUsecase は RecordFilterUsecase を生成します。
-func NewRecordFilterUsecase(repo repository.RecordFilterRepository) RecordFilterUsecase {
-	return &recordFilterUsecase{repo: repo}
+func NewRecordFilterUsecase(db repository.Executor, tm TransactionManager, repo repository.RecordFilterRepository, userRepo repository.UserRepository) RecordFilterUsecase {
+	return &recordFilterUsecase{db: db, tm: tm, repo: repo, userRepo: userRepo}
 }
 
 func (u *recordFilterUsecase) List(ctx context.Context, userID int, filterType string) ([]*RecordFilterOutput, error) {
@@ -79,7 +82,7 @@ func (u *recordFilterUsecase) List(ctx context.Context, userID int, filterType s
 		wantWorldsend = &isWorldsend
 	}
 
-	filters, err := u.repo.ListByUserID(ctx, userID)
+	filters, err := u.repo.ListByUserID(ctx, u.db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -104,25 +107,35 @@ func (u *recordFilterUsecase) Create(ctx context.Context, userID int, input *Rec
 		return nil, err
 	}
 
-	count, err := u.repo.CountByUserID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if count >= info.RecordFilterMaxPerUser {
-		return nil, ErrRecordFilterLimitExceeded
-	}
-
 	id := uuid.NewV4()
-
 	filter, err := entity.NewRecordFilter(id[:], userID, validated.name, validated.filterValueGzip, validated.isWorldsend)
 	if err != nil {
 		return nil, err
 	}
-	if err := u.repo.Save(ctx, filter); err != nil {
-		return nil, err
-	}
 
-	saved, err := u.repo.FindByIDAndUserID(ctx, id[:], userID)
+	var saved *entity.RecordFilter
+	err = u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		// 同一ユーザーの作成を直列化し、件数確認から保存までの間に別の作成が割り込んで上限を超えることを防ぎます。
+		if _, err := u.userRepo.FindByIDForUpdate(ctx, tx, userID); err != nil {
+			// 認証後に退会処理と競合した場合は、内部エラーではなくユーザー未検出として扱います。
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
+		}
+		count, err := u.repo.CountByUserID(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		if count >= info.RecordFilterMaxPerUser {
+			return ErrRecordFilterLimitExceeded
+		}
+		if err := u.repo.Create(ctx, tx, filter); err != nil {
+			return err
+		}
+		saved, err = u.repo.FindByIDAndUserID(ctx, tx, id[:], userID)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +152,7 @@ func (u *recordFilterUsecase) Update(ctx context.Context, userID int, id string,
 		return nil, err
 	}
 
-	filter, err := u.repo.FindByIDAndUserID(ctx, idBytes, userID)
+	filter, err := u.repo.FindByIDAndUserID(ctx, u.db, idBytes, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrRecordFilterNotFound) {
 			return nil, ErrRecordFilterNotFound
@@ -154,14 +167,15 @@ func (u *recordFilterUsecase) Update(ctx context.Context, userID int, id string,
 	}
 	filter.ChangeWorldsend(validated.isWorldsend)
 
-	if err := u.repo.Save(ctx, filter); err != nil {
+	// 取得後に別リクエストで削除された場合は、削除を取り消さないよう未検出として扱います。
+	if err := u.repo.Update(ctx, u.db, filter); err != nil {
 		if errors.Is(err, repository.ErrRecordFilterNotFound) {
 			return nil, ErrRecordFilterNotFound
 		}
 		return nil, err
 	}
 
-	saved, err := u.repo.FindByIDAndUserID(ctx, idBytes, userID)
+	saved, err := u.repo.FindByIDAndUserID(ctx, u.db, idBytes, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +187,7 @@ func (u *recordFilterUsecase) Delete(ctx context.Context, userID int, id string)
 	if err != nil {
 		return err
 	}
-	err = u.repo.DeleteByIDAndUserID(ctx, idBytes, userID)
+	err = u.repo.DeleteByIDAndUserID(ctx, u.db, idBytes, userID)
 	if errors.Is(err, repository.ErrRecordFilterNotFound) {
 		return ErrRecordFilterNotFound
 	}

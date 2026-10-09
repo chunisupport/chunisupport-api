@@ -8,22 +8,19 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
-	"github.com/jmoiron/sqlx"
 )
 
-type recordFilterRepository struct {
-	db *sqlx.DB
-}
+type recordFilterRepository struct{}
 
 // NewRecordFilterRepository は新しいRecordFilterRepositoryを生成します。
-func NewRecordFilterRepository(db *sqlx.DB) repository.RecordFilterRepository {
-	return &recordFilterRepository{db: db}
+func NewRecordFilterRepository() repository.RecordFilterRepository {
+	return &recordFilterRepository{}
 }
 
-func (r *recordFilterRepository) ListByUserID(ctx context.Context, userID int) ([]*entity.RecordFilter, error) {
+func (r *recordFilterRepository) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.RecordFilter, error) {
 	var filterModels []*models.RecordFilterModel
 	query := `SELECT id, user_id, name, filter_value_gzip, is_worldsend, created_at, updated_at FROM record_filters WHERE user_id = ? ORDER BY updated_at DESC, id ASC`
-	if err := r.db.SelectContext(ctx, &filterModels, query, userID); err != nil {
+	if err := exec.SelectContext(ctx, &filterModels, query, userID); err != nil {
 		return nil, err
 	}
 	filters := make([]*entity.RecordFilter, 0, len(filterModels))
@@ -37,10 +34,10 @@ func (r *recordFilterRepository) ListByUserID(ctx context.Context, userID int) (
 	return filters, nil
 }
 
-func (r *recordFilterRepository) FindByIDAndUserID(ctx context.Context, id []byte, userID int) (*entity.RecordFilter, error) {
+func (r *recordFilterRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id []byte, userID int) (*entity.RecordFilter, error) {
 	var filterModel models.RecordFilterModel
 	query := `SELECT id, user_id, name, filter_value_gzip, is_worldsend, created_at, updated_at FROM record_filters WHERE id = ? AND user_id = ?`
-	if err := r.db.GetContext(ctx, &filterModel, query, id, userID); err != nil {
+	if err := exec.GetContext(ctx, &filterModel, query, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.Join(repository.ErrRecordFilterNotFound, err)
 		}
@@ -53,51 +50,24 @@ func (r *recordFilterRepository) FindByIDAndUserID(ctx context.Context, id []byt
 	return filter, nil
 }
 
-func (r *recordFilterRepository) Save(ctx context.Context, filter *entity.RecordFilter) error {
-	updateQuery := `
+func (r *recordFilterRepository) Create(ctx context.Context, exec repository.Executor, filter *entity.RecordFilter) error {
+	query := `
+INSERT INTO record_filters (id, user_id, name, filter_value_gzip, is_worldsend, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+`
+	_, err := exec.ExecContext(ctx, query, filter.ID(), filter.UserID(), filter.Name(), filter.FilterValueGzip(), filter.IsWorldsend())
+	return err
+}
+
+// Update は所有者を限定して既存のフィルタを更新します。
+// 本番のDSNは clientFoundRows=true のため、値が変わらない UPDATE でもマッチした行数が返り、存在判定に使えます。
+func (r *recordFilterRepository) Update(ctx context.Context, exec repository.Executor, filter *entity.RecordFilter) error {
+	query := `
 UPDATE record_filters
 SET name = ?, filter_value_gzip = ?, is_worldsend = ?, updated_at = CURRENT_TIMESTAMP
 WHERE id = ? AND user_id = ?
 `
-	id := filter.ID()
-	result, err := r.db.ExecContext(ctx, updateQuery, filter.Name(), filter.FilterValueGzip(), filter.IsWorldsend(), id, filter.UserID())
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected > 0 {
-		return nil
-	}
-
-	var existingUserID int
-	err = r.db.GetContext(ctx, &existingUserID, `SELECT user_id FROM record_filters WHERE id = ?`, id)
-	if err == nil {
-		if existingUserID != filter.UserID() {
-			return repository.ErrRecordFilterNotFound
-		}
-		return nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-
-	insertQuery := `
-INSERT INTO record_filters (id, user_id, name, filter_value_gzip, is_worldsend, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-`
-	if _, err := r.db.ExecContext(ctx, insertQuery, id, filter.UserID(), filter.Name(), filter.FilterValueGzip(), filter.IsWorldsend()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *recordFilterRepository) DeleteByIDAndUserID(ctx context.Context, id []byte, userID int) error {
-	query := `DELETE FROM record_filters WHERE id = ? AND user_id = ?`
-	result, err := r.db.ExecContext(ctx, query, id, userID)
+	result, err := exec.ExecContext(ctx, query, filter.Name(), filter.FilterValueGzip(), filter.IsWorldsend(), filter.ID(), filter.UserID())
 	if err != nil {
 		return err
 	}
@@ -111,9 +81,25 @@ func (r *recordFilterRepository) DeleteByIDAndUserID(ctx context.Context, id []b
 	return nil
 }
 
-func (r *recordFilterRepository) CountByUserID(ctx context.Context, userID int) (int, error) {
+func (r *recordFilterRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id []byte, userID int) error {
+	query := `DELETE FROM record_filters WHERE id = ? AND user_id = ?`
+	result, err := exec.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return repository.ErrRecordFilterNotFound
+	}
+	return nil
+}
+
+func (r *recordFilterRepository) CountByUserID(ctx context.Context, exec repository.Executor, userID int) (int, error) {
 	var count int
-	if err := r.db.GetContext(ctx, &count, `SELECT COUNT(*) FROM record_filters WHERE user_id = ?`, userID); err != nil {
+	if err := exec.GetContext(ctx, &count, `SELECT COUNT(*) FROM record_filters WHERE user_id = ?`, userID); err != nil {
 		return 0, err
 	}
 	return count, nil
