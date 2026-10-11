@@ -120,14 +120,29 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// GetUserShow は指定されたユーザーのプロフィールをchunirec互換形式で返します
-// GET /compat/chunirec/2.0/users/show
+// Deprecated: 既存利用者の文字列型レーティングを維持します。新規利用にはGetRecordsProfileを使用してください。
 func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
+	profile, err := h.getProfile(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, ToChunirecProfileDTO(profile, h.masterCache, h.location))
+}
+
+func (h *ChunirecHandler) GetRecordsProfile(c *echo.Context) error {
+	profile, err := h.getProfile(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, ToChunirecRecordsProfileDTO(profile, h.masterCache, h.location))
+}
+
+func (h *ChunirecHandler) getProfile(c *echo.Context) (*repository.ChunirecProfile, error) {
 	ctx := c.Request().Context()
 
 	validUsername, apiErr := h.resolveTargetUsername(c)
 	if apiErr != nil {
-		return apiErr
+		return nil, apiErr
 	}
 
 	// requester はAPIトークン所有者（非公開ユーザーの本人アクセス判定用）
@@ -140,21 +155,19 @@ func (h *ChunirecHandler) GetUserShow(c *echo.Context) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
-			return apierror.ErrUserNotFound
+			return nil, apierror.ErrUserNotFound
 		case errors.Is(err, usecase.ErrUserPrivate):
 			// セキュリティ: 非公開と未発見を区別しない
-			return apierror.ErrUserNotFound
+			return nil, apierror.ErrUserNotFound
 		default:
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("failed to get user profile", "username", validUsername, "error", err)
 			}
-			return apierror.ErrInternalError.WithInternal(err)
+			return nil, apierror.ErrInternalError.WithInternal(err)
 		}
 	}
 
-	response := ToChunirecProfileDTO(result, h.masterCache, h.location)
-
-	return c.JSON(http.StatusOK, response)
+	return result, nil
 }
 
 func (h *ChunirecHandler) resolveTargetUsername(c *echo.Context) (string, *apierror.APIError) {

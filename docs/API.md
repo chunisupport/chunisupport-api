@@ -342,8 +342,10 @@ Content-Type: application/json
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
 | `/compat/chunirec/2.0/music/show` | GET | APIトークン | chunirec互換：1楽曲情報取得 |
 | `/compat/chunirec/2.0/records/showall` | GET | APIトークン | chunirec互換：通常譜面全レコード取得 |
-| `/compat/chunirec/2.0/users/show` | GET | APIトークン | chunirec互換：ユーザープロフィール取得 |
+| `/compat/chunirec/2.0/records/profile` | GET | APIトークン | chunirec互換：プレイヤープロフィール取得 |
+| `/compat/chunirec/2.0/users/show` | GET | APIトークン | Deprecated：プレイヤープロフィール取得（レーティングは文字列） |
 | `/compat/reiwa/1/chunithm_record/original` | GET | APIトークン | reiwa互換：通常譜面全楽曲一覧取得 |
+| `/compat/reiwa/1/chunirec_all.json` | GET | APIトークン | reiwa互換：通常楽曲・WORLD'S END楽曲一覧取得 |
 | `/compat/reiwa/1/chunithm_versions.json` | GET | APIトークン | reiwa互換：CHUNITHMバージョン一覧取得 |
 
 ---
@@ -5615,7 +5617,58 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
   - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
 
+### GET `/compat/chunirec/2.0/records/profile`
+- **認証**: APIトークン必須
+- **概要**: 指定されたユーザーのプレイヤープロフィールをchunirec互換形式で取得します。
+- **クエリパラメータ**:
+  - `user_name` (string, optional): 取得対象のユーザー名。未指定の場合はAPIトークン所有者のプロフィールを返します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "user_id": 0,
+  "player_name": "Ｕ＋ＦＦ３１",
+  "title": "邪気眼",
+  "title_rarity": "platinum",
+  "level": 229,
+  "rating": 17.23,
+  "rating_max": 17.23,
+  "classemblem": "inf",
+  "classemblem_base": null,
+  "is_joined_team": null,
+  "updated_at": "2026-01-24T18:39:52+09:00"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `user_id` | number | 内部ユーザーIDを公開しないため常に `0` |
+| `player_name` | string | プレイヤー名 |
+| `title` | string\|null | 1番目の称号（スロット1） |
+| `title_rarity` | string\|null | 1番目の称号のレアリティ（normal, copper, silver, gold, platinum, rainbow等）。ChuniSupport内部では"platina"を"platinum"に変換 |
+| `level` | number | プレイヤーレベル |
+| `rating` | number\|null | 保存済みスコアから算出したレーティング（小数点以下2桁で切り捨てた数値） |
+| `rating_max` | number\|null | 最大レーティング（現在はratingと同じ値） |
+| `classemblem` | string\|null | クラスエンブレム（"1", "2", "3", "4", "5", "inf"） |
+| `classemblem_base` | string\|null | クラスエンブレムベース（"1", "2", "3", "4", "5", "inf"） |
+| `is_joined_team` | null | チーム参加状態（ChuniSupportでは保持しないため常にnull） |
+| `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
+
+
+---
+
 ### GET `/compat/chunirec/2.0/users/show`
+
+Deprecatedです。新規利用には `GET /compat/chunirec/2.0/records/profile` を使用してください。このエンドポイントは既存利用者向けに `rating`・`rating_max` を文字列で返します。それ以外のレスポンス項目とアクセス制御は `records/profile` と同じです。
+
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロフィールをchunirec互換形式で取得します。
 - **クエリパラメータ**:
@@ -5667,6 +5720,106 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 reiwa互換APIは外部ツールとの互換性を持つエンドポイントです。APIトークン認証を使用し、`Authorization: Bearer <token>` ヘッダーで送信してください。
 
 メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
+
+### GET `/compat/reiwa/1/chunirec_all.json`
+
+通常楽曲とWORLD'S END楽曲を楽曲単位の配列で返します。削除済み楽曲は除外します。
+`meta.id`はchunisupportの楽曲識別子で、chunirecの楽曲IDとは異なります。
+同名の通常楽曲とWORLD'S END楽曲は別要素として返します。
+
+- 認証: APIトークン必須。`Authorization: Bearer <token>`を使用します。
+- クエリパラメータ: なし。
+- レスポンス: HTTP 200、トップレベル配列。
+- エラー形式・レート制限・メンテナンス制御: 他のreiwa互換APIと同じです。クライアント切断はHTTP 499です。
+- 静的JSON: `https://static.chunisupport.net/compat/reiwa/1/chunirec_all.json`から認証不要で取得できます。静的JSONはバッチ更新時点のデータです。
+
+#### meta
+
+| 項目 | 型 | 通常楽曲 | WORLD'S END |
+| --- | --- | --- | --- |
+| `id` | string | 楽曲識別子 | 楽曲識別子 |
+| `title` | string | 保存された曲名 | 保存された曲名の末尾に `【属性】` を付加 |
+| `genre` | string | マスタのジャンル名。`POPS & ANIME` は `POPS&ANIME` に変換 | `WORLD'S END` |
+| `artist` | string | アーティスト名 | アーティスト名 |
+| `release` | string | リリース日を `YYYY-MM-DD` で表現 | 同左 |
+| `bpm` | number | BPM | BPM |
+| `img` | string | 拡張子なしのジャケット画像識別子 | 項目を省略 |
+| `idx` | string | 公式インデックス。数値化せず文字列で返す | 項目を省略 |
+
+未設定の文字列は空文字、未設定の数値は0を返します。`null`は返しません。
+WORLD'S ENDの属性は譜面に保存された値を使用し、星数はタイトルに含めません。
+属性が未設定または空文字の場合は、属性の括弧を付けず曲名のみを返します。
+
+#### data
+
+通常楽曲は存在する難易度の `BAS`、`ADV`、`EXP`、`MAS`、`ULT` を返します。
+存在しない難易度は項目ごと省略します。空オブジェクトや `null` は返しません。
+WORLD'S ENDは `WE` のみを返します。
+
+| 各難易度の項目 | 型 | 通常譜面 | WORLD'S END |
+| --- | --- | --- | --- |
+| `level` | number | 既存互換APIと同じ表記レベル。定数の小数部が0.5未満なら整数、0.5以上なら整数部+0.5 | 0 |
+| `const` | number | 保存された譜面定数 | 0 |
+| `maxcombo` | number | ノーツ数。未設定なら0 | ノーツ数。未設定なら0 |
+| `is_const_unknown` | number | 定数が推定値なら1、それ以外は0 | 常に0 |
+
+`is_const_unknown`はbooleanではなく整数の0または1です。
+WORLD'S ENDの `level` は星数ではありません。
+
+#### 例
+
+```json
+[
+  {
+    "meta": {
+      "id": "0000000000000001",
+      "title": "通常楽曲",
+      "genre": "ORIGINAL",
+      "artist": "アーティスト",
+      "release": "2026-10-01",
+      "bpm": 180,
+      "img": "jacket_identifier",
+      "idx": "100"
+    },
+    "data": {
+      "MAS": {
+        "level": 14.5,
+        "const": 14.7,
+        "maxcombo": 1000,
+        "is_const_unknown": 0
+      }
+    }
+  },
+  {
+    "meta": {
+      "id": "0000000000000002",
+      "title": "WORLD'S END楽曲【狂】",
+      "genre": "WORLD'S END",
+      "artist": "アーティスト",
+      "release": "2026-10-01",
+      "bpm": 180
+    },
+    "data": {
+      "WE": {
+        "level": 0,
+        "const": 0,
+        "maxcombo": 1500,
+        "is_const_unknown": 0
+      }
+    }
+  }
+]
+```
+
+#### 並び順
+
+通常楽曲を先に、WORLD'S END楽曲を後に返します。
+通常楽曲は公式インデックスを数値として昇順に並べ、同値の場合は楽曲識別子の昇順に並べます。
+公式インデックスが空または数値として解釈できない通常楽曲は、有効なインデックスを持つ通常楽曲の後に楽曲識別子の昇順で並べます。
+WORLD'S END楽曲は楽曲識別子の昇順で並べます。
+オブジェクト内のキーの順序は契約に含めません。
+
+---
 
 ### GET `/compat/reiwa/1/chunithm_versions.json`
 

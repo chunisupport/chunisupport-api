@@ -56,20 +56,21 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `v1/worldsend-songs.json` | `GET /v1/worldsend-songs` と同じ `V1WorldsendSongsResponse` |
 | `compat/chunirec/2.0/music/showall.json` | `GET /compat/chunirec/2.0/music/showall` と同じchunirec互換楽曲配列 |
 | `compat/reiwa/1/chunithm_record/original.json` | `GET /compat/reiwa/1/chunithm_record/original` と同じreiwa互換譜面配列 |
+| `compat/reiwa/1/chunirec_all.json` | `GET /compat/reiwa/1/chunirec_all.json` と同じ通常楽曲・WORLD'S END楽曲のreiwa互換配列 |
 | `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列 |
 
 アップロード時の `Content-Type` は `application/json; charset=utf-8` です。
 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、またはreiwa互換バージョンが0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。
 
-5種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、各オブジェクトのPUTは単一トランザクションではありません。
+6種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、各オブジェクトのPUTは単一トランザクションではありません。
 途中のPUTが失敗した場合、それより前のオブジェクトだけが新しい内容になります。次回の正常実行ですべて揃います。
 
-5オブジェクトのPUTがすべて成功した後、対応する公開URLを1回のCloudflare APIリクエストでパージします。
+6オブジェクトのPUTがすべて成功した後、対応する公開URLを1回のCloudflare APIリクエストでパージします。
 途中のPUTが失敗した場合はパージしません。パージAPIの通信失敗、`429`、`5xx`は最大3回まで再試行し、それでも失敗した場合はバッチを失敗させます。
 
 ### 難易度別の全譜面統計
 
-`--chart-stats`指定時は、次の固定キーだけを更新します。楽曲・譜面・バージョン一覧の5オブジェクトは更新しません。
+`--chart-stats`指定時は、次の固定キーだけを更新します。楽曲・譜面・バージョン一覧の6オブジェクトは更新しません。
 
 | オブジェクトキー | 対象難易度 |
 | --- | --- |

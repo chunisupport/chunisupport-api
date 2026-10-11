@@ -807,8 +807,10 @@ func TestRegisterRoutes_メンテナンス中もEDITORは状態変更できな�
 func TestRegisterRoutes_メンテナンス中のcompatは既存503形式を維持する(t *testing.T) {
 	paths := []string{
 		"/compat/chunirec/2.0/music/showall",
+		"/compat/chunirec/2.0/records/profile",
 		"/compat/reiwa/1/chunithm_record/original",
 		"/compat/reiwa/1/chunithm_versions.json",
+		"/compat/reiwa/1/chunirec_all.json",
 	}
 
 	for _, path := range paths {
@@ -912,5 +914,30 @@ func newAuthorizationTestHandlers() *Handlers {
 		V1Version:           new(api_v1.V1VersionHandler),
 		Chunirec:            new(chunirec.ChunirecHandler),
 		Reiwa:               new(reiwa.ReiwaHandler),
+	}
+}
+
+func TestRegisterRoutes_ReiwaChunirecAll_トークン認証(t *testing.T) {
+	for _, tt := range []struct {
+		name, token string
+		status      int
+	}{{name: "未認証", status: http.StatusServiceUnavailable}, {name: "認証済み", token: "player-token", status: http.StatusOK}} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			handlers := newAuthorizationTestHandlers()
+			handlers.Reiwa = reiwa.NewReiwaHandler(&testutil.MockSongUsecase{}, &testutil.MockWorldsendUsecase{}, nil, nil)
+			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/reiwa/1/chunirec_all.json", nil)
+			if tt.token != "" {
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			assert.Equal(t, tt.status, rec.Code)
+			if tt.status == http.StatusOK {
+				assert.JSONEq(t, `[]`, rec.Body.String())
+			}
+		})
 	}
 }

@@ -359,3 +359,28 @@ func ToChunirecRecordsResponse(records []*usecase.ChunirecRecordOutput, location
 	}
 	return ToRecordsShowAllResponse(values, genres, location)
 }
+
+// 旧ルートの文字列型を維持しながら、共通のプロフィール項目を同じ形式で返します。
+type ChunirecRecordsProfileDTO struct {
+	*ChunirecUserDTO
+	Rating    *float64 `json:"rating"`
+	RatingMax *float64 `json:"rating_max"`
+}
+
+func ToChunirecRecordsProfileDTO(profile *repository.ChunirecProfile, masterCache *masterdata.Cache, location *time.Location) *ChunirecRecordsProfileDTO {
+	if profile == nil {
+		return nil
+	}
+	legacy := ToChunirecProfileDTO(profile, masterCache, location)
+	var rating *float64
+	if profile.Rating != nil {
+		// 二進浮動小数点の誤差で、2桁の保存値がさらに切り捨てられることを防ぎます。
+		value := math.Floor(*profile.Rating*profileRatingScale+profileRatingEpsilon) / profileRatingScale
+		rating = &value
+	}
+	return &ChunirecRecordsProfileDTO{
+		ChunirecUserDTO: legacy,
+		Rating:          rating,
+		RatingMax:       rating,
+	}
+}
