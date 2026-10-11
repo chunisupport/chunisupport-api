@@ -32,7 +32,7 @@ func (s stubReiwaMasterDataUsecase) GetHonorTypes(context.Context) []domainmaste
 
 func TestReiwaHandler_GetChunithmVersions(t *testing.T) {
 	// Given
-	handler := NewReiwaHandler(nil, stubReiwaMasterDataUsecase{
+	handler := NewReiwaHandler(nil, nil, stubReiwaMasterDataUsecase{
 		versions: []domainmasterdata.Version{
 			{ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
 		},

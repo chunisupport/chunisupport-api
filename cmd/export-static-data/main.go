@@ -179,6 +179,10 @@ func run() int {
 			response := reiwa.ToChunithmRecordOriginalResponse(songs, masterCache)
 			return response, len(response)
 		},
+		func(songs []*entity.Song, worldsendSongs []*entity.WorldsendSongWithChart) (any, int) {
+			response := reiwa.ToChunirecAllResponse(songs, worldsendSongs, masterCache)
+			return response, len(response)
+		},
 		func(ctx context.Context) (any, int) {
 			response := reiwa.ToChunithmVersionsResponse(masterDataUsecase.GetVersions(ctx))
 			return response, len(response)
@@ -199,6 +203,7 @@ func run() int {
 		"worldsend_songs", result.WorldsendSongCount,
 		"chunirec_songs", result.ChunirecSongCount,
 		"reiwa_records", result.ReiwaRecordCount,
+		"reiwa_chunirec_all_songs", result.ReiwaChunirecAllSongCount,
 		"reiwa_versions", result.ReiwaVersionCount,
 		"duration", time.Since(startedAt),
 	)

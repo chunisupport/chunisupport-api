@@ -32,29 +32,34 @@ type CachePurger interface {
 // CompatibilitySnapshotBuilder は通常楽曲から互換API用レスポンスと件数を構築します。
 type CompatibilitySnapshotBuilder func(songs []*entity.Song) (response any, count int)
 
+// ReiwaChunirecAllSnapshotBuilder は通常楽曲とWORLD'S END楽曲からreiwa互換レスポンスと件数を構築します。
+type ReiwaChunirecAllSnapshotBuilder func(songs []*entity.Song, worldsendSongs []*entity.WorldsendSongWithChart) (response any, count int)
+
 // VersionSnapshotBuilder は公開対象のバージョンから互換API用レスポンスと件数を構築します。
 type VersionSnapshotBuilder func(ctx context.Context) (response any, count int)
 
 // Result は正常に公開したスナップショットの件数を表します。
 type Result struct {
-	SongCount          int
-	WorldsendSongCount int
-	ChunirecSongCount  int
-	ReiwaRecordCount   int
-	ReiwaVersionCount  int
+	SongCount                 int
+	WorldsendSongCount        int
+	ChunirecSongCount         int
+	ReiwaRecordCount          int
+	ReiwaChunirecAllSongCount int
+	ReiwaVersionCount         int
 }
 
 // Exporter は公開用の静的JSONを生成してオブジェクトストレージへ保存します。
 type Exporter struct {
-	songs                 songSource
-	worldsendSongs        worldsendSource
-	genreNamesByID        map[int]string
-	difficultyNamesByID   map[int]string
-	buildChunirecSnapshot CompatibilitySnapshotBuilder
-	buildReiwaSnapshot    CompatibilitySnapshotBuilder
-	buildVersionSnapshot  VersionSnapshotBuilder
-	objectStorageJSONSink JSONWriter
-	cachePurger           CachePurger
+	songs                         songSource
+	worldsendSongs                worldsendSource
+	genreNamesByID                map[int]string
+	difficultyNamesByID           map[int]string
+	buildChunirecSnapshot         CompatibilitySnapshotBuilder
+	buildReiwaSnapshot            CompatibilitySnapshotBuilder
+	buildReiwaChunirecAllSnapshot ReiwaChunirecAllSnapshotBuilder
+	buildVersionSnapshot          VersionSnapshotBuilder
+	objectStorageJSONSink         JSONWriter
+	cachePurger                   CachePurger
 }
 
 // NewExporter は静的データのエクスポーターを生成します。
@@ -65,25 +70,27 @@ func NewExporter(
 	difficultyNamesByID map[int]string,
 	buildChunirecSnapshot CompatibilitySnapshotBuilder,
 	buildReiwaSnapshot CompatibilitySnapshotBuilder,
+	buildReiwaChunirecAllSnapshot ReiwaChunirecAllSnapshotBuilder,
 	buildVersionSnapshot VersionSnapshotBuilder,
 	objectStorageJSONSink JSONWriter,
 	cachePurger CachePurger,
 ) *Exporter {
 	return &Exporter{
-		songs:                 songs,
-		worldsendSongs:        worldsendSongs,
-		genreNamesByID:        genreNamesByID,
-		difficultyNamesByID:   difficultyNamesByID,
-		buildChunirecSnapshot: buildChunirecSnapshot,
-		buildReiwaSnapshot:    buildReiwaSnapshot,
-		buildVersionSnapshot:  buildVersionSnapshot,
-		objectStorageJSONSink: objectStorageJSONSink,
-		cachePurger:           cachePurger,
+		songs:                         songs,
+		worldsendSongs:                worldsendSongs,
+		genreNamesByID:                genreNamesByID,
+		difficultyNamesByID:           difficultyNamesByID,
+		buildChunirecSnapshot:         buildChunirecSnapshot,
+		buildReiwaSnapshot:            buildReiwaSnapshot,
+		buildReiwaChunirecAllSnapshot: buildReiwaChunirecAllSnapshot,
+		buildVersionSnapshot:          buildVersionSnapshot,
+		objectStorageJSONSink:         objectStorageJSONSink,
+		cachePurger:                   cachePurger,
 	}
 }
 
-// Export は通常楽曲とWORLD'S END楽曲を取得し、5種類のJSON生成後に固定キーへ保存します。
-// 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、またはバージョンが0件の場合は、異常な空スナップショットによる上書きを防ぐため失敗させます。
+// Export は通常楽曲とWORLD'S END楽曲を取得し、6種類のJSON生成後に固定キーへ保存します。
+// 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、reiwa chunirec_all互換データ、またはバージョンが0件の場合は、異常な空スナップショットによる上書きを防ぐため失敗させます。
 func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	songs, err := e.songs.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
@@ -127,6 +134,14 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to marshal reiwa song snapshot: %w", err)
 	}
+	reiwaChunirecAll, reiwaChunirecAllSongCount := e.buildReiwaChunirecAllSnapshot(songs, worldsendSongs)
+	if reiwaChunirecAllSongCount == 0 {
+		return Result{}, fmt.Errorf("refusing to export an empty reiwa chunirec_all snapshot")
+	}
+	reiwaChunirecAllJSON, err := json.Marshal(reiwaChunirecAll)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to marshal reiwa chunirec_all snapshot: %w", err)
+	}
 	versions, versionCount := e.buildVersionSnapshot(ctx)
 	if versionCount == 0 {
 		return Result{}, fmt.Errorf("refusing to export an empty reiwa version snapshot")
@@ -151,6 +166,9 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 	if err := e.objectStorageJSONSink.PutJSON(ctx, info.ReiwaVersionSnapshotObjectKey, versionsJSON); err != nil {
 		return Result{}, fmt.Errorf("failed to upload %s: %w", info.ReiwaVersionSnapshotObjectKey, err)
 	}
+	if err := e.objectStorageJSONSink.PutJSON(ctx, info.ReiwaChunirecAllSnapshotObjectKey, reiwaChunirecAllJSON); err != nil {
+		return Result{}, fmt.Errorf("failed to upload %s: %w", info.ReiwaChunirecAllSnapshotObjectKey, err)
+	}
 
 	objectKeys := []string{
 		info.SongSnapshotObjectKey,
@@ -158,16 +176,18 @@ func (e *Exporter) Export(ctx context.Context) (Result, error) {
 		info.ChunirecSongSnapshotObjectKey,
 		info.ReiwaSongSnapshotObjectKey,
 		info.ReiwaVersionSnapshotObjectKey,
+		info.ReiwaChunirecAllSnapshotObjectKey,
 	}
 	if err := e.cachePurger.Purge(ctx, objectKeys); err != nil {
 		return Result{}, fmt.Errorf("failed to purge static data cache: %w", err)
 	}
 
 	return Result{
-		SongCount:          len(songs),
-		WorldsendSongCount: len(worldsendSongs),
-		ChunirecSongCount:  chunirecSongCount,
-		ReiwaRecordCount:   reiwaRecordCount,
-		ReiwaVersionCount:  versionCount,
+		SongCount:                 len(songs),
+		WorldsendSongCount:        len(worldsendSongs),
+		ChunirecSongCount:         chunirecSongCount,
+		ReiwaRecordCount:          reiwaRecordCount,
+		ReiwaChunirecAllSongCount: reiwaChunirecAllSongCount,
+		ReiwaVersionCount:         versionCount,
 	}, nil
 }

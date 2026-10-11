@@ -25,6 +25,7 @@ func TestChunirecHandler_CancellationLogging(t *testing.T) {
 	}{
 		{"レコード", (*ChunirecHandler).GetRecordsShowAll},
 		{"プロフィール", (*ChunirecHandler).GetUserShow},
+		{"records/profile", (*ChunirecHandler).GetRecordsProfile},
 	} {
 		t.Run(endpoint.name, func(t *testing.T) {
 			var output bytes.Buffer

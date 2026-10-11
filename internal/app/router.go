@@ -313,7 +313,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		MetricHistory:         api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		V1Course:              api_v1.NewV1CourseHandler(courseUsecase),
 		Chunirec:              chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
-		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, masterDataUsecase, masterCache),
+		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, worldsendUsecase, masterDataUsecase, masterCache),
 	}
 
 	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
@@ -720,6 +720,7 @@ func registerRoutes(
 		chunirecGroup.GET("/music/showall", handlers.Chunirec.GetMusicShowAll)
 		chunirecGroup.GET("/music/show", handlers.Chunirec.GetMusicShow)
 		chunirecGroup.GET("/records/showall", handlers.Chunirec.GetRecordsShowAll)
+		chunirecGroup.GET("/records/profile", handlers.Chunirec.GetRecordsProfile)
 		chunirecGroup.GET("/users/show", handlers.Chunirec.GetUserShow)
 	}
 
@@ -735,6 +736,7 @@ func registerRoutes(
 	))
 	{
 		reiwaGroup.GET("/chunithm_record/original", handlers.Reiwa.GetChunithmRecordOriginal)
+		reiwaGroup.GET("/chunirec_all.json", handlers.Reiwa.GetChunirecAll)
 		reiwaGroup.GET("/chunithm_versions.json", handlers.Reiwa.GetChunithmVersions)
 	}
 }

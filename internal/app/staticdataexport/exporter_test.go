@@ -76,6 +76,11 @@ func buildTestReiwaSnapshot(songs []*entity.Song) (any, int) {
 	return response, len(response)
 }
 
+func buildTestReiwaChunirecAllSnapshot(songs []*entity.Song, worldsendSongs []*entity.WorldsendSongWithChart) (any, int) {
+	response := reiwa.ToChunirecAllResponse(songs, worldsendSongs, nil)
+	return response, len(response)
+}
+
 func buildTestReiwaVersionSnapshot(context.Context) (any, int) {
 	response := reiwa.ChunithmVersionList{{Version: "CHUNITHM", Release: "2015-07-16"}}
 	return response, len(response)
@@ -115,6 +120,7 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 		map[int]string{1: "BASIC", 2: "ADVANCED", 3: "EXPERT", 4: "MASTER", 5: "ULTIMA"},
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
+		buildTestReiwaChunirecAllSnapshot,
 		buildTestReiwaVersionSnapshot,
 		writer,
 		cachePurger,
@@ -125,12 +131,14 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, Result{SongCount: 1, WorldsendSongCount: 1, ChunirecSongCount: 1, ReiwaRecordCount: 1, ReiwaVersionCount: 1}, result)
+	assert.Equal(t, Result{SongCount: 1, WorldsendSongCount: 1, ChunirecSongCount: 1, ReiwaRecordCount: 1, ReiwaChunirecAllSongCount: 2, ReiwaVersionCount: 1}, result)
+	assert.Len(t, writer.objects, 6)
 	require.Contains(t, writer.objects, info.SongSnapshotObjectKey)
 	require.Contains(t, writer.objects, info.WorldsendSongSnapshotObjectKey)
 	require.Contains(t, writer.objects, info.ChunirecSongSnapshotObjectKey)
 	require.Contains(t, writer.objects, info.ReiwaSongSnapshotObjectKey)
 	require.Contains(t, writer.objects, info.ReiwaVersionSnapshotObjectKey)
+	require.Contains(t, writer.objects, info.ReiwaChunirecAllSnapshotObjectKey)
 
 	var songsResponse api_v1.V1SongsResponse
 	require.NoError(t, json.Unmarshal(writer.objects[info.SongSnapshotObjectKey], &songsResponse))
@@ -161,6 +169,18 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 	assert.Equal(t, "通常楽曲", reiwaResponse[0].Title)
 	assert.Equal(t, "MAS", reiwaResponse[0].Diff)
 
+	var reiwaChunirecAllResponse reiwa.ChunirecAllResponse
+	require.NoError(t, json.Unmarshal(writer.objects[info.ReiwaChunirecAllSnapshotObjectKey], &reiwaChunirecAllResponse))
+	require.Len(t, reiwaChunirecAllResponse, 2)
+	assert.Equal(t, "0123456789abcdef", reiwaChunirecAllResponse[0].Meta.ID)
+	assert.Contains(t, reiwaChunirecAllResponse[0].Data, "MAS")
+	assert.Equal(t, "fedcba9876543210", reiwaChunirecAllResponse[1].Meta.ID)
+	require.Contains(t, reiwaChunirecAllResponse[1].Data, "WE")
+	require.NotNil(t, reiwaChunirecAllResponse[1].Data["WE"])
+	assert.Zero(t, reiwaChunirecAllResponse[1].Data["WE"].Level)
+	assert.Zero(t, reiwaChunirecAllResponse[1].Data["WE"].Const)
+	assert.Zero(t, reiwaChunirecAllResponse[1].Data["WE"].IsConstUnknown)
+
 	var versionResponse reiwa.ChunithmVersionList
 	require.NoError(t, json.Unmarshal(writer.objects[info.ReiwaVersionSnapshotObjectKey], &versionResponse))
 	assert.Equal(t, reiwa.ChunithmVersionList{{Version: "CHUNITHM", Release: "2015-07-16"}}, versionResponse)
@@ -170,6 +190,7 @@ func TestExporterExport_一覧JSONを固定キーへアップロードする(t *
 		info.ChunirecSongSnapshotObjectKey,
 		info.ReiwaSongSnapshotObjectKey,
 		info.ReiwaVersionSnapshotObjectKey,
+		info.ReiwaChunirecAllSnapshotObjectKey,
 	}, cachePurger.objectKeys)
 }
 
@@ -216,6 +237,7 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 				nil,
 				buildTestChunirecSnapshot,
 				buildTestReiwaSnapshot,
+				buildTestReiwaChunirecAllSnapshot,
 				buildTestReiwaVersionSnapshot,
 				writer,
 				&recordingCachePurger{},
@@ -248,6 +270,7 @@ func TestExporterExport_アップロード失敗を返す(t *testing.T) {
 		nil,
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
+		buildTestReiwaChunirecAllSnapshot,
 		buildTestReiwaVersionSnapshot,
 		writer,
 		cachePurger,
@@ -279,6 +302,7 @@ func TestExporterExport_reiwa互換バージョンが0件の場合はアップ�
 		nil,
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
+		buildTestReiwaChunirecAllSnapshot,
 		func(context.Context) (any, int) { return reiwa.ChunithmVersionList{}, 0 },
 		writer,
 		&recordingCachePurger{},
@@ -301,6 +325,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 		{name: "chunirec互換", failOnKey: info.ChunirecSongSnapshotObjectKey},
 		{name: "reiwa互換楽曲", failOnKey: info.ReiwaSongSnapshotObjectKey},
 		{name: "reiwa互換バージョン", failOnKey: info.ReiwaVersionSnapshotObjectKey},
+		{name: "reiwa chunirec_all互換", failOnKey: info.ReiwaChunirecAllSnapshotObjectKey},
 	}
 
 	for _, tt := range tests {
@@ -321,6 +346,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 				nil,
 				buildTestChunirecSnapshot,
 				buildTestReiwaSnapshot,
+				buildTestReiwaChunirecAllSnapshot,
 				buildTestReiwaVersionSnapshot,
 				writer,
 				cachePurger,
@@ -349,6 +375,14 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 					info.ReiwaSongSnapshotObjectKey,
 				}, writer.putKeys)
 				assert.Contains(t, writer.objects, info.ChunirecSongSnapshotObjectKey)
+			} else if tt.failOnKey == info.ReiwaVersionSnapshotObjectKey {
+				assert.Equal(t, []string{
+					info.SongSnapshotObjectKey,
+					info.WorldsendSongSnapshotObjectKey,
+					info.ChunirecSongSnapshotObjectKey,
+					info.ReiwaSongSnapshotObjectKey,
+					info.ReiwaVersionSnapshotObjectKey,
+				}, writer.putKeys)
 			} else {
 				assert.Equal(t, []string{
 					info.SongSnapshotObjectKey,
@@ -356,6 +390,7 @@ func TestExporterExport_互換APIのアップロード失敗を返す(t *testing
 					info.ChunirecSongSnapshotObjectKey,
 					info.ReiwaSongSnapshotObjectKey,
 					info.ReiwaVersionSnapshotObjectKey,
+					info.ReiwaChunirecAllSnapshotObjectKey,
 				}, writer.putKeys)
 			}
 		})
@@ -378,6 +413,7 @@ func TestExporterExport_キャッシュパージ失敗を返す(t *testing.T) {
 		nil,
 		buildTestChunirecSnapshot,
 		buildTestReiwaSnapshot,
+		buildTestReiwaChunirecAllSnapshot,
 		buildTestReiwaVersionSnapshot,
 		&recordingWriter{},
 		cachePurger,
@@ -389,5 +425,73 @@ func TestExporterExport_キャッシュパージ失敗を返す(t *testing.T) {
 	// Then
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to purge static data cache")
-	assert.Len(t, cachePurger.objectKeys, 5)
+	assert.Len(t, cachePurger.objectKeys, 6)
+}
+
+func TestExporterExport_reiwaChunirecAllが0件の場合はアップロードしない(t *testing.T) {
+	// Given
+	writer := &recordingWriter{}
+	cachePurger := &recordingCachePurger{}
+	exporter := NewExporter(
+		&stubSongSource{songs: []*entity.Song{{
+			DisplayID: "0123456789abcdef",
+			Charts:    []*entity.Chart{{DifficultyID: 4}},
+		}}},
+		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{{
+			Song:  &entity.Song{DisplayID: "fedcba9876543210"},
+			Chart: &entity.WorldsendChart{},
+		}}},
+		nil,
+		nil,
+		buildTestChunirecSnapshot,
+		buildTestReiwaSnapshot,
+		func([]*entity.Song, []*entity.WorldsendSongWithChart) (any, int) {
+			return reiwa.ChunirecAllResponse{}, 0
+		},
+		buildTestReiwaVersionSnapshot,
+		writer,
+		cachePurger,
+	)
+
+	// When
+	_, err := exporter.Export(context.Background())
+
+	// Then
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty reiwa chunirec_all snapshot")
+	assert.Empty(t, writer.putKeys)
+	assert.Empty(t, cachePurger.objectKeys)
+}
+
+func TestExporterExport_reiwaChunirecAllのJSON生成失敗時はアップロードしない(t *testing.T) {
+	// Given
+	writer := &recordingWriter{}
+	cachePurger := &recordingCachePurger{}
+	exporter := NewExporter(
+		&stubSongSource{songs: []*entity.Song{{
+			DisplayID: "0123456789abcdef",
+			Charts:    []*entity.Chart{{DifficultyID: 4}},
+		}}},
+		&stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{{
+			Song:  &entity.Song{DisplayID: "fedcba9876543210"},
+			Chart: &entity.WorldsendChart{},
+		}}},
+		nil,
+		nil,
+		buildTestChunirecSnapshot,
+		buildTestReiwaSnapshot,
+		func([]*entity.Song, []*entity.WorldsendSongWithChart) (any, int) { return make(chan int), 1 },
+		buildTestReiwaVersionSnapshot,
+		writer,
+		cachePurger,
+	)
+
+	// When
+	_, err := exporter.Export(context.Background())
+
+	// Then
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to marshal reiwa chunirec_all snapshot")
+	assert.Empty(t, writer.putKeys)
+	assert.Empty(t, cachePurger.objectKeys)
 }

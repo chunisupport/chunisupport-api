@@ -13,14 +13,16 @@ import (
 // ReiwaHandler はreiwa互換APIのハンドラです
 type ReiwaHandler struct {
 	songUsecase       usecase.SongUsecase
+	worldsendUsecase  usecase.WorldsendUsecase
 	masterDataUsecase usecase.MasterDataUsecase
 	masterCache       *masterdata.Cache
 }
 
 // NewReiwaHandler はReiwaHandlerの新しいインスタンスを返します
-func NewReiwaHandler(songUsecase usecase.SongUsecase, masterDataUsecase usecase.MasterDataUsecase, masterCache *masterdata.Cache) *ReiwaHandler {
+func NewReiwaHandler(songUsecase usecase.SongUsecase, worldsendUsecase usecase.WorldsendUsecase, masterDataUsecase usecase.MasterDataUsecase, masterCache *masterdata.Cache) *ReiwaHandler {
 	return &ReiwaHandler{
 		songUsecase:       songUsecase,
+		worldsendUsecase:  worldsendUsecase,
 		masterDataUsecase: masterDataUsecase,
 		masterCache:       masterCache,
 	}
@@ -47,4 +49,17 @@ func (h *ReiwaHandler) GetChunithmRecordOriginal(c *echo.Context) error {
 func (h *ReiwaHandler) GetChunithmVersions(c *echo.Context) error {
 	versions := h.masterDataUsecase.GetVersions(c.Request().Context())
 	return c.JSON(http.StatusOK, ToChunithmVersionsResponse(versions))
+}
+
+func (h *ReiwaHandler) GetChunirecAll(c *echo.Context) error {
+	ctx := c.Request().Context()
+	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	worldsendSongs, err := h.worldsendUsecase.GetAllWorldsendSongs(ctx, false, nil)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, ToChunirecAllResponse(songs, worldsendSongs, h.masterCache))
 }
