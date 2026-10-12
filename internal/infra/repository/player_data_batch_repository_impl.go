@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,10 +21,18 @@ func NewPlayerDataBatchRepository(db *sqlx.DB) domainrepo.PlayerDataBatchReposit
 	return &playerDataBatchRepository{db: db}
 }
 
+// LoadSnapshot はrun全体で固定するマスタを読み取り専用の REPEATABLE READ トランザクション内で取得します。
+// 取得の途中でマスタ編集がコミットされても旧楽曲属性と新譜面定数が混在しないよう、すべての読み取りを1つのスナップショットで行います。
 func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationalDate time.Time) (domainrepo.PlayerDataMasterSnapshot, error) {
 	var snapshot domainrepo.PlayerDataMasterSnapshot
+	tx, err := r.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return snapshot, fmt.Errorf("begin player data master snapshot: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var version batchVersionRow
-	if err := r.db.GetContext(ctx, &version, `
+	if err := tx.GetContext(ctx, &version, `
 		SELECT id, name, released_at
 		FROM versions
 		WHERE released_at <= ?
@@ -33,7 +42,7 @@ func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationa
 	}
 	snapshot.Version = domainrepo.BatchVersion{ID: version.ID, Name: version.Name, ReleasedAt: version.ReleasedAt}
 	var songs []batchSongRow
-	if err := r.db.SelectContext(ctx, &songs, `
+	if err := tx.SelectContext(ctx, &songs, `
 		SELECT id, released_at, is_deleted, is_worldsend, official_idx
 		FROM songs`); err != nil {
 		return snapshot, err
@@ -42,7 +51,7 @@ func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationa
 		snapshot.Songs = append(snapshot.Songs, domainrepo.BatchSong{ID: song.ID, ReleasedAt: song.ReleasedAt, IsDeleted: song.IsDeleted, IsWorldsend: song.IsWorldsend, OfficialIndex: song.OfficialIndex})
 	}
 	var charts []batchChartRow
-	if err := r.db.SelectContext(ctx, &charts, `
+	if err := tx.SelectContext(ctx, &charts, `
 		SELECT c.id, c.song_id, c.difficulty_id, d.name AS difficulty_name,
 		       c.const AS chart_const, c.is_const_unknown
 		FROM charts c
@@ -56,14 +65,14 @@ func (r *playerDataBatchRepository) LoadSnapshot(ctx context.Context, operationa
 		ID   int    `db:"id"`
 		Name string `db:"name"`
 	}
-	if err := r.db.SelectContext(ctx, &slots, `SELECT id, name FROM slots`); err != nil {
+	if err := tx.SelectContext(ctx, &slots, `SELECT id, name FROM slots`); err != nil {
 		return snapshot, err
 	}
 	snapshot.SlotIDs = make(map[string]int, len(slots))
 	for _, slot := range slots {
 		snapshot.SlotIDs[slot.Name] = slot.ID
 	}
-	if err := r.db.GetContext(ctx, &snapshot.UpperBound, `SELECT COALESCE(MAX(id), 0) FROM players`); err != nil {
+	if err := tx.GetContext(ctx, &snapshot.UpperBound, `SELECT COALESCE(MAX(id), 0) FROM players`); err != nil {
 		return snapshot, err
 	}
 	return snapshot, nil

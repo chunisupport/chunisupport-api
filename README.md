@@ -186,7 +186,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 
 `go run ./cmd/recalculate-player-data` は最新マスタに基づいて全プレイヤーのRatingとOVER POWERを再計算します。MySQLアドバイザリロックで多重起動を防ぎ、プレイヤー単位のトランザクションで処理します。運用では07:00前後を避け、cronまたはsystemd timerから1日1回起動してください。
 
-バッチは開始時に、計算に使うマスタ項目（バージョン、楽曲の配信日・削除・WORLD'S END・`official_idx`、譜面の楽曲・難易度名・譜面定数、枠ID）と `info.PlayerRecalculationLogicVersion` からSHA-256のフィンガープリントを求めます。再計算に成功したプレイヤーには `players.recalculated_master_fingerprint` へその値を記録し、次回以降は記録が一致するプレイヤーを処理対象から除外します。登録と未解禁曲の更新は計算値を変更する際に記録を `NULL` に戻し、楽曲削除に伴う未解禁登録の一括削除も影響するプレイヤーの記録を `NULL` に戻すため、次回のバッチで再計算されます。データ引き継ぎで作成したプレイヤーは記録が `NULL` のまま作成されます。Rating・OVER POWER・枠構築の計算結果が変わる修正をした場合は、`info.PlayerRecalculationLogicVersion` の値を上げて全プレイヤーを再計算させてください。緊急時は `UPDATE players SET recalculated_master_fingerprint = NULL` でも全員を再計算対象に戻せます。
+バッチは開始時に、計算に使うマスタ項目（バージョン、楽曲の配信日・削除・WORLD'S END・`official_idx`、譜面の楽曲・難易度名・譜面定数、枠ID）と `info.PlayerRecalculationLogicVersion` からSHA-256のフィンガープリントを求めます。マスタ項目と処理対象のプレイヤーID上限は読み取り専用の単一 REPEATABLE READ トランザクションでまとめて取得するため、取得中にマスタ編集がコミットされても1回の実行で異なる世代のマスタは混在しません。再計算に成功したプレイヤーには `players.recalculated_master_fingerprint` へその値を記録し、次回以降は記録が一致するプレイヤーを処理対象から除外します。登録と未解禁曲の更新は計算値を変更する際に記録を `NULL` に戻し、楽曲削除に伴う未解禁登録の一括削除も影響するプレイヤーの記録を `NULL` に戻すため、次回のバッチで再計算されます。データ引き継ぎで作成したプレイヤーは記録が `NULL` のまま作成されます。Rating・OVER POWER・枠構築の計算結果が変わる修正をした場合は、`info.PlayerRecalculationLogicVersion` の値を上げて全プレイヤーを再計算させてください。緊急時は `UPDATE players SET recalculated_master_fingerprint = NULL` でも全員を再計算対象に戻せます。
 
 APIとバッチは `players.recalculated_master_fingerprint` を読み書きするため、マイグレーション `000055` を適用してから新しいバイナリをデプロイしてください。適用直後はすべての記録が `NULL` のため、初回のバッチは全プレイヤーを再計算します。
 
