@@ -54,11 +54,13 @@ func handleChunirecError(err error, c *echo.Context) {
 
 	// エラーの種類に応じてHTTPステータスコードを決定
 	var apiErr *apierror.APIError
+	var statusCoder echo.HTTPStatusCoder
 	if errors.As(err, &apiErr) {
 		httpStatus = apiErr.HTTPStatus
 		additionalMessage = ""
-	} else if he, ok := err.(*echo.HTTPError); ok {
-		httpStatus = he.Code
+	} else if errors.As(err, &statusCoder) {
+		// Echo v5のルート不一致（ErrNotFound等）は*echo.HTTPErrorではないため、ステータスを持つエラー全般で判定します。
+		httpStatus = statusCoder.StatusCode()
 		additionalMessage = ""
 	} else {
 		httpStatus = http.StatusServiceUnavailable
@@ -68,7 +70,7 @@ func handleChunirecError(err error, c *echo.Context) {
 	logChunirecError(httpStatus, err, c)
 
 	// chunirec互換形式でエラーレスポンスを送信
-	// 注意: chunirec API 2.0の仕様に準拠するため、以下の6パターンのステータスコードのみをサポートします。
+	// 注意: chunirec API 2.0の仕様に準拠するため、以下の5種類のステータスコードのみをサポートします。
 	// chunirec API 2.0は既に更新が終了しており、仕様変更の可能性はありません。
 	// 対応するHTTPステータスコード: 400, 404, 405, 429, 503
 	// それ以外のステータスコードは503として処理されます。

@@ -376,17 +376,8 @@ func registerRoutes(
 	maintenanceStateProvider usecase.MaintenanceStateProvider,
 	cfg config.Config,
 ) {
-	// 未登録パスへのグループ認証・メンテナンス制限を避け、通常の404応答を維持する。
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			if c.RouteInfo().Method == echo.RouteNotFound {
-				return echo.ErrNotFound
-			}
-			return next(c)
-		}
-	})
-
 	internal := e.Group("/internal")
+	internal.Use(rejectUnmatchedRoute)
 	// 一時保存APIの拡張CORSは、メンテナンス503にも適用できるようゲートより先に評価します。
 	internal.Use(echoMiddleware.CORSWithConfig(newTemporaryPlayerDataCORSConfig(cfg)))
 	internal.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
@@ -405,6 +396,7 @@ func registerRoutes(
 		Window:   info.DataTransferRateLimitWindow,
 	})
 	badgeGroup := e.Group("/badges")
+	badgeGroup.Use(rejectUnmatchedRoute)
 	badgeGroup.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
 	badgeGroup.Use(middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.RatingBadgeIPRateLimitRequests,
@@ -678,6 +670,7 @@ func registerRoutes(
 	}
 
 	apiV1 := e.Group("/v1")
+	apiV1.Use(rejectUnmatchedRoute)
 	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	apiV1.Use(middleware.APIRateLimitMiddleware(
@@ -708,6 +701,7 @@ func registerRoutes(
 	chunirecGroup := e.Group("/compat/chunirec/2.0")
 	// 後続ミドルウェアのエラーも互換形式で返すため、最初に適用します。
 	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
+	chunirecGroup.Use(rejectUnmatchedRoute)
 	chunirecGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
@@ -726,6 +720,7 @@ func registerRoutes(
 
 	reiwaGroup := e.Group("/compat/reiwa/1")
 	reiwaGroup.Use(reiwa.ReiwaErrorHandlerMiddleware())
+	reiwaGroup.Use(rejectUnmatchedRoute)
 	reiwaGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	reiwaGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	reiwaGroup.Use(middleware.APIRateLimitMiddleware(
@@ -946,5 +941,18 @@ func newRequestBodyLimitMiddleware() echo.MiddlewareFunc {
 				return standardHandler(context)
 			}
 		}
+	}
+}
+
+// rejectUnmatchedRoute はグループの未登録パス（登録済みパスへのメソッド不一致を含む）を、認証・メンテナンス制限より前に404として返します。
+// Echoはグループミドルウェアを実行するため未登録パスにもグループのルートを割り当てるので、
+// 後続の認証やメンテナンス判定で401・503になることを防ぎます。
+// 互換APIでは互換エラー形式で返すため、各グループのエラーハンドラーより後に適用します。
+func rejectUnmatchedRoute(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		if c.RouteInfo().Method == echo.RouteNotFound {
+			return echo.ErrNotFound
+		}
+		return next(c)
 	}
 }

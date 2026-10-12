@@ -854,8 +854,6 @@ func TestRegisterRoutes_メンテナンス中も未登録パスは404(t *testing
 	paths := []string{
 		"/internal/not-registered",
 		"/v1/not-registered",
-		"/compat/chunirec/2.0/not-registered",
-		"/compat/reiwa/1/not-registered",
 	}
 
 	for _, path := range paths {
@@ -883,6 +881,56 @@ func TestRegisterRoutes_メンテナンス中も未登録パスは404(t *testing
 			require.Equal(t, http.StatusNotFound, rec.Code)
 			assert.Contains(t, rec.Body.String(), `"code":"not_found"`)
 			assert.NotContains(t, rec.Body.String(), "maintenance_mode")
+		})
+	}
+}
+
+func TestRegisterRoutes_互換APIのルート不一致は互換形式の404を返す(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: メンテナンス状態とリクエスト
+		maintenance bool
+		method      string
+		path        string
+	}{
+		{name: "chunirecの未登録パス", method: http.MethodGet, path: "/compat/chunirec/2.0/not-registered"},
+		{name: "chunirecの登録済みパスへのメソッド不一致", method: http.MethodPost, path: "/compat/chunirec/2.0/music/show"},
+		{name: "メンテナンス中のchunirecの未登録パス", maintenance: true, method: http.MethodGet, path: "/compat/chunirec/2.0/not-registered"},
+		{name: "reiwaの未登録パス", method: http.MethodGet, path: "/compat/reiwa/1/not-registered"},
+		{name: "reiwaの登録済みパスへのメソッド不一致", method: http.MethodPost, path: "/compat/reiwa/1/chunithm_versions.json"},
+		{name: "メンテナンス中のreiwaの未登録パス", maintenance: true, method: http.MethodGet, path: "/compat/reiwa/1/not-registered"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			maintenance := stubMaintenanceUsecase{state: usecase.MaintenanceState{Enabled: tt.maintenance}}
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(
+				e,
+				newAuthorizationTestHandlers(),
+				stubFirebaseAuthenticator{},
+				stubFirebaseAuthenticator{},
+				stubAPITokenUsecase{},
+				maintenance,
+				config.Config{},
+			)
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusNotFound, rec.Code)
+			assert.JSONEq(t, `{
+				"error": {
+					"code": 404,
+					"message": "not found.",
+					"additional_message": ""
+				}
+			}`, rec.Body.String())
 		})
 	}
 }
