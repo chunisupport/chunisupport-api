@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -92,4 +93,59 @@ func TestChunirecErrorHandlerMiddleware_クライアント切断は499としてI
 	assert.Contains(t, output.String(), "level=INFO")
 	assert.Contains(t, output.String(), `msg="Chunirec HTTP request canceled by client"`)
 	assert.Contains(t, output.String(), "status=499")
+}
+
+func TestChunirecErrorHandlerMiddleware_Echoのエラーはステータスを維持する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 後続処理が返すエラー
+		err error
+		// Then: 期待するステータスとメッセージ
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name:            "ルート不一致の404は404のまま返す",
+			err:             echo.ErrNotFound,
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "not found.",
+		},
+		{
+			name:            "メソッド不一致の405は405のまま返す",
+			err:             echo.ErrMethodNotAllowed,
+			expectedStatus:  http.StatusMethodNotAllowed,
+			expectedMessage: "the requested method is not allowed.",
+		},
+		{
+			name:            "ラップされたHTTPErrorもステータスを維持する",
+			err:             fmt.Errorf("wrap: %w", echo.NewHTTPError(http.StatusTooManyRequests, "")),
+			expectedStatus:  http.StatusTooManyRequests,
+			expectedMessage: "too many requests.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/chunirec/2.0/music/show", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			handler := ChunirecErrorHandlerMiddleware()(func(c *echo.Context) error {
+				return tt.err
+			})
+
+			// When
+			err := handler(c)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedStatus, rec.Code)
+
+			var response ChunirecErrorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			assert.Equal(t, tt.expectedStatus, response.Error.Code)
+			assert.Equal(t, tt.expectedMessage, response.Error.Message)
+		})
+	}
 }
