@@ -175,6 +175,32 @@ Content-Type: application/json
 }
 ```
 
+### 互換APIのエラー応答
+
+`/compat/chunirec/2.0` と `/compat/reiwa/1` は、互換元の仕様に合わせて次の形式でエラーを返します。本文にエラーコード文字列（`missing_token` など）は含めません。
+
+```json
+{
+  "error": {
+    "code": 404,
+    "message": "not found.",
+    "additional_message": ""
+  }
+}
+```
+
+| HTTPステータス | `message` | 主な発生条件 |
+| ---- | ---- | ---- |
+| 400 | `bad request.` | 互換元仕様との対応のため定義（入力検証エラーは422扱いで503になるため、現行では通常発生しない） |
+| 404 | `not found.` | 対象の楽曲・ユーザーが存在しない、未登録パス、登録済みパスへのメソッド不一致 |
+| 405 | `the requested method is not allowed.` | 互換元仕様との対応のため定義（現行ルーティングではメソッド不一致も404） |
+| 429 | `too many requests.` | レートリミット超過 |
+| 503 | `service unavailable.` | メンテナンス中、および上記以外のすべてのエラー |
+
+互換元の仕様は上記5種類のステータスだけを定義しているため、APIトークン未指定・無効（標準APIの401）、クエリパラメータの入力検証エラー（422）、サーバー内部エラー（500）などは `503 service unavailable.` に変換します。chunirec API 2.0は更新が終了しており、この対応表は変更しません。
+
+未登録パスとメソッド不一致は、APIトークン認証・メンテナンス判定より前に `404 not found.` を返します。クライアント切断時は応答が届かないため、互換形式へ変換せずHTTP 499として記録します。
+
 ### 互換APIのメンテナンス応答
 
 `/compat/chunirec/2.0` と `/compat/reiwa/1` は、それぞれの既存互換エラー形式を維持します。`Retry-After: 60` と `Cache-Control: no-store` は標準APIと同様に付与します。
@@ -5498,9 +5524,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `data.*.is_const_unknown` | boolean | 定数が推定値の場合true |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/music/show`
 - **認証**: APIトークン必須
@@ -5555,11 +5579,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `data.*.is_const_unknown` | boolean | 定数が推定値の場合true |
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): クエリパラメータ`id`が未指定
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found: 指定されたDisplay IDの楽曲が見つからない
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: 指定されたIDの楽曲が見つからない
+  - 503 Service Unavailable: クエリパラメータ`id`が未指定・形式不正、APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/records/showall`
 - **認証**: APIトークン必須
@@ -5612,10 +5633,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `records[].is_played` | boolean | 常にtrue |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザー含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/records/profile`
 - **認証**: APIトークン必須
@@ -5655,10 +5674,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザーを含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
 
@@ -5706,10 +5723,8 @@ Deprecatedです。新規利用には `GET /compat/chunirec/2.0/records/profile`
 | `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザーを含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
 
@@ -5847,7 +5862,7 @@ WORLD'S END楽曲は楽曲識別子の昇順で並べます。
 
 - **ソート順**: リリース日昇順
 - **主なエラー**:
-  - 401 Unauthorized: APIトークン未指定または無効
+  - 503 Service Unavailable: APIトークン未指定・無効（互換仕様により503へ変換）
 
 ---
 
@@ -5897,8 +5912,7 @@ WORLD'S END楽曲は楽曲識別子の昇順で並べます。
 
 - **ソート順**: `idx` を数値として昇順 → 難易度順（BAS → ADV → EXP → MAS → ULT）
 - **主なエラー**:
-  - 401 Unauthorized: APIトークン未指定または無効
-  - 500 Internal Server Error: サーバー内部エラー
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ---
 

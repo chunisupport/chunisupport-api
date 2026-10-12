@@ -49,11 +49,13 @@ func handleReiwaError(err error, c *echo.Context) {
 	}
 
 	var apiErr *apierror.APIError
+	var statusCoder echo.HTTPStatusCoder
 	if errors.As(err, &apiErr) {
 		httpStatus = apiErr.HTTPStatus
 		additionalMessage = ""
-	} else if he, ok := err.(*echo.HTTPError); ok {
-		httpStatus = he.Code
+	} else if errors.As(err, &statusCoder) {
+		// Echo v5のルート不一致（ErrNotFound等）は*echo.HTTPErrorではないため、ステータスを持つエラー全般で判定します。
+		httpStatus = statusCoder.StatusCode()
 		additionalMessage = ""
 	} else {
 		httpStatus = http.StatusServiceUnavailable
