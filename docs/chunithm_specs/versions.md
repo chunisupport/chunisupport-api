@@ -23,14 +23,14 @@
 | CRYSTAL PLUS | 2020-07-16 | |
 | PARADISE | 2021-01-21 | |
 | PARADISE LOST | 2021-05-13 | 旧システム最後のバージョン |
-| NEW | 2021-11-04 | システムを大きく刷新。ULTIMA、AIR-SLIDE、AIR-CRUSH、楽曲ランクS+/SS+/SSS+、クリアマーク、スキルシード追加。コースモードが「クラス認定」に。リザルトでFAST/LATEのグラフを表示。CHUNITHM-NET!!が始まる |
+| NEW | 2021-11-04 | システムを大きく刷新。ULTIMA、AIR-SLIDE、AIR-CRUSH、楽曲ランクS+/SS+/SSS+、スキルシード追加。コースモードが「クラス認定」に。リザルトでFAST/LATEのグラフを表示。CHUNITHM-NET!!が始まる |
 | NEW PLUS | 2022-04-14 | |
 | SUN | 2022-10-13 | |
-| SUN PLUS | 2023-05-11 | キャラクターRANKの上限が200に |
+| SUN PLUS | 2023-05-11 | 強制終了のあるスキルでクリアすると上位のクリアマークが付くように。キャラクターRANKの上限が200に |
 | LUMINOUS | 2023-12-14 | クリアマークの色を一部変更 |
 | LUMINOUS PLUS | 2024-06-20 | ULTIMAの解禁条件が「EXPERT以上でランクS」に緩和（LUMINOUSまでは「EXPERTとMASTERの両方でランクSS以上」） |
 | VERSE | 2024-12-12 | レーティングのリーセント枠を廃止し、**新曲枠**を追加。スキルを刷新 |
-| X-VERSE | 2025-07-16 | 10周年記念作品。Linked VERSE追加。難易度でマップのマス数が変わらなくなる |
+| X-VERSE | 2025-07-16 | 10周年記念作品。Linked VERSE追加。BASIC・ADVANCEDはEXPERTと、WORLD'S ENDはMASTER・ULTIMAと同じだけマップを進めるようになる |
 | X-VERSE-X | 2025-12-11 | レベル16が初登場。チームコースでULTIMAが選べるようになる |
 | Mate | 2026-07-02 | メイト・メイトルーム追加。リザルトの1ページ目にFAST/LATEの数を表示。ULTIMA・WORLD'S ENDの専用チケットを廃止し、全難易度プレイチケットに統合 |
 

@@ -116,7 +116,7 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 ### クリアランプ（クリアマーク）
 
 - 曲が終わった時点でゲージのノルマを満たしていればCLEARです。プレイしたがCLEARしていない譜面は、このプロジェクトではFAILEDとして扱います。
-- 強制終了がある特定のスキルを使い、強制終了しないで曲を終えると、より上位のクリアマークが付きます（NEWから）。
+- 強制終了がある特定のスキルを使い、強制終了しないで曲を終えると、より上位のクリアマークが付きます（SUN PLUSから。SUN以前に同じスキルでクリアした記録には反映されていません）。
 - 強制終了せずに曲を終えれば、ほとんどの場合CLEARは付きます。このため、CLEARだけでは上手いとは言いづらいです。
 
 | クリアランプ | 強制終了の条件 | 対応スキル（VERSE以降の分類） |
@@ -129,7 +129,7 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 
 - 上位のクリアランプは、下位のクリアランプも満たしているものとして扱います（CATASTROPHY ⊃ ABSOLUTE ⊃ BRAVE ⊃ HARD ⊃ CLEAR）。
 - 真・限界突破の証は分類がOTHERですが、強制終了の条件がオーバージャッジと同じMISS 10回なので、完走するとHARDになります（攻略wikiの検証による。公式の明記はなし）。
-- スキルとクリアマークの対応や名前はバージョンによって違います（例: NEW〜LUMINOUS PLUSには「ABSOLUTE+」があり、嘆きのしるしはABSOLUTEでした）。
+- スキルとクリアマークの対応や名前はバージョンによって違います（例: SUN PLUS〜LUMINOUS PLUSには「ABSOLUTE+」があり、嘆きのしるしはABSOLUTEでした）。
 - コンボランプとクリアランプは独立しています。例えば「HARDでFCしていない」状態や「CLEARだけでAJ」状態もあり得ます。
 
 ---
@@ -176,4 +176,5 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 - [基本の遊び方 | CHUNITHM](https://chunithm.sega.jp/play/)
 - [12/12(木) CHUNITHMのバージョンアップにともなうお知らせ](https://info-chunithm.sega.jp/8774/)（VERSEのスキル一覧）
 - [『CHUNITHM NEW』で追加される新機能について](https://info-chunithm.sega.jp/1098/)（FAST/LATE表示）
+- [5/11(木) CHUNITHM SUN PLUSの新要素まとめ！](https://info-chunithm.sega.jp/4836/)（クリアマーク）
 - [CHUNITHM VERSE情報まとめ - CHUNITHM攻略Wiki](https://wikiwiki.jp/chunithmwiki/CHUNITHM%20VERSE%E6%83%85%E5%A0%B1%E3%81%BE%E3%81%A8%E3%82%81)（真・限界突破の証のクリアマーク）
