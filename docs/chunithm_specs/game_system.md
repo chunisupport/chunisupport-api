@@ -57,7 +57,7 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 | MISS | 0% | 切れる |
 
 - JUSTICE CRITICALより内側に「JUSTICE HEAVEN」があるともいわれますが、スコアには関係しません。
-- Mateから、リザルトにFAST/LATE（早すぎ・遅すぎ）の数が表示されるようになりました。
+- リザルトでは、FAST/LATE（早すぎ・遅すぎ）の割合を見られます（NEWから、表示切替でグラフ表示）。Mateからは、リザルトの1ページ目にFAST/LATEの数が表示されます。
 
 ## スコア
 
@@ -121,13 +121,14 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 
 | クリアランプ | 強制終了の条件 | 対応スキル（VERSE以降の分類） |
 |---|---|---|
-| CLEAR | なし | スキルなし・NORMAL・OTHERのスキル |
-| HARD | MISS 20回 / MISS 10回 / JUSTICE以下 300回 | ジャッジメント / オーバージャッジ / 嘆きのしるし |
+| CLEAR | なし | スキルなし・NORMALのスキル・OTHERのスキル（真・限界突破の証を除く） |
+| HARD | MISS 20回 / MISS 10回 / JUSTICE以下 300回 | ジャッジメント / オーバージャッジ・真・限界突破の証 / 嘆きのしるし |
 | BRAVE | JUSTICE以下 150回 | 勇気のしるし |
 | ABSOLUTE | JUSTICE以下 50回 | 道化師の狂気 |
 | CATASTROPHY | JUSTICE以下 10回 | 天地創造 |
 
 - 上位のクリアランプは、下位のクリアランプも満たしているものとして扱います（CATASTROPHY ⊃ ABSOLUTE ⊃ BRAVE ⊃ HARD ⊃ CLEAR）。
+- 真・限界突破の証は分類がOTHERですが、強制終了の条件がオーバージャッジと同じMISS 10回なので、完走するとHARDになります（攻略wikiの検証による。公式の明記はなし）。
 - スキルとクリアマークの対応や名前はバージョンによって違います（例: NEW〜LUMINOUS PLUSには「ABSOLUTE+」があり、嘆きのしるしはABSOLUTEでした）。
 - コンボランプとクリアランプは独立しています。例えば「HARDでFCしていない」状態や「CLEARだけでAJ」状態もあり得ます。
 
@@ -150,7 +151,7 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 | HARD | オーバージャッジ | ゲージ上昇 230%、MISS 10回で強制終了 |
 | HARD | 嘆きのしるし | JUSTICE CRITICALでボーナス +22.50、JUSTICE以下 300回で強制終了 |
 | BRAVE | 勇気のしるし | JUSTICE CRITICALでボーナス +32.50、JUSTICE以下 150回で強制終了 |
-| ABSOLUTE | 道化師の狂気 | JUSTICE CRITICALでボーナス +53.00、JUSTICE以下 50回で強制終了 |
+| ABSOLUTE | 道化師の狂気 | JUSTICE CRITICALでボーナス +52.50、JUSTICE以下 50回で強制終了 |
 | CATASTROPHY | 天地創造 | ゲージ上昇 400%、JUSTICE以下 10回で強制終了 |
 | OTHER | 限界突破の証 | ゲージ上昇 100%、1,010,000点で終了時ボーナス +30,000 |
 | OTHER | 真・限界突破の証 | ゲージ上昇 150%、1,010,000点で終了時ボーナス +50,000、MISS 10回で強制終了 |
@@ -173,3 +174,6 @@ CHUNITHMの1プレイの流れ、操作、ノーツ、判定、スコア、ラ�
 
 - [チュウニズム - Wikipedia](https://ja.wikipedia.org/wiki/チュウニズム)（「内容」「キャラクター・スキル」の節、2026年10月14日に参照）
 - [基本の遊び方 | CHUNITHM](https://chunithm.sega.jp/play/)
+- [12/12(木) CHUNITHMのバージョンアップにともなうお知らせ](https://info-chunithm.sega.jp/8774/)（VERSEのスキル一覧）
+- [『CHUNITHM NEW』で追加される新機能について](https://info-chunithm.sega.jp/1098/)（FAST/LATE表示）
+- [CHUNITHM VERSE情報まとめ - CHUNITHM攻略Wiki](https://wikiwiki.jp/chunithmwiki/CHUNITHM%20VERSE%E6%83%85%E5%A0%B1%E3%81%BE%E3%81%A8%E3%82%81)（真・限界突破の証のクリアマーク）
