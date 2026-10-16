@@ -1,0 +1,260 @@
+<title>chunisupport-api セキュリティレビュー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* レイアウト: 1カラムの監査報告書。要約 → 指摘一覧(重大度ストライプ) → 確認済み事項 → 範囲 */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5a6577;
+  --line: #dde2ea;
+  --accent: #2f5bd3;
+  --sev-med: #c2410c;
+  --sev-med-bg: #fff1e8;
+  --sev-low: #a16207;
+  --sev-low-bg: #fdf6dc;
+  --sev-info: #475569;
+  --sev-info-bg: #eef1f5;
+  --ok: #15803d;
+  --ok-bg: #e9f7ee;
+  --code-bg: #eef1f6;
+  --font-body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151c; --surface: #181e28; --fg: #e4e8ef; --muted: #9aa5b6; --line: #2a3242;
+    --accent: #7ea2ff; --sev-med: #fb923c; --sev-med-bg: #2c1a10; --sev-low: #facc15; --sev-low-bg: #2a2410;
+    --sev-info: #a8b4c6; --sev-info-bg: #1f2632; --ok: #4ade80; --ok-bg: #12261a; --code-bg: #212938;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151c; --surface: #181e28; --fg: #e4e8ef; --muted: #9aa5b6; --line: #2a3242;
+  --accent: #7ea2ff; --sev-med: #fb923c; --sev-med-bg: #2c1a10; --sev-low: #facc15; --sev-low-bg: #2a2410;
+  --sev-info: #a8b4c6; --sev-info-bg: #1f2632; --ok: #4ade80; --ok-bg: #12261a; --code-bg: #212938;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.75;
+}
+.wrap {
+  max-width: 880px; margin: 0 auto;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 40px;
+}
+h1, h2, h3 { text-wrap: balance; line-height: 1.35; margin: 0; }
+h1 { font-size: 1.9rem; font-weight: 700; }
+h2 { font-size: 1.3rem; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+header { display: grid; gap: 10px; }
+.meta { color: var(--muted); font-size: 0.9rem; }
+section { display: grid; gap: 16px; }
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: grid; gap: 12px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500; padding: 2px 10px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill.med { color: var(--sev-med); background: var(--sev-med-bg); }
+.pill.low { color: var(--sev-low); background: var(--sev-low-bg); }
+.pill.info { color: var(--sev-info); background: var(--sev-info-bg); }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.9rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.04em; }
+tr:last-child td { border-bottom: 0; }
+td.id { font-family: var(--font-mono); white-space: nowrap; }
+td a { color: var(--accent); text-decoration: none; }
+td a:hover, td a:focus-visible { text-decoration: underline; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--sev-info); border-radius: 6px; padding: 18px 20px; display: grid; gap: 10px; min-width: 0; }
+.finding.med { border-left-color: var(--sev-med); }
+.finding.low { border-left-color: var(--sev-low); }
+.finding .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.finding .fid { font-family: var(--font-mono); color: var(--muted); font-size: 0.85rem; }
+dl { margin: 0; display: grid; grid-template-columns: 6.5em 1fr; gap: 6px 14px; }
+dt { color: var(--muted); font-size: 0.85rem; padding-top: 2px; }
+dd { margin: 0; min-width: 0; }
+dd ul { margin: 0; padding-left: 1.2em; }
+@media (max-width: 560px) { dl { grid-template-columns: 1fr; } dt { padding-top: 6px; } }
+.oklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.oklist li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: baseline; min-width: 0; }
+.oklist li > div { min-width: 0; }
+.check { color: var(--ok); font-weight: 700; }
+.note { color: var(--muted); font-size: 0.9rem; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Security Review · chunisupport-api</div>
+    <h1>chunisupport-api セキュリティレビュー</h1>
+    <p class="meta">実施日 2026-10-16 ／ 対象コミット <code>83ec533</code>（develop 相当） ／ 方式: ソースコード静的レビュー + <code>govulncheck</code></p>
+  </header>
+
+  <section aria-labelledby="sum">
+    <h2 id="sum">結論</h2>
+    <div class="verdict">
+      <p><strong>重大（Critical / High）な脆弱性は見つかりませんでした。</strong>認証・認可、非公開ユーザーの閲覧制御、SQL インジェクション対策、APIトークンとデータ移行ファイルの暗号処理は、いずれも丁寧に実装されています。</p>
+      <p>指摘は主に<strong>未認証で使える一時保存API と IP 単位のレート制限</strong>に集中しています。少ない送信元から一時保存の全体容量を埋められる問題（M1）と、IPv6 でレート制限を回避できる問題（M2）は、早めの対応を推奨します。</p>
+      <div class="tally">
+        <span class="pill med">Medium 3</span>
+        <span class="pill low">Low 4</span>
+        <span class="pill info">Info 3</span>
+        <span class="pill ok">依存脆弱性 到達可能 0</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="list">
+    <h2 id="list">指摘一覧</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>ID</th><th>重大度</th><th>概要</th><th>主な箇所</th></tr></thead>
+        <tbody>
+          <tr><td class="id"><a href="#m1">M1</a></td><td><span class="pill med">Medium</span></td><td>一時保存APIの全体容量を少数のIPで枯渇させられる</td><td><code>temporary_player_data_repository_impl.go</code></td></tr>
+          <tr><td class="id"><a href="#m2">M2</a></td><td><span class="pill med">Medium</span></td><td>IPベースのレート制限がIPv6の1アドレス単位で、/64内のアドレス変更で回避できる</td><td><code>rate_limit_middleware.go</code></td></tr>
+          <tr><td class="id"><a href="#m3">M3</a></td><td><span class="pill med">Medium</span></td><td>一時保存トークンを他人に確定させると、偽造データがその人のアカウントに登録される（フロント実装次第）</td><td><code>temporary_player_data_usecase_impl.go</code></td></tr>
+          <tr><td class="id"><a href="#l1">L1</a></td><td><span class="pill low">Low</span></td><td>読み取り系GETはFirebaseトークンの失効・無効化を確認しない</td><td><code>router.go</code> / <code>read_optimized_token_verifier.go</code></td></tr>
+          <tr><td class="id"><a href="#l2">L2</a></td><td><span class="pill low">Low</span></td><td>クライアントIP判定がリバースプロキシ設定に強く依存する</td><td><code>router.go</code> <code>configureIPExtractor</code></td></tr>
+          <tr><td class="id"><a href="#l3">L3</a></td><td><span class="pill low">Low</span></td><td>DBの数値IDがAPIの <code>id</code> として露出している</td><td><code>api_token_handler.go</code> ほか</td></tr>
+          <tr><td class="id"><a href="#l4">L4</a></td><td><span class="pill low">Low</span></td><td>レート制限ストアの件数に上限がない</td><td><code>rate_limit_middleware.go</code></td></tr>
+          <tr><td class="id"><a href="#i1">I1</a></td><td><span class="pill info">Info</span></td><td>新規登録でメールアドレス確認済みかを見ていない</td><td><code>signup_usecase.go</code></td></tr>
+          <tr><td class="id"><a href="#i2">I2</a></td><td><span class="pill info">Info</span></td><td>Turnstile 検証で hostname / action を照合していない</td><td><code>turnstile/verifier.go</code></td></tr>
+          <tr><td class="id"><a href="#i3">I3</a></td><td><span class="pill info">Info</span></td><td>楽曲バッチのダウンロードで応答サイズの上限がない</td><td><code>songbatch/datasource/downloader.go</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="detail">
+    <h2 id="detail">指摘の詳細</h2>
+
+    <article class="finding med" id="m1">
+      <div class="head"><span class="fid">M1</span><h3>一時保存APIの全体容量を少数のIPで枯渇させられる</h3><span class="pill med">Medium</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/infra/repository/temporary_player_data_repository_impl.go</code> <code>Create</code>、<code>internal/info/info.go</code>（<code>TempData*</code>）</dd>
+        <dt>内容</dt><dd><code>POST /internal/player-data/temp</code> は認証不要です。保持量は<strong>展開後</strong>のバイト数で数えられ、上限は全体で既定 64MB、1件あたり 5MiB、1IPあたり 3件です。gzip 500KiB 以下で 5MiB に展開されるJSONは容易に作れるため、約13件、つまり<strong>5つ程度のIP</strong>（IPv6 なら1台の端末で足ります。M2参照）から送るだけで全体容量が埋まります。</dd>
+        <dt>影響</dt><dd>TTLの5分間、全利用者のブックマークレット経由のアップロードが <code>503</code> になります。5分ごとに送り直せば、この状態を続けられます。</dd>
+        <dt>対策案</dt><dd><ul>
+          <li>IP単位の件数制限に加えて、<strong>IP単位の合計バイト数</strong>にも上限を設ける（例: 全体の数%）。</li>
+          <li>IPv6 は /64 単位でまとめて数える（M2 の対策と共通化）。</li>
+          <li>展開後の上限（5MiB）を実データの最大サイズに合わせて引き下げる、または圧縮後のまま保持して確定時に展開する。</li>
+        </ul></dd>
+      </dl>
+    </article>
+
+    <article class="finding med" id="m2">
+      <div class="head"><span class="fid">M2</span><h3>IPベースのレート制限がIPv6の1アドレス単位</h3><span class="pill med">Medium</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/app/middleware/rate_limit_middleware.go</code> の <code>IPRateLimitMiddleware</code> / <code>AnonymousIPRateLimitMiddleware</code>、<code>ip_username_rate_limit_middleware.go</code></dd>
+        <dt>内容</dt><dd>識別子に <code>c.RealIP()</code> の文字列をそのまま使っています。一般的なIPv6回線では利用者1人に /64（2<sup>64</sup> 個）以上のアドレスが割り当てられるため、送信元アドレスを変えるだけで制限を受けません。</dd>
+        <dt>影響</dt><dd>ログイン（10回/分）・新規登録（5回/時）・一時保存（30回/分, 3件/IP）・未認証の公開API（60回/分）の制限を回避できます。ログインと新規登録は Turnstile があるため影響は限定的ですが、一時保存（M1）と公開APIの負荷対策は実質的に効きません。</dd>
+        <dt>対策案</dt><dd>IPv6 アドレスは <code>netip.Prefix</code> で /64（または /56）に丸めてからキーにする共通関数を用意し、全てのIPベース制限で使う。</dd>
+      </dl>
+    </article>
+
+    <article class="finding med" id="m3">
+      <div class="head"><span class="fid">M3</span><h3>一時保存トークンを他人に確定させられる</h3><span class="pill med">Medium（条件付き）</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/usecase/temporary_player_data_usecase_impl.go</code> <code>Commit</code>、<code>POST /internal/player-data/commit</code></dd>
+        <dt>内容</dt><dd>一時保存データは誰でも任意の内容で作成でき、<code>uploadToken</code> を知っている認証済みユーザーなら誰でも自分のアカウントへ確定できます。アップロードした人と確定する人の結び付きは確認していません。</dd>
+        <dt>成立条件</dt><dd>フロントエンドが URL などで受け取った <code>uploadToken</code> を、<strong>内容の確認なしに自動で commit する</strong>場合に成立します。攻撃者が偽造スコアで作ったトークン付きリンクを踏ませると、被害者のプレイヤーデータ・スコア履歴が攻撃者の用意した内容で上書きされます（ログインCSRFに近い型）。</dd>
+        <dt>対策案</dt><dd><ul>
+          <li>フロントで確定前にプレイヤー名・件数などの要約を表示し、明示的な操作で確定させる（最小対応）。</li>
+          <li>サーバー側では、確定時のIPと保存時のIP（<code>entry.IPAddress</code>、既に保持済み）が異なる場合に拒否する、または既存プレイヤーとプレイヤー名が異なる場合は警告を返す。</li>
+        </ul></dd>
+      </dl>
+    </article>
+
+    <article class="finding low" id="l1">
+      <div class="head"><span class="fid">L1</span><h3>読み取り系GETはトークンの失効を確認しない</h3><span class="pill low">Low</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/app/router.go</code> の <code>firebaseAuthReadOptimized</code> 適用グループ（<code>/internal/me</code> GET、<code>/friends</code> GET、<code>/friend-rankings</code>、<code>/friend-comparisons</code>、公開系のオプショナル認証）</dd>
+        <dt>内容</dt><dd><code>VerifyIDToken</code>（失効確認なし）を使っているため、パスワード変更・セッション失効・アカウント無効化の後も、IDトークンの有効期限（最大1時間）までは閲覧できます。フレンド比較など非公開データも対象です。</dd>
+        <dt>評価</dt><dd>応答速度とのトレードオフとして意図された設計で、書き込み系は全て厳密検証です。トークン漏えい時の影響が「最大1時間の閲覧」に限られる点を許容できるか確認してください。必要なら非公開データを返すフレンド比較系だけ厳密検証に切り替えられます。</dd>
+      </dl>
+    </article>
+
+    <article class="finding low" id="l2">
+      <div class="head"><span class="fid">L2</span><h3>クライアントIP判定がプロキシ設定に強く依存する</h3><span class="pill low">Low（運用確認）</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/app/router.go</code> <code>configureIPExtractor</code>、<code>docs/configuration.md</code></dd>
+        <dt>内容</dt><dd>コード自体は正しく、信頼するCIDRからの <code>X-Forwarded-For</code> だけを使います。ただし Cloudflare → nginx → API の構成で nginx が CF のIPを実IPへ置き換えていない場合、全利用者が Cloudflare エッジのIPとして扱われ、<strong>レート制限を利用者全体で共有</strong>してしまいます（正規利用者が429になる）。逆に nginx がクライアント由来の <code>X-Forwarded-For</code> をそのまま引き継ぐと、IPを偽装できます。</dd>
+        <dt>対策案</dt><dd>本番の nginx で <code>set_real_ip_from</code>（Cloudflare のIP範囲）と <code>real_ip_header CF-Connecting-IP</code> を設定し、<code>proxy_set_header X-Forwarded-For $remote_addr</code> で上書きしていることを確認する。</dd>
+      </dl>
+    </article>
+
+    <article class="finding low" id="l3">
+      <div class="head"><span class="fid">L3</span><h3>DBの数値IDがAPIの id として露出している</h3><span class="pill low">Low</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/app/handler/api_internal/api_token_handler.go:23</code>（<code>uint64</code>）、<code>internal/dto/api_internal/goal_dto.go:18</code>、<code>goal_group_dto.go:12</code></dd>
+        <dt>内容</dt><dd>APIトークン・目標・目標グループのAUTO_INCREMENT値が <code>id</code> として返ります。所有者スコープ（<code>WHERE id = ? AND user_id = ?</code>）は徹底されているためIDORにはなりませんが、サービス全体の作成件数や作成ペースが推測でき、AGENTS.md の「数値IDの露出禁止」にも反します。</dd>
+        <dt>対策案</dt><dd>他リソースと同様に <code>display_id</code>（ランダムな公開ID）を導入し、APIではそちらを <code>id</code> として扱う。</dd>
+      </dl>
+    </article>
+
+    <article class="finding low" id="l4">
+      <div class="head"><span class="fid">L4</span><h3>レート制限ストアの件数に上限がない</h3><span class="pill low">Low</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/app/middleware/rate_limit_middleware.go</code> <code>FixedWindowStore</code></dd>
+        <dt>内容</dt><dd>エントリは時間窓の2倍経過後に削除されますが、窓の間は識別子ごとに無制限に増えます。M2 のようにIPv6アドレスを変え続けると、1窓の間にメモリ使用量を増やせます（<code>/badges</code> はIP×ユーザー名のキーなので特に増えやすい）。</dd>
+        <dt>対策案</dt><dd>M2 の /64 丸めで大半は解消します。加えてエントリ数の上限を設けると確実です。</dd>
+      </dl>
+    </article>
+
+    <article class="finding" id="i1">
+      <div class="head"><span class="fid">I1</span><h3>新規登録でメール確認済みかを見ていない</h3><span class="pill info">Info</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/usecase/signup_usecase.go</code></dd>
+        <dt>内容</dt><dd>有効なFirebaseトークンであれば、<code>email_verified</code> やサインインプロバイダを問わず登録できます。Firebase 側でメール/パスワードや匿名認証を有効にしている場合、使い捨てアカウントを量産できます（Turnstile と 5回/時/IP の制限はあります）。Firebase コンソールで有効なプロバイダを確認してください。</dd>
+      </dl>
+    </article>
+
+    <article class="finding" id="i2">
+      <div class="head"><span class="fid">I2</span><h3>Turnstile の hostname / action を照合していない</h3><span class="pill info">Info</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/infra/turnstile/verifier.go</code></dd>
+        <dt>内容</dt><dd><code>success</code> だけを見ています。同じサイトキーを複数ホストやフォームで使う場合、別の場所で取得したトークンを流用できます。レスポンスの <code>hostname</code> と <code>action</code>（login / signup）を照合すると防げます。</dd>
+      </dl>
+    </article>
+
+    <article class="finding" id="i3">
+      <div class="head"><span class="fid">I3</span><h3>楽曲バッチのダウンロードで応答サイズの上限がない</h3><span class="pill info">Info</span></div>
+      <dl>
+        <dt>箇所</dt><dd><code>internal/infra/songbatch/datasource/downloader.go:140</code>（<code>io.ReadAll(resp.Body)</code>）</dd>
+        <dt>内容</dt><dd>取得先は設定済みの信頼できるURLで、起動できるのはADMINだけです。取得先が侵害された場合の備えとして <code>io.LimitReader</code> を付けておくと安全です。</dd>
+      </dl>
+    </article>
+  </section>
+
+  <section aria-labelledby="good">
+    <h2 id="good">確認して問題がなかった項目</h2>
+    <ul class="oklist">
+      <li><span class="check">✓</span><div><strong>SQLインジェクション</strong>: 動的SQLは全てプレースホルダ。<code>fmt.Sprintf</code> で埋め込むのはコード内の定数・列名・プレースホルダ列だけ。LIKE検索は <code>%</code> <code>_</code> <code>\</code> をエスケープ済み。</div></li>
+      <li><span class="check">✓</span><div><strong>ルート単位の認可</strong>: 管理系（<code>/internal/admin</code>、<code>/honors</code>、ユーザー削除・権限変更）は厳密認証 + ADMIN、楽曲編集は EDITOR。<code>rejectUnmatchedRoute</code> で未登録パスが認証前に404になる。</div></li>
+      <li><span class="check">✓</span><div><strong>非公開ユーザー</strong>: <code>canAccessPrivateUser</code> に集約され、プロフィール・レコード・履歴・コース・ロック/お気に入り曲・バッジ・chunirec互換・v1 の全経路で適用。非公開は404で返し、存在を隠している。</div></li>
+      <li><span class="check">✓</span><div><strong>フレンド</strong>: 比較・ランキングはSQLで双方向の承認済み関係を要求。承認は相手からの保留中申請がある場合に限られる。</div></li>
+      <li><span class="check">✓</span><div><strong>IDOR</strong>: 目標・目標グループ・レコードフィルタ・APIトークン・ロック/お気に入り曲の更新・削除は全て <code>user_id</code> / <code>player_id</code> で絞り込み。プレイヤーデータはユーザー単位で紐付くため他人のプレイヤーを乗っ取れない。</div></li>
+      <li><span class="check">✓</span><div><strong>重要操作の再認証</strong>: ユーザー名変更・退会は <code>X-Reauth-Token</code> の失効確認付き検証、<code>auth_time</code> 5分以内、UID一致を要求。管理者の自己降格・自己削除は禁止。</div></li>
+      <li><span class="check">✓</span><div><strong>APIトークン</strong>: 32バイトの暗号論的乱数、SHA-256で保存、平文は発行時のみ。書き込み権限トークンの発行と利用の両方でEDITOR以上を要求。クエリ文字列でのトークン受け取りはない。</div></li>
+      <li><span class="check">✓</span><div><strong>データ移行ファイル</strong>: HMAC-SHA256（秘密鍵32バイト以上）を <code>hmac.Equal</code> で比較してから展開。厳密なJSON・Base64検証、gzip爆弾対策の展開上限あり。</div></li>
+      <li><span class="check">✓</span><div><strong>入力サイズ</strong>: 全体5MiB（移行のみ32MiB）のボディ上限、gzip展開時の <code>LimitReader</code>、Echo 既定の <code>ReadTimeout</code> 30秒。</div></li>
+      <li><span class="check">✓</span><div><strong>エラー応答とログ</strong>: 内部エラーの詳細はクライアントに返さない。ログは改行を除去。Google API キー入りURLはエラー文から除いている。</div></li>
+      <li><span class="check">✓</span><div><strong>CORS</strong>: 許可オリジンは明示リスト。<code>*</code> と credentials の併用は起動時に拒否。外部オリジンは一時保存・死活・状態取得の3パスだけに限定。</div></li>
+      <li><span class="check">✓</span><div><strong>秘密情報</strong>: 鍵・認証情報は環境変数と <code>.config/</code> で管理し、<code>.gitignore</code> 済み。リポジトリ内に秘密情報のファイルは見当たらない。APIは <code>127.0.0.1</code> でのみ待ち受け。</div></li>
+      <li><span class="check">✓</span><div><strong>依存ライブラリ</strong>: <code>govulncheck ./...</code> の結果、コードから到達可能な既知脆弱性は0件（依存モジュールに1件あるが未使用の経路）。</div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="scope">
+    <h2 id="scope">範囲と制約</h2>
+    <p class="note">対象は本リポジトリのGoコード（<code>cmd/</code>・<code>internal/</code>）と設定ドキュメントです。フロントエンド、nginx・Cloudflare・Firebase の本番設定、DBの権限設定は確認していません（M3・L2・I1 はそれらの確認が前提）。動的テストやペネトレーションテストは行っていません。<code>_report/</code> 配下の資料は仕様の根拠として扱っていません。</p>
+  </section>
+</div>
