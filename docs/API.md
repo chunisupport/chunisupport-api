@@ -4776,12 +4776,6 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | code | name |
 | ---- | ---- |
-| ABCD | ABCD |
-| EFGH | EFGH |
-| IJKL | IJKL |
-| MNOP | MNOP |
-| QRST | QRST |
-| UVWXYZ | UVWXYZ |
 | A | あ行 |
 | KA | か行 |
 | SA | さ行 |
@@ -4792,6 +4786,12 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | YA | や行 |
 | RA | ら行 |
 | WA | わ行 |
+| ABCD | ABCD |
+| EFGH | EFGH |
+| IJKL | IJKL |
+| MNOP | MNOP |
+| QRST | QRST |
+| UVWXYZ | UVWXYZ |
 | NUMBER | 数字 |
 
 通常楽曲と WORLD'S END 楽曲は必ず1つのフォルダに所属し、楽曲レスポンスでは `name_folder_code` を返します。この項目は読み取り専用で、楽曲の登録・更新リクエストには含めません。所属は楽曲の登録時と `title` / `reading` の変更時に自動判定し、楽曲収集バッチによる更新時も同期します。DBの初期値は「数字」フォルダです。既存楽曲の初回設定も通常の楽曲収集バッチで行い、読み・曲名が変わらない楽曲も正しい所属へ更新します。`reading` の前後空白を除去した結果が空なら `title` を使い、選んだ文字列の前後空白を除去して NFKC 正規化した先頭文字で判定します。API 起動時に既存楽曲の所属を補完しません。
