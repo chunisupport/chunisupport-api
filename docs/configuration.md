@@ -52,6 +52,8 @@ MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `inte
 
 MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
 
+パラメータ付きクエリは、DSNの `interpolateParams=true` によりクライアント側で値を展開します。サーバーサイドプリペアドステートメントの Prepare / Execute / Close をクエリごとに行わないためです。接続の文字セットと照合順序はDSNで上書きせず、go-sql-driver/mysql の既定である utf8mb4（`utf8mb4_general_ci`）を使います。スキーマも `utf8mb4` です。ドライバが展開を拒否する big5 / cp932 / gb2312 / gbk / sjis / gb18030 は指定しません。`NO_BACKSLASH_ESCAPES` はアプリケーションからもマイグレーションからも有効化せず、MySQL 8.4 の既定 `sql_mode` にも含まれません。このSQLモードを有効にした接続では使わないでください。
+
 `client_ip.trusted_proxy_cidrs` が未設定の場合、クライアントIPにはTCP接続元を使用します。リバースプロキシ配下では、アプリケーションへ接続するプロキシのCIDRをすべて指定してください。指定されたCIDR以外のアドレスや、プロキシが付加したと確認できないIPは信頼しません。外側のプロキシでは、クライアントから持ち込まれた`X-Forwarded-For`を上書きまたは破棄してから付加する設定が必要です。
 
 `logging` は必須です。旧 `log_level` / `log_paths` 形式にはフォールバックしません。
