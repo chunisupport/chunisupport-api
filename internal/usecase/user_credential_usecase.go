@@ -270,7 +270,8 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 
 // ChangeFirebaseAccount はログインに使う Firebase アカウントを差し替えます。
 // 乗っ取りを防ぐため、現在のアカウントと変更先アカウントの両方で recent sign-in を要求します。
-// 差し替え後は旧 Firebase ユーザーを削除し、旧アカウントからの再ログインや別アカウント作成に使えないようにします。
+// 差し替え後は旧 Firebase ユーザーを削除し、ほかの端末に残った旧アカウントのセッションを失効させます。
+// 削除しても旧アカウントで再度サインインすれば新しい UID の Firebase ユーザーが作られるため、旧アカウントでの新規登録は防げません。
 func (s *userCredentialUsecaseImpl) ChangeFirebaseAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken, newAccountToken reauthtoken.ReauthToken) error {
 	reauthInfo, err := s.verifyRecentSignIn(ctx, reauthToken)
 	if err != nil {
