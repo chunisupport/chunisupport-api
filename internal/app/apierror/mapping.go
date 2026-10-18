@@ -60,6 +60,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrInvalidTurnstileToken.WithInternal(err)
 	case errors.Is(err, usecase.ErrFirebaseUIDAlreadyLinked):
 		return ErrFirebaseUIDAlreadyLinked.WithInternal(err)
+	case errors.Is(err, usecase.ErrFirebaseAccountUnchanged):
+		return ErrFirebaseAccountUnchanged.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return ErrUserNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrUserPrivate):

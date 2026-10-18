@@ -452,6 +452,7 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
+		meGroup.PUT("/firebase-account", handlers.Profile.ChangeFirebaseAccount)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
