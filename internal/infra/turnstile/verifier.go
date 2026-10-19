@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,25 +26,36 @@ type verifier struct {
 	secretKey string
 	endpoint  string
 	client    *http.Client
+	hosts     hostnameMatcher
 }
 
 type siteverifyResponse struct {
 	Success    bool     `json:"success"`
+	Hostname   string   `json:"hostname"`
+	Action     string   `json:"action"`
 	ErrorCodes []string `json:"error-codes"`
 }
 
+type hostnameMatcher struct {
+	exact    map[string]struct{}
+	patterns []*regexp.Regexp
+}
+
 // NewVerifier はCloudflare Turnstileの検証器を生成します。
-func NewVerifier(secretKey string) usecase.TurnstileVerifier {
+// allowedOrigins はフロントのCORS許可オリジンです。siteverify の hostname はスキームとポートを含まないため、
+// オリジンからホスト名だけを取り出して照合します。空や解釈できないオリジンは許可ホストに含めません。
+func NewVerifier(secretKey string, allowedOrigins []string) usecase.TurnstileVerifier {
 	return &verifier{
 		secretKey: strings.TrimSpace(secretKey),
 		endpoint:  siteverifyEndpoint,
 		client: &http.Client{
 			Timeout: requestTimeout,
 		},
+		hosts: newHostnameMatcher(allowedOrigins),
 	}
 }
 
-func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP string) error {
+func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP string, expectedAction string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return usecase.ErrInvalidTurnstileToken
@@ -83,8 +96,110 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	if !result.Success {
 		return usecase.ErrInvalidTurnstileToken
 	}
+	// 別ホストで解かれたトークンの流用を防ぐ。許可リストが空のときも拒否する。
+	if !v.hosts.matches(result.Hostname) {
+		return usecase.ErrInvalidTurnstileToken
+	}
+	// 別フォームのトークン流用を防ぐ。ウィジェットが action を付けていない場合も拒否する。
+	if !actionMatches(result.Action, expectedAction) {
+		return usecase.ErrInvalidTurnstileToken
+	}
 
 	return nil
+}
+
+func actionMatches(actual, expected string) bool {
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		return false
+	}
+
+	return strings.TrimSpace(actual) == expected
+}
+
+func newHostnameMatcher(allowedOrigins []string) hostnameMatcher {
+	exact := make(map[string]struct{})
+	var patterns []*regexp.Regexp
+	for _, origin := range allowedOrigins {
+		host, ok := hostnameFromOrigin(origin)
+		if !ok {
+			continue
+		}
+		if strings.Contains(host, "*") {
+			patterns = append(patterns, compileHostnamePattern(host))
+			continue
+		}
+		exact[host] = struct{}{}
+	}
+
+	return hostnameMatcher{exact: exact, patterns: patterns}
+}
+
+// hostnameFromOrigin は CORS オリジンから照合用ホスト名を取り出します。
+// `*` だけの許可や、スキームを持たない値はフロントのホストとして扱わないため除外します。
+func hostnameFromOrigin(origin string) (string, bool) {
+	origin = strings.TrimSpace(origin)
+	if origin == "" || origin == "*" {
+		return "", false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", false
+	}
+	if parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" || host == "*" {
+		return "", false
+	}
+
+	return host, true
+}
+
+func compileHostnamePattern(host string) *regexp.Regexp {
+	quoted := regexp.QuoteMeta(host)
+	quoted = strings.ReplaceAll(quoted, `\*`, `.*`)
+
+	matcher, err := regexp.Compile(`(?i)^` + quoted + `$`)
+	if err != nil {
+		panic(fmt.Sprintf("invalid turnstile hostname pattern %q: %v", host, err))
+	}
+
+	return matcher
+}
+
+func (m hostnameMatcher) matches(hostname string) bool {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	if hostname == "" {
+		return false
+	}
+	if m.contains(hostname) {
+		return true
+	}
+
+	// siteverify がポート付きホストを返した場合も、オリジンから取り出したホスト名と照合する。
+	host, _, err := net.SplitHostPort(hostname)
+	if err != nil {
+		return false
+	}
+
+	return m.contains(strings.ToLower(host))
+}
+
+func (m hostnameMatcher) contains(hostname string) bool {
+	if _, ok := m.exact[hostname]; ok {
+		return true
+	}
+	for _, pattern := range m.patterns {
+		if pattern.MatchString(hostname) {
+			return true
+		}
+	}
+
+	return false
 }
 
 var _ usecase.TurnstileVerifier = (*verifier)(nil)

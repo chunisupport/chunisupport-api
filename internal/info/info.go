@@ -129,6 +129,10 @@ const (
 	RegisterDataRateLimitWindow     = 30 * time.Second
 	RecentSignInMaxAge              = 5 * time.Minute
 	RecentSignInFutureAllowance     = 1 * time.Minute
+	// TurnstileActionLogin と TurnstileActionSignup はログインと新規登録のウィジェット action です。
+	// フロントの Turnstile ウィジェットと同じ値で照合し、別フォームで発行されたトークンの流用を防ぎます。
+	TurnstileActionLogin  = "login"
+	TurnstileActionSignup = "signup"
 
 	TempDataTTL                  = 5 * time.Minute
 	TempDataMaxCompressedBytes   = 512000
