@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
@@ -93,7 +94,7 @@ func logReiwaError(status int, err error, c *echo.Context) {
 	}
 
 	errorMessage := sanitizeLogValue(err.Error())
-	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(middleware.UserLogAttrs(c)...)
 	if status >= 500 {
 		logger.Error("Reiwa HTTP error",
 			"status", status,
