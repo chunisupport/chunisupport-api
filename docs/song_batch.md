@@ -72,6 +72,15 @@ CLI・管理画面のどちらから実行した場合も、`song_batch_jobs` �
 
 st1027 の `meta.unlock_required` は楽曲の `unlock_required` に反映します。`0` は `false`、`1` は `true` です。ソースに項目がない曲や st1027 を利用できない実行では既存値を維持し、新規楽曲は `false` を初期値とします。既存楽曲では `true` から `false` への変更（解禁）のみ反映し、`false` から `true` への変更は行いません。解禁済みの楽曲が要解禁に戻ることはないためです。楽曲編集APIで `true` に設定した値は、st1027 から `false` を取得できた場合に上書きされます。
 
+### 削除された可能性がある楽曲の検出
+
+MySQL 同期の前に、MySQL 上の未削除楽曲（`is_deleted = 0`）のうち、official と additional_songs のどちらにも `official_idx` が含まれない楽曲を「削除された可能性がある楽曲」として警告ログへ出力します。
+
+- データソースの一時的な欠落で誤って削除しないよう、自動では論理削除しません。ログを確認し、必要に応じて楽曲の削除APIで論理削除してください。
+- 同期は `official_idx` で照合するため、`official_idx` が振り直されると新しい楽曲として登録され、旧 `official_idx` の楽曲が重複として残ります。この旧楽曲も削除が必要なため対象に含めます。
+- 楽曲追加APIで手動登録し、additional_songs に含めていない楽曲も対象になります。
+- ログには件数（`Detected songs that may have been deleted from datasources`）と、楽曲ごとの `display_id`・`official_idx`・タイトル・アーティスト・WORLD'S END 区分（`Song may have been deleted`）を出力します。
+
 ## 環境変数
 
 データソースの URL や Google スプレッドシートの ID は `CHUNISUPPORT_BATCH_*` 環境変数で指定します。変数の一覧と必須・任意の区別は [設定ファイル・環境変数](configuration.md#楽曲データ収集バッチ) を参照してください。
