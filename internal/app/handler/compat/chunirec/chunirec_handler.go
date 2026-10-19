@@ -74,7 +74,7 @@ func (h *ChunirecHandler) GetMusicShow(c *echo.Context) error {
 			return apierror.ErrSongNotFound
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to get song", "displayID", displayID, "error", err)
+			slog.ErrorContext(ctx, "failed to get song", "displayID", displayID, "error", err)
 		}
 		return apierror.ErrInternalError.WithInternal(err)
 	}
@@ -109,7 +109,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 			return apierror.ErrUserNotFound
 		default:
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("failed to get user records", "username", username, "error", err)
+				slog.ErrorContext(ctx, "failed to get user records", "username", username, "error", err)
 			}
 			return apierror.ErrInternalError.WithInternal(err)
 		}
@@ -161,7 +161,7 @@ func (h *ChunirecHandler) getProfile(c *echo.Context) (*repository.ChunirecProfi
 			return nil, apierror.ErrUserNotFound
 		default:
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("failed to get user profile", "username", validUsername, "error", err)
+				slog.ErrorContext(ctx, "failed to get user profile", "username", validUsername, "error", err)
 			}
 			return nil, apierror.ErrInternalError.WithInternal(err)
 		}

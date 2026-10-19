@@ -350,7 +350,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	if err := validatePlayerDataPayload(payload); err != nil {
-		slog.Warn("player data validation failed", "user_id", user.ID, "error", err.Error())
+		slog.WarnContext(ctx, "player data validation failed", "user_id", user.ID, "error", err.Error())
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
@@ -496,7 +496,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 
 	logRegisteredSPHonors(registeredSPHonors)
 
-	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
+	slog.InfoContext(ctx, "player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
 }
 
