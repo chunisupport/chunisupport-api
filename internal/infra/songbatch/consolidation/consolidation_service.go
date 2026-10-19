@@ -98,6 +98,9 @@ func (s *ConsolidationService) SyncWorkspace(ctx context.Context, workspace *son
 		FillMissingReleaseDate: s.opts.FillMissingReleaseDate,
 	}
 
+	if err := logSongsMissingFromSources(ctx, mysql, s.sources); err != nil {
+		return err
+	}
 	if err := workspace.SyncToMySQL(ctx, mysql, syncOpts); err != nil {
 		return fmt.Errorf("failed to sync workspace to MySQL: %w", err)
 	}
