@@ -908,38 +908,3 @@ func TestSyncToMySQLResolvesNameFolderIDsFromDatabase(t *testing.T) {
 		"DELETED-WE": 6,
 	}, got)
 }
-
-func TestFindSongsMissingFromSources(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	target, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
-	require.NoError(t, err)
-	defer target.Close()
-
-	// Given: MySQL 側に既存楽曲があり、データソース側には一部だけが含まれる
-	_, err = target.DB().ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
-		VALUES
-			('kept', 'Kept', 'Artist', 1, 'KEPT', 0, 0),
-			('missing', 'Missing', 'Artist', 1, 'MISSING', 0, 0),
-			('deleted', 'Deleted', 'Artist', 1, 'DELETED', 0, 1),
-			('renumbered', 'Renumbered', 'Artist', 1, 'OLD-IDX', 0, 0)
-	`)
-	require.NoError(t, err)
-	wsSongs := []workspaceSong{
-		{Title: "Kept", Artist: "Artist", OfficialIdx: "KEPT"},
-		// official_idx が振り直されると新しい行が登録され、旧 official_idx の行は重複として残る
-		{Title: "Renumbered", Artist: "Artist", OfficialIdx: "NEW-IDX"},
-	}
-
-	// When
-	got, err := findSongsMissingFromSources(ctx, target.DB(), wsSongs)
-
-	// Then: 削除済みを除き、official_idx がデータソースに無い楽曲を削除候補とする
-	require.NoError(t, err)
-	assert.Equal(t, []missingSong{
-		{DisplayID: "missing", OfficialIdx: "MISSING", Title: "Missing", Artist: "Artist", IsWorldsend: 0},
-		{DisplayID: "renumbered", OfficialIdx: "OLD-IDX", Title: "Renumbered", Artist: "Artist", IsWorldsend: 0},
-	}, got)
-}

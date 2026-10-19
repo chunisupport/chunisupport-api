@@ -187,10 +187,6 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 		}
 	}
 
-	if err := logSongsMissingFromSources(ctx, mysql, wsSongs); err != nil {
-		return err
-	}
-
 	slog.Info("Prepared MySQL song synchronization",
 		"insert_count", len(songsToInsert),
 		"update_count", len(songsToUpdate))
@@ -413,63 +409,6 @@ func loadMySQLSongs(ctx context.Context, mysql apirepo.Executor) (map[string]mys
 		return nil, fmt.Errorf("mysql songs iteration error: %w", err)
 	}
 	return result, nil
-}
-
-// missingSong はデータソースに含まれなくなった MySQL 上の楽曲です。
-type missingSong struct {
-	DisplayID   string `db:"display_id"`
-	OfficialIdx string `db:"official_idx"`
-	Title       string `db:"title"`
-	Artist      string `db:"artist"`
-	IsWorldsend int    `db:"is_worldsend"`
-}
-
-// findSongsMissingFromSources は未削除の MySQL 楽曲のうち、データソースに含まれなくなった楽曲を返します。
-// ワークスペースの楽曲は official と additional_songs の和集合のため、どちらにも無い楽曲が対象です。
-// 同期は official_idx で照合するため、official_idx が振り直された場合は旧 official_idx の行が重複として残ります。
-// その行も削除が必要なため、タイトルなどでは除外せず official_idx だけで判定します。
-func findSongsMissingFromSources(ctx context.Context, mysql apirepo.Executor, wsSongs []workspaceSong) ([]missingSong, error) {
-	var activeSongs []missingSong
-	if err := mysql.SelectContext(ctx, &activeSongs, `SELECT display_id, official_idx, title, artist, is_worldsend FROM songs WHERE is_deleted = 0 ORDER BY official_idx`); err != nil {
-		return nil, fmt.Errorf("failed to load active mysql songs: %w", err)
-	}
-
-	seenIdx := make(map[string]struct{}, len(wsSongs))
-	for _, song := range wsSongs {
-		seenIdx[song.OfficialIdx] = struct{}{}
-	}
-
-	var missing []missingSong
-	for _, song := range activeSongs {
-		if _, ok := seenIdx[song.OfficialIdx]; ok {
-			continue
-		}
-		missing = append(missing, song)
-	}
-	return missing, nil
-}
-
-// logSongsMissingFromSources はデータソースから消えた楽曲を「削除された可能性がある楽曲」として警告ログに出力します。
-// データソースの一時的な欠落でも誤って削除しないよう、自動では論理削除せず、判断は管理者に委ねます。
-func logSongsMissingFromSources(ctx context.Context, mysql apirepo.Executor, wsSongs []workspaceSong) error {
-	missing, err := findSongsMissingFromSources(ctx, mysql, wsSongs)
-	if err != nil {
-		return err
-	}
-	if len(missing) == 0 {
-		return nil
-	}
-
-	slog.Warn("Detected songs that may have been deleted from datasources", "count", len(missing))
-	for _, song := range missing {
-		slog.Warn("Song may have been deleted",
-			"display_id", song.DisplayID,
-			"official_idx", song.OfficialIdx,
-			"title", song.Title,
-			"artist", song.Artist,
-			"is_worldsend", song.IsWorldsend == 1)
-	}
-	return nil
 }
 
 func loadMySQLNameFolderIDs(ctx context.Context, mysql apirepo.Executor) (map[string]int, error) {

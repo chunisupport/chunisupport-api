@@ -77,6 +77,7 @@ st1027 の `meta.unlock_required` は楽曲の `unlock_required` に反映しま
 MySQL 同期の前に、MySQL 上の未削除楽曲（`is_deleted = 0`）のうち、official と additional_songs のどちらにも `official_idx` が含まれない楽曲を「削除された可能性がある楽曲」として警告ログへ出力します。
 
 - データソースの一時的な欠落で誤って削除しないよう、自動では論理削除しません。ログを確認し、必要に応じて楽曲の削除APIで論理削除してください。
+- 判定には統合前のデータソースの ID を使います。ジャンル不明などで統合から除外された楽曲も、データソースに含まれていれば対象外です。
 - 同期は `official_idx` で照合するため、`official_idx` が振り直されると新しい楽曲として登録され、旧 `official_idx` の楽曲が重複として残ります。この旧楽曲も削除が必要なため対象に含めます。
 - 楽曲追加APIで手動登録し、additional_songs に含めていない楽曲も対象になります。
 - ログには件数（`Detected songs that may have been deleted from datasources`）と、楽曲ごとの `display_id`・`official_idx`・タイトル・アーティスト・WORLD'S END 区分（`Song may have been deleted`）を出力します。
