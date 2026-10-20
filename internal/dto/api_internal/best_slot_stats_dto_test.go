@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestToSingleChartBestSlotStatsResponse_レート帯IDを公開しない(t *
 	}
 
 	// When
-	response := ToSingleChartBestSlotStatsResponse(stats, []*ratingband.RatingBand{{ID: 22, Label: "17.0"}})
+	response := ToSingleChartBestSlotStatsResponse(context.Background(), stats, []*ratingband.RatingBand{{ID: 22, Label: "17.0"}})
 	encoded, err := json.Marshal(response)
 
 	// Then
@@ -50,7 +51,7 @@ func TestBestSlotStatsResponse_採用率を小数点以下4桁へ丸める(t *te
 	}
 
 	// When
-	singleResponse := ToSingleChartBestSlotStatsResponse(singleStats, nil)
+	singleResponse := ToSingleChartBestSlotStatsResponse(context.Background(), singleStats, nil)
 	rankingResponse := ToBestSlotRankingResponse(ranking, nil)
 
 	// Then

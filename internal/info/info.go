@@ -87,6 +87,12 @@ const (
 	// StatusClientClosedRequest はクライアントが応答前に切断したことを表すステータスです。
 	// net/http に定義がないため、nginx の慣習である 499 を用いてサーバー障害（5xx）と区別します。
 	StatusClientClosedRequest = 499
+	// RequestIDMaxLength はクライアントが X-Request-ID で渡せる最大文字数です。
+	// UUID や一般的なトレースIDは収まる一方、ログ行とレスポンスヘッダーの肥大は避けます。
+	RequestIDMaxLength = 128
+	// LogAttrRequestID はアクセスログ（Echo RequestLogger の request_id）と
+	// アプリケーションログで揃える相関IDの属性名です。
+	LogAttrRequestID          = "request_id"
 	VersionCacheReloadTimeout = 5 * time.Second
 
 	// Goal関連の理論値計算定数

@@ -23,6 +23,7 @@
 ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp`、`GET /internal/system/status` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 メンテナンス中の待機時間をブラウザから参照できるよう、CORSの公開レスポンスヘッダーには `Retry-After` を含みます。
+ブラウザから相関IDを送受信できるよう、`X-Request-ID` を許可リクエストヘッダーおよび公開レスポンスヘッダーに含みます。
 
 ## 認証
 
@@ -76,6 +77,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 ## 共通レスポンス仕様
 
 - コンテンツタイプは `application/json`。
+- すべてのHTTPレスポンスに相関ID `X-Request-ID` を付けます。クライアントが妥当な `X-Request-ID`（先頭は英数字、以降は英数字・`.`・`_`・`-`、128文字以内）を送った場合はその値を使い、未指定または形式・長さが不正な場合はサーバーがUUIDを生成して置き換えます。同じ値をアクセスログと、リクエストコンテキスト付きのアプリケーションログの `request_id` に記録します。
 - カスタムエラーハンドラーは以下形式を返します。
 
 ```json

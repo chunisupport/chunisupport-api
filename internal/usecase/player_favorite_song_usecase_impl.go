@@ -72,7 +72,7 @@ func (u *playerFavoriteSongUsecase) List(ctx context.Context, username string, r
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, ErrUserNotFound
 		}
-		slog.Error("failed to find user by username", "username", username, "error", err)
+		slog.ErrorContext(ctx, "failed to find user by username", "username", username, "error", err)
 		return nil, err
 	}
 	if user == nil {

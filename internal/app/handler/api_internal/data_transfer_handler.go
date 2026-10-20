@@ -40,7 +40,7 @@ func (handler *DataTransferHandler) Export(context *echo.Context) error {
 	}
 	context.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="chunisupport-transfer.json"`)
 	context.Response().Header().Set(echo.HeaderCacheControl, "no-store")
-	slog.Info("data transfer exported", "event", "data_transfer_exported", "user_id", user.ID, "duration_ms", time.Since(started).Milliseconds())
+	slog.InfoContext(context.Request().Context(), "data transfer exported", "event", "data_transfer_exported", "user_id", user.ID, "duration_ms", time.Since(started).Milliseconds())
 	return context.Blob(http.StatusOK, echo.MIMEApplicationJSON, output.File)
 }
 
@@ -81,7 +81,7 @@ func (handler *DataTransferHandler) Import(context *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	slog.Info("data transfer imported", "event", "data_transfer_imported", "user_id", user.ID, "player_id", output.PlayerID, "duration_ms", time.Since(started).Milliseconds())
+	slog.InfoContext(context.Request().Context(), "data transfer imported", "event", "data_transfer_imported", "user_id", user.ID, "player_id", output.PlayerID, "duration_ms", time.Since(started).Milliseconds())
 	context.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	return context.JSON(http.StatusOK, &dto_internal.DataTransferImportResponse{PlayerID: output.PlayerID, Counts: toDataTransferCountsResponse(output.Counts)})
 }

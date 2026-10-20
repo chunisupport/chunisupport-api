@@ -192,7 +192,7 @@ func (s *userCredentialUsecaseImpl) UpdateUsername(ctx context.Context, userID i
 			}
 			return err
 		}
-		if _, err := s.validateReauthenticatedUser(user, reauthInfo, "update_username"); err != nil {
+		if _, err := s.validateReauthenticatedUser(ctx, user, reauthInfo, "update_username"); err != nil {
 			return err
 		}
 		if user.Username == newUsername {
@@ -241,7 +241,7 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			return err
 		}
 
-		firebaseUID, err := s.validateReauthenticatedUser(user, reauthInfo, "delete_account")
+		firebaseUID, err := s.validateReauthenticatedUser(ctx, user, reauthInfo, "delete_account")
 		if err != nil {
 			return err
 		}
@@ -260,17 +260,17 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 
 	if deletedFirebaseUID != "" {
 		if err := s.firebaseDeleter.DeleteUser(ctx, deletedFirebaseUID); err != nil {
-			slog.Error("failed to delete firebase user after account deletion", "user_id", deletedUserID, "username", deletedUsername, "firebase_uid", deletedFirebaseUID, "error", err)
+			slog.ErrorContext(ctx, "failed to delete firebase user after account deletion", "user_id", deletedUserID, "username", deletedUsername, "firebase_uid", deletedFirebaseUID, "error", err)
 		}
 	}
 
 	return nil
 }
 
-func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(user *entity.User, reauthInfo *RecentSignInInfo, operation string) (string, error) {
+func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(ctx context.Context, user *entity.User, reauthInfo *RecentSignInInfo, operation string) (string, error) {
 	firebaseUID := normalizeFirebaseUID(user.FirebaseUID)
 	if firebaseUID == "" {
-		slog.Warn(
+		slog.WarnContext(ctx,
 			reauthenticationFailureMessage(operation),
 			"reason",
 			operation+"_firebase_uid_not_linked",
@@ -282,7 +282,7 @@ func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(user *entity.Use
 		return "", ErrInvalidCredentials
 	}
 	if firebaseUID != reauthInfo.UID {
-		slog.Warn(
+		slog.WarnContext(ctx,
 			reauthenticationFailureMessage(operation),
 			"reason",
 			operation+"_reauth_uid_mismatch",

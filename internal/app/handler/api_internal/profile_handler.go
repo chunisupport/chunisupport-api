@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -66,7 +67,7 @@ func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 	updatedUsername, err := h.userCredentialUsecase.UpdateUsername(c.Request().Context(), user.ID, req.Username, reauthToken)
 	if err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to update username", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to update username", user.ID, apiErr)
 		return apiErr
 	}
 	return c.JSON(http.StatusOK, map[string]string{"username": updatedUsername})
@@ -86,7 +87,7 @@ func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 
 	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to update privacy setting", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to update privacy setting", user.ID, apiErr)
 		return apiErr
 	}
 
@@ -107,7 +108,7 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 
 	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID, reauthToken); err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to delete user", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to delete user", user.ID, apiErr)
 		return apiErr
 	}
 
@@ -118,10 +119,10 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 // 禁止語・使用済み・バリデーションなどの想定内クライアントエラー（4xx系）は
 // Error通知の対象にしないためInfoに落とし、想定外のサーバーエラー（5xx系）のみErrorとします。
 // 4xx系の詳細は共通エラーハンドラー側でもWarnログとして記録されます。
-func logProfileUpdateFailure(message string, userID int, apiErr *apierror.APIError) {
+func logProfileUpdateFailure(ctx context.Context, message string, userID int, apiErr *apierror.APIError) {
 	if apiErr.HTTPStatus >= http.StatusInternalServerError {
-		slog.Error(message, "user_id", userID, "code", apiErr.Code, "error", apiErr.Internal)
+		slog.ErrorContext(ctx, message, "user_id", userID, "code", apiErr.Code, "error", apiErr.Internal)
 		return
 	}
-	slog.Info(message, "user_id", userID, "code", apiErr.Code, "status", apiErr.HTTPStatus)
+	slog.InfoContext(ctx, message, "user_id", userID, "code", apiErr.Code, "status", apiErr.HTTPStatus)
 }
