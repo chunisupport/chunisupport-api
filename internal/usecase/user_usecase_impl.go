@@ -160,7 +160,7 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 	lastScoreUpdate, err := s.playerRecordRepo.GetLastScoreUpdate(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to get last score update", "player_id", *user.PlayerID, "error", err)
+			slog.ErrorContext(ctx, "failed to get last score update", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
@@ -286,14 +286,14 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 	records, err := s.playerRecordRepo.FindByPlayerIDForRating(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find player rating records", "player_id", *user.PlayerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find player rating records", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
 	opTargetCandidates, err := s.playerRecordRepo.FindOPTargetCandidatesByPlayerID(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find player record OP target candidates", "player_id", *user.PlayerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find player record OP target candidates", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 			return ErrUserNotFound
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find user by username", "username", username, "error", err)
+			slog.ErrorContext(ctx, "failed to find user by username", "username", username, "error", err)
 		}
 		return err
 	}
@@ -408,7 +408,7 @@ func (s *userUsecase) DeleteUser(ctx context.Context, requester *entity.User, us
 
 	if firebaseUID != "" {
 		if err := s.firebaseDeleter.DeleteUser(ctx, firebaseUID); err != nil {
-			slog.Error("failed to delete firebase user after account deletion", "user_id", user.ID, "username", username, "firebase_uid", firebaseUID, "error", err)
+			slog.ErrorContext(ctx, "failed to delete firebase user after account deletion", "user_id", user.ID, "username", username, "firebase_uid", firebaseUID, "error", err)
 		}
 	}
 
@@ -455,7 +455,7 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, requester
 			return ErrUserNotFound
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to delete user from database", "user_id", userID, "username", username, "error", err)
+			slog.ErrorContext(ctx, "failed to delete user from database", "user_id", userID, "username", username, "error", err)
 		}
 		return err
 	}
@@ -645,7 +645,7 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	records, err := s.playerRecordRepo.FindByPlayerID(ctx, s.db, playerID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find player records", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find player records", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
@@ -780,7 +780,7 @@ func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, r
 	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find songs for no-play completion", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find songs for no-play completion", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
@@ -806,7 +806,7 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 	records, err := s.worldsendRecordRepo.FindByPlayerID(ctx, s.db, playerID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find worldsend records", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find worldsend records", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
@@ -827,7 +827,7 @@ func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int
 	worldsendSongs, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
@@ -933,7 +933,7 @@ func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, re
 			return nil, ErrUserNotFound
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find user by username", "username", username, "error", err)
+			slog.ErrorContext(ctx, "failed to find user by username", "username", username, "error", err)
 		}
 		return nil, err
 	}
@@ -968,7 +968,7 @@ func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) 
 			return nil, nil
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find player", "player_id", *user.PlayerID, "error", err)
+			slog.ErrorContext(ctx, "failed to find player", "player_id", *user.PlayerID, "error", err)
 		}
 		return nil, err
 	}
@@ -1021,19 +1021,19 @@ func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *
 			if state.normal {
 				maxOP, ok := snapshot.SongMaxOP[songID]
 				if !ok {
-					slog.Warn("applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", songID, "player_id", playerID)
+					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", songID, "player_id", playerID)
 					continue
 				}
 				denominator -= maxOP
 			} else if state.ultima {
 				maxOP, ok := snapshot.SongMaxOP[songID]
 				if !ok {
-					slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", songID, "player_id", playerID)
+					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", songID, "player_id", playerID)
 					continue
 				}
 				maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[songID]
 				if !ok {
-					slog.Warn("applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", songID, "player_id", playerID)
+					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", songID, "player_id", playerID)
 					continue
 				}
 				denominator -= maxOP - maxOPWithoutUltima

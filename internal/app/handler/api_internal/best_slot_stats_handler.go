@@ -74,7 +74,7 @@ func (h *BestSlotStatsHandler) GetChartStats(c *echo.Context) error {
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
-	return c.JSON(http.StatusOK, internaldto.ToSingleChartBestSlotStatsResponse(stats, h.masterProvider.RatingBands()))
+	return c.JSON(http.StatusOK, internaldto.ToSingleChartBestSlotStatsResponse(c.Request().Context(), stats, h.masterProvider.RatingBands()))
 }
 
 func parseBestSlotRankingLimit(value string) (int, *apierror.APIError) {

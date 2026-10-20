@@ -145,6 +145,9 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 
 	e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
 
+	// アクセスログは処理後にリクエストヘッダーの X-Request-ID を読むため、先に受理または生成しておく。
+	e.Use(middleware.RequestIDMiddleware())
+
 	if echoLogWriter != nil {
 		e.Logger = slog.New(slog.NewTextHandler(echoLogWriter, nil))
 		e.Use(echoMiddleware.RequestLogger())
@@ -783,11 +786,13 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 			echo.HeaderContentEncoding,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
+			echo.HeaderXRequestID,
 			"X-Reauth-Token",
 		},
 		ExposeHeaders: []string{
 			echo.HeaderContentLength,
 			echo.HeaderRetryAfter,
+			echo.HeaderXRequestID,
 		},
 		MaxAge: cfg.CORS.MaxAge,
 	}

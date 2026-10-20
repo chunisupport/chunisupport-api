@@ -38,7 +38,7 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	// クライアント切断はサーバー障害ではないため、500 として扱わずに記録だけ残します。
 	// 応答は届かないが、未送信のまま返すと net/http が 200 を書き込むため 499 を明示します。
 	if errors.Is(err, context.Canceled) {
-		slog.Info("HTTP request canceled by client",
+		slog.InfoContext(c.Request().Context(), "HTTP request canceled by client",
 			"method", c.Request().Method,
 			"path", c.Request().URL.Path,
 			"remote_addr", c.RealIP(),
@@ -46,7 +46,7 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 			"error", sanitizeLogValue(err.Error()),
 		)
 		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
-			slog.Debug("Failed to send client closed response", "error", err)
+			slog.DebugContext(c.Request().Context(), "Failed to send client closed response", "error", err)
 		}
 		return
 	}
@@ -70,7 +70,7 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 			Details: errorDetails,
 		},
 	}); err != nil {
-		slog.Error("Failed to send error response", "error", err)
+		slog.ErrorContext(c.Request().Context(), "Failed to send error response", "error", err)
 	}
 }
 
@@ -133,15 +133,16 @@ func logError(status int, code string, err error, c *echo.Context) {
 
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(UserLogAttrs(c)...)
+	ctx := c.Request().Context()
 
 	if status >= 500 {
-		logger.Error("HTTP error occurred",
+		logger.ErrorContext(ctx, "HTTP error occurred",
 			"status", status,
 			"code", code,
 			"error", errorMessage,
 		)
 	} else if status >= 400 {
-		logger.Warn("HTTP client error",
+		logger.WarnContext(ctx, "HTTP client error",
 			"status", status,
 			"code", code,
 			"error", errorMessage,

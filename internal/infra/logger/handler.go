@@ -50,7 +50,8 @@ func NewHandler(cfg config.Logging) (*Handler, error) {
 
 	opts := &slog.HandlerOptions{Level: level}
 	return &Handler{
-		handler: slog.NewTextHandler(writer, opts),
+		// リクエストコンテキストに相関IDがあるとき、アプリログへ同じ request_id を足します。
+		handler: newContextHandler(slog.NewTextHandler(writer, opts)),
 		writer:  writer,
 	}, nil
 }

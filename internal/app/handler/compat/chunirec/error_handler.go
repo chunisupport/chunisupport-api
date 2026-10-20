@@ -40,7 +40,7 @@ func handleChunirecError(err error, c *echo.Context) {
 
 	// クライアント切断はサーバー障害ではないため、互換形式のエラー応答は返さずに記録だけ残します。
 	if errors.Is(err, context.Canceled) {
-		slog.Info("Chunirec HTTP request canceled by client",
+		slog.InfoContext(c.Request().Context(), "Chunirec HTTP request canceled by client",
 			"method", c.Request().Method,
 			"path", c.Request().URL.Path,
 			"remote_addr", c.RealIP(),
@@ -48,7 +48,7 @@ func handleChunirecError(err error, c *echo.Context) {
 			"error", sanitizeLogValue(err.Error()),
 		)
 		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
-			slog.Debug("Failed to send chunirec client closed response", "error", err)
+			slog.DebugContext(c.Request().Context(), "Failed to send chunirec client closed response", "error", err)
 		}
 		return
 	}
@@ -94,7 +94,7 @@ func handleChunirecError(err error, c *echo.Context) {
 	}
 
 	if err := c.JSON(httpStatus, errorResponse); err != nil {
-		slog.Error("Failed to send chunirec error response", "error", err)
+		slog.ErrorContext(c.Request().Context(), "Failed to send chunirec error response", "error", err)
 	}
 }
 
@@ -107,16 +107,17 @@ func logChunirecError(status int, err error, c *echo.Context) {
 
 	errorMessage := sanitizeLogValue(err.Error())
 	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(middleware.UserLogAttrs(c)...)
+	ctx := c.Request().Context()
 
 	if status >= 500 {
-		logger.Error("Chunirec HTTP error",
+		logger.ErrorContext(ctx, "Chunirec HTTP error",
 			"status", status,
 			"error", errorMessage,
 		)
 		return
 	}
 
-	logger.Warn("Chunirec HTTP client error",
+	logger.WarnContext(ctx, "Chunirec HTTP client error",
 		"status", status,
 		"error", errorMessage,
 	)

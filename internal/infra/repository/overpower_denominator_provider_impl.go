@@ -67,7 +67,7 @@ func (p *OverpowerDenominatorProvider) Snapshot(ctx context.Context) (*domainrep
 	}
 	p.snapshot = snapshot
 	p.expiresAt = now.Add(p.ttl)
-	slog.Info("overpower denominator snapshot rebuilt", "song_count", len(snapshot.SongMaxOP), "ttl", p.ttl.String())
+	slog.InfoContext(ctx, "overpower denominator snapshot rebuilt", "song_count", len(snapshot.SongMaxOP), "ttl", p.ttl.String())
 
 	return cloneOverpowerDenominatorSnapshot(snapshot), nil
 }
