@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestToSingleChartStatsResponse_AJとAJCを排他的な件数として変換
 	ratingBands := []*ratingband.RatingBand{{ID: 0, Label: "ALL"}}
 
 	// When
-	result := ToSingleChartStatsResponse(stats, ratingBands)
+	result := ToSingleChartStatsResponse(context.Background(), stats, ratingBands)
 
 	// Then
 	require.NotNil(t, result)
@@ -49,7 +50,7 @@ func TestToSingleChartStatsResponse_中央値を変換する(t *testing.T) {
 	ratingBands := []*ratingband.RatingBand{{ID: 0, Label: "ALL"}, {ID: 1, Label: "15.0"}}
 
 	// When
-	result := ToSingleChartStatsResponse(stats, ratingBands)
+	result := ToSingleChartStatsResponse(context.Background(), stats, ratingBands)
 
 	// Then
 	require.NotNil(t, result)
@@ -73,7 +74,7 @@ func TestToChartStatsResponse_中央値とNULLをJSONへ変換する(t *testing.
 	ratingBands := []*ratingband.RatingBand{{ID: 0, Label: "ALL"}, {ID: 1, Label: "15.0"}}
 
 	// When
-	result := ToChartStatsResponse(stats, ratingBands)
+	result := ToChartStatsResponse(context.Background(), stats, ratingBands)
 	encoded, err := json.Marshal(result)
 
 	// Then

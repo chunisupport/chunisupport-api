@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -42,7 +43,7 @@ func (h *WorldsendHandler) GetWorldsendSongs(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTOs := h.convertToWorldsendSongDTOs(songsWithCharts)
+	songDTOs := h.convertToWorldsendSongDTOs(c.Request().Context(), songsWithCharts)
 	return c.JSON(http.StatusOK, &api_internal.WorldsendSongsResponse{
 		Songs: songDTOs,
 	})
@@ -60,7 +61,7 @@ func (h *WorldsendHandler) GetWorldsendSong(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTO := h.convertToWorldsendSongDTO(songWithChart)
+	songDTO := h.convertToWorldsendSongDTO(c.Request().Context(), songWithChart)
 	return c.JSON(http.StatusOK, songDTO)
 }
 
@@ -73,7 +74,7 @@ func (h *WorldsendHandler) GetEditorWorldsendSongs(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, &api_internal.EditorWorldsendSongsResponse{
-		Songs: h.convertToEditorWorldsendSongDTOs(songsWithCharts),
+		Songs: h.convertToEditorWorldsendSongDTOs(c.Request().Context(), songsWithCharts),
 	})
 }
 
@@ -89,7 +90,7 @@ func (h *WorldsendHandler) GetEditorWorldsendSong(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusOK, h.convertToEditorWorldsendSongDTO(songWithChart))
+	return c.JSON(http.StatusOK, h.convertToEditorWorldsendSongDTO(c.Request().Context(), songWithChart))
 }
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
@@ -158,7 +159,7 @@ func (h *WorldsendHandler) CreateWorldsendSong(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	return c.JSON(http.StatusCreated, h.convertToEditorWorldsendSongDTO(songWithChart))
+	return c.JSON(http.StatusCreated, h.convertToEditorWorldsendSongDTO(c.Request().Context(), songWithChart))
 }
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
@@ -255,40 +256,40 @@ func convertToUpdateWorldsendSongInputs(requests []*api_internal.UpdateWorldsend
 }
 
 // convertToWorldsendSongDTOs は WorldsendSongWithChart のスライスを WorldsendSongDTO のスライスに変換します。
-func (h *WorldsendHandler) convertToWorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.WorldsendSongDTO {
+func (h *WorldsendHandler) convertToWorldsendSongDTOs(ctx context.Context, songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.WorldsendSongDTO {
 	songDTOs := make([]*api_internal.WorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
-		songDTOs = append(songDTOs, h.convertToWorldsendSongDTO(swc))
+		songDTOs = append(songDTOs, h.convertToWorldsendSongDTO(ctx, swc))
 	}
 	return songDTOs
 }
 
 // convertToWorldsendSongDTO は WorldsendSongWithChart を WorldsendSongDTO に変換します。
-func (h *WorldsendHandler) convertToWorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_internal.WorldsendSongDTO {
+func (h *WorldsendHandler) convertToWorldsendSongDTO(ctx context.Context, swc *entity.WorldsendSongWithChart) *api_internal.WorldsendSongDTO {
 	if swc.Song != nil && swc.Song.GenreID != nil {
 		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
-			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
+			slog.WarnContext(ctx, "genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
 		}
 	}
 	return api_internal.ToWorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)
 }
 
 // convertToEditorWorldsendSongDTOs は WorldsendSongWithChart のスライスを EditorWorldsendSongDTO のスライスに変換します。
-func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTOs(ctx context.Context, songsWithCharts []*entity.WorldsendSongWithChart) []*api_internal.EditorWorldsendSongDTO {
 	songDTOs := make([]*api_internal.EditorWorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
-		songDTOs = append(songDTOs, h.convertToEditorWorldsendSongDTO(swc))
+		songDTOs = append(songDTOs, h.convertToEditorWorldsendSongDTO(ctx, swc))
 	}
 	return songDTOs
 }
 
 // convertToEditorWorldsendSongDTO は WorldsendSongWithChart を EditorWorldsendSongDTO に変換します。
 // EditorWorldsendChartDTO を使用して譜面の updated_at を含めます。
-func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
+func (h *WorldsendHandler) convertToEditorWorldsendSongDTO(ctx context.Context, swc *entity.WorldsendSongWithChart) *api_internal.EditorWorldsendSongDTO {
 	if swc == nil {
 		return nil
 	}
-	base := h.convertToWorldsendSongDTO(swc)
+	base := h.convertToWorldsendSongDTO(ctx, swc)
 
 	charts := map[string]*api_internal.EditorWorldsendChartDTO{
 		"WORLDSEND": api_internal.ToEditorWorldsendChartDTO(swc.Chart),

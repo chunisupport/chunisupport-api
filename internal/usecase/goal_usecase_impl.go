@@ -48,7 +48,7 @@ func (u *goalUsecase) List(ctx context.Context, userID int) ([]*GoalOutput, erro
 	if err != nil {
 		return nil, err
 	}
-	return u.toOutputs(goals)
+	return u.toOutputs(ctx, goals)
 }
 
 func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) (*GoalOutput, error) {
@@ -97,7 +97,7 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 	if err != nil {
 		return nil, err
 	}
-	outs, err := u.toOutputs([]*entity.Goal{created})
+	outs, err := u.toOutputs(ctx, []*entity.Goal{created})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 	if err != nil {
 		return nil, err
 	}
-	outs, err := u.toOutputs([]*entity.Goal{goal})
+	outs, err := u.toOutputs(ctx, []*entity.Goal{goal})
 	if err != nil {
 		return nil, err
 	}
@@ -869,7 +869,7 @@ func (u *goalUsecase) validateDynamicUpperBound(ctx context.Context, achievement
 	if err != nil {
 		return err
 	}
-	return validateDynamicUpperBoundWithStats(achievementType, params, stats)
+	return validateDynamicUpperBoundWithStats(ctx, achievementType, params, stats)
 }
 
 func goalTargetFilter(attrs *goalAttributeFilter, achievementType string, params *goalAchievementParam) repository.GoalTargetFilter {
@@ -889,61 +889,61 @@ func goalTargetFilter(attrs *goalAttributeFilter, achievementType string, params
 	return filter
 }
 
-func validateDynamicUpperBoundWithStats(achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
+func validateDynamicUpperBoundWithStats(ctx context.Context, achievementType string, params *goalAchievementParam, stats *repository.GoalTargetStats) error {
 	switch achievementType {
 	case "rank_count", "score_count", "hardlamp_count", "combolamp_count", "fullchain_count":
 		if params.Count != nil && *params.Count > stats.ChartCount {
-			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
 		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
-			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
 	case "rating_count":
 		if stats.ChartCount == 0 {
-			slog.Info("goal validation failed", "reason", "rating_count_no_reachable_charts", "achievement_type", achievementType)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "rating_count_no_reachable_charts", "achievement_type", achievementType)
 			return ErrInvalidAchievementParam
 		}
 		if params.Count != nil && *params.Count > stats.ChartCount {
-			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
 		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount) {
-			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.ChartCount)
 			return ErrInvalidAchievementParam
 		}
 	case "rainbow_count":
 		if params.Count != nil && *params.Count > stats.SongCount {
-			slog.Info("goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.SongCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "count_over_dynamic_max", "achievement_type", achievementType, "input", *params.Count, "max", stats.SongCount)
 			return ErrInvalidAchievementParam
 		}
 		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.SongCount) {
-			slog.Info("goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.SongCount)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "remaining_over_dynamic_max", "achievement_type", achievementType, "input", *params.RemainingInt, "max", stats.SongCount)
 			return ErrInvalidAchievementParam
 		}
 	case "total_score":
 		maxTotal := float64(stats.ChartCount) * float64(info.TheoreticalScore)
 		if params.Total != nil {
 			if *params.Total > maxTotal {
-				slog.Info("goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
+				slog.InfoContext(ctx, "goal validation failed", "reason", "total_score_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
 		}
 		if params.RemainingInt != nil && *params.RemainingInt > int64(stats.ChartCount)*int64(info.TheoreticalScore) {
-			slog.Info("goal validation failed", "reason", "total_score_remaining_over_dynamic_max", "input", *params.RemainingInt, "max", maxTotal)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "total_score_remaining_over_dynamic_max", "input", *params.RemainingInt, "max", maxTotal)
 			return ErrInvalidAchievementParam
 		}
 	case "overpower_value":
 		maxTotal := info.CalcTheoreticalOverpowerTotal(stats.TotalChartConst, stats.ChartCount)
 		if params.Total != nil {
 			if *params.Total > maxTotal {
-				slog.Info("goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
+				slog.InfoContext(ctx, "goal validation failed", "reason", "overpower_value_over_dynamic_max", "input", *params.Total, "max", maxTotal)
 				return ErrInvalidAchievementParam
 			}
 		}
 		if params.RemainingFloat != nil && *params.RemainingFloat > maxTotal {
-			slog.Info("goal validation failed", "reason", "overpower_value_remaining_over_dynamic_max", "input", *params.RemainingFloat, "max", maxTotal)
+			slog.InfoContext(ctx, "goal validation failed", "reason", "overpower_value_remaining_over_dynamic_max", "input", *params.RemainingFloat, "max", maxTotal)
 			return ErrInvalidAchievementParam
 		}
 	case "overpower_percent":
@@ -986,7 +986,7 @@ func hasControlCharacter(value string) bool {
 	return false
 }
 
-func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
+func (u *goalUsecase) toOutputs(ctx context.Context, goals []*entity.Goal) ([]*GoalOutput, error) {
 	masters := u.masterProvider.GoalMasters()
 	if masters == nil {
 		return nil, ErrInternalError
@@ -995,7 +995,7 @@ func (u *goalUsecase) toOutputs(goals []*entity.Goal) ([]*GoalOutput, error) {
 	for _, g := range goals {
 		typeCode := masters.AchievementTypesByID[g.AchievementTypeID]
 		if typeCode == "" {
-			slog.Error("achievement type code not found in master cache", "goal_id", g.ID, "achievement_type_id", g.AchievementTypeID)
+			slog.ErrorContext(ctx, "achievement type code not found in master cache", "goal_id", g.ID, "achievement_type_id", g.AchievementTypeID)
 			return nil, ErrInternalError
 		}
 		var p map[string]any
