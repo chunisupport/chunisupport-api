@@ -314,6 +314,9 @@ func (s *userCredentialUsecaseImpl) ChangeFirebaseAccount(ctx context.Context, u
 	}
 
 	slog.InfoContext(ctx, "firebase account changed", "user_id", userID, "previous_firebase_uid", previousFirebaseUID, "new_firebase_uid", newAccountInfo.UID)
+	// コミットから削除までの間に旧 UID が別ユーザーへ連携されると、削除によってそのユーザーがログインできなくなります。
+	// ただし連携には旧アカウントでの直近のサインインが必要で、影響を受けるのは同時に操作した旧アカウントの持ち主本人に限られます。
+	// 偶然には起こり得ないため、UID の再利用禁止などの排他は設けずに許容します。
 	if err := s.firebaseDeleter.DeleteUser(ctx, previousFirebaseUID); err != nil {
 		slog.ErrorContext(ctx, "failed to delete previous firebase user after firebase account change", "user_id", userID, "firebase_uid", previousFirebaseUID, "error", err)
 	}
