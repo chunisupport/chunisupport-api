@@ -50,6 +50,10 @@ type updateUsernameRequest struct {
 	Username string `json:"username"`
 }
 
+type changeFirebaseAccountRequest struct {
+	IDToken string `json:"id_token"`
+}
+
 // UpdateUsername は再認証済みユーザーのユーザー名変更を処理します。
 func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
@@ -112,6 +116,33 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 		return apiErr
 	}
 
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ChangeFirebaseAccount はログインに使う Firebase アカウントの変更を処理します。
+// 現在のアカウントの再認証トークンをヘッダーで、変更先アカウントの ID トークンをボディで受け取ります。
+func (h *ProfileHandler) ChangeFirebaseAccount(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	reauthToken, err := reauthtoken.New(c.Request().Header.Get(reauthTokenHeader))
+	if err != nil {
+		return apierror.ErrRecentSignInRequired
+	}
+	req := new(changeFirebaseAccountRequest)
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	newAccountToken, err := reauthtoken.New(req.IDToken)
+	if err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := h.userCredentialUsecase.ChangeFirebaseAccount(c.Request().Context(), user.ID, reauthToken, newAccountToken); err != nil {
+		apiErr := apierror.FromUsecaseError(err)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to change firebase account", user.ID, apiErr)
+		return apiErr
+	}
 	return c.NoContent(http.StatusNoContent)
 }
 

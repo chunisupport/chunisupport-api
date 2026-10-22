@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -64,6 +67,30 @@ func TestLogReiwaError_メンテナンス応答はアプリケーションエラ
 
 	// Then
 	assert.Empty(t, output.String())
+}
+
+func TestLogReiwaError_認証済みユーザーの識別子をログへ出す(t *testing.T) {
+	// Given
+	var output bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+	})
+
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/reiwa/1/chunithm_record/original", nil)
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.Set("userEntity", &entity.User{ID: 42, Username: usernametest.New(t, "testuser"), PlayerID: new(7)})
+
+	// When
+	logReiwaError(http.StatusInternalServerError, errors.New("boom"), c)
+
+	// Then
+	assert.Contains(t, output.String(), "level=ERROR")
+	assert.Contains(t, output.String(), "user_id=42")
+	assert.Contains(t, output.String(), "username=testuser")
+	assert.Contains(t, output.String(), "player_id=7")
 }
 
 func TestReiwaErrorHandlerMiddleware_クライアント切断は499としてINFOログに出す(t *testing.T) {

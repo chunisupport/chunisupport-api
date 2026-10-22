@@ -114,6 +114,14 @@ func TestFromUsecaseError_ユーザー名変更エラーを専用レスポンス
 	}
 }
 
+func TestFromUsecaseError_Firebaseアカウント未変更を400に変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrFirebaseAccountUnchanged)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeFirebaseAccountUnchanged, apiErr.Code)
+}
+
 func TestFromUsecaseError_お気に入り上限エラーを400に変換する(t *testing.T) {
 	apiErr := FromUsecaseError(usecase.ErrPlayerFavoriteSongLimitExceeded)
 

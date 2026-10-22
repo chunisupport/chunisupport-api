@@ -132,7 +132,7 @@ func logError(status int, code string, err error, c *echo.Context) {
 	}
 
 	errorMessage := sanitizeLogValue(err.Error())
-	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(UserLogAttrs(c)...)
 	ctx := c.Request().Context()
 
 	if status >= 500 {
