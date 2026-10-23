@@ -159,7 +159,8 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
@@ -172,7 +173,8 @@ func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID st
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}

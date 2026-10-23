@@ -78,6 +78,16 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 
 // FindByDisplayID は指定された DisplayID の WORLD'S END 楽曲を取得します。
 func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	return r.findByDisplayID(ctx, exec, displayID, false)
+}
+
+// FindByDisplayIDForChange は指定された DisplayID の WORLD'S END 楽曲を変更用にロックして取得します。
+// 削除・復活は SaveSong で楽曲の全列を書き戻すため、読み取り時点の行を排他ロックします。
+func (r *worldsendChartRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	return r.findByDisplayID(ctx, exec, displayID, true)
+}
+
+func (r *worldsendChartRepository) findByDisplayID(ctx context.Context, exec repository.Executor, displayID string, forUpdate bool) (*entity.WorldsendSongWithChart, error) {
 	query := `
 		SELECT
 			s.id, s.display_id, s.title, s.wiki_page_title, s.reading, s.artist, s.genre_id, s.bpm, s.released_at, s.official_idx, s.jacket, s.is_worldsend, s.is_new, s.unlock_required, s.is_deleted, s.updated_at, nf.code AS name_folder_code,
@@ -92,6 +102,9 @@ func (r *worldsendChartRepository) FindByDisplayID(ctx context.Context, exec rep
 		INNER JOIN name_folders nf ON nf.id = s.name_folder_id
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.display_id = ? AND s.is_worldsend = 1`
+	if forUpdate {
+		query += " FOR UPDATE"
+	}
 
 	var songModel models.SongModel
 	var chartModel models.WorldsendChartModel
