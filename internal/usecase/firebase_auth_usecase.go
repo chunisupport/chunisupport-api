@@ -31,8 +31,9 @@ type RecentSignInVerifier interface {
 
 // TurnstileVerifier はCloudflare Turnstileの応答トークン検証を抽象化します。
 type TurnstileVerifier interface {
-	// VerifyTurnstile は応答トークンを検証します。
-	VerifyTurnstile(ctx context.Context, token string, remoteIP string) error
+	// VerifyTurnstile は応答トークンを検証し、許可ホストと期待する action を照合します。
+	// expectedAction が空、または siteverify の action と一致しない場合はトークンを拒否します。
+	VerifyTurnstile(ctx context.Context, token string, remoteIP string, expectedAction string) error
 }
 
 // FirebaseAuthUsecase はFirebase IDトークンによる認証を扱います。

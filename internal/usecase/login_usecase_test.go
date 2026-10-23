@@ -31,7 +31,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
 				un := usernametest.New(t, "loginuser")
 				user := &entity.User{ID: 10, Username: un, AccountTypeID: info.AccountTypePlayer}
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1", "login").Return(nil).Once()
 				authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()
 			},
 			wantUser: "loginuser",
@@ -49,7 +49,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			idToken:   "valid-token",
 			turnstile: "invalid-turnstile-token",
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "").Return(ErrInvalidTurnstileToken).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "", "login").Return(ErrInvalidTurnstileToken).Once()
 			},
 			wantErr: ErrInvalidTurnstileToken,
 		},
@@ -58,7 +58,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			idToken:   "invalid-token",
 			turnstile: "turnstile-token",
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "login").Return(nil).Once()
 				authUsecase.On("Authenticate", mock.Anything, "invalid-token").Return(nil, errors.Join(ErrInvalidIDToken, errors.New("invalid token"))).Once()
 			},
 			wantErr: ErrInvalidIDToken,
@@ -68,7 +68,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			idToken:   "missing-user-token",
 			turnstile: "turnstile-token",
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "login").Return(nil).Once()
 				authUsecase.On("Authenticate", mock.Anything, "missing-user-token").Return(nil, ErrInvalidIDToken).Once()
 			},
 			wantErr: ErrInvalidIDToken,
@@ -78,7 +78,7 @@ func TestLoginUsecase_Login(t *testing.T) {
 			idToken:   "nil-nil-token",
 			turnstile: "turnstile-token",
 			setup: func(authUsecase *mockFirebaseAuthUsecase, turnstileVerifier *mockTurnstileVerifier) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "login").Return(nil).Once()
 				authUsecase.On("Authenticate", mock.Anything, "nil-nil-token").Return(nil, nil).Once()
 			},
 			wantErr: ErrInternalError,
@@ -144,7 +144,7 @@ func TestLoginUsecase_Login_メンテナンス中のロール制御(t *testing.T
 			turnstileVerifier := new(mockTurnstileVerifier)
 			un := usernametest.New(t, "loginuser")
 			user := &entity.User{ID: 10, Username: un, AccountTypeID: tt.accountTypeID}
-			turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
+			turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1", "login").Return(nil).Once()
 			authUsecase.On("Authenticate", mock.Anything, "valid-token").Return(user, nil).Once()
 			service := NewLoginUsecase(
 				authUsecase,
@@ -177,7 +177,7 @@ func TestLoginUsecase_Login_メンテナンス中も認証エラーを維持す�
 	authUsecase := new(mockFirebaseAuthUsecase)
 	turnstileVerifier := new(mockTurnstileVerifier)
 	maintenanceProvider := &countingMaintenanceStateStub{enabled: true}
-	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "login").Return(nil).Once()
 	authUsecase.On("Authenticate", mock.Anything, "invalid-token").Return(nil, ErrInvalidIDToken).Once()
 	service := NewLoginUsecase(
 		authUsecase,
@@ -204,7 +204,7 @@ func TestLoginUsecase_Login_メンテナンス中もTurnstileエラーを維持�
 	authUsecase := new(mockFirebaseAuthUsecase)
 	turnstileVerifier := new(mockTurnstileVerifier)
 	maintenanceProvider := &countingMaintenanceStateStub{enabled: true}
-	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "").Return(ErrInvalidTurnstileToken).Once()
+	turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "", "login").Return(ErrInvalidTurnstileToken).Once()
 	service := NewLoginUsecase(
 		authUsecase,
 		turnstileVerifier,
