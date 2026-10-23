@@ -36,6 +36,14 @@ func (m *MockWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec
 	return args.Get(0).(*entity.WorldsendSongWithChart), args.Error(1)
 }
 
+func (m *MockWorldsendChartRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	args := m.Called(ctx, exec, displayID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.WorldsendSongWithChart), args.Error(1)
+}
+
 func (m *MockWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	args := m.Called(ctx, exec, song)
 	return args.Error(0)
@@ -227,7 +235,7 @@ func TestDeleteWorldsendSong_SavesDeletedState(t *testing.T) {
 		Song:  &entity.Song{ID: 21, DisplayID: "WE021", IsWorldsend: true, IsDeleted: false, Charts: []*entity.Chart{}},
 		Chart: &entity.WorldsendChart{ID: 210, SongID: 21},
 	}
-	mockRepo.On("FindByDisplayID", ctx, mockExec, "WE021").Return(songWithChart, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "WE021").Return(songWithChart, nil).Once()
 	mockRepo.On("SaveSong", ctx, mockExec, mock.MatchedBy(func(song *entity.Song) bool {
 		return song == songWithChart.Song && song.IsDeleted
 	})).Return(nil).Once()
@@ -253,7 +261,7 @@ func TestRestoreWorldsendSong_SavesRestoredState(t *testing.T) {
 		Song:  &entity.Song{ID: 22, DisplayID: "WE022", IsWorldsend: true, IsDeleted: true, Charts: []*entity.Chart{}},
 		Chart: &entity.WorldsendChart{ID: 220, SongID: 22},
 	}
-	mockRepo.On("FindByDisplayID", ctx, mockExec, "WE022").Return(songWithChart, nil).Once()
+	mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "WE022").Return(songWithChart, nil).Once()
 	mockRepo.On("SaveSong", ctx, mockExec, mock.MatchedBy(func(song *entity.Song) bool {
 		return song == songWithChart.Song && !song.IsDeleted
 	})).Return(nil).Once()
