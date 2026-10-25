@@ -229,6 +229,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrFriendScoreComparisonUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidFriendRequest):
 		return ErrValidationFailedBadRequest.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidUserListPage):
+		return ErrValidationFailed.WithInternal(err)
 	}
 
 	return ErrInternalError.WithInternal(err)

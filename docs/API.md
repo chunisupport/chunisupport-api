@@ -2842,7 +2842,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
-    - `page` (任意): ページ番号 (デフォルト: 1)
+    - `page` (任意): ページ番号 (デフォルト: 1)。正の整数として解釈でき、かつ `(page - 1) * 100` が符号付き64bit整数の最大値を超える場合は 422 Unprocessable Entity (`validation_failed`)
     - `name` (任意): ユーザー名またはプレイヤー名の前方一致検索
 - **レスポンス**: `AdminUserListResponse` の配列を返します。
 
