@@ -16,6 +16,9 @@ var (
 	ErrVersionInUse                 = errors.New("version in use")
 
 	ErrAdminRequired = errors.New("admin permission required")
+	// ErrInvalidUserListPage はユーザー一覧の page から計算する OFFSET が int に収まらない場合に返します。
+	// そのまま乗算すると負の OFFSET になり、DBへ不正なページングが渡ります。
+	ErrInvalidUserListPage = errors.New("invalid user list page")
 	// ErrCannotDeleteSelf は管理者がユーザー削除APIで自分自身を削除しようとした場合に返します。
 	// 本人の退会はアカウント削除APIで行います。
 	ErrCannotDeleteSelf = errors.New("cannot delete own account via admin user deletion")

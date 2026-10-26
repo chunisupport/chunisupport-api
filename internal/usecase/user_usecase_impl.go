@@ -3,7 +3,9 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -339,6 +341,11 @@ func (s *userUsecase) GetAllUsersForAdmin(ctx context.Context, page int, limit i
 	}
 	if limit < 1 {
 		limit = 100
+	}
+	// (page-1)*limit を int のまま計算すると、極端に大きい page でオーバーフローして負の OFFSET になる。
+	// 負の値を DB へ渡す前に拒否し、入力エラーとして返す。
+	if page-1 > math.MaxInt/limit {
+		return nil, fmt.Errorf("%w: page=%d limit=%d", ErrInvalidUserListPage, page, limit)
 	}
 	offset := (page - 1) * limit
 
