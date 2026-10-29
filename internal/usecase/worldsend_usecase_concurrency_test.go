@@ -18,12 +18,14 @@ import (
 type worldsendMutationTx struct {
 	repository.Executor
 	locked bool
+	song   entity.Song
 }
 
 // worldsendMutationRepository は楽曲行の排他ロックを模し、
-// ロック中に読み取った全列の書き戻しと、編集による列更新が競合しても両方残ることを検証します。
+// コミット済み状態の検索と、行ロック後の更新を本番と同じ順序で行います。
 type worldsendMutationRepository struct {
 	row       sync.Mutex
+	committed sync.RWMutex
 	first     sync.Once
 	attempted chan struct{}
 	acquired  chan struct{}
@@ -38,7 +40,20 @@ func (r *worldsendMutationRepository) Transactional(_ context.Context, fn func(r
 			r.row.Unlock()
 		}
 	}()
-	return fn(tx)
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if tx.locked {
+		// 更新後・コミット前で止め、別トランザクションに未確定の値が見えないことを確認する。
+		r.first.Do(func() {
+			close(r.acquired)
+			<-r.release
+		})
+		r.committed.Lock()
+		r.song = tx.song
+		r.committed.Unlock()
+	}
+	return nil
 }
 
 func (r *worldsendMutationRepository) lock(exec repository.Executor) error {
@@ -49,10 +64,9 @@ func (r *worldsendMutationRepository) lock(exec repository.Executor) error {
 	r.attempted <- struct{}{}
 	r.row.Lock()
 	tx.locked = true
-	r.first.Do(func() {
-		close(r.acquired)
-		<-r.release
-	})
+	r.committed.RLock()
+	tx.song = r.song
+	r.committed.RUnlock()
 	return nil
 }
 
@@ -68,7 +82,7 @@ func (r *worldsendMutationRepository) FindByDisplayIDForChange(_ context.Context
 	if err := r.lock(exec); err != nil {
 		return nil, err
 	}
-	song := r.song
+	song := exec.(*worldsendMutationTx).song
 	return &entity.WorldsendSongWithChart{
 		Song:  &song,
 		Chart: &entity.WorldsendChart{ID: 1, SongID: song.ID},
@@ -80,11 +94,19 @@ func (r *worldsendMutationRepository) SaveSong(_ context.Context, exec repositor
 	if !ok || !tx.locked {
 		return errors.New("locked transaction required")
 	}
-	r.song = *song
+	tx.song = *song
 	return nil
 }
 
 func (r *worldsendMutationRepository) UpdateSongs(_ context.Context, exec repository.Executor, updates []*repository.WorldsendUpdate) error {
+	// 本番と同じく、行ロックを待つ前にコミット済みの有効な楽曲を検索する。
+	// 未コミットの復活は見えないため、削除済みなら UPDATE に進まない。
+	r.committed.RLock()
+	deleted := r.song.IsDeleted
+	r.committed.RUnlock()
+	if deleted {
+		return repository.ErrSongNotFound
+	}
 	// 実更新は is_deleted を書かず、行ロックの解放を待ってから対象列だけを更新する。
 	if err := r.lock(exec); err != nil {
 		return err
@@ -92,7 +114,13 @@ func (r *worldsendMutationRepository) UpdateSongs(_ context.Context, exec reposi
 	if len(updates) != 1 || updates[0] == nil || updates[0].Song == nil {
 		return errors.New("unexpected update")
 	}
-	r.song.Title = updates[0].Song.Title
+	tx := exec.(*worldsendMutationTx)
+	tx.song.Title = updates[0].Song.Title
+	// 譜面更新を省略した本番処理は、UPDATE 後に有効な対象の存在を再確認する。
+	// 自トランザクションの更新行では、直前にコミットされた削除状態も見える。
+	if updates[0].Chart == nil && tx.song.IsDeleted {
+		return repository.ErrSongNotFound
+	}
 	return nil
 }
 
@@ -104,13 +132,15 @@ func TestWorldsendUsecase_ConcurrentMutationsPreserveIndependentFields(t *testin
 	tests := []struct {
 		name string
 		// Given
-		deleted   bool
-		editFirst bool
+		deleted          bool
+		editFirst        bool
+		initiallyDeleted bool
+		editErr          error
 	}{
 		{name: "編集が先に行ロックを取得しても削除状態を保持する", deleted: true, editFirst: true},
-		{name: "削除が先に行ロックを取得しても編集内容を保持する", deleted: true, editFirst: false},
-		{name: "編集が先に行ロックを取得しても復元状態を保持する", deleted: false, editFirst: true},
-		{name: "復元が先に行ロックを取得しても編集内容を保持する", deleted: false, editFirst: false},
+		{name: "削除が先なら編集はロック待機後に未検出となり変更を戻す", deleted: true, editFirst: false, editErr: repository.ErrSongNotFound},
+		{name: "有効な楽曲の編集が先に行ロックを取得しても復元状態を保持する", deleted: false, editFirst: true},
+		{name: "未コミットの復元中は編集がロックを待たずに未検出となる", deleted: false, editFirst: false, initiallyDeleted: true, editErr: repository.ErrSongNotFound},
 	}
 
 	for _, tt := range tests {
@@ -127,7 +157,7 @@ func TestWorldsendUsecase_ConcurrentMutationsPreserveIndependentFields(t *testin
 					Title:       "変更前",
 					Artist:      "artist",
 					IsWorldsend: true,
-					IsDeleted:   !tt.deleted,
+					IsDeleted:   tt.initiallyDeleted,
 				},
 			}
 			var release sync.Once
@@ -148,30 +178,42 @@ func TestWorldsendUsecase_ConcurrentMutationsPreserveIndependentFields(t *testin
 				}
 				return uc.RestoreWorldsendSong(context.Background(), displayID)
 			}
-			first, second := edit, state
+			editDone := make(chan error, 1)
+			stateDone := make(chan error, 1)
+			first := func() { editDone <- edit() }
+			second := func() { stateDone <- state() }
 			if !tt.editFirst {
-				first, second = state, edit
+				first, second = second, first
 			}
 
 			// When
-			done := make(chan error, 2)
-			go func() { done <- first() }()
+			go first()
 			waitWorldsendSignal(t, repo.acquired)
 			waitWorldsendSignal(t, repo.attempted)
-			go func() { done <- second() }()
-			waitWorldsendSignal(t, repo.attempted)
+			go second()
+			if tt.initiallyDeleted {
+				// 復活側のロック解放前に編集が終了することも確認する。
+				require.ErrorIs(t, waitWorldsendResult(t, editDone), tt.editErr)
+			} else {
+				waitWorldsendSignal(t, repo.attempted)
+			}
 			unblock()
 
 			// Then
-			for range 2 {
-				select {
-				case err := <-done:
+			require.NoError(t, waitWorldsendResult(t, stateDone))
+			if !tt.initiallyDeleted {
+				err := waitWorldsendResult(t, editDone)
+				if tt.editErr != nil {
+					require.ErrorIs(t, err, tt.editErr)
+				} else {
 					require.NoError(t, err)
-				case <-time.After(5 * time.Second):
-					require.FailNow(t, "WORLD'S END楽曲の更新が完了しません")
 				}
 			}
-			assert.Equal(t, "変更後", repo.song.Title)
+			expectedTitle := "変更後"
+			if tt.editErr != nil {
+				expectedTitle = "変更前"
+			}
+			assert.Equal(t, expectedTitle, repo.song.Title)
 			assert.Equal(t, tt.deleted, repo.song.IsDeleted)
 		})
 	}
@@ -183,5 +225,16 @@ func waitWorldsendSignal(t *testing.T, signal <-chan struct{}) {
 	case <-signal:
 	case <-time.After(5 * time.Second):
 		require.FailNow(t, "WORLD'S END楽曲ロックの同期が完了しません")
+	}
+}
+
+func waitWorldsendResult(t *testing.T, result <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "WORLD'S END楽曲の更新が完了しません")
+		return nil
 	}
 }
