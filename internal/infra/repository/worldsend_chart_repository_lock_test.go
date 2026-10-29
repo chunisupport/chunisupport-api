@@ -21,7 +21,7 @@ type worldsendLockQueryExecutor struct {
 func (e *worldsendLockQueryExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
 	e.query = query
 	e.args = args
-	return e.Executor.QueryRowxContext(ctx, strings.TrimSuffix(query, " FOR UPDATE"), args...)
+	return e.Executor.QueryRowxContext(ctx, strings.TrimSuffix(query, " FOR UPDATE OF s"), args...)
 }
 
 func TestWorldsendChartRepository_FindByDisplayIDForChange_楽曲を排他ロックする(t *testing.T) {
@@ -69,7 +69,7 @@ func TestWorldsendChartRepository_FindByDisplayIDForChange_楽曲を排他ロッ
 			got, err := repo.FindByDisplayIDForChange(ctx, exec, tt.displayID)
 
 			// Then
-			assert.True(t, strings.HasSuffix(exec.query, " FOR UPDATE"))
+			assert.True(t, strings.HasSuffix(exec.query, " FOR UPDATE OF s"))
 			assert.Contains(t, exec.query, "s.display_id = ?")
 			assert.Contains(t, exec.query, "s.is_worldsend = 1")
 			assert.NotContains(t, exec.query, "is_deleted =")

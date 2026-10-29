@@ -103,7 +103,7 @@ func (r *worldsendChartRepository) findByDisplayID(ctx context.Context, exec rep
 		INNER JOIN worldsend_charts wc ON s.id = wc.song_id
 		WHERE s.display_id = ? AND s.is_worldsend = 1`
 	if forUpdate {
-		query += " FOR UPDATE"
+		query += " FOR UPDATE OF s"
 	}
 
 	var songModel models.SongModel
