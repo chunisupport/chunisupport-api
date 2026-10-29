@@ -59,20 +59,20 @@ func newCachePurger(
 	}
 }
 
-// Purge は同じZoneの無関係なキャッシュを残すため、全削除ではなく公開URLだけをまとめて削除します。
+// Purge はOrigin別のキャッシュを残さないよう、各公開JSONのファイル名まで含むプレフィックスを指定します。
 func (p *CachePurger) Purge(ctx context.Context, objectKeys []string) error {
-	files := make([]string, 0, len(objectKeys))
+	prefixes := make([]string, 0, len(objectKeys))
 	for _, objectKey := range objectKeys {
-		fileURL, err := url.JoinPath(p.publicBaseURL, objectKey)
+		prefix, err := url.JoinPath(strings.TrimPrefix(p.publicBaseURL, "https://"), objectKey) // #nosec G125 -- objectKey は info.go で定義した固定のオブジェクトキーのみ
 		if err != nil {
-			return fmt.Errorf("failed to build public object URL for %s: %w", objectKey, err)
+			return fmt.Errorf("failed to build public object prefix for %s: %w", objectKey, err)
 		}
-		files = append(files, fileURL)
+		prefixes = append(prefixes, prefix)
 	}
 
 	requestBody, err := json.Marshal(struct {
-		Files []string `json:"files"`
-	}{Files: files})
+		Prefixes []string `json:"prefixes"`
+	}{Prefixes: prefixes})
 	if err != nil {
 		return fmt.Errorf("failed to marshal cloudflare cache purge request: %w", err)
 	}
