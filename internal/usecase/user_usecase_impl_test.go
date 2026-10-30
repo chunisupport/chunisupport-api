@@ -437,6 +437,10 @@ func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec
 	return s.record, nil
 }
 
+func (s *stubWorldsendChartRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	return s.FindByDisplayID(ctx, exec, displayID)
+}
+
 func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
 	return errors.New("not implemented")
 }
