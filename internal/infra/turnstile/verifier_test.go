@@ -178,6 +178,15 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
 			wantErr:        usecase.ErrInvalidTurnstileToken,
 		},
+		{
+			name:           "ホストが複数のワイルドカードだけのCORSオリジンもTurnstileのホストとして扱わない",
+			token:          "turnstile-token",
+			expectedAction: "login",
+			allowedOrigins: []string{"https://**"},
+			statusCode:     http.StatusOK,
+			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
+			wantErr:        usecase.ErrInvalidTurnstileToken,
+		},
 	}
 
 	for _, tt := range tests {
@@ -256,7 +265,7 @@ func TestNewVerifier_許可ホストが0件の場合だけ警告する(t *testin
 		},
 		{
 			name:           "全許可のオリジンだけなら警告する",
-			allowedOrigins: []string{"*", "https://*"},
+			allowedOrigins: []string{"*", "https://*", "https://**"},
 			wantWarning:    true,
 		},
 		{

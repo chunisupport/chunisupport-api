@@ -141,7 +141,7 @@ func newHostnameMatcher(allowedOrigins []string) hostnameMatcher {
 }
 
 // hostnameFromOrigin は CORS オリジンから照合用ホスト名を取り出します。
-// `*` や `https://*` のような全許可や、スキームを持たない値はフロントのホストとして扱わないため除外します。
+// `*` や `https://*`、`https://**` のような全許可や、スキームを持たない値はフロントのホストとして扱わないため除外します。
 // 全許可をホスト照合に持ち込むと、別ホストで取得したトークンの流用を防げなくなるためです。
 func hostnameFromOrigin(origin string) (string, bool) {
 	origin = strings.TrimSpace(origin)
@@ -158,7 +158,8 @@ func hostnameFromOrigin(origin string) (string, bool) {
 	}
 
 	host := strings.ToLower(parsed.Hostname())
-	if host == "" || host == "*" {
+	// `https://**` のように `*` だけで構成されるホストも全許可になるため、`*` 1文字と同様に除外する。
+	if strings.Trim(host, "*") == "" {
 		return "", false
 	}
 
