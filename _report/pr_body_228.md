@@ -24,7 +24,8 @@ issue の指摘どおり、`player_locked_songs` の `is_ultima = false`（通�
   - データ引き継ぎ `calculateTransferDerivedMetrics`
   - プロフィールOP%の分母 `applyDynamicOverpowerPercent`
 - プロフィールOP%の分母は、通常譜面群未解禁なら楽曲最大OPを丸ごと、ULTIMAだけの未解禁なら最大OPと通常譜面最大OPの差だけを減算するように修正
-- データ引き継ぎは `official_idx` から楽曲IDを解決してから判定に渡すよう変更（譜面マスタ1件からしかIDを引けないため）
+- データ引き継ぎは既存の `songIDs` マスタで `official_idx` から楽曲IDを解決してから判定に渡すよう変更
+- `info.PlayerRecalculationLogicVersion` を 2 から 3 へ上げ、既存プレイヤーの誤った `overpower_value` が次回の日次バッチで再計算されるようにした
 - 各経路に回帰テストを追加し、`PlayerLockedSongSet` 自体のテーブルテストも追加
 - `docs/player_locked_songs.md` と `docs/overpower_calculation.md` に規則と集約方針を明記
 
@@ -32,7 +33,7 @@ issue の指摘どおり、`player_locked_songs` の `is_ultima = false`（通�
 
 - `go test ./...` がすべて成功
 - `go vet ./...` が指摘なし
-- 新規・変更した Go ファイルのみ `gofmt -s -w` を実行
+- 新規・変更した Go ファイルのみ `gofmt -s -w` を実行し、`gofmt -l` が無出力
 - `git diff --check` で問題なし
 
 # レビュー観点
@@ -40,3 +41,4 @@ issue の指摘どおり、`player_locked_songs` の `is_ultima = false`（通�
 - 分子（OP値）と分母（OP%）で規則がずれていないか
 - 5経路すべてが同じ規則になっているか
 - データ引き継ぎで N+1 を作っていないか（楽曲IDの解決はメモリ上で1回だけ）
+- バージョン bump により、既存の誤った保存値が次回バッチで修復されること
