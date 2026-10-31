@@ -877,7 +877,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み、または未登録ユーザー
-  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、検証済み、または hostname / action (`login`) が一致しない
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、使用済み、または hostname / action (`login`) が一致しない
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
   - 503 Service Unavailable (`maintenance_mode`): メンテナンス中に認証済みのPLAYER / EXTDEVがログインを試みた
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
@@ -919,7 +919,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 400 Bad Request (`registration_failed`): ユーザー登録失敗（詳細隠蔽）
   - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
-  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、検証済み、または hostname / action (`signup`) が一致しない
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、使用済み、または hostname / action (`signup`) が一致しない
   - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
   - 503 Service Unavailable (`maintenance_mode`): メンテナンス中のスタッフ以外によるアクセス
