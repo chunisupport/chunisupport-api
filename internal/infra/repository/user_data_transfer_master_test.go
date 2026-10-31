@@ -133,3 +133,34 @@ func TestCalculateTransferDerivedMetricsExcludesLockedAndDeletedSongsFromOverpow
 
 	assert.Equal(t, want, got)
 }
+
+func TestCalculateTransferDerivedMetrics_通常譜面未解禁の楽曲はULTIMA記録も除外する(t *testing.T) {
+	name, err := playername.NewPlayerName("テスト")
+	require.NoError(t, err)
+	parsedScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+	updatedAt := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	snapshot := &entity.UserDataTransferSnapshot{
+		Player: entity.UserDataTransferPlayer{Name: name, Level: 1, CreatedAt: updatedAt},
+		Records: []entity.UserDataTransferRecord{
+			{SongOfficialIdx: "1", Difficulty: "MASTER", Score: parsedScore, ComboLampName: "ALL JUSTICE", SlotName: "none", UpdatedAt: updatedAt},
+			{SongOfficialIdx: "1", Difficulty: "ULTIMA", Score: parsedScore, ComboLampName: "ALL JUSTICE", SlotName: "none", UpdatedAt: updatedAt},
+			{SongOfficialIdx: "2", Difficulty: "MASTER", Score: parsedScore, ComboLampName: "ALL JUSTICE", SlotName: "none", UpdatedAt: updatedAt},
+		},
+		LockedSongs: []entity.UserDataTransferLockedSong{{SongOfficialIdx: "1", IsUltima: false}},
+	}
+	masters := &transferMasterData{
+		songIDs: map[string]int{"1": 1, "2": 2},
+		charts: map[string]transferChartMaster{
+			transferChartKey("1", "MASTER"): {ID: 1, SongID: 1, OfficialIdx: "1", Difficulty: "MASTER", ChartConst: 13},
+			transferChartKey("1", "ULTIMA"): {ID: 2, SongID: 1, OfficialIdx: "1", Difficulty: "ULTIMA", ChartConst: 15},
+			transferChartKey("2", "MASTER"): {ID: 3, SongID: 2, OfficialIdx: "2", Difficulty: "MASTER", ChartConst: 15},
+		},
+		comboLampIDs: map[string]int{"ALL JUSTICE": 3},
+	}
+
+	_, _, _, got := calculateTransferDerivedMetrics(snapshot, masters)
+	want := service.CalcSingleOverpower(1010000, 15, 3)
+
+	assert.Equal(t, want, got)
+}

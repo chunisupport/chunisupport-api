@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -20,6 +21,15 @@ import (
 )
 
 const playerDataBatchPageSize = 100
+
+// playerDataBatchLockedSongs はバッチ取得した未解禁設定をドメインの判定用エンティティへ変換します。
+func playerDataBatchLockedSongs(lockedSongs []repository.PlayerBatchLockedSong) []*entity.PlayerLockedSong {
+	lockedEntities := make([]*entity.PlayerLockedSong, 0, len(lockedSongs))
+	for _, lockedSong := range lockedSongs {
+		lockedEntities = append(lockedEntities, &entity.PlayerLockedSong{SongID: lockedSong.SongID, IsUltima: lockedSong.IsUltima})
+	}
+	return lockedEntities
+}
 
 type PlayerDataBatchResult struct {
 	StartedAt            time.Time
@@ -270,10 +280,7 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 	best := make([]service.RatingSlotRecord, 0)
 	newRecords := make([]service.RatingSlotRecord, 0)
 	opRecords := make([]service.OverpowerRecord, 0)
-	locked := make(map[string]struct{}, len(data.LockedSongs))
-	for _, item := range data.LockedSongs {
-		locked[fmt.Sprintf("%d:%t", item.SongID, item.IsUltima)] = struct{}{}
-	}
+	lockedSet := service.NewPlayerLockedSongSet(playerDataBatchLockedSongs(data.LockedSongs))
 	for _, record := range data.Records {
 		chart, ok := p.chartsByID[record.ChartID]
 		if !ok {
@@ -283,12 +290,8 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 		if !ok {
 			return repository.PlayerBatchUpdate{}, currentBroken, fmt.Errorf("楽曲マスタを解決できません: song_id=%d", chart.SongID)
 		}
-		if !song.IsDeleted && !song.IsWorldsend {
-			_, songLocked := locked[fmt.Sprintf("%d:false", song.ID)]
-			_, ultimaLocked := locked[fmt.Sprintf("%d:true", song.ID)]
-			if !songLocked && !(chart.DifficultyName == info.DifficultyNameUltima && ultimaLocked) {
-				opRecords = append(opRecords, service.OverpowerRecord{SongID: song.ID, Score: record.Score, ChartConst: chart.ChartConst, ComboLampID: record.ComboLampID})
-			}
+		if !song.IsDeleted && !song.IsWorldsend && !lockedSet.IsLocked(song.ID, chart.DifficultyName == info.DifficultyNameUltima) {
+			opRecords = append(opRecords, service.OverpowerRecord{SongID: song.ID, Score: record.Score, ChartConst: chart.ChartConst, ComboLampID: record.ComboLampID})
 		}
 		if song.IsDeleted || song.IsWorldsend || (song.ReleasedAt != nil && databaseDateInLocation(*song.ReleasedAt, p.operationalDate.Location()).After(p.operationalDate)) {
 			continue

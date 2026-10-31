@@ -138,8 +138,18 @@ type PlayerLockedSong struct {
 
 - 対象譜面がULTIMAの場合、`is_ultima = true` の未解禁設定があればOP計算対象から除外する
 - 対象譜面がULTIMA以外の場合、`is_ultima = false` の未解禁設定があればOP計算対象から除外する
+- 通常譜面群の未解禁（`is_ultima = false`）は、同じ楽曲のULTIMA譜面もOP計算対象から除外する
 
-通常譜面群とULTIMA譜面は解禁単位が異なるため、`is_ultima = false` はULTIMA譜面を包含しない。通常譜面群とULTIMA譜面の両方が未解禁の場合は、同一曲に `is_ultima = false` と `is_ultima = true` の2レコードを登録する。
+通常譜面群とULTIMA譜面は解禁単位が異なるため、`is_ultima = false` のレコードはULTIMA譜面の解禁状態を表さない。通常譜面群とULTIMA譜面の両方が未解禁の場合は、同一曲に `is_ultima = false` と `is_ultima = true` の2レコードを登録する。
+
+ただし、OP計算では通常譜面群が未解禁の楽曲を譜面単位ではなく楽曲ごと対象から外す。そのため `is_ultima = false` の未解禁はULTIMA譜面の記録にも及び、ULTIMA譜面だけが未解禁の `is_ultima = true` とは次のように扱いが異なる。
+
+| 未解禁設定 | 通常譜面の記録 | ULTIMA譜面の記録 |
+| --- | --- | --- |
+| `is_ultima = false` | 除外 | 除外 |
+| `is_ultima = true` | 対象 | 除外 |
+
+この規則は登録時のOP再計算、未解禁設定変更時の再計算、日次再計算バッチ、データ引き継ぎ、プロフィールのOP%分母のすべてで共通であり、`internal/domain/service` の `PlayerLockedSongSet` に集約する。経路ごとに判定を書き分けると保存値と表示値が食い違うため、新しい経路を追加するときもこの型を使う。
 
 ULTIMA譜面だけが未解禁の場合のみ `is_ultima = true` を登録する。`is_ultima = true` の登録時は、対象楽曲にULTIMA譜面が存在することを検証する。
 
@@ -395,10 +405,12 @@ OP計算API本体では、次の順序で対象譜面を絞り込む。
 2. 論理削除済み楽曲を除外する
 3. WORLD'S END楽曲を除外する
 4. プレイヤーの未解禁設定を一括取得する
-5. 譜面難易度に応じて未解禁設定と照合する
+5. 未解禁設定と照合する。難易度名がULTIMAのときは `IsLocked(song_id, true)`、それ以外は `IsLocked(song_id, false)` を使う
 6. 残った譜面から楽曲ごとの最大OPを計算する
 
-N+1回避のため、未解禁設定は `ListByPlayerID` で一括取得し、`song_id + is_ultima` のセットとして扱う。
+N+1回避のため、未解禁設定は `ListByPlayerID` で一括取得し、`PlayerLockedSongSet` のセットとして扱う。難易度名は大文字の `ULTIMA` と比較する。
+
+OP%の分母は楽曲単位の除外が必要なため、`IsSongLocked`（通常譜面群が未解禁）と `IsUltimaLocked`（ULTIMA譜面が未解禁）を分けて判定する。通常譜面群が未解禁の楽曲は分子にULTIMAのOPが残らないため、楽曲最大OPを丸ごと分母から除く。ULTIMAだけが未解禁の楽曲は、ULTIMAの最大OPと通常譜面の最大OPの差だけを分母から除く。日次再計算バッチとデータ引き継ぎも同じ規則を使う。
 
 API一覧取得では、Read Model取得で `songs` とJOINして `id` と `title` を一括取得し、N+1を避ける。
 
@@ -428,7 +440,16 @@ API一覧取得では、Read Model取得で `songs` とJOINして `id` と `titl
 - Read Model取得では `display_id ASC, is_ultima ASC` の順序で返る
 - `SELECT *` を使っていない
 
-同一曲に `is_ultima = false` と `is_ultima = true` が共存しても、一覧取得で両方返せることを確認する。OP計算用の判定はOP計算API側でテストする。
+同一曲に `is_ultima = false` と `is_ultima = true` が共存しても、一覧取得で両方返せることを確認する。
+
+`PlayerLockedSongSet` は次の組み合わせを検証する。
+
+- `is_ultima = false` は通常譜面とULTIMA譜面の両方を未解禁と判定する
+- `is_ultima = true` はULTIMA譜面だけを未解禁と判定する
+- 通常譜面群未解禁とULTIMAのみ未解禁が同一曲に共存しても、通常譜面は未解禁と判定する
+- 未解禁設定がない譜面は解禁済みと判定する
+
+OP計算用の判定はOP計算API側でも経路ごとにテストし、登録時の再計算・未解禁設定変更時の再計算・日次再計算バッチ・データ引き継ぎで同じ結果になることを確認する。
 
 ### 10.3 Usecase
 
