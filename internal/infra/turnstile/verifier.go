@@ -43,7 +43,8 @@ type hostnameMatcher struct {
 
 // NewVerifier はCloudflare Turnstileの検証器を生成します。
 // allowedOrigins はフロントのCORS許可オリジンです。siteverify の hostname はスキームとポートを含まないため、
-// オリジンからホスト名だけを取り出して照合します。空や解釈できないオリジンは許可ホストに含めません。
+// オリジンからホスト名だけを取り出して照合します。空や解釈できないオリジン、全許可のオリジンは許可ホストに含めません。
+// 許可ホストが残らない設定ではログインと新規登録が常に失敗するため、起動時に警告します。
 func NewVerifier(secretKey string, allowedOrigins []string) usecase.TurnstileVerifier {
 	return &verifier{
 		secretKey: strings.TrimSpace(secretKey),
@@ -132,11 +133,16 @@ func newHostnameMatcher(allowedOrigins []string) hostnameMatcher {
 		exact[host] = struct{}{}
 	}
 
+	if len(exact) == 0 && len(patterns) == 0 {
+		slog.Warn("no Turnstile allowed hosts; login and signup will reject every Turnstile token", "allowed_origins", allowedOrigins)
+	}
+
 	return hostnameMatcher{exact: exact, patterns: patterns}
 }
 
 // hostnameFromOrigin は CORS オリジンから照合用ホスト名を取り出します。
-// `*` だけの許可や、スキームを持たない値はフロントのホストとして扱わないため除外します。
+// `*` や `https://*`、`https://**` のような全許可や、スキームを持たない値はフロントのホストとして扱わないため除外します。
+// 全許可をホスト照合に持ち込むと、別ホストで取得したトークンの流用を防げなくなるためです。
 func hostnameFromOrigin(origin string) (string, bool) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" || origin == "*" {
@@ -152,7 +158,8 @@ func hostnameFromOrigin(origin string) (string, bool) {
 	}
 
 	host := strings.ToLower(parsed.Hostname())
-	if host == "" || host == "*" {
+	// `https://**` のように `*` だけで構成されるホストも全許可になるため、`*` 1文字と同様に除外する。
+	if strings.Trim(host, "*") == "" {
 		return "", false
 	}
 

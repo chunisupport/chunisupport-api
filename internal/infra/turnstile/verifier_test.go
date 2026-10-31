@@ -169,6 +169,24 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
 			wantErr:        usecase.ErrInvalidTurnstileToken,
 		},
+		{
+			name:           "ホストが全許可のワイルドカードだけのCORSオリジンはTurnstileのホストとして扱わない",
+			token:          "turnstile-token",
+			expectedAction: "login",
+			allowedOrigins: []string{"https://*"},
+			statusCode:     http.StatusOK,
+			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
+			wantErr:        usecase.ErrInvalidTurnstileToken,
+		},
+		{
+			name:           "ホストが複数のワイルドカードだけのCORSオリジンもTurnstileのホストとして扱わない",
+			token:          "turnstile-token",
+			expectedAction: "login",
+			allowedOrigins: []string{"https://**"},
+			statusCode:     http.StatusOK,
+			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
+			wantErr:        usecase.ErrInvalidTurnstileToken,
+		},
 	}
 
 	for _, tt := range tests {
@@ -232,6 +250,57 @@ func TestVerifier_VerifyTurnstile_検証失敗をログに出力しない(t *tes
 	// 検証
 	assert.ErrorIs(t, err, usecase.ErrInvalidTurnstileToken)
 	assert.Empty(t, logOutput.String())
+}
+
+func TestNewVerifier_許可ホストが0件の場合だけ警告する(t *testing.T) {
+	tests := []struct {
+		name           string
+		allowedOrigins []string
+		wantWarning    bool
+	}{
+		{
+			name:           "許可オリジンが空なら警告する",
+			allowedOrigins: nil,
+			wantWarning:    true,
+		},
+		{
+			name:           "全許可のオリジンだけなら警告する",
+			allowedOrigins: []string{"*", "https://*", "https://**"},
+			wantWarning:    true,
+		},
+		{
+			name:           "除外されるオリジンがあっても許可ホストが残れば警告しない",
+			allowedOrigins: []string{"*", "https://app.example.com"},
+			wantWarning:    false,
+		},
+		{
+			name:           "ワイルドカードの許可ホストだけでも警告しない",
+			allowedOrigins: []string{"https://*.example.pages.dev"},
+			wantWarning:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			var logOutput bytes.Buffer
+			previousLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logOutput, nil)))
+			t.Cleanup(func() {
+				slog.SetDefault(previousLogger)
+			})
+
+			// When
+			NewVerifier("secret", tt.allowedOrigins)
+
+			// Then
+			if tt.wantWarning {
+				assert.Contains(t, logOutput.String(), "level=WARN")
+				return
+			}
+			assert.Empty(t, logOutput.String())
+		})
+	}
 }
 
 func newTestVerifier(t *testing.T, allowedOrigins []string, endpoint string, client *http.Client) *verifier {

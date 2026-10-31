@@ -63,7 +63,7 @@ func newCachePurger(
 func (p *CachePurger) Purge(ctx context.Context, objectKeys []string) error {
 	files := make([]string, 0, len(objectKeys))
 	for _, objectKey := range objectKeys {
-		fileURL, err := url.JoinPath(p.publicBaseURL, objectKey)
+		fileURL, err := url.JoinPath(p.publicBaseURL, objectKey) // #nosec G125 -- objectKey は info.go で定義した固定のオブジェクトキーのみ
 		if err != nil {
 			return fmt.Errorf("failed to build public object URL for %s: %w", objectKey, err)
 		}
