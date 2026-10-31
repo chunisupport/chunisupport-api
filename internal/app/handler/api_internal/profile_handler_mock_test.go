@@ -37,6 +37,11 @@ func (m *mockUserCredentialUsecase) DeleteOwnAccount(ctx context.Context, userID
 	return args.Error(0)
 }
 
+func (m *mockUserCredentialUsecase) ChangeFirebaseAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken, newAccountToken reauthtoken.ReauthToken) error {
+	args := m.Called(ctx, userID, reauthToken, newAccountToken)
+	return args.Error(0)
+}
+
 func newProfileHandlerWithMocks() (*api_internal.ProfileHandler, *mockUserCredentialUsecase) {
 	userCredentialMock := new(mockUserCredentialUsecase)
 

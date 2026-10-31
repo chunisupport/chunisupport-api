@@ -23,6 +23,7 @@
 ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp`、`GET /internal/system/status` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 メンテナンス中の待機時間をブラウザから参照できるよう、CORSの公開レスポンスヘッダーには `Retry-After` を含みます。
+ブラウザから相関IDを送受信できるよう、`X-Request-ID` を許可リクエストヘッダーおよび公開レスポンスヘッダーに含みます。
 
 ## 認証
 
@@ -76,6 +77,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 ## 共通レスポンス仕様
 
 - コンテンツタイプは `application/json`。
+- すべてのHTTPレスポンスに相関ID `X-Request-ID` を付けます。クライアントが妥当な `X-Request-ID`（先頭は英数字、以降は英数字・`.`・`_`・`-`、128文字以内）を送った場合はその値を使い、未指定または形式・長さが不正な場合はサーバーがUUIDを生成して置き換えます。同じ値をアクセスログと、リクエストコンテキスト付きのアプリケーションログの `request_id` に記録します。
 - カスタムエラーハンドラーは以下形式を返します。
 
 ```json
@@ -112,6 +114,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | 認証情報不正 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `firebase_account_unchanged` | ログイン用アカウントの変更先が現在と同じ |
 | `invalid_api_token_permission` | APIトークン権限が不正 |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
@@ -1084,6 +1087,31 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 401 Unauthorized (`invalid_credentials`): 再認証UIDと連携済みFirebase UIDが一致しない
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 409 Conflict (`username_taken`): ユーザー名が使用済み
+
+### PUT `/internal/me/firebase-account`
+- **認証**: Firebase Bearer 必須（変更前のアカウント）
+- **必須ヘッダ**: `X-Reauth-Token: <変更前のアカウントで再認証直後の Firebase ID トークン>`
+- **リクエストボディ**:
+
+```json
+{"id_token": "<変更先のアカウントでサインイン直後の Firebase ID トークン>"}
+```
+
+ログインに使う Firebase アカウント（Google アカウントなど）を差し替えます。ユーザー名、プレイヤーデータ、目標、フレンド、APIトークン、公開設定などのアプリ内データはそのまま引き継がれます。
+
+乗っ取りを防ぐため、`X-Reauth-Token` と `id_token` の両方について、`auth_time` が 5 分以内であることを検証します。`X-Reauth-Token` の UID は変更前ユーザーに連携された Firebase UID と一致する必要があります。変更先の Firebase UID は、どのユーザーにも連携されていない必要があります。変更先のアカウントで既にユーザー登録している場合は、先にそのアカウントを退会してください。
+
+変更後は、旧 Firebase ユーザーの削除を試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。旧アカウントの ID トークンは以降の認証で `invalid_token` となるため、クライアントはサインアウトし、変更先のアカウントでサインインし直してください。
+
+- **レスポンス**: 204 No Content。ボディは空です。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正、`id_token` 未指定
+  - 400 Bad Request (`firebase_account_unchanged`): 変更先が現在と同じアカウント
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 通常認証が必要
+  - 401 Unauthorized (`recent_sign_in_required`): `X-Reauth-Token` が未指定、または `X-Reauth-Token` / `id_token` が不正・期限切れ
+  - 401 Unauthorized (`invalid_credentials`): 再認証UIDと連携済みFirebase UIDが一致しない
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない
+  - 409 Conflict (`firebase_uid_already_linked`): 変更先の Firebase UID が他ユーザーに連携済み
 
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
@@ -2814,7 +2842,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
-    - `page` (任意): ページ番号 (デフォルト: 1)
+    - `page` (任意): ページ番号 (デフォルト: 1)。正の整数として解釈でき、かつ `(page - 1) * 100` が符号付き64bit整数の最大値を超える場合は 422 Unprocessable Entity (`validation_failed`)
     - `name` (任意): ユーザー名またはプレイヤー名の前方一致検索
 - **レスポンス**: `AdminUserListResponse` の配列を返します。
 

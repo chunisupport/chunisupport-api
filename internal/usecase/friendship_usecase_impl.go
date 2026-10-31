@@ -63,7 +63,7 @@ func (u *friendshipUsecase) SendRequest(ctx context.Context, userID int, usernam
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
-		slog.Error("failed to find friend target by username", "username", username, "error", err)
+		slog.ErrorContext(ctx, "failed to find friend target by username", "username", username, "error", err)
 		return err
 	}
 	if target == nil {

@@ -128,7 +128,7 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 	if len(unknownFields) > 0 {
-		slog.Warn("unknown fields in player data payload", "unknown_fields", unknownFields, "user_id", user.ID)
+		slog.WarnContext(c.Request().Context(), "unknown fields in player data payload", "unknown_fields", unknownFields, "user_id", user.ID)
 	}
 
 	// 正式な構造体にデコード（未知フィールドは無視される）

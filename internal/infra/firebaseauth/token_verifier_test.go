@@ -35,15 +35,18 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 	originalIsFirebaseInvalidIDToken := isFirebaseInvalidIDToken
 	originalIsFirebaseIDTokenRevoked := isFirebaseIDTokenRevoked
 	originalIsFirebaseUserDisabled := isFirebaseUserDisabled
+	originalIsFirebaseUserNotFound := isFirebaseUserNotFound
 	t.Cleanup(func() {
 		isFirebaseInvalidIDToken = originalIsFirebaseInvalidIDToken
 		isFirebaseIDTokenRevoked = originalIsFirebaseIDTokenRevoked
 		isFirebaseUserDisabled = originalIsFirebaseUserDisabled
+		isFirebaseUserNotFound = originalIsFirebaseUserNotFound
 	})
 
 	invalidErr := errors.New("invalid token from firebase sdk")
 	revokedErr := errors.New("revoked token from firebase sdk")
 	disabledErr := errors.New("disabled user from firebase sdk")
+	notFoundErr := errors.New("user not found from firebase sdk")
 	isFirebaseInvalidIDToken = func(err error) bool {
 		return errors.Is(err, invalidErr)
 	}
@@ -52,6 +55,9 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 	}
 	isFirebaseUserDisabled = func(err error) bool {
 		return errors.Is(err, disabledErr)
+	}
+	isFirebaseUserNotFound = func(err error) bool {
+		return errors.Is(err, notFoundErr)
 	}
 
 	tests := []struct {
@@ -90,6 +96,12 @@ func TestTokenVerifier_VerifyIDToken(t *testing.T) {
 			name:    "SDK が無効化済みユーザーエラーを返す場合は ErrInvalidIDToken を返す",
 			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedErr: disabledErr},
 			idToken: "disabled-user-token",
+			wantErr: usecase.ErrInvalidIDToken,
+		},
+		{
+			name:    "SDK が削除済みユーザーエラーを返す場合は ErrInvalidIDToken を返す",
+			client:  &stubAuthClient{verifyIDTokenAndCheckRevokedErr: notFoundErr},
+			idToken: "deleted-user-token",
 			wantErr: usecase.ErrInvalidIDToken,
 		},
 		{

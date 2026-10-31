@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -49,6 +50,10 @@ type updateUsernameRequest struct {
 	Username string `json:"username"`
 }
 
+type changeFirebaseAccountRequest struct {
+	IDToken string `json:"id_token"`
+}
+
 // UpdateUsername は再認証済みユーザーのユーザー名変更を処理します。
 func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 	user, err := getUserEntityFromContext(c)
@@ -66,7 +71,7 @@ func (h *ProfileHandler) UpdateUsername(c *echo.Context) error {
 	updatedUsername, err := h.userCredentialUsecase.UpdateUsername(c.Request().Context(), user.ID, req.Username, reauthToken)
 	if err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to update username", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to update username", user.ID, apiErr)
 		return apiErr
 	}
 	return c.JSON(http.StatusOK, map[string]string{"username": updatedUsername})
@@ -86,7 +91,7 @@ func (h *ProfileHandler) UpdatePrivacy(c *echo.Context) error {
 
 	if err := h.userCredentialUsecase.UpdatePrivacy(c.Request().Context(), user.ID, req.IsPrivate); err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to update privacy setting", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to update privacy setting", user.ID, apiErr)
 		return apiErr
 	}
 
@@ -107,10 +112,37 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 
 	if err := h.userCredentialUsecase.DeleteOwnAccount(c.Request().Context(), user.ID, reauthToken); err != nil {
 		apiErr := apierror.FromUsecaseError(err)
-		logProfileUpdateFailure("Failed to delete user", user.ID, apiErr)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to delete user", user.ID, apiErr)
 		return apiErr
 	}
 
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ChangeFirebaseAccount はログインに使う Firebase アカウントの変更を処理します。
+// 現在のアカウントの再認証トークンをヘッダーで、変更先アカウントの ID トークンをボディで受け取ります。
+func (h *ProfileHandler) ChangeFirebaseAccount(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	reauthToken, err := reauthtoken.New(c.Request().Header.Get(reauthTokenHeader))
+	if err != nil {
+		return apierror.ErrRecentSignInRequired
+	}
+	req := new(changeFirebaseAccountRequest)
+	if err := apphandler.BindStrictJSON(c, req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	newAccountToken, err := reauthtoken.New(req.IDToken)
+	if err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := h.userCredentialUsecase.ChangeFirebaseAccount(c.Request().Context(), user.ID, reauthToken, newAccountToken); err != nil {
+		apiErr := apierror.FromUsecaseError(err)
+		logProfileUpdateFailure(c.Request().Context(), "Failed to change firebase account", user.ID, apiErr)
+		return apiErr
+	}
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -118,10 +150,10 @@ func (h *ProfileHandler) DeleteAccount(c *echo.Context) error {
 // 禁止語・使用済み・バリデーションなどの想定内クライアントエラー（4xx系）は
 // Error通知の対象にしないためInfoに落とし、想定外のサーバーエラー（5xx系）のみErrorとします。
 // 4xx系の詳細は共通エラーハンドラー側でもWarnログとして記録されます。
-func logProfileUpdateFailure(message string, userID int, apiErr *apierror.APIError) {
+func logProfileUpdateFailure(ctx context.Context, message string, userID int, apiErr *apierror.APIError) {
 	if apiErr.HTTPStatus >= http.StatusInternalServerError {
-		slog.Error(message, "user_id", userID, "code", apiErr.Code, "error", apiErr.Internal)
+		slog.ErrorContext(ctx, message, "user_id", userID, "code", apiErr.Code, "error", apiErr.Internal)
 		return
 	}
-	slog.Info(message, "user_id", userID, "code", apiErr.Code, "status", apiErr.HTTPStatus)
+	slog.InfoContext(ctx, message, "user_id", userID, "code", apiErr.Code, "status", apiErr.HTTPStatus)
 }

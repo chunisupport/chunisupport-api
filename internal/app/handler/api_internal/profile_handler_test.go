@@ -298,3 +298,82 @@ func TestProfileHandler_DeleteAccount(t *testing.T) {
 		userCredentialMock.AssertExpectations(t)
 	})
 }
+
+func TestProfileHandler_ChangeFirebaseAccount(t *testing.T) {
+	e := newTestEcho()
+
+	t.Run("両アカウントのトークンでFirebaseアカウントを変更し204を返す", func(t *testing.T) {
+		// Given
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		userCredentialMock.On("ChangeFirebaseAccount", mock.Anything, 30, reauthtokentest.New(t, "reauth-token"), reauthtokentest.New(t, "new-account-token")).Return(nil).Once()
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/firebase-account", bytes.NewBufferString(`{"id_token":"new-account-token"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set("X-Reauth-Token", "reauth-token")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("userEntity", &entity.User{ID: 30})
+
+		// When
+		err := h.ChangeFirebaseAccount(c)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		userCredentialMock.AssertExpectations(t)
+	})
+
+	t.Run("再認証トークンがなければ recent sign-in required を返す", func(t *testing.T) {
+		// Given
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/firebase-account", bytes.NewBufferString(`{"id_token":"new-account-token"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		c := e.NewContext(req, httptest.NewRecorder())
+		c.Set("userEntity", &entity.User{ID: 30})
+
+		// When
+		err := h.ChangeFirebaseAccount(c)
+
+		// Then
+		assert.ErrorIs(t, err, apierror.ErrRecentSignInRequired)
+		userCredentialMock.AssertNotCalled(t, "ChangeFirebaseAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("変更先トークンが空なら400を返す", func(t *testing.T) {
+		// Given
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/firebase-account", bytes.NewBufferString(`{"id_token":"  "}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set("X-Reauth-Token", "reauth-token")
+		c := e.NewContext(req, httptest.NewRecorder())
+		c.Set("userEntity", &entity.User{ID: 30})
+
+		// When
+		err := h.ChangeFirebaseAccount(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, apierror.CodeBadRequest, apiErr.Code)
+		userCredentialMock.AssertNotCalled(t, "ChangeFirebaseAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("変更先が連携済みなら409を返す", func(t *testing.T) {
+		// Given
+		h, userCredentialMock := newProfileHandlerWithMocks()
+		userCredentialMock.On("ChangeFirebaseAccount", mock.Anything, 30, reauthtokentest.New(t, "reauth-token"), reauthtokentest.New(t, "new-account-token")).Return(usecase.ErrFirebaseUIDAlreadyLinked).Once()
+		req := httptest.NewRequest(http.MethodPut, "/internal/me/firebase-account", bytes.NewBufferString(`{"id_token":"new-account-token"}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set("X-Reauth-Token", "reauth-token")
+		c := e.NewContext(req, httptest.NewRecorder())
+		c.Set("userEntity", &entity.User{ID: 30})
+
+		// When
+		err := h.ChangeFirebaseAccount(c)
+
+		// Then
+		var apiErr *apierror.APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
+		assert.Equal(t, apierror.CodeFirebaseUIDAlreadyLinked, apiErr.Code)
+	})
+}

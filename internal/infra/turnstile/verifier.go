@@ -82,7 +82,7 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		if err := resp.Body.Close(); err != nil {
-			slog.Warn("failed to close response body", "error", err)
+			slog.WarnContext(ctx, "failed to close response body", "error", err)
 		}
 	}()
 

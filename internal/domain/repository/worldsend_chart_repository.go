@@ -26,6 +26,12 @@ type WorldsendChartRepository interface {
 	// 削除済み楽曲も取得します。
 	FindByDisplayID(ctx context.Context, exec Executor, displayID string) (*entity.WorldsendSongWithChart, error)
 
+	// FindByDisplayIDForChange は指定された DisplayID の WORLD'S END 楽曲を変更用に排他的に取得します。
+	// 論理削除済みの楽曲も含めて取得します。
+	// 削除・復活は SaveSong で楽曲の全列を書き戻すため、同時編集を上書きしないよう行ロックして読み取ります。
+	// 対象が存在しない場合は ErrSongNotFound を返します。
+	FindByDisplayIDForChange(ctx context.Context, exec Executor, displayID string) (*entity.WorldsendSongWithChart, error)
+
 	// SaveSong は WORLD'S END 楽曲エンティティの現在の状態を永続化します。
 	// 対象が存在しない場合は ErrSongNotFound を返します。
 	SaveSong(ctx context.Context, exec Executor, song *entity.Song) error

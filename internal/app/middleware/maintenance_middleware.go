@@ -38,19 +38,19 @@ func FirebaseMaintenanceMiddleware(
 				return maintenanceModeError(c)
 			}
 			if authenticator == nil {
-				slog.Error("Maintenance Firebase authentication failed", "error", "firebase authenticator is nil")
+				slog.ErrorContext(c.Request().Context(), "Maintenance Firebase authentication failed", "error", "firebase authenticator is nil")
 				return maintenanceModeError(c)
 			}
 
 			user, err := authenticator.Authenticate(c.Request().Context(), idToken)
 			if err != nil {
 				if !errors.Is(err, usecase.ErrInvalidIDToken) {
-					slog.Error("Maintenance Firebase authentication failed", "error", err)
+					slog.ErrorContext(c.Request().Context(), "Maintenance Firebase authentication failed", "error", err)
 				}
 				return maintenanceModeError(c)
 			}
 			if user == nil {
-				slog.Error("Maintenance Firebase authentication failed", "error", "firebase authenticator returned nil user")
+				slog.ErrorContext(c.Request().Context(), "Maintenance Firebase authentication failed", "error", "firebase authenticator returned nil user")
 				return maintenanceModeError(c)
 			}
 			if !info.HasRole(user.AccountTypeID, info.AccountTypeEditor) {
@@ -83,19 +83,19 @@ func APITokenMaintenanceMiddleware(
 				return maintenanceModeError(c)
 			}
 			if validator == nil {
-				slog.Error("Maintenance API token authentication failed", "error", "API token validator is nil")
+				slog.ErrorContext(c.Request().Context(), "Maintenance API token authentication failed", "error", "API token validator is nil")
 				return maintenanceModeError(c)
 			}
 
 			user, token, err := validator.Validate(c.Request().Context(), rawToken)
 			if err != nil {
 				if !errors.Is(err, usecase.ErrInvalidAPIToken) {
-					slog.Error("Maintenance API token authentication failed", "error", err)
+					slog.ErrorContext(c.Request().Context(), "Maintenance API token authentication failed", "error", err)
 				}
 				return maintenanceModeError(c)
 			}
 			if user == nil || token == nil {
-				slog.Error("Maintenance API token authentication failed", "error", "API token validator returned nil authentication data")
+				slog.ErrorContext(c.Request().Context(), "Maintenance API token authentication failed", "error", "API token validator returned nil authentication data")
 				return maintenanceModeError(c)
 			}
 			if !info.HasRole(user.AccountTypeID, info.AccountTypeEditor) {

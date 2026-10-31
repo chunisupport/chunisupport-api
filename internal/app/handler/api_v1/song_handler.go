@@ -85,7 +85,7 @@ func (h *V1SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 
 	ratingBands := h.staticMasterCache.RatingBands
 
-	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
+	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(c.Request().Context(), stats, ratingBands))
 }
 
 // UpdateSongs はAPIトークン認証済みの編集者向けに楽曲および譜面情報を一括更新します。
