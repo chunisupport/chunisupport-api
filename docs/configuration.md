@@ -171,6 +171,12 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 - `.config/<APP_ENV>.settings.json` に Turnstile 用のキーは不要です
 - 環境変数 `TURNSTILE_SECRET_KEY` に Turnstile のシークレットキーを設定してください
+- siteverify の `success` に加え、`hostname` が `cors.allow_origins` のホストと一致すること、`action` がエンドポイントの期待値と一致することを確認します
+- ログインの `action` は `login`、新規登録の `action` は `signup` です。フロントの Turnstile ウィジェットにも同じ値を設定してください。未設定や不一致のトークンは無効として拒否します
+- `hostname` はスキームとポートを含まないため、`http://localhost:3000` は `localhost` として照合します。`https://*.example.pages.dev` のようなワイルドカードもホスト名に対して同様に判定します
+- `*` や `https://*`、`https://**` のような全許可のオリジン（ホストが `*` だけで構成されるもの）は、Turnstile の許可ホストにはしません。別ホストで取得したトークンの流用を防げなくなるためです
+- 許可ホストが1件も残らない場合、ログインと新規登録はすべて無効トークンとして拒否されます。この場合は起動時に警告ログを出力します
+- `/healthz` などに追加する `https://new.chunithm-net.com` は Turnstile の許可ホストに含めません
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 

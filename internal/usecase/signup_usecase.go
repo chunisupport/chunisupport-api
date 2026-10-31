@@ -66,7 +66,7 @@ func NewSignupUsecase(
 }
 
 func (u *signupUsecase) Signup(ctx context.Context, idToken string, usernameStr string, turnstileToken string, remoteIP string) (*UserOutput, error) {
-	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP); err != nil {
+	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP, info.TurnstileActionSignup); err != nil {
 		return nil, err
 	}
 

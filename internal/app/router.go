@@ -267,7 +267,9 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		usecase.NewChartStatsBatchUsecase(infra.NewChartStatsBatchRepository(db)),
 	)
 
-	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
+	// 許可ホストはフロントの CORS オリジンだけを使う。
+	// 外部サイト向けに追加する new.chunithm-net.com はログイン画面のホストではない。
+	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey, cfg.CORS.AllowOrigins)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)

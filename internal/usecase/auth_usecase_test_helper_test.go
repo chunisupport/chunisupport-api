@@ -117,8 +117,8 @@ func (m *mockRecentSignInVerifier) VerifyRecentSignIn(ctx context.Context, idTok
 	return args.Get(0).(*RecentSignInInfo), args.Error(1)
 }
 
-func (m *mockTurnstileVerifier) VerifyTurnstile(ctx context.Context, token string, remoteIP string) error {
-	args := m.Called(ctx, token, remoteIP)
+func (m *mockTurnstileVerifier) VerifyTurnstile(ctx context.Context, token string, remoteIP string, expectedAction string) error {
+	args := m.Called(ctx, token, remoteIP, expectedAction)
 	return args.Error(0)
 }
 
