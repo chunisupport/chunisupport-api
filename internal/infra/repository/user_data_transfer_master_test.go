@@ -120,6 +120,7 @@ func TestCalculateTransferDerivedMetricsExcludesLockedAndDeletedSongsFromOverpow
 		LockedSongs: []entity.UserDataTransferLockedSong{{SongOfficialIdx: "2", IsUltima: false}},
 	}
 	masters := &transferMasterData{
+		songIDs: map[string]int{"1": 1, "2": 2, "3": 3},
 		charts: map[string]transferChartMaster{
 			transferChartKey("1", "MASTER"): {ID: 1, SongID: 1, OfficialIdx: "1", Difficulty: "MASTER", ChartConst: 15},
 			transferChartKey("2", "MASTER"): {ID: 2, SongID: 2, OfficialIdx: "2", Difficulty: "MASTER", ChartConst: 15},

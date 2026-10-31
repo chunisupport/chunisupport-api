@@ -23,6 +23,7 @@ import (
 const playerDataBatchPageSize = 100
 
 // playerDataBatchLockedSongs はバッチ取得した未解禁設定をドメインの判定用エンティティへ変換します。
+// バッチは楽曲IDだけを取得しており、判定にもPlayerIDを使わないため設定しません。
 func playerDataBatchLockedSongs(lockedSongs []repository.PlayerBatchLockedSong) []*entity.PlayerLockedSong {
 	lockedEntities := make([]*entity.PlayerLockedSong, 0, len(lockedSongs))
 	for _, lockedSong := range lockedSongs {

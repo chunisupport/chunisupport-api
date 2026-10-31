@@ -274,16 +274,13 @@ func calculateTransferDerivedMetrics(snapshot *entity.UserDataTransferSnapshot, 
 }
 
 // transferLockedSongs は引き継ぎスナップショットの未解禁設定を楽曲ID付きのエンティティへ変換します。
-// 楽曲IDを解決できない未解禁設定は、引き継ぎ後のレコードにも現れないため判定から除外します。
+//
+// 呼び出し前の findUnresolvedReferences が未解禁曲の official_idx をすべて照合済みのため、
+// ここで解決できない未解禁設定は通常現れない。PlayerID は判定に使わないため設定しない。
 func transferLockedSongs(lockedSongs []entity.UserDataTransferLockedSong, masters *transferMasterData) []*entity.PlayerLockedSong {
-	// マスタの譜面は official_idx と難易度の組で引くため、楽曲IDは official_idx から別途解決する。
-	songIDsByOfficialIdx := make(map[string]int, len(masters.songIDs))
-	for _, chart := range masters.charts {
-		songIDsByOfficialIdx[chart.OfficialIdx] = chart.SongID
-	}
 	lockedEntities := make([]*entity.PlayerLockedSong, 0, len(lockedSongs))
 	for _, lockedSong := range lockedSongs {
-		songID, ok := songIDsByOfficialIdx[lockedSong.SongOfficialIdx]
+		songID, ok := masters.songIDs[lockedSong.SongOfficialIdx]
 		if !ok {
 			continue
 		}

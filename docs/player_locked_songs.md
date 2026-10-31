@@ -140,7 +140,7 @@ type PlayerLockedSong struct {
 - 対象譜面がULTIMA以外の場合、`is_ultima = false` の未解禁設定があればOP計算対象から除外する
 - 通常譜面群の未解禁（`is_ultima = false`）は、同じ楽曲のULTIMA譜面もOP計算対象から除外する
 
-通常譜面群とULTIMA譜面は解禁単位が異なるため、`is_ultima = false` のレコードはULTIMA譜面の解禁状態を表さない。通常譜面群とULTIMA譜面の両方が未解禁の場合は、同一曲に `is_ultima = false` と `is_ultima = true` の2レコードを登録する。
+通常譜面群とULTIMA譜面は解禁単位が異なるため、`is_ultima = false` のレコードだけではULTIMA譜面だけを未解禁にできない。通常譜面群とULTIMA譜面の両方を未解禁にする場合は、同一曲に `is_ultima = false` と `is_ultima = true` の2レコードを登録する。
 
 ただし、OP計算では通常譜面群が未解禁の楽曲を譜面単位ではなく楽曲ごと対象から外す。そのため `is_ultima = false` の未解禁はULTIMA譜面の記録にも及び、ULTIMA譜面だけが未解禁の `is_ultima = true` とは次のように扱いが異なる。
 
