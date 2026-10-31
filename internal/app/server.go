@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/jmoiron/sqlx"
@@ -62,16 +63,35 @@ func (s *Server) Start() error {
 	slog.Info("Starting server", "address", address)
 
 	defer close(s.startDone)
-	startConfig := echo.StartConfig{
-		Address:         address,
-		GracefulTimeout: time.Duration(s.cfg.ShutdownTimeoutSeconds) * time.Second,
-	}
+	startConfig := newStartConfig(address, time.Duration(s.cfg.ShutdownTimeoutSeconds)*time.Second)
 	if err := startConfig.Start(s.startCtx, s.echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("Failed to start server", "error", err)
 		return err
 	}
 
 	return nil
+}
+
+// newStartConfig はEchoの起動設定を組み立てます。
+// タイムアウトはBeforeServeFuncでhttp.Serverへ直接設定するため、Echoの既定値変更に左右されません。
+func newStartConfig(address string, gracefulTimeout time.Duration) echo.StartConfig {
+	return echo.StartConfig{
+		Address:         address,
+		GracefulTimeout: gracefulTimeout,
+		BeforeServeFunc: func(s *http.Server) error {
+			applyHTTPServerTimeouts(s)
+			return nil
+		},
+	}
+}
+
+// applyHTTPServerTimeouts はHTTPサーバーのタイムアウト方針を適用します。
+// Slowloris対策のReadHeaderTimeoutを短めにしつつ、通常リクエストの読み書きと待受接続の維持に必要な時間を確保します。
+func applyHTTPServerTimeouts(s *http.Server) {
+	s.ReadHeaderTimeout = info.HTTPReadHeaderTimeout
+	s.ReadTimeout = info.HTTPReadTimeout
+	s.WriteTimeout = info.HTTPWriteTimeout
+	s.IdleTimeout = info.HTTPIdleTimeout
 }
 
 // serverAddress はNginxからのプロキシ接続だけを受け付けるループバック待受アドレスを返します。

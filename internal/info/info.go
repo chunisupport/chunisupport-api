@@ -184,6 +184,15 @@ const (
 	// ユーザープロフィール取得APIの view クエリで指定できる表示形式
 	UserProfileViewRating = "rating"
 	UserProfileViewRecord = "record"
+
+	// HTTPサーバーのタイムアウト設定。
+	// Echoの既定値（ReadTimeoutのみ30秒）に依存せず、アプリケーション側で明示します。
+	// 127.0.0.1でnginxからの接続だけを受ける構成のため、外向きの推奨値より短めにしています。
+	// SSEのような長時間接続は提供していないため、WriteTimeoutを設定しても通常応答に影響しません。
+	HTTPReadHeaderTimeout = 10 * time.Second
+	HTTPReadTimeout       = 30 * time.Second
+	HTTPWriteTimeout      = 60 * time.Second
+	HTTPIdleTimeout       = 120 * time.Second
 )
 
 var (
