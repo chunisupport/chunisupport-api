@@ -564,6 +564,7 @@ func TestRegisterRoutes_認証必須の読み取りGETはread最適化認証を�
 		{name: "WORLD'S ENDフレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/worldsend-songs/abc", wantReadOptimizedCalls: 1},
 		{name: "公開設定の更新", method: http.MethodPut, path: "/internal/me/privacy", wantStrictCalls: 1},
 		{name: "アカウント削除", method: http.MethodDelete, path: "/internal/me", wantStrictCalls: 1},
+		{name: "ログイン用Firebaseアカウントの変更", method: http.MethodPut, path: "/internal/me/firebase-account", wantStrictCalls: 1},
 		{name: "フレンド申請の送信", method: http.MethodPost, path: "/internal/friends/requests", wantStrictCalls: 1},
 		{name: "フレンド削除", method: http.MethodDelete, path: "/internal/friends/frienduser", wantStrictCalls: 1},
 		{name: "APIトークン一覧の取得", method: http.MethodGet, path: "/internal/auth/api-tokens", wantStrictCalls: 1},

@@ -19,6 +19,11 @@ const (
 	// SongBatchJobFinalizeTimeout は実行結果の記録とロック解放に使う猶予です。
 	// 停止シグナルで実行がキャンセルされた後も、中断を記録できるよう独立したタイムアウトを使います。
 	SongBatchJobFinalizeTimeout = 10 * time.Second
+	// SongBatchDatasourceResponseMaxBytes は汎用ダウンローダーが読み込むHTTPレスポンス本文の上限です。
+	// 2026-10-21 に実測した展開後のサイズは、official が 793,932 バイト、st1027 が 2,322,321 バイト、
+	// otoge-db が 2,824,475 バイトで、最大は約 2.7MiB です。
+	// 楽曲と項目が増えて最大ソースが3倍になっても収まるよう、約6倍の 16MiB としています。
+	SongBatchDatasourceResponseMaxBytes = 16 * 1024 * 1024
 )
 
 // song-batch が参照する環境変数名です。

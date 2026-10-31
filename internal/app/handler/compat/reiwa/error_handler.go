@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
@@ -35,7 +36,7 @@ func handleReiwaError(err error, c *echo.Context) {
 
 	// クライアント切断はサーバー障害ではないため、互換形式のエラー応答は返さずに記録だけ残します。
 	if errors.Is(err, context.Canceled) {
-		slog.Info("Reiwa HTTP request canceled by client",
+		slog.InfoContext(c.Request().Context(), "Reiwa HTTP request canceled by client",
 			"method", c.Request().Method,
 			"path", c.Request().URL.Path,
 			"remote_addr", c.RealIP(),
@@ -43,7 +44,7 @@ func handleReiwaError(err error, c *echo.Context) {
 			"error", sanitizeLogValue(err.Error()),
 		)
 		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
-			slog.Debug("Failed to send reiwa client closed response", "error", err)
+			slog.DebugContext(c.Request().Context(), "Failed to send reiwa client closed response", "error", err)
 		}
 		return
 	}
@@ -82,7 +83,7 @@ func handleReiwaError(err error, c *echo.Context) {
 	}
 
 	if err := c.JSON(httpStatus, errorResponse); err != nil {
-		slog.Error("Failed to send reiwa error response", "error", err)
+		slog.ErrorContext(c.Request().Context(), "Failed to send reiwa error response", "error", err)
 	}
 }
 
@@ -93,15 +94,16 @@ func logReiwaError(status int, err error, c *echo.Context) {
 	}
 
 	errorMessage := sanitizeLogValue(err.Error())
-	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(middleware.UserLogAttrs(c)...)
+	ctx := c.Request().Context()
 	if status >= 500 {
-		logger.Error("Reiwa HTTP error",
+		logger.ErrorContext(ctx, "Reiwa HTTP error",
 			"status", status,
 			"error", errorMessage,
 		)
 		return
 	}
-	logger.Warn("Reiwa HTTP client error",
+	logger.WarnContext(ctx, "Reiwa HTTP client error",
 		"status", status,
 		"error", errorMessage,
 	)

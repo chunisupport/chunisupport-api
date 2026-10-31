@@ -264,6 +264,18 @@ func TestCORSExposeHeaders_RetryAfterを公開する(t *testing.T) {
 	assert.Contains(t, corsConfig.ExposeHeaders, echo.HeaderRetryAfter)
 }
 
+func TestCORS_リクエストIDヘッダーを送受信できる(t *testing.T) {
+	// Given
+	cfg := config.Config{DataTransferHMACSecret: testDataTransferHMACSecret, CORS: config.CORS{AllowOrigins: []string{"https://chunisupport.example.com"}}}
+
+	// When
+	corsConfig := newDefaultCORSConfig(cfg)
+
+	// Then
+	assert.Contains(t, corsConfig.AllowHeaders, echo.HeaderXRequestID)
+	assert.Contains(t, corsConfig.ExposeHeaders, echo.HeaderXRequestID)
+}
+
 func TestMaintenanceResponse_許可済みオリジンへCORSヘッダーを返す(t *testing.T) {
 	// Given
 	const origin = "https://chunisupport.example.com"

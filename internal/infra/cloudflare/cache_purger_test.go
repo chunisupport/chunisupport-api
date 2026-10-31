@@ -13,12 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCachePurgerPurge_URL単位でキャッシュを削除する(t *testing.T) {
+func TestCachePurgerPurge_公開JSONのプレフィックスだけを削除する(t *testing.T) {
 	var gotAuthorization string
-	var gotBody struct {
-		Files []string `json:"files"`
-	}
+	var gotBody map[string][]string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
 		gotAuthorization = r.Header.Get("Authorization")
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
@@ -37,21 +36,26 @@ func TestCachePurgerPurge_URL単位でキャッシュを削除する(t *testing.
 		func(context.Context, time.Duration) error { return nil },
 	)
 
-	err := purger.Purge(context.Background(), []string{"v1/songs.json", "v1/worldsend-songs.json"})
+	err := purger.Purge(context.Background(), []string{"v1/songs.json", "v1/worldsend-songs.json", "compat/reiwa/1/chunithm_record/original.json"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer token", gotAuthorization)
 	assert.Equal(t, []string{
-		"https://static.chunisupport.net/v1/songs.json",
-		"https://static.chunisupport.net/v1/worldsend-songs.json",
-	}, gotBody.Files)
+		"static.chunisupport.net/v1/songs.json",
+		"static.chunisupport.net/v1/worldsend-songs.json",
+		"static.chunisupport.net/compat/reiwa/1/chunithm_record/original.json",
+	}, gotBody["prefixes"])
+	assert.Len(t, gotBody, 1)
 }
 
 func TestCachePurgerPurge_一時的な失敗を再試行する(t *testing.T) {
 	attempts := 0
 	var retryDelays []time.Duration
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
+		var body map[string][]string
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, map[string][]string{"prefixes": {"static.chunisupport.net/v1/songs.json"}}, body)
 		w.Header().Set("Content-Type", "application/json")
 		if attempts == 1 {
 			w.Header().Set("Retry-After", "0")

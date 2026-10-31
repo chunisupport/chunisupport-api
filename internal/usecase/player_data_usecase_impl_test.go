@@ -506,7 +506,7 @@ func TestLogRegisteredSPHonors_通常ログ形式でWarnを出力する(t *testi
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buffer, nil)))
 	t.Cleanup(func() { slog.SetDefault(original) })
 
-	logRegisteredSPHonors([]registeredSPHonor{{
+	logRegisteredSPHonors(context.Background(), []registeredSPHonor{{
 		ID:            10,
 		ImageFilename: "sp.png",
 		ImageURL:      "https://example.com/sp.png",
@@ -709,7 +709,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -760,7 +760,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -804,7 +804,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		_, err = calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		_, err = calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -852,7 +852,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -884,7 +884,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		lockedSongs := []*entity.PlayerLockedSong{}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -923,7 +923,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)

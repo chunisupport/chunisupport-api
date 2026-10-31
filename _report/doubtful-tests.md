@@ -1,7 +1,11 @@
 # 仕様判断が必要なテストの調査結果
 
-再検証日: 2026-10-03
-調査対象: `develop`
+再検証日: 2026-10-28
+調査対象: `origin/develop` (`d6748035bebab9b499440168c256a19d0a9bc441`)
+
+前回の基準日以降の比較元: `99bb540defd52f9b5f7ceaf6884a4f5638b1d920`（2026-10-03）。比較期間中に追加・変更・削除されたテスト関連ファイル82件を差分で確認し、既存2項目と追加機能の期待値を実装・正式ドキュメントに照合した。全テストの全経路を網羅した証明ではない。
+
+今回の結果は、仕様判断の継続2件、追加テストの検証不足2件。追加機能で明確に誤った期待値と断定できる新規項目は今回の範囲では確認していない。
 
 ## 目的
 
@@ -10,7 +14,7 @@
 
 ## 判断が必要な項目
 
-### 1. 同一レーティング・同一譜面定数で低いスコアを優先するか
+### 1. 【継続・中】同一レーティング・同一譜面定数で低いスコアを優先するか
 
 #### 現状
 
@@ -36,10 +40,10 @@
 
 #### 関連箇所
 
-- `internal/domain/service/rating_slot_service.go`
-- `internal/domain/service/rating_slot_service_test.go`
+- `internal/domain/service/rating_slot_service.go:50`
+- `internal/domain/service/rating_slot_service_test.go:118`
 
-### 2. 認証済みユーザーを公開参照APIのレート制限対象外にするか
+### 2. 【継続・中】認証済みユーザーを公開参照APIのレート制限対象外にするか
 
 #### 現状
 
@@ -60,12 +64,46 @@
 
 #### 関連箇所
 
-- `internal/app/middleware/rate_limit_middleware.go`
-- `internal/app/middleware/rate_limit_middleware_test.go`
-- `internal/app/router.go`
+- `internal/app/middleware/rate_limit_middleware.go:218`
+- `internal/app/middleware/rate_limit_middleware_test.go:573`
+- `internal/app/router.go:392`
 - `docs/API.md`
 
-## 仕様・実装・検証結果が一致している項目
+## 追加テストで残る検証不足
+
+以下は期待値が誤っているという指摘ではなく、テスト成功から保証できる範囲の限界である。
+
+### 3. 【新規・中】コースの実MySQL並行更新テストが標準CIではスキップされる
+
+- `internal/infra/repository/course_concurrency_mysql_test.go:26` は `COURSE_CONCURRENCY_MYSQL_DSN` がないとスキップする。
+- `.github/workflows/ci.yml:18` および `build.yml` は `go test ./...` を呼ぶが、リポジトリ内のworkflowにはこのDSNの設定もMySQLサービスの用意もない。外部のCI変数が別途設定されているかは未確認。
+- 実MySQLテスト自体は `performance_schema.data_lock_waits` で後続処理の待機まで確認する。一方、`internal/usecase/course_usecase_concurrency_test.go:84` の通常テストはメモリ上のロック付き代替リポジトリを使う。こちらの成功だけではInnoDBの実際のロック待機・コミット後の読み取りは保証できない。
+- 例: `FOR UPDATE` の実DB上の排他が失われても、代替リポジトリ側のロックが働けば通常テストが通る可能性がある。
+- 対応判断: MySQLを用意する統合テストjobを追加するか、別の実行場所・頻度と直近の実行結果を記録する。
+
+### 4. 【新規・中】SP称号の並行登録リカバリーはSQLを模倣したテストに留まる
+
+- `internal/infra/repository/honor_repository_impl_test.go:247` は、事前検索で未検出→INSERTの一意制約エラー→`FOR UPDATE`で既存ID取得、という応答を `honorEnsureExec` に設定している。
+- `:267` 以降でSQL文字列・引数を検証しているが、別トランザクションのコミットを待つ挙動、REPEATABLE READのスナップショットとカレントリードの違いは実行していない。
+- `internal/infra/repository/honor_repository_impl.go:172` 付近の実装意図は「先行コミット済みの行をREPEATABLE READでも取得する」こと。代替ExecutorにIDを返させるテスト成功だけでは、その意図がMySQLで成立する証拠にならない。
+- 対応判断: 同一ファイル名・URL違いの2接続による並行登録をMySQLで実行し、両方が同じIDで成功し、保存済みURLが変わらないことを検証する。現実装の誤りと断定はしない。
+
+## 今回追加で確認し、疑義として採用しなかった項目
+
+- 名前順フォルダの濁音・小文字などが `NUMBER` になるケース: `ResolveNameFolderCode` は正規化済み読みを前提とし、正式API仕様（`docs/API.md:4825`）も選択文字列をNFKC正規化して先頭文字で判定する。テストの非正規化入力だけから通常データの誤分類とは断定しない。
+- Firebaseアカウント変更後の旧ユーザー削除失敗でも成功するケース: DB差し替え後の外部処理失敗として正式API仕様と実装に明記済み。コミット失敗時に旧アカウントを削除しない経路の専用テストはないが、コードはトランザクション失敗時に即returnしている。
+- 互換APIで未認証を503へ変換するケース、`rating_max`へ現在値を返すケース: `docs/API.md` の互換契約に明記済み。
+- 固定件数目標を対象数減少時に自動補正しないケース: `docs/API.md:2505` に維持する仕様が明記済み。
+- 権限変更時のレート制限: 今回追加のテストは枠の開始時刻・消費回数を維持して上限のみ変える挙動を検証する。前述の未認証IP制限の免除問題とは別であり、この追加テストを疑義とはしない。
+
+## 今回の検証と限界
+
+- 実装・テスト差分・正式API仕様・CI設定を静的に確認した。変更はこの資料のみで、本番コードとテストの期待値は変更していない。
+- `go test ./...` は本環境の `/usr/bin/go` がGo言語のCLIとして動かず、`Go: Unknown option: test` となり実行できなかった。今回のテスト成功を主張しない。
+- `go vet`、実MySQL並行テスト、実DB照会、マイグレーション適用は今回未実行。
+- 下記の譜面定数に関する実行結果・データ件数は2026-10-03の過去記録であり、今回のdevelopで再実行した結果ではない。
+
+## 前回確認済みの項目（実行結果は2026-10-03）
 
 ### 譜面定数は必ず`1.0`以上とする
 
