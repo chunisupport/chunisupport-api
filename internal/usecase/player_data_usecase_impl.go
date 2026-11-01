@@ -894,6 +894,9 @@ func randomFavoriteHonorSlots(honors map[string]PlayerDataHonorPayload) []int {
 // 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
 func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time, beforeStatistics service.PlayerRecordStatisticsSnapshot) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
 	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
+	if err := validateMainSlotRecordsResolved(scores.Standard, fullRecordsToUpsert, masters); err != nil {
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
 	worldsendCounts, worldsendSkipped, worldsendRecordsToUpsert := applyWorldsendScores(playerID, scores.Worldsend, masters, updatedAt)
 	courseCounts, courseSkipped, courseRecordsToUpsert := applyCourseScores(playerID, scores.Course, masters, updatedAt)
 	counts.WorldsendRecordsUpserted = worldsendCounts.WorldsendRecordsUpserted
@@ -1345,6 +1348,27 @@ func normalizeFullRecordsForUpsert(records []repository.PlayerRecordForUpsert) [
 	return normalized
 }
 
+// validateMainSlotRecordsResolved は本枠のスキップによる枠の消失を防ぎます。
+// 重複の正規化前に件数を比較し、末尾の順位が保存できない場合も拒否します。
+func validateMainSlotRecordsResolved(entries []PlayerDataScoreEntry, records []repository.PlayerRecordForUpsert, masters *playerDataMaster) error {
+	missing := 0
+	for _, entry := range entries {
+		if isMainSlotEntry(entry) {
+			missing++
+		}
+	}
+	for _, record := range records {
+		slot := masters.SlotNamesByID[record.State.SlotID]
+		if slot == "best" || slot == "new" {
+			missing--
+		}
+	}
+	if missing > 0 {
+		return newPlayerDataSlotValidationError("best or new slot records could not be saved")
+	}
+	return nil
+}
+
 func validateFullRecordSlots(records []repository.PlayerRecordForUpsert, masters *playerDataMaster) error {
 	seenOrders := make(map[string]map[int]struct{})
 	counts := make(map[string]int)
@@ -1380,6 +1404,14 @@ func validateFullRecordSlots(records []repository.PlayerRecordForUpsert, masters
 			return newPlayerDataSlotValidationError(fmt.Sprintf("%s slot_order is duplicated: %d", slotName, *record.State.SlotOrder))
 		}
 		orders[*record.State.SlotOrder] = struct{}{}
+	}
+	// 上限未満の正常な枠は許可し、難易度ごとの収集漏れなどによる欠番を拒否します。
+	for _, slotName := range []string{"best", "new"} {
+		for order := 1; order <= counts[slotName]; order++ {
+			if _, exists := seenOrders[slotName][order]; !exists {
+				return newPlayerDataSlotValidationError(fmt.Sprintf("%s slot_order must be consecutive from 1", slotName))
+			}
+		}
 	}
 	return nil
 }
