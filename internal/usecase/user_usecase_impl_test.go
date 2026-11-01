@@ -930,6 +930,55 @@ func TestUserUsecase_GetUserProfile_同一楽曲の通常譜面とUltimaロッ�
 	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 70), *result.Player.OverpowerPercent)
 }
 
+func TestUserUsecase_GetUserProfile_通常譜面未解禁はULTIMAを含む楽曲の最大OPを分母から除く(t *testing.T) {
+	now := time.Now()
+	un, err := username.NewUserName("tester")
+	require.NoError(t, err)
+	overpowerValue := 50.0
+	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	player := &entity.Player{
+		ID:             1,
+		Name:           playernametest.New(t, "テストプレイヤー"),
+		Level:          1,
+		OverpowerValue: &overpowerValue,
+		UpdatedAt:      now,
+	}
+	lockedSong, err := entity.NewPlayerLockedSong(1, 10, false)
+	require.NoError(t, err)
+	provider := &stubOverpowerDenominatorProvider{
+		snapshot: &repository.OverpowerDenominatorSnapshot{
+			GlobalTotal: 100,
+			SongMaxOP: map[int]float64{
+				10: 30,
+			},
+			SongMaxOPWithoutUltima: map[int]float64{
+				10: 25,
+			},
+		},
+	}
+	usecase := NewUserUsecaseWithOverpowerDenominator(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		&stubPlayerLockedSongRepository{lockedSongs: []*entity.PlayerLockedSong{lockedSong}},
+		provider,
+	)
+
+	result, err := usecase.GetUserProfile(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Player)
+	require.NotNil(t, result.Player.OverpowerPercent)
+	// 通常譜面群が未解禁の楽曲は分子からも消えるため、ULTIMA分ではなく楽曲最大OPを丸ごと除く。
+	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 70), *result.Player.OverpowerPercent)
+}
+
 func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する(t *testing.T) {
 	now := time.Now()
 	scorePlayed, _ := score.NewScore(1000000)

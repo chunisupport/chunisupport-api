@@ -8,8 +8,11 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -595,6 +598,67 @@ func TestPlayerLockedSongLock_再計算済みの記録を無効にする(t *test
 	require.NoError(t, err)
 	require.NotNil(t, playerRepo.saved)
 	assert.Nil(t, playerRepo.saved.RecalculatedMasterFingerprint)
+}
+
+func TestPlayerLockedSongLock_通常譜面を未解禁にするとULTIMAのOPも除外する(t *testing.T) {
+	// Given
+	displayID, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	recordScore, err := score.NewScore(1_010_000)
+	require.NoError(t, err)
+	ultimaConst, err := chartconstant.NewChartConstant(15.0)
+	require.NoError(t, err)
+	masterConst, err := chartconstant.NewChartConstant(13.0)
+	require.NoError(t, err)
+	lockedPlayer := &entity.Player{ID: 10, UserID: 100}
+	records := []*entity.PlayerRecord{
+		{
+			PlayerID:        10,
+			ChartID:         10,
+			Score:           recordScore,
+			Song:            &entity.Song{ID: 1},
+			Chart:           &entity.Chart{ID: 10, Const: ultimaConst},
+			ChartDifficulty: &entity.ChartDifficulty{ID: 5, Name: info.DifficultyNameUltima},
+		},
+		{
+			PlayerID:        10,
+			ChartID:         11,
+			Score:           recordScore,
+			Song:            &entity.Song{ID: 1},
+			Chart:           &entity.Chart{ID: 11, Const: masterConst},
+			ChartDifficulty: &entity.ChartDifficulty{ID: 4, Name: "MASTER"},
+		},
+		{
+			PlayerID:        10,
+			ChartID:         12,
+			Score:           recordScore,
+			Song:            &entity.Song{ID: 2},
+			Chart:           &entity.Chart{ID: 12, Const: ultimaConst},
+			ChartDifficulty: &entity.ChartDifficulty{ID: 4, Name: "MASTER"},
+		},
+	}
+	songRepo := new(MockSongRepository)
+	songRepo.On("FindByDisplayID", mock.Anything, mock.Anything, displayID.String()).
+		Return(&entity.Song{ID: 1, DisplayID: displayID.String(), Charts: []*entity.Chart{{DifficultyID: domainservice.DifficultyIDUltima}}}, nil).Once()
+	playerRepo := &stubPlayerLockedSongPlayerRepository{lockedPlayer: lockedPlayer}
+	u := &playerLockedSongUsecase{
+		tm:             &passthroughTransactionManager{},
+		playerRepo:     playerRepo,
+		playerRecRepo:  &stubPlayerRecordRepositoryForLockedSong{records: records},
+		playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
+		songRepo:       songRepo,
+		// Lock直後の未解禁集合を再現するため、通常譜面群の未解禁だけを返す。
+		lockedRepo: &spyPlayerLockedSongRepository{lockedSongs: []*entity.PlayerLockedSong{{PlayerID: 10, SongID: 1, IsUltima: false}}},
+	}
+
+	// When
+	err = u.Lock(context.Background(), 100, &PlayerLockedSongInput{DisplayID: displayID, IsUltima: false})
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, playerRepo.saved)
+	require.NotNil(t, playerRepo.saved.OverpowerValue)
+	assert.InDelta(t, domainservice.CalcSingleOverpower(1_010_000, 15.0, 0), *playerRepo.saved.OverpowerValue, 0.0001)
 }
 
 func TestNewPlayerLockedSongUsecase_フレンド判定リポジトリは必須(t *testing.T) {

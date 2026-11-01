@@ -1773,22 +1773,16 @@ func optionalIntValue(value *int) string {
 }
 
 func calculateOverpowerSummaryFromPlayerRecords(ctx context.Context, records []*entity.PlayerRecord, lockedSongs []*entity.PlayerLockedSong, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
-	lockedSet := make(map[string]struct{}, len(lockedSongs))
-	for _, lockedSong := range lockedSongs {
-		if lockedSong == nil {
-			continue
-		}
-		lockedSet[lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)] = struct{}{}
-	}
+	lockedSet := service.NewPlayerLockedSongSet(lockedSongs)
 	overpowerRecords, skippedRecords, err := playerRecordsToOverpowerRecordsWithSkipped(records, false, func(record *entity.PlayerRecord) (bool, string) {
-		if len(lockedSet) == 0 {
+		if lockedSet.IsEmpty() {
 			return true, ""
 		}
 		if record.ChartDifficulty == nil {
 			return false, "chart_difficulty_nil"
 		}
-		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
-		if exists {
+		isUltima := record.ChartDifficulty.Name == info.DifficultyNameUltima
+		if lockedSet.IsLocked(record.Song.ID, isUltima) {
 			return false, "locked_song"
 		}
 		return true, ""

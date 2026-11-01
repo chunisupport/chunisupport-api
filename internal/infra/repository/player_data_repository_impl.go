@@ -378,6 +378,10 @@ func (r *playerDataRepository) getOverpowerTargetStats(ctx context.Context, exec
 		INNER JOIN charts c ON c.song_id = s.id
 	`
 	if filter.PlayerID != nil {
+		// 未解禁の扱いは service.PlayerLockedSongSet と同じ規則にする。
+		// pls_song（通常譜面群の未解禁）がある楽曲は楽曲ごと分母から外し、
+		// pls_ultima（ULTIMAだけの未解禁）がある楽曲は ULTIMA の定数だけを NULL にして通常譜面の最大定数を残す。
+		// 規則を変えるときは PlayerLockedSongSet と揃える。
 		maxConstExpr = `MAX(
 			CASE
 				WHEN pls_ultima.song_id IS NOT NULL AND d.name = 'ULTIMA' THEN NULL

@@ -1007,43 +1007,23 @@ func (s *userUsecase) applyDynamicOverpowerPercent(ctx context.Context, player *
 		if err != nil {
 			return err
 		}
-		type lockState struct {
-			normal bool
-			ultima bool
-		}
-		lockedMap := make(map[int]lockState, len(lockedSongs))
-		for _, lockedSong := range lockedSongs {
-			if lockedSong == nil {
-				continue
-			}
-			state := lockedMap[lockedSong.SongID]
-			if lockedSong.IsUltima {
-				state.ultima = true
-			} else {
-				state.normal = true
-			}
-			lockedMap[lockedSong.SongID] = state
-		}
-		for songID, state := range lockedMap {
-			if state.normal {
-				maxOP, ok := snapshot.SongMaxOP[songID]
-				if !ok {
-					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked song not found in snapshot", "song_id", songID, "player_id", playerID)
-					continue
+		lockedSet := service.NewPlayerLockedSongSet(lockedSongs)
+		// 未解禁設定がない場合はどの楽曲も対象のままなので、全楽曲の分母走査を省略する。
+		if !lockedSet.IsEmpty() {
+			for songID, maxOP := range snapshot.SongMaxOP {
+				switch {
+				case lockedSet.IsSongLocked(songID):
+					// 通常譜面群が未解禁の楽曲は分子にも残らないため、楽曲最大OPを分母から丸ごと除く。
+					denominator -= maxOP
+				case lockedSet.IsUltimaLocked(songID):
+					// ULTIMAだけが未解禁の楽曲は通常譜面の最大OPだけを残す。
+					maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[songID]
+					if !ok {
+						slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", songID, "player_id", playerID)
+						continue
+					}
+					denominator -= maxOP - maxOPWithoutUltima
 				}
-				denominator -= maxOP
-			} else if state.ultima {
-				maxOP, ok := snapshot.SongMaxOP[songID]
-				if !ok {
-					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOP", "song_id", songID, "player_id", playerID)
-					continue
-				}
-				maxOPWithoutUltima, ok := snapshot.SongMaxOPWithoutUltima[songID]
-				if !ok {
-					slog.WarnContext(ctx, "applyDynamicOverpowerPercent: locked Ultima song not found in snapshot.SongMaxOPWithoutUltima", "song_id", songID, "player_id", playerID)
-					continue
-				}
-				denominator -= maxOP - maxOPWithoutUltima
 			}
 		}
 	}

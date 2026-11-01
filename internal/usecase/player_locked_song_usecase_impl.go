@@ -258,17 +258,12 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 	if err != nil {
 		return err
 	}
-	lockedSet := make(map[string]struct{}, len(lockedSongs))
-	for _, lockedSong := range lockedSongs {
-		key := lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)
-		lockedSet[key] = struct{}{}
-	}
+	lockedSet := domainservice.NewPlayerLockedSongSet(lockedSongs)
 	overpowerRecords, err := playerRecordsToOverpowerRecords(records, false, func(record *entity.PlayerRecord) bool {
 		if record.ChartDifficulty == nil {
 			return false
 		}
-		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
-		return !exists
+		return !lockedSet.IsLocked(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)
 	})
 	if err != nil {
 		return err
@@ -281,8 +276,4 @@ func (u *playerLockedSongUsecase) recalculatePlayerOverpowerWithTx(ctx context.C
 	value, percent := domainservice.CalcOverpowerSummary(overpowerRecords, stats.MaxOverpowerTotal)
 	player.ChangeOverpower(&value, &percent)
 	return u.playerRepo.Save(ctx, exec, player)
-}
-
-func lockedSongKey(songID int, isUltima bool) string {
-	return fmt.Sprintf("%d:%t", songID, isUltima)
 }

@@ -250,10 +250,8 @@ func calculateTransferDerivedMetrics(snapshot *entity.UserDataTransferSnapshot, 
 	best := make([]service.RatingSlotRecord, 0, 30)
 	newest := make([]service.RatingSlotRecord, 0, 20)
 	overpower := make([]service.OverpowerRecord, 0, len(snapshot.Records))
-	locked := make(map[string]struct{}, len(snapshot.LockedSongs))
-	for _, item := range snapshot.LockedSongs {
-		locked[item.SongOfficialIdx+"\x00"+fmt.Sprintf("%t", item.IsUltima)] = struct{}{}
-	}
+	// 未解禁設定は記録と違って譜面を持たないため、official_idx と難易度の全譜面から楽曲IDを解決する。
+	lockedSet := service.NewPlayerLockedSongSet(transferLockedSongs(snapshot.LockedSongs, masters))
 	for _, record := range snapshot.Records {
 		chart := masters.charts[transferChartKey(record.SongOfficialIdx, record.Difficulty)]
 		rating := service.RatingSlotRecord{ChartID: chart.ID, Score: uint32(record.Score), ChartConst: chart.ChartConst, OfficialIndex: parseTransferOfficialIndex(record.SongOfficialIdx)}
@@ -265,15 +263,30 @@ func calculateTransferDerivedMetrics(snapshot *entity.UserDataTransferSnapshot, 
 				newest = append(newest, rating)
 			}
 		}
-		_, songLocked := locked[record.SongOfficialIdx+"\x00false"]
-		_, ultimaLocked := locked[record.SongOfficialIdx+"\x00true"]
-		if !chart.IsDeleted && !songLocked && !(record.Difficulty == info.DifficultyNameUltima && ultimaLocked) {
+		isUltima := record.Difficulty == info.DifficultyNameUltima
+		if !chart.IsDeleted && !lockedSet.IsLocked(chart.SongID, isUltima) {
 			overpower = append(overpower, service.OverpowerRecord{SongID: chart.SongID, Score: uint32(record.Score), ChartConst: chart.ChartConst, ComboLampID: masters.comboLampIDs[record.ComboLampName]})
 		}
 	}
 	stats := service.AggregateOfficialRating(best, newest)
 	op, _ := service.CalcOverpowerSummary(overpower, 0)
 	return stats.PlayerRating, stats.BestAverage, stats.NewAverage, op
+}
+
+// transferLockedSongs は引き継ぎスナップショットの未解禁設定を楽曲ID付きのエンティティへ変換します。
+//
+// 呼び出し前の findUnresolvedReferences が未解禁曲の official_idx をすべて照合済みのため、
+// ここで解決できない未解禁設定は通常現れない。PlayerID は判定に使わないため設定しない。
+func transferLockedSongs(lockedSongs []entity.UserDataTransferLockedSong, masters *transferMasterData) []*entity.PlayerLockedSong {
+	lockedEntities := make([]*entity.PlayerLockedSong, 0, len(lockedSongs))
+	for _, lockedSong := range lockedSongs {
+		songID, ok := masters.songIDs[lockedSong.SongOfficialIdx]
+		if !ok {
+			continue
+		}
+		lockedEntities = append(lockedEntities, &entity.PlayerLockedSong{SongID: songID, IsUltima: lockedSong.IsUltima})
+	}
+	return lockedEntities
 }
 
 func saveTransferRecords(ctx context.Context, exec domainrepo.Executor, playerID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData) error {
