@@ -19,6 +19,7 @@
 - [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
+- [サーバー新設手順](docs/server_setup.md)
 
 ## 技術スタック
 
