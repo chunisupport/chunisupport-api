@@ -50,6 +50,39 @@ func (h *V1CourseHandler) GetUserRecords(c *echo.Context) error {
 	return c.JSON(http.StatusOK, &api_v1.V1CourseRecordListResponse{UpdatedAt: result.UpdatedAt, Courses: toV1CourseRecordDTOs(result.Records)})
 }
 
+func (h *V1CourseHandler) Create(c *echo.Context) error {
+	var req api_v1.V1CreateCourseRequest
+	if err := handler.BindStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return apierror.ErrValidationFailed.WithInternal(err)
+	}
+	item, err := h.usecase.Create(c.Request().Context(), usecase.CreateCourseInput{Idx: req.Idx, Name: req.Name, Class: req.Class})
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusCreated, toV1CourseDTO(item))
+}
+func (h *V1CourseHandler) Update(c *echo.Context) error {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
+	if apiErr != nil {
+		return apiErr
+	}
+	var req api_v1.V1UpdateCourseRequest
+	if err := handler.BindStrictJSON(c, &req); err != nil {
+		return apierror.ErrBadRequest.WithInternal(err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return apierror.ErrValidationFailed.WithInternal(err)
+	}
+	item, err := h.usecase.Update(c.Request().Context(), displayID, usecase.UpdateCourseInput{Name: req.Name, Class: req.Class})
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, toV1CourseDTO(item))
+}
+
 func toV1CourseDTO(value *usecase.CourseOutput) *api_v1.V1CourseDTO {
 	if value == nil {
 		return nil
