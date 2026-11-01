@@ -177,7 +177,7 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			identifier := c.RealIP()
+			identifier := ClientIPKey(c)
 
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 
@@ -228,7 +228,7 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 				return next(c)
 			}
 
-			identifier := c.RealIP()
+			identifier := ClientIPKey(c)
 
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 			if !allowed {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -85,7 +86,7 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 	result, err := h.temporaryPlayerDataUsecase.Create(c.Request().Context(), usecase.CreateTemporaryPlayerDataInput{
-		IPAddress: c.RealIP(),
+		IPAddress: middleware.ClientIPKey(c),
 		Payload:   internalPayload,
 		BodyHash:  hex.EncodeToString(hash[:]),
 	})

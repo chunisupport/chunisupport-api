@@ -11,7 +11,7 @@ func IPAndUsernameRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFun
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			key := c.RealIP() + "\x00" + c.Param("username")
+			key := ClientIPKey(c) + "\x00" + c.Param("username")
 			allowed, _, _ := store.Allow(key, config.Requests)
 			if !allowed {
 				return apierror.ErrTooManyRequests

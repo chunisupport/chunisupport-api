@@ -104,6 +104,31 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
 	mockUC.AssertExpectations(t)
 }
 
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_IPv6は64単位で保持件数を数える(t *testing.T) {
+	// Given
+	e := echo.New()
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(gzipJSON(t, map[string]any{"name": "TEST"})))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.RemoteAddr = "[2001:db8:1:2:3:4:5:6]:12345"
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mockUC.On("Create", mock.Anything, mock.MatchedBy(func(input usecase.CreateTemporaryPlayerDataInput) bool {
+		return input.IPAddress == "2001:db8:1:2::/64"
+	})).Return(&usecase.CreateTemporaryPlayerDataOutput{UploadToken: "token", ExpiresAt: time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)}, nil).Once()
+
+	// When
+	err := h.CreateTemporaryData(c)
+
+	// Then
+	require.NoError(t, err)
+	mockUC.AssertExpectations(t)
+}
+
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_認証状態を見ない(t *testing.T) {
 	e := echo.New()
 	e.Validator = &testValidator{validator: validator.New()}

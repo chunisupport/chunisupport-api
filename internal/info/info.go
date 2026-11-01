@@ -140,6 +140,9 @@ const (
 	TurnstileActionLogin  = "login"
 	TurnstileActionSignup = "signup"
 
+	// ClientIPv6PrefixBits はIPv6の送信元を1つとして数えるプレフィックス長です。
+	ClientIPv6PrefixBits = 64
+
 	TempDataTTL                  = 5 * time.Minute
 	TempDataMaxCompressedBytes   = 512000
 	TempDataMaxUncompressedBytes = 5 * 1024 * 1024
