@@ -72,7 +72,8 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 
 例外:
 
-- `POST /internal/me/register-data` と `POST /internal/player-data/temp`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/me/register-data`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/player-data/temp`: 受付時はJSONをデコードしないため、構文不正でも 201 を返します。デコードは `POST /internal/player-data/commit` の実行時に行い、未知フィールドは無視、構文不正は 400 です。
 - `POST /internal/me/data-transfer/validate` と `POST /internal/me/data-transfer/import`: 移行ファイル本体を受け取り、未知フィールドの拒否は専用コーデック側で行います。
 - `DELETE /internal/me/locked-songs/:id`: JSONボディではなく path / query をバインドします。
 
@@ -2223,10 +2224,12 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - **制限**:
   - gzip後サイズ: 500KiB以下
   - 解凍後JSONサイズ: 5MiB以下
-  - 同時保持件数: 1IPあたり最大3件
+  - 同時保持件数: 1送信元あたり最大3件（IPv4はアドレス単位、IPv6は `/64` 単位）
+  - 同時保持量: 1送信元あたり最大 約1.5MB（gzip後サイズの上限 × 3件）
+  - 全体の保持量: gzip後サイズの合計で `temp_data.max_total_mb`（既定 64MB）まで
 - **検証内容**:
   - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびサイズ制限のみを検証します。
-  - 展開後の本文は生のバイト列のまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
+  - 受信したgzip本文をそのまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
   - そのため、JSON構文が壊れている本文や、`PlayerDataPayload` として解釈できない本文でも一時保存される場合があります。
   - 厳密な検証および実際の登録処理は `/internal/player-data/commit` 実行時に初めて行われます。
   - 認証状態は判定に使いません。認証済みブラウザから呼び出した場合でも、未認証と同じ扱いで受け付けます。
@@ -2244,7 +2247,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 - `400 Bad Request`: gzip不正 / `Content-Encoding` 不正 / `Content-Type` 不正
 - `413 Payload Too Large`: サイズ上限超過
-- `409 Conflict`: 1IPあたり保持件数上限超過
+- `409 Conflict`: 1送信元あたり保持件数上限超過
 - `429 Too Many Requests`: レート超過
 - `503 Service Unavailable`: 一時データ総量上限超過
 

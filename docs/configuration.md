@@ -35,7 +35,7 @@
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
-- `temp_data.max_total_mb`（任意。未設定または0以下の場合は`64`を使用）
+- `temp_data.max_total_mb`（任意。一時保存するgzip本文の合計サイズの上限。未設定または0以下の場合は`64`を使用）
 - `database.startup.max_wait_sec`（任意。未設定の場合は`120`、`0`の場合は再試行せず即時失敗）
 - `database.startup.interval_sec`（任意。未設定の場合は`5`、1以上）
 - `database.pool.max_open_conns`（必須）
