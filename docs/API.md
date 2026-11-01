@@ -337,6 +337,8 @@ Content-Type: application/json
 | `/v1/users/:username/rating-op-history` | GET | APIトークン | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/courses` | POST | APIトークン (`read_write`、ADMIN+) | コース追加 |
+| `/v1/courses/:id` | PUT | APIトークン (`read_write`、EDITOR+) | コース名称・クラス更新 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
@@ -5411,6 +5413,46 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **概要**: 有効なコースマスタ単件を取得します。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+
+### POST `/v1/courses`
+- **認証**: `read_write` APIトークンかつADMIN以上
+- **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
+- **リクエストボディ**:
+
+```json
+{
+  "idx": "50020",
+  "name": "CLASS I COURSE",
+  "class": "1"
+}
+```
+
+| フィールド | 型 | 必須 | バリデーション |
+| ---------- | -- | ---- | -------------- |
+| `idx` | string | ✓ | 公式インデックス。最大32文字。前後空白除去後に空不可。既存値と重複不可 |
+| `name` | string | ✓ | コース名。最大255文字。前後空白除去後に空不可 |
+| `class` | string | ✓ | コースクラス。`1`〜`5` / `inf` / `extra`。最大16文字 |
+
+- **レスポンス**: 201 Created。`id` / `idx` / `name` / `class` を含む、GET単件取得と同じ形式のコースオブジェクトを返します。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド
+  - 401 Unauthorized: APIトークン未指定または無効
+  - 403 Forbidden (`forbidden`): `read` トークン、またはADMIN権限なし
+  - 409 Conflict (`duplicate_official_idx`): `idx` 重複
+  - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
+
+### PUT `/v1/courses/:id`
+- **認証**: `read_write` APIトークンかつEDITOR以上
+- **概要**: コース名称とクラスを更新します。`id` は文字列の外部識別子です。`idx` は変更できません。`class` の `6` は `inf` に正規化します。
+- **リクエストボディ**: `{ "name": "CLASS I COURSE", "class": "1" }`。両方必須で、制約は作成時と同じです。
+- **並行更新**: 同じコースの編集・削除・復元は行ロックの取得順に処理します。名称・クラスの編集は削除状態を保持します。削除済みのコースも編集できます。
+- **レスポンス**: 200 OK。`id` / `idx` / `name` / `class` を含む、GET単件取得と同じ形式のコースオブジェクトを返します。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド（`idx` を含む）
+  - 401 Unauthorized: APIトークン未指定または無効
+  - 403 Forbidden (`forbidden`): `read` トークン、またはEDITOR以上の権限なし
+  - 404 Not Found (`not_found`): コースが存在しない
+  - 422 Unprocessable Entity (`validation_failed`): 入力や `id` の形式が不正、または未知の `class`
 
 ### GET `/v1/users/:username/records/courses`
 - **認証**: APIトークン必須

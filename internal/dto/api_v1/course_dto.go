@@ -56,3 +56,14 @@ func ToV1CourseRecordDTO(course *dto.CourseRecordDTO) *V1CourseRecordDTO {
 		UpdatedAt: course.UpdatedAt,
 	}
 }
+
+type V1CreateCourseRequest struct {
+	Idx   string `json:"idx" validate:"required,max=32"`
+	Name  string `json:"name" validate:"required,max=255"`
+	Class string `json:"class" validate:"required,max=16"`
+}
+
+type V1UpdateCourseRequest struct {
+	Name  string `json:"name" validate:"required,max=255"`
+	Class string `json:"class" validate:"required,max=16"`
+}

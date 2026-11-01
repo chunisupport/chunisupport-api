@@ -702,6 +702,8 @@ func registerRoutes(
 		apiV1.GET("/users/:username/records/courses", handlers.V1Course.GetUserRecords)
 		apiV1.GET("/courses", handlers.V1Course.List)
 		apiV1.GET("/courses/:id", handlers.V1Course.Get)
+		apiV1.POST("/courses", handlers.V1Course.Create, requireAPITokenWrite, requireAdmin)
+		apiV1.PUT("/courses/:id", handlers.V1Course.Update, requireAPITokenWrite, requireEditor)
 		apiV1.GET("/master/versions", handlers.V1Version.GetVersions)
 	}
 
