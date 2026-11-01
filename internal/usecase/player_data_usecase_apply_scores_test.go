@@ -58,7 +58,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 				ComboLv:   intPtrForApplyScoresTest(3),
 				FullChain: intPtrForApplyScoresTest(3),
 				Slot:      stringPtrForApplyScoresTest("best"),
-				Order:     intPtrForApplyScoresTest(2),
+				Order:     intPtrForApplyScoresTest(1),
 			},
 		},
 		Worldsend: []PlayerDataScoreEntry{
@@ -106,7 +106,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 			ComboLampID: 3,
 			FullChainID: 2,
 			SlotID:      2,
-			SlotOrder:   intPtrForApplyScoresTest(2),
+			SlotOrder:   intPtrForApplyScoresTest(1),
 			UpdatedAt:   updatedAt,
 		},
 	}, repo.savedInput.FullRecords[0])
@@ -515,7 +515,7 @@ func TestValidateFullRecordSlots_枠順と件数を検証する(t *testing.T) {
 	bestOrder1 := 1
 	bestOrder2 := 2
 	bestOrder31 := 31
-	newOrder20 := 20
+	newOrder1 := 1
 	candidateOrder10 := 10
 	noneOrder := 1
 	masters := newApplyScoresTestMasters()
@@ -532,7 +532,7 @@ func TestValidateFullRecordSlots_枠順と件数を検証する(t *testing.T) {
 				{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder1}},
 				{ChartID: 102, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &bestOrder2}},
 				{ChartID: 103, State: repository.PlayerRecordState{SlotID: 1}},
-				{ChartID: 104, State: repository.PlayerRecordState{SlotID: 3, SlotOrder: &newOrder20}},
+				{ChartID: 104, State: repository.PlayerRecordState{SlotID: 3, SlotOrder: &newOrder1}},
 				{ChartID: 105, State: repository.PlayerRecordState{SlotID: 4, SlotOrder: &candidateOrder10}},
 				{ChartID: 106, State: repository.PlayerRecordState{SlotID: 5, SlotOrder: &candidateOrder10}},
 			},
