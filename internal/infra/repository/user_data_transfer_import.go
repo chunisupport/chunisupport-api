@@ -425,16 +425,16 @@ func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, pl
 
 func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData) error {
 	type goalRow struct {
-		UserID            int       `db:"user_id"`
-		GroupID           *uint32   `db:"group_id"`
-		Title             string    `db:"title"`
-		AchievementTypeID int       `db:"achievement_type_id"`
-		AchievementParams []byte    `db:"achievement_params"`
-		Attributes        []byte    `db:"attributes"`
-		InvertValue       bool      `db:"invert_value"`
-		InvertPercentage  bool      `db:"invert_percentage"`
-		SortOrder         uint16    `db:"sort_order"`
-		CreatedAt         time.Time `db:"created_at"`
+		UserID            int             `db:"user_id"`
+		GroupID           *uint32         `db:"group_id"`
+		Title             string          `db:"title"`
+		AchievementTypeID int             `db:"achievement_type_id"`
+		AchievementParams json.RawMessage `db:"achievement_params"`
+		Attributes        json.RawMessage `db:"attributes"`
+		InvertValue       bool            `db:"invert_value"`
+		InvertPercentage  bool            `db:"invert_percentage"`
+		SortOrder         uint16          `db:"sort_order"`
+		CreatedAt         time.Time       `db:"created_at"`
 	}
 	rows := make([]goalRow, 0)
 	appendGoal := func(item entity.UserDataTransferGoal, groupID *uint32) error {

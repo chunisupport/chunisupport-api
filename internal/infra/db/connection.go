@@ -100,6 +100,9 @@ func ConnectContext(ctx context.Context, dbConfig config.DbConfig) (*sqlx.DB, er
 //   - charset と collation は指定せず、ドライバ既定の utf8mb4（utf8mb4_general_ci）を使う。
 //     ドライバが埋め込みを拒否する big5 / cp932 / gb2312 / gbk / sjis / gb18030 は使わない。
 //   - セッションの sql_mode で NO_BACKSLASH_ESCAPES を有効にしない。
+//
+// []byte は _binary'...' に展開され、JSON列へ書き込むとエラー3144になります。
+// JSON列へ渡す値は、文字列として展開される json.RawMessage にしてください。
 func mysqlDSN(dbConfig config.DbConfig) string {
 	// clientFoundRows=true: UPDATE時に「変更された行数」ではなく「マッチした行数」を返すようにする。
 	// これにより、値が変わらないUPDATEでもRowsAffected>=1となり、
