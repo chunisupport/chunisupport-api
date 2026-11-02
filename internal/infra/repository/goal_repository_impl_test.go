@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -186,6 +188,95 @@ func TestGoalRepository_PersistsInvertFlagsIndependently(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, updated.InvertValue)
 	assert.True(t, updated.InvertPercentage)
+}
+
+// jsonArgCapturingExecutor は Executor へ渡す引数を記録します。
+// SQLiteではMySQLのJSON列の制約を再現できないため、引数の型を直接検証します。
+type jsonArgCapturingExecutor struct {
+	domainrepo.Executor
+	args []any
+}
+
+func (e *jsonArgCapturingExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	e.args = args
+	return e.Executor.ExecContext(ctx, query, args...)
+}
+
+func (e *jsonArgCapturingExecutor) NamedExecContext(ctx context.Context, query string, arg any) (sql.Result, error) {
+	_, args, err := sqlx.Named(query, arg)
+	if err != nil {
+		return nil, err
+	}
+	e.args = args
+	return e.Executor.NamedExecContext(ctx, query, arg)
+}
+
+func TestGoalPersistence_JSON列へjsonRawMessageとして渡す(t *testing.T) {
+	newGoal := func() *entity.Goal {
+		return &entity.Goal{
+			UserID:            1,
+			Title:             "JSONテスト",
+			AchievementTypeID: 1,
+			AchievementParams: []byte(`{"count":1}`),
+			Attributes:        []byte(`{}`),
+			SortOrder:         1,
+		}
+	}
+	tests := []struct {
+		name string
+		// When: 目標を書き込む操作
+		write func(ctx context.Context, repo *goalRepository, exec domainrepo.Executor) error
+	}{
+		{
+			name: "目標の作成",
+			write: func(ctx context.Context, repo *goalRepository, exec domainrepo.Executor) error {
+				return repo.Create(ctx, exec, newGoal())
+			},
+		},
+		{
+			name: "目標の更新",
+			write: func(ctx context.Context, repo *goalRepository, exec domainrepo.Executor) error {
+				goal := newGoal()
+				if err := repo.Create(ctx, repo.db, goal); err != nil {
+					return err
+				}
+				return repo.Save(ctx, exec, goal)
+			},
+		},
+		{
+			name: "データ移行での取り込み",
+			write: func(ctx context.Context, _ *goalRepository, exec domainrepo.Executor) error {
+				snapshot := &entity.UserDataTransferSnapshot{Goals: entity.UserDataTransferGoals{
+					Ungrouped: []entity.UserDataTransferGoal{{
+						Title:             "JSONテスト",
+						AchievementType:   "score_count",
+						AchievementParams: json.RawMessage(`{"count":1}`),
+						Attributes:        json.RawMessage(`{}`),
+						SortOrder:         1,
+					}},
+				}}
+				masters := &transferMasterData{achievementTypeIDs: map[string]int{"score_count": 1}}
+				return saveTransferGoals(ctx, exec, 1, snapshot, masters)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupGoalRepositorySQLite(t)
+			repo := &goalRepository{db: db}
+			exec := &jsonArgCapturingExecutor{Executor: db}
+
+			// When
+			err := tt.write(context.Background(), repo, exec)
+
+			// Then
+			require.NoError(t, err)
+			assert.Contains(t, exec.args, json.RawMessage(`{"count":1}`))
+			assert.Contains(t, exec.args, json.RawMessage(`{}`))
+		})
+	}
 }
 
 func TestGoalRepository_SaveGoalOrderAssignsDenseSortOrders(t *testing.T) {

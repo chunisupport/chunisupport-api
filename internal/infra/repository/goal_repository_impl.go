@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -55,7 +56,7 @@ func (r *goalRepository) FindByIDAndUserID(ctx context.Context, exec repository.
 
 func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
 	query := `INSERT INTO goals (user_id, group_id, title, achievement_type_id, achievement_params, attributes, invert_value, invert_percentage, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.InvertValue, goal.InvertPercentage, goal.SortOrder)
+	res, err := exec.ExecContext(ctx, query, goal.UserID, goal.GroupID, goal.Title, goal.AchievementTypeID, json.RawMessage(goal.AchievementParams), json.RawMessage(goal.Attributes), goal.InvertValue, goal.InvertPercentage, goal.SortOrder)
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func (r *goalRepository) Create(ctx context.Context, exec repository.Executor, g
 
 func (r *goalRepository) Save(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
 	query := `UPDATE goals SET group_id = ?, title = ?, achievement_type_id = ?, achievement_params = ?, attributes = ?, invert_value = ?, invert_percentage = ?, sort_order = ? WHERE id = ? AND user_id = ?`
-	res, err := exec.ExecContext(ctx, query, goal.GroupID, goal.Title, goal.AchievementTypeID, goal.AchievementParams, goal.Attributes, goal.InvertValue, goal.InvertPercentage, goal.SortOrder, goal.ID, goal.UserID)
+	res, err := exec.ExecContext(ctx, query, goal.GroupID, goal.Title, goal.AchievementTypeID, json.RawMessage(goal.AchievementParams), json.RawMessage(goal.Attributes), goal.InvertValue, goal.InvertPercentage, goal.SortOrder, goal.ID, goal.UserID)
 	if err != nil {
 		return err
 	}
