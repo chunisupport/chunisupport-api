@@ -60,7 +60,7 @@ func TestEnsurePlayer_古い取得日時は原因エラーを保持する(t *tes
 
 func TestTemporaryPlayerDataUsecase_Create_生成失敗は原因エラーを保持する(t *testing.T) {
 	// Given: 有効期限が作成日時より後にならない保持期間
-	uc := NewTemporaryPlayerDataUsecase(nil, &stubTemporaryPlayerDataRepository{}, &stubPlayerDataUsecase{}, 0)
+	uc := NewTemporaryPlayerDataUsecase(nil, &stubTemporaryPlayerDataRepository{}, &stubPlayerDataUsecase{}, 0, decodeTestTemporaryPayload)
 
 	// When
 	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{

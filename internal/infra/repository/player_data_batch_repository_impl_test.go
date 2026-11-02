@@ -150,6 +150,40 @@ func TestPlayerDataBatchRepository_ProcessPlayer_計算エラーを返す(t *tes
 	assert.Equal(t, 1, count)
 }
 
+func TestPlayerDataBatchRepository_LoadSnapshot_運用日時点のマスタを取得する(t *testing.T) {
+	// Given
+	db := setupPlayerBatchRepository(t)
+	for _, stmt := range []string{
+		`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, released_at DATE NOT NULL)`,
+		`INSERT INTO versions VALUES (1, 'X-VERSE', '2025-07-16'), (2, 'NEXT', '2026-10-01')`,
+		`CREATE TABLE songs (id INTEGER PRIMARY KEY, released_at DATE NULL, is_deleted BOOLEAN NOT NULL, is_worldsend BOOLEAN NOT NULL, official_idx TEXT NOT NULL)`,
+		`INSERT INTO songs VALUES (1, '2025-07-16', 0, 0, '100')`,
+		`CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
+		`INSERT INTO difficulties VALUES (4, 'MASTER')`,
+		`CREATE TABLE charts (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL, difficulty_id INTEGER NOT NULL, const REAL NOT NULL, is_const_unknown BOOLEAN NOT NULL)`,
+		`INSERT INTO charts VALUES (10, 1, 4, 14.5, 0)`,
+	} {
+		_, err := db.Exec(stmt)
+		require.NoError(t, err)
+	}
+	seedPlayerForBatchList(t, db, 3, nil)
+	operationalDate := time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)
+
+	// When
+	snapshot, err := NewPlayerDataBatchRepository(db).LoadSnapshot(context.Background(), operationalDate)
+
+	// Then: 運用日時点で最新のバージョンと、楽曲・譜面・枠・プレイヤーID上限を返す
+	require.NoError(t, err)
+	songReleasedAt := time.Date(2025, 7, 16, 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, domainrepo.PlayerDataMasterSnapshot{
+		Version:    domainrepo.BatchVersion{ID: 1, Name: "X-VERSE", ReleasedAt: songReleasedAt},
+		Songs:      []domainrepo.BatchSong{{ID: 1, ReleasedAt: &songReleasedAt, OfficialIndex: "100"}},
+		Charts:     []domainrepo.BatchChart{{ID: 10, SongID: 1, DifficultyID: 4, DifficultyName: "MASTER", ChartConst: 14.5}},
+		SlotIDs:    map[string]int{"none": 1, "best": 2},
+		UpperBound: 3,
+	}, snapshot)
+}
+
 func TestPlayerDataBatchRepository_ListPlayerKeys_再計算済みのプレイヤーを除外する(t *testing.T) {
 	// Given
 	db := setupPlayerBatchRepository(t)

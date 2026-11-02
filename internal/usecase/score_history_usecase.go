@@ -90,7 +90,7 @@ func (us *scoreHistoryUsecase) GetStandard(ctx context.Context, username string,
 	if err != nil {
 		return nil, err
 	}
-	return us.convertEntries(rows)
+	return us.convertEntries(ctx, rows)
 }
 
 func (us *scoreHistoryUsecase) GetWorldsend(ctx context.Context, username string, requester *entity.User, displayID string) ([]ScoreHistoryEntry, error) {
@@ -112,7 +112,7 @@ func (us *scoreHistoryUsecase) GetWorldsend(ctx context.Context, username string
 	if err != nil {
 		return nil, err
 	}
-	return us.convertEntries(rows)
+	return us.convertEntries(ctx, rows)
 }
 
 func (us *scoreHistoryUsecase) findVisibleUser(ctx context.Context, username string, requester *entity.User) (*entity.User, error) {
@@ -136,7 +136,7 @@ func (us *scoreHistoryUsecase) findVisibleUser(ctx context.Context, username str
 	return user, nil
 }
 
-func (us *scoreHistoryUsecase) convertEntries(rows []entity.ScoreHistoryEntry) ([]ScoreHistoryEntry, error) {
+func (us *scoreHistoryUsecase) convertEntries(ctx context.Context, rows []entity.ScoreHistoryEntry) ([]ScoreHistoryEntry, error) {
 	if len(rows) == 0 {
 		return nil, ErrScoreHistoryNotFound
 	}
@@ -145,9 +145,9 @@ func (us *scoreHistoryUsecase) convertEntries(rows []entity.ScoreHistoryEntry) (
 	for _, row := range rows {
 		entries = append(entries, ScoreHistoryEntry{
 			Score:     row.Score,
-			ClearLamp: playerDataLampNamePtr(masters.ClearLampNamesByID[row.ClearLampID], row.ClearLampID, "clear_lamp"),
-			ComboLamp: playerDataLampNamePtr(masters.ComboLampNamesByID[row.ComboLampID], row.ComboLampID, "combo_lamp"),
-			FullChain: playerDataLampNamePtr(masters.FullChainNamesByID[row.FullChainID], row.FullChainID, "full_chain"),
+			ClearLamp: playerDataLampNamePtr(ctx, masters.ClearLampNamesByID[row.ClearLampID], row.ClearLampID, "clear_lamp"),
+			ComboLamp: playerDataLampNamePtr(ctx, masters.ComboLampNamesByID[row.ComboLampID], row.ComboLampID, "combo_lamp"),
+			FullChain: playerDataLampNamePtr(ctx, masters.FullChainNamesByID[row.FullChainID], row.FullChainID, "full_chain"),
 			UpdatedAt: row.UpdatedAt,
 		})
 	}

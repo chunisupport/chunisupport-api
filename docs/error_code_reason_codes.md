@@ -1,6 +1,6 @@
 # エラーコード / 内部理由コード一覧
 
-最終更新: 2026-09-28
+最終更新: 2026-10-18
 
 ## 更新ルール
 
@@ -22,6 +22,7 @@
 | `missing_token` | トークン欠落 |
 | `forbidden` | 権限不足 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `firebase_account_unchanged` | ログイン用アカウントの変更先が現在と同じ |
 | `recent_sign_in_required` | recent sign-in を満たす再認証が必要 |
 | `registration_failed` | ユーザー登録失敗 |
 | `user_not_found` | ユーザー未検出 |
@@ -126,6 +127,13 @@
 | --- | --- |
 | `update_username_firebase_uid_not_linked` | ユーザー名変更対象ユーザーに Firebase UID が連携されていない |
 | `update_username_reauth_uid_mismatch` | 再認証トークンの UID とユーザー名変更対象ユーザーの Firebase UID が一致しない |
+
+### ログイン用アカウント変更の認証監視ログ（`slog`）
+
+| reason | 発生条件 |
+| --- | --- |
+| `change_firebase_account_firebase_uid_not_linked` | 変更対象ユーザーに Firebase UID が連携されていない |
+| `change_firebase_account_reauth_uid_mismatch` | 再認証トークンの UID と変更対象ユーザーの Firebase UID が一致しない |
 
 ### PlayerData `skipped_records[].reason`
 

@@ -8,7 +8,12 @@ import (
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 )
 
+// TemporaryPlayerDataPayloadDecoder は一時保存された本文をプレイヤーデータへデコードします。
+// 入力JSONの形式はユースケースの外側の層が持つため、外側から注入します。
+type TemporaryPlayerDataPayloadDecoder func(stored []byte) (*PlayerDataPayload, error)
+
 // CreateTemporaryPlayerDataInput は一時登録入力です。
+// Payload は受信したままの本文で、IPAddress は保持件数を数える送信元の単位です（IPv6 は /64）。
 type CreateTemporaryPlayerDataInput struct {
 	IPAddress string
 	Payload   []byte

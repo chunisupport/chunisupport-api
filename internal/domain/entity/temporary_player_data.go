@@ -6,6 +6,7 @@ import (
 )
 
 // TemporaryPlayerData は未ログイン時に一時保存するプレイヤーデータです。
+// Payload は受信したままの本文、BodyHash は展開後の本文のハッシュです。
 type TemporaryPlayerData struct {
 	Token     string
 	IPAddress string

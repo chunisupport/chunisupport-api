@@ -1,6 +1,7 @@
 package api_v1
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -35,7 +36,7 @@ func (h *V1WorldsendHandler) GetWorldsendSongs(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTOs := h.convertToV1WorldsendSongDTOs(songsWithCharts)
+	songDTOs := h.convertToV1WorldsendSongDTOs(c.Request().Context(), songsWithCharts)
 	return c.JSON(http.StatusOK, &api_v1.V1WorldsendSongsResponse{
 		Songs: songDTOs,
 	})
@@ -53,24 +54,24 @@ func (h *V1WorldsendHandler) GetWorldsendSong(c *echo.Context) error {
 		return apierror.FromUsecaseError(err)
 	}
 
-	songDTO := h.convertToV1WorldsendSongDTO(songWithChart)
+	songDTO := h.convertToV1WorldsendSongDTO(c.Request().Context(), songWithChart)
 	return c.JSON(http.StatusOK, songDTO)
 }
 
 // convertToV1WorldsendSongDTOs は WorldsendSongWithChart のスライスを V1WorldsendSongDTO のスライスに変換します。
-func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(songsWithCharts []*entity.WorldsendSongWithChart) []*api_v1.V1WorldsendSongDTO {
+func (h *V1WorldsendHandler) convertToV1WorldsendSongDTOs(ctx context.Context, songsWithCharts []*entity.WorldsendSongWithChart) []*api_v1.V1WorldsendSongDTO {
 	songDTOs := make([]*api_v1.V1WorldsendSongDTO, 0, len(songsWithCharts))
 	for _, swc := range songsWithCharts {
-		songDTOs = append(songDTOs, h.convertToV1WorldsendSongDTO(swc))
+		songDTOs = append(songDTOs, h.convertToV1WorldsendSongDTO(ctx, swc))
 	}
 	return songDTOs
 }
 
 // convertToV1WorldsendSongDTO は WorldsendSongWithChart を V1WorldsendSongDTO に変換します。
-func (h *V1WorldsendHandler) convertToV1WorldsendSongDTO(swc *entity.WorldsendSongWithChart) *api_v1.V1WorldsendSongDTO {
+func (h *V1WorldsendHandler) convertToV1WorldsendSongDTO(ctx context.Context, swc *entity.WorldsendSongWithChart) *api_v1.V1WorldsendSongDTO {
 	if swc.Song != nil && swc.Song.GenreID != nil {
 		if _, ok := h.masterCache.GenreNamesByID[*swc.Song.GenreID]; !ok {
-			slog.Warn("genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
+			slog.WarnContext(ctx, "genre name not found for genre_id", "genre_id", *swc.Song.GenreID, "song_display_id", swc.Song.DisplayID)
 		}
 	}
 	return api_v1.ToV1WorldsendSongDTO(swc.Song, swc.Chart, h.masterCache.GenreNamesByID)

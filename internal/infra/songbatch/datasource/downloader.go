@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -137,9 +138,9 @@ func (d *Downloader) downloadDatasource(ctx context.Context, ds Datasource) erro
 		return httpStatusError{status: resp.StatusCode}
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := readLimitedResponseBody(resp.Body, info.SongBatchDatasourceResponseMaxBytes)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return err
 	}
 
 	if ds.Type == "fix_songs_charts" {
@@ -174,6 +175,20 @@ func (d *Downloader) downloadDatasource(ctx context.Context, ds Datasource) erro
 	slog.Debug("File saved", "path", filePath, "size", len(data))
 
 	return nil
+}
+
+// readLimitedResponseBody は本文を limit+1 バイトまで読み、超過をエラーにします。
+// net/http は gzip を透過展開すると Content-Length を -1 にするため、宣言サイズでは判定しません。
+// 超過時は読み取ったバイト列を返さず、呼び出し側が不完全なデータを保存できないようにします。
+func readLimitedResponseBody(body io.Reader, limit int) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, int64(limit)+1))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if len(data) > limit {
+		return nil, fmt.Errorf("response body exceeds %d bytes", limit)
+	}
+	return data, nil
 }
 
 // buildURL はベースURLとパラメータから完全なURLを構築します

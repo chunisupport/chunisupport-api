@@ -19,6 +19,7 @@ type authClient interface {
 var isFirebaseInvalidIDToken = firebaseauthsdk.IsIDTokenInvalid
 var isFirebaseIDTokenRevoked = firebaseauthsdk.IsIDTokenRevoked
 var isFirebaseUserDisabled = firebaseauthsdk.IsUserDisabled
+var isFirebaseUserNotFound = firebaseauthsdk.IsUserNotFound
 
 type tokenVerifier struct {
 	client authClient
@@ -87,7 +88,8 @@ func (v *tokenVerifier) verifyTokenWithRevocationCheck(ctx context.Context, idTo
 
 	token, err := v.client.VerifyIDTokenAndCheckRevoked(ctx, idToken)
 	if err != nil {
-		if isFirebaseInvalidIDToken(err) || isFirebaseIDTokenRevoked(err) || isFirebaseUserDisabled(err) {
+		// 失効確認では Firebase ユーザーを取得するため、退会やログイン用アカウント変更で削除済みのユーザーは not found になります。
+		if isFirebaseInvalidIDToken(err) || isFirebaseIDTokenRevoked(err) || isFirebaseUserDisabled(err) || isFirebaseUserNotFound(err) {
 			return nil, errors.Join(usecase.ErrInvalidIDToken, err)
 		}
 

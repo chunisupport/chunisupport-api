@@ -166,7 +166,7 @@ func (u *SongBatchJobUsecase) interruptOrphanedJobs(ctx context.Context) error {
 		if err := u.jobRepo.Save(ctx, orphan); err != nil {
 			return err
 		}
-		slog.Warn("取り残された楽曲バッチジョブを中断扱いにしました", "job_id", orphan.ID())
+		slog.WarnContext(ctx, "取り残された楽曲バッチジョブを中断扱いにしました", "job_id", orphan.ID())
 	}
 	return nil
 }
@@ -219,6 +219,6 @@ func (u *SongBatchJobUsecase) releaseLockAfterFailure(ctx context.Context, lock 
 // releaseLock はロックを解放します。ctx には期限付きの context を渡します。
 func (u *SongBatchJobUsecase) releaseLock(ctx context.Context, lock repository.BatchLock) {
 	if err := lock.Release(ctx); err != nil {
-		slog.Error("楽曲バッチのロック解放に失敗しました", "error", err)
+		slog.ErrorContext(ctx, "楽曲バッチのロック解放に失敗しました", "error", err)
 	}
 }

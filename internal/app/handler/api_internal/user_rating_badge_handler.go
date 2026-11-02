@@ -27,7 +27,7 @@ func (h *UserHandler) GetOfficialRatingBadge(c *echo.Context) error {
 	// バッジは第三者サービスから認証なしで取得されるため、常に匿名閲覧の権限で判定します。
 	rating, err := h.userUsecase.GetPublicOfficialRating(c.Request().Context(), username)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "official rating badge")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "official rating badge")
 	}
 
 	return c.JSON(http.StatusOK, newBadgeResponse(info.RatingBadgeLabel, rating, 2, "", ratingBadgeColor(rating)))
@@ -84,7 +84,7 @@ func (h *UserHandler) getPublicBadgePlayer(c *echo.Context) (*entity.Player, err
 	}
 	player, err := h.userUsecase.GetPublicBadgePlayer(c.Request().Context(), username)
 	if err != nil {
-		return nil, h.handleUserProfileError(err, username, "player badge")
+		return nil, h.handleUserProfileError(c.Request().Context(), err, username, "player badge")
 	}
 	return player, nil
 }

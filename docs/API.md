@@ -23,6 +23,7 @@
 ただし `GET /healthz`、`OPTIONS /healthz`、`POST /internal/player-data/temp`、`OPTIONS /internal/player-data/temp`、`GET /internal/system/status` は、設定された許可オリジンに加えて `https://new.chunithm-net.com` も常に許可します。
 
 メンテナンス中の待機時間をブラウザから参照できるよう、CORSの公開レスポンスヘッダーには `Retry-After` を含みます。
+ブラウザから相関IDを送受信できるよう、`X-Request-ID` を許可リクエストヘッダーおよび公開レスポンスヘッダーに含みます。
 
 ## 認証
 
@@ -56,6 +57,8 @@
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 - `/compat/reiwa/1/*`: **`/v1` と同一**
 
+IP単位の制限では、IPv4はアドレスごと、IPv6は `/64` ごとに1つの送信元として数えます。
+
 実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
 
 ## 共通リクエスト仕様
@@ -69,13 +72,15 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 
 例外:
 
-- `POST /internal/me/register-data` と `POST /internal/player-data/temp`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/me/register-data`: 公式エクスポートJSONの前方互換のため、未知フィールドは無視します。
+- `POST /internal/player-data/temp`: 受付時はJSONをデコードしないため、構文不正でも 201 を返します。デコードは `POST /internal/player-data/commit` の実行時に行い、未知フィールドは無視、構文不正は 400 です。
 - `POST /internal/me/data-transfer/validate` と `POST /internal/me/data-transfer/import`: 移行ファイル本体を受け取り、未知フィールドの拒否は専用コーデック側で行います。
 - `DELETE /internal/me/locked-songs/:id`: JSONボディではなく path / query をバインドします。
 
 ## 共通レスポンス仕様
 
 - コンテンツタイプは `application/json`。
+- すべてのHTTPレスポンスに相関ID `X-Request-ID` を付けます。クライアントが妥当な `X-Request-ID`（先頭は英数字、以降は英数字・`.`・`_`・`-`、128文字以内）を送った場合はその値を使い、未指定または形式・長さが不正な場合はサーバーがUUIDを生成して置き換えます。同じ値をアクセスログと、リクエストコンテキスト付きのアプリケーションログの `request_id` に記録します。
 - カスタムエラーハンドラーは以下形式を返します。
 
 ```json
@@ -106,12 +111,13 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `validation_failed` | 入力バリデーション失敗 |
 | `unauthorized` | 認証が必要 |
 | `invalid_token` | トークンが不正 |
-| `invalid_turnstile_token` | Turnstile トークンが不正 |
+| `invalid_turnstile_token` | Turnstile トークンが不正、または hostname / action が一致しない |
 | `token_expired` | トークン期限切れ |
 | `missing_token` | トークン未指定 |
 | `forbidden` | 権限不足 |
 | `invalid_credentials` | 認証情報不正 |
 | `firebase_uid_already_linked` | Firebase UID が他ユーザーまたは削除済みユーザーに連携済み |
+| `firebase_account_unchanged` | ログイン用アカウントの変更先が現在と同じ |
 | `invalid_api_token_permission` | APIトークン権限が不正 |
 | `username_empty` | ユーザー名が空 |
 | `username_too_short` | ユーザー名が短すぎる |
@@ -174,6 +180,32 @@ Content-Type: application/json
   }
 }
 ```
+
+### 互換APIのエラー応答
+
+`/compat/chunirec/2.0` と `/compat/reiwa/1` は、互換元の仕様に合わせて次の形式でエラーを返します。本文にエラーコード文字列（`missing_token` など）は含めません。
+
+```json
+{
+  "error": {
+    "code": 404,
+    "message": "not found.",
+    "additional_message": ""
+  }
+}
+```
+
+| HTTPステータス | `message` | 主な発生条件 |
+| ---- | ---- | ---- |
+| 400 | `bad request.` | 互換元仕様との対応のため定義（入力検証エラーは422扱いで503になるため、現行では通常発生しない） |
+| 404 | `not found.` | 対象の楽曲・ユーザーが存在しない、未登録パス、登録済みパスへのメソッド不一致 |
+| 405 | `the requested method is not allowed.` | 互換元仕様との対応のため定義（現行ルーティングではメソッド不一致も404） |
+| 429 | `too many requests.` | レートリミット超過 |
+| 503 | `service unavailable.` | メンテナンス中、および上記以外のすべてのエラー |
+
+互換元の仕様は上記5種類のステータスだけを定義しているため、APIトークン未指定・無効（標準APIの401）、クエリパラメータの入力検証エラー（422）、サーバー内部エラー（500）などは `503 service unavailable.` に変換します。chunirec API 2.0は更新が終了しており、この対応表は変更しません。
+
+未登録パスとメソッド不一致は、APIトークン認証・メンテナンス判定より前に `404 not found.` を返します。クライアント切断時は応答が届かないため、互換形式へ変換せずHTTP 499として記録します。
 
 ### 互換APIのメンテナンス応答
 
@@ -829,7 +861,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
-| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
+| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン。ウィジェットの `action` は `login` |
 
 - **レスポンス**: 200 OK。`UserDTO` を返します。
 - **メンテナンス中**:
@@ -850,7 +882,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 400 Bad Request (`bad_request`): リクエスト形式不正（JSONパースエラー）
   - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み、または未登録ユーザー
-  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、使用済み、または hostname / action (`login`) が一致しない
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
   - 503 Service Unavailable (`maintenance_mode`): メンテナンス中に認証済みのPLAYER / EXTDEVがログインを試みた
   - 500 Internal Server Error (`internal_error`): 予期しないサーバーエラー
@@ -870,7 +902,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 | フィールド | 型 | 必須 | バリデーション |
 | ---------- | -- | ---- | -------------- |
 | `username` | string | ✓ | 5〜50文字、小文字英数字のみ。設定された禁止語に該当しないこと |
-| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン |
+| `turnstile_token` | string | ✓ | Cloudflare Turnstile の応答トークン。ウィジェットの `action` は `signup` |
 
 - **レスポンス**: 201 Created。`UserDTO` を返します。
 
@@ -892,7 +924,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 400 Bad Request (`registration_failed`): ユーザー登録失敗（詳細隠蔽）
   - 401 Unauthorized (`missing_token`): Bearerトークン未指定
   - 401 Unauthorized (`invalid_token`): Firebase IDトークンが不正または失効済み
-  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正または検証済み
+  - 401 Unauthorized (`invalid_turnstile_token`): Turnstileトークンが不正、使用済み、または hostname / action (`signup`) が一致しない
   - 409 Conflict (`firebase_uid_already_linked`): Firebase UID が既存ユーザーに連携済み
   - 422 Unprocessable Entity (`validation_failed`): `turnstile_token` 未指定
   - 503 Service Unavailable (`maintenance_mode`): メンテナンス中のスタッフ以外によるアクセス
@@ -1060,6 +1092,31 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 401 Unauthorized (`invalid_credentials`): 再認証UIDと連携済みFirebase UIDが一致しない
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 409 Conflict (`username_taken`): ユーザー名が使用済み
+
+### PUT `/internal/me/firebase-account`
+- **認証**: Firebase Bearer 必須（変更前のアカウント）
+- **必須ヘッダ**: `X-Reauth-Token: <変更前のアカウントで再認証直後の Firebase ID トークン>`
+- **リクエストボディ**:
+
+```json
+{"id_token": "<変更先のアカウントでサインイン直後の Firebase ID トークン>"}
+```
+
+ログインに使う Firebase アカウント（Google アカウントなど）を差し替えます。ユーザー名、プレイヤーデータ、目標、フレンド、APIトークン、公開設定などのアプリ内データはそのまま引き継がれます。
+
+乗っ取りを防ぐため、`X-Reauth-Token` と `id_token` の両方について、`auth_time` が 5 分以内であることを検証します。`X-Reauth-Token` の UID は変更前ユーザーに連携された Firebase UID と一致する必要があります。変更先の Firebase UID は、どのユーザーにも連携されていない必要があります。変更先のアカウントで既にユーザー登録している場合は、先にそのアカウントを退会してください。
+
+変更後は、旧 Firebase ユーザーの削除を試行します（失敗時はサーバーログに記録し、APIレスポンスは成功を維持します）。旧アカウントの ID トークンは以降の認証で `invalid_token` となるため、クライアントはサインアウトし、変更先のアカウントでサインインし直してください。
+
+- **レスポンス**: 204 No Content。ボディは空です。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正、`id_token` 未指定
+  - 400 Bad Request (`firebase_account_unchanged`): 変更先が現在と同じアカウント
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 通常認証が必要
+  - 401 Unauthorized (`recent_sign_in_required`): `X-Reauth-Token` が未指定、または `X-Reauth-Token` / `id_token` が不正・期限切れ
+  - 401 Unauthorized (`invalid_credentials`): 再認証UIDと連携済みFirebase UIDが一致しない
+  - 404 Not Found (`user_not_found`): ユーザーが見つからない
+  - 409 Conflict (`firebase_uid_already_linked`): 変更先の Firebase UID が他ユーザーに連携済み
 
 ### DELETE `/internal/me`
 - **認証**: Firebase Bearer 必須
@@ -2167,10 +2224,12 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - **制限**:
   - gzip後サイズ: 500KiB以下
   - 解凍後JSONサイズ: 5MiB以下
-  - 同時保持件数: 1IPあたり最大3件
+  - 同時保持件数: 1送信元あたり最大3件（IPv4はアドレス単位、IPv6は `/64` 単位）
+  - 同時保持量: 1送信元あたり最大 約1.5MB（gzip後サイズの上限 × 3件）
+  - 全体の保持量: gzip後サイズの合計で `temp_data.max_total_mb`（既定 64MB）まで
 - **検証内容**:
   - この時点では `Content-Encoding: gzip`、`Content-Type: application/json`、gzip展開の可否、およびサイズ制限のみを検証します。
-  - 展開後の本文は生のバイト列のまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
+  - 受信したgzip本文をそのまま保持し、`PlayerDataPayload` へのデコードや妥当性検証は行いません。
   - そのため、JSON構文が壊れている本文や、`PlayerDataPayload` として解釈できない本文でも一時保存される場合があります。
   - 厳密な検証および実際の登録処理は `/internal/player-data/commit` 実行時に初めて行われます。
   - 認証状態は判定に使いません。認証済みブラウザから呼び出した場合でも、未認証と同じ扱いで受け付けます。
@@ -2188,7 +2247,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 - `400 Bad Request`: gzip不正 / `Content-Encoding` 不正 / `Content-Type` 不正
 - `413 Payload Too Large`: サイズ上限超過
-- `409 Conflict`: 1IPあたり保持件数上限超過
+- `409 Conflict`: 1送信元あたり保持件数上限超過
 - `429 Too Many Requests`: レート超過
 - `503 Service Unavailable`: 一時データ総量上限超過
 
@@ -2792,7 +2851,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
-    - `page` (任意): ページ番号 (デフォルト: 1)
+    - `page` (任意): ページ番号 (デフォルト: 1)。正の整数として解釈でき、かつ `(page - 1) * 100` が符号付き64bit整数の最大値を超える場合は 422 Unprocessable Entity (`validation_failed`)
     - `name` (任意): ユーザー名またはプレイヤー名の前方一致検索
 - **レスポンス**: `AdminUserListResponse` の配列を返します。
 
@@ -5542,9 +5601,7 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `data.*.is_const_unknown` | boolean | 定数が推定値の場合true |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/music/show`
 - **認証**: APIトークン必須
@@ -5599,11 +5656,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `data.*.is_const_unknown` | boolean | 定数が推定値の場合true |
 
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): クエリパラメータ`id`が未指定
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found: 指定されたDisplay IDの楽曲が見つからない
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: 指定されたIDの楽曲が見つからない
+  - 503 Service Unavailable: クエリパラメータ`id`が未指定・形式不正、APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/records/showall`
 - **認証**: APIトークン必須
@@ -5656,10 +5710,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `records[].is_played` | boolean | 常にtrue |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザー含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザー含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ### GET `/compat/chunirec/2.0/records/profile`
 - **認証**: APIトークン必須
@@ -5699,10 +5751,8 @@ chunirec互換APIはchunirec APIとの互換性を持つエンドポイントで
 | `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザーを含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
 
@@ -5750,10 +5800,8 @@ Deprecatedです。新規利用には `GET /compat/chunirec/2.0/records/profile`
 | `updated_at` | string | プレイヤーデータの最終更新日時（RFC3339形式） |
 
 - **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 404 Not Found (`user_not_found`): ユーザーが見つからない（非公開ユーザーを含む）
-  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+  - 404 Not Found: ユーザーが見つからない（非公開ユーザーを含む）
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 プレイヤー未連携ユーザーでは `200 OK` とJSONの `null` を返します。
 
@@ -5891,7 +5939,7 @@ WORLD'S END楽曲は楽曲識別子の昇順で並べます。
 
 - **ソート順**: リリース日昇順
 - **主なエラー**:
-  - 401 Unauthorized: APIトークン未指定または無効
+  - 503 Service Unavailable: APIトークン未指定・無効（互換仕様により503へ変換）
 
 ---
 
@@ -5941,8 +5989,7 @@ WORLD'S END楽曲は楽曲識別子の昇順で並べます。
 
 - **ソート順**: `idx` を数値として昇順 → 難易度順（BAS → ADV → EXP → MAS → ULT）
 - **主なエラー**:
-  - 401 Unauthorized: APIトークン未指定または無効
-  - 500 Internal Server Error: サーバー内部エラー
+  - 503 Service Unavailable: APIトークン未指定・無効、またはサーバー内部エラー（互換仕様により503へ変換）
 
 ---
 

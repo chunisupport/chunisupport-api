@@ -93,9 +93,18 @@ func (s *stubPlayerDataUsecase) GetRecentUpdates(_ context.Context, _ *entity.Us
 
 func (s *stubPlayerDataUsecase) Delete(_ context.Context, _ *entity.User) error { return nil }
 
+// decodeTestTemporaryPayload は保存形式の詳細に依存せずユースケースを検証するためのデコーダです。
+func decodeTestTemporaryPayload(stored []byte) (*PlayerDataPayload, error) {
+	var payload PlayerDataPayload
+	if err := json.Unmarshal(stored, &payload); err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
 func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	result, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
@@ -111,7 +120,7 @@ func TestTemporaryPlayerDataUsecase_Create(t *testing.T) {
 
 func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{createErr: domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	_, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{IPAddress: "127.0.0.1", Payload: []byte("{}")})
 
@@ -121,7 +130,7 @@ func TestTemporaryPlayerDataUsecase_Create_PerIP上限超過(t *testing.T) {
 
 func TestTemporaryPlayerDataUsecase_Create_壊れたJSONでも一時保存できる(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	result, err := uc.Create(context.Background(), CreateTemporaryPlayerDataInput{
 		IPAddress: "127.0.0.1",
@@ -136,7 +145,7 @@ func TestTemporaryPlayerDataUsecase_Create_壊れたJSONでも一時保存でき
 
 func TestTemporaryPlayerDataUsecase_Commit_登録後に消費される(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"}`), BodyHash: "hash"}}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	result, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{
 		User:        &entity.User{ID: 10},
@@ -160,7 +169,7 @@ func TestTemporaryPlayerDataUsecase_Commit_DB失敗時は同じトークンで�
 			return nil, expectedErr
 		}
 		return &api_internal.PlayerDataResult{PlayerID: 10}, nil
-	}}, 5*time.Minute)
+	}}, 5*time.Minute, decodeTestTemporaryPayload)
 	input := CommitTemporaryPlayerDataInput{User: &entity.User{ID: 10}, UploadToken: "token-1"}
 
 	// When
@@ -183,7 +192,7 @@ func TestTemporaryPlayerDataUsecase_Commit_クライアント切断時もトー�
 	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{registerFn: func(ctx context.Context, _ *entity.User, _ *PlayerDataPayload, _ string) (*api_internal.PlayerDataResult, error) {
 		cancel()
 		return nil, ctx.Err()
-	}}, 5*time.Minute)
+	}}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	// When
 	_, err := uc.Commit(ctx, CommitTemporaryPlayerDataInput{User: &entity.User{ID: 10}, UploadToken: "token-1"})
@@ -198,7 +207,7 @@ func TestTemporaryPlayerDataUsecase_Commit_クライアント切断時もトー�
 func TestTemporaryPlayerDataUsecase_Commit_処理中のトークンは競合エラーになる(t *testing.T) {
 	// Given
 	repo := &stubTemporaryPlayerDataRepository{claimErr: domainrepo.ErrTemporaryPlayerDataInUse}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	// When
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "token-1"})
@@ -210,7 +219,7 @@ func TestTemporaryPlayerDataUsecase_Commit_処理中のトークンは競合エ�
 
 func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{claimErr: domainrepo.ErrTemporaryPlayerDataNotFound}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "x"})
 
@@ -220,7 +229,7 @@ func TestTemporaryPlayerDataUsecase_Commit_NotFound(t *testing.T) {
 
 func TestTemporaryPlayerDataUsecase_Commit_壊れたJSONはBadRequest相当エラーになる(t *testing.T) {
 	repo := &stubTemporaryPlayerDataRepository{found: &entity.TemporaryPlayerData{Token: "token-1", Payload: []byte(`{"name":"TEST"`)}}
-	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute)
+	uc := NewTemporaryPlayerDataUsecase(nil, repo, &stubPlayerDataUsecase{}, 5*time.Minute, decodeTestTemporaryPayload)
 
 	_, err := uc.Commit(context.Background(), CommitTemporaryPlayerDataInput{User: &entity.User{ID: 1}, UploadToken: "token-1"})
 

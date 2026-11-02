@@ -35,7 +35,7 @@ func (h *ReiwaHandler) GetChunithmRecordOriginal(c *echo.Context) error {
 
 	songs, err := h.songUsecase.GetAllSongsExcludingWorldsend(ctx, false, nil)
 	if err != nil {
-		slog.Error("failed to get songs for reiwa compat", "error", err)
+		slog.ErrorContext(ctx, "failed to get songs for reiwa compat", "error", err)
 		return apierror.ErrInternalError.WithInternal(err)
 	}
 

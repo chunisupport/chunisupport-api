@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -15,15 +16,17 @@ import (
 
 type honorEnsureExec struct {
 	baseExecutor
-	query       string
-	args        []any
-	execErr     error
-	existingID  int
-	afterMissID int
-	getCalled   bool
-	getCount    int
-	getQueries  []string
-	getArgs     [][]any
+	query           string
+	args            []any
+	execErr         error
+	existingID      int
+	afterMissID     int
+	nameMatchID     int
+	nameForUpdateID int
+	getCalled       bool
+	getCount        int
+	getQueries      []string
+	getArgs         [][]any
 }
 
 func (e *honorEnsureExec) GetContext(_ context.Context, dest any, query string, args ...any) error {
@@ -32,8 +35,15 @@ func (e *honorEnsureExec) GetContext(_ context.Context, dest any, query string, 
 	e.getQueries = append(e.getQueries, query)
 	e.getArgs = append(e.getArgs, args)
 	existingID := e.existingID
-	if e.getCount > 1 {
+	switch {
+	case strings.Contains(query, "FOR UPDATE") && strings.Contains(query, "name = ?"):
+		existingID = e.nameForUpdateID
+	case strings.Contains(query, "FOR UPDATE"):
 		existingID = e.afterMissID
+	case strings.Contains(query, "image_url"):
+		existingID = e.existingID
+	case e.getCount > 1:
+		existingID = e.nameMatchID
 	}
 	if existingID == 0 {
 		return sql.ErrNoRows
@@ -183,10 +193,82 @@ func TestEnsureHonor_SP称号の並行登録で画像URLが重複した場合は
 			require.NoError(t, err)
 			assert.Equal(t, 30, result.ID)
 			assert.False(t, result.ImageURLRegistered)
-			assert.Equal(t, 2, exec.getCount)
-			assert.Contains(t, exec.getQueries[1], "FOR UPDATE")
+			require.Len(t, exec.getQueries, 3)
+			assert.Contains(t, exec.getQueries[1], "name = ? AND honor_type_id = ?")
+			assert.NotContains(t, exec.getQueries[1], "FOR UPDATE")
+			assert.Contains(t, exec.getQueries[2], "image_url = ? FOR UPDATE")
 		})
 	}
+}
+
+func TestEnsureHonor_同じファイル名でURL文字列だけ異なるSP称号は既存行を使う(t *testing.T) {
+	tests := []struct {
+		name     string
+		imageURL string
+	}{
+		{
+			name:     "クエリだけ異なる",
+			imageURL: "https://new.chunithm-net.com/img/honor_xxx.png?ver=2",
+		},
+		{
+			name:     "フラグメントだけ異なる",
+			imageURL: "https://new.chunithm-net.com/img/honor_xxx.png#v2",
+		},
+		{
+			name:     "ホストだけ異なる",
+			imageURL: "https://old.chunithm-net.com/img/honor_xxx.png",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 画像URLの完全一致では見つからず、一意制約と同じ name・honor_type_id では見つかる
+			exec := &honorEnsureExec{nameMatchID: 42}
+			repo := &honorRepository{}
+
+			// When
+			result, err := repo.EnsureHonor(context.Background(), exec, "honor_xxx.png", 2, &tt.imageURL)
+
+			// Then: 保存済みURLは書き換えず、既存IDを返す
+			require.NoError(t, err)
+			assert.Equal(t, 42, result.ID)
+			assert.False(t, result.ImageURLRegistered)
+			assert.Empty(t, exec.query)
+			require.Len(t, exec.getQueries, 2)
+			assert.Contains(t, exec.getQueries[0], "WHERE image_url = ?")
+			assert.Equal(t, []any{tt.imageURL}, exec.getArgs[0])
+			assert.Contains(t, exec.getQueries[1], "WHERE name = ? AND honor_type_id = ?")
+			assert.NotContains(t, exec.getQueries[1], "FOR UPDATE")
+			assert.Equal(t, []any{"honor_xxx.png", 2}, exec.getArgs[1])
+		})
+	}
+}
+
+func TestEnsureHonor_URL違いのSP称号が名称制約に衝突した場合は既存IDを返す(t *testing.T) {
+	// Given: 事前検索では見えず、INSERT が unique_honor_name_type に衝突する。
+	// image_url のカレントリードでは見つからず、name・honor_type_id のカレントリードで見つかる。
+	imageURL := "https://other.example.com/img/honor_xxx.png?ver=2"
+	exec := &honorEnsureExec{
+		nameForUpdateID: 77,
+		execErr: &mysql.MySQLError{
+			Number:  mysqlDuplicateEntryErrorNumber,
+			Message: "Duplicate entry 'honor_xxx.png-2' for key 'unique_honor_name_type'",
+		},
+	}
+	repo := &honorRepository{}
+
+	// When
+	result, err := repo.EnsureHonor(context.Background(), exec, "honor_xxx.png", 2, &imageURL)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, 77, result.ID)
+	assert.False(t, result.ImageURLRegistered)
+	require.Len(t, exec.getQueries, 4)
+	assert.Contains(t, exec.getQueries[2], "image_url = ? FOR UPDATE")
+	assert.Contains(t, exec.getQueries[3], "name = ? AND honor_type_id = ?")
+	assert.Contains(t, exec.getQueries[3], "FOR UPDATE")
+	assert.Equal(t, []any{"honor_xxx.png", 2}, exec.getArgs[3])
 }
 
 func TestDeletePlayerHonorsExceptSlots_指定スロットを削除対象から除外する(t *testing.T) {

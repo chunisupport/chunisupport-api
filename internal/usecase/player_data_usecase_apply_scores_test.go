@@ -1018,7 +1018,7 @@ func TestFullRecordDisplayKeys_難易度マスタ欠損時は難易度IDをDiff�
 
 func TestPlayerDataRecordState_ランプ未設定をnilで保持する(t *testing.T) {
 	// Given
-	dto := playerRecordStateDTO(repository.PlayerRecordState{
+	dto := playerRecordStateDTO(context.Background(), repository.PlayerRecordState{
 		Score:       1000000,
 		ClearLampID: 1,
 		ComboLampID: 1,
@@ -1132,7 +1132,7 @@ func TestPlayerRecordStateDTO_マスタ欠損時はランプ名をnullで返す(
 	lookup := newLampNameLookup(newApplyScoresTestMasters())
 
 	// When
-	dto := playerRecordStateDTO(repository.PlayerRecordState{
+	dto := playerRecordStateDTO(context.Background(), repository.PlayerRecordState{
 		Score:       1000000,
 		ClearLampID: 99,
 		ComboLampID: 1,

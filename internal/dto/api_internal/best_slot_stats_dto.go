@@ -1,6 +1,7 @@
 package api_internal
 
 import (
+	"context"
 	"log/slog"
 	"math"
 
@@ -76,7 +77,7 @@ func ToBestSlotRankingResponse(result *usecase.BestSlotRankingResult, nextCursor
 }
 
 // ToSingleChartBestSlotStatsResponse は内部レート帯IDを公開ラベルへ変換します。
-func ToSingleChartBestSlotStatsResponse(stats *entity.SingleChartBestSlotStats, bands []*ratingband.RatingBand) *SingleChartBestSlotStatsResponse {
+func ToSingleChartBestSlotStatsResponse(ctx context.Context, stats *entity.SingleChartBestSlotStats, bands []*ratingband.RatingBand) *SingleChartBestSlotStatsResponse {
 	if stats == nil {
 		return nil
 	}
@@ -88,7 +89,7 @@ func ToSingleChartBestSlotStatsResponse(stats *entity.SingleChartBestSlotStats, 
 	for _, stat := range stats.Stats {
 		label, ok := labels[stat.RatingBandID]
 		if !ok {
-			slog.Warn("Rating band label not found for best-slot stats", "rating_band_id", stat.RatingBandID)
+			slog.WarnContext(ctx, "Rating band label not found for best-slot stats", "rating_band_id", stat.RatingBandID)
 			label = "UNKNOWN"
 		}
 		response.Stats = append(response.Stats, ChartBestSlotStatsByRatingBandDTO{

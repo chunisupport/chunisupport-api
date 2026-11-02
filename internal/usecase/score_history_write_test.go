@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func TestScoreHistoryUsecase_ランプ名のnone表記を大文字小文字に�
 		},
 	}
 
-	entries, err := us.convertEntries([]entity.ScoreHistoryEntry{{
+	entries, err := us.convertEntries(context.Background(), []entity.ScoreHistoryEntry{{
 		Score: 900000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1,
 	}})
 

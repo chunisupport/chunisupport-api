@@ -32,7 +32,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			turnstile: "turnstile-token",
 			remoteIP:  "203.0.113.1",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "203.0.113.1", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(user *entity.User) bool {
 					user.ID = 99
@@ -47,7 +47,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "iamadmin",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
 			},
 			wantErr: ErrUsernameForbidden,
@@ -58,7 +58,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 			},
 			wantErr: ErrInvalidIDToken,
 		},
@@ -77,7 +77,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "invalid-turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "").Return(ErrInvalidTurnstileToken).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "invalid-turnstile-token", "", "signup").Return(ErrInvalidTurnstileToken).Once()
 			},
 			wantErr: ErrInvalidTurnstileToken,
 		},
@@ -87,7 +87,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "invalid-token").Return("", errors.Join(ErrInvalidIDToken, errors.New("invalid token"))).Once()
 			},
 			wantErr: ErrInvalidIDToken,
@@ -98,7 +98,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "linked-token").Return("firebase-uid", nil).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 			},
@@ -110,7 +110,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "valid-token").Return("firebase-uid", nil).Once()
 				userRepo.On("Save", mock.Anything, mock.Anything, mock.AnythingOfType("*entity.User")).Return(repository.ErrDuplicateUsername).Once()
 			},
@@ -122,7 +122,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "empty-uid-token").Return("   ", nil).Once()
 			},
 			wantErr: ErrInternalError,
@@ -133,7 +133,7 @@ func TestSignupUsecase_Signup(t *testing.T) {
 			username:  "newuser",
 			turnstile: "turnstile-token",
 			setup: func(verifier *mockTokenVerifier, turnstileVerifier *mockTurnstileVerifier, userRepo *MockUserRepository) {
-				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "").Return(nil).Once()
+				turnstileVerifier.On("VerifyTurnstile", mock.Anything, "turnstile-token", "", "signup").Return(nil).Once()
 				verifier.On("VerifyIDToken", mock.Anything, "error-token").Return("", errors.New("boom")).Once()
 			},
 			wantErr: ErrInternalError,

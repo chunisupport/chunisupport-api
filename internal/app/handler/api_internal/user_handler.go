@@ -40,7 +40,7 @@ func (h *UserHandler) GetUserProfile(c *echo.Context) error {
 
 	result, err := h.userUsecase.GetUserProfile(c.Request().Context(), username, requester)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "user profile")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "user profile")
 	}
 
 	return c.JSON(http.StatusOK, toUserProfileDTO(result))
@@ -59,7 +59,7 @@ func (h *UserHandler) GetUserUpdatedAt(c *echo.Context) error {
 
 	result, err := h.userUsecase.GetUserUpdatedAt(c.Request().Context(), username, requester)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "user updated at")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "user updated at")
 	}
 
 	return c.JSON(http.StatusOK, &dto_internal.UserUpdatedAtDTO{UpdatedAt: result.UpdatedAt})
@@ -78,7 +78,7 @@ func (h *UserHandler) GetUserRating(c *echo.Context) error {
 
 	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "user rating")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "user rating")
 	}
 
 	return c.JSON(http.StatusOK, toUserRatingDTO(result))
@@ -97,7 +97,7 @@ func (h *UserHandler) GetUserRecord(c *echo.Context) error {
 
 	result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "user record")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "user record")
 	}
 
 	return c.JSON(http.StatusOK, toUserRecordDTO(result))
@@ -165,7 +165,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 	if view == info.UserProfileViewRating {
 		result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 		if err != nil {
-			return h.handleUserProfileError(err, username, "user profile rating view")
+			return h.handleUserProfileError(c.Request().Context(), err, username, "user profile rating view")
 		}
 		return c.JSON(http.StatusOK, toUserProfileRatingViewDTO(result))
 	}
@@ -173,20 +173,20 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 	if view == info.UserProfileViewRecord {
 		result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 		if err != nil {
-			return h.handleUserProfileError(err, username, "user profile record view")
+			return h.handleUserProfileError(c.Request().Context(), err, username, "user profile record view")
 		}
 		return c.JSON(http.StatusOK, toUserProfileRecordViewDTO(result))
 	}
 
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
-		return h.handleUserProfileError(err, username, "user profile with records")
+		return h.handleUserProfileError(c.Request().Context(), err, username, "user profile with records")
 	}
 
 	return c.JSON(http.StatusOK, ToUserProfileWithRecordsDTO(result))
 }
 
-func (h *UserHandler) handleUserProfileError(err error, username string, contextDescription string) error {
+func (h *UserHandler) handleUserProfileError(ctx context.Context, err error, username string, contextDescription string) error {
 	switch {
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return apierror.ErrUserNotFound
@@ -195,7 +195,7 @@ func (h *UserHandler) handleUserProfileError(err error, username string, context
 		return apierror.ErrUserNotFound
 	default:
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to get "+contextDescription, "username", username, "error", err)
+			slog.ErrorContext(ctx, "failed to get "+contextDescription, "username", username, "error", err)
 		}
 		return apierror.ErrInternalError.WithInternal(err)
 	}
@@ -367,7 +367,7 @@ func (h *UserHandler) DeleteUser(c *echo.Context) error {
 
 	if err := h.userUsecase.DeleteUser(c.Request().Context(), requester, username); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, usecase.ErrAdminRequired) && !errors.Is(err, usecase.ErrCannotDeleteSelf) && !errors.Is(err, usecase.ErrUserNotFound) {
-			slog.Error("failed to delete user", "username", username, "error", err)
+			slog.ErrorContext(c.Request().Context(), "failed to delete user", "username", username, "error", err)
 		}
 		return apierror.FromUsecaseError(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"testing"
 	"time"
 
@@ -35,6 +36,9 @@ type stubUserRepository struct {
 	deleteByID      func(context.Context, repository.Executor, int) error
 	usersByID       map[int]*entity.User
 	lockedIDs       []int
+	adminListLimit  int
+	adminListOffset int
+	adminListCalls  int
 }
 
 func (s *stubUserRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.User, error) {
@@ -64,6 +68,9 @@ func (s *stubUserRepository) FindAllWithPlayer(ctx context.Context, exec reposit
 }
 
 func (s *stubUserRepository) FindAllWithPlayerForAdmin(ctx context.Context, exec repository.Executor, limit int, offset int, searchName string) ([]entity.UserWithPlayer, error) {
+	s.adminListCalls++
+	s.adminListLimit = limit
+	s.adminListOffset = offset
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -428,6 +435,10 @@ func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec
 		return nil, s.err
 	}
 	return s.record, nil
+}
+
+func (s *stubWorldsendChartRepository) FindByDisplayIDForChange(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
+	return s.FindByDisplayID(ctx, exec, displayID)
 }
 
 func (s *stubWorldsendChartRepository) SaveSong(ctx context.Context, exec repository.Executor, song *entity.Song) error {
@@ -916,6 +927,55 @@ func TestUserUsecase_GetUserProfile_同一楽曲の通常譜面とUltimaロッ�
 	require.NoError(t, err)
 	require.NotNil(t, result.Player)
 	require.NotNil(t, result.Player.OverpowerPercent)
+	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 70), *result.Player.OverpowerPercent)
+}
+
+func TestUserUsecase_GetUserProfile_通常譜面未解禁はULTIMAを含む楽曲の最大OPを分母から除く(t *testing.T) {
+	now := time.Now()
+	un, err := username.NewUserName("tester")
+	require.NoError(t, err)
+	overpowerValue := 50.0
+	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	player := &entity.Player{
+		ID:             1,
+		Name:           playernametest.New(t, "テストプレイヤー"),
+		Level:          1,
+		OverpowerValue: &overpowerValue,
+		UpdatedAt:      now,
+	}
+	lockedSong, err := entity.NewPlayerLockedSong(1, 10, false)
+	require.NoError(t, err)
+	provider := &stubOverpowerDenominatorProvider{
+		snapshot: &repository.OverpowerDenominatorSnapshot{
+			GlobalTotal: 100,
+			SongMaxOP: map[int]float64{
+				10: 30,
+			},
+			SongMaxOPWithoutUltima: map[int]float64{
+				10: 25,
+			},
+		},
+	}
+	usecase := NewUserUsecaseWithOverpowerDenominator(
+		nil,
+		&stubUserRepository{user: user},
+		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
+		&stubPlayerRecordRepository{},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		&stubPlayerLockedSongRepository{lockedSongs: []*entity.PlayerLockedSong{lockedSong}},
+		provider,
+	)
+
+	result, err := usecase.GetUserProfile(context.Background(), "tester", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Player)
+	require.NotNil(t, result.Player.OverpowerPercent)
+	// 通常譜面群が未解禁の楽曲は分子からも消えるため、ULTIMA分ではなく楽曲最大OPを丸ごと除く。
 	assert.Equal(t, service.CalcOverpowerPercent(overpowerValue, 70), *result.Player.OverpowerPercent)
 }
 
@@ -1483,6 +1543,68 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	assert.True(t, list[1].UpdatedAt.Equal(updatedAt2))
 	assert.False(t, list[1].IsSuspicious)
 	assert.Nil(t, list[1].PlayerName)
+}
+
+func TestUserUsecase_GetAllUsersForAdmin_pageから負のOFFSETを作らない(t *testing.T) {
+	limit := info.DefaultUserListLimit
+	// (page-1)*limit が MaxInt を超えない最大の page。次の値は乗算がオーバーフローする。
+	maxPage := math.MaxInt/limit + 1
+
+	tests := []struct {
+		name       string
+		page       int
+		wantErr    bool
+		wantOffset int
+	}{
+		{
+			name:       "page=1はoffset 0",
+			page:       1,
+			wantOffset: 0,
+		},
+		{
+			name:       "通常のページは(page-1)*limit",
+			page:       2,
+			wantOffset: limit,
+		},
+		{
+			name:       "オーバーフローしない最大ページ",
+			page:       maxPage,
+			wantOffset: (maxPage - 1) * limit,
+		},
+		{
+			name:    "最大ページの次は入力エラー",
+			page:    maxPage + 1,
+			wantErr: true,
+		},
+		{
+			name:    "intの最大値は入力エラー",
+			page:    9223372036854775807,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubUserRepository{}
+			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+
+			// When
+			_, err := service.GetAllUsersForAdmin(context.Background(), tt.page, limit, "")
+
+			// Then
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrInvalidUserListPage)
+				assert.Zero(t, repo.adminListCalls)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, 1, repo.adminListCalls)
+			assert.Equal(t, limit, repo.adminListLimit)
+			assert.Equal(t, tt.wantOffset, repo.adminListOffset)
+			assert.GreaterOrEqual(t, repo.adminListOffset, 0)
+		})
+	}
 }
 
 func intPointer(v int) *int {

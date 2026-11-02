@@ -124,7 +124,7 @@ func (s *worldsendUsecase) GetAllWorldsendSongs(ctx context.Context, includeDele
 	songsWithCharts, err := s.worldsendChartRepo.FindAll(ctx, s.defaultExecutor, includeDeleted)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find all worldsend songs", "error", err)
+			slog.ErrorContext(ctx, "failed to find all worldsend songs", "error", err)
 		}
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 			return nil, repository.ErrSongNotFound
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to find worldsend song by display_id", "display_id", displayID, "error", err)
+			slog.ErrorContext(ctx, "failed to find worldsend song by display_id", "display_id", displayID, "error", err)
 		}
 		return nil, err
 	}
@@ -159,7 +159,8 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
@@ -172,7 +173,8 @@ func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID st
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
 	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
-		songWithChart, err := s.worldsendChartRepo.FindByDisplayID(ctx, tx, displayID)
+		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
+		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
 			return err
 		}
@@ -208,7 +210,7 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 			return fmt.Errorf("%w: %w", ErrInvalidWorldsendInput, err)
 		}
 		if !errors.Is(err, context.Canceled) {
-			slog.Error("failed to update worldsend songs", "error", err)
+			slog.ErrorContext(ctx, "failed to update worldsend songs", "error", err)
 		}
 		return err
 	}

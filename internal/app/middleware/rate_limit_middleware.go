@@ -95,6 +95,10 @@ func (s *FixedWindowStore) Allow(identifier string, limit int) (allowed bool, re
 			Limit:       limit,
 		}
 		s.entries[identifier] = entry
+	} else {
+		// 権限変更で上限だけが変わった場合も、同一時間枠の消費済み回数と開始時刻は維持する。
+		// 枠を作り直すと降格直後にカウントが消え、制限を回避できてしまう。
+		entry.Limit = limit
 	}
 
 	resetTime = entry.WindowStart.Add(s.window)
@@ -173,7 +177,7 @@ func IPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			identifier := c.RealIP()
+			identifier := ClientIPKey(c)
 
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 
@@ -224,7 +228,7 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 				return next(c)
 			}
 
-			identifier := c.RealIP()
+			identifier := ClientIPKey(c)
 
 			allowed, _, _ := store.Allow(identifier, config.Requests)
 			if !allowed {

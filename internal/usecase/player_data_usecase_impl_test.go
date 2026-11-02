@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
@@ -506,7 +507,7 @@ func TestLogRegisteredSPHonors_通常ログ形式でWarnを出力する(t *testi
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buffer, nil)))
 	t.Cleanup(func() { slog.SetDefault(original) })
 
-	logRegisteredSPHonors([]registeredSPHonor{{
+	logRegisteredSPHonors(context.Background(), []registeredSPHonor{{
 		ID:            10,
 		ImageFilename: "sp.png",
 		ImageURL:      "https://example.com/sp.png",
@@ -709,7 +710,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -760,7 +761,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -804,7 +805,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		_, err = calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		_, err = calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -852,7 +853,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -884,7 +885,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		lockedSongs := []*entity.PlayerLockedSong{}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -923,7 +924,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
@@ -932,5 +933,85 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
+	})
+
+	t.Run("通常譜面群が未解禁の楽曲はULTIMA記録もスキップする", func(t *testing.T) {
+		// Given
+		logBuffer := captureDefaultSlog(t)
+		recordScore, err := score.NewScore(1_010_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(15.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID:        1,
+				ChartID:         10,
+				Score:           recordScore,
+				Song:            &entity.Song{ID: 100, Title: "通常譜面未解禁曲"},
+				Chart:           &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{ID: 5, Name: info.DifficultyNameUltima},
+			},
+			{
+				PlayerID:        1,
+				ChartID:         11,
+				Score:           recordScore,
+				Song:            &entity.Song{ID: 101, Title: "解禁済み曲"},
+				Chart:           &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{ID: 4, Name: "MASTER"},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: false},
+		}
+
+		// When
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
+
+		// Then
+		require.NoError(t, err)
+		require.NotNil(t, result.Value)
+		assert.InDelta(t, service.CalcSingleOverpower(1_010_000, 15.0, 0), *result.Value, 0.0001)
+		assert.NotContains(t, logBuffer.String(), "skipped player records during overpower recalculation")
+	})
+
+	t.Run("ULTIMAだけが未解禁の楽曲は通常譜面の記録を残す", func(t *testing.T) {
+		// Given
+		recordScore, err := score.NewScore(1_010_000)
+		require.NoError(t, err)
+		chartConst, err := chartconstant.NewChartConstant(15.0)
+		require.NoError(t, err)
+
+		records := []*entity.PlayerRecord{
+			{
+				PlayerID:        1,
+				ChartID:         10,
+				Score:           recordScore,
+				Song:            &entity.Song{ID: 100, Title: "ULTIMA未解禁曲"},
+				Chart:           &entity.Chart{ID: 10, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{ID: 5, Name: info.DifficultyNameUltima},
+			},
+			{
+				PlayerID:        1,
+				ChartID:         11,
+				Score:           recordScore,
+				Song:            &entity.Song{ID: 100, Title: "ULTIMA未解禁曲"},
+				Chart:           &entity.Chart{ID: 11, Const: chartConst},
+				ChartDifficulty: &entity.ChartDifficulty{ID: 4, Name: "MASTER"},
+			},
+		}
+
+		lockedSongs := []*entity.PlayerLockedSong{
+			{PlayerID: 1, SongID: 100, IsUltima: true},
+		}
+
+		// When
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
+
+		// Then
+		require.NoError(t, err)
+		require.NotNil(t, result.Value)
+		assert.InDelta(t, service.CalcSingleOverpower(1_010_000, 15.0, 0), *result.Value, 0.0001)
 	})
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // setupFixedWindowStoreCleanup はFixedWindowStoreのクリーンアップgoroutineを停止できるようにします
@@ -598,5 +599,138 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 			e.HTTPErrorHandler(c, err)
 		}
 		assert.Equal(t, http.StatusOK, rec.Code)
+	}
+}
+
+func TestFixedWindowStore_Allow_同一時間枠で上限が変わってもカウントと開始時刻を維持する(t *testing.T) {
+	// Given: 高い上限で2回消費した時間枠
+	store := NewFixedWindowStore(time.Minute)
+	const identifier = "rate-limit-user"
+
+	allowed, remaining, resetTime := store.Allow(identifier, 10)
+	require.True(t, allowed)
+	assert.Equal(t, 9, remaining)
+
+	allowed, remaining, sameReset := store.Allow(identifier, 10)
+	require.True(t, allowed)
+	assert.Equal(t, 8, remaining)
+	assert.Equal(t, resetTime, sameReset)
+
+	// When: 消費済み回数まで上限を引き下げる
+	allowed, remaining, demotedReset := store.Allow(identifier, 2)
+
+	// Then: 拒否し、拒否したリクエストではカウントを増やさない。時間枠も維持する
+	assert.False(t, allowed)
+	assert.Equal(t, 0, remaining)
+	assert.Equal(t, resetTime, demotedReset)
+
+	allowed, remaining, deniedAgainReset := store.Allow(identifier, 2)
+	assert.False(t, allowed)
+	assert.Equal(t, 0, remaining)
+	assert.Equal(t, resetTime, deniedAgainReset)
+
+	// When: 上限を引き上げる
+	allowed, remaining, promotedReset := store.Allow(identifier, 4)
+
+	// Then: 拒否分はカウントされず、残りは新しい上限から計算される
+	assert.True(t, allowed)
+	assert.Equal(t, 1, remaining)
+	assert.Equal(t, resetTime, promotedReset)
+}
+
+func TestAPIRateLimitMiddleware_権限変更後は同一時間枠の現在の上限を適用する(t *testing.T) {
+	tests := []struct {
+		name         string
+		normalLimit  int
+		editorLimit  int
+		adminLimit   int
+		accountTypes []int
+		wantStatuses []int
+		wantLimits   []string
+		wantRemains  []string
+	}{
+		{
+			name:         "ADMINからPLAYERへ降格すると消費済み回数を超えた新しい上限で拒否する",
+			normalLimit:  2,
+			editorLimit:  50,
+			adminLimit:   5,
+			accountTypes: []int{info.AccountTypeAdmin, info.AccountTypeAdmin, info.AccountTypeAdmin, info.AccountTypePlayer},
+			wantStatuses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
+			wantLimits:   []string{"5", "5", "5", "2"},
+			wantRemains:  []string{"4", "3", "2", "0"},
+		},
+		{
+			name:         "EDITORからPLAYERへ降格すると残り回数を新しい上限で計算する",
+			normalLimit:  4,
+			editorLimit:  10,
+			adminLimit:   100,
+			accountTypes: []int{info.AccountTypeEditor, info.AccountTypeEditor, info.AccountTypePlayer, info.AccountTypePlayer, info.AccountTypePlayer},
+			wantStatuses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
+			wantLimits:   []string{"10", "10", "4", "4", "4"},
+			wantRemains:  []string{"9", "8", "1", "0", "0"},
+		},
+		{
+			name:         "PLAYERからEDITORへ昇格すると残りの枠を新しい上限まで使える",
+			normalLimit:  2,
+			editorLimit:  4,
+			adminLimit:   100,
+			accountTypes: []int{info.AccountTypePlayer, info.AccountTypePlayer, info.AccountTypeEditor, info.AccountTypeEditor, info.AccountTypeEditor},
+			wantStatuses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
+			wantLimits:   []string{"2", "2", "4", "4", "4"},
+			wantRemains:  []string{"1", "0", "1", "0", "0"},
+		},
+		{
+			name:         "PLAYERからADMINへ昇格すると残りの枠を新しい上限まで使える",
+			normalLimit:  2,
+			editorLimit:  4,
+			adminLimit:   5,
+			accountTypes: []int{info.AccountTypePlayer, info.AccountTypePlayer, info.AccountTypeAdmin, info.AccountTypeAdmin, info.AccountTypeAdmin, info.AccountTypeAdmin},
+			wantStatuses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
+			wantLimits:   []string{"2", "2", "5", "5", "5", "5"},
+			wantRemains:  []string{"1", "0", "2", "1", "0", "0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, len(tt.accountTypes), len(tt.wantStatuses))
+			require.Equal(t, len(tt.accountTypes), len(tt.wantLimits))
+			require.Equal(t, len(tt.accountTypes), len(tt.wantRemains))
+
+			e := setupEchoWithErrorHandler(t)
+			middleware := APIRateLimitMiddleware(tt.normalLimit, tt.editorLimit, tt.adminLimit, time.Minute)
+			user := &entity.User{ID: 800}
+			handler := middleware(func(c *echo.Context) error {
+				return c.String(http.StatusOK, "OK")
+			})
+
+			var windowReset string
+			for i, accountTypeID := range tt.accountTypes {
+				user.AccountTypeID = accountTypeID
+
+				req := httptest.NewRequest(http.MethodGet, "/", nil)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				c.Set("userEntity", user)
+
+				err := handler(c)
+				if err != nil {
+					e.HTTPErrorHandler(c, err)
+				}
+
+				assert.Equal(t, tt.wantStatuses[i], rec.Code, "リクエスト回数: %d", i+1)
+				assert.Equal(t, tt.wantLimits[i], rec.Header().Get("X-RateLimit-Limit"), "リクエスト回数: %d", i+1)
+				assert.Equal(t, tt.wantRemains[i], rec.Header().Get("X-RateLimit-Remaining"), "リクエスト回数: %d", i+1)
+
+				reset := rec.Header().Get("X-RateLimit-Reset")
+				require.NotEmpty(t, reset, "リクエスト回数: %d", i+1)
+				if i == 0 {
+					windowReset = reset
+					continue
+				}
+				// 権限変更で時間枠を作り直すと、降格直後に消費済み回数を回避できる
+				assert.Equal(t, windowReset, reset, "リクエスト回数: %d", i+1)
+			}
+		})
 	}
 }

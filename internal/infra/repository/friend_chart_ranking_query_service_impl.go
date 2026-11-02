@@ -144,31 +144,28 @@ func (q *FriendChartRankingQueryService) ListRecords(ctx context.Context, exec d
 			co.name AS combo_lamp,
 			fc.name AS full_chain,
 			pr.updated_at AS updated_at
-		FROM users u
+		FROM (
+			SELECT ? AS user_id
+			UNION
+			SELECT f.friend_user_id
+			FROM friendships f
+			INNER JOIN friendships rf
+				ON rf.user_id = f.friend_user_id
+			   AND rf.friend_user_id = f.user_id
+			   AND rf.status_id = ?
+			WHERE f.user_id = ?
+			  AND f.status_id = ?
+		) ranking_users
+		INNER JOIN users u ON u.id = ranking_users.user_id
 		INNER JOIN players p ON p.id = u.player_id
-		INNER JOIN player_records pr ON pr.player_id = p.id
+		INNER JOIN player_records pr ON pr.player_id = p.id AND pr.chart_id = ?
 		INNER JOIN clear_lamp_types cl ON cl.id = pr.clear_lamp_id
 		INNER JOIN combo_lamp_types co ON co.id = pr.combo_lamp_id
 		INNER JOIN full_chain_types fc ON fc.id = pr.full_chain_id
-		WHERE pr.chart_id = ?
-		  AND (
-			u.id = ?
-			OR EXISTS (
-				SELECT 1
-				FROM friendships f
-				INNER JOIN friendships rf
-					ON rf.user_id = f.friend_user_id
-				   AND rf.friend_user_id = f.user_id
-				   AND rf.status_id = ?
-				WHERE f.user_id = ?
-				  AND f.friend_user_id = u.id
-				  AND f.status_id = ?
-			)
-		  )
 		ORDER BY pr.score DESC, pr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, query, chartID, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted); err != nil {
+	if err := sqlx.SelectContext(ctx, exec, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, chartID); err != nil {
 		return nil, wrapFriendChartRankingQueryError("list records", err)
 	}
 	records := make([]*domainrepo.FriendChartRankingRecord, 0, len(rows))
@@ -198,31 +195,28 @@ func (q *FriendChartRankingQueryService) ListWorldsendRecords(ctx context.Contex
 			co.name AS combo_lamp,
 			fc.name AS full_chain,
 			pwr.updated_at AS updated_at
-		FROM users u
+		FROM (
+			SELECT ? AS user_id
+			UNION
+			SELECT f.friend_user_id
+			FROM friendships f
+			INNER JOIN friendships rf
+				ON rf.user_id = f.friend_user_id
+			   AND rf.friend_user_id = f.user_id
+			   AND rf.status_id = ?
+			WHERE f.user_id = ?
+			  AND f.status_id = ?
+		) ranking_users
+		INNER JOIN users u ON u.id = ranking_users.user_id
 		INNER JOIN players p ON p.id = u.player_id
-		INNER JOIN player_worldsend_records pwr ON pwr.player_id = p.id
+		INNER JOIN player_worldsend_records pwr ON pwr.player_id = p.id AND pwr.worldsend_chart_id = ?
 		INNER JOIN clear_lamp_types cl ON cl.id = pwr.clear_lamp_id
 		INNER JOIN combo_lamp_types co ON co.id = pwr.combo_lamp_id
 		INNER JOIN full_chain_types fc ON fc.id = pwr.full_chain_id
-		WHERE pwr.worldsend_chart_id = ?
-		  AND (
-			u.id = ?
-			OR EXISTS (
-				SELECT 1
-				FROM friendships f
-				INNER JOIN friendships rf
-					ON rf.user_id = f.friend_user_id
-				   AND rf.friend_user_id = f.user_id
-				   AND rf.status_id = ?
-				WHERE f.user_id = ?
-				  AND f.friend_user_id = u.id
-				  AND f.status_id = ?
-			)
-		  )
 		ORDER BY pwr.score DESC, pwr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, query, worldsendChartID, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted); err != nil {
+	if err := sqlx.SelectContext(ctx, exec, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, worldsendChartID); err != nil {
 		return nil, wrapFriendChartRankingQueryError("list worldsend records", err)
 	}
 	records := make([]*domainrepo.FriendChartRankingRecord, 0, len(rows))

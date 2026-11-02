@@ -134,7 +134,7 @@ func (h *SongHandler) GetChartStatsByDifficulty(c *echo.Context) error {
 
 	ratingBands := h.staticMasterCache.RatingBands
 
-	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(stats, ratingBands))
+	return c.JSON(http.StatusOK, dto.ToSingleChartStatsResponse(c.Request().Context(), stats, ratingBands))
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

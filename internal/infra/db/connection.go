@@ -71,17 +71,7 @@ func Connect(dbConfig config.DbConfig) (*sqlx.DB, error) {
 
 // ConnectContext はデータベースへの接続を確立し、*sqlx.DBを返します。
 func ConnectContext(ctx context.Context, dbConfig config.DbConfig) (*sqlx.DB, error) {
-	// clientFoundRows=true: UPDATE時に「変更された行数」ではなく「マッチした行数」を返すようにする。
-	// これにより、値が変わらないUPDATEでもRowsAffected>=1となり、
-	// Save/SaveSongのRowsAffected==0チェック（存在確認）が正しく動作する。
-	// loc=UTC はGoのtime.Timeの読み書きに使い、time_zoneは接続プール内のMySQLセッションをUTCへ固定します。
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&time_zone=%%27%%2B00%%3A00%%27&clientFoundRows=true",
-		dbConfig.DbUser,
-		dbConfig.DbPass,
-		dbConfig.DbHost,
-		dbConfig.DbPort,
-		dbConfig.DbName,
-	)
+	dsn := mysqlDSN(dbConfig)
 
 	db, err := sqlx.Open("mysql", dsn)
 	if err != nil {
@@ -101,4 +91,25 @@ func ConnectContext(ctx context.Context, dbConfig config.DbConfig) (*sqlx.DB, er
 	}
 
 	return db, nil
+}
+
+// mysqlDSN はアプリケーションが使うMySQL接続文字列を組み立てます。
+// interpolateParams=true は、プレースホルダ付きクエリをクライアント側で展開し、
+// 使い捨てプリペアドステートメントの COM_STMT_PREPARE / EXECUTE / CLOSE の往復を避けるためです。
+// 安全に展開できる前提は次のとおりです。
+//   - charset と collation は指定せず、ドライバ既定の utf8mb4（utf8mb4_general_ci）を使う。
+//     ドライバが埋め込みを拒否する big5 / cp932 / gb2312 / gbk / sjis / gb18030 は使わない。
+//   - セッションの sql_mode で NO_BACKSLASH_ESCAPES を有効にしない。
+func mysqlDSN(dbConfig config.DbConfig) string {
+	// clientFoundRows=true: UPDATE時に「変更された行数」ではなく「マッチした行数」を返すようにする。
+	// これにより、値が変わらないUPDATEでもRowsAffected>=1となり、
+	// Save/SaveSongのRowsAffected==0チェック（存在確認）が正しく動作する。
+	// loc=UTC はGoのtime.Timeの読み書きに使い、time_zoneは接続プール内のMySQLセッションをUTCへ固定します。
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&time_zone=%%27%%2B00%%3A00%%27&clientFoundRows=true&interpolateParams=true",
+		dbConfig.DbUser,
+		dbConfig.DbPass,
+		dbConfig.DbHost,
+		dbConfig.DbPort,
+		dbConfig.DbName,
+	)
 }

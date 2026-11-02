@@ -45,7 +45,7 @@ const (
 	RandomFavoriteHonorTitle                    = "お気に入りからランダム"
 	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
-	PlayerRecalculationLogicVersion             = 2 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
+	PlayerRecalculationLogicVersion             = 3 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
 	StaticDataExportBatchLockName               = "chunisupport:export-static-data"
 	ChartStatsExportBatchLockName               = "chunisupport:export-chart-stats"
 	AllRatingBandID                             = 0
@@ -87,6 +87,12 @@ const (
 	// StatusClientClosedRequest はクライアントが応答前に切断したことを表すステータスです。
 	// net/http に定義がないため、nginx の慣習である 499 を用いてサーバー障害（5xx）と区別します。
 	StatusClientClosedRequest = 499
+	// RequestIDMaxLength はクライアントが X-Request-ID で渡せる最大文字数です。
+	// UUID や一般的なトレースIDは収まる一方、ログ行とレスポンスヘッダーの肥大は避けます。
+	RequestIDMaxLength = 128
+	// LogAttrRequestID はアクセスログ（Echo RequestLogger の request_id）と
+	// アプリケーションログで揃える相関IDの属性名です。
+	LogAttrRequestID          = "request_id"
 	VersionCacheReloadTimeout = 5 * time.Second
 
 	// Goal関連の理論値計算定数
@@ -129,6 +135,13 @@ const (
 	RegisterDataRateLimitWindow     = 30 * time.Second
 	RecentSignInMaxAge              = 5 * time.Minute
 	RecentSignInFutureAllowance     = 1 * time.Minute
+	// TurnstileActionLogin と TurnstileActionSignup はログインと新規登録のウィジェット action です。
+	// フロントの Turnstile ウィジェットと同じ値で照合し、別フォームで発行されたトークンの流用を防ぎます。
+	TurnstileActionLogin  = "login"
+	TurnstileActionSignup = "signup"
+
+	// ClientIPv6PrefixBits はIPv6の送信元を1つとして数えるプレフィックス長です。
+	ClientIPv6PrefixBits = 64
 
 	TempDataTTL                  = 5 * time.Minute
 	TempDataMaxCompressedBytes   = 512000
@@ -174,6 +187,15 @@ const (
 	// ユーザープロフィール取得APIの view クエリで指定できる表示形式
 	UserProfileViewRating = "rating"
 	UserProfileViewRecord = "record"
+
+	// HTTPサーバーのタイムアウト設定。
+	// Echoの既定値（ReadTimeoutのみ30秒）に依存せず、アプリケーション側で明示します。
+	// 127.0.0.1でnginxからの接続だけを受ける構成のため、外向きの推奨値より短めにしています。
+	// SSEのような長時間接続は提供していないため、WriteTimeoutを設定しても通常応答に影響しません。
+	HTTPReadHeaderTimeout = 10 * time.Second
+	HTTPReadTimeout       = 30 * time.Second
+	HTTPWriteTimeout      = 60 * time.Second
+	HTTPIdleTimeout       = 120 * time.Second
 )
 
 var (

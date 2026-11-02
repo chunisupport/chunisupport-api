@@ -145,6 +145,9 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 
 	e.HTTPErrorHandler = middleware.CustomHTTPErrorHandler
 
+	// アクセスログは処理後にリクエストヘッダーの X-Request-ID を読むため、先に受理または生成しておく。
+	e.Use(middleware.RequestIDMiddleware())
+
 	if echoLogWriter != nil {
 		e.Logger = slog.New(slog.NewTextHandler(echoLogWriter, nil))
 		e.Use(echoMiddleware.RequestLogger())
@@ -215,7 +218,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, friendshipRepo, masterCache)
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
-	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL)
+	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL, api_internal.DecodeTemporaryPlayerDataPayload)
 	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	versionUsecase := usecase.NewVersionUsecase(versionRepo, masterCache, tm, db)
@@ -264,7 +267,9 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		usecase.NewChartStatsBatchUsecase(infra.NewChartStatsBatchRepository(db)),
 	)
 
-	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey)
+	// 許可ホストはフロントの CORS オリジンだけを使う。
+	// 外部サイト向けに追加する new.chunithm-net.com はログイン画面のホストではない。
+	turnstileVerifier := turnstile.NewVerifier(cfg.Turnstile.SecretKey, cfg.CORS.AllowOrigins)
 	firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 	firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
 	loginUsecase := usecase.NewLoginUsecase(firebaseAuthUsecaseStrict, turnstileVerifier, masterCache, systemMaintenanceUsecase)
@@ -376,17 +381,8 @@ func registerRoutes(
 	maintenanceStateProvider usecase.MaintenanceStateProvider,
 	cfg config.Config,
 ) {
-	// 未登録パスへのグループ認証・メンテナンス制限を避け、通常の404応答を維持する。
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			if c.RouteInfo().Method == echo.RouteNotFound {
-				return echo.ErrNotFound
-			}
-			return next(c)
-		}
-	})
-
 	internal := e.Group("/internal")
+	internal.Use(rejectUnmatchedRoute)
 	// 一時保存APIの拡張CORSは、メンテナンス503にも適用できるようゲートより先に評価します。
 	internal.Use(echoMiddleware.CORSWithConfig(newTemporaryPlayerDataCORSConfig(cfg)))
 	internal.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
@@ -405,6 +401,7 @@ func registerRoutes(
 		Window:   info.DataTransferRateLimitWindow,
 	})
 	badgeGroup := e.Group("/badges")
+	badgeGroup.Use(rejectUnmatchedRoute)
 	badgeGroup.Use(middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticatorStrict))
 	badgeGroup.Use(middleware.IPRateLimitMiddleware(middleware.RateLimitConfig{
 		Requests: info.RatingBadgeIPRateLimitRequests,
@@ -460,6 +457,7 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
+		meGroup.PUT("/firebase-account", handlers.Profile.ChangeFirebaseAccount)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.RegisterDataRateLimitRequests,
@@ -678,6 +676,7 @@ func registerRoutes(
 	}
 
 	apiV1 := e.Group("/v1")
+	apiV1.Use(rejectUnmatchedRoute)
 	apiV1.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	apiV1.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	apiV1.Use(middleware.APIRateLimitMiddleware(
@@ -710,6 +709,7 @@ func registerRoutes(
 	chunirecGroup := e.Group("/compat/chunirec/2.0")
 	// 後続ミドルウェアのエラーも互換形式で返すため、最初に適用します。
 	chunirecGroup.Use(chunirec.ChunirecErrorHandlerMiddleware())
+	chunirecGroup.Use(rejectUnmatchedRoute)
 	chunirecGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	chunirecGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	chunirecGroup.Use(middleware.APIRateLimitMiddleware(
@@ -728,6 +728,7 @@ func registerRoutes(
 
 	reiwaGroup := e.Group("/compat/reiwa/1")
 	reiwaGroup.Use(reiwa.ReiwaErrorHandlerMiddleware())
+	reiwaGroup.Use(rejectUnmatchedRoute)
 	reiwaGroup.Use(middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase))
 	reiwaGroup.Use(middleware.APITokenMiddleware(apiTokenUsecase))
 	reiwaGroup.Use(middleware.APIRateLimitMiddleware(
@@ -789,11 +790,13 @@ func newCORSConfig(allowOrigins []string, cfg config.Config, skipper echoMiddlew
 			echo.HeaderContentEncoding,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
+			echo.HeaderXRequestID,
 			"X-Reauth-Token",
 		},
 		ExposeHeaders: []string{
 			echo.HeaderContentLength,
 			echo.HeaderRetryAfter,
+			echo.HeaderXRequestID,
 		},
 		MaxAge: cfg.CORS.MaxAge,
 	}
@@ -948,5 +951,18 @@ func newRequestBodyLimitMiddleware() echo.MiddlewareFunc {
 				return standardHandler(context)
 			}
 		}
+	}
+}
+
+// rejectUnmatchedRoute はグループの未登録パス（登録済みパスへのメソッド不一致を含む）を、認証・メンテナンス制限より前に404として返します。
+// Echoはグループミドルウェアを実行するため未登録パスにもグループのルートを割り当てるので、
+// 後続の認証やメンテナンス判定で401・503になることを防ぎます。
+// 互換APIでは互換エラー形式で返すため、各グループのエラーハンドラーより後に適用します。
+func rejectUnmatchedRoute(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		if c.RouteInfo().Method == echo.RouteNotFound {
+			return echo.ErrNotFound
+		}
+		return next(c)
 	}
 }

@@ -350,7 +350,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	}
 
 	if err := validatePlayerDataPayload(payload); err != nil {
-		slog.Warn("player data validation failed", "user_id", user.ID, "error", err.Error())
+		slog.WarnContext(ctx, "player data validation failed", "user_id", user.ID, "error", err.Error())
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
@@ -494,9 +494,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, withPlayerDataRegistrationContext(user.ID, result.PlayerID, err)
 	}
 
-	logRegisteredSPHonors(registeredSPHonors)
+	logRegisteredSPHonors(ctx, registeredSPHonors)
 
-	slog.Info("player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
+	slog.InfoContext(ctx, "player data imported", "user_id", user.ID, "player_id", result.PlayerID, "hash", bodyHash)
 	return result, nil
 }
 
@@ -525,9 +525,10 @@ func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx 
 }
 
 // logRegisteredSPHonors はトランザクションのコミット後に、手動対応が必要な新規SP称号を通知用ログへ出力します。
-func logRegisteredSPHonors(honors []registeredSPHonor) {
+func logRegisteredSPHonors(ctx context.Context, honors []registeredSPHonor) {
 	for _, honor := range honors {
-		slog.Warn(
+		slog.WarnContext(
+			ctx,
 			"unknown SP honor registered",
 			"event", info.UnknownSPHonorRegisteredEvent,
 			"honor_id", honor.ID,
@@ -936,9 +937,9 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	worldsendRecordChanges := computeWorldsendRecordChanges(ctx, worldsendBefore, worldsendRecordsToUpsert, masters)
 	lampLookup := newLampNameLookup(masters)
 	changes := make([]api_internal.PlayerDataRecordChange, 0, len(fullRecordChanges)+len(worldsendRecordChanges))
-	changes = append(changes, playerRecordChangesDTO(fullRecordChanges, lampLookup)...)
-	changes = append(changes, worldsendRecordChangesDTO(worldsendRecordChanges, lampLookup)...)
-	courseChanges := computeCourseRecordChanges(courseBefore, courseRecordsToUpsert, masters, lampLookup)
+	changes = append(changes, playerRecordChangesDTO(ctx, fullRecordChanges, lampLookup)...)
+	changes = append(changes, worldsendRecordChangesDTO(ctx, worldsendRecordChanges, lampLookup)...)
+	courseChanges := computeCourseRecordChanges(ctx, courseBefore, courseRecordsToUpsert, masters, lampLookup)
 	changes = append(changes, courseChanges...)
 	changes = sortAndLimitRecordChanges(changes)
 	counts.FullRecordsActuallyChanged = len(fullRecordChanges)
@@ -1004,7 +1005,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if lockedErr != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to fetch locked songs for overpower calculation: %w", lockedErr)
 	}
-	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
+	overpowerSummary, err := calculateOverpowerSummaryFromPlayerRecords(ctx, records, lockedSongs, overpowerTargetStats.MaxOverpowerTotal)
 	if err != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, fmt.Errorf("failed to aggregate overpower from player records: %w", err)
 	}
@@ -1061,7 +1062,7 @@ func collectCourseIDs(records []repository.CourseRecordForUpsert) []int {
 	return result
 }
 
-func computeCourseRecordChanges(before map[int]repository.CourseRecordState, after []repository.CourseRecordForUpsert, masters *playerDataMaster, lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
+func computeCourseRecordChanges(ctx context.Context, before map[int]repository.CourseRecordState, after []repository.CourseRecordForUpsert, masters *playerDataMaster, lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
 	byID := make(map[int]*entity.Course, len(masters.courses))
 	for _, course := range masters.courses {
 		byID[course.ID] = course
@@ -1082,11 +1083,11 @@ func computeCourseRecordChanges(before map[int]repository.CourseRecordState, aft
 			}
 		}
 		clearAfter := record.State.IsClear
-		change := api_internal.PlayerDataRecordChange{RecordType: "course", ChangeType: "new", Idx: idx, CourseClass: class, After: api_internal.PlayerDataRecordState{Score: record.State.Score, ComboLamp: lookup.comboLampName(record.State.ComboLampID), IsClear: &clearAfter}}
+		change := api_internal.PlayerDataRecordChange{RecordType: "course", ChangeType: "new", Idx: idx, CourseClass: class, After: api_internal.PlayerDataRecordState{Score: record.State.Score, ComboLamp: lookup.comboLampName(ctx, record.State.ComboLampID), IsClear: &clearAfter}}
 		if exists {
 			clearBefore := old.IsClear
 			change.ChangeType = "updated"
-			change.Before = &api_internal.PlayerDataRecordState{Score: old.Score, ComboLamp: lookup.comboLampName(old.ComboLampID), IsClear: &clearBefore}
+			change.Before = &api_internal.PlayerDataRecordState{Score: old.Score, ComboLamp: lookup.comboLampName(ctx, old.ComboLampID), IsClear: &clearBefore}
 		}
 		result = append(result, change)
 	}
@@ -1591,15 +1592,15 @@ func worldsendRecordDisplayKeys(chartID int, lookup recordDisplayLookup) (string
 	return idx, "WE"
 }
 
-func playerRecordChangesDTO(changes []playerDataRecordChange[repository.PlayerRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
+func playerRecordChangesDTO(ctx context.Context, changes []playerDataRecordChange[repository.PlayerRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
 	return recordChangesDTO(changes, func(state repository.PlayerRecordState) api_internal.PlayerDataRecordState {
-		return playerRecordStateDTO(state, lookup)
+		return playerRecordStateDTO(ctx, state, lookup)
 	})
 }
 
-func worldsendRecordChangesDTO(changes []playerDataRecordChange[repository.WorldsendRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
+func worldsendRecordChangesDTO(ctx context.Context, changes []playerDataRecordChange[repository.WorldsendRecordState], lookup lampNameLookup) []api_internal.PlayerDataRecordChange {
 	return recordChangesDTO(changes, func(state repository.WorldsendRecordState) api_internal.PlayerDataRecordState {
-		return worldsendRecordStateDTO(state, lookup)
+		return worldsendRecordStateDTO(ctx, state, lookup)
 	})
 }
 
@@ -1683,23 +1684,23 @@ func newLampNameLookup(masters *playerDataMaster) lampNameLookup {
 	return lookup
 }
 
-func (l lampNameLookup) clearLampName(id int) *string {
-	return playerDataLampNamePtr(l.clearLamps[id], id, "clear_lamp")
+func (l lampNameLookup) clearLampName(ctx context.Context, id int) *string {
+	return playerDataLampNamePtr(ctx, l.clearLamps[id], id, "clear_lamp")
 }
 
-func (l lampNameLookup) comboLampName(id int) *string {
-	return playerDataLampNamePtr(l.comboLamps[id], id, "combo_lamp")
+func (l lampNameLookup) comboLampName(ctx context.Context, id int) *string {
+	return playerDataLampNamePtr(ctx, l.comboLamps[id], id, "combo_lamp")
 }
 
-func (l lampNameLookup) fullChainName(id int) *string {
-	return playerDataLampNamePtr(l.fullChains[id], id, "full_chain")
+func (l lampNameLookup) fullChainName(ctx context.Context, id int) *string {
+	return playerDataLampNamePtr(ctx, l.fullChains[id], id, "full_chain")
 }
 
 // playerDataLampNamePtr は none 相当およびマスタ未解決を null として返します。
-func playerDataLampNamePtr(name string, id int, resource string) *string {
+func playerDataLampNamePtr(ctx context.Context, name string, id int, resource string) *string {
 	if name == "" {
 		if id != 0 {
-			slog.Warn("lamp name not found for player data change display", "resource", resource, "id", id)
+			slog.WarnContext(ctx, "lamp name not found for player data change display", "resource", resource, "id", id)
 		}
 		return nil
 	}
@@ -1709,21 +1710,21 @@ func playerDataLampNamePtr(name string, id int, resource string) *string {
 	return &name
 }
 
-func playerRecordStateDTO(state repository.PlayerRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
+func playerRecordStateDTO(ctx context.Context, state repository.PlayerRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
 	return api_internal.PlayerDataRecordState{
 		Score:     state.Score,
-		ClearLamp: lookup.clearLampName(state.ClearLampID),
-		ComboLamp: lookup.comboLampName(state.ComboLampID),
-		FullChain: lookup.fullChainName(state.FullChainID),
+		ClearLamp: lookup.clearLampName(ctx, state.ClearLampID),
+		ComboLamp: lookup.comboLampName(ctx, state.ComboLampID),
+		FullChain: lookup.fullChainName(ctx, state.FullChainID),
 	}
 }
 
-func worldsendRecordStateDTO(state repository.WorldsendRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
+func worldsendRecordStateDTO(ctx context.Context, state repository.WorldsendRecordState, lookup lampNameLookup) api_internal.PlayerDataRecordState {
 	return api_internal.PlayerDataRecordState{
 		Score:     state.Score,
-		ClearLamp: lookup.clearLampName(state.ClearLampID),
-		ComboLamp: lookup.comboLampName(state.ComboLampID),
-		FullChain: lookup.fullChainName(state.FullChainID),
+		ClearLamp: lookup.clearLampName(ctx, state.ClearLampID),
+		ComboLamp: lookup.comboLampName(ctx, state.ComboLampID),
+		FullChain: lookup.fullChainName(ctx, state.FullChainID),
 	}
 }
 
@@ -1803,23 +1804,17 @@ func optionalIntValue(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
-func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, lockedSongs []*entity.PlayerLockedSong, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
-	lockedSet := make(map[string]struct{}, len(lockedSongs))
-	for _, lockedSong := range lockedSongs {
-		if lockedSong == nil {
-			continue
-		}
-		lockedSet[lockedSongKey(lockedSong.SongID, lockedSong.IsUltima)] = struct{}{}
-	}
+func calculateOverpowerSummaryFromPlayerRecords(ctx context.Context, records []*entity.PlayerRecord, lockedSongs []*entity.PlayerLockedSong, maxOverpowerTotal float64) (calculatedOverpowerSummary, error) {
+	lockedSet := service.NewPlayerLockedSongSet(lockedSongs)
 	overpowerRecords, skippedRecords, err := playerRecordsToOverpowerRecordsWithSkipped(records, false, func(record *entity.PlayerRecord) (bool, string) {
-		if len(lockedSet) == 0 {
+		if lockedSet.IsEmpty() {
 			return true, ""
 		}
 		if record.ChartDifficulty == nil {
 			return false, "chart_difficulty_nil"
 		}
-		_, exists := lockedSet[lockedSongKey(record.Song.ID, record.ChartDifficulty.Name == info.DifficultyNameUltima)]
-		if exists {
+		isUltima := record.ChartDifficulty.Name == info.DifficultyNameUltima
+		if lockedSet.IsLocked(record.Song.ID, isUltima) {
 			return false, "locked_song"
 		}
 		return true, ""
@@ -1834,7 +1829,7 @@ func calculateOverpowerSummaryFromPlayerRecords(records []*entity.PlayerRecord, 
 		}
 	}
 	if len(unexpectedSkippedRecords) > 0 {
-		slog.Warn("skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", unexpectedSkippedRecords)
+		slog.WarnContext(ctx, "skipped player records during overpower recalculation", "total_records", len(records), "aggregated_records", len(overpowerRecords), "skipped_records", unexpectedSkippedRecords)
 	}
 	value, percent := service.CalcOverpowerSummary(overpowerRecords, maxOverpowerTotal)
 	return calculatedOverpowerSummary{Value: &value, Percent: &percent, MaxOverpowerTotal: maxOverpowerTotal}, nil

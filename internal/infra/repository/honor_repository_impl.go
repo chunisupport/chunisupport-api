@@ -138,24 +138,30 @@ func toHonorEntity(row *honorRow) *entity.Honor {
 // 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
 // InnoDB は INSERT が重複で失敗・UPDATE へ切り替わった場合も AUTO_INCREMENT を消費するため、
 // 既存称号ではINSERTを発行しないよう先に検索します。
+// SP称号は画像URLの完全一致に加え、一意制約と同じ name と honor_type_id でも探します。
+// ファイル名が同じでURL文字列だけ異なる既存行は、保存済みの image_url を書き換えずに再利用します。
 func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Executor, title string, honorTypeID int, imageURL *string) (repository.HonorEnsureResult, error) {
 	storedTitle := strings.TrimSpace(title)
 	var storedImageURL any
 	if imageURL != nil {
 		storedImageURL = nullableHonorImageURL(*imageURL)
 	}
-	var existingID int
-	var findErr error
 	if storedImageURL != nil {
-		findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+		existingID, found, err := findHonorID(ctx, exec, `SELECT id FROM honors WHERE image_url = ?`, storedImageURL)
+		if err != nil || found {
+			return repository.HonorEnsureResult{ID: existingID}, err
+		}
+		// SP称号の name は画像URLのファイル名で、(name, honor_type_id) が一意。
+		// クエリ・フラグメント・ホストだけ異なるURLは image_url の完全一致では見つからない。
+		existingID, found, err = findHonorID(ctx, exec, `SELECT id FROM honors WHERE name = ? AND honor_type_id = ?`, storedTitle, honorTypeID)
+		if err != nil || found {
+			return repository.HonorEnsureResult{ID: existingID}, err
+		}
 	} else {
-		findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE name = ? AND honor_type_id = ?`, storedTitle, honorTypeID)
-	}
-	if findErr == nil {
-		return repository.HonorEnsureResult{ID: existingID}, nil
-	}
-	if !errors.Is(findErr, sql.ErrNoRows) {
-		return repository.HonorEnsureResult{}, findErr
+		existingID, found, err := findHonorID(ctx, exec, `SELECT id FROM honors WHERE name = ? AND honor_type_id = ?`, storedTitle, honorTypeID)
+		if err != nil || found {
+			return repository.HonorEnsureResult{ID: existingID}, err
+		}
 	}
 	// 検索後に並行登録された場合に備え、通常称号は重複時に既存IDを返すUpsertとする。
 	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
@@ -167,12 +173,13 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 		if storedImageURL != nil && (isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") ||
 			isMySQLDuplicateEntryForKey(err, "unique_honor_name_type")) {
 			// 先行トランザクションのコミット後の行をREPEATABLE READでも取得するためカレントリードする。
-			findErr = exec.GetContext(ctx, &existingID, `SELECT id FROM honors WHERE image_url = ? FOR UPDATE`, storedImageURL)
-			if findErr == nil {
-				return repository.HonorEnsureResult{ID: existingID}, nil
+			existingID, found, findErr := findHonorID(ctx, exec, `SELECT id FROM honors WHERE image_url = ? FOR UPDATE`, storedImageURL)
+			if findErr != nil || found {
+				return repository.HonorEnsureResult{ID: existingID}, findErr
 			}
-			if !errors.Is(findErr, sql.ErrNoRows) {
-				return repository.HonorEnsureResult{}, findErr
+			existingID, found, findErr = findHonorID(ctx, exec, `SELECT id FROM honors WHERE name = ? AND honor_type_id = ? FOR UPDATE`, storedTitle, honorTypeID)
+			if findErr != nil || found {
+				return repository.HonorEnsureResult{ID: existingID}, findErr
 			}
 		}
 		return repository.HonorEnsureResult{}, wrapHonorDuplicateError(err)
@@ -182,6 +189,19 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 		return repository.HonorEnsureResult{}, err
 	}
 	return repository.HonorEnsureResult{ID: int(id), ImageURLRegistered: storedImageURL != nil}, nil
+}
+
+// findHonorID は条件に一致する称号IDを返します。行が無い場合は found=false です。
+func findHonorID(ctx context.Context, exec repository.Executor, query string, args ...any) (int, bool, error) {
+	var id int
+	err := exec.GetContext(ctx, &id, query, args...)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return id, true, nil
 }
 
 // nullableHonorImageURL は画像URL未設定の称号を、一意制約で複数保持できるSQL NULLに変換します。

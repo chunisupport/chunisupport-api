@@ -14,6 +14,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -40,7 +41,8 @@ type commitTemporaryPlayerDataRequest struct {
 }
 
 // CreateTemporaryData は未ログインユーザーの一時アップロードを受け付けます。
-// gzip圧縮されたプレイヤーデータJSONを受け取るため BindStrictJSON は使わず、未知フィールドは json.Unmarshal により無視されます。
+// gzip圧縮されたプレイヤーデータJSONを受け取るため BindStrictJSON は使いません。
+// 高圧縮率の本文でメモリや保持容量を消費されないよう、未認証の受付時はJSONをデコードせず、受信したgzip本文をそのまま保持します。
 func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error {
 	if !strings.EqualFold(c.Request().Header.Get(echo.HeaderContentEncoding), "gzip") {
 		return apierror.ErrBadRequest
@@ -66,28 +68,19 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 	}
 	defer gzipReader.Close()
 
-	jsonBody, exceeded, err := readAllWithMaxBytes(gzipReader, info.TempDataMaxUncompressedBytes)
+	hash := sha256.New()
+	uncompressedBytes, err := io.Copy(hash, io.LimitReader(gzipReader, int64(info.TempDataMaxUncompressedBytes)+1))
 	if err != nil {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
-	if exceeded {
+	if uncompressedBytes > info.TempDataMaxUncompressedBytes {
 		return apierror.ErrPayloadTooLarge
 	}
 
-	hash := sha256.Sum256(jsonBody)
-	var request playerDataRequest
-	if err := json.Unmarshal(jsonBody, &request); err != nil {
-		return apierror.ErrBadRequest.WithInternal(err)
-	}
-	payload := request.toUsecase()
-	internalPayload, err := json.Marshal(payload)
-	if err != nil {
-		return apierror.ErrInternalError.WithInternal(err)
-	}
 	result, err := h.temporaryPlayerDataUsecase.Create(c.Request().Context(), usecase.CreateTemporaryPlayerDataInput{
-		IPAddress: c.RealIP(),
-		Payload:   internalPayload,
-		BodyHash:  hex.EncodeToString(hash[:]),
+		IPAddress: middleware.ClientIPKey(c),
+		Payload:   compressedBody,
+		BodyHash:  hex.EncodeToString(hash.Sum(nil)),
 	})
 	if err != nil {
 		switch {
@@ -104,6 +97,31 @@ func (h *TemporaryPlayerDataHandler) CreateTemporaryData(c *echo.Context) error 
 		UploadToken: result.UploadToken,
 		ExpiresAt:   result.ExpiresAt,
 	})
+}
+
+// DecodeTemporaryPlayerDataPayload は一時保存されたgzip本文をプレイヤーデータへデコードします。
+// 入力JSONの形式はこの層が持つため、確定保存時にユースケースへ渡して使います。未知フィールドは json.Unmarshal により無視されます。
+func DecodeTemporaryPlayerDataPayload(stored []byte) (*usecase.PlayerDataPayload, error) {
+	gzipReader, err := gzip.NewReader(bytes.NewReader(stored))
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	jsonBody, exceeded, err := readAllWithMaxBytes(gzipReader, info.TempDataMaxUncompressedBytes)
+	if err != nil {
+		return nil, err
+	}
+	if exceeded {
+		return nil, errors.New("temporary player data exceeds max uncompressed size")
+	}
+
+	var request playerDataRequest
+	if err := json.Unmarshal(jsonBody, &request); err != nil {
+		return nil, err
+	}
+	payload := request.toUsecase()
+	return &payload, nil
 }
 
 func readAllWithMaxBytes(r io.Reader, maxBytes int) ([]byte, bool, error) {

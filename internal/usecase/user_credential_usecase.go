@@ -21,6 +21,7 @@ type UserCredentialUsecase interface {
 	UpdatePrivacy(ctx context.Context, userID int, isPrivate bool) error
 	UpdateUsername(ctx context.Context, userID int, username string, reauthToken reauthtoken.ReauthToken) (string, error)
 	DeleteOwnAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken) error
+	ChangeFirebaseAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken, newAccountToken reauthtoken.ReauthToken) error
 }
 
 type clock interface {
@@ -192,7 +193,7 @@ func (s *userCredentialUsecaseImpl) UpdateUsername(ctx context.Context, userID i
 			}
 			return err
 		}
-		if _, err := s.validateReauthenticatedUser(user, reauthInfo, "update_username"); err != nil {
+		if _, err := s.validateReauthenticatedUser(ctx, user, reauthInfo, "update_username"); err != nil {
 			return err
 		}
 		if user.Username == newUsername {
@@ -241,7 +242,7 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 			return err
 		}
 
-		firebaseUID, err := s.validateReauthenticatedUser(user, reauthInfo, "delete_account")
+		firebaseUID, err := s.validateReauthenticatedUser(ctx, user, reauthInfo, "delete_account")
 		if err != nil {
 			return err
 		}
@@ -260,17 +261,72 @@ func (s *userCredentialUsecaseImpl) DeleteOwnAccount(ctx context.Context, userID
 
 	if deletedFirebaseUID != "" {
 		if err := s.firebaseDeleter.DeleteUser(ctx, deletedFirebaseUID); err != nil {
-			slog.Error("failed to delete firebase user after account deletion", "user_id", deletedUserID, "username", deletedUsername, "firebase_uid", deletedFirebaseUID, "error", err)
+			slog.ErrorContext(ctx, "failed to delete firebase user after account deletion", "user_id", deletedUserID, "username", deletedUsername, "firebase_uid", deletedFirebaseUID, "error", err)
 		}
 	}
 
 	return nil
 }
 
-func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(user *entity.User, reauthInfo *RecentSignInInfo, operation string) (string, error) {
+// ChangeFirebaseAccount はログインに使う Firebase アカウントを差し替えます。
+// 乗っ取りを防ぐため、現在のアカウントと変更先アカウントの両方で recent sign-in を要求します。
+// 差し替え後は旧 Firebase ユーザーを削除し、ほかの端末に残った旧アカウントのセッションを失効させます。
+// 削除しても旧アカウントで再度サインインすれば新しい UID の Firebase ユーザーが作られるため、旧アカウントでの新規登録は防げません。
+func (s *userCredentialUsecaseImpl) ChangeFirebaseAccount(ctx context.Context, userID int, reauthToken reauthtoken.ReauthToken, newAccountToken reauthtoken.ReauthToken) error {
+	reauthInfo, err := s.verifyRecentSignIn(ctx, reauthToken)
+	if err != nil {
+		return err
+	}
+	newAccountInfo, err := s.verifyRecentSignIn(ctx, newAccountToken)
+	if err != nil {
+		return err
+	}
+
+	var previousFirebaseUID string
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
+		user, err := s.userRepo.FindByIDForUpdate(ctx, tx, userID)
+		if err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrUserNotFound
+			}
+			return err
+		}
+		firebaseUID, err := s.validateReauthenticatedUser(ctx, user, reauthInfo, "change_firebase_account")
+		if err != nil {
+			return err
+		}
+		if newAccountInfo.UID == firebaseUID {
+			return ErrFirebaseAccountUnchanged
+		}
+
+		// 変更先 UID が他ユーザーに連携済みかどうかは UNIQUE 制約で判定します。
+		user.LinkFirebaseUID(newAccountInfo.UID)
+		if err := s.userRepo.LinkFirebaseUID(ctx, tx, user.ID, &firebaseUID, newAccountInfo.UID, user.UpdatedAt); err != nil {
+			if errors.Is(err, repository.ErrFirebaseUIDAlreadyLinked) {
+				return ErrFirebaseUIDAlreadyLinked
+			}
+			return err
+		}
+		previousFirebaseUID = firebaseUID
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	slog.InfoContext(ctx, "firebase account changed", "user_id", userID, "previous_firebase_uid", previousFirebaseUID, "new_firebase_uid", newAccountInfo.UID)
+	// コミットから削除までの間に旧 UID が別ユーザーへ連携されると、削除によってそのユーザーがログインできなくなります。
+	// ただし連携には旧アカウントでの直近のサインインが必要で、影響を受けるのは同時に操作した旧アカウントの持ち主本人に限られます。
+	// 偶然には起こり得ないため、UID の再利用禁止などの排他は設けずに許容します。
+	if err := s.firebaseDeleter.DeleteUser(ctx, previousFirebaseUID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete previous firebase user after firebase account change", "user_id", userID, "firebase_uid", previousFirebaseUID, "error", err)
+	}
+	return nil
+}
+
+func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(ctx context.Context, user *entity.User, reauthInfo *RecentSignInInfo, operation string) (string, error) {
 	firebaseUID := normalizeFirebaseUID(user.FirebaseUID)
 	if firebaseUID == "" {
-		slog.Warn(
+		slog.WarnContext(ctx,
 			reauthenticationFailureMessage(operation),
 			"reason",
 			operation+"_firebase_uid_not_linked",
@@ -282,7 +338,7 @@ func (s *userCredentialUsecaseImpl) validateReauthenticatedUser(user *entity.Use
 		return "", ErrInvalidCredentials
 	}
 	if firebaseUID != reauthInfo.UID {
-		slog.Warn(
+		slog.WarnContext(ctx,
 			reauthenticationFailureMessage(operation),
 			"reason",
 			operation+"_reauth_uid_mismatch",

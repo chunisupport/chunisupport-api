@@ -35,6 +35,15 @@ func TestFromUsecaseError_フレンド比較対象なしを404へ変換する(t 
 	assert.Equal(t, CodeFriendNotFound, apiErr.Code)
 }
 
+func TestFromUsecaseError_ユーザー一覧のpage範囲外を422へ変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrInvalidUserListPage)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	assert.Equal(t, CodeValidationFailed, apiErr.Code)
+	assert.ErrorIs(t, apiErr, usecase.ErrInvalidUserListPage)
+}
+
 func TestFromUsecaseError_フレンド比較不能を409へ変換する(t *testing.T) {
 	apiErr := FromUsecaseError(usecase.ErrFriendScoreComparisonUnavailable)
 
@@ -112,6 +121,14 @@ func TestFromUsecaseError_ユーザー名変更エラーを専用レスポンス
 			assert.Equal(t, tt.httpStatus, got.HTTPStatus)
 		})
 	}
+}
+
+func TestFromUsecaseError_Firebaseアカウント未変更を400に変換する(t *testing.T) {
+	apiErr := FromUsecaseError(usecase.ErrFirebaseAccountUnchanged)
+
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeFirebaseAccountUnchanged, apiErr.Code)
 }
 
 func TestFromUsecaseError_お気に入り上限エラーを400に変換する(t *testing.T) {

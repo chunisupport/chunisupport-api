@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,15 +18,17 @@ type temporaryPlayerDataUsecase struct {
 	repo              domainrepo.TemporaryPlayerDataRepository
 	playerDataUsecase PlayerDataUsecase
 	ttl               time.Duration
+	decodePayload     TemporaryPlayerDataPayloadDecoder
 }
 
 // NewTemporaryPlayerDataUsecase は TemporaryPlayerDataUsecase の実装を返します。
-func NewTemporaryPlayerDataUsecase(exec domainrepo.Executor, repo domainrepo.TemporaryPlayerDataRepository, playerDataUsecase PlayerDataUsecase, ttl time.Duration) TemporaryPlayerDataUsecase {
+func NewTemporaryPlayerDataUsecase(exec domainrepo.Executor, repo domainrepo.TemporaryPlayerDataRepository, playerDataUsecase PlayerDataUsecase, ttl time.Duration, decodePayload TemporaryPlayerDataPayloadDecoder) TemporaryPlayerDataUsecase {
 	return &temporaryPlayerDataUsecase{
 		exec:              exec,
 		repo:              repo,
 		playerDataUsecase: playerDataUsecase,
 		ttl:               ttl,
+		decodePayload:     decodePayload,
 	}
 }
 
@@ -108,12 +109,12 @@ func (u *temporaryPlayerDataUsecase) Commit(ctx context.Context, input CommitTem
 }
 
 func (u *temporaryPlayerDataUsecase) register(ctx context.Context, user *entity.User, entry *entity.TemporaryPlayerData) (*playerdataresult.Result, error) {
-	var payload PlayerDataPayload
-	if err := json.Unmarshal(entry.Payload, &payload); err != nil {
+	payload, err := u.decodePayload(entry.Payload)
+	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrTempDataPayloadInvalidJSON, err)
 	}
 
-	return u.playerDataUsecase.Register(ctx, user, &payload, entry.BodyHash)
+	return u.playerDataUsecase.Register(ctx, user, payload, entry.BodyHash)
 }
 
 var _ TemporaryPlayerDataUsecase = (*temporaryPlayerDataUsecase)(nil)

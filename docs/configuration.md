@@ -35,7 +35,7 @@
 - `cors.allow_origins`
 - `cors.allow_credentials`
 - `cors.max_age`
-- `temp_data.max_total_mb`（任意。未設定または0以下の場合は`64`を使用）
+- `temp_data.max_total_mb`（任意。一時保存するgzip本文の合計サイズの上限。未設定または0以下の場合は`64`を使用）
 - `database.startup.max_wait_sec`（任意。未設定の場合は`120`、`0`の場合は再試行せず即時失敗）
 - `database.startup.interval_sec`（任意。未設定の場合は`5`、1以上）
 - `database.pool.max_open_conns`（必須）
@@ -51,6 +51,8 @@
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
 
 MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
+
+パラメータ付きクエリは、DSNの `interpolateParams=true` によりクライアント側で値を展開します。サーバーサイドプリペアドステートメントの Prepare / Execute / Close をクエリごとに行わないためです。接続の文字セットと照合順序はDSNで上書きせず、go-sql-driver/mysql の既定である utf8mb4（`utf8mb4_general_ci`）を使います。スキーマも `utf8mb4` です。ドライバが展開を拒否する big5 / cp932 / gb2312 / gbk / sjis / gb18030 は指定しません。`NO_BACKSLASH_ESCAPES` はアプリケーションからもマイグレーションからも有効化せず、MySQL 8.4 の既定 `sql_mode` にも含まれません。このSQLモードを有効にした接続では使わないでください。
 
 `client_ip.trusted_proxy_cidrs` が未設定の場合、クライアントIPにはTCP接続元を使用します。リバースプロキシ配下では、アプリケーションへ接続するプロキシのCIDRをすべて指定してください。指定されたCIDR以外のアドレスや、プロキシが付加したと確認できないIPは信頼しません。外側のプロキシでは、クライアントから持ち込まれた`X-Forwarded-For`を上書きまたは破棄してから付加する設定が必要です。
 
@@ -169,6 +171,12 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 - `.config/<APP_ENV>.settings.json` に Turnstile 用のキーは不要です
 - 環境変数 `TURNSTILE_SECRET_KEY` に Turnstile のシークレットキーを設定してください
+- siteverify の `success` に加え、`hostname` が `cors.allow_origins` のホストと一致すること、`action` がエンドポイントの期待値と一致することを確認します
+- ログインの `action` は `login`、新規登録の `action` は `signup` です。フロントの Turnstile ウィジェットにも同じ値を設定してください。未設定や不一致のトークンは無効として拒否します
+- `hostname` はスキームとポートを含まないため、`http://localhost:3000` は `localhost` として照合します。`https://*.example.pages.dev` のようなワイルドカードもホスト名に対して同様に判定します
+- `*` や `https://*`、`https://**` のような全許可のオリジン（ホストが `*` だけで構成されるもの）は、Turnstile の許可ホストにはしません。別ホストで取得したトークンの流用を防げなくなるためです
+- 許可ホストが1件も残らない場合、ログインと新規登録はすべて無効トークンとして拒否されます。この場合は起動時に警告ログを出力します
+- `/healthz` などに追加する `https://new.chunithm-net.com` は Turnstile の許可ホストに含めません
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 

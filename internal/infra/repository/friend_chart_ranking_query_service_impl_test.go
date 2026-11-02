@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +78,8 @@ func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 		CREATE TABLE friendships (
 			user_id INTEGER NOT NULL,
 			friend_user_id INTEGER NOT NULL,
-			status_id INTEGER NOT NULL
+			status_id INTEGER NOT NULL,
+			PRIMARY KEY (user_id, friend_user_id)
 		);
 		CREATE TABLE player_records (
 			player_id INTEGER NOT NULL,
@@ -86,8 +88,10 @@ func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 			clear_lamp_id INTEGER NOT NULL,
 			combo_lamp_id INTEGER NOT NULL,
 			full_chain_id INTEGER NOT NULL,
-			updated_at DATETIME NOT NULL
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (player_id, chart_id)
 		);
+		CREATE INDEX idx_player_records_chart_id ON player_records (chart_id);
 		CREATE TABLE clear_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 		CREATE TABLE combo_lamp_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 		CREATE TABLE full_chain_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
@@ -107,8 +111,10 @@ func setupFriendChartRankingDB(t *testing.T, db *sqlx.DB) {
 			clear_lamp_id INTEGER NOT NULL,
 			combo_lamp_id INTEGER NOT NULL,
 			full_chain_id INTEGER NOT NULL,
-			updated_at DATETIME NOT NULL
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (player_id, worldsend_chart_id)
 		);
+		CREATE INDEX idx_player_worldsend_records_worldsend_chart_id ON player_worldsend_records (worldsend_chart_id);
 		INSERT INTO clear_lamp_types (id, name) VALUES (1, 'CLEAR');
 		INSERT INTO combo_lamp_types (id, name) VALUES (1, 'NONE'), (2, 'FULL COMBO'), (3, 'ALL JUSTICE');
 		INSERT INTO full_chain_types (id, name) VALUES (1, 'NONE');
@@ -168,4 +174,105 @@ func insertFriendChartRankingFixtures(t *testing.T, db *sqlx.DB) {
 			(104, 10, 1010000, 1, 3, 1, ?)
 	`, updatedAt, updatedAt.Add(time.Minute), updatedAt, updatedAt.Add(2*time.Minute))
 	require.NoError(t, err)
+}
+
+type friendRankingQueryCapture struct {
+	*sqlx.DB
+	query string
+	args  []any
+}
+
+func (c *friendRankingQueryCapture) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
+	c.query, c.args = query, args
+	return c.DB.QueryxContext(ctx, query, args...)
+}
+
+func TestFriendChartRankingQueryService_対象プレイヤーと譜面の複合主キーで記録を取得する(t *testing.T) {
+	for _, worldsend := range []bool{false, true} {
+		name := "通常譜面"
+		if worldsend {
+			name = "WORLD'S END"
+		}
+		t.Run(name, func(t *testing.T) {
+			db := setupTestDB(t)
+			defer db.Close()
+			setupFriendChartRankingDB(t, db)
+			insertFriendChartRankingFixtures(t, db)
+			insertFriendWorldsendRankingFixtures(t, db)
+			capture := &friendRankingQueryCapture{DB: db}
+			query := NewFriendChartRankingQueryService()
+			var err error
+			key := "player_id=? AND chart_id=?"
+			if worldsend {
+				_, err = query.ListWorldsendRecords(context.Background(), capture, 1, 20)
+				key = "player_id=? AND worldsend_chart_id=?"
+			} else {
+				_, err = query.ListRecords(context.Background(), capture, 1, 10)
+			}
+			require.NoError(t, err)
+
+			rows, err := db.Queryx("EXPLAIN QUERY PLAN "+capture.query, capture.args...)
+			require.NoError(t, err)
+			defer rows.Close()
+			var details []string
+			for rows.Next() {
+				var id, parent, unused int
+				var detail string
+				require.NoError(t, rows.Scan(&id, &parent, &unused, &detail))
+				details = append(details, detail)
+			}
+			require.NoError(t, rows.Err())
+			assert.Contains(t, strings.Join(details, "\n"), key)
+		})
+	}
+}
+
+func TestFriendChartRankingQueryService_相互承認と同点時のユーザー名順を維持する(t *testing.T) {
+	for _, worldsend := range []bool{false, true} {
+		name := "通常譜面"
+		if worldsend {
+			name = "WORLD'S END"
+		}
+		t.Run(name, func(t *testing.T) {
+			db := setupTestDB(t)
+			defer db.Close()
+			setupFriendChartRankingDB(t, db)
+			insertFriendChartRankingFixtures(t, db)
+			insertFriendWorldsendRankingFixtures(t, db)
+			_, err := db.Exec(
+				"UPDATE player_records SET updated_at = '2026-07-09 12:00:00';" +
+					"UPDATE player_worldsend_records SET updated_at = '2026-07-09 12:00:00';" +
+					"UPDATE users SET username = 'z_friend' WHERE id = 2;" +
+					"INSERT INTO friendships (user_id, friend_user_id, status_id) VALUES (4, 1, 1), (1, 5, 2), (5, 1, 2);")
+			require.NoError(t, err)
+			query := NewFriendChartRankingQueryService()
+			list := query.ListRecords
+			chartID := 10
+			if worldsend {
+				list = query.ListWorldsendRecords
+				chartID = 20
+			}
+			records, err := list(context.Background(), db, 1, chartID)
+			require.NoError(t, err)
+			require.Len(t, records, 3)
+			assert.Equal(t, []int{3, 2, 1}, []int{records[0].UserID, records[1].UserID, records[2].UserID})
+
+			_, err = db.Exec("UPDATE friendships SET status_id = 1 WHERE user_id = 1 AND friend_user_id = 3")
+			require.NoError(t, err)
+			records, err = list(context.Background(), db, 1, chartID)
+			require.NoError(t, err)
+			require.Len(t, records, 2)
+			assert.Equal(t, []int{2, 1}, []int{records[0].UserID, records[1].UserID})
+
+			_, err = db.Exec("DELETE FROM friendships")
+			require.NoError(t, err)
+			records, err = list(context.Background(), db, 1, chartID)
+			require.NoError(t, err)
+			require.Len(t, records, 1)
+			assert.Equal(t, 1, records[0].UserID)
+			records, err = list(context.Background(), db, 5, chartID)
+			require.NoError(t, err)
+			assert.Empty(t, records)
+		})
+	}
 }

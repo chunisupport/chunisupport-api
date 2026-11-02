@@ -1,24 +1,26 @@
 # 目標API 外向きJSON変換計画書
 
-## 0. 現行状況（2026-05-18時点）
+## 0. 現行状況（2026-11-02追記、元記事2026-05-18）
 
-本計画はまだ実装されていません。現行の `/internal/me/goals` 系APIは、以下の通り内部IDを含むJSON契約のままです。
+本計画はまだ実装されていません。現行の `/internal/me/goals` 系APIは、以下の通り内部IDを含むJSON契約のままです（`docs/goals-api-current-specification.md` 章8参照）。
 
 - `achievement_type`: コード文字列
 - `attributes.diff`: difficulty ID（1〜5）
 - `attributes.genre`: genre ID
 - `attributes.ver`: version ID
+- `attributes.name_folder`: コード文字列（IDではない）、`attributes.chart_target`: `"OP_TARGET"` のみ、`attributes.const`: 範囲オブジェクト（計画初版後に追加）
 
-一方で、`achievement_params` は当初調査時より許容形が広がっており、以下は省略または `null` を受け付けます。
+一方で、`achievement_params` は当初調査時より許容形が広がっており、以下は省略または `null` を受け付けます（`rating_count` / `fullchain_count` / `rainbow_count` は計画初版後に追加）。
 
-- `rank_count.count`
-- `score_count.count`
-- `hardlamp_count.count`
-- `combolamp_count.count`
+- `rank_count.count` / `score_count.count` / `rating_count.count`
+- `hardlamp_count.count` / `combolamp_count.count` / `fullchain_count.count`
+- `rainbow_count.count`
 - `total_score.total`
 - `overpower_value.total`
 
-上記は「対象譜面数」や「対象譜面の理論値合計」などの動的上限値を目標値として扱うための入力です。外向きJSON変換を実装する場合も、この省略/null許容仕様は維持する必要があります。
+上記は「対象譜面数（`rainbow_count` は対象楽曲数）」や「対象譜面の理論値合計」などの動的上限値を目標値として扱うための入力です。外向きJSON変換を実装する場合も、この省略/null許容仕様は維持する必要があります。
+
+なお反転フラグは計画初版の単一 `invert` から `invert_value` / `invert_percentage` の2フラグへ分割されました（`migration/mysql/000040_split_goal_invert_flags`）。いずれも表示用フラグであり、外向きJSON化後も保存・返却仕様は維持します。対象エンドポイントに `PUT /internal/me/goals/order` と goal-groups 系が追加されていますが、本計画の対象範囲（変換対象3エンドポイント）は変わりません。
 
 ## 1. 目的
 
@@ -394,9 +396,9 @@ API表現の変換は、Clean Architecture上は外側の責務として扱う�
 ## 11.2 特に重要な回帰観点
 
 - `attributes` 未指定時に `{}` が返る
-- `achievement_type` ごとの `achievement_params` バリデーションは変わらない
-- `invert` の保存・返却は変わらない
-- 一覧順は `created_at ASC, id ASC` のまま
+- `achievement_type` ごとの `achievement_params` バリデーションは変わらない（`rating_count` / `fullchain_count` / `rainbow_count` を含む11種）
+- `invert_value` / `invert_percentage` の保存・返却は変わらない（単一 `invert` 時代の記述は `000040` 分割後に読み替え）
+- 一覧順はグループ `sort_order` 昇順（未分類は末尾）・同一グループ内は Goal の `sort_order` 昇順・不整合時のみ `id` 昇順のまま（初版の `created_at ASC, id ASC` という記述は現行仕様に合わせて読み替え）
 
 ---
 

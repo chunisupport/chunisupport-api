@@ -23,5 +23,13 @@ jobs:
           govulncheck ./...
       - name: Install and run gosec
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          # gosec が依存する golang.org/x/tools v0.49.0 は Go 1.27.2 のエクスポートデータ（pkgbits V5）を読めないため、
+          # V5 に対応した x/tools へ更新した一時モジュールでビルドします。
+          gosec_build_dir="$(mktemp -d)"
+          (
+            cd "$gosec_build_dir"
+            go mod init gosec-build
+            go get github.com/securego/gosec/v2/cmd/gosec@latest golang.org/x/tools@v0.52.0
+            go install github.com/securego/gosec/v2/cmd/gosec
+          )
           gosec ./...

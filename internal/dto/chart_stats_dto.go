@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"context"
 	"log/slog"
 	"strconv"
 
@@ -68,7 +69,7 @@ type SingleChartStatsResponse struct {
 }
 
 // ToChartStatsResponse は SongChartStats を ChartStatsResponse に変換します。
-func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingband.RatingBand) *ChartStatsResponse {
+func ToChartStatsResponse(ctx context.Context, stats *entity.SongChartStats, ratingBands []*ratingband.RatingBand) *ChartStatsResponse {
 	if stats == nil {
 		return nil
 	}
@@ -84,7 +85,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 		for _, stat := range chartStats {
 			label, ok := ratingBandLabels[stat.RatingBandID]
 			if !ok {
-				slog.Warn("Rating band label not found", "rating_band_id", stat.RatingBandID)
+				slog.WarnContext(ctx, "Rating band label not found", "rating_band_id", stat.RatingBandID)
 				label = strconv.Itoa(stat.RatingBandID)
 			}
 
@@ -132,7 +133,7 @@ func ToChartStatsResponse(stats *entity.SongChartStats, ratingBands []*ratingban
 }
 
 // ToSingleChartStatsResponse は SingleChartStats を SingleChartStatsResponse に変換します。
-func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*ratingband.RatingBand) *SingleChartStatsResponse {
+func ToSingleChartStatsResponse(ctx context.Context, stats *entity.SingleChartStats, ratingBands []*ratingband.RatingBand) *SingleChartStatsResponse {
 	if stats == nil {
 		return nil
 	}
@@ -146,7 +147,7 @@ func ToSingleChartStatsResponse(stats *entity.SingleChartStats, ratingBands []*r
 	for _, stat := range stats.Stats {
 		label, ok := ratingBandLabels[stat.RatingBandID]
 		if !ok {
-			slog.Warn("Rating band label not found", "rating_band_id", stat.RatingBandID)
+			slog.WarnContext(ctx, "Rating band label not found", "rating_band_id", stat.RatingBandID)
 			label = strconv.Itoa(stat.RatingBandID)
 		}
 

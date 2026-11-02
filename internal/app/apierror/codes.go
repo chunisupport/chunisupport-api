@@ -17,6 +17,7 @@ const (
 	CodeForbidden                = "forbidden"
 	CodeFirebaseUIDAlreadyLinked = "firebase_uid_already_linked"
 	CodeRecentSignInRequired     = "recent_sign_in_required"
+	CodeFirebaseAccountUnchanged = "firebase_account_unchanged"
 
 	// ユーザー関連エラー
 	CodeRegistrationFailed = "registration_failed"

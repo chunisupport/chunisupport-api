@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 )
@@ -39,7 +40,7 @@ func handleChunirecError(err error, c *echo.Context) {
 
 	// クライアント切断はサーバー障害ではないため、互換形式のエラー応答は返さずに記録だけ残します。
 	if errors.Is(err, context.Canceled) {
-		slog.Info("Chunirec HTTP request canceled by client",
+		slog.InfoContext(c.Request().Context(), "Chunirec HTTP request canceled by client",
 			"method", c.Request().Method,
 			"path", c.Request().URL.Path,
 			"remote_addr", c.RealIP(),
@@ -47,18 +48,20 @@ func handleChunirecError(err error, c *echo.Context) {
 			"error", sanitizeLogValue(err.Error()),
 		)
 		if err := c.NoContent(info.StatusClientClosedRequest); err != nil {
-			slog.Debug("Failed to send chunirec client closed response", "error", err)
+			slog.DebugContext(c.Request().Context(), "Failed to send chunirec client closed response", "error", err)
 		}
 		return
 	}
 
 	// エラーの種類に応じてHTTPステータスコードを決定
 	var apiErr *apierror.APIError
+	var statusCoder echo.HTTPStatusCoder
 	if errors.As(err, &apiErr) {
 		httpStatus = apiErr.HTTPStatus
 		additionalMessage = ""
-	} else if he, ok := err.(*echo.HTTPError); ok {
-		httpStatus = he.Code
+	} else if errors.As(err, &statusCoder) {
+		// Echo v5のルート不一致（ErrNotFound等）は*echo.HTTPErrorではないため、ステータスを持つエラー全般で判定します。
+		httpStatus = statusCoder.StatusCode()
 		additionalMessage = ""
 	} else {
 		httpStatus = http.StatusServiceUnavailable
@@ -68,7 +71,7 @@ func handleChunirecError(err error, c *echo.Context) {
 	logChunirecError(httpStatus, err, c)
 
 	// chunirec互換形式でエラーレスポンスを送信
-	// 注意: chunirec API 2.0の仕様に準拠するため、以下の6パターンのステータスコードのみをサポートします。
+	// 注意: chunirec API 2.0の仕様に準拠するため、以下の5種類のステータスコードのみをサポートします。
 	// chunirec API 2.0は既に更新が終了しており、仕様変更の可能性はありません。
 	// 対応するHTTPステータスコード: 400, 404, 405, 429, 503
 	// それ以外のステータスコードは503として処理されます。
@@ -91,7 +94,7 @@ func handleChunirecError(err error, c *echo.Context) {
 	}
 
 	if err := c.JSON(httpStatus, errorResponse); err != nil {
-		slog.Error("Failed to send chunirec error response", "error", err)
+		slog.ErrorContext(c.Request().Context(), "Failed to send chunirec error response", "error", err)
 	}
 }
 
@@ -103,17 +106,18 @@ func logChunirecError(status int, err error, c *echo.Context) {
 	}
 
 	errorMessage := sanitizeLogValue(err.Error())
-	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP())
+	logger := slog.With("method", c.Request().Method, "path", c.Request().URL.Path, "remote_addr", c.RealIP()).With(middleware.UserLogAttrs(c)...)
+	ctx := c.Request().Context()
 
 	if status >= 500 {
-		logger.Error("Chunirec HTTP error",
+		logger.ErrorContext(ctx, "Chunirec HTTP error",
 			"status", status,
 			"error", errorMessage,
 		)
 		return
 	}
 
-	logger.Warn("Chunirec HTTP client error",
+	logger.WarnContext(ctx, "Chunirec HTTP client error",
 		"status", status,
 		"error", errorMessage,
 	)

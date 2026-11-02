@@ -1,26 +1,27 @@
 # 目標評価API 設計書
 
-## 0. 現行実装との差分（2026-05-18時点）
+## 0. 現行実装との差分（2026-11-02追記、元記事2026-05-18）
 
 この文書は **未実装の設計案** です。現行実装に存在する目標APIは以下のCRUDのみで、評価APIはまだルーティングされていません。
 
 - `GET /internal/me/goals`
 - `POST /internal/me/goals`
+- `PUT /internal/me/goals/order`
 - `PUT /internal/me/goals/:id`
 - `DELETE /internal/me/goals/:id`
+- `GET/POST/PUT/DELETE /internal/me/goal-groups`（目標グループCRUD・並び替え）
 
-現行の目標CRUDでは、`invert` は保存・返却されるUI表示用フラグであり、サーバー側の達成判定には使われていません。本設計で `invert` を評価条件として扱う場合は、CRUD側の説明と責務差分を `docs/API.md` に明記する必要があります。
+現行の目標CRUDでは、`invert` 単一フラグは `migration/mysql/000040_split_goal_invert_flags` により `invert_value` / `invert_percentage` の2フラグへ分割されました（旧値は両方へ引き継ぎ）。いずれも保存・返却されるUI表示用フラグであり、サーバー側の達成判定には使われていません（`docs/API.md` のGoal節参照）。本設計で反転条件を評価条件として扱う場合は、どちらのフラグを評価に使うか決め直し、CRUD側の説明と責務差分を `docs/API.md` に明記する必要があります。
 
-また、現行CRUDでは以下のパラメータが省略または `null` を許容します。
+また、現行CRUD（`docs/goals-api-current-specification.md` 章7）では以下のパラメータが省略または `null` を許容します。本設計書の初版時点から `rating_count` / `fullchain_count` / `rainbow_count` が追加されています。
 
-- `rank_count.count`
-- `score_count.count`
-- `hardlamp_count.count`
-- `combolamp_count.count`
+- `rank_count.count` / `score_count.count` / `rating_count.count`
+- `hardlamp_count.count` / `combolamp_count.count` / `fullchain_count.count`
+- `rainbow_count.count`
 - `total_score.total`
 - `overpower_value.total`
 
-評価APIを実装する場合、これらの未指定値はレスポンスの `evaluation.target` で動的上限値へ解決して返す方針とします。
+評価APIを実装する場合、これらの未指定値はレスポンスの `evaluation.target` で動的上限値へ解決して返す方針とします。`attributes` の許可キーも初版時点から `name_folder` / `chart_target` が追加されています。
 
 ## 1. 目的
 
@@ -134,7 +135,7 @@
 
 ## 5. achievement_type別 判定仕様
 
-既存のachievement_typeに準拠し、`remaining` と `progress_rate` は以下の共通式で計算する。
+既存のachievement_typeに準拠し、`remaining` と `progress_rate` は以下の共通式で計算する。現行CRUDの反転フラグは `invert_value` / `invert_percentage` の2つであり、本設計書初版の単一 `invert` とは異なる。評価APIで反転を採用する場合は、実数値判定に `invert_value`、割合表示に `invert_percentage` を使うなど対応付けを決め直すこと。以下では `invert` と書いた箇所を該当フラグに読み替える。
 
 - `invert: false`（目標値以上を目指す）
   - 判定: `actual >= target`
@@ -154,9 +155,10 @@
   - actual: `{ "score": int }`（平均の小数以下は既存仕様に合わせて切り捨て）
   - 判定: `invert=false` の場合は `actual.score >= target.score`、`invert=true` の場合は `actual.score <= target.score`
   - `remaining`: `invert=false` は `max(target.score - actual.score, 0)`、`invert=true` は `max(actual.score - target.score, 0)`
-- `hardlamp_count` / `combolamp_count`
+- `hardlamp_count` / `combolamp_count` / `fullchain_count`
   - actual: `{ "count": int }`
   - 判定: `invert=false` の場合は `actual.count >= target.count`、`invert=true` の場合は `actual.count <= target.count`
+- `rank_count` / `score_count` / `rating_count` の `count` 判定も同上（`rating_count` は `rating` 閾値に対する到達可能譜面数を分母にする）。`rainbow_count` は対象譜面数ではなく対象楽曲数を分母にする点だけが異なる
 - `total_score`
   - actual: `{ "total": int }`
   - 判定: `invert=false` の場合は `actual.total >= target.total`、`invert=true` の場合は `actual.total <= target.total`
@@ -169,10 +171,11 @@
 
 ### 5.1 未指定・nullパラメータの評価時解決
 
-現行CRUDで省略または `null` が許容される値は、評価時に以下の動的目標値へ解決する。
+現行CRUDで省略または `null` が許容される値は、評価時に以下の動的目標値へ解決する（`docs/goals-api-current-specification.md` 章10参照）。
 
-- `rank_count.count` / `score_count.count`: 対象譜面数
-- `hardlamp_count.count` / `combolamp_count.count`: 対象譜面数
+- `rank_count.count` / `score_count.count` / `rating_count.count`: 対象譜面数（`rating_count` は到達可能譜面数）
+- `hardlamp_count.count` / `combolamp_count.count` / `fullchain_count.count`: 対象譜面数
+- `rainbow_count.count`: 対象楽曲数
 - `total_score.total`: 対象譜面数 × 1,010,000
 - `overpower_value.total`: 対象譜面の理論値OverPower合計
 
@@ -195,7 +198,8 @@ if percent != nil:
 `overpower_value` は小数値のまま扱う。
 
 各 `achievement_type` での `max`（動的目標値）は以下の通り：
-- `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count`: 対象譜面数
+- `rank_count` / `score_count` / `rating_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count`: 対象譜面数（`rating_count` は到達可能譜面数）
+- `rainbow_count`: 対象楽曲数
 - `total_score`: 対象譜面数 × 1,010,000
 - `overpower_value`: 対象譜面の理論値OverPower合計
 

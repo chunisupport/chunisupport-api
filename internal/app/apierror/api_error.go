@@ -75,6 +75,7 @@ var (
 	ErrForbidden                = New(CodeForbidden, http.StatusForbidden)
 	ErrFirebaseUIDAlreadyLinked = New(CodeFirebaseUIDAlreadyLinked, http.StatusConflict)
 	ErrRecentSignInRequired     = New(CodeRecentSignInRequired, http.StatusUnauthorized)
+	ErrFirebaseAccountUnchanged = New(CodeFirebaseAccountUnchanged, http.StatusBadRequest)
 
 	// ユーザー関連エラー
 	ErrRegistrationFailed = New(CodeRegistrationFailed, http.StatusBadRequest)

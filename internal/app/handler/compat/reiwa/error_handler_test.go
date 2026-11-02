@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -65,6 +69,30 @@ func TestLogReiwaError_メンテナンス応答はアプリケーションエラ
 	assert.Empty(t, output.String())
 }
 
+func TestLogReiwaError_認証済みユーザーの識別子をログへ出す(t *testing.T) {
+	// Given
+	var output bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+	})
+
+	e := echo.New()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/reiwa/1/chunithm_record/original", nil)
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.Set("userEntity", &entity.User{ID: 42, Username: usernametest.New(t, "testuser"), PlayerID: new(7)})
+
+	// When
+	logReiwaError(http.StatusInternalServerError, errors.New("boom"), c)
+
+	// Then
+	assert.Contains(t, output.String(), "level=ERROR")
+	assert.Contains(t, output.String(), "user_id=42")
+	assert.Contains(t, output.String(), "username=testuser")
+	assert.Contains(t, output.String(), "player_id=7")
+}
+
 func TestReiwaErrorHandlerMiddleware_クライアント切断は499としてINFOログに出す(t *testing.T) {
 	// Given
 	var output bytes.Buffer
@@ -92,4 +120,59 @@ func TestReiwaErrorHandlerMiddleware_クライアント切断は499としてINFO
 	assert.Contains(t, output.String(), "level=INFO")
 	assert.Contains(t, output.String(), `msg="Reiwa HTTP request canceled by client"`)
 	assert.Contains(t, output.String(), "status=499")
+}
+
+func TestReiwaErrorHandlerMiddleware_Echoのエラーはステータスを維持する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 後続処理が返すエラー
+		err error
+		// Then: 期待するステータスとメッセージ
+		expectedStatus  int
+		expectedMessage string
+	}{
+		{
+			name:            "ルート不一致の404は404のまま返す",
+			err:             echo.ErrNotFound,
+			expectedStatus:  http.StatusNotFound,
+			expectedMessage: "not found.",
+		},
+		{
+			name:            "メソッド不一致の405は405のまま返す",
+			err:             echo.ErrMethodNotAllowed,
+			expectedStatus:  http.StatusMethodNotAllowed,
+			expectedMessage: "the requested method is not allowed.",
+		},
+		{
+			name:            "ラップされたHTTPErrorもステータスを維持する",
+			err:             fmt.Errorf("wrap: %w", echo.NewHTTPError(http.StatusTooManyRequests, "")),
+			expectedStatus:  http.StatusTooManyRequests,
+			expectedMessage: "too many requests.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/compat/reiwa/1/chunithm_versions.json", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			handler := ReiwaErrorHandlerMiddleware()(func(c *echo.Context) error {
+				return tt.err
+			})
+
+			// When
+			err := handler(c)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedStatus, rec.Code)
+
+			var response ReiwaErrorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			assert.Equal(t, tt.expectedStatus, response.Error.Code)
+			assert.Equal(t, tt.expectedMessage, response.Error.Message)
+		})
+	}
 }

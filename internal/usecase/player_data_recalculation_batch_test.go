@@ -281,6 +281,31 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠から候補枠と指標�
 	assert.Positive(t, update.Overpower)
 }
 
+func TestPreparedBatchSnapshot_通常譜面未解禁はULTIMA譜面のOPも除外する(t *testing.T) {
+	// Given
+	snapshot := batchSnapshotForSlotTest(2)
+	snapshot.Charts = []repository.BatchChart{
+		{ID: 1, SongID: 1, DifficultyName: "MASTER", ChartConst: 13},
+		{ID: 2, SongID: 1, DifficultyName: "ULTIMA", ChartConst: 15},
+	}
+	prepared := preparedBatchSnapshotForCustomSnapshot(t, snapshot)
+	data := repository.PlayerBatchData{
+		ID: 1,
+		Records: []repository.PlayerBatchRecord{
+			{ChartID: 1, Score: 1_010_000},
+			{ChartID: 2, Score: 1_010_000},
+		},
+		LockedSongs: []repository.PlayerBatchLockedSong{{SongID: 1, IsUltima: false}},
+	}
+
+	// When
+	update, _, err := prepared.buildUpdate(data, false)
+
+	// Then
+	require.NoError(t, err)
+	assert.Zero(t, update.Overpower)
+}
+
 func TestValidateOfficialSlotSet_本枠の件数超過を検出する(t *testing.T) {
 	// Given
 	records := make([]repository.PlayerBatchRecord, 0, 31)

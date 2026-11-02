@@ -49,7 +49,7 @@ func NewLoginUsecase(
 }
 
 func (u *loginUsecase) Login(ctx context.Context, idToken string, turnstileToken string, remoteIP string) (*UserOutput, error) {
-	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP); err != nil {
+	if err := verifyTurnstile(ctx, u.turnstileVerifier, turnstileToken, remoteIP, info.TurnstileActionLogin); err != nil {
 		return nil, err
 	}
 

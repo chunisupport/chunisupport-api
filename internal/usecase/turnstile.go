@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func verifyTurnstile(ctx context.Context, verifier TurnstileVerifier, token string, remoteIP string) error {
+func verifyTurnstile(ctx context.Context, verifier TurnstileVerifier, token string, remoteIP string, expectedAction string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return ErrInvalidTurnstileToken
@@ -15,7 +15,7 @@ func verifyTurnstile(ctx context.Context, verifier TurnstileVerifier, token stri
 		return errors.Join(ErrInternalError, errors.New("turnstile verifier is nil"))
 	}
 
-	if err := verifier.VerifyTurnstile(ctx, token, strings.TrimSpace(remoteIP)); err != nil {
+	if err := verifier.VerifyTurnstile(ctx, token, strings.TrimSpace(remoteIP), expectedAction); err != nil {
 		if errors.Is(err, ErrInvalidTurnstileToken) || errors.Is(err, ErrInternalError) {
 			return err
 		}

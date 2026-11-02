@@ -73,7 +73,7 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 		return ErrInternalError
 	}
 	for index, validation := range validations {
-		if err := validateDynamicUpperBoundWithStats(validation.achievementType, validation.params, &stats[index]); err != nil {
+		if err := validateDynamicUpperBoundWithStats(ctx, validation.achievementType, validation.params, &stats[index]); err != nil {
 			return fmt.Errorf("%w: transferred goal is invalid: %w", ErrDataTransferInvalidData, err)
 		}
 	}
