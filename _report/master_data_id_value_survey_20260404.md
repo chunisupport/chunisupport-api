@@ -1,6 +1,8 @@
 # マスタデータ返却形式の調査
 
-作成日: 2026-04-04
+作成日: 2026-04-04（2026-11-02 追記あり）
+
+> **2026-11-02 追記**: 本調査後に `000057`（genres/versions に `short_name` 追加）、`000058-060`（name_folders 追加）、`/internal/master` の拡張（`class_emblems` / `class_emblem_bases` / `clear_lamps` / `combo_lamps` / `full_chains` / `slots` / `honor_types` / `possessions` / `name_folders` 追加）、内部 `PlayerDTO` の数値ID非公開化が行われた。本文のうち class emblem 系の記述（3-2節・4章・5章・最終まとめ）は当時の記録として残し、末尾の「追記」節を正とする。目標 `attributes` がIDのままである点と `achievement_type` がコードである点は現在も同様（`docs/goals-api-current-specification.md` 章8参照）。
 
 ## 結論
 
@@ -21,9 +23,9 @@
 - chunirec 互換APIの変換処理
 - API仕様書
 
-## 1. フロント向けマスタAPIは `id + name` を返している
+## 1. フロント向けマスタAPIは `id + name` を返している（2026-11-02時点では拡張済み）
 
-`/internal/master` は、フロントで辞書的に使えるマスタ一覧を返しています。実装上は以下を返却しています。
+`/internal/master` は、フロントで辞書的に使えるマスタ一覧を返しています。調査時点（2026-04-04）の実装上は以下を返却していました。
 
 - `genres`: `id`, `name`
 - `difficulties`: `id`, `name`
@@ -31,6 +33,8 @@
 - `versions`: `id`, `name`, `released_at`
 - `rating_bands`: `id`, `label`, `min_inclusive`, `max_exclusive`, `sort_order`
 - `achievement_types`: APIレスポンス上は `id`, `name`。ただし `name` に入る実体は `achievement_types.code` のコード文字列
+
+2026-11-02時点ではさらに拡張され、`genres` / `versions` に `short_name` が付き、`name_folders`、`class_emblems` / `class_emblem_bases`、`clear_lamps` / `combo_lamps` / `full_chains` / `slots`、`honor_types` / `possessions` を返します（`docs/API.md` の `/internal/master` 節、`internal/dto/master_data_dto.go` の `MasterDataResponse` 参照）。
 
 根拠:
 
@@ -131,9 +135,9 @@
 - `versions`
 - `achievement_types`（API上の `name` に achievement type のコード文字列が入る）
 
-### 3-2. プレイヤーの class emblem 系は ID のまま返している
+### 3-2. プレイヤーの class emblem 系は ID のまま返していた（2026-11-02時点で解消済み・以下は当時の記録）
 
-プレイヤー情報では以下がIDのままです。
+調査時点（2026-04-04）のプレイヤー情報では以下がIDのままでした。
 
 - `class_emblem_id`
 - `class_emblem_base_id`
@@ -162,7 +166,9 @@
 
 - `internal/app/handler/compat/chunirec/dto.go`
 
-したがって、class emblem 系は「内部にはマスタがあるが、フロント向けマスタAPIには露出しておらず、通常APIではIDのまま返している」状態です。
+したがって、調査時点では class emblem 系は「内部にはマスタがあるが、フロント向けマスタAPIには露出しておらず、通常APIではIDのまま返している」状態でした。
+
+**2026-11-02 追記**: 上記は解消済みです。`/internal/master` は `class_emblems` / `class_emblem_bases` を返し、内部APIの `PlayerDTO` は数値ID（`ClassEmblemID` / `ClassEmblemBaseID` は `json:"-"`）を公開せず `class_emblem` / `class_emblem_base` のマスタ名文字列のみ返します（`docs/API.md:2904`）。v1互換APIのみ互換性のためIDと名称を併記します（`docs/API.md:5363`）。
 
 ## 4. 実態の整理
 
@@ -185,13 +191,13 @@
 - `rating_bands`
 - `achievement_types`
 
-### IDのまま返しているもの
+### IDのまま返しているもの（2026-11-02時点）
 
 - 目標 `attributes.diff`
 - 目標 `attributes.genre`
 - 目標 `attributes.ver`
-- プレイヤー `class_emblem_id`
-- プレイヤー `class_emblem_base_id`
+- ~~プレイヤー `class_emblem_id`~~ → 解消済み：内部APIでは非公開、`/internal/master` に辞書あり。上記3-2節追記参照
+- ~~プレイヤー `class_emblem_base_id`~~ → 同上
 
 ## 5. フロントエンド観点での意味
 
@@ -213,17 +219,17 @@
 - 目標 `attributes.genre`
 - 目標 `attributes.ver`
 
-### フロントで現状は解決しづらい箇所
+### フロントで現状は解決しづらい箇所（2026-11-02時点で解消済み・以下は当時の記録）
 
-以下は通常APIでIDが返る一方、`/internal/master` には対応マスタがありません。
+調査時点では以下は通常APIでIDが返る一方、`/internal/master` には対応マスタがありませんでした。
 
 - `class_emblem_id`
 - `class_emblem_base_id`
 
 このため、フロントで人間向け名称を表示したい場合は、現状では次のいずれかが必要です。
 
-1. `/internal/master` に `class_emblems` / `class_emblem_bases` を追加する
-2. ユーザー系APIで class emblem 名も同時に返す
+1. `/internal/master` に `class_emblems` / `class_emblem_bases` を追加する → **対応済み**
+2. ユーザー系APIで class emblem 名も同時に返す → **対応済み（内部APIは名称のみ）**
 3. フロントが別の静的辞書を持つ
 
 ## 6. 補足: 実装と仕様書の同期状況
@@ -247,11 +253,11 @@
 実態としては以下です。
 
 - 閲覧系APIは名称展開を多用している
-- 目標APIはコード文字列とIDが混在している
-- class emblem 系はID返却のまま残っている
-- `/internal/master` は存在するが、フロントが必要としそうな全マスタを網羅しているわけではない
+- 目標APIはコード文字列とIDが混在している（継続）
+- ~~class emblem 系はID返却のまま残っている~~ → 2026-11-02時点で解消済み
+- `/internal/master` は存在するが、調査時点ではフロントが必要としそうな全マスタを網羅しているわけではなかった（2026-11-02時点で拡張済み）
 
-「混ざっている気がする」は正しく、特に問題として認識しやすいのは以下の2点です。
+「混ざっている気がする」は正しく、特に問題として認識しやすいのは以下の2点でした（2点目は2026-11-02時点で解消済み）。
 
-1. 目標APIの `achievement_type` は文字列なのに `attributes` はID
-2. `class_emblem_id` / `class_emblem_base_id` はIDなのに、通常のフロント向けマスタAPIでは解決材料が返らない
+1. 目標APIの `achievement_type` は文字列なのに `attributes` はID（継続）
+2. ~~`class_emblem_id` / `class_emblem_base_id` はIDなのに、通常のフロント向けマスタAPIでは解決材料が返らない~~ → 解消済み
