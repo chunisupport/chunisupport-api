@@ -680,9 +680,15 @@ func (s *userUsecase) getUserProfilePlayerRecords(ctx context.Context, playerID 
 	}, nil
 }
 
-type opTargetCandidate struct {
-	record       *entity.PlayerRecord
-	overpower    float64
+// opTargetChart は曲ごとのOP対象譜面を比較するための値です。
+// PlayerRecord と PlayerRecordOPTargetCandidate で入力の形が異なるため、
+// 選択前にこの構造体へ揃え、比較規則を一箇所に閉じます。
+type opTargetChart struct {
+	songID       int
+	chartID      int
+	score        uint32
+	chartConst   float64
+	comboLampID  int
 	difficultyID int
 }
 
@@ -704,64 +710,70 @@ func applyOPTargetFlags(records []*entity.PlayerRecord, targetChartIDs map[int]s
 }
 
 func calculateOPTargetChartIDs(records []*entity.PlayerRecord) map[int]struct{} {
-	bestBySongID := make(map[int]opTargetCandidate, len(records))
+	charts := make([]opTargetChart, 0, len(records))
 	for _, record := range records {
-		if record == nil {
+		if record == nil || record.UpdatedAt.IsZero() || record.Song == nil || record.Chart == nil {
 			continue
 		}
-		if record.UpdatedAt.IsZero() || record.Song == nil || record.Chart == nil {
-			continue
-		}
-
-		overpower := service.CalcSingleOverpower(uint32(record.Score), record.Chart.Const.Float64(), record.ComboLampID)
-		candidate := opTargetCandidate{
-			record:       record,
-			overpower:    overpower,
+		charts = append(charts, opTargetChart{
+			songID:       record.Song.ID,
+			chartID:      playerRecordChartID(record),
+			score:        uint32(record.Score),
+			chartConst:   record.Chart.Const.Float64(),
+			comboLampID:  record.ComboLampID,
 			difficultyID: record.Chart.DifficultyID,
-		}
-		current, exists := bestBySongID[record.Song.ID]
-		if !exists || candidate.overpower > current.overpower ||
-			(candidate.overpower == current.overpower && candidate.difficultyID > current.difficultyID) {
-			bestBySongID[record.Song.ID] = candidate
-		}
+		})
 	}
-
-	targetChartIDs := make(map[int]struct{}, len(bestBySongID))
-	for _, candidate := range bestBySongID {
-		if chartID := playerRecordChartID(candidate.record); chartID != 0 {
-			targetChartIDs[chartID] = struct{}{}
-		}
-	}
-	return targetChartIDs
+	return selectOPTargetChartIDs(charts)
 }
 
 func calculateOPTargetChartIDsFromCandidates(candidates []repository.PlayerRecordOPTargetCandidate) map[int]struct{} {
-	type candidate struct {
+	charts := make([]opTargetChart, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.ChartID == 0 || candidate.SongID == 0 {
+			continue
+		}
+		charts = append(charts, opTargetChart{
+			songID:       candidate.SongID,
+			chartID:      candidate.ChartID,
+			score:        uint32(candidate.Score),
+			chartConst:   candidate.ChartConstant.Float64(),
+			comboLampID:  candidate.ComboLampID,
+			difficultyID: candidate.DifficultyID,
+		})
+	}
+	return selectOPTargetChartIDs(charts)
+}
+
+// selectOPTargetChartIDs は曲ごとにOVER POWERが最大の譜面を1つ選びます。
+// 同値のときは難易度IDが大きい譜面を採用します。この優先順を変えるとプロフィール上のOP対象表示が変わります。
+// chartID が 0 の結果は対象に含めません。未プレイや識別子のない入力は呼び出し側で除外します。
+func selectOPTargetChartIDs(charts []opTargetChart) map[int]struct{} {
+	type choice struct {
 		chartID      int
 		overpower    float64
 		difficultyID int
 	}
 
-	bestBySongID := make(map[int]candidate, len(candidates))
-	for _, value := range candidates {
-		if value.ChartID == 0 || value.SongID == 0 {
-			continue
+	bestBySongID := make(map[int]choice, len(charts))
+	for _, chart := range charts {
+		candidate := choice{
+			chartID:      chart.chartID,
+			overpower:    service.CalcSingleOverpower(chart.score, chart.chartConst, chart.comboLampID),
+			difficultyID: chart.difficultyID,
 		}
-		currentCandidate := candidate{
-			chartID:      value.ChartID,
-			overpower:    service.CalcSingleOverpower(uint32(value.Score), value.ChartConstant.Float64(), value.ComboLampID),
-			difficultyID: value.DifficultyID,
-		}
-		current, exists := bestBySongID[value.SongID]
-		if !exists || currentCandidate.overpower > current.overpower ||
-			(currentCandidate.overpower == current.overpower && currentCandidate.difficultyID > current.difficultyID) {
-			bestBySongID[value.SongID] = currentCandidate
+		current, exists := bestBySongID[chart.songID]
+		if !exists || candidate.overpower > current.overpower ||
+			(candidate.overpower == current.overpower && candidate.difficultyID > current.difficultyID) {
+			bestBySongID[chart.songID] = candidate
 		}
 	}
 
 	targetChartIDs := make(map[int]struct{}, len(bestBySongID))
-	for _, value := range bestBySongID {
-		targetChartIDs[value.chartID] = struct{}{}
+	for _, candidate := range bestBySongID {
+		if candidate.chartID != 0 {
+			targetChartIDs[candidate.chartID] = struct{}{}
+		}
 	}
 	return targetChartIDs
 }
