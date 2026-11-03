@@ -6,7 +6,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
 	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -28,10 +27,7 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -46,10 +42,7 @@ func (h *V1UserHandler) GetUserRating(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 	if err != nil {

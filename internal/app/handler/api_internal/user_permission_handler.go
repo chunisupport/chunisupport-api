@@ -38,9 +38,9 @@ func (h *UserPermissionHandler) UpdatePermission(c *echo.Context) error {
 		return apierror.ErrBadRequest.WithInternal(err)
 	}
 
-	requester, ok := c.Get("userEntity").(*entity.User)
-	if !ok {
-		return apierror.ErrUnauthorized
+	requester, apiErr := apphandler.RequireRequester(c)
+	if apiErr != nil {
+		return apiErr
 	}
 
 	if err := h.usecase.ChangePermission(c.Request().Context(), requester, username, request.Permission); err != nil {

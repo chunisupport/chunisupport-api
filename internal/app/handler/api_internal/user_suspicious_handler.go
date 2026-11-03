@@ -6,7 +6,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -41,9 +40,9 @@ func (h *UserSuspiciousHandler) UpdateSuspicious(c *echo.Context) error {
 		return apierror.ErrBadRequest
 	}
 
-	requester, ok := c.Get("userEntity").(*entity.User)
-	if !ok {
-		return apierror.ErrUnauthorized
+	requester, apiErr := apphandler.RequireRequester(c)
+	if apiErr != nil {
+		return apiErr
 	}
 
 	if err := h.usecase.ChangeSuspicious(c.Request().Context(), requester, username, *request.IsSuspicious); err != nil {

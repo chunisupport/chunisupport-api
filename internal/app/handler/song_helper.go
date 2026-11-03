@@ -46,13 +46,8 @@ func BuildChartsMap[T any](
 // GetRequesterAccountTypeID はコンテキストからログインユーザーのAccountTypeIDを取得します。
 // ユーザーがログインしていない場合はnilを返します。
 func GetRequesterAccountTypeID(c *echo.Context) *int {
-	userObj := c.Get("userEntity")
-	if userObj == nil {
-		return nil
-	}
-
-	user, ok := userObj.(*entity.User)
-	if !ok {
+	user := Requester(c)
+	if user == nil {
 		return nil
 	}
 

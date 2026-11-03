@@ -5,7 +5,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -116,10 +115,7 @@ func (h *CourseHandler) Restore(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 func (h *CourseHandler) GetUserRecords(c *echo.Context) error {
-	var requester *entity.User
-	if v, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = v
-	}
+	requester := handler.Requester(c)
 	result, err := h.usecase.GetUserRecords(c.Request().Context(), c.Param("username"), requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -132,10 +128,7 @@ func (h *CourseHandler) GetUserRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if value, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = value
-	}
+	requester := handler.Requester(c)
 	result, err := h.usecase.GetUserRecord(c.Request().Context(), c.Param("username"), requester, displayID)
 	if err != nil {
 		return apierror.FromUsecaseError(err)

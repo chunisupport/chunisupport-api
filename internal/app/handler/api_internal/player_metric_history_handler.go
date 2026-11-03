@@ -5,7 +5,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -27,7 +26,7 @@ func (h *PlayerMetricHistoryHandler) Get(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	requester, _ := c.Get("userEntity").(*entity.User)
+	requester := apphandler.Requester(c)
 	entries, err := h.usecase.Get(c.Request().Context(), username, requester)
 	if err != nil {
 		return apierror.FromUsecaseError(err)

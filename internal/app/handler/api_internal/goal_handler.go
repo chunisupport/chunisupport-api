@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -144,14 +143,6 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 		InvertValue:       req.InvertValue,
 		InvertPercentage:  req.InvertPercentage,
 	}, nil
-}
-
-func getUser(c *echo.Context) (*entity.User, error) {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return nil, apierror.ErrUnauthorized
-	}
-	return user, nil
 }
 
 func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
