@@ -157,6 +157,11 @@ var (
 	ErrFriendNotFound                   = New(CodeFriendNotFound, http.StatusNotFound)
 	ErrFriendScoreComparisonUnavailable = New(CodeFriendScoreComparisonUnavailable, http.StatusConflict)
 
+	ErrXAccountNotLinked = New(CodeXAccountNotLinked, http.StatusConflict)
+	// ErrInvalidXCredentials は X のトークンの問題であり ChuniSupport のセッションは有効なため、401 ではなく 400 を返します。
+	ErrInvalidXCredentials = New(CodeInvalidXCredentials, http.StatusBadRequest)
+	ErrXAPIUnavailable     = New(CodeXAPIUnavailable, http.StatusBadGateway)
+
 	ErrInvalidVersionInput = New(CodeInvalidVersionInput, http.StatusUnprocessableEntity)
 	ErrVersionNotFound     = New(CodeVersionNotFound, http.StatusNotFound)
 	ErrVersionNameConflict = New(CodeVersionNameConflict, http.StatusConflict)

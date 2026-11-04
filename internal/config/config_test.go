@@ -419,6 +419,46 @@ func TestNormalizeAndValidateTurnstileConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateXAPIConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  XAPI
+		wantErr string
+	}{
+		{
+			name:    "コンシューマーキーとシークレットが揃えば前後の空白を除いて通る",
+			config:  XAPI{ConsumerKey: "  key  ", ConsumerSecret: " secret "},
+			wantErr: "",
+		},
+		{
+			name:    "コンシューマーキーがなければエラーになる",
+			config:  XAPI{ConsumerSecret: "secret"},
+			wantErr: "X_API_KEY environment variable is required",
+		},
+		{
+			name:    "シークレットがなければエラーになる",
+			config:  XAPI{ConsumerKey: "key"},
+			wantErr: "X_API_KEY_SECRET environment variable is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			err := normalizeAndValidateXAPIConfig(&tt.config)
+
+			// Then
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, XAPI{ConsumerKey: "key", ConsumerSecret: "secret"}, tt.config)
+		})
+	}
+}
+
 func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 	tests := []struct {
 		name                string

@@ -33,10 +33,10 @@ type Server struct {
 }
 
 // NewServer は永続化済みの運用状態を読み込んでServerインスタンスを作成します。
-func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*Server, error) {
+func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*Server, error) {
 	// 管理画面から起動したバッチを、停止シグナルに加えて Shutdown でもキャンセルできるようにします。
 	routerCtx, cancelBatchJobs := context.WithCancel(ctx)
-	router, batchJobs, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
+	router, batchJobs, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
 	if err != nil {
 		cancelBatchJobs()
 		return nil, err

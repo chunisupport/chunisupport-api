@@ -32,6 +32,15 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `is_suspicious`: 不審アカウントフラグ（0=正常, 1=不審）。
     - `created_at`, `updated_at`: 作成日時、更新日時。
 
+#### `user_x_accounts`
+- **役割**: ユーザーが連携している X アカウントの識別情報を、ユーザーごとに1件保持します。X API の `GET /2/users/me` が返した値だけを保存します。
+- **主なカラム**:
+    - `user_id`: `users`テーブルへの外部キー（主キー）。ユーザー削除時に削除されます。
+    - `x_user_id`: X の数値ユーザーID。表示側が現在の連携先と同じアカウントか照合するために保持します。
+    - `x_username`: `@` を除いた X のユーザー名。
+    - `is_public`: X アカウントをフレンドなど他のユーザーに見せるか（0=非公開, 1=公開）。既定は非公開。X から取得し直しても維持し、`x_user_id` が変わった（別の X アカウントに連携し直した）場合だけ非公開に戻す。現時点では API から参照・変更しない。
+    - `updated_at`: 最後に X から取得し直した日時。
+
 #### `api_tokens`
 - **役割**: API認証用のトークンを管理します。
 - **主なカラム**:

@@ -27,13 +27,14 @@ internal/
 ├── info/        # アプリケーションの基本情報
 ├── infra/       # インフラストラクチャ層
 │   ├── db/      # データベース接続管理
-│   ├── firebaseauth/ # Firebase IDトークン検証
+│   ├── firebaseauth/ # Firebase IDトークン検証・連携プロバイダの照会
 │   ├── models/  # データベース永続化用モデル（db/jsonタグあり）
 │   ├── repository/ # リポジトリ実装
 │   ├── logger/  # ロギング実装
 │   ├── masterdata/ # マスターデータプリロード
 │   ├── songbatch/ # 楽曲データ収集バッチの取得・取り込み・統合（SQLiteワークスペース）
-│   └── transaction/ # トランザクション管理
+│   ├── transaction/ # トランザクション管理
+│   └── xapi/    # X API 呼び出し（本人情報の取得）
 ├── usecase/     # ユースケース層: アプリケーションのビジネスロジック
 └── utils/       # 汎用的なユーティリティ関数
 ```
@@ -86,7 +87,8 @@ chunirec互換APIのユーザー・レコード取得は、`ChunirecUsecase`が�
 
 - **`internal/app/middleware`**: Firebase IDトークンおよびAPIトークンのHTTP認証ミドルウェアを提供します。
 - **`internal/usecase`**: Firebase IDトークン検証後のユーザー解決や初回登録など、認証フローのユースケースを提供します。
-- **`internal/infra/firebaseauth`**: Firebase Admin SDK を用いたIDトークン検証とFirebaseユーザー削除の実装を提供します。
+- **`internal/infra/firebaseauth`**: Firebase Admin SDK を用いたIDトークン検証、Firebaseユーザー削除、連携済み認証プロバイダ（X など）のユーザーID照会の実装を提供します。
+- **`internal/infra/xapi`**: 利用者本人の OAuth 1.0a トークンで X API の `GET /2/users/me` を呼び出し、X の数値IDとユーザー名を取得します。
 
 ### `internal/info`
 

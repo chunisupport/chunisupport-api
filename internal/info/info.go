@@ -170,6 +170,17 @@ const (
 	DataTransferRateLimitRequests         = 5
 	DataTransferRateLimitWindow           = time.Minute
 
+	// FirebaseProviderIDX は Firebase Authentication で X 連携を表す providerId です。
+	FirebaseProviderIDX = "twitter.com"
+	// XAPIBaseURL は X API v2 のベースURLです。
+	XAPIBaseURL = "https://api.x.com"
+	// XAPIRequestTimeout は X API 呼び出し1回あたりの上限時間です。
+	XAPIRequestTimeout = 5 * time.Second
+	// XAccountSyncRateLimitRequests は X アカウント情報の取得し直しを許す回数です。
+	// ログインや連携の直後にだけ呼ばれるため、X 側の回数制限に触れない程度に絞ります。
+	XAccountSyncRateLimitRequests = 10
+	XAccountSyncRateLimitWindow   = time.Minute
+
 	// DBコネクションプールのデフォルト設定
 	DefaultDBMaxOpenConns       = 25
 	DefaultDBMaxIdleConns       = 25

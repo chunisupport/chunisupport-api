@@ -6,6 +6,7 @@ toolchain go1.27.3
 
 require (
 	firebase.google.com/go/v4 v4.22.0
+	github.com/dghubble/oauth1 v0.7.3
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/google/uuid v1.6.0

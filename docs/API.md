@@ -50,6 +50,7 @@
 - `/internal/auth/signup`: **1分あたり5回/IP**
 - `/internal/me/register-data`: **30秒あたり1回/ユーザー**
 - `/internal/me/data-transfer/*`: **1分あたり5回/ユーザー**
+- `PUT /internal/me/x-account`: **1分あたり10回/ユーザー**
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
 - `/internal/users/*`、`/internal/songs/*`、`/internal/worldsend-songs/*`、`/internal/courses` の公開参照系、および `/internal/best-slot-rankings`（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
@@ -133,6 +134,9 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `friend_request_not_found` | 対象のフレンド申請が見つからない |
 | `friend_not_found` | 承認済み双方向フレンドではない |
 | `friend_score_comparison_unavailable` | 承認済みフレンドだが自分または相手がプレイヤー未連携 |
+| `x_account_not_linked` | ログイン中の Firebase ユーザーに X が連携されていない |
+| `invalid_x_credentials` | X のアクセストークンが拒否された、または連携中とは別の X アカウントのトークン |
+| `x_api_unavailable` | X API の障害・回数制限などで本人情報を取得できない |
 
 ## メンテナンスモード
 
@@ -297,6 +301,8 @@ Content-Type: application/json
 | `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
 | `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
 | `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
+| `/internal/me/x-account` | GET | Firebase Bearer | 保存済みの X アカウント（数値IDとユーザー名）を取得 |
+| `/internal/me/x-account` | PUT | Firebase Bearer | X のアクセストークンで本人のユーザー名を取得し直して保存 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
@@ -1133,6 +1139,65 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 401 Unauthorized (`invalid_credentials`): 削除対象アカウントと再認証情報の整合性が取れない認証失敗。詳細理由はレスポンスに含めず、サーバーログで監視します
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
+
+### GET `/internal/me/x-account`
+- **認証**: Firebase Bearer 必須
+- **レスポンス**: 200 OK
+
+```json
+{
+  "x_account": {
+    "id": "1234567890",
+    "username": "chunisupport"
+  }
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `x_account` | object \| null | 最後に `PUT /internal/me/x-account` で取得した X アカウント。一度も取得していない場合は `null` |
+| `x_account.id` | string | X の数値ユーザーID |
+| `x_account.username` | string | `@` を除いた X のユーザー名 |
+
+X の連携を解除したり、別の X アカウントに連携し直したりしても、保存済みの値は自動では消えません。クライアントは `x_account.id` を Firebase の `twitter.com` プロバイダのユーザーIDと照合し、一致する場合だけ表示してください。
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+
+### PUT `/internal/me/x-account`
+- **認証**: Firebase Bearer 必須
+- **レート制限**: 1分あたり10回/ユーザー
+- **リクエストボディ**:
+
+```json
+{
+  "access_token": "<X ログイン直後に得た OAuth 1.0a アクセストークン>",
+  "access_token_secret": "<同アクセストークンシークレット>"
+}
+```
+
+Firebase の X ログイン（`TwitterAuthProvider`）で得た OAuth 1.0a のアクセストークンを使い、X API の `GET /2/users/me` で本人のユーザー名を取得して保存します。ユーザー名はクライアントから受け取らず、X API が返した値だけを保存します。
+
+偽装を防ぐため、X API が返した数値ユーザーIDを、Firebase Admin SDK で取得したログイン中ユーザーの `twitter.com` プロバイダのユーザーIDと照合し、一致した場合だけ保存します。保存はユーザーごとに1件で、取得し直すたびに数値IDとユーザー名を更新します。別の X アカウントに連携し直して数値IDが変わった場合は、X アカウントの公開設定（現時点では API から変更できません）を非公開に戻します。
+
+X API の署名には環境変数 `X_API_KEY` / `X_API_KEY_SECRET` を使います。Firebase の X ログインに設定した X アプリと同じキーである必要があります。
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "id": "1234567890",
+  "username": "chunisupport"
+}
+```
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正、未知のフィールド
+  - 400 Bad Request (`invalid_x_credentials`): トークンが空、X がトークンを拒否した、または連携中とは別の X アカウントのトークン。ChuniSupport のセッションとは無関係のため 401 ではなく 400 を返します
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 409 Conflict (`x_account_not_linked`): ログイン中の Firebase ユーザーに X が連携されていない
+  - 429 Too Many Requests (`too_many_requests`): レート制限超過
+  - 502 Bad Gateway (`x_api_unavailable`): X API の障害・回数制限などで取得できない
 
 ### DELETE `/internal/me/player-data`
 - **認証**: Firebase Bearer 必須

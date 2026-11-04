@@ -105,6 +105,11 @@ const (
 	CodeFriendNotFound                   = "friend_not_found"
 	CodeFriendScoreComparisonUnavailable = "friend_score_comparison_unavailable"
 
+	// X アカウント連携関連エラー
+	CodeXAccountNotLinked   = "x_account_not_linked"
+	CodeInvalidXCredentials = "invalid_x_credentials" // #nosec G101 -- 公開APIのエラーコードであり認証情報ではありません。
+	CodeXAPIUnavailable     = "x_api_unavailable"
+
 	// バージョン管理関連エラー
 	CodeInvalidVersionInput = "invalid_version_input"
 	CodeVersionNotFound     = "version_not_found"
