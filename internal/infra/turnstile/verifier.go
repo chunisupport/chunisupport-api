@@ -30,10 +30,16 @@ type verifier struct {
 }
 
 type siteverifyResponse struct {
-	Success    bool     `json:"success"`
-	Hostname   string   `json:"hostname"`
-	Action     string   `json:"action"`
-	ErrorCodes []string `json:"error-codes"`
+	Success    bool               `json:"success"`
+	Hostname   string             `json:"hostname"`
+	Action     string             `json:"action"`
+	ErrorCodes []string           `json:"error-codes"`
+	Metadata   siteverifyMetadata `json:"metadata"`
+}
+
+type siteverifyMetadata struct {
+	// ResultWithTestingKey はテスト用シークレットキーで検証した場合だけ true になります。
+	ResultWithTestingKey bool `json:"result_with_testing_key"`
 }
 
 type hostnameMatcher struct {
@@ -96,6 +102,11 @@ func (v *verifier) VerifyTurnstile(ctx context.Context, token string, remoteIP s
 	}
 	if !result.Success {
 		return usecase.ErrInvalidTurnstileToken
+	}
+	// テスト用シークレットキーの応答は hostname が example.com 固定で action も付かず、照合が必ず失敗する。
+	// このフラグは実キーでは返らないため、ローカル開発用のテストキーに限って照合を省いても本番の防御は弱まらない。
+	if result.Metadata.ResultWithTestingKey {
+		return nil
 	}
 	// 別ホストで解かれたトークンの流用を防ぐ。許可リストが空のときも拒否する。
 	if !v.hosts.matches(result.Hostname) {
