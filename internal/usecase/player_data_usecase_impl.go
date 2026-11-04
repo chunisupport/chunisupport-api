@@ -501,10 +501,13 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 }
 
 func withPlayerDataRegistrationContext(userID, playerID int, err error) error {
-	var validationErr *PlayerDataValidationError
-	var notFoundErr *PlayerDataNotFoundError
-	var conflictErr *PlayerDataConflictError
-	if errors.As(err, &validationErr) || errors.As(err, &notFoundErr) || errors.As(err, &conflictErr) {
+	if _, ok := errors.AsType[*PlayerDataValidationError](err); ok {
+		return err
+	}
+	if _, ok := errors.AsType[*PlayerDataNotFoundError](err); ok {
+		return err
+	}
+	if _, ok := errors.AsType[*PlayerDataConflictError](err); ok {
 		return err
 	}
 	return fmt.Errorf("player data registration failed (user_id=%d, player_id=%d): %w", userID, playerID, err)
@@ -1195,8 +1198,7 @@ func cloneFloat64Pointer(value *float64) *float64 {
 	if value == nil {
 		return nil
 	}
-	cloned := *value
-	return &cloned
+	return new(*value)
 }
 
 func buildPlayerDataStatisticsGroupDiff(before service.PlayerRecordStatistics, after service.PlayerRecordStatistics) api_internal.PlayerDataStatisticsGroup {

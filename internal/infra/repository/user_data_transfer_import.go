@@ -6,8 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
-	"sort"
+	"slices"
 	"time"
 	"uuid"
 
@@ -105,12 +106,8 @@ func findTransferUnresolvedReferences(snapshot *entity.UserDataTransferSnapshot,
 			checkGoal(goal)
 		}
 	}
-	result := make([]string, 0, len(unresolved))
-	for value := range unresolved {
-		result = append(result, value)
-	}
-	sort.Strings(result)
-	return result
+	// 未解決参照がない場合も、呼び出し側に空配列を返す契約を維持します。
+	return append([]string{}, slices.Sorted(maps.Keys(unresolved))...)
 }
 
 func checkTransferRecordMasters(unresolved map[string]struct{}, masters *transferMasterData, clear, combo, fullChain string) {

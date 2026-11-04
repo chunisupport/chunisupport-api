@@ -254,7 +254,7 @@ func TestRecordFilterUsecase_CreateRejectsInvalidInput(t *testing.T) {
 func TestRecordFilterUsecase_CreateRejectsWhenLimitExceeded(t *testing.T) {
 	ctx := context.Background()
 	repo := newStubRecordFilterRepository()
-	for i := 0; i < info.RecordFilterMaxPerUser; i++ {
+	for range info.RecordFilterMaxPerUser {
 		id := uuid.NewV4()
 		payload, err := gzipBytes([]byte(`{"schema_version":3,"filter":{"title":""}}`))
 		require.NoError(t, err)

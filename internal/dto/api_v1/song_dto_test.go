@@ -57,7 +57,7 @@ func TestToV1ChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: true,
 		Notes:          &notesObj,
-		NotesDesigner:  stringPtr("譜面作者B"),
+		NotesDesigner:  new("譜面作者B"),
 	}
 
 	dto := ToV1ChartDTO(chart)
@@ -109,7 +109,7 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 		Release:            &releaseDate,
 		Jacket:             &jacket,
 		MaxOP:              85,
-		OpTargetDifficulty: stringPtr("EXPERT"),
+		OpTargetDifficulty: new("EXPERT"),
 		IsNew:              true,
 		Charts: V1OrderedChartsMap{
 			"BASIC":  &V1ChartDTO{Const: chartBasic, IsConstUnknown: false},
@@ -264,8 +264,4 @@ func indexOfString(str, substr string) int {
 		}
 	}
 	return -1
-}
-
-func stringPtr(value string) *string {
-	return &value
 }

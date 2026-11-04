@@ -212,7 +212,7 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 	if err := normalizeAndValidateLoggingConfig(&config.Logging, config.loggingSet); err != nil {
 		errMsg := strings.TrimPrefix(err.Error(), "configuration validation failed: ")
-		for _, msg := range strings.Split(errMsg, "; ") {
+		for msg := range strings.SplitSeq(errMsg, "; ") {
 			errors = append(errors, strings.TrimSpace(msg))
 		}
 	}
@@ -224,9 +224,9 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
-		if strings.HasPrefix(errMsg, prefix) {
-			errMsg = strings.TrimPrefix(errMsg, prefix)
-			for _, msg := range strings.Split(errMsg, "; ") {
+		if after, ok := strings.CutPrefix(errMsg, prefix); ok {
+			errMsg = after
+			for msg := range strings.SplitSeq(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
 		} else {
@@ -237,9 +237,9 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	if err := normalizeAndValidateDatabaseStartupConfig(&config.Database.Startup); err != nil {
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
-		if strings.HasPrefix(errMsg, prefix) {
-			errMsg = strings.TrimPrefix(errMsg, prefix)
-			for _, msg := range strings.Split(errMsg, "; ") {
+		if after, ok := strings.CutPrefix(errMsg, prefix); ok {
+			errMsg = after
+			for msg := range strings.SplitSeq(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
 		} else {

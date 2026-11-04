@@ -114,7 +114,7 @@ func TestValidatePlayerDataPayload_AppVersionを検証しない(t *testing.T) {
 				LastPlayed: "2024/01/01 00:00",
 				Overpower: PlayerDataOverpowerPayload{
 					Value:      &rating,
-					Percentage: float64Pointer(0.0),
+					Percentage: new(0.0),
 				},
 				ClassEmblem: PlayerDataClassPayload{
 					MedalClass: "none",
@@ -305,8 +305,8 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				ComboLv:   intPtrForApplyScoresTest(2),
-				FullChain: intPtrForApplyScoresTest(3),
+				ComboLv:   new(2),
+				FullChain: new(3),
 			},
 			wantError: false,
 		},
@@ -315,8 +315,8 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				ComboLv:   intPtrForApplyScoresTest(3),
-				FullChain: intPtrForApplyScoresTest(2),
+				ComboLv:   new(3),
+				FullChain: new(2),
 			},
 			wantError: false,
 		},
@@ -325,7 +325,7 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				FullChain: intPtrForApplyScoresTest(3),
+				FullChain: new(3),
 			},
 			wantError: true,
 		},
@@ -334,8 +334,8 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				ComboLv:   intPtrForApplyScoresTest(1),
-				FullChain: intPtrForApplyScoresTest(2),
+				ComboLv:   new(1),
+				FullChain: new(2),
 			},
 			wantError: true,
 		},
@@ -344,7 +344,7 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				FullChain: intPtrForApplyScoresTest(1),
+				FullChain: new(1),
 			},
 			wantError: false,
 		},
@@ -353,7 +353,7 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 			entry: PlayerDataScoreEntry{
 				Idx:       "full-song",
 				Score:     1009000,
-				FullChain: intPtrForApplyScoresTest(9),
+				FullChain: new(9),
 			},
 			wantError: false,
 		},
@@ -385,8 +385,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "06",
 				BaseClass:  "06",
 			},
-			wantClassID: intPtrForApplyScoresTest(6),
-			wantBaseID:  intPtrForApplyScoresTest(6),
+			wantClassID: new(6),
+			wantBaseID:  new(6),
 		},
 		{
 			name: "infの直接指定も従来通り解決できる",
@@ -394,8 +394,8 @@ func TestResolveClassEmblemIDs(t *testing.T) {
 				MedalClass: "INF",
 				BaseClass:  "inf",
 			},
-			wantClassID: intPtrForApplyScoresTest(6),
-			wantBaseID:  intPtrForApplyScoresTest(6),
+			wantClassID: new(6),
+			wantBaseID:  new(6),
 		},
 		{
 			name: "未定義値はnil扱いになる",

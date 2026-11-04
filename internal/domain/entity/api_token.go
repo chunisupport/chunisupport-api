@@ -132,14 +132,12 @@ func cloneStringPointer(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	copyValue := *value
-	return &copyValue
+	return new(*value)
 }
 
 func cloneTimePointer(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}
-	copyValue := *value
-	return &copyValue
+	return new(*value)
 }

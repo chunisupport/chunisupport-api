@@ -83,8 +83,8 @@ func buildClientErrorInfo(apiErr *apierror.APIError) (string, []apierror.Validat
 		return "入力値の形式を確認してください。", nil
 	}
 
-	var validationErrors apierror.ValidationErrors
-	if !errors.As(apiErr.Internal, &validationErrors) {
+	validationErrors, ok := errors.AsType[apierror.ValidationErrors](apiErr.Internal)
+	if !ok {
 		return "入力値の形式を確認してください。", nil
 	}
 

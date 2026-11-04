@@ -125,7 +125,7 @@ func TestCalcRatingStats(t *testing.T) {
 			name: "ベスト枠のみ30曲",
 			records: func() []RatingRecord {
 				records := make([]RatingRecord, 30)
-				for i := 0; i < 30; i++ {
+				for i := range 30 {
 					records[i] = RatingRecord{
 						Score:      1009000,
 						ChartConst: 15.0 - float64(i)*0.1,
@@ -147,7 +147,7 @@ func TestCalcRatingStats(t *testing.T) {
 			name: "新曲枠のみ20曲",
 			records: func() []RatingRecord {
 				records := make([]RatingRecord, 20)
-				for i := 0; i < 20; i++ {
+				for i := range 20 {
 					records[i] = RatingRecord{
 						Score:      1009000,
 						ChartConst: 15.0 - float64(i)*0.1,
@@ -198,14 +198,14 @@ func TestCalcRatingStats(t *testing.T) {
 			name: "ベスト枠30曲と新曲枠20曲が混在",
 			records: func() []RatingRecord {
 				records := make([]RatingRecord, 50)
-				for i := 0; i < 30; i++ {
+				for i := range 30 {
 					records[i] = RatingRecord{
 						Score:      1009000,
 						ChartConst: 15.0 - float64(i)*0.1,
 						IsNew:      false,
 					}
 				}
-				for i := 0; i < 20; i++ {
+				for i := range 20 {
 					records[30+i] = RatingRecord{
 						Score:      1009000,
 						ChartConst: 14.0 - float64(i)*0.1,

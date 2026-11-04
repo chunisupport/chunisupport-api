@@ -74,8 +74,7 @@ func prunePlayerMetricHistories(ctx context.Context, exec domainrepo.Executor, d
 }
 
 func wrapPlayerMetricHistoryInsertError(err error) error {
-	var mysqlErr *mysql.MySQLError
-	if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntryErrorNumber {
+	if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok && mysqlErr.Number == mysqlDuplicateEntryErrorNumber {
 		return fmt.Errorf("%w: %w", domainrepo.ErrPlayerMetricHistoryTimestampConflict, err)
 	}
 	return fmt.Errorf("failed to insert player metric history: %w", err)

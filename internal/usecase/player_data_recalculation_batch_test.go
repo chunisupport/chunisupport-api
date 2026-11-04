@@ -136,8 +136,8 @@ func TestPreparedBatchSnapshot_現行の正常な公式枠を保持する(t *tes
 	// Given
 	prepared := preparedBatchSnapshotForSlotTest(t, 2)
 	data := repository.PlayerBatchData{ID: 1, Records: []repository.PlayerBatchRecord{
-		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-		{ChartID: 2, Score: 1_008_000, SlotName: "new", SlotOrder: batchIntPtr(1)},
+		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+		{ChartID: 2, Score: 1_008_000, SlotName: "new", SlotOrder: new(1)},
 	}}
 
 	// When
@@ -158,8 +158,8 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠を再構築する(t *tes
 		{
 			name: "bestの順位重複",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(1)},
 			},
 		},
 		{
@@ -171,7 +171,7 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠を再構築する(t *tes
 		{
 			name: "bestの順位範囲外",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(31)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(31)},
 			},
 		},
 	}
@@ -195,9 +195,9 @@ func TestPreparedBatchSnapshot_現行の候補枠だけが壊れていても保�
 	// Given
 	prepared := preparedBatchSnapshotForSlotTest(t, 3)
 	data := repository.PlayerBatchData{ID: 1, Records: []repository.PlayerBatchRecord{
-		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-		{ChartID: 2, Score: 1_008_000, SlotName: "best_candidate", SlotOrder: batchIntPtr(1)},
-		{ChartID: 3, Score: 1_007_000, SlotName: "best_candidate", SlotOrder: batchIntPtr(1)},
+		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+		{ChartID: 2, Score: 1_008_000, SlotName: "best_candidate", SlotOrder: new(1)},
+		{ChartID: 3, Score: 1_007_000, SlotName: "best_candidate", SlotOrder: new(1)},
 	}}
 
 	// When
@@ -214,8 +214,8 @@ func TestPreparedBatchSnapshot_現行本枠の順位が連番でなくても保�
 	// Given
 	prepared := preparedBatchSnapshotForSlotTest(t, 2)
 	data := repository.PlayerBatchData{ID: 1, Records: []repository.PlayerBatchRecord{
-		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-		{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(3)},
+		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+		{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(3)},
 	}}
 
 	// When
@@ -237,8 +237,8 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠をリリース日で再�
 	prepared, err := prepareBatchSnapshot(snapshot, time.Date(2026, 7, 6, 0, 0, 0, 0, jst), jst)
 	require.NoError(t, err)
 	data := repository.PlayerBatchData{ID: 1, Records: []repository.PlayerBatchRecord{
-		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-		{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+		{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+		{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(1)},
 	}}
 
 	// When
@@ -261,7 +261,7 @@ func TestPreparedBatchSnapshot_現行の壊れた本枠から候補枠と指標�
 		record := repository.PlayerBatchRecord{ChartID: i, Score: 1_009_000}
 		if i <= 2 {
 			record.SlotName = "best"
-			record.SlotOrder = batchIntPtr(1)
+			record.SlotOrder = new(1)
 		}
 		records = append(records, record)
 	}
@@ -310,7 +310,7 @@ func TestValidateOfficialSlotSet_本枠の件数超過を検出する(t *testing
 	// Given
 	records := make([]repository.PlayerBatchRecord, 0, 31)
 	for i := 1; i <= 31; i++ {
-		records = append(records, repository.PlayerBatchRecord{ChartID: i, SlotName: "best", SlotOrder: batchIntPtr(min(i, 30))})
+		records = append(records, repository.PlayerBatchRecord{ChartID: i, SlotName: "best", SlotOrder: new(min(i, 30))})
 	}
 
 	// When
@@ -330,8 +330,8 @@ func TestPlayerDataRecalculationBatchUsecase_現行の壊れた本枠を成功�
 		snapshot: snapshot,
 		keys:     []repository.PlayerBatchKey{{ID: 1}},
 		data: map[int]repository.PlayerBatchData{1: {ID: 1, LastPlayedAt: &lastPlayedAt, Records: []repository.PlayerBatchRecord{
-			{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-			{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+			{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+			{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(1)},
 		}}},
 	}
 	usecase := NewPlayerDataRecalculationBatchUsecase(repo)
@@ -358,8 +358,8 @@ func TestPlayerDataRecalculationBatchUsecase_壊れた本枠の保存失敗を�
 		keys:          []repository.PlayerBatchKey{{ID: 1}},
 		afterBuildErr: assert.AnError,
 		data: map[int]repository.PlayerBatchData{1: {ID: 1, LastPlayedAt: &lastPlayedAt, Records: []repository.PlayerBatchRecord{
-			{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-			{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+			{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+			{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(1)},
 		}}},
 	}
 	usecase := NewPlayerDataRecalculationBatchUsecase(repo)
@@ -585,8 +585,8 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 		{
 			name: "枠が同じなら更新しない",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(2)},
 			},
 			wantClear:       []int{},
 			wantAssignments: []repository.PlayerBatchSlotAssignment{},
@@ -594,8 +594,8 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 		{
 			name: "順位だけ変わった譜面は付け替えだけ行う",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
-				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(2)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(1)},
 			},
 			wantClear: []int{},
 			wantAssignments: []repository.PlayerBatchSlotAssignment{
@@ -606,9 +606,9 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 		{
 			name: "枠から外れた譜面を外す",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
-				{ChartID: 3, Score: 0, SlotName: "best_candidate", SlotOrder: batchIntPtr(1)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(2)},
+				{ChartID: 3, Score: 0, SlotName: "best_candidate", SlotOrder: new(1)},
 			},
 			wantClear:       []int{3},
 			wantAssignments: []repository.PlayerBatchSlotAssignment{},
@@ -616,9 +616,9 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 		{
 			name: "noneなのに順位がある譜面を外す",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
-				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: batchIntPtr(2)},
-				{ChartID: 3, Score: 0, SlotName: "none", SlotOrder: batchIntPtr(3)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+				{ChartID: 2, Score: 1_008_000, SlotName: "best", SlotOrder: new(2)},
+				{ChartID: 3, Score: 0, SlotName: "none", SlotOrder: new(3)},
 			},
 			wantClear:       []int{3},
 			wantAssignments: []repository.PlayerBatchSlotAssignment{},
@@ -626,7 +626,7 @@ func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新す�
 		{
 			name: "枠のない譜面を新しく割り当てる",
 			records: []repository.PlayerBatchRecord{
-				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: batchIntPtr(1)},
+				{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
 				{ChartID: 2, Score: 1_008_000, SlotName: "none"},
 			},
 			wantClear:       []int{},
@@ -717,8 +717,4 @@ func batchSnapshotForSlotTest(recordCount int) repository.PlayerDataMasterSnapsh
 		snapshot.Charts = append(snapshot.Charts, repository.BatchChart{ID: i, SongID: i, DifficultyName: "MASTER", ChartConst: 15})
 	}
 	return snapshot
-}
-
-func batchIntPtr(value int) *int {
-	return &value
 }

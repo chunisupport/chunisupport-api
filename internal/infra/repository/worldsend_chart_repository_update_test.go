@@ -231,9 +231,9 @@ func TestUpdateSongs_UpdatesChartLevelStarUsingValueObject(t *testing.T) {
 		},
 		Chart: &entity.WorldsendChart{
 			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute:     stringPtrForWorldsendSaveTest("改"),
+			Attribute:     new("改"),
 			Notes:         &n,
-			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
+			NotesDesigner: new("新作者"),
 		},
 	}}
 
@@ -266,9 +266,9 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenDisplayIDMissing(t *testing.T) {
 		},
 		Chart: &entity.WorldsendChart{
 			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute:     stringPtrForWorldsendSaveTest("狂"),
+			Attribute:     new("狂"),
 			Notes:         &n,
-			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
+			NotesDesigner: new("新作者"),
 		},
 	}}
 
@@ -349,9 +349,9 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenTargetDisappearsDuringUpdate(t *t
 		},
 		Chart: &entity.WorldsendChart{
 			LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
-			Attribute:     stringPtrForWorldsendSaveTest("改"),
+			Attribute:     new("改"),
 			Notes:         &n,
-			NotesDesigner: stringPtrForWorldsendSaveTest("新作者"),
+			NotesDesigner: new("新作者"),
 		},
 	}}
 
@@ -462,9 +462,9 @@ func TestUpdateSongs_ReturnsErrSongNotFoundWhenMixedChartUpdatesSkipOneAndSkippe
 			},
 			Chart: &entity.WorldsendChart{
 				LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
-				Attribute:     stringPtrForWorldsendSaveTest("改"),
+				Attribute:     new("改"),
 				Notes:         &n,
-				NotesDesigner: stringPtrForWorldsendSaveTest("新作者2"),
+				NotesDesigner: new("新作者2"),
 			},
 		},
 	}
@@ -601,9 +601,9 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 			},
 			Chart: &entity.WorldsendChart{
 				LevelStar:     levelStarPtrForWorldsendUpdateTest(t, 5),
-				Attribute:     stringPtrForWorldsendSaveTest("改"),
+				Attribute:     new("改"),
 				Notes:         &n,
-				NotesDesigner: stringPtrForWorldsendSaveTest("新作者2"),
+				NotesDesigner: new("新作者2"),
 			},
 		},
 	}

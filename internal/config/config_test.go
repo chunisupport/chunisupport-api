@@ -437,8 +437,8 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "明示した待機設定があればその値を使う",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(60),
-				IntervalSec: intPtr(2),
+				MaxWaitSec:  new(60),
+				IntervalSec: new(2),
 			},
 			wantErr:             false,
 			expectedMaxWaitSec:  60,
@@ -447,8 +447,8 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "最大待機秒数は0なら即時失敗として許可する",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(0),
-				IntervalSec: intPtr(1),
+				MaxWaitSec:  new(0),
+				IntervalSec: new(1),
 			},
 			wantErr:             false,
 			expectedMaxWaitSec:  0,
@@ -457,16 +457,16 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "最大待機秒数が負数ならエラーになる",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(-1),
-				IntervalSec: intPtr(1),
+				MaxWaitSec:  new(-1),
+				IntervalSec: new(1),
 			},
 			wantErr: true,
 		},
 		{
 			name: "再試行間隔が0ならエラーになる",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(60),
-				IntervalSec: intPtr(0),
+				MaxWaitSec:  new(60),
+				IntervalSec: new(0),
 			},
 			wantErr: true,
 		},
@@ -487,8 +487,4 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedIntervalSec, *tt.config.IntervalSec)
 		})
 	}
-}
-
-func intPtr(v int) *int {
-	return &v
 }

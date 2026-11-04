@@ -184,37 +184,37 @@ func TestToRecordsShowAllResponse_ClearLampFlags(t *testing.T) {
 		},
 		{
 			name:      "FAILEDは未クリア",
-			clearLamp: stringPtr("FAILED"),
+			clearLamp: new("FAILED"),
 			wantClear: false,
 		},
 		{
 			name:      "CLEARはクリア",
-			clearLamp: stringPtr("CLEAR"),
+			clearLamp: new("CLEAR"),
 			wantClear: true,
 		},
 		{
 			name:      "HARDはクリア",
-			clearLamp: stringPtr("HARD"),
+			clearLamp: new("HARD"),
 			wantClear: true,
 		},
 		{
 			name:      "BRAVEはクリア",
-			clearLamp: stringPtr("BRAVE"),
+			clearLamp: new("BRAVE"),
 			wantClear: true,
 		},
 		{
 			name:      "ABSOLUTEはクリア",
-			clearLamp: stringPtr("ABSOLUTE"),
+			clearLamp: new("ABSOLUTE"),
 			wantClear: true,
 		},
 		{
 			name:      "CATASTROPHYはクリア",
-			clearLamp: stringPtr("CATASTROPHY"),
+			clearLamp: new("CATASTROPHY"),
 			wantClear: true,
 		},
 		{
 			name:      "未知の値は未クリア",
-			clearLamp: stringPtr("UNKNOWN"),
+			clearLamp: new("UNKNOWN"),
 			wantClear: false,
 		},
 	}
@@ -255,13 +255,13 @@ func TestToRecordsShowAllResponse_ComboLampFlags(t *testing.T) {
 	}{
 		{
 			name:           "FULL COMBOはFCのみtrue",
-			comboLamp:      stringPtr("FULL COMBO"),
+			comboLamp:      new("FULL COMBO"),
 			wantFullCombo:  true,
 			wantAllJustice: false,
 		},
 		{
 			name:           "ALL JUSTICEはFCとAJがtrue",
-			comboLamp:      stringPtr("ALL JUSTICE"),
+			comboLamp:      new("ALL JUSTICE"),
 			wantFullCombo:  true,
 			wantAllJustice: true,
 		},
@@ -365,8 +365,4 @@ func TestToChunirecUserDTO_内部ユーザーIDを公開しない(t *testing.T) 
 	userID, exists := response["user_id"]
 	require.True(t, exists)
 	assert.Equal(t, float64(0), userID)
-}
-
-func stringPtr(value string) *string {
-	return &value
 }

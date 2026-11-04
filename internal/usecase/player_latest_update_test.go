@@ -31,9 +31,9 @@ func TestBuildPlayerLatestUpdate_skippedRecordsを除外して登録結果を圧
 		},
 		Summary: playerdataresult.Summary{Name: "TEST", Level: 99},
 		MetricDiffs: playerdataresult.MetricDiffs{
-			Rating:           playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
-			OverpowerValue:   playerdataresult.Float64Diff{Before: float64Pointer(96120.123), After: float64Pointer(96123.91), Delta: float64Pointer(3.787)},
-			OverpowerPercent: playerdataresult.Float64Diff{Before: float64Pointer(76.26789), After: float64Pointer(76.27011), Delta: float64Pointer(0.00222)},
+			Rating:           playerdataresult.Float64Diff{Before: new(16.42), After: new(16.45), Delta: new(0.03)},
+			OverpowerValue:   playerdataresult.Float64Diff{Before: new(96120.123), After: new(96123.91), Delta: new(3.787)},
+			OverpowerPercent: playerdataresult.Float64Diff{Before: new(76.26789), After: new(76.27011), Delta: new(0.00222)},
 		},
 		Counts: playerdataresult.Counts{FullRecordsActuallyChanged: 2, FullRecordsSkipped: 1},
 		Changes: []playerdataresult.RecordChange{{
@@ -83,14 +83,14 @@ func TestBuildPlayerDataFloat64Diff_登録前後がある場合だけ差分を�
 	}{
 		{
 			name:   "登録前後がある場合はdeltaを計算する",
-			before: float64Pointer(16.42),
-			after:  float64Pointer(16.45),
-			want:   playerdataresult.Float64Diff{Before: float64Pointer(16.42), After: float64Pointer(16.45), Delta: float64Pointer(0.03)},
+			before: new(16.42),
+			after:  new(16.45),
+			want:   playerdataresult.Float64Diff{Before: new(16.42), After: new(16.45), Delta: new(0.03)},
 		},
 		{
 			name:  "初回登録ではdeltaを返さない",
-			after: float64Pointer(16.45),
-			want:  playerdataresult.Float64Diff{After: float64Pointer(16.45)},
+			after: new(16.45),
+			want:  playerdataresult.Float64Diff{After: new(16.45)},
 		},
 	}
 
@@ -110,10 +110,6 @@ func TestBuildPlayerDataFloat64Diff_登録前後がある場合だけ差分を�
 			}
 		})
 	}
-}
-
-func float64Pointer(value float64) *float64 {
-	return &value
 }
 
 func TestPlayerDataUsecase_GetLatestUpdate(t *testing.T) {
@@ -306,23 +302,23 @@ func TestBuildPlayerDataOverpowerPercentDiff_更新前OP値を同一分母で割
 	}{
 		{
 			name:              "増加時は小数点以下5桁のポイント差を返す",
-			beforeValue:       float64Pointer(2),
-			afterPercent:      float64Pointer(66.679),
+			beforeValue:       new(float64(2)),
+			afterPercent:      new(66.679),
 			maxOverpowerTotal: 3,
-			wantBefore:        float64Pointer(66.66666),
-			wantDelta:         float64Pointer(0.01234),
+			wantBefore:        new(66.66666),
+			wantDelta:         new(0.01234),
 		},
 		{
 			name:              "減少時は負のポイント差を返す",
-			beforeValue:       float64Pointer(2),
-			afterPercent:      float64Pointer(66.65432),
+			beforeValue:       new(float64(2)),
+			afterPercent:      new(66.65432),
 			maxOverpowerTotal: 3,
-			wantBefore:        float64Pointer(66.66666),
-			wantDelta:         float64Pointer(-0.01234),
+			wantBefore:        new(66.66666),
+			wantDelta:         new(-0.01234),
 		},
 		{
 			name:              "初回登録ではbeforeとdeltaを返さない",
-			afterPercent:      float64Pointer(66.679),
+			afterPercent:      new(66.679),
 			maxOverpowerTotal: 3,
 		},
 	}

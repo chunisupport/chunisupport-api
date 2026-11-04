@@ -20,7 +20,7 @@ func TestUserUsecase_GetUserProfile_Success(t *testing.T) {
 	user := &entity.User{
 		ID:       1,
 		Username: un,
-		PlayerID: intPointer(1),
+		PlayerID: new(1),
 	}
 	player := &entity.Player{
 		ID:        1,
@@ -43,7 +43,7 @@ func TestUserUsecase_GetUserProfile_PrivateUserBlocked(t *testing.T) {
 	user := &entity.User{
 		ID:        1,
 		Username:  un,
-		PlayerID:  intPointer(1),
+		PlayerID:  new(1),
 		IsPrivate: true,
 	}
 	player := &entity.Player{

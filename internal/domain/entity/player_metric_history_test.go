@@ -19,10 +19,10 @@ func TestPlayer_HasOfficialMetricsChanged(t *testing.T) {
 		afterPercent    float64
 		expected        bool
 	}{
-		{name: "同じ値なら変更なし", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: float64Pointer(98.76), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: false},
-		{name: "RATINGが変われば変更あり", beforeRating: 17.24, beforeOverpower: 12345.67, beforePercent: float64Pointer(98.76), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: true},
-		{name: "OPが変われば変更あり", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: float64Pointer(98.76), afterRating: 17.25, afterOverpower: 12346.01, afterPercent: 98.76, expected: true},
-		{name: "OPパーセントが変われば変更あり", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: float64Pointer(98.75), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: true},
+		{name: "同じ値なら変更なし", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: new(98.76), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: false},
+		{name: "RATINGが変われば変更あり", beforeRating: 17.24, beforeOverpower: 12345.67, beforePercent: new(98.76), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: true},
+		{name: "OPが変われば変更あり", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: new(98.76), afterRating: 17.25, afterOverpower: 12346.01, afterPercent: 98.76, expected: true},
+		{name: "OPパーセントが変われば変更あり", beforeRating: 17.25, beforeOverpower: 12345.67, beforePercent: new(98.75), afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: true},
 		{name: "OPパーセントが未記録なら変更あり", beforeRating: 17.25, beforeOverpower: 12345.67, afterRating: 17.25, afterOverpower: 12345.67, afterPercent: 98.76, expected: true},
 	}
 
@@ -55,7 +55,7 @@ func TestPlayer_ChangeOfficialMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			player := &Player{ID: 10, OfficialRating: 17.24, OfficialOverpower: 12340.12, OfficialOverpowerPercent: float64Pointer(98.75), DataCollectedAt: &collectedAt}
+			player := &Player{ID: 10, OfficialRating: 17.24, OfficialOverpower: 12340.12, OfficialOverpowerPercent: new(98.75), DataCollectedAt: &collectedAt}
 
 			err := player.ChangeOfficialMetrics(tt.rating, tt.overpower, tt.overpowerPercent, tt.inputAt)
 
@@ -74,8 +74,4 @@ func TestPlayer_ChangeOfficialMetrics(t *testing.T) {
 			}
 		})
 	}
-}
-
-func float64Pointer(value float64) *float64 {
-	return &value
 }

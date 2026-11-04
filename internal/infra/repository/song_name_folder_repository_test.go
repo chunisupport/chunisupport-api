@@ -20,9 +20,9 @@ func TestSongRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 		song := &entity.Song{
 			DisplayID:   "CREATE001",
 			Title:       "Unrelated title",
-			Reading:     stringPtrForNameFolderTest("ココロ"),
+			Reading:     new("ココロ"),
 			Artist:      "Artist",
-			GenreID:     intPtrForNameFolderTest(1),
+			GenreID:     new(1),
 			OfficialIdx: "IDX-CREATE001",
 		}
 
@@ -47,9 +47,9 @@ func TestSongRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 			ID:          1,
 			DisplayID:   "SAVE001",
 			Title:       "Title",
-			Reading:     stringPtrForNameFolderTest("ソラ"),
+			Reading:     new("ソラ"),
 			Artist:      "Artist",
-			GenreID:     intPtrForNameFolderTest(1),
+			GenreID:     new(1),
 			OfficialIdx: "IDX-SAVE001",
 		}
 		repo := &songRepository{db: db}
@@ -74,8 +74,8 @@ func TestSongRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 		`)
 		require.NoError(t, err)
 
-		first := &entity.Song{DisplayID: "BULK001", Title: "First", Reading: stringPtrForNameFolderTest("ココロ"), Artist: "Artist", GenreID: intPtrForNameFolderTest(1)}
-		second := &entity.Song{DisplayID: "BULK002", Title: "Second", Reading: stringPtrForNameFolderTest("ソラ"), Artist: "Artist", GenreID: intPtrForNameFolderTest(1)}
+		first := &entity.Song{DisplayID: "BULK001", Title: "First", Reading: new("ココロ"), Artist: "Artist", GenreID: new(1)}
+		second := &entity.Song{DisplayID: "BULK002", Title: "Second", Reading: new("ソラ"), Artist: "Artist", GenreID: new(1)}
 		repo := &songRepository{db: db}
 
 		err = repo.UpdateSongs(context.Background(), db, []*domainrepo.SongUpdate{{Song: first}, {Song: second}})
@@ -97,9 +97,9 @@ func TestWorldsendRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 		song := &entity.Song{
 			DisplayID:   "WE-CREATE001",
 			Title:       "Unrelated title",
-			Reading:     stringPtrForNameFolderTest("ホシ"),
+			Reading:     new("ホシ"),
 			Artist:      "Artist",
-			GenreID:     intPtrForNameFolderTest(1),
+			GenreID:     new(1),
 			OfficialIdx: "WEIDX-CREATE001",
 		}
 
@@ -126,9 +126,9 @@ func TestWorldsendRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 			ID:          1,
 			DisplayID:   "WE-SAVE001",
 			Title:       "Title",
-			Reading:     stringPtrForNameFolderTest("モリ"),
+			Reading:     new("モリ"),
 			Artist:      "Artist",
-			GenreID:     intPtrForNameFolderTest(1),
+			GenreID:     new(1),
 			OfficialIdx: "WEIDX-SAVE001",
 			IsWorldsend: true,
 		}
@@ -156,8 +156,8 @@ func TestWorldsendRepositoryPersistsAndRestoresNameFolderCode(t *testing.T) {
 		_, err = db.Exec(`INSERT INTO worldsend_charts (song_id) VALUES (1), (2)`)
 		require.NoError(t, err)
 
-		first := &entity.Song{DisplayID: "WE-BULK001", Title: "First", Reading: stringPtrForNameFolderTest("ココロ"), Artist: "Artist", GenreID: intPtrForNameFolderTest(1), IsWorldsend: true}
-		second := &entity.Song{DisplayID: "WE-BULK002", Title: "Second", Reading: stringPtrForNameFolderTest("ソラ"), Artist: "Artist", GenreID: intPtrForNameFolderTest(1), IsWorldsend: true}
+		first := &entity.Song{DisplayID: "WE-BULK001", Title: "First", Reading: new("ココロ"), Artist: "Artist", GenreID: new(1), IsWorldsend: true}
+		second := &entity.Song{DisplayID: "WE-BULK002", Title: "Second", Reading: new("ソラ"), Artist: "Artist", GenreID: new(1), IsWorldsend: true}
 		repo := &worldsendChartRepository{db: db}
 
 		err = repo.UpdateSongs(context.Background(), db, []*domainrepo.WorldsendUpdate{{Song: first}, {Song: second}})
@@ -181,12 +181,4 @@ func nameFolderCodeForSong(t *testing.T, db *sqlx.DB, songID int) string {
 	`, songID)
 	require.NoError(t, err)
 	return code
-}
-
-func stringPtrForNameFolderTest(value string) *string {
-	return &value
-}
-
-func intPtrForNameFolderTest(value int) *int {
-	return &value
 }

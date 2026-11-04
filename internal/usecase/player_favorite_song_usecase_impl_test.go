@@ -214,7 +214,7 @@ func TestPlayerFavoriteSongUsecase_List(t *testing.T) {
 			userRepo:   &stubUserRepoForFav{user: &entity.User{ID: 1}},
 			playerRepo: &stubPlayerRepoForFav{player: &entity.Player{ID: 10, UserID: 1}},
 			queryService: &stubFavoriteQueryService{models: []*PlayerFavoriteSongReadModel{
-				{DisplayID: "0000000000000001", Title: "楽曲A", Jacket: strPtrFS("a.jpg"), FavoritedAt: now},
+				{DisplayID: "0000000000000001", Title: "楽曲A", Jacket: new("a.jpg"), FavoritedAt: now},
 			}},
 		}
 
@@ -494,10 +494,6 @@ func TestPlayerFavoriteSongUsecase_Remove(t *testing.T) {
 		err := u.Remove(context.Background(), 1, did)
 		require.ErrorIs(t, err, ErrPlayerNotLinked)
 	})
-}
-
-func strPtrFS(s string) *string {
-	return &s
 }
 
 func TestNewPlayerFavoriteSongUsecase_フレンド判定リポジトリは必須(t *testing.T) {

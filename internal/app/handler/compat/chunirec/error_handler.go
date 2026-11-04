@@ -54,9 +54,8 @@ func handleChunirecError(err error, c *echo.Context) {
 	}
 
 	// エラーの種類に応じてHTTPステータスコードを決定
-	var apiErr *apierror.APIError
 	var statusCoder echo.HTTPStatusCoder
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok {
 		httpStatus = apiErr.HTTPStatus
 		additionalMessage = ""
 	} else if errors.As(err, &statusCoder) {
@@ -100,8 +99,7 @@ func handleChunirecError(err error, c *echo.Context) {
 
 // logChunirecError はエラーをログに出力します（詳細情報を含む）
 func logChunirecError(status int, err error, c *echo.Context) {
-	var apiErr *apierror.APIError
-	if errors.As(err, &apiErr) && apiErr.Code == apierror.CodeMaintenanceMode {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok && apiErr.Code == apierror.CodeMaintenanceMode {
 		return
 	}
 

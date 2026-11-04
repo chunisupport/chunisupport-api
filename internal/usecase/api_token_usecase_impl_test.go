@@ -307,7 +307,7 @@ func TestAPITokenUsecase_Generate_RejectsInvalidPermission(t *testing.T) {
 
 func TestAPITokenUsecase_ListAndRename(t *testing.T) {
 	repo := newStubAPITokenRepository()
-	token := newAPITokenForTest(t, 5, 10, "CLI", "plain-token", stringPointer("plain"), nil)
+	token := newAPITokenForTest(t, 5, 10, "CLI", "plain-token", new("plain"), nil)
 	repo.tokens[token.ID] = token
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
@@ -345,7 +345,7 @@ func TestAPITokenUsecase_Validate_DoesNotUpdateRecentLastUsedAt(t *testing.T) {
 	now := time.Date(2026, 7, 22, 15, 0, 0, 0, time.UTC)
 	lastUsedAt := now.Add(-30 * time.Minute)
 	repo := newStubAPITokenRepository()
-	token := newAPITokenForTest(t, 1, 10, "CLI", "plain-token", stringPointer("plain"), &lastUsedAt)
+	token := newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), &lastUsedAt)
 	repo.tokens[token.ID] = token
 	uc := newAPITokenUsecaseWithClock(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}}, func() time.Time { return now })
 
@@ -360,8 +360,8 @@ func TestAPITokenUsecase_Validate_RechecksLastUsedAtAfterLock(t *testing.T) {
 	now := time.Date(2026, 7, 22, 15, 0, 0, 0, time.UTC)
 	recentlyUsedAt := now.Add(-time.Minute)
 	repo := newStubAPITokenRepository()
-	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", stringPointer("plain"), nil)
-	repo.lockedToken = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", stringPointer("plain"), &recentlyUsedAt)
+	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), nil)
+	repo.lockedToken = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), &recentlyUsedAt)
 	uc := newAPITokenUsecaseWithClock(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}}, func() time.Time { return now })
 
 	// When
@@ -386,7 +386,7 @@ func TestAPITokenUsecase_Validate_InvalidCases(t *testing.T) {
 		{name: "トークン不明", raw: "unknown", repo: newStubAPITokenRepository(), users: &tokenStubUserRepository{}},
 		{name: "ユーザー不明", raw: "valid", repo: func() *stubAPITokenRepository {
 			repo := newStubAPITokenRepository()
-			repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "valid", stringPointer("valid"), nil)
+			repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "valid", new("valid"), nil)
 			return repo
 		}(), users: &tokenStubUserRepository{}},
 	}
@@ -402,7 +402,7 @@ func TestAPITokenUsecase_Validate_InvalidCases(t *testing.T) {
 
 func TestAPITokenUsecase_Delete_IsScopedToOwner(t *testing.T) {
 	repo := newStubAPITokenRepository()
-	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", stringPointer("plain"), nil)
+	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), nil)
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
 	err := uc.Delete(context.Background(), 11, "1")
@@ -434,8 +434,4 @@ func cloneAPITokenForTest(token *entity.APIToken) *entity.APIToken {
 		panic(err)
 	}
 	return cloned
-}
-
-func stringPointer(value string) *string {
-	return &value
 }
