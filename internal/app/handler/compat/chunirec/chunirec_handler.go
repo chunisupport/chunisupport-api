@@ -9,7 +9,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -95,10 +94,7 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		return apiErr
 	}
 
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.chunirecUsecase.GetRecords(ctx, username, requester)
 	if err != nil {
@@ -146,10 +142,7 @@ func (h *ChunirecHandler) getProfile(c *echo.Context) (*repository.ChunirecProfi
 	}
 
 	// requester はAPIトークン所有者（非公開ユーザーの本人アクセス判定用）
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.chunirecUsecase.GetProfile(ctx, validUsername, requester)
 	if err != nil {
@@ -173,7 +166,7 @@ func (h *ChunirecHandler) getProfile(c *echo.Context) (*repository.ChunirecProfi
 func (h *ChunirecHandler) resolveTargetUsername(c *echo.Context) (string, *apierror.APIError) {
 	username := c.QueryParam("user_name")
 	if username == "" {
-		if userEntity, ok := c.Get("userEntity").(*entity.User); ok && userEntity != nil {
+		if userEntity := handler.Requester(c); userEntity != nil {
 			username = userEntity.Username.String()
 		} else {
 			return "", apierror.ErrUnauthorized

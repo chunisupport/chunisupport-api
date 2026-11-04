@@ -68,7 +68,7 @@ func internalScoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *
 	if apiErr != nil {
 		return "", nil, apiErr
 	}
-	requester, _ := c.Get("userEntity").(*entity.User)
+	requester := apphandler.Requester(c)
 	return username, requester, nil
 }
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -33,10 +32,7 @@ func (h *UserHandler) GetUserProfile(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserProfile(c.Request().Context(), username, requester)
 	if err != nil {
@@ -52,10 +48,7 @@ func (h *UserHandler) GetUserUpdatedAt(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserUpdatedAt(c.Request().Context(), username, requester)
 	if err != nil {
@@ -71,10 +64,7 @@ func (h *UserHandler) GetUserRating(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 	if err != nil {
@@ -90,10 +80,7 @@ func (h *UserHandler) GetUserRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserProfileRecordView(c.Request().Context(), username, requester)
 	if err != nil {
@@ -114,10 +101,7 @@ func (h *UserHandler) GetUserSongRecord(c *echo.Context) error {
 		return apiErr
 	}
 	difficulty := strings.ToUpper(c.QueryParam("difficulty"))
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserSongRecord(c.Request().Context(), username, requester, displayID, difficulty)
 	if err != nil {
@@ -136,10 +120,7 @@ func (h *UserHandler) GetUserWorldsendSongRecord(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 
 	result, err := h.userUsecase.GetUserWorldsendSongRecord(c.Request().Context(), username, requester, displayID)
 	if err != nil {
@@ -158,10 +139,7 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	var requester *entity.User
-	if userEntity, ok := c.Get("userEntity").(*entity.User); ok {
-		requester = userEntity
-	}
+	requester := handler.Requester(c)
 	if view == info.UserProfileViewRating {
 		result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
 		if err != nil {
@@ -360,9 +338,9 @@ func (h *UserHandler) DeleteUser(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	requester, ok := c.Get("userEntity").(*entity.User)
-	if !ok {
-		return apierror.ErrUnauthorized
+	requester, apiErr := handler.RequireRequester(c)
+	if apiErr != nil {
+		return apiErr
 	}
 
 	if err := h.userUsecase.DeleteUser(c.Request().Context(), requester, username); err != nil {

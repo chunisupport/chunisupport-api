@@ -13,7 +13,6 @@ import (
 	"net/http"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	dto_internal "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -30,9 +29,9 @@ type MeHandler struct {
 
 // GetLatestPlayerUpdate は認証済みユーザーの最新プレイヤーデータ登録結果を返します。
 func (h *MeHandler) GetLatestPlayerUpdate(c *echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 
 	raw, err := h.playerDataUsecase.GetLatestUpdate(c.Request().Context(), user)
@@ -52,9 +51,9 @@ func (h *MeHandler) GetLatestPlayerUpdate(c *echo.Context) error {
 
 // GetRecentPlayerUpdates は本人の直近5件の登録結果を返します。
 func (h *MeHandler) GetRecentPlayerUpdates(c *echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 	updates, err := h.playerDataUsecase.GetRecentUpdates(c.Request().Context(), user)
 	if err != nil {
@@ -80,9 +79,9 @@ func NewMeHandler(playerDataUsecase usecase.PlayerDataUsecase) *MeHandler {
 // デフォルトではbase64+gzip圧縮形式を受け入れ、クエリパラメータformat=jsonの場合は生JSONを受け入れます。
 // 公式エクスポートJSONの前方互換のため BindStrictJSON は使わず、未知フィールドは無視して警告ログのみ出力します。
 func (h *MeHandler) RegisterData(c *echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 
 	format := c.QueryParam("format")
@@ -148,9 +147,9 @@ func (h *MeHandler) RegisterData(c *echo.Context) error {
 
 // DeletePlayerData はプレイヤーデータの削除（連携解除）を扱います。
 func (h *MeHandler) DeletePlayerData(c *echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 
 	if err := h.playerDataUsecase.Delete(c.Request().Context(), user); err != nil {

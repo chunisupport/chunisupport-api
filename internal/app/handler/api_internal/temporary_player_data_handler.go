@@ -15,7 +15,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -142,9 +141,9 @@ func readAllWithMaxBytes(r io.Reader, maxBytes int) ([]byte, bool, error) {
 
 // CommitTemporaryData は一時データを認証済みユーザーに紐づけて確定保存します。
 func (h *TemporaryPlayerDataHandler) CommitTemporaryData(c *echo.Context) error {
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
-		return apierror.ErrUnauthorized
+	user, err := getUser(c)
+	if err != nil {
+		return err
 	}
 
 	var req commitTemporaryPlayerDataRequest

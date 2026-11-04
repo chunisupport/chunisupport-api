@@ -6,7 +6,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -37,8 +36,8 @@ func (h *PlayerHandler) CreatePlayer(c *echo.Context) error {
 		return apierror.ErrValidationFailed.WithInternal(err)
 	}
 
-	user, ok := c.Get("userEntity").(*entity.User)
-	if !ok || user == nil {
+	user, apiErr := apphandler.RequireRequester(c)
+	if apiErr != nil || user == nil {
 		return apierror.ErrUnauthorized.WithInternal(errors.New("user entity not found in context"))
 	}
 
