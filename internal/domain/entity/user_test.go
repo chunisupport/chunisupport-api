@@ -41,7 +41,7 @@ func TestUser_LinkFirebaseUID(t *testing.T) {
 			name:           "UID を設定すると連携済みになる",
 			uid:            "firebase-uid-1",
 			expectedLinked: true,
-			expectedUID:    ptr("firebase-uid-1"),
+			expectedUID:    new("firebase-uid-1"),
 		},
 		{
 			name:           "空白だけのUIDは未連携として扱う",
@@ -150,8 +150,4 @@ func TestUser_ChangeAccountType(t *testing.T) {
 			assert.Equal(t, tt.wantAccountType, user.AccountTypeID)
 		})
 	}
-}
-
-func ptr(value string) *string {
-	return &value
 }

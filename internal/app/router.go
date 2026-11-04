@@ -62,8 +62,7 @@ func validateUsername(fl validator.FieldLevel) bool {
 func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		slog.Warn("Validation error", "error", err.Error())
-		var validationErrors validator.ValidationErrors
-		if ok := errors.As(err, &validationErrors); ok {
+		if validationErrors, ok := errors.AsType[validator.ValidationErrors](err); ok {
 			return apierror.ErrValidationFailed.WithInternal(apierror.ValidationErrors(validationErrors))
 		}
 		return apierror.ErrValidationFailed.WithInternal(err)

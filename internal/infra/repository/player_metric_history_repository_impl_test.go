@@ -96,7 +96,7 @@ func TestPrunePlayerMetricHistories_上限超過時は古い履歴から削除�
 	`)
 	require.NoError(t, err)
 	oldest := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	for i := 0; i < info.MaxMetricHistoryEntriesPerPlayer+2; i++ {
+	for i := range info.MaxMetricHistoryEntriesPerPlayer + 2 {
 		_, err := db.Exec(`INSERT INTO player_metric_histories VALUES (?, ?, ?, ?, ?)`,
 			1, float64(i), float64(i), nil, oldest.Add(time.Duration(i)*time.Second))
 		require.NoError(t, err, fmt.Sprintf("履歴%d件目", i+1))
@@ -155,7 +155,7 @@ func TestPlayerMetricHistoryRepository_FindTimeline_現行値込みの上限ま�
 	current := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 	_, err = db.Exec(`INSERT INTO players VALUES (?, ?, ?, ?, ?)`, 1, 17.25, 12345.67, 98.76, current)
 	require.NoError(t, err)
-	for i := 0; i < info.MaxMetricHistoryEntriesPerPlayer+2; i++ {
+	for i := range info.MaxMetricHistoryEntriesPerPlayer + 2 {
 		_, err := db.Exec(`INSERT INTO player_metric_histories VALUES (?, ?, ?, ?, ?)`,
 			1, float64(i), float64(i), nil, current.Add(-time.Duration(i+1)*time.Second))
 		require.NoError(t, err, fmt.Sprintf("履歴%d件目", i+1))

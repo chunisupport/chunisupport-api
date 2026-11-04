@@ -1,9 +1,10 @@
 package reiwa
 
 import (
+	"cmp"
 	"log/slog"
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -214,19 +215,19 @@ func boolToInt(b bool) int {
 
 // sortChunithmRecords はレコードをidx（数値昇順）→難易度順にソートします
 func sortChunithmRecords(records ChunithmRecordList) {
-	sort.Slice(records, func(i, j int) bool {
-		idxI, errI := strconv.Atoi(records[i].Idx)
-		if errI != nil {
-			slog.Warn("failed to parse official idx as integer", "idx", records[i].Idx, "error", errI)
+	slices.SortFunc(records, func(a, b *ChunithmRecordDTO) int {
+		idxA, errA := strconv.Atoi(a.Idx)
+		if errA != nil {
+			slog.Warn("failed to parse official idx as integer", "idx", a.Idx, "error", errA)
 		}
-		idxJ, errJ := strconv.Atoi(records[j].Idx)
-		if errJ != nil {
-			slog.Warn("failed to parse official idx as integer", "idx", records[j].Idx, "error", errJ)
+		idxB, errB := strconv.Atoi(b.Idx)
+		if errB != nil {
+			slog.Warn("failed to parse official idx as integer", "idx", b.Idx, "error", errB)
 		}
-		if idxI != idxJ {
-			return idxI < idxJ
+		if idxA != idxB {
+			return cmp.Compare(idxA, idxB)
 		}
-		return diffSortOrder(records[i].Diff) < diffSortOrder(records[j].Diff)
+		return cmp.Compare(diffSortOrder(a.Diff), diffSortOrder(b.Diff))
 	})
 }
 

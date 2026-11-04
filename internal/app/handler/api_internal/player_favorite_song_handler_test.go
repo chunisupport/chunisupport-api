@@ -55,7 +55,7 @@ func TestPlayerFavoriteSongHandler_List(t *testing.T) {
 				assert.Equal(t, "testuser", username)
 				assert.Same(t, requester, gotRequester)
 				return []*usecase.PlayerFavoriteSongOutput{
-					{DisplayID: "1234567890abcdef", Title: "テスト楽曲", Jacket: strPtrFH("test.jpg"), FavoritedAt: now},
+					{DisplayID: "1234567890abcdef", Title: "テスト楽曲", Jacket: new("test.jpg"), FavoritedAt: now},
 				}, nil
 			},
 		})
@@ -263,8 +263,4 @@ func TestPlayerFavoriteSongHandler_Remove(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
 	})
-}
-
-func strPtrFH(s string) *string {
-	return &s
 }

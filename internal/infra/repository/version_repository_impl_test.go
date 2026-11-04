@@ -42,8 +42,8 @@ func TestVersionRepository_ExistsSongInRange(t *testing.T) {
 		to   *time.Time
 		want bool
 	}{
-		{name: "下端を含む", from: repositoryTestDate(2025, 1, 1), to: datePointer(repositoryTestDate(2025, 1, 2)), want: true},
-		{name: "上端を含まない", from: repositoryTestDate(2025, 1, 2), to: datePointer(repositoryTestDate(2026, 1, 1)), want: false},
+		{name: "下端を含む", from: repositoryTestDate(2025, 1, 1), to: new(repositoryTestDate(2025, 1, 2)), want: true},
+		{name: "上端を含まない", from: repositoryTestDate(2025, 1, 2), to: new(repositoryTestDate(2026, 1, 1)), want: false},
 		{name: "上限なし", from: repositoryTestDate(2026, 1, 1), want: true},
 		{name: "NULLは対象外", from: repositoryTestDate(2027, 1, 1), want: false},
 	}
@@ -104,8 +104,4 @@ func newVersionRepositoryTestDB(t *testing.T) *sqlx.DB {
 
 func repositoryTestDate(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-}
-
-func datePointer(value time.Time) *time.Time {
-	return &value
 }

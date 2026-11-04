@@ -46,8 +46,8 @@ func wrapHonorDuplicateError(err error) error {
 }
 
 func wrapHonorReferencedError(err error) error {
-	var mysqlErr *mysql.MySQLError
-	if !errors.As(err, &mysqlErr) || mysqlErr.Number != mysqlCannotDeleteOrUpdateParentRowErrorNumber {
+	mysqlErr, ok := errors.AsType[*mysql.MySQLError](err)
+	if !ok || mysqlErr.Number != mysqlCannotDeleteOrUpdateParentRowErrorNumber {
 		return err
 	}
 
@@ -69,8 +69,8 @@ func wrapAPITokenDuplicateError(err error) error {
 }
 
 func isMySQLDuplicateEntryForKey(err error, key string) bool {
-	var mysqlErr *mysql.MySQLError
-	if !errors.As(err, &mysqlErr) {
+	mysqlErr, ok := errors.AsType[*mysql.MySQLError](err)
+	if !ok {
 		return false
 	}
 

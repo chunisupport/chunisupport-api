@@ -223,7 +223,7 @@ func (b *fillBody) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 	k := min(len(p), b.n-b.off)
-	for i := 0; i < k; i++ {
+	for i := range k {
 		p[i] = b.fill
 	}
 	b.off += k

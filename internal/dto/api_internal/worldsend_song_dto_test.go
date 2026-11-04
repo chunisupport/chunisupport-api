@@ -211,7 +211,7 @@ func TestToWorldsendSongDTO_WikiPageTitle(t *testing.T) {
 	}{
 		{
 			name:          "Wikiページタイトルが設定されている場合はその値を返す",
-			wikiPageTitle: stringPtr("楽曲名(WORLD'S END)"),
+			wikiPageTitle: new("楽曲名(WORLD'S END)"),
 			expectedJSON:  `"wiki_page_title":"楽曲名(WORLD'S END)"`,
 		},
 		{

@@ -44,13 +44,12 @@ func TestChartStatsMasterProviderAdapter_RatingBands_呼び出し側で変更し
 				}
 			},
 			wantLabel:        "A",
-			wantMinInclusive: float64Ptr(10.0),
-			wantMaxExclusive: float64Ptr(20.0),
+			wantMinInclusive: new(10.0),
+			wantMaxExclusive: new(20.0),
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -78,8 +77,4 @@ func TestChartStatsMasterProviderAdapter_RatingBands_呼び出し側で変更し
 			}
 		})
 	}
-}
-
-func float64Ptr(v float64) *float64 {
-	return &v
 }

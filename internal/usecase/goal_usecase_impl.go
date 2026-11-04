@@ -247,8 +247,7 @@ func cloneUint32Pointer(value *uint32) *uint32 {
 	if value == nil {
 		return nil
 	}
-	cloned := *value
-	return &cloned
+	return new(*value)
 }
 
 type validatedGoalInput struct {

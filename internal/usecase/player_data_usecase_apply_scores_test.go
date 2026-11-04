@@ -54,20 +54,20 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 				Idx:       "full-song",
 				Diff:      "MAS",
 				Score:     1010000,
-				ClearLamp: stringPtrForApplyScoresTest("absolute"),
-				ComboLv:   intPtrForApplyScoresTest(3),
-				FullChain: intPtrForApplyScoresTest(3),
-				Slot:      stringPtrForApplyScoresTest("best"),
-				Order:     intPtrForApplyScoresTest(1),
+				ClearLamp: new("absolute"),
+				ComboLv:   new(3),
+				FullChain: new(3),
+				Slot:      new("best"),
+				Order:     new(1),
 			},
 		},
 		Worldsend: []PlayerDataScoreEntry{
 			{
 				Idx:       "world-song",
 				Score:     1009000,
-				ClearLamp: stringPtrForApplyScoresTest("hard"),
-				ComboLv:   intPtrForApplyScoresTest(2),
-				FullChain: intPtrForApplyScoresTest(2),
+				ClearLamp: new("hard"),
+				ComboLv:   new(2),
+				FullChain: new(2),
 			},
 		},
 	}
@@ -94,7 +94,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 	assert.Equal(t, 1, statistics.ByDifficulty["WE"].RecordStatistics.FC.After)
 	assert.Len(t, statistics.ByDifficulty, 6)
 	require.Equal(t, 1, repo.saveCalls)
-	assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: intPtrForApplyScoresTest(99)}, repo.receivedFilter)
+	assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: new(99)}, repo.receivedFilter)
 
 	require.Len(t, repo.savedInput.FullRecords, 1)
 	assert.Equal(t, repository.PlayerRecordForUpsert{
@@ -106,7 +106,7 @@ func TestApplyScores_通常譜面とWORLDSENDを保存し通常譜面だけをOV
 			ComboLampID: 3,
 			FullChainID: 2,
 			SlotID:      2,
-			SlotOrder:   intPtrForApplyScoresTest(1),
+			SlotOrder:   new(1),
 			UpdatedAt:   updatedAt,
 		},
 	}, repo.savedInput.FullRecords[0])
@@ -165,7 +165,7 @@ func TestApplyScores_既存レコードを含めてOVERPOWERを再計算する(t
 	masters := newApplyScoresTestMasters()
 	payload := PlayerDataScorePayload{
 		Standard: []PlayerDataScoreEntry{{
-			Idx: "full-song", Diff: "MAS", Score: 1010000, ComboLv: intPtrForApplyScoresTest(3),
+			Idx: "full-song", Diff: "MAS", Score: 1010000, ComboLv: new(3),
 		}},
 	}
 
@@ -351,7 +351,7 @@ func TestApplyScores_不正レコードをスキップして理由を保持す�
 				Standard: []PlayerDataScoreEntry{
 					{Idx: "missing-song", Diff: "MAS", Score: 1000000},
 					{Idx: "full-song", Diff: "MAS", Score: 1010001},
-					{Idx: "full-song", Diff: "MAS", Score: 1009000, Slot: stringPtrForApplyScoresTest("unknown")},
+					{Idx: "full-song", Diff: "MAS", Score: 1009000, Slot: new("unknown")},
 				},
 			},
 			wantCounts: api_internal.PlayerDataCounts{
@@ -371,9 +371,9 @@ func TestApplyScores_不正レコードをスキップして理由を保持す�
 			payload: PlayerDataScorePayload{
 				Worldsend: []PlayerDataScoreEntry{
 					{Idx: "missing-world", Score: 1000000},
-					{Idx: "world-song", Score: 1000000, ClearLamp: stringPtrForApplyScoresTest("unknown")},
-					{Idx: "world-song", Score: 1000000, ComboLv: intPtrForApplyScoresTest(9)},
-					{Idx: "world-song", Score: 1000000, FullChain: intPtrForApplyScoresTest(9)},
+					{Idx: "world-song", Score: 1000000, ClearLamp: new("unknown")},
+					{Idx: "world-song", Score: 1000000, ComboLv: new(9)},
+					{Idx: "world-song", Score: 1000000, FullChain: new(9)},
 				},
 			},
 			wantCounts: api_internal.PlayerDataCounts{
@@ -431,22 +431,22 @@ func TestResolveFullChainID_fchLvの値に応じてフルチェインIDを解決
 		},
 		{
 			name:       "fch_lvが1の場合はnoneとして解決される",
-			fullChain:  intPtrForApplyScoresTest(1),
+			fullChain:  new(1),
 			expectedID: 1,
 		},
 		{
 			name:       "fch_lvが2の場合はfull chain platinumとして解決される",
-			fullChain:  intPtrForApplyScoresTest(2),
+			fullChain:  new(2),
 			expectedID: 3,
 		},
 		{
 			name:       "fch_lvが3の場合はfull chain goldとして解決される",
-			fullChain:  intPtrForApplyScoresTest(3),
+			fullChain:  new(3),
 			expectedID: 2,
 		},
 		{
 			name:        "未知のfch_lvはバリデーションエラーになる",
-			fullChain:   intPtrForApplyScoresTest(9),
+			fullChain:   new(9),
 			expectedErr: "fch_lv: unknown full chain level: 9",
 		},
 	}
@@ -657,8 +657,8 @@ func TestApplyScores_枠検証失敗時は枠解除も保存もしない(t *test
 	repo := &stubPlayerDataRepositoryForApplyScoresTest{overpowerStats: &repository.OverpowerTargetStats{}}
 	uc := &playerDataUsecase{playerDataRepo: repo, playerRecRepo: &stubPlayerRecordRepositoryForApplyScoresTest{}, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}}
 	payload := PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{
-		{Idx: "full-song", Diff: "MAS", Score: 1_000_000, Slot: stringPtrForApplyScoresTest("best"), Order: &order},
-		{Idx: "second-song", Diff: "MAS", Score: 1_000_000, Slot: stringPtrForApplyScoresTest("best"), Order: &order},
+		{Idx: "full-song", Diff: "MAS", Score: 1_000_000, Slot: new("best"), Order: &order},
+		{Idx: "second-song", Diff: "MAS", Score: 1_000_000, Slot: new("best"), Order: &order},
 	}}
 
 	// When
@@ -906,14 +906,6 @@ func (s *stubPlayerRecordRepositoryForApplyScoresTest) GetLastScoreUpdate(_ cont
 	return nil, nil
 }
 
-func stringPtrForApplyScoresTest(value string) *string {
-	return &value
-}
-
-func intPtrForApplyScoresTest(value int) *int {
-	return &value
-}
-
 func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -933,18 +925,18 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 			wantChanges: []api_internal.PlayerDataRecordChange{
 				{
 					RecordType: "standard", ChangeType: "new", Idx: "full-song", Diff: "MASTER",
-					After: api_internal.PlayerDataRecordState{Score: 1000000, ClearLamp: stringPtrForApplyScoresTest("FAILED")},
+					After: api_internal.PlayerDataRecordState{Score: 1000000, ClearLamp: new("FAILED")},
 				},
 				{
 					RecordType: "worldsend", ChangeType: "new", Idx: "world-song", Diff: "WE",
-					After: api_internal.PlayerDataRecordState{Score: 990000, ClearLamp: stringPtrForApplyScoresTest("FAILED")},
+					After: api_internal.PlayerDataRecordState{Score: 990000, ClearLamp: new("FAILED")},
 				},
 			},
 		},
 		{
 			name:       "scoreとランプが同じでslotだけ違う場合は差分なし",
 			fullBefore: map[int]repository.PlayerRecordState{101: {Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1}},
-			payload:    PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1000000, Slot: stringPtrForApplyScoresTest("best"), Order: intPtrForApplyScoresTest(1)}}},
+			payload:    PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1000000, Slot: new("best"), Order: new(1)}}},
 			wantCounts: api_internal.PlayerDataCounts{FullRecordsUpserted: 1},
 		},
 		{
@@ -952,14 +944,14 @@ func TestApplyScores_保存前状態との差分を返す(t *testing.T) {
 			fullBefore: map[int]repository.PlayerRecordState{101: {Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1}},
 			payload: PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{
 				{Idx: "full-song", Diff: "MAS", Score: 1000000},
-				{Idx: "full-song", Diff: "MAS", Score: 1005000, ComboLv: intPtrForApplyScoresTest(2)},
+				{Idx: "full-song", Diff: "MAS", Score: 1005000, ComboLv: new(2)},
 			}},
 			wantCounts: api_internal.PlayerDataCounts{FullRecordsUpserted: 2, FullRecordsActuallyChanged: 1},
 			wantChanges: []api_internal.PlayerDataRecordChange{{
 				RecordType: "standard", ChangeType: "updated", Idx: "full-song", Diff: "MASTER",
-				Before: &api_internal.PlayerDataRecordState{Score: 1000000, ClearLamp: stringPtrForApplyScoresTest("FAILED")},
+				Before: &api_internal.PlayerDataRecordState{Score: 1000000, ClearLamp: new("FAILED")},
 				After: api_internal.PlayerDataRecordState{
-					Score: 1005000, ClearLamp: stringPtrForApplyScoresTest("FAILED"), ComboLamp: stringPtrForApplyScoresTest("full combo"),
+					Score: 1005000, ClearLamp: new("FAILED"), ComboLamp: new("full combo"),
 				},
 			}},
 		},
@@ -1042,7 +1034,7 @@ func TestPlayerDataRecordChange_newではBeforeがnilになる(t *testing.T) {
 		Diff:       "MASTER",
 		After: api_internal.PlayerDataRecordState{
 			Score:     1000000,
-			ClearLamp: stringPtrForApplyScoresTest("FAILED"),
+			ClearLamp: new("FAILED"),
 		},
 	}
 
@@ -1164,7 +1156,7 @@ func TestWorldsendRecordDisplayKeys_楽曲マスタ欠損時は楽曲IDをIdxに
 }
 
 func TestPlayerRecordMeaningfullyChanged_DB更新条件と同じ対象だけを比較する(t *testing.T) {
-	base := repository.PlayerRecordState{Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1, SlotOrder: intPtrForApplyScoresTest(1), UpdatedAt: time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)}
+	base := repository.PlayerRecordState{Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1, SlotOrder: new(1), UpdatedAt: time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)}
 	tests := []struct {
 		name  string
 		after repository.PlayerRecordState

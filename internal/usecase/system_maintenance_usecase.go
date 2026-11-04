@@ -157,8 +157,7 @@ func isInvalidMaintenanceCommentError(err error) bool {
 func cloneSystemMaintenance(source *entity.SystemMaintenance) *entity.SystemMaintenance {
 	cloned := *source
 	if source.UpdatedByUserID != nil {
-		updaterUserID := *source.UpdatedByUserID
-		cloned.UpdatedByUserID = &updaterUserID
+		cloned.UpdatedByUserID = new(*source.UpdatedByUserID)
 	}
 	return &cloned
 }

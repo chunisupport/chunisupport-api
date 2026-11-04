@@ -56,7 +56,7 @@ func TestToChartDTO(t *testing.T) {
 		Const:          chartConst,
 		IsConstUnknown: false,
 		Notes:          &notesObj,
-		NotesDesigner:  stringPtr("譜面作者A"),
+		NotesDesigner:  new("譜面作者A"),
 	}
 
 	dto := ToChartDTO(chart)
@@ -111,7 +111,7 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 		Release:            &releaseDate,
 		Jacket:             &jacket,
 		MaxOP:              85,
-		OpTargetDifficulty: stringPtr("MASTER"),
+		OpTargetDifficulty: new("MASTER"),
 		IsNew:              true,
 		Charts: OrderedChartsMap{
 			"BASIC":    &ChartDTO{Const: chartBasic, IsConstUnknown: false, Notes: nil},
@@ -354,10 +354,6 @@ func TestEditorOrderedChartsMap_MarshalJSON_現行のバイト列と一致する
 	}
 }
 
-func stringPtr(value string) *string {
-	return &value
-}
-
 func TestToSongDTO_WikiPageTitle(t *testing.T) {
 	tests := []struct {
 		name string
@@ -368,7 +364,7 @@ func TestToSongDTO_WikiPageTitle(t *testing.T) {
 	}{
 		{
 			name:          "Wikiページタイトルが設定されている場合はその値を返す",
-			wikiPageTitle: stringPtr("楽曲名(CHUNITHM)"),
+			wikiPageTitle: new("楽曲名(CHUNITHM)"),
 			expectedJSON:  `"wiki_page_title":"楽曲名(CHUNITHM)"`,
 		},
 		{

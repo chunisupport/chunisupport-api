@@ -21,7 +21,7 @@ func TestApplyScores_本枠を保存できなければ枠解除前に拒否す�
 		{name: "未登録の新曲", entry: PlayerDataScoreEntry{Idx: "missing-song", Diff: "MAS", Score: 1000000}},
 		{name: "未登録の譜面", entry: PlayerDataScoreEntry{Idx: "full-song", Diff: "ULT", Score: 1000000}},
 		{name: "範囲外スコア", entry: PlayerDataScoreEntry{Idx: "full-song", Diff: "MAS", Score: 1010001}},
-		{name: "解決できないランプ", entry: PlayerDataScoreEntry{Idx: "full-song", Diff: "MAS", Score: 1000000, ClearLamp: stringPtrForApplyScoresTest("unknown")}},
+		{name: "解決できないランプ", entry: PlayerDataScoreEntry{Idx: "full-song", Diff: "MAS", Score: 1000000, ClearLamp: new("unknown")}},
 	}
 	for _, slot := range []string{"best", " NEW "} {
 		for _, tt := range tests {
@@ -29,13 +29,13 @@ func TestApplyScores_本枠を保存できなければ枠解除前に拒否す�
 				// Given: 末尾の本枠が保存できない場合も、欠番の検証だけで見逃さない。
 				entry := tt.entry
 				entry.Slot = &slot
-				entry.Order = intPtrForApplyScoresTest(2)
+				entry.Order = new(2)
 				masters := newApplyScoresTestMasters()
 				masters.Difficulties["ULTIMA"] = mastervo.ChartDifficulty{ID: 5, Name: "ULTIMA"}
 				masters.songs["existing-song"] = entity.PlayerDataSong{ID: 3, OfficialIdx: "existing-song"}
 				masters.chartsByKey["3:4"] = entity.PlayerDataChart{ID: 102, SongID: 3, DifficultyID: 4}
 				payload := PlayerDataScorePayload{Standard: []PlayerDataScoreEntry{
-					{Idx: "existing-song", Diff: "MAS", Score: 1000000, Slot: &slot, Order: intPtrForApplyScoresTest(1)},
+					{Idx: "existing-song", Diff: "MAS", Score: 1000000, Slot: &slot, Order: new(1)},
 					entry,
 				}}
 				repo := &stubPlayerDataRepositoryForApplyScoresTest{}

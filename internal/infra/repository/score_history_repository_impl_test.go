@@ -72,7 +72,7 @@ func TestScoreHistoryRepository_PruneStandardOverLimit(t *testing.T) {
 	repo, cleanup := setupScoreHistoryTestDB(t)
 	defer cleanup()
 	now := time.Date(2026, 6, 28, 12, 0, 0, 0, time.UTC)
-	for i := 0; i < info.MaxScoreHistoryEntriesPerChart+2; i++ {
+	for i := range info.MaxScoreHistoryEntriesPerChart + 2 {
 		_, err := repo.db.Exec(`INSERT INTO player_record_histories VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			1, 10, 900000+i, 1, 1, 1, now.Add(time.Duration(i)*time.Second))
 		require.NoError(t, err, fmt.Sprintf("履歴%d件目", i+1))

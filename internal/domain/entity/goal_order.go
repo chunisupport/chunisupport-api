@@ -105,6 +105,5 @@ func cloneOptionalID(id *uint32) *uint32 {
 	if id == nil {
 		return nil
 	}
-	cloned := *id
-	return &cloned
+	return new(*id)
 }

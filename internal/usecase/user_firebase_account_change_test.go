@@ -48,7 +48,7 @@ func TestUserCredentialUsecase_ChangeFirebaseAccount(t *testing.T) {
 		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: oldUID, AuthTime: recentAuthTime}, nil).Once()
 		verifier.On("VerifyRecentSignIn", mock.Anything, "new-account-token").Return(&RecentSignInInfo{UID: newUID, AuthTime: recentAuthTime}, nil).Once()
 		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(newUser(), nil).Once()
-		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, ptrString(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(nil).Once()
+		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, new(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(nil).Once()
 		uc := newUsecase(repo, verifier, deleter)
 
 		// When
@@ -69,7 +69,7 @@ func TestUserCredentialUsecase_ChangeFirebaseAccount(t *testing.T) {
 		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: oldUID, AuthTime: recentAuthTime}, nil).Once()
 		verifier.On("VerifyRecentSignIn", mock.Anything, "new-account-token").Return(&RecentSignInInfo{UID: newUID, AuthTime: recentAuthTime}, nil).Once()
 		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(newUser(), nil).Once()
-		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, ptrString(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(nil).Once()
+		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, new(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(nil).Once()
 		uc := newUsecase(repo, verifier, deleter)
 		logBuffer := captureDefaultSlog(t)
 
@@ -108,7 +108,7 @@ func TestUserCredentialUsecase_ChangeFirebaseAccount(t *testing.T) {
 		verifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: oldUID, AuthTime: recentAuthTime}, nil).Once()
 		verifier.On("VerifyRecentSignIn", mock.Anything, "new-account-token").Return(&RecentSignInInfo{UID: newUID, AuthTime: recentAuthTime}, nil).Once()
 		repo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(newUser(), nil).Once()
-		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, ptrString(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
+		repo.On("LinkFirebaseUID", mock.Anything, mock.Anything, 1, new(oldUID), newUID, mock.AnythingOfType("time.Time")).Return(repository.ErrFirebaseUIDAlreadyLinked).Once()
 		uc := newUsecase(repo, verifier, deleter)
 
 		// When

@@ -212,22 +212,22 @@ func TestUserRepositoryLinkFirebaseUID(t *testing.T) {
 			initialUID:   nil,
 			currentUID:   nil,
 			newUID:       "firebase-uid",
-			wantSavedUID: stringPtrForUserSaveTest("firebase-uid"),
+			wantSavedUID: new("firebase-uid"),
 		},
 		{
 			name:         "現在値が一致すれば既存UIDを置き換えられる",
-			initialUID:   stringPtrForUserSaveTest("old-uid"),
-			currentUID:   stringPtrForUserSaveTest("old-uid"),
+			initialUID:   new("old-uid"),
+			currentUID:   new("old-uid"),
 			newUID:       "new-uid",
-			wantSavedUID: stringPtrForUserSaveTest("new-uid"),
+			wantSavedUID: new("new-uid"),
 		},
 		{
 			name:         "現在値が一致しなければ更新しない",
-			initialUID:   stringPtrForUserSaveTest("persisted-uid"),
+			initialUID:   new("persisted-uid"),
 			currentUID:   nil,
 			newUID:       "new-uid",
 			wantErr:      domainrepo.ErrUserConflict,
-			wantSavedUID: stringPtrForUserSaveTest("persisted-uid"),
+			wantSavedUID: new("persisted-uid"),
 		},
 		{
 			name:         "対象ユーザーが存在しなければErrUserNotFoundを返す",
@@ -321,10 +321,6 @@ func newUserForRepositorySaveTest(t *testing.T, id int, name string) *entity.Use
 	user.ID = id
 
 	return user
-}
-
-func stringPtrForUserSaveTest(v string) *string {
-	return &v
 }
 
 func TestUserRepositorySaveRejectsStalePermission(t *testing.T) {

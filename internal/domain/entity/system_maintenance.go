@@ -114,6 +114,5 @@ func cloneIntPointer(value *int) *int {
 	if value == nil {
 		return nil
 	}
-	cloned := *value
-	return &cloned
+	return new(*value)
 }

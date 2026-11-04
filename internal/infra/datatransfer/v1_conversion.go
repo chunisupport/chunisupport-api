@@ -403,24 +403,21 @@ func cloneStringPointer(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	result := *value
-	return &result
+	return new(*value)
 }
 
 func cloneIntPointer(value *int) *int {
 	if value == nil {
 		return nil
 	}
-	result := *value
-	return &result
+	return new(*value)
 }
 
 func cloneFloat64Pointer(value *float64) *float64 {
 	if value == nil {
 		return nil
 	}
-	result := *value
-	return &result
+	return new(*value)
 }
 
 func cloneRawMessage(value json.RawMessage) json.RawMessage {

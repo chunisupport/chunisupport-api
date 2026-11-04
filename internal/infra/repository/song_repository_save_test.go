@@ -63,12 +63,12 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 				ID:          1,
 				DisplayID:   "DISPLAY001-UPDATED",
 				Title:       "Updated Title",
-				Reading:     stringPtrForSongSaveTest("Updated Reading"),
+				Reading:     new("Updated Reading"),
 				Artist:      "Updated Artist",
-				GenreID:     intPtrForSongSaveTest(2),
-				BPM:         intPtrForSongSaveTest(222),
+				GenreID:     new(2),
+				BPM:         new(222),
 				OfficialIdx: "IDX001-UPDATED",
-				Jacket:      stringPtrForSongSaveTest("updated.png"),
+				Jacket:      new("updated.png"),
 				IsWorldsend: false,
 				IsNew:       true,
 				IsDeleted:   true,
@@ -84,8 +84,8 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 				DisplayID:   "NOTFOUND",
 				Title:       "Not Found",
 				Artist:      "Not Found",
-				GenreID:     intPtrForSongSaveTest(1),
-				BPM:         intPtrForSongSaveTest(120),
+				GenreID:     new(1),
+				BPM:         new(120),
 				OfficialIdx: "IDX-NOTFOUND",
 				IsWorldsend: false,
 				IsDeleted:   true,
@@ -158,12 +158,4 @@ func TestSongRepositoryPersistsSongLifecycleState(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtrForSongSaveTest(v int) *int {
-	return &v
-}
-
-func stringPtrForSongSaveTest(v string) *string {
-	return &v
 }

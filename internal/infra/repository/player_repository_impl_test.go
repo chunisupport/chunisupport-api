@@ -152,7 +152,7 @@ func TestGoalFindByIDAndUserID_ReturnsErrGoalNotFoundWhenWrappedNoRows(t *testin
 
 func TestGoalSave_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
 	repo := &goalRepository{}
-	exec := &goalSaveExecutor{execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}}}
+	exec := &goalSaveExecutor{result: rowsAffectedResult{rowsAffected: 0}}
 
 	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})
 	require.ErrorIs(t, err, domainrepo.ErrGoalNotFound)
@@ -161,8 +161,8 @@ func TestGoalSave_ReturnsErrGoalNotFoundWhenNoRowsAffected(t *testing.T) {
 func TestGoalSave_AllowsIdempotentUpdate(t *testing.T) {
 	repo := &goalRepository{}
 	exec := &goalSaveExecutor{
-		execResultExecutor: execResultExecutor{result: rowsAffectedResult{rowsAffected: 0}},
-		exists:             1,
+		result: rowsAffectedResult{rowsAffected: 0},
+		exists: 1,
 	}
 
 	err := repo.Save(context.Background(), exec, &entity.Goal{ID: 1, UserID: 1})

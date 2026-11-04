@@ -231,13 +231,13 @@ func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 			DisplayID: "DISPLAY001",
 			Charts: []*entity.Chart{
 				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.3), IsConstUnknown: false, Notes: &notes1Expert},
-				{DifficultyID: 4, Const: chartconstant.ChartConstant(13.8), IsConstUnknown: false, Notes: &notes1Master, NotesDesigner: stringPtr("新作者2")},
+				{DifficultyID: 4, Const: chartconstant.ChartConstant(13.8), IsConstUnknown: false, Notes: &notes1Master, NotesDesigner: new("新作者2")},
 			},
 		},
 		{
 			DisplayID: "DISPLAY002",
 			Charts: []*entity.Chart{
-				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.8), IsConstUnknown: false, Notes: &notes2Expert, NotesDesigner: stringPtr("新作者3")},
+				{DifficultyID: 3, Const: chartconstant.ChartConstant(12.8), IsConstUnknown: false, Notes: &notes2Expert, NotesDesigner: new("新作者3")},
 				{DifficultyID: 4, Const: chartconstant.ChartConstant(14.3), IsConstUnknown: false, Notes: &notes2Master},
 			},
 		},
@@ -331,10 +331,6 @@ func TestSongUpdateSongs_ReturnsErrDuplicateDisplayIDWhenRequestContainsDuplicat
 	err = db.Get(&title, `SELECT title FROM songs WHERE id = 1`)
 	require.NoError(t, err)
 	assert.Equal(t, "Original Title", title)
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func TestSongUpdateSongs_ReturnsErrorWhenTargetIsWorldsendSong(t *testing.T) {
