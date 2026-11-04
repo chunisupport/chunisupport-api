@@ -198,6 +198,59 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 	}
 }
 
+// TestV1OrderedChartsMap_MarshalJSON_現行のバイト列と一致する は、
+// 共通化後もキー順・null・エスケープが共通化前の出力とバイト単位で一致することを確認します。
+func TestV1OrderedChartsMap_MarshalJSON_現行のバイト列と一致する(t *testing.T) {
+	chartAdvanced, err := chartconstant.NewChartConstant(7.5)
+	require.NoError(t, err)
+	notes := 100
+	designer := "v1 <tag> & \"q\""
+	advanced := &V1ChartDTO{
+		Const:          chartAdvanced,
+		IsConstUnknown: false,
+		Notes:          &notes,
+		NotesDesigner:  &designer,
+	}
+
+	tests := []struct {
+		name string
+		// Given: 順不同の譜面マップ
+		charts V1OrderedChartsMap
+		// Then: 共通化前のJSON
+		want string
+	}{
+		{
+			name: "ADVANCEDと未知キー",
+			charts: V1OrderedChartsMap{
+				"ADVANCED": advanced,
+				"EXTRA":    &V1ChartDTO{Const: chartAdvanced},
+			},
+			want: `{"BASIC":null,"ADVANCED":{"const":7.5,"is_const_unknown":false,"notes":100,"notes_designer":"v1 \u003ctag\u003e \u0026 \"q\""},"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+		{
+			name:   "nilマップは全難易度がnull",
+			charts: nil,
+			want:   `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+		{
+			name:   "空マップは全難易度がnull",
+			charts: V1OrderedChartsMap{},
+			want:   `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got, err := json.Marshal(tt.charts)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(got))
+		})
+	}
+}
+
 // containsString はstrがsubstrを含むかどうかを判定します。
 func containsString(str, substr string) bool {
 	return indexOfString(str, substr) != -1

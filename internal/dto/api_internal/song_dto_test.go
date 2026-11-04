@@ -247,6 +247,113 @@ func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
 	}
 }
 
+// TestOrderedChartsMap_MarshalJSON_現行のバイト列と一致する は、
+// 共通化後もキー順・null・エスケープが共通化前の出力とバイト単位で一致することを確認します。
+func TestOrderedChartsMap_MarshalJSON_現行のバイト列と一致する(t *testing.T) {
+	chartBasic, err := chartconstant.NewChartConstant(3.0)
+	require.NoError(t, err)
+	chartMaster, err := chartconstant.NewChartConstant(14.9)
+	require.NoError(t, err)
+	notes := 1234
+	designer := "A \"B\" <C> & D\\譜面\n\u2028"
+	basic := &ChartDTO{
+		Const:          chartBasic,
+		IsConstUnknown: false,
+		Notes:          &notes,
+		NotesDesigner:  &designer,
+	}
+
+	tests := []struct {
+		name string
+		// Given: 順不同の譜面マップ
+		charts OrderedChartsMap
+		// Then: 共通化前のJSON
+		want string
+	}{
+		{
+			name: "存在する譜面と欠損とnilと未知キー",
+			charts: OrderedChartsMap{
+				"MASTER":  &ChartDTO{Const: chartMaster, IsConstUnknown: true},
+				"BASIC":   basic,
+				"UNKNOWN": basic,
+				"EXPERT":  nil,
+			},
+			want: `{"BASIC":{"const":3,"is_const_unknown":false,"notes":1234,"notes_designer":"A \"B\" \u003cC\u003e \u0026 D\\譜面\n\u2028"},"ADVANCED":null,"EXPERT":null,"MASTER":{"const":14.9,"is_const_unknown":true,"notes":null,"notes_designer":null},"ULTIMA":null}`,
+		},
+		{
+			name:   "nilマップは全難易度がnull",
+			charts: nil,
+			want:   `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+		{
+			name:   "空マップは全難易度がnull",
+			charts: OrderedChartsMap{},
+			want:   `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got, err := json.Marshal(tt.charts)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(got))
+		})
+	}
+}
+
+// TestEditorOrderedChartsMap_MarshalJSON_現行のバイト列と一致する は、
+// 編集者向け譜面の updated_at を含めて共通化前の出力と一致することを確認します。
+func TestEditorOrderedChartsMap_MarshalJSON_現行のバイト列と一致する(t *testing.T) {
+	chartUltima, err := chartconstant.NewChartConstant(15.4)
+	require.NoError(t, err)
+	notes := 999
+	designer := "編集者\"<>&\\"
+	updatedAt := time.Date(2026, 7, 11, 15, 30, 0, 123000000, time.UTC)
+	ultima := &EditorChartDTO{
+		Const:          chartUltima,
+		IsConstUnknown: false,
+		Notes:          &notes,
+		NotesDesigner:  &designer,
+		UpdatedAt:      &updatedAt,
+	}
+
+	tests := []struct {
+		name string
+		// Given: 順不同の編集者向け譜面マップ
+		charts EditorOrderedChartsMap
+		// Then: 共通化前のJSON
+		want string
+	}{
+		{
+			name: "ULTIMAと未知キー",
+			charts: EditorOrderedChartsMap{
+				"ULTIMA": ultima,
+				"WEIRD":  &EditorChartDTO{Const: chartUltima},
+			},
+			want: `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":{"const":15.4,"is_const_unknown":false,"notes":999,"notes_designer":"編集者\"\u003c\u003e\u0026\\","updated_at":"2026-07-11T15:30:00.123Z"}}`,
+		},
+		{
+			name:   "nilマップは全難易度がnull",
+			charts: nil,
+			want:   `{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got, err := json.Marshal(tt.charts)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(got))
+		})
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }
