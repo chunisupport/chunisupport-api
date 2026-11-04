@@ -1140,6 +1140,105 @@ func TestCalculateOPTargetChartIDsFromCandidates(t *testing.T) {
 	}
 }
 
+func TestCalculateOPTargetChartIDs_両経路が同じ譜面ID集合を返す(t *testing.T) {
+	chartConst, err := chartconstant.NewChartConstant(12.4)
+	require.NoError(t, err)
+	sameOPScore, err := score.NewScore(1009000)
+	require.NoError(t, err)
+	higherOPScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+
+	type play struct {
+		chartID      int
+		songID       int
+		difficultyID int
+		playScore    score.Score
+		comboLampID  int
+	}
+
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		plays    []play
+		expected map[int]struct{}
+	}{
+		{
+			name: "同値の場合は難易度IDが大きい譜面を選ぶ",
+			plays: []play{
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}},
+		},
+		{
+			name: "同値のタイブレークは難易度の高い譜面が先でも変わらない",
+			plays: []play{
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}},
+		},
+		{
+			name: "OVER POWERが高い譜面を難易度IDより優先する",
+			plays: []play{
+				{chartID: 2002, songID: 20, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2001, songID: 20, difficultyID: 3, playScore: higherOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{2001: {}},
+		},
+		{
+			name: "曲ごとに独立して対象譜面を選ぶ",
+			plays: []play{
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2002, songID: 20, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2001, songID: 20, difficultyID: 3, playScore: higherOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}, 2001: {}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 同じプレイをレコードと候補の両方で表す
+			records := make([]*entity.PlayerRecord, 0, len(tt.plays))
+			candidates := make([]repository.PlayerRecordOPTargetCandidate, 0, len(tt.plays))
+			for _, p := range tt.plays {
+				records = append(records, &entity.PlayerRecord{
+					ChartID:     p.chartID,
+					Score:       p.playScore,
+					ComboLampID: p.comboLampID,
+					UpdatedAt:   now,
+					Chart: &entity.Chart{
+						ID:           p.chartID,
+						SongID:       p.songID,
+						DifficultyID: p.difficultyID,
+						Const:        chartConst,
+					},
+					Song: &entity.Song{ID: p.songID},
+				})
+				candidates = append(candidates, repository.PlayerRecordOPTargetCandidate{
+					ChartID:       p.chartID,
+					SongID:        p.songID,
+					DifficultyID:  p.difficultyID,
+					Score:         p.playScore,
+					ComboLampID:   p.comboLampID,
+					ChartConstant: chartConst,
+				})
+			}
+
+			// When
+			fromRecords := calculateOPTargetChartIDs(records)
+			fromCandidates := calculateOPTargetChartIDsFromCandidates(candidates)
+
+			// Then: タイブレークを含む現行の選択と、2経路の一致を確認する
+			assert.Equal(t, tt.expected, fromRecords)
+			assert.Equal(t, fromRecords, fromCandidates)
+		})
+	}
+}
+
 func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
