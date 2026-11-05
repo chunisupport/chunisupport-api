@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/featureflag"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/joho/godotenv"
 )
@@ -86,7 +88,8 @@ type Config struct {
 	Firebase               Firebase
 	Turnstile              Turnstile
 	Database               Database
-	SongBatch              SongBatchConfig `json:"-"`
+	SongBatch              SongBatchConfig   `json:"-"`
+	FeatureFlags           featureflag.Flags `json:"-"`
 	loggingSet             bool
 }
 
@@ -198,6 +201,10 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 	var errors []string
 
+	// APIとバッチで同じ定義を検証し、未知のAPP_ENVでも設定の破損を見逃しません。
+	featureFlags, featureFlagErr := parseFeatureFlags(featureFlagYAML, env, featureflag.RegisteredNames())
+	config.FeatureFlags = featureFlags
+
 	if config.ShutdownTimeoutSeconds <= 0 {
 		errors = append(errors, "shutdown_timeout_seconds must be greater than 0")
 	}
@@ -299,8 +306,12 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		errors = append(errors, "DB_PASS environment variable is required")
 	}
 
+	var validationErr error
 	if len(errors) > 0 {
-		return config, fmt.Errorf("configuration validation failed: %s", strings.Join(errors, "; "))
+		validationErr = stderrors.New(strings.Join(errors, "; "))
+	}
+	if err := stderrors.Join(validationErr, featureFlagErr); err != nil {
+		return config, fmt.Errorf("configuration validation failed: %w", err)
 	}
 
 	config.Database.DbConfig = DbConfig{
