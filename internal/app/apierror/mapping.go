@@ -17,20 +17,17 @@ func FromUsecaseError(err error) *APIError {
 	// プレイヤーデータの独自エラーは usecase がレスポンスの分類を明示したものです。
 	// Validation / Conflict は原因エラーを Unwrap で保持しているため、原因側の sentinel が下の switch に先にマッチしないよう最初に判定します。
 	// PlayerDataValidationError
-	var validationErr *usecase.PlayerDataValidationError
-	if errors.As(err, &validationErr) {
+	if _, ok := errors.AsType[*usecase.PlayerDataValidationError](err); ok {
 		return ErrValidationFailed.WithInternal(err)
 	}
 
 	// PlayerDataNotFoundError
-	var notFoundErr *usecase.PlayerDataNotFoundError
-	if errors.As(err, &notFoundErr) {
+	if _, ok := errors.AsType[*usecase.PlayerDataNotFoundError](err); ok {
 		return ErrResourceNotFound.WithInternal(err)
 	}
 
 	// PlayerDataConflictError
-	var conflictErr *usecase.PlayerDataConflictError
-	if errors.As(err, &conflictErr) {
+	if _, ok := errors.AsType[*usecase.PlayerDataConflictError](err); ok {
 		return ErrConflict.WithInternal(err)
 	}
 
@@ -227,6 +224,12 @@ func FromUsecaseError(err error) *APIError {
 		return ErrFriendNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrFriendScoreComparisonUnavailable):
 		return ErrFriendScoreComparisonUnavailable.WithInternal(err)
+	case errors.Is(err, usecase.ErrXAccountNotLinked):
+		return ErrXAccountNotLinked.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidXCredentials):
+		return ErrInvalidXCredentials.WithInternal(err)
+	case errors.Is(err, usecase.ErrXAPIUnavailable):
+		return ErrXAPIUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidFriendRequest):
 		return ErrValidationFailedBadRequest.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidUserListPage):

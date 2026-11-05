@@ -73,7 +73,7 @@ func scoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror
 	if apiErr != nil {
 		return "", nil, apiErr
 	}
-	requester, _ := c.Get("userEntity").(*entity.User)
+	requester := handler.Requester(c)
 	return username, requester, nil
 }
 

@@ -44,7 +44,7 @@ func TestUserModel_ToEntity(t *testing.T) {
 			model: UserModel{
 				ID:            3,
 				Username:      "invaliduser",
-				FirebaseUID:   ptr(" "),
+				FirebaseUID:   new(" "),
 				CreatedAt:     now,
 				UpdatedAt:     now,
 				AccountTypeID: 1,
@@ -67,8 +67,4 @@ func TestUserModel_ToEntity(t *testing.T) {
 			assert.Equal(t, tt.wantFirebaseUID, got.FirebaseUID)
 		})
 	}
-}
-
-func ptr(value string) *string {
-	return &value
 }

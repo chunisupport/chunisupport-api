@@ -49,9 +49,8 @@ func handleReiwaError(err error, c *echo.Context) {
 		return
 	}
 
-	var apiErr *apierror.APIError
 	var statusCoder echo.HTTPStatusCoder
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok {
 		httpStatus = apiErr.HTTPStatus
 		additionalMessage = ""
 	} else if errors.As(err, &statusCoder) {
@@ -88,8 +87,7 @@ func handleReiwaError(err error, c *echo.Context) {
 }
 
 func logReiwaError(status int, err error, c *echo.Context) {
-	var apiErr *apierror.APIError
-	if errors.As(err, &apiErr) && apiErr.Code == apierror.CodeMaintenanceMode {
+	if apiErr, ok := errors.AsType[*apierror.APIError](err); ok && apiErr.Code == apierror.CodeMaintenanceMode {
 		return
 	}
 

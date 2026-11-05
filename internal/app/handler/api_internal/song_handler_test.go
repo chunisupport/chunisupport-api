@@ -223,7 +223,7 @@ func TestGetSongs(t *testing.T) {
 					Const:          7.5,
 					IsConstUnknown: false,
 					Notes:          &notes1,
-					NotesDesigner:  stringPtr("譜面作者A"),
+					NotesDesigner:  new("譜面作者A"),
 				},
 			},
 		},
@@ -464,10 +464,6 @@ func TestSongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
 			assert.False(t, called)
 		})
 	}
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {

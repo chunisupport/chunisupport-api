@@ -49,8 +49,8 @@ func setupCourseConcurrencyMySQL(t *testing.T) *sqlx.DB {
 		data, err := os.ReadFile(filepath.Join("..", "..", "..", "migration", "mysql", file))
 		require.NoError(t, err)
 		// プレイヤー記録は検証対象外のため、別集約への外部キーを持つテーブルは作成しない。
-		schema := strings.Split(string(data), "CREATE TABLE player_course_records")[0]
-		for _, statement := range strings.Split(schema, ";") {
+		schema, _, _ := strings.Cut(string(data), "CREATE TABLE player_course_records")
+		for statement := range strings.SplitSeq(schema, ";") {
 			if strings.TrimSpace(statement) == "" {
 				continue
 			}

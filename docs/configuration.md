@@ -11,6 +11,8 @@
 - `APP_ENV` (例: `develop`)
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
+- `X_API_KEY` (必須。X アプリの OAuth 1.0a コンシューマーキー（API Key）)
+- `X_API_KEY_SECRET` (必須。X アプリの OAuth 1.0a コンシューマーシークレット（API Key Secret）)
 - `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
@@ -232,8 +234,20 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `*` や `https://*`、`https://**` のような全許可のオリジン（ホストが `*` だけで構成されるもの）は、Turnstile の許可ホストにはしません。別ホストで取得したトークンの流用を防げなくなるためです
 - 許可ホストが1件も残らない場合、ログインと新規登録はすべて無効トークンとして拒否されます。この場合は起動時に警告ログを出力します
 - `/healthz` などに追加する `https://new.chunithm-net.com` は Turnstile の許可ホストに含めません
+- ローカル開発では Cloudflare のテスト用キー（シークレット `1x0000000000000000000000000000000AA` とフロントのサイトキー `1x00000000000000000000AA`）を使えます。テスト用シークレットの応答は `hostname` が `example.com` 固定で `action` も付かないため、siteverify が `metadata.result_with_testing_key: true` を返した場合は `hostname` と `action` を照合しません。実キーではこのフラグが返らないため、本番の照合には影響しません
 
 `TURNSTILE_SECRET_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
+
+## X API
+
+設定画面に X アカウントのユーザー名（`@` ID）を表示するため、`PUT /internal/me/x-account` で X API の `GET /2/users/me` を呼び出します。
+
+- 環境変数 `X_API_KEY` と `X_API_KEY_SECRET` に、X アプリの OAuth 1.0a コンシューマーキーを設定してください
+- Firebase の X ログインが発行するアクセストークンは、Firebase コンソールの X プロバイダに設定した X アプリのものです。署名に別アプリのキーを使うと X に拒否されるため、同じ X アプリのキーを設定してください
+- アプリ専用の Bearer トークンは使いません。`GET /2/users/me` は利用者本人のトークンでしか呼べないためです
+- `GET /2/users/me` は従量課金でも課金対象外とされています（X Developers Community での X スタッフの回答、2026年5月）。念のため Developer Console で支払い上限を設定し、使用量に計上されていないことを確認してください
+
+`X_API_KEY` または `X_API_KEY_SECRET` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
 ## オブジェクトストレージ静的データ
 

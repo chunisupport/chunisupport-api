@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func float64Ptr(value float64) *float64 { return &value }
-
 func TestChartStatsCalculator_ランプとランクを分類する(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -25,7 +23,7 @@ func TestChartStatsCalculator_ランプとランクを分類する(t *testing.T)
 				Rank:         entity.ChartRankStats{Max: 1},
 				Combo:        entity.ChartComboStats{AJC: 1},
 				Clear:        entity.ChartClearStats{Clear: 1},
-				AverageScore: float64Ptr(scoreMax), MedianScore: float64Ptr(scoreMax),
+				AverageScore: new(float64(scoreMax)), MedianScore: new(float64(scoreMax)),
 			},
 		},
 		{
@@ -36,7 +34,7 @@ func TestChartStatsCalculator_ランプとランクを分類する(t *testing.T)
 				Rank:         entity.ChartRankStats{Max: 1},
 				Combo:        entity.ChartComboStats{FC: 1},
 				Clear:        entity.ChartClearStats{Clear: 1},
-				AverageScore: float64Ptr(scoreMax), MedianScore: float64Ptr(scoreMax),
+				AverageScore: new(float64(scoreMax)), MedianScore: new(float64(scoreMax)),
 			},
 		},
 		{
@@ -50,7 +48,7 @@ func TestChartStatsCalculator_ランプとランクを分類する(t *testing.T)
 				Rank:         entity.ChartRankStats{SS: 1},
 				Combo:        entity.ChartComboStats{None: 1, FC: 1},
 				Clear:        entity.ChartClearStats{Failed: 1, Clear: 1},
-				AverageScore: float64Ptr(scoreSS), MedianScore: float64Ptr(scoreSS),
+				AverageScore: new(float64(scoreSS)), MedianScore: new(float64(scoreSS)),
 			},
 		},
 		{
@@ -77,8 +75,8 @@ func TestChartStatsCalculator_ランプとランクを分類する(t *testing.T)
 				Rank:         entity.ChartRankStats{SSSP: 1, SSS: 1, SSP: 1, SP: 1, S: 1, AAAL: 1},
 				Combo:        entity.ChartComboStats{None: 6},
 				Clear:        entity.ChartClearStats{Clear: 2, Hard: 1, Brave: 1, Absolute: 1, Catastrophy: 1},
-				AverageScore: float64Ptr(float64(scoreSSSPlus+scoreSSS+scoreSSPlus+scoreSPlus+scoreS+scoreS-1) / 6),
-				MedianScore:  float64Ptr(float64(scoreSSPlus+scoreSPlus) / 2),
+				AverageScore: new(float64(scoreSSSPlus+scoreSSS+scoreSSPlus+scoreSPlus+scoreS+scoreS-1) / 6),
+				MedianScore:  new(float64(scoreSSPlus+scoreSPlus) / 2),
 			},
 		},
 	}

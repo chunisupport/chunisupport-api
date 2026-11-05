@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -103,17 +104,18 @@ func (r *PlayerLockedSongRepository) BulkCreate(ctx context.Context, exec domain
 	}
 	const baseQuery = `INSERT INTO player_locked_songs (player_id, song_id, is_ultima) VALUES `
 	const valueClause = `(?, ?, ?)`
-	query := baseQuery
+	var query strings.Builder
+	query.WriteString(baseQuery)
 	args := make([]any, 0, len(lockedSongs)*3)
 	for i, lockedSong := range lockedSongs {
 		if i > 0 {
-			query += ", "
+			query.WriteString(", ")
 		}
-		query += valueClause
+		query.WriteString(valueClause)
 		args = append(args, lockedSong.PlayerID, lockedSong.SongID, lockedSong.IsUltima)
 	}
-	query += ` ON DUPLICATE KEY UPDATE player_id = player_id`
-	_, err := exec.ExecContext(ctx, query, args...)
+	query.WriteString(` ON DUPLICATE KEY UPDATE player_id = player_id`)
+	_, err := exec.ExecContext(ctx, query.String(), args...)
 	if err != nil {
 		return wrapPlayerLockedSongRepositoryError("bulk create", err)
 	}
@@ -128,17 +130,18 @@ func (r *PlayerLockedSongRepository) BulkDelete(ctx context.Context, exec domain
 		return wrapPlayerLockedSongRepositoryError("bulk delete", fmt.Errorf("songIDs and isUltimaFlags length mismatch"))
 	}
 	const baseQuery = "DELETE FROM player_locked_songs WHERE player_id = ? AND (song_id, is_ultima) IN ("
-	query := baseQuery
+	var query strings.Builder
+	query.WriteString(baseQuery)
 	args := []any{playerID}
 	for i := range songIDs {
 		if i > 0 {
-			query += ", "
+			query.WriteString(", ")
 		}
-		query += "(?, ?)"
+		query.WriteString("(?, ?)")
 		args = append(args, songIDs[i], isUltimaFlags[i])
 	}
-	query += ")"
-	_, err := exec.ExecContext(ctx, query, args...)
+	query.WriteString(")")
+	_, err := exec.ExecContext(ctx, query.String(), args...)
 	return wrapPlayerLockedSongRepositoryError("bulk delete", err)
 }
 

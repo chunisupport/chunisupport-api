@@ -106,7 +106,7 @@ func run() int {
 
 	slog.Info("Static master data preloaded")
 
-	firebaseTokenVerifier, firebaseUserDeleter, err := app.SetupFirebaseAuthServices(ctx, cfg)
+	firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, err := app.SetupFirebaseAuthServices(ctx, cfg)
 	if err != nil {
 		slog.Error("Failed to initialize firebase services", "error", err)
 		return 1
@@ -121,7 +121,7 @@ func run() int {
 		return 0
 	}
 
-	server, err := app.NewServer(signalCtx, database, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, accessLogWriter)
+	server, err := app.NewServer(signalCtx, database, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, accessLogWriter)
 	if err != nil {
 		slog.Error("Failed to create server", "error", err)
 		if closeErr := database.Close(); closeErr != nil {

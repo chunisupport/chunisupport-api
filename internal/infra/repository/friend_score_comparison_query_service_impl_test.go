@@ -24,7 +24,7 @@ func TestFriendScoreComparisonQueryService_FindAcceptedFriendPair_双方向accep
 		wantFound  bool
 		wantPlayer *int
 	}{
-		{name: "双方向accepted", username: "frienduser", wantFound: true, wantPlayer: intPtr(102)},
+		{name: "双方向accepted", username: "frienduser", wantFound: true, wantPlayer: new(102)},
 		{name: "片方向accepted", username: "onewayuser", wantFound: false},
 		{name: "pending", username: "pendinguser", wantFound: false},
 		{name: "不存在", username: "missinguser", wantFound: false},
@@ -262,10 +262,6 @@ func insertFriendScoreComparisonCharts(t *testing.T, db *sqlx.DB) {
 			(101, 70, 1000000, 1, 1, 1, ?);
 	`, updatedAt, updatedAt, updatedAt, updatedAt, updatedAt, updatedAt, updatedAt)
 	require.NoError(t, err)
-}
-
-func intPtr(value int) *int {
-	return &value
 }
 
 func TestFriendScoreComparisonQueryService_ListChartRecords_楽曲のジャケットを返す(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -144,11 +145,7 @@ func cloneOverpowerDenominatorSnapshot(src *domainrepo.OverpowerDenominatorSnaps
 		SongMaxOP:              make(map[int]float64, len(src.SongMaxOP)),
 		SongMaxOPWithoutUltima: make(map[int]float64, len(src.SongMaxOPWithoutUltima)),
 	}
-	for songID, maxOP := range src.SongMaxOP {
-		dst.SongMaxOP[songID] = maxOP
-	}
-	for songID, maxOP := range src.SongMaxOPWithoutUltima {
-		dst.SongMaxOPWithoutUltima[songID] = maxOP
-	}
+	maps.Copy(dst.SongMaxOP, src.SongMaxOP)
+	maps.Copy(dst.SongMaxOPWithoutUltima, src.SongMaxOPWithoutUltima)
 	return dst
 }

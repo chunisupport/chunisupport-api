@@ -270,3 +270,28 @@ func TestFromUsecaseError_プレイヤーデータの独自エラーは原因エ
 		})
 	}
 }
+
+func TestFromUsecaseError_Xアカウント連携のエラーを変換する(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "X未連携は409", err: usecase.ErrXAccountNotLinked, wantStatus: http.StatusConflict, wantCode: CodeXAccountNotLinked},
+		{name: "Xのトークン拒否はセッション切れと区別して400", err: usecase.ErrInvalidXCredentials, wantStatus: http.StatusBadRequest, wantCode: CodeInvalidXCredentials},
+		{name: "X APIの取得失敗は502", err: errors.Join(usecase.ErrXAPIUnavailable, errors.New("status 503")), wantStatus: http.StatusBadGateway, wantCode: CodeXAPIUnavailable},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+		})
+	}
+}

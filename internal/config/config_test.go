@@ -419,6 +419,46 @@ func TestNormalizeAndValidateTurnstileConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateXAPIConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  XAPI
+		wantErr string
+	}{
+		{
+			name:    "コンシューマーキーとシークレットが揃えば前後の空白を除いて通る",
+			config:  XAPI{ConsumerKey: "  key  ", ConsumerSecret: " secret "},
+			wantErr: "",
+		},
+		{
+			name:    "コンシューマーキーがなければエラーになる",
+			config:  XAPI{ConsumerSecret: "secret"},
+			wantErr: "X_API_KEY environment variable is required",
+		},
+		{
+			name:    "シークレットがなければエラーになる",
+			config:  XAPI{ConsumerKey: "key"},
+			wantErr: "X_API_KEY_SECRET environment variable is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			err := normalizeAndValidateXAPIConfig(&tt.config)
+
+			// Then
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, XAPI{ConsumerKey: "key", ConsumerSecret: "secret"}, tt.config)
+		})
+	}
+}
+
 func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -437,8 +477,8 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "明示した待機設定があればその値を使う",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(60),
-				IntervalSec: intPtr(2),
+				MaxWaitSec:  new(60),
+				IntervalSec: new(2),
 			},
 			wantErr:             false,
 			expectedMaxWaitSec:  60,
@@ -447,8 +487,8 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "最大待機秒数は0なら即時失敗として許可する",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(0),
-				IntervalSec: intPtr(1),
+				MaxWaitSec:  new(0),
+				IntervalSec: new(1),
 			},
 			wantErr:             false,
 			expectedMaxWaitSec:  0,
@@ -457,16 +497,16 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 		{
 			name: "最大待機秒数が負数ならエラーになる",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(-1),
-				IntervalSec: intPtr(1),
+				MaxWaitSec:  new(-1),
+				IntervalSec: new(1),
 			},
 			wantErr: true,
 		},
 		{
 			name: "再試行間隔が0ならエラーになる",
 			config: DatabaseStartupConfig{
-				MaxWaitSec:  intPtr(60),
-				IntervalSec: intPtr(0),
+				MaxWaitSec:  new(60),
+				IntervalSec: new(0),
 			},
 			wantErr: true,
 		},
@@ -487,8 +527,4 @@ func TestNormalizeAndValidateDatabaseStartupConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedIntervalSec, *tt.config.IntervalSec)
 		})
 	}
-}
-
-func intPtr(v int) *int {
-	return &v
 }

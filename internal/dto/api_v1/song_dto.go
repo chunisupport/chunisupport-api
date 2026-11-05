@@ -1,8 +1,6 @@
 package api_v1
 
 import (
-	"encoding/json"
-
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	sharedto "github.com/chunisupport/chunisupport-api/internal/dto"
@@ -23,42 +21,9 @@ type V1OrderedChartsMap map[string]*V1ChartDTO
 // MarshalJSON はJSONマーシャリング時にchartsのキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順序で出力します。
 // 譜面が存在しない難易度はnullとして出力されます。
-// mapの標準エンコードでは難易度順にならないため、キーの出力順を固定します。
+// mapの標準エンコードでは難易度順にならないため、共通の順序付きマーシャラを使います。
 func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
-	orderedKeys := []string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
-
-	// 手動でJSONを構築して順序を保証
-	var jsonParts []string
-	jsonParts = append(jsonParts, "{")
-
-	first := true
-	for _, key := range orderedKeys {
-		if !first {
-			jsonParts = append(jsonParts, ",")
-		}
-		first = false
-
-		jsonParts = append(jsonParts, `"`+key+`":`)
-
-		if chart, exists := o[key]; exists && chart != nil {
-			chartJSON, err := json.Marshal(chart)
-			if err != nil {
-				return nil, err
-			}
-			jsonParts = append(jsonParts, string(chartJSON))
-		} else {
-			jsonParts = append(jsonParts, "null")
-		}
-	}
-
-	jsonParts = append(jsonParts, "}")
-
-	result := ""
-	for _, part := range jsonParts {
-		result += part
-	}
-
-	return []byte(result), nil
+	return sharedto.MarshalOrderedCharts(o)
 }
 
 // V1SongDTO は外部API v1 用の楽曲情報DTOです。

@@ -401,7 +401,7 @@ func TestPlayerLockedSongLock(t *testing.T) {
 			}
 			assert.Equal(t, tt.wantCreateCall, lockedRepo.createCalled)
 			if tt.wantCreateCall {
-				assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: ptrInt(10)}, playerDataRepo.receivedFilter)
+				assert.Equal(t, repository.OverpowerTargetFilter{ExcludeWorldsend: true, ExcludeDeleted: true, PlayerID: new(10)}, playerDataRepo.receivedFilter)
 			}
 			songRepo.AssertExpectations(t)
 		})
@@ -467,7 +467,7 @@ func TestPlayerLockedSongBatch(t *testing.T) {
 		playerDataRepo: &stubPlayerDataRepositoryForLockedSong{},
 		songRepo:       songRepo,
 		lockedRepo:     lockedRepo,
-		resolver:       &stubPlayerSongIDResolver{songID: ptrInt(1)},
+		resolver:       &stubPlayerSongIDResolver{songID: new(1)},
 	}
 
 	// When
@@ -548,7 +548,7 @@ func TestPlayerLockedSongMutationsLockPlayerBeforeChildRows(t *testing.T) {
 				playerDataRepo: playerDataRepo,
 				songRepo:       songRepo,
 				lockedRepo:     lockedRepo,
-				resolver:       &stubPlayerSongIDResolver{songID: ptrInt(1)},
+				resolver:       &stubPlayerSongIDResolver{songID: new(1)},
 			}
 
 			// When
@@ -570,8 +570,6 @@ func TestPlayerLockedSongMutationsLockPlayerBeforeChildRows(t *testing.T) {
 		})
 	}
 }
-
-func ptrInt(v int) *int { return &v }
 
 func TestPlayerLockedSongLock_再計算済みの記録を無効にする(t *testing.T) {
 	// Given

@@ -30,13 +30,13 @@ func TestBestSlotStatsCalculator_全譜面と全レーティング帯の行を�
 	// Then
 	require.Len(t, results, 8)
 	assert.Equal(t, &entity.ChartBestSlotStatsByRatingBand{
-		ChartID: 10, RatingBandID: 0, BestPlayerCount: 2, EligiblePlayerCount: 3, BestPlayerPercentage: float64Ptr(66.6667),
+		ChartID: 10, RatingBandID: 0, BestPlayerCount: 2, EligiblePlayerCount: 3, BestPlayerPercentage: new(66.6667),
 	}, findBestSlotStats(t, results, 10, 0))
 	assert.Equal(t, &entity.ChartBestSlotStatsByRatingBand{
-		ChartID: 10, RatingBandID: 22, BestPlayerCount: 1, EligiblePlayerCount: 2, BestPlayerPercentage: float64Ptr(50),
+		ChartID: 10, RatingBandID: 22, BestPlayerCount: 1, EligiblePlayerCount: 2, BestPlayerPercentage: new(float64(50)),
 	}, findBestSlotStats(t, results, 10, 22))
 	assert.Equal(t, &entity.ChartBestSlotStatsByRatingBand{
-		ChartID: 20, RatingBandID: 22, BestPlayerCount: 0, EligiblePlayerCount: 2, BestPlayerPercentage: float64Ptr(0),
+		ChartID: 20, RatingBandID: 22, BestPlayerCount: 0, EligiblePlayerCount: 2, BestPlayerPercentage: new(float64(0)),
 	}, findBestSlotStats(t, results, 20, 22), "誰も採用していない譜面は0%")
 	assert.Equal(t, &entity.ChartBestSlotStatsByRatingBand{
 		ChartID: 10, RatingBandID: 99,

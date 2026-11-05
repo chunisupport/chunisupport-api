@@ -158,7 +158,7 @@ func TestGetOverpowerTargetStats_対象楽曲の最大OP合計を取得する(t 
 			filter: domainrepo.OverpowerTargetFilter{
 				ExcludeWorldsend: true,
 				ExcludeDeleted:   true,
-				PlayerID:         intPtrForPlayerDataRepositoryTest(100),
+				PlayerID:         new(100),
 			},
 			wantCount: 2,
 			wantTotal: service.CalcSongMaxOP(15.0) + // Song1: ULTIMA未解禁のためMASTERを採用
@@ -273,7 +273,7 @@ func TestGetOverpowerTargetStatsWithExecutor_トランザクション内の未�
 	stats, err := repo.GetOverpowerTargetStatsWithExecutor(ctx, tx, domainrepo.OverpowerTargetFilter{
 		ExcludeWorldsend: true,
 		ExcludeDeleted:   true,
-		PlayerID:         intPtrForPlayerDataRepositoryTest(100),
+		PlayerID:         new(100),
 	})
 
 	// Then
@@ -281,10 +281,6 @@ func TestGetOverpowerTargetStatsWithExecutor_トランザクション内の未�
 	require.NotNil(t, stats)
 	assert.Equal(t, 1, stats.SongCount)
 	assert.InDelta(t, service.CalcSongMaxOP(14.5), stats.MaxOverpowerTotal, 0.0001)
-}
-
-func intPtrForPlayerDataRepositoryTest(value int) *int {
-	return &value
 }
 
 func TestSavePlayerData_execがnilならエラーを返す(t *testing.T) {

@@ -150,7 +150,7 @@ func TestAPIRateLimitMiddleware_NonAdminLimited(t *testing.T) {
 	})
 
 	// 制限回数までは成功
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -203,7 +203,7 @@ func TestAPIRateLimitMiddleware_EditorHasSeparateLimit(t *testing.T) {
 	})
 
 	// 通常の制限（2回）を超えてもeditorLimit（3回）までは成功
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -246,7 +246,7 @@ func TestAPIRateLimitMiddleware_ExtDevHasEditorLimit(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	})
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -293,7 +293,7 @@ func TestAPIRateLimitMiddleware_DifferentUsersHaveSeparateLimits(t *testing.T) {
 	})
 
 	// ユーザー1が制限回数までリクエスト
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -547,7 +547,7 @@ func TestAnonymousIPRateLimitMiddleware_AnonymousLimited(t *testing.T) {
 
 	testIP := "192.0.2.100:1234"
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = testIP
 		rec := httptest.NewRecorder()
@@ -587,7 +587,7 @@ func TestAnonymousIPRateLimitMiddleware_AuthenticatedSkipsLimit(t *testing.T) {
 		AccountTypeID: info.AccountTypePlayer,
 	}
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "192.0.2.100:1234"
 		rec := httptest.NewRecorder()

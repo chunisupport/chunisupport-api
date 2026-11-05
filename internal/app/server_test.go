@@ -51,6 +51,7 @@ func TestNewServer_メンテナンス状態を復元できなければ起動準�
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	// Then
@@ -100,6 +101,7 @@ func TestNewRouter_永続化済みメンテナンス状態を全体へ適用す�
 		nil,
 		nil,
 		tokenVerifierWithRecentSignIn{},
+		nil,
 		nil,
 		&accessLog,
 	)

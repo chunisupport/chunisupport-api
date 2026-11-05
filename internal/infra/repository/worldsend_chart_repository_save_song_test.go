@@ -30,16 +30,16 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				ID:          1,
 				DisplayID:   "WE001-UPDATED",
 				Title:       "Updated WE Title",
-				Reading:     stringPtrForWorldsendSaveTest("Updated WE Reading"),
+				Reading:     new("Updated WE Reading"),
 				Artist:      "Updated WE Artist",
-				GenreID:     intPtrForWorldsendSaveTest(2),
-				BPM:         intPtrForWorldsendSaveTest(230),
+				GenreID:     new(2),
+				BPM:         new(230),
 				OfficialIdx: "WEIDX001-UPDATED",
-				Jacket:      stringPtrForWorldsendSaveTest("we-updated.png"),
+				Jacket:      new("we-updated.png"),
 				IsWorldsend: true,
 				IsNew:       true,
 				IsDeleted:   true,
-				ReleasedAt:  timePtrForWorldsendSaveTest(releasedAt),
+				ReleasedAt:  new(releasedAt),
 			},
 			assertPersist: true,
 		},
@@ -51,8 +51,8 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 				DisplayID:   "NOT-WE",
 				Title:       "Not WE",
 				Artist:      "Not WE",
-				GenreID:     intPtrForWorldsendSaveTest(1),
-				BPM:         intPtrForWorldsendSaveTest(120),
+				GenreID:     new(1),
+				BPM:         new(120),
 				OfficialIdx: "IDX-NOT-WE",
 				IsDeleted:   true,
 			},
@@ -137,18 +137,6 @@ func TestWorldsendRepositoryPersistsWorldsendSongLifecycleState(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtrForWorldsendSaveTest(v int) *int {
-	return &v
-}
-
-func stringPtrForWorldsendSaveTest(v string) *string {
-	return &v
-}
-
-func timePtrForWorldsendSaveTest(v time.Time) *time.Time {
-	return &v
 }
 
 func parseWorldsendSavedDate(v string) (time.Time, error) {

@@ -288,7 +288,3 @@ func TestV1SongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
 		})
 	}
 }
-
-func stringPtr(value string) *string {
-	return &value
-}

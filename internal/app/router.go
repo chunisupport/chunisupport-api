@@ -33,6 +33,7 @@ import (
 	infrasongbatch "github.com/chunisupport/chunisupport-api/internal/infra/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
 	"github.com/chunisupport/chunisupport-api/internal/infra/turnstile"
+	"github.com/chunisupport/chunisupport-api/internal/infra/xapi"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/jmoiron/sqlx"
@@ -63,8 +64,7 @@ func validateUsername(fl validator.FieldLevel) bool {
 func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.Validator.Struct(i); err != nil {
 		slog.Warn("Validation error", "error", err.Error())
-		var validationErrors validator.ValidationErrors
-		if ok := errors.As(err, &validationErrors); ok {
+		if validationErrors, ok := errors.AsType[validator.ValidationErrors](err); ok {
 			return apierror.ErrValidationFailed.WithInternal(apierror.ValidationErrors(validationErrors))
 		}
 		return apierror.ErrValidationFailed.WithInternal(err)
@@ -94,6 +94,7 @@ type Handlers struct {
 	Goal                  *api_internal.GoalHandler
 	GoalGroup             *api_internal.GoalGroupHandler
 	RecordFilter          *api_internal.RecordFilterHandler
+	XAccount              *api_internal.XAccountHandler
 	TemporaryPlayerData   *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong      *api_internal.PlayerLockedSongHandler
 	PlayerFavoriteSong    *api_internal.PlayerFavoriteSongHandler
@@ -123,8 +124,8 @@ type Handlers struct {
 
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
-func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, error) {
-	e, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, echoLogWriter)
+func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, error) {
+	e, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
 	return e, err
 }
 
@@ -136,7 +137,7 @@ type backgroundBatchJobs interface {
 
 // newRouter はルーターを構築し、サーバー停止時に完了を待つ必要があるバッチのユースケースも返します。
 // ctx は管理画面から起動したバッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
-func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, error) {
+func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, error) {
 	e := echo.New()
 	if err := configureIPExtractor(e, cfg.ClientIP); err != nil {
 		return nil, nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
@@ -277,6 +278,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	signupUsecase := usecase.NewSignupUsecase(tm, userRepo, firebaseTokenVerifier, turnstileVerifier, masterCache, usernamePolicy)
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
+	xAccountUsecase := usecase.NewXAccountUsecase(db, infra.NewXAccountRepository(), firebaseProviderFinder, xapi.NewUserClient(cfg.XAPI.ConsumerKey, cfg.XAPI.ConsumerSecret))
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -298,6 +300,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		Goal:                  api_internal.NewGoalHandler(goalUsecase),
 		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
 		RecordFilter:          api_internal.NewRecordFilterHandler(recordFilterUsecase),
+		XAccount:              api_internal.NewXAccountHandler(xAccountUsecase),
 		TemporaryPlayerData:   api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:      api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
@@ -448,6 +451,7 @@ func registerRoutes(
 		meReadGroup.GET("/goals", handlers.Goal.List)
 		meReadGroup.GET("/goal-groups", handlers.GoalGroup.List)
 		meReadGroup.GET("/record-filters", handlers.RecordFilter.List)
+		meReadGroup.GET("/x-account", handlers.XAccount.Get)
 	}
 
 	meGroup := internal.Group("/me")
@@ -476,6 +480,10 @@ func registerRoutes(
 		meGroup.POST("/record-filters", handlers.RecordFilter.Create)
 		meGroup.PUT("/record-filters/:id", handlers.RecordFilter.Update)
 		meGroup.DELETE("/record-filters/:id", handlers.RecordFilter.Delete)
+		meGroup.PUT("/x-account", handlers.XAccount.Sync, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.XAccountSyncRateLimitRequests,
+			Window:   info.XAccountSyncRateLimitWindow,
+		}))
 		meGroup.POST("/locked-songs", handlers.PlayerLockedSong.Lock)
 		meGroup.POST("/locked-songs/batch", handlers.PlayerLockedSong.Batch)
 		meGroup.DELETE("/locked-songs/:id", handlers.PlayerLockedSong.Unlock)

@@ -61,6 +61,13 @@ type Turnstile struct {
 	SecretKey string
 }
 
+// XAPI は X API を利用者本人のトークンで呼ぶための OAuth 1.0a コンシューマーキーです。
+// Firebase の X ログインに設定した X アプリと同じキーでなければ、トークンの署名が一致せず拒否されます。
+type XAPI struct {
+	ConsumerKey    string
+	ConsumerSecret string
+}
+
 // TempData は一時プレイヤーデータ保存設定です。
 type TempData struct {
 	MaxTotalMB int `json:"max_total_mb"`
@@ -87,6 +94,7 @@ type Config struct {
 	DataTransferHMACSecret []byte         `json:"-"`
 	Firebase               Firebase
 	Turnstile              Turnstile
+	XAPI                   XAPI
 	Database               Database
 	SongBatch              SongBatchConfig   `json:"-"`
 	FeatureFlags           featureflag.Flags `json:"-"`
@@ -219,7 +227,7 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 	if err := normalizeAndValidateLoggingConfig(&config.Logging, config.loggingSet); err != nil {
 		errMsg := strings.TrimPrefix(err.Error(), "configuration validation failed: ")
-		for _, msg := range strings.Split(errMsg, "; ") {
+		for msg := range strings.SplitSeq(errMsg, "; ") {
 			errors = append(errors, strings.TrimSpace(msg))
 		}
 	}
@@ -231,9 +239,9 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	if err := normalizeAndValidateDatabasePoolConfig(&config.Database.Pool); err != nil {
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
-		if strings.HasPrefix(errMsg, prefix) {
-			errMsg = strings.TrimPrefix(errMsg, prefix)
-			for _, msg := range strings.Split(errMsg, "; ") {
+		if after, ok := strings.CutPrefix(errMsg, prefix); ok {
+			errMsg = after
+			for msg := range strings.SplitSeq(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
 		} else {
@@ -244,9 +252,9 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 	if err := normalizeAndValidateDatabaseStartupConfig(&config.Database.Startup); err != nil {
 		errMsg := err.Error()
 		prefix := "configuration validation failed: "
-		if strings.HasPrefix(errMsg, prefix) {
-			errMsg = strings.TrimPrefix(errMsg, prefix)
-			for _, msg := range strings.Split(errMsg, "; ") {
+		if after, ok := strings.CutPrefix(errMsg, prefix); ok {
+			errMsg = after
+			for msg := range strings.SplitSeq(errMsg, "; ") {
 				errors = append(errors, strings.TrimSpace(msg))
 			}
 		} else {
@@ -262,6 +270,12 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 
 		config.Turnstile.SecretKey = strings.TrimSpace(os.Getenv("TURNSTILE_SECRET_KEY"))
 		if err := normalizeAndValidateTurnstileConfig(&config.Turnstile); err != nil {
+			errors = append(errors, err.Error())
+		}
+
+		config.XAPI.ConsumerKey = os.Getenv("X_API_KEY")
+		config.XAPI.ConsumerSecret = os.Getenv("X_API_KEY_SECRET")
+		if err := normalizeAndValidateXAPIConfig(&config.XAPI); err != nil {
 			errors = append(errors, err.Error())
 		}
 	}
@@ -448,6 +462,26 @@ func normalizeAndValidateTurnstileConfig(turnstile *Turnstile) error {
 	turnstile.SecretKey = strings.TrimSpace(turnstile.SecretKey)
 	if turnstile.SecretKey == "" {
 		return fmt.Errorf("TURNSTILE_SECRET_KEY environment variable is required")
+	}
+
+	return nil
+}
+
+// normalizeAndValidateXAPIConfig は X API のコンシューマーキーが揃っていることを検証します。
+// 欠けていると X アカウント情報の取得が常に失敗するため、起動時に検出します。
+func normalizeAndValidateXAPIConfig(xapi *XAPI) error {
+	xapi.ConsumerKey = strings.TrimSpace(xapi.ConsumerKey)
+	xapi.ConsumerSecret = strings.TrimSpace(xapi.ConsumerSecret)
+
+	var errors []string
+	if xapi.ConsumerKey == "" {
+		errors = append(errors, "X_API_KEY environment variable is required")
+	}
+	if xapi.ConsumerSecret == "" {
+		errors = append(errors, "X_API_KEY_SECRET environment variable is required")
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("%s", strings.Join(errors, "; "))
 	}
 
 	return nil

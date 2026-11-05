@@ -2,8 +2,10 @@ package importer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -22,7 +24,7 @@ func NewOfficialImporter() *OfficialImporter {
 func (oi *OfficialImporter) Import(filePath string) (*songbatch.ImportedSource, error) {
 	slog.Info("Starting official data import", "file", filePath)
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); errors.Is(err, fs.ErrNotExist) {
 		slog.Warn("Official datasource file not found, skipping import", "path", filePath)
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceOfficial, Data: nil}, nil
 	}

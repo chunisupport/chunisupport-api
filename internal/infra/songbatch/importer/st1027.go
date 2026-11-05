@@ -2,8 +2,10 @@ package importer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -22,7 +24,7 @@ func NewSt1027Importer() *St1027Importer {
 func (si *St1027Importer) Import(filePath string) (*songbatch.ImportedSource, error) {
 	slog.Info("Starting st1027 data import", "file", filePath)
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); errors.Is(err, fs.ErrNotExist) {
 		slog.Warn("St1027 datasource file not found, skipping import", "path", filePath)
 		return &songbatch.ImportedSource{Type: songbatch.DataSourceSt1027, Data: nil}, nil
 	}

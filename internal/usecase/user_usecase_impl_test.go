@@ -479,7 +479,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 	user := &entity.User{
 		ID:        1,
 		Username:  un,
-		PlayerID:  intPointer(1),
+		PlayerID:  new(1),
 		IsPrivate: true,
 	}
 	player := &entity.Player{
@@ -499,7 +499,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilP
 	user := &entity.User{
 		ID:       1,
 		Username: un,
-		PlayerID: intPointer(1),
+		PlayerID: new(1),
 	}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
@@ -513,7 +513,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilP
 
 func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 	now := time.Now()
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	playerUpdatedAt := now
 	scoreUpdatedAt := now.Add(time.Hour)
 
@@ -552,7 +552,7 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 				Level:     1,
 				UpdatedAt: playerUpdatedAt,
 			}, Honors: []*entity.PlayerHonor{}}},
-			&stubPlayerRecordRepository{lastScoreUpdate: timePointer(now.Add(-time.Hour))},
+			&stubPlayerRecordRepository{lastScoreUpdate: new(now.Add(-time.Hour))},
 			nil,
 			nil,
 			nil,
@@ -596,7 +596,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
 		result: &repository.UserUpdatedAtQueryResult{
-			User:             &entity.User{ID: 1, PlayerID: intPointer(10)},
+			User:             &entity.User{ID: 1, PlayerID: new(10)},
 			PlayerUpdatedAt:  &playerUpdatedAt,
 			RecordsUpdatedAt: &recordsUpdatedAt,
 		},
@@ -616,7 +616,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
 		result: &repository.UserUpdatedAtQueryResult{
-			User: &entity.User{ID: 1, PlayerID: intPointer(10), IsPrivate: true},
+			User: &entity.User{ID: 1, PlayerID: new(10), IsPrivate: true},
 		},
 	}
 
@@ -657,7 +657,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリで存在しないユーザ
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリで非公開ユーザー本人は取得できる(t *testing.T) {
 	playerUpdatedAt := time.Now()
-	user := &entity.User{ID: 1, PlayerID: intPointer(10), IsPrivate: true}
+	user := &entity.User{ID: 1, PlayerID: new(10), IsPrivate: true}
 	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
@@ -693,7 +693,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 			ComboLampID: 1,
 			FullChainID: 1,
 			SlotID:      1,
-			SlotOrder:   intPointer(1),
+			SlotOrder:   new(1),
 			UpdatedAt:   now,
 			Chart: &entity.Chart{
 				ID:             101,
@@ -750,7 +750,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 	playerUpdatedAt := now.Add(-time.Hour)
 	rating := 15.0
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 100, OfficialRating: rating, UpdatedAt: playerUpdatedAt}
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
@@ -774,7 +774,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 
 func TestUserUsecase_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t *testing.T) {
 	now := time.Now()
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 10, UpdatedAt: now}
 	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
@@ -791,7 +791,7 @@ func TestUserUsecase_GetUserProfile_OverpowerPercentを最新分母で随時計�
 	require.NoError(t, err)
 	oldPercent := 1.0
 	overpowerValue := 50.0
-	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, Username: un, PlayerID: new(1)}
 	player := &entity.Player{
 		ID:               1,
 		Name:             playernametest.New(t, "テストプレイヤー"),
@@ -834,7 +834,7 @@ func TestUserUsecase_GetUserProfile_未解禁設定を分母に反映する(t *t
 	un, err := username.NewUserName("tester")
 	require.NoError(t, err)
 	overpowerValue := 50.0
-	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, Username: un, PlayerID: new(1)}
 	player := &entity.Player{
 		ID:             1,
 		Name:           playernametest.New(t, "テストプレイヤー"),
@@ -885,7 +885,7 @@ func TestUserUsecase_GetUserProfile_同一楽曲の通常譜面とUltimaロッ�
 	un, err := username.NewUserName("tester")
 	require.NoError(t, err)
 	overpowerValue := 50.0
-	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, Username: un, PlayerID: new(1)}
 	player := &entity.Player{
 		ID:             1,
 		Name:           playernametest.New(t, "テストプレイヤー"),
@@ -935,7 +935,7 @@ func TestUserUsecase_GetUserProfile_通常譜面未解禁はULTIMAを含む楽�
 	un, err := username.NewUserName("tester")
 	require.NoError(t, err)
 	overpowerValue := 50.0
-	user := &entity.User{ID: 1, Username: un, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, Username: un, PlayerID: new(1)}
 	player := &entity.Player{
 		ID:             1,
 		Name:           playernametest.New(t, "テストプレイヤー"),
@@ -984,7 +984,7 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 	scorePlayed, _ := score.NewScore(1000000)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: now.Add(-time.Hour)}
 	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
 	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
@@ -1044,7 +1044,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 	chartConst, err := chartconstant.NewChartConstant(12.4)
 	require.NoError(t, err)
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: now}
 	records := []*entity.PlayerRecord{
 		{
@@ -1140,6 +1140,105 @@ func TestCalculateOPTargetChartIDsFromCandidates(t *testing.T) {
 	}
 }
 
+func TestCalculateOPTargetChartIDs_両経路が同じ譜面ID集合を返す(t *testing.T) {
+	chartConst, err := chartconstant.NewChartConstant(12.4)
+	require.NoError(t, err)
+	sameOPScore, err := score.NewScore(1009000)
+	require.NoError(t, err)
+	higherOPScore, err := score.NewScore(1010000)
+	require.NoError(t, err)
+
+	type play struct {
+		chartID      int
+		songID       int
+		difficultyID int
+		playScore    score.Score
+		comboLampID  int
+	}
+
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		plays    []play
+		expected map[int]struct{}
+	}{
+		{
+			name: "同値の場合は難易度IDが大きい譜面を選ぶ",
+			plays: []play{
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}},
+		},
+		{
+			name: "同値のタイブレークは難易度の高い譜面が先でも変わらない",
+			plays: []play{
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}},
+		},
+		{
+			name: "OVER POWERが高い譜面を難易度IDより優先する",
+			plays: []play{
+				{chartID: 2002, songID: 20, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2001, songID: 20, difficultyID: 3, playScore: higherOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{2001: {}},
+		},
+		{
+			name: "曲ごとに独立して対象譜面を選ぶ",
+			plays: []play{
+				{chartID: 1001, songID: 10, difficultyID: 3, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 1002, songID: 10, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2002, songID: 20, difficultyID: 4, playScore: sameOPScore, comboLampID: 3},
+				{chartID: 2001, songID: 20, difficultyID: 3, playScore: higherOPScore, comboLampID: 3},
+			},
+			expected: map[int]struct{}{1002: {}, 2001: {}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 同じプレイをレコードと候補の両方で表す
+			records := make([]*entity.PlayerRecord, 0, len(tt.plays))
+			candidates := make([]repository.PlayerRecordOPTargetCandidate, 0, len(tt.plays))
+			for _, p := range tt.plays {
+				records = append(records, &entity.PlayerRecord{
+					ChartID:     p.chartID,
+					Score:       p.playScore,
+					ComboLampID: p.comboLampID,
+					UpdatedAt:   now,
+					Chart: &entity.Chart{
+						ID:           p.chartID,
+						SongID:       p.songID,
+						DifficultyID: p.difficultyID,
+						Const:        chartConst,
+					},
+					Song: &entity.Song{ID: p.songID},
+				})
+				candidates = append(candidates, repository.PlayerRecordOPTargetCandidate{
+					ChartID:       p.chartID,
+					SongID:        p.songID,
+					DifficultyID:  p.difficultyID,
+					Score:         p.playScore,
+					ComboLampID:   p.comboLampID,
+					ChartConstant: chartConst,
+				})
+			}
+
+			// When
+			fromRecords := calculateOPTargetChartIDs(records)
+			fromCandidates := calculateOPTargetChartIDsFromCandidates(candidates)
+
+			// Then: タイブレークを含む現行の選択と、2経路の一致を確認する
+			assert.Equal(t, tt.expected, fromRecords)
+			assert.Equal(t, fromRecords, fromCandidates)
+		})
+	}
+}
+
 func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 	now := time.Now()
 	notesValue := notes.Notes(500)
@@ -1157,7 +1256,7 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 			ComboLampID: 1,
 			FullChainID: 1,
 			SlotID:      1,
-			SlotOrder:   intPointer(1),
+			SlotOrder:   new(1),
 			UpdatedAt:   now,
 			Chart: &entity.Chart{
 				ID:             101,
@@ -1213,7 +1312,7 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 
 	playerUpdatedAt := now.Add(-time.Hour)
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 100, UpdatedAt: playerUpdatedAt}
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	opTargetCandidates := []repository.PlayerRecordOPTargetCandidate{
 		{ChartID: 101, SongID: 1001, DifficultyID: 2, Score: score1, ComboLampID: 1, ChartConstant: chartConst},
 		{ChartID: 102, SongID: 1002, DifficultyID: 3, Score: score2, ComboLampID: 2, ChartConstant: chartConst},
@@ -1241,7 +1340,7 @@ func TestUserUsecase_GetUserProfileRatingView_OP対象は全譜面候補から�
 	require.NoError(t, err)
 	higherOPScore, err := score.NewScore(1010000)
 	require.NoError(t, err)
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), UpdatedAt: now}
 	ratingRecord := &entity.PlayerRecord{
 		ChartID:     101,
@@ -1281,7 +1380,7 @@ func TestUserUsecase_GetUserProfileRatingView_OP対象は全譜面候補から�
 func TestUserUsecase_GetUserProfileRatingView_OP対象候補の取得失敗を返す(t *testing.T) {
 	// Given
 	expectedErr := errors.New("OP対象候補の取得失敗")
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー")}
 	service := NewUserUsecase(
 		nil,
@@ -1320,7 +1419,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 	scorePlayed, _ := score.NewScore(1000000)
 	chartConst, _ := chartconstant.NewChartConstant(12.4)
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: now.Add(-time.Hour)}
 	playedSong := &entity.Song{ID: 10, DisplayID: "song10", Charts: []*entity.Chart{{ID: 1001, SongID: 10, DifficultyID: 3, Const: chartConst}}}
 	unplayedSong := &entity.Song{ID: 20, DisplayID: "song20", Charts: []*entity.Chart{{ID: 2001, SongID: 20, DifficultyID: 4, Const: chartConst}}}
@@ -1378,7 +1477,7 @@ func TestUserUsecase_GetUserProfileRecordView_PlayerNotLinkedReturnsNilPlayerAnd
 func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerUpdatedAt(t *testing.T) {
 	now := time.Now()
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: now}
 
 	service := NewUserUsecase(
@@ -1405,7 +1504,7 @@ func TestUserUsecase_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLate
 	scorePlayed, err := score.NewScore(1000000)
 	require.NoError(t, err)
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: playerUpdatedAt}
 	worldsendRecord := &entity.PlayerWorldsendRecord{
 		PlayerID:         1,
@@ -1439,7 +1538,7 @@ func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLates
 	scorePlayed, err := score.NewScore(1000000)
 	require.NoError(t, err)
 
-	user := &entity.User{ID: 1, PlayerID: intPointer(1)}
+	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: playerUpdatedAt}
 	worldsendRecord := &entity.PlayerWorldsendRecord{
 		PlayerID:         1,
@@ -1490,7 +1589,7 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 				AccountTypeID: info.AccountTypeAdmin,
 				CreatedAt:     createdAt1,
 				UpdatedAt:     updatedAt1,
-				PlayerID:      intPointer(1),
+				PlayerID:      new(1),
 				IsSuspicious:  true,
 			},
 			Player: &entity.Player{
@@ -1605,14 +1704,6 @@ func TestUserUsecase_GetAllUsersForAdmin_pageから負のOFFSETを作らない(t
 			assert.GreaterOrEqual(t, repo.adminListOffset, 0)
 		})
 	}
-}
-
-func intPointer(v int) *int {
-	return &v
-}
-
-func timePointer(v time.Time) *time.Time {
-	return &v
 }
 
 func TestUserUsecase_GetUserSongRecord_指定難易度を未プレイ補完して返す(t *testing.T) {

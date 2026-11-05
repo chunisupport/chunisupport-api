@@ -81,7 +81,7 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 	t.Run("スロットの上限を超えるslot_orderを拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
-		snapshot.Records[0].SlotOrder = intPointer(31)
+		snapshot.Records[0].SlotOrder = new(31)
 
 		err := snapshot.Validate()
 
@@ -220,7 +220,7 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 	t.Run("空のポゼッション名を拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
-		snapshot.Player.PossessionName = stringPointer("")
+		snapshot.Player.PossessionName = new("")
 
 		err := snapshot.Validate()
 
@@ -270,8 +270,8 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			Level:               100,
 			OfficialRating:      17.25,
 			OfficialOverpower:   12_345.67,
-			ClassEmblemName:     stringPointer("inf"),
-			ClassEmblemBaseName: stringPointer("5"),
+			ClassEmblemName:     new("inf"),
+			ClassEmblemBaseName: new("5"),
 			LastPlayedAt:        &lastPlayedAt,
 			DataCollectedAt:     &dataCollectedAt,
 			CreatedAt:           time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
@@ -284,7 +284,7 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			ComboLampName:   "FULL COMBO",
 			FullChainName:   "NONE",
 			SlotName:        "best",
-			SlotOrder:       intPointer(1),
+			SlotOrder:       new(1),
 			UpdatedAt:       time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
 		}},
 		RecordHistories: []UserDataTransferRecordHistory{
@@ -378,5 +378,3 @@ func validMetricHistories(count int) []UserDataTransferMetricHistory {
 	}
 	return histories
 }
-func intPointer(value int) *int          { return &value }
-func stringPointer(value string) *string { return &value }

@@ -187,6 +187,31 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 			response:       siteverifyResponse{Success: true, Hostname: "app.example.com", Action: "login"},
 			wantErr:        usecase.ErrInvalidTurnstileToken,
 		},
+		{
+			name:           "テスト用シークレットキーの応答ならホスト名とactionを照合しない",
+			token:          "XXXX.DUMMY.TOKEN.XXXX",
+			expectedAction: "login",
+			allowedOrigins: []string{"http://localhost:3000"},
+			statusCode:     http.StatusOK,
+			response: siteverifyResponse{
+				Success:  true,
+				Hostname: "example.com",
+				Metadata: siteverifyMetadata{ResultWithTestingKey: true},
+			},
+		},
+		{
+			name:           "テスト用シークレットキーの応答でも検証失敗ならErrInvalidTurnstileToken",
+			token:          "XXXX.DUMMY.TOKEN.XXXX",
+			expectedAction: "login",
+			allowedOrigins: []string{"http://localhost:3000"},
+			statusCode:     http.StatusOK,
+			response: siteverifyResponse{
+				Success:    false,
+				ErrorCodes: []string{"invalid-input-response"},
+				Metadata:   siteverifyMetadata{ResultWithTestingKey: true},
+			},
+			wantErr: usecase.ErrInvalidTurnstileToken,
+		},
 	}
 
 	for _, tt := range tests {

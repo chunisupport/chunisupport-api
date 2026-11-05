@@ -28,8 +28,8 @@ func (e httpStatusError) Error() string {
 }
 
 func isRetryableDownloadError(err error) bool {
-	var statusErr httpStatusError
-	if !errors.As(err, &statusErr) {
+	statusErr, ok := errors.AsType[httpStatusError](err)
+	if !ok {
 		return false
 	}
 	switch statusErr.status {
@@ -65,8 +65,7 @@ func retryDownload(ctx context.Context, sourceType string, fn func() error) erro
 }
 
 func wrapRequestError(err error) error {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
 		return fmt.Errorf("failed to execute request: %w", urlErr.Err)
 	}
 	return fmt.Errorf("failed to execute request: %w", err)
