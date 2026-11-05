@@ -21,7 +21,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	"github.com/chunisupport/chunisupport-api/internal/domain/featureflag"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
@@ -582,10 +581,6 @@ func registerRoutes(
 		adminGroup.GET("/chart-stats-batch/jobs", handlers.ChartStatsBatch.List)
 		adminGroup.POST("/chart-stats-batch/jobs", handlers.ChartStatsBatch.Start)
 		adminGroup.GET("/chart-stats-batch/jobs/:id", handlers.ChartStatsBatch.Get)
-		// 無効な環境ではルートを登録せず404にし、フラグによるルート切り替えを管理画面から確認できるようにします。
-		if cfg.FeatureFlags.Enabled(featureflag.FeatureFlagProbe) {
-			adminGroup.GET("/feature-flag-probe", handleAdminFeatureFlagProbe)
-		}
 	}
 
 	honorsGroup := internal.Group("/honors")
@@ -938,12 +933,6 @@ func handleAdminBuildInfo(c *echo.Context) error {
 		"commit_hash": info.Revision,
 		"go_version":  runtime.Version(),
 	})
-}
-
-// handleAdminFeatureFlagProbe は feature-flag の確認用機能が有効な環境で、有効であることを返します。
-// 無効な環境ではルート自体を登録しないため、このハンドラーは常に true を返します。
-func handleAdminFeatureFlagProbe(c *echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]bool{"enabled": true})
 }
 
 // handleVersion はADMIN向けにAPIのバージョン識別子を返します。
