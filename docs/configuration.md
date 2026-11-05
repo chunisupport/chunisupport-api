@@ -160,7 +160,7 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 
 ## feature-flag（機能のリリース切り替え）
 
-`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。現在の登録フラグは0件で、YAMLにはコメントの書式例だけを置いています。
+`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。現在の登録フラグは、配備設定の確認用の `feature_flag_probe`（develop / staging で有効）だけです。管理者向けの `GET /internal/admin/feature-flag-probe` を有効な環境でだけ登録します。確認用のため、後述の手順の例外として最初から staging も有効にしています。単一機能の確認用エンドポイントであり、フラグ一覧の公開ではありません。確認が済んだら削除します。
 
 ### ファイル形式と検証
 

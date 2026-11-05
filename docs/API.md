@@ -248,6 +248,7 @@ Content-Type: application/json
 | `/internal/auth/api-tokens/:id` | PATCH | Firebase Bearer | APIトークン名変更 |
 | `/internal/auth/api-tokens/:id` | DELETE | Firebase Bearer | APIトークン削除 |
 | `/internal/admin/build-info` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けAPIビルド情報取得 |
+| `/internal/admin/feature-flag-probe` | GET | Firebase Bearer (ADMIN+) | feature-flag の確認用機能が有効か取得（無効な環境では404） |
 | `/internal/admin/user-stats` | GET | Firebase Bearer (ADMIN+) | 管理者画面向けユーザー集計取得 |
 | `/internal/admin/versions` | GET / POST | Firebase Bearer (ADMIN+) | バージョン全件一覧・追加 |
 | `/internal/admin/versions/:id` | PUT / DELETE | Firebase Bearer (ADMIN+) | バージョン改名・削除 |
@@ -710,6 +711,24 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 | `build_date` | string | ビルド日 |
 | `commit_hash` | string | APIのGit短縮コミットハッシュ。開発起動時は `none` |
 | `go_version` | string | APIバイナリのGoバージョン |
+
+### GET `/internal/admin/feature-flag-probe`
+- **認証**: Firebase Bearer (ADMIN)
+- **概要**: feature-flag `feature_flag_probe` の配備設定が効いているかを、管理者画面から確認します。確認が済んだら削除します。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "enabled": true
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `enabled` | boolean | 常に `true` |
+
+- **エラー**:
+  - 404 Not Found (`not_found`): `feature_flag_probe` が無効な環境。ルート自体を登録しないため、認証より先に404を返します
 
 ### 楽曲バッチ `/internal/admin/song-batch/jobs`
 
