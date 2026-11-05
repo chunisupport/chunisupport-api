@@ -8,6 +8,9 @@ import (
 
 const (
 	Name                                        = "chunisupport-api"
+	AppEnvDevelop                               = "develop"
+	AppEnvStaging                               = "staging"
+	AppEnvProduction                            = "production"
 	ConfigDir                                   = ".config/"
 	UsernameForbiddenWordsFile                  = "username_forbidden_words.json"
 	ResourceDir                                 = ".resources/"

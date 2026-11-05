@@ -158,6 +158,61 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 この場合、許可された実際のリクエスト元オリジンが `Access-Control-Allow-Origin` に返されます。
 ただし `/healthz` の `GET` と `OPTIONS`、および `/internal/player-data/temp` の `POST` と `OPTIONS` に限っては、固定で `https://new.chunithm-net.com` も追加許可されます。
 
+## feature-flag（機能のリリース切り替え）
+
+`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。現在の登録フラグは0件で、YAMLにはコメントの書式例だけを置いています。
+
+### ファイル形式と検証
+
+以下は書式例です。
+
+```yaml
+new_ranking_page:
+  develop: true
+  staging: true
+  production: false
+```
+
+運用環境は `develop` / `staging` / `production` の3種類です。省略した環境は `false`、`new_ranking_page: {}` は全環境で `false` になります。
+
+| 入力 | 扱い |
+| --- | --- |
+| 空ファイル・コメントのみ・`{}` | フラグ0件 |
+| ルートがマッピングでない | エラー |
+| YAMLドキュメントが複数 | エラー |
+| 機能名の重複 | エラー |
+| 機能の値がマッピングでない（空値、`true` など） | エラー |
+| `develop` / `staging` / `production` 以外の環境キー | エラー |
+| 環境キーの重複 | エラー |
+| 環境の値が `!!bool` タグのスカラー以外（`"true"`、`yes`、`1`、`null`、空値など） | エラー |
+
+機能名と環境キーには文字列スカラーを使います。別名参照をbool値として指定することはできません。`yaml.Node` の種別とタグを確認してからbool値へ変換し、暗黙の型変換には頼りません。
+
+APIとバッチは共通の `loadConfig` を通り、全環境のYAML定義を検証した後、機能名を `featureflag.RegisteredNames()` と両方向に突き合わせます。片方にしかない名前はエラーです。最後に `APP_ENV` に対応する値を選び、`Config.FeatureFlags` に格納します。このフィールドはJSONに出力しません。
+
+未知の `APP_ENV` はフラグを全て無効にしますが、YAMLの検証と登録一覧の突き合わせは省略しません。`APP_ENV=test` のテストでも定義の破損を検出します。なお、`validateEnv` が検査するのは使用可能な文字だけなので、未知の `APP_ENV` でも対応する `.config/<APP_ENV>.settings.json` と必要な設定があれば起動します。
+
+### 利用ルール
+
+- フラグで制御するのは機能を使えるかどうかだけです。必須設定や外部サービスの初期化は変更しません。
+- 新しいエンドポイントはrouterで登録を切り替え、無効時は404にします。
+- 既存処理の切り替えや、APIとCLIの両方で使う処理はusecaseで判定します。handlerとusecaseでの二重判定は必須ではありません。
+- 無効時に404以外を返す必要があれば、機能を追加する際に決めて `docs/API.md` に記載します。
+- `featureflag.Flags` は値として必要なコンストラクタだけに渡します。routerで組み立てる場合も、CLIのmainで組み立てる場合も同じです。
+- テストは `featureflag.New(featureflag.X)` で有効な機能を明示し、`featureflag.New()` またはゼロ値で全機能を無効にします。テスト専用名も渡せます。`New` は本番の登録一覧を参照せず、集合に含まれない名前に対する `Enabled` は `false` です。
+
+### 追加・リリース・削除の手順
+
+1. 開発開始時に `internal/domain/featureflag/info.go` の機能名定数、非公開の `registeredNames`、YAMLの3か所へ追加します。最初は `develop: true` だけを指定します。
+2. staging、productionの順に `true` にします。コードと一緒にレビューし、再ビルド・再配布します。
+3. 全環境で安定したら定数、登録一覧の要素、YAMLの定義、判定の分岐を削除します。
+
+定数だけを追加して登録一覧への追加を忘れた場合、その定数とYAMLの突き合わせは行われません。コード生成や静的解析による検出は行わないため、追加時のレビューで3か所を確認してください。`RegisteredNames()` はコピーを返し、`Flags` は生成後に変更しない読み取り専用の集合として並行参照できます。
+
+APIとバッチを別々に配布すると、一時的にフラグの状態がずれることがあります。DBスキーマやデータ形式の互換性は、フラグとは別に管理してください。
+
+フロントへの公開API、有効なフラグ一覧の起動時ログ、実行中の切り替え（ホットリロード）は対象外です。
+
 ## Firebase 認証
 
 Firebase を使ったログイン・連携エンドポイントは常に有効です。

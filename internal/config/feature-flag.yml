@@ -1,0 +1,6 @@
+# 現在の登録フラグは0件です。以下は書式例のみです。
+# new_ranking_page:
+#   develop: true
+#   staging: false
+#   production: false
+# 省略した環境は false です。変更の反映には再ビルド・再配布が必要です。

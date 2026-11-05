@@ -17,6 +17,7 @@ internal/
 ├── domain/      # ドメインモデルとリポジトリインターフェース
 │   ├── constants/ # ドメイン定数
 │   ├── entity/  # エンティティ（純粋なドメインモデル、db/jsonタグなし）
+│   ├── featureflag/ # 環境やYAMLに依存しない機能名と読み取り専用フラグ集合
 │   ├── masterdata/ # マスタデータ型
 │   ├── vo/      # 値オブジェクト
 │   ├── service/  # レーティング計算ドメインサービス
@@ -81,7 +82,7 @@ chunirec互換APIのユーザー・レコード取得は、`ChunirecUsecase`が�
 
 ### `internal/config`
 
-- **役割**: `.config/<environment>.settings.json` からアプリケーション設定を読み込み、構造体にマッピングする責務を持ちます。
+- **役割**: `.config/<environment>.settings.json` からアプリケーション設定を読み込み、構造体にマッピングする責務を持ちます。また、`go:embed` で同梱する `feature-flag.yml` の全環境の定義とドメインの登録一覧を検証し、選択した環境の `featureflag.Flags` を生成します。APIとバッチの両方で共通の読み込み処理を使用します。環境名とYAML形式の解釈はこの層で行い、ドメイン層には持ち込みません。利用方法と運用手順は [docs/configuration.md](docs/configuration.md) を参照してください。
 
 ### 認証関連コンポーネント
 
