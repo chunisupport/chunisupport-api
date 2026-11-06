@@ -304,6 +304,7 @@ func TestLoadWorkspaceCharts(t *testing.T) {
 	}
 }
 
+// TestResolveChartUpdate はSQLのnullable値を介しても、通常・大型更新の保存方針と定数・ノーツ数が維持されることを検証します。
 func TestResolveChartUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -507,6 +508,7 @@ func TestResolveChartUpdate(t *testing.T) {
 	}
 }
 
+// TestResolveChartUpdatePreservesComplementaryValuesWhileApplyingValidUpdate は定数を確定する更新で補完値が欠落していても、既存のノーツ数と製作者を保持することを検証します。
 func TestResolveChartUpdatePreservesComplementaryValuesWhileApplyingValidUpdate(t *testing.T) {
 	t.Parallel()
 

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestResolveChartUpdateBoundaries は大型更新の10.0と0.5幅の境界で、保存候補と保存方針が維持されることを検証します。
 func TestResolveChartUpdateBoundaries(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -61,6 +62,7 @@ func TestResolveChartUpdateBoundaries(t *testing.T) {
 	}
 }
 
+// TestResolveChartUpdateComplementaryValues は取得済みの0を欠落と区別し、既存の製作者と入力値を保持することを検証します。
 func TestResolveChartUpdateComplementaryValues(t *testing.T) {
 	t.Parallel()
 	// Given: 不明定数の既存譜面と、定数確定・補完値の取り込み。
@@ -74,6 +76,7 @@ func TestResolveChartUpdateComplementaryValues(t *testing.T) {
 	assert.Equal(t, ChartUpdateValues{Const: 14.2, Notes: new(int64(0)), NotesDesigner: new("")}, incoming)
 }
 
+// TestResolveChartUpdateFillsEmptyDesigner は取得済みの空文字を未取得と区別し、製作者の補完として更新することを検証します。
 func TestResolveChartUpdateFillsEmptyDesigner(t *testing.T) {
 	t.Parallel()
 	// Given: 製作者が未取得の譜面へ、取得済みの空文字が届く。
