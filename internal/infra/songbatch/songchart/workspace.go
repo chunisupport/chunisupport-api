@@ -11,6 +11,7 @@ import (
 
 	apirepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/utils"
 
@@ -233,7 +234,7 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 		finalConst, finalUnknown, finalNotes, finalNotesDesigner, action := resolveChartUpdate(existing, exists, chart, opts)
 
 		switch action {
-		case actionInsert:
+		case songbatch.ChartInsert:
 			chartsToInsert = append(chartsToInsert, chartInsertRecord{
 				SongID:        mysqlSongID,
 				DifficultyID:  chart.DifficultyID,
@@ -242,7 +243,7 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 				Notes:         finalNotes,
 				NotesDesigner: finalNotesDesigner,
 			})
-		case actionUpdate:
+		case songbatch.ChartUpdate:
 			chartsToUpdate = append(chartsToUpdate, chartUpdateRecord{
 				SongID:        mysqlSongID,
 				DifficultyID:  chart.DifficultyID,
@@ -759,106 +760,37 @@ func bulkUpdateMySQLWorldsendCharts(ctx context.Context, mysql apirepo.Executor,
 	return nil
 }
 
-type syncAction int
-
-const (
-	actionSkip syncAction = iota
-	actionInsert
-	actionUpdate
-)
-
-const (
-	majorUpdateLevelThreshold = 10.0
-	majorUpdateLevelRange     = 0.5
-)
-
-func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, opts SyncOptions) (float64, bool, sql.NullInt64, sql.NullString, syncAction) {
-	if !exists {
-		tConst := chart.Const
-		tUnknown := chart.IsConstUnknown
-		if opts.MajorUpdate {
-			if chart.Const < majorUpdateLevelThreshold {
-				tUnknown = false
-			} else {
-				tUnknown = true
-			}
-		}
-		return tConst, tUnknown, chart.Notes, chart.NotesDesigner, actionInsert
+// resolveChartUpdate はSQLのnullable値をドメインの入力へ変換し、判定結果をSQLの保存値へ戻します。
+func resolveChartUpdate(existing mysqlChart, exists bool, chart workspaceChart, opts SyncOptions) (float64, bool, sql.NullInt64, sql.NullString, songbatch.ChartUpdateAction) {
+	input := songbatch.ChartUpdateInput{
+		Incoming:    chartUpdateValues(chart.Const, chart.IsConstUnknown, chart.Notes, chart.NotesDesigner),
+		MajorUpdate: opts.MajorUpdate,
 	}
-
-	finalConst := existing.Const
-	finalUnknown := existing.IsConstUnknown
-	finalNotes := existing.Notes
-	finalNotesDesigner := existing.NotesDesigner
-	shouldUpdate := false
-
-	if opts.MajorUpdate {
-		if chart.Const < majorUpdateLevelThreshold {
-			finalConst = chart.Const
-			finalUnknown = false
-			if existing.Const != finalConst || existing.IsConstUnknown != finalUnknown {
-				shouldUpdate = true
-			}
-		} else {
-			finalUnknown = true
-			rangeStart := chart.Const
-			rangeEnd := chart.Const + majorUpdateLevelRange
-			if existing.Const < rangeStart || existing.Const >= rangeEnd {
-				finalConst = chart.Const
-				shouldUpdate = true
-			}
-
-			if existing.IsConstUnknown != finalUnknown {
-				shouldUpdate = true
-			}
-		}
-
-		if !shouldUpdate {
-			if !existing.Notes.Valid && chart.Notes.Valid {
-				shouldUpdate = true
-			}
-			if !existing.NotesDesigner.Valid && chart.NotesDesigner.Valid {
-				shouldUpdate = true
-			}
-		}
-	} else {
-
-		if existing.IsConstUnknown && !chart.IsConstUnknown {
-			finalConst = chart.Const
-			finalUnknown = false
-			shouldUpdate = true
-		} else {
-			// 既知 -> 不明 への変更はブロック
-			// それ以外（既知 -> 既知、不明 -> 不明）で、定数が一致し、かつノーツが新しい場合のみ更新
-			isBlocked := !existing.IsConstUnknown && chart.IsConstUnknown
-
-			if !isBlocked && existing.Const == chart.Const {
-				if !existing.Notes.Valid && chart.Notes.Valid {
-					shouldUpdate = true
-				}
-				if !existing.NotesDesigner.Valid && chart.NotesDesigner.Valid {
-					shouldUpdate = true
-				}
-			}
-		}
+	if exists {
+		input.Existing = new(chartUpdateValues(existing.Const, existing.IsConstUnknown, existing.Notes, existing.NotesDesigner))
 	}
+	result := songbatch.ResolveChartUpdate(input)
+	var notes sql.NullInt64
+	if result.Values.Notes != nil {
+		notes = sql.NullInt64{Int64: *result.Values.Notes, Valid: true}
+	}
+	var designer sql.NullString
+	if result.Values.NotesDesigner != nil {
+		designer = sql.NullString{String: *result.Values.NotesDesigner, Valid: true}
+	}
+	return result.Values.Const, result.Values.IsConstUnknown, notes, designer, result.Action
+}
 
-	// ノーツ数の更新制御: 既存値が存在する場合、NULL値での上書きを防止
-	if chart.Notes.Valid {
-		finalNotes = chart.Notes
+// chartUpdateValues は未取得と取得済みの0・空文字を区別してSQL表現を取り除きます。
+func chartUpdateValues(chartConst float64, unknown bool, notes sql.NullInt64, designer sql.NullString) songbatch.ChartUpdateValues {
+	values := songbatch.ChartUpdateValues{Const: chartConst, IsConstUnknown: unknown}
+	if notes.Valid {
+		values.Notes = new(notes.Int64)
 	}
-	// 既存値がない場合のみ、新しい値（NULLでも）を受け入れる
-	if !existing.Notes.Valid && chart.Notes.Valid {
-		finalNotes = chart.Notes
+	if designer.Valid {
+		values.NotesDesigner = new(designer.String)
 	}
-	if !existing.NotesDesigner.Valid && chart.NotesDesigner.Valid {
-		finalNotesDesigner = chart.NotesDesigner
-	}
-
-	if shouldUpdate {
-		return finalConst, finalUnknown, finalNotes, finalNotesDesigner, actionUpdate
-	}
-	return finalConst, finalUnknown, finalNotes, finalNotesDesigner, actionSkip
+	return values
 }
 
 func chartKey(songID, difficultyID int) string {
