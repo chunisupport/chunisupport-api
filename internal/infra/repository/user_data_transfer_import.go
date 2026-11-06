@@ -422,16 +422,18 @@ func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, pl
 
 func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int, snapshot *entity.UserDataTransferSnapshot, masters *transferMasterData) error {
 	type goalRow struct {
-		UserID            int             `db:"user_id"`
-		GroupID           *uint32         `db:"group_id"`
-		Title             string          `db:"title"`
-		AchievementTypeID int             `db:"achievement_type_id"`
-		AchievementParams json.RawMessage `db:"achievement_params"`
-		Attributes        json.RawMessage `db:"attributes"`
-		InvertValue       bool            `db:"invert_value"`
-		InvertPercentage  bool            `db:"invert_percentage"`
-		SortOrder         uint16          `db:"sort_order"`
-		CreatedAt         time.Time       `db:"created_at"`
+		UserID                      int             `db:"user_id"`
+		GroupID                     *uint32         `db:"group_id"`
+		Title                       string          `db:"title"`
+		AchievementTypeID           int             `db:"achievement_type_id"`
+		AchievementParams           json.RawMessage `db:"achievement_params"`
+		Attributes                  json.RawMessage `db:"attributes"`
+		InvertValue                 bool            `db:"invert_value"`
+		InvertPercentage            bool            `db:"invert_percentage"`
+		GaugeStart                  float64         `db:"gauge_start"`
+		ApplyGaugeStartToPercentage bool            `db:"apply_gauge_start_to_percentage"`
+		SortOrder                   uint16          `db:"sort_order"`
+		CreatedAt                   time.Time       `db:"created_at"`
 	}
 	rows := make([]goalRow, 0)
 	appendGoal := func(item entity.UserDataTransferGoal, groupID *uint32) error {
@@ -439,7 +441,7 @@ func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int
 		if err != nil {
 			return err
 		}
-		rows = append(rows, goalRow{userID, groupID, item.Title, masters.achievementTypeIDs[item.AchievementType], item.AchievementParams, attrs, item.InvertValue, item.InvertPercentage, item.SortOrder, item.CreatedAt})
+		rows = append(rows, goalRow{userID, groupID, item.Title, masters.achievementTypeIDs[item.AchievementType], item.AchievementParams, attrs, item.InvertValue, item.InvertPercentage, item.GaugeStart, item.ApplyGaugeStartToPercentage, item.SortOrder, item.CreatedAt})
 		return nil
 	}
 	for _, item := range snapshot.Goals.Ungrouped {
@@ -466,7 +468,7 @@ func saveTransferGoals(ctx context.Context, exec domainrepo.Executor, userID int
 			}
 		}
 	}
-	return bulkTransferNamedExec(ctx, exec, `INSERT INTO goals (user_id,group_id,title,achievement_type_id,achievement_params,attributes,invert_value,invert_percentage,sort_order,created_at) VALUES (:user_id,:group_id,:title,:achievement_type_id,:achievement_params,:attributes,:invert_value,:invert_percentage,:sort_order,:created_at)`, rows)
+	return bulkTransferNamedExec(ctx, exec, `INSERT INTO goals (user_id,group_id,title,achievement_type_id,achievement_params,attributes,invert_value,invert_percentage,gauge_start,apply_gauge_start_to_percentage,sort_order,created_at) VALUES (:user_id,:group_id,:title,:achievement_type_id,:achievement_params,:attributes,:invert_value,:invert_percentage,:gauge_start,:apply_gauge_start_to_percentage,:sort_order,:created_at)`, rows)
 }
 
 // transferGoalGroupID はDBが返すIDを値域検証し、安全にドメインのID型へ変換します。

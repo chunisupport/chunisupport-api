@@ -16,6 +16,7 @@ HTTP契約の正本は `docs/API.md` の Goal / GoalGroup 節です。この文�
 - `migration/mysql/000010_add_updated_at_to_song_tables.up.sql`
 - `migration/mysql/000013_optimize_player_records_last_update_index.up.sql`
 - `migration/mysql/000040_split_goal_invert_flags.up.sql`
+- `migration/mysql/000062_add_goal_gauge_start.up.sql`
 
 ## 1. 概要
 
@@ -50,6 +51,7 @@ DB上の `goals` テーブルは以下の構造です。
 - `achievement_type` はDBに文字列では保存されず、`achievement_type_id` で保存されます。
 - `achievement_params` と `attributes` は JSON 型で保存されます。
 - `000040` 適用時、旧 `invert` の値は `invert_value` と `invert_percentage` の両方へ引き継がれます。
+- `000062` で `gauge_start`（`DECIMAL(16,3)`、既定値0）と `apply_gauge_start_to_percentage`（既定値 `false`）を追加しました。既存の目標は従来どおり0からゲージを描きます。
 - 作成時はユーザー行ロック後に件数を確認し、指定グループ（未指定時は未分類）の末尾へ `sort_order = グループ内件数+1` で追加します。
 
 ## 3. 認証と対象範囲
@@ -92,6 +94,8 @@ DB上の `goals` テーブルは以下の構造です。
       },
       "invert_value": false,
       "invert_percentage": true,
+      "gauge_start": 0,
+      "apply_gauge_start_to_percentage": false,
       "sort_order": 1,
       "created_at": "2026-04-12T10:00:00+09:00"
     }
@@ -131,7 +135,9 @@ DB上の `goals` テーブルは以下の構造です。
     }
   },
   "invert_value": false,
-  "invert_percentage": true
+  "invert_percentage": true,
+  "gauge_start": 0,
+  "apply_gauge_start_to_percentage": false
 }
 ```
 
@@ -144,7 +150,7 @@ DB上の `goals` テーブルは以下の構造です。
 - 認証: 必須
 - ステータス: `200 OK`
 - `:id` は `uint32` として解釈可能な10進数のみ有効
-- 更新方法: 部分更新ではなく、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` の完全上書きです。`group_id` 変更時は移動元を詰めて移動先末尾へ追加します
+- 更新方法: 部分更新ではなく、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` / `gauge_start` / `apply_gauge_start_to_percentage` の完全上書きです。`group_id` 変更時は移動元を詰めて移動先末尾へ追加します
 
 リクエスト形状は `POST` と同じです。
 レスポンスは更新後の単一 goal オブジェクトです。
@@ -181,7 +187,9 @@ DB上の `goals` テーブルは以下の構造です。
   "achievement_params": {},
   "attributes": {},
   "invert_value": false,
-  "invert_percentage": true
+  "invert_percentage": true,
+  "gauge_start": 0,
+  "apply_gauge_start_to_percentage": false
 }
 ```
 
@@ -196,6 +204,8 @@ DB上の `goals` テーブルは以下の構造です。
 | `attributes` | object | 任意 | 対象譜面の絞り込み条件 |
 | `invert_value` | boolean | 任意 | `28/100` などの実数値表示用反転フラグ。未指定時は `false` |
 | `invert_percentage` | boolean | 任意 | パーセンテージ表示用反転フラグ。未指定時は `false` |
+| `gauge_start` | number | 任意 | 進捗ゲージを0%として描く値（ゲージのスタート位置）。単位は `achievement_type` の現在値と同じ。未指定時は `0` |
+| `apply_gauge_start_to_percentage` | boolean | 任意 | 達成率表示も `gauge_start` から計算するか。未指定時は `false`。`gauge_start` が `0`、または `avg_score` のときは `false` に正規化 |
 
 重要な仕様:
 
@@ -227,6 +237,8 @@ DB上の `goals` テーブルは以下の構造です。
   },
   "invert_value": false,
   "invert_percentage": true,
+  "gauge_start": 0,
+  "apply_gauge_start_to_percentage": false,
   "sort_order": 1,
   "created_at": "2026-04-12T10:00:00+09:00"
 }
@@ -244,6 +256,8 @@ DB上の `goals` テーブルは以下の構造です。
 | `attributes` | object | 保存済みJSONをデコードしたもの |
 | `invert_value` | boolean | 実数値表示用の保存値そのまま |
 | `invert_percentage` | boolean | パーセンテージ表示用の保存値そのまま |
+| `gauge_start` | number | ゲージのスタート位置。未設定の目標は `0` |
+| `apply_gauge_start_to_percentage` | boolean | 達成率表示へスタート位置を適用するか |
 | `sort_order` | number | グループ内の表示順 |
 | `created_at` | string | RFC3339形式文字列 |
 
@@ -762,6 +776,22 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 - 固定範囲 `0..100` のみで判定され、動的上限はありません。
 
+### 10.5 `gauge_start`
+
+`gauge_start` は表示専用の値で、動的上限は検証しません。`achievement_type` ごとに以下の固定範囲だけを検証し、違反時は `goal_invalid_gauge_start` です。
+
+| `achievement_type` | 許可する値 |
+| --- | --- |
+| `overpower_value` | 0以上、小数第3位まで |
+| `overpower_percent` | 0以上100以下、小数第3位まで |
+| `avg_score` | 0以上1,010,000以下の整数 |
+| 上記以外（件数系・`total_score`） | 0以上の整数 |
+
+- いずれの種別も保存列 `DECIMAL(16,3)` の上限 9,999,999,999,999.999 以下です。
+- 目標値は「すべて」「残数」「割合」で動的に決まり、マスタ更新でも変わるため、`gauge_start` が目標値未満かどうかは判定しません。目標値以上になった場合の表示はクライアントが扱います。
+- `gauge_start` が `0` の場合、または `avg_score`（割合の代わりに残り点数を表示する種別）の場合、`apply_gauge_start_to_percentage` は `false` に正規化して保存します。
+- データ移行のインポートでは、移行元で正規化済みの値をそのまま保存します（署名済みファイルのため改変されません）。
+
 ## 11. 作成・更新・削除の挙動
 
 ### 11.1 作成
@@ -809,6 +839,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 | `goal_invalid_achievement_type` | 400 | `achievement_type` がマスタに存在しない |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形状不正、範囲不正、動的上限超過 |
 | `goal_invalid_attributes` | 400 | `attributes` の形状不正、未知キー、ID不正、範囲不正 |
+| `goal_invalid_gauge_start` | 400 | `gauge_start` が `achievement_type` ごとの範囲外、または許可されない小数桁数 |
 | `invalid_goal_input` | 400 | ユースケース入力全般不正 |
 
 ### 12.2 共通エラー
@@ -835,6 +866,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
 - `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。また `remaining` / `percent` が代わりに指定されている場合もあります。受信側は欠落・`null` を許容してください。
 - `invert_value` と `invert_percentage` はサーバー側で評価条件に使われていません。それぞれ独立して保存・返却される表示用フラグです。
+- `gauge_start` と `apply_gauge_start_to_percentage` も表示専用で、サーバー側の評価条件には使われていません。`gauge_start` が目標値以上になった目標も一覧ではそのまま返ります。
 
 ## 14. 実装から見える補足事項
 
@@ -878,6 +910,8 @@ type GoalRequest = {
   attributes?: GoalAttributes;
   invert_value?: boolean;
   invert_percentage?: boolean;
+  gauge_start?: number;
+  apply_gauge_start_to_percentage?: boolean;
 };
 
 type GoalResponse = {
@@ -888,6 +922,8 @@ type GoalResponse = {
   attributes: GoalAttributes;
   invert_value: boolean;
   invert_percentage: boolean;
+  gauge_start: number;
+  apply_gauge_start_to_percentage: boolean;
   created_at: string;
 };
 

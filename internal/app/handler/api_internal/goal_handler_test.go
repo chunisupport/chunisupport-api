@@ -322,3 +322,39 @@ func TestToGoalResponseKeepsInvertFlagsIndependent(t *testing.T) {
 	assert.Equal(t, true, body["invert_percentage"])
 	assert.NotContains(t, body, "invert")
 }
+
+func TestGoalGaugeStartMapping(t *testing.T) {
+	t.Run("リクエストのスタート位置と達成率への適用指定をユースケース入力へ渡す", func(t *testing.T) {
+		// Given
+		req := &internaldto.GoalRequest{
+			Title:                       "OP達成率99.8%",
+			AchievementType:             "overpower_percent",
+			AchievementParams:           map[string]any{"total": 99.8},
+			GaugeStart:                  99.6,
+			ApplyGaugeStartToPercentage: true,
+		}
+
+		// When
+		in, err := toGoalInput(req)
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, 99.6, in.GaugeStart)
+		assert.True(t, in.ApplyGaugeStartToPercentage)
+	})
+
+	t.Run("レスポンスにスタート位置と達成率への適用指定を含める", func(t *testing.T) {
+		// Given
+		goal := &usecase.GoalOutput{GaugeStart: 99.6, ApplyGaugeStartToPercentage: true}
+
+		// When
+		encoded, err := json.Marshal(toGoalResponse(goal))
+
+		// Then
+		require.NoError(t, err)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &body))
+		assert.Equal(t, 99.6, body["gauge_start"])
+		assert.Equal(t, true, body["apply_gauge_start_to_percentage"])
+	})
+}

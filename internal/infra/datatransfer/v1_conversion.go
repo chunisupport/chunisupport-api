@@ -155,14 +155,16 @@ func newPayloadV1(snapshot *entity.UserDataTransferSnapshot) payloadV1 {
 
 func newGoalV1(goal entity.UserDataTransferGoal) goalV1 {
 	return goalV1{
-		Title:             goal.Title,
-		AchievementType:   goal.AchievementType,
-		AchievementParams: cloneRawMessage(goal.AchievementParams),
-		Attributes:        cloneRawMessage(goal.Attributes),
-		InvertValue:       goal.InvertValue,
-		InvertPercentage:  goal.InvertPercentage,
-		SortOrder:         goal.SortOrder,
-		CreatedAt:         newUTCDateTime(goal.CreatedAt),
+		Title:                       goal.Title,
+		AchievementType:             goal.AchievementType,
+		AchievementParams:           cloneRawMessage(goal.AchievementParams),
+		Attributes:                  cloneRawMessage(goal.Attributes),
+		InvertValue:                 goal.InvertValue,
+		InvertPercentage:            goal.InvertPercentage,
+		GaugeStart:                  goal.GaugeStart,
+		ApplyGaugeStartToPercentage: goal.ApplyGaugeStartToPercentage,
+		SortOrder:                   goal.SortOrder,
+		CreatedAt:                   newUTCDateTime(goal.CreatedAt),
 	}
 }
 
@@ -354,14 +356,16 @@ func (group goalGroupV1) toEntity() (entity.UserDataTransferGoalGroup, error) {
 
 func (goal goalV1) toEntity() entity.UserDataTransferGoal {
 	return entity.UserDataTransferGoal{
-		Title:             goal.Title,
-		AchievementType:   goal.AchievementType,
-		AchievementParams: cloneRawMessage(goal.AchievementParams),
-		Attributes:        cloneRawMessage(goal.Attributes),
-		InvertValue:       goal.InvertValue,
-		InvertPercentage:  goal.InvertPercentage,
-		SortOrder:         goal.SortOrder,
-		CreatedAt:         goal.CreatedAt.Time,
+		Title:                       goal.Title,
+		AchievementType:             goal.AchievementType,
+		AchievementParams:           cloneRawMessage(goal.AchievementParams),
+		Attributes:                  cloneRawMessage(goal.Attributes),
+		InvertValue:                 goal.InvertValue,
+		InvertPercentage:            goal.InvertPercentage,
+		GaugeStart:                  goal.GaugeStart,
+		ApplyGaugeStartToPercentage: goal.ApplyGaugeStartToPercentage,
+		SortOrder:                   goal.SortOrder,
+		CreatedAt:                   goal.CreatedAt.Time,
 	}
 }
 

@@ -219,6 +219,8 @@ CREATE TABLE `goals` (
   `attributes` json NOT NULL,
   `invert_value` tinyint(1) NOT NULL DEFAULT '0',
   `invert_percentage` tinyint(1) NOT NULL DEFAULT '0',
+  `gauge_start` decimal(16,3) NOT NULL DEFAULT '0.000',
+  `apply_gauge_start_to_percentage` tinyint(1) NOT NULL DEFAULT '0',
   `sort_order` smallint unsigned NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

@@ -88,3 +88,18 @@ func TestValidateTransferredGoals_不正な目標は原因エラーを保持す�
 	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
 	assert.ErrorIs(t, err, ErrInvalidGoalTitle)
 }
+
+func TestValidateTransferredGoals_不正なスタート位置を拒否する(t *testing.T) {
+	// Given: 件数系の目標に小数のスタート位置が入っている
+	validator := &goalUsecase{goalRepo: &stubGoalRepo{}, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "100万点を1譜面", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{}`), GaugeStart: 0.5},
+	}}
+
+	// When
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	// Then
+	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
+	assert.ErrorIs(t, err, ErrInvalidGoalGaugeStart)
+}

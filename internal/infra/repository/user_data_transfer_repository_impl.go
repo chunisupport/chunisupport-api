@@ -301,17 +301,19 @@ func (r *userDataTransferRepository) exportGoals(ctx context.Context, exec domai
 		snapshot.Goals.Groups = append(snapshot.Goals.Groups, entity.UserDataTransferGoalGroup{Name: name, SortOrder: row.SortOrder, CreatedAt: transferUTC(row.CreatedAt), Goals: []entity.UserDataTransferGoal{}})
 	}
 	var goals []struct {
-		GroupID           *uint32   `db:"group_id"`
-		Title             string    `db:"title"`
-		AchievementType   string    `db:"achievement_type"`
-		AchievementParams []byte    `db:"achievement_params"`
-		Attributes        []byte    `db:"attributes"`
-		InvertValue       bool      `db:"invert_value"`
-		InvertPercentage  bool      `db:"invert_percentage"`
-		SortOrder         uint16    `db:"sort_order"`
-		CreatedAt         time.Time `db:"created_at"`
+		GroupID                     *uint32   `db:"group_id"`
+		Title                       string    `db:"title"`
+		AchievementType             string    `db:"achievement_type"`
+		AchievementParams           []byte    `db:"achievement_params"`
+		Attributes                  []byte    `db:"attributes"`
+		InvertValue                 bool      `db:"invert_value"`
+		InvertPercentage            bool      `db:"invert_percentage"`
+		GaugeStart                  float64   `db:"gauge_start"`
+		ApplyGaugeStartToPercentage bool      `db:"apply_gauge_start_to_percentage"`
+		SortOrder                   uint16    `db:"sort_order"`
+		CreatedAt                   time.Time `db:"created_at"`
 	}
-	if err := exec.SelectContext(ctx, &goals, `SELECT g.group_id, g.title, at.code AS achievement_type, g.achievement_params, g.attributes, g.invert_value, g.invert_percentage, g.sort_order, g.created_at FROM goals g INNER JOIN achievement_types at ON at.id = g.achievement_type_id LEFT JOIN goal_groups gg ON gg.id = g.group_id AND gg.user_id = g.user_id WHERE g.user_id = ? ORDER BY (g.group_id IS NULL), gg.sort_order, g.sort_order, g.id`, userID); err != nil {
+	if err := exec.SelectContext(ctx, &goals, `SELECT g.group_id, g.title, at.code AS achievement_type, g.achievement_params, g.attributes, g.invert_value, g.invert_percentage, g.gauge_start, g.apply_gauge_start_to_percentage, g.sort_order, g.created_at FROM goals g INNER JOIN achievement_types at ON at.id = g.achievement_type_id LEFT JOIN goal_groups gg ON gg.id = g.group_id AND gg.user_id = g.user_id WHERE g.user_id = ? ORDER BY (g.group_id IS NULL), gg.sort_order, g.sort_order, g.id`, userID); err != nil {
 		return err
 	}
 	for _, row := range goals {
@@ -319,7 +321,7 @@ func (r *userDataTransferRepository) exportGoals(ctx context.Context, exec domai
 		if err != nil {
 			return err
 		}
-		goal := entity.UserDataTransferGoal{Title: row.Title, AchievementType: row.AchievementType, AchievementParams: append(json.RawMessage(nil), row.AchievementParams...), Attributes: attributes, InvertValue: row.InvertValue, InvertPercentage: row.InvertPercentage, SortOrder: row.SortOrder, CreatedAt: transferUTC(row.CreatedAt)}
+		goal := entity.UserDataTransferGoal{Title: row.Title, AchievementType: row.AchievementType, AchievementParams: append(json.RawMessage(nil), row.AchievementParams...), Attributes: attributes, InvertValue: row.InvertValue, InvertPercentage: row.InvertPercentage, GaugeStart: row.GaugeStart, ApplyGaugeStartToPercentage: row.ApplyGaugeStartToPercentage, SortOrder: row.SortOrder, CreatedAt: transferUTC(row.CreatedAt)}
 		if row.GroupID == nil {
 			snapshot.Goals.Ungrouped = append(snapshot.Goals.Ungrouped, goal)
 			continue

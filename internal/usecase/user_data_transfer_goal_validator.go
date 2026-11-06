@@ -36,12 +36,14 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 			return fmt.Errorf("%w: %w", ErrDataTransferInvalidData, err)
 		}
 		_, attrs, params, err := u.validateInputStatic(&GoalInput{
-			Title:             goal.Title,
-			AchievementType:   goal.AchievementType,
-			AchievementParams: goal.AchievementParams,
-			Attributes:        attributes,
-			InvertValue:       goal.InvertValue,
-			InvertPercentage:  goal.InvertPercentage,
+			Title:                       goal.Title,
+			AchievementType:             goal.AchievementType,
+			AchievementParams:           goal.AchievementParams,
+			Attributes:                  attributes,
+			InvertValue:                 goal.InvertValue,
+			InvertPercentage:            goal.InvertPercentage,
+			GaugeStart:                  goal.GaugeStart,
+			ApplyGaugeStartToPercentage: goal.ApplyGaugeStartToPercentage,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: transferred goal is invalid: %w", ErrDataTransferInvalidData, err)

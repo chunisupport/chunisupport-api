@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -26,6 +27,7 @@ var (
 	ErrInvalidAchievementType  = errors.New("invalid achievement type")
 	ErrInvalidAchievementParam = errors.New("invalid achievement params")
 	ErrInvalidGoalAttributes   = errors.New("invalid goal attributes")
+	ErrInvalidGoalGaugeStart   = errors.New("invalid goal gauge start")
 	ErrInvalidGoalOrder        = errors.New("invalid goal order")
 )
 
@@ -77,14 +79,16 @@ func (u *goalUsecase) Create(ctx context.Context, userID int, input *GoalInput) 
 			return err
 		}
 		goal := &entity.Goal{
-			UserID:            userID,
-			GroupID:           cloneUint32Pointer(input.GroupID),
-			Title:             validated.Title,
-			AchievementTypeID: validated.AchievementTypeID,
-			AchievementParams: validated.AchievementParams,
-			Attributes:        validated.Attributes,
-			InvertValue:       validated.InvertValue,
-			InvertPercentage:  validated.InvertPercentage,
+			UserID:                      userID,
+			GroupID:                     cloneUint32Pointer(input.GroupID),
+			Title:                       validated.Title,
+			AchievementTypeID:           validated.AchievementTypeID,
+			AchievementParams:           validated.AchievementParams,
+			Attributes:                  validated.Attributes,
+			InvertValue:                 validated.InvertValue,
+			InvertPercentage:            validated.InvertPercentage,
+			GaugeStart:                  validated.GaugeStart,
+			ApplyGaugeStartToPercentage: validated.ApplyGaugeStartToPercentage,
 			// ユーザー単位の目標上限を検証済みのため、uint16の範囲を超えません。
 			SortOrder: uint16(groupCount + 1), // #nosec G115
 		}
@@ -155,6 +159,8 @@ func (u *goalUsecase) Update(ctx context.Context, userID int, id uint32, input *
 		g.Attributes = validated.Attributes
 		g.InvertValue = validated.InvertValue
 		g.InvertPercentage = validated.InvertPercentage
+		g.GaugeStart = validated.GaugeStart
+		g.ApplyGaugeStartToPercentage = validated.ApplyGaugeStartToPercentage
 		if err := u.goalRepo.Save(ctx, tx, g); err != nil {
 			if errors.Is(err, repository.ErrGoalNotFound) {
 				return ErrGoalNotFound
@@ -251,12 +257,14 @@ func cloneUint32Pointer(value *uint32) *uint32 {
 }
 
 type validatedGoalInput struct {
-	Title             string
-	AchievementTypeID int
-	AchievementParams []byte
-	Attributes        []byte
-	InvertValue       bool
-	InvertPercentage  bool
+	Title                       string
+	AchievementTypeID           int
+	AchievementParams           []byte
+	Attributes                  []byte
+	InvertValue                 bool
+	InvertPercentage            bool
+	GaugeStart                  float64
+	ApplyGaugeStartToPercentage bool
 }
 
 type goalAttributeFilter struct {
@@ -314,6 +322,9 @@ func (u *goalUsecase) validateInputStatic(input *GoalInput) (*validatedGoalInput
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if err := validateGaugeStart(input.AchievementType, input.GaugeStart); err != nil {
+		return nil, nil, nil, err
+	}
 	return &validatedGoalInput{
 		Title:             title,
 		AchievementTypeID: item.ID,
@@ -321,8 +332,38 @@ func (u *goalUsecase) validateInputStatic(input *GoalInput) (*validatedGoalInput
 		Attributes:        attrsRaw,
 		InvertValue:       input.InvertValue,
 		InvertPercentage:  input.InvertPercentage,
+		GaugeStart:        input.GaugeStart,
+		// スタート位置が0なら達成率は従来どおりで、平均スコア目標は割合の代わりに残り点数を表示するため、
+		// どちらも意味のない適用指定は保存しない。
+		ApplyGaugeStartToPercentage: input.ApplyGaugeStartToPercentage && input.GaugeStart > 0 && input.AchievementType != "avg_score",
 	}, attrsFilter, params, nil
 }
+
+// validateGaugeStart はゲージのスタート位置を目標種別の現在値と同じ単位として検証します。
+// 目標値は「すべて」「残数」「割合」で動的に決まり、マスタ更新で変わるため、
+// スタート位置が目標値未満かどうかはここでは判定せず、表示側で扱います。
+func validateGaugeStart(achievementType string, gaugeStart float64) error {
+	if gaugeStart < 0 || gaugeStart > info.GoalGaugeStartMax {
+		return ErrInvalidGoalGaugeStart
+	}
+	var valid bool
+	switch achievementType {
+	case "overpower_value":
+		valid = isScale(gaugeStart, info.GoalGaugeStartDecimalScale)
+	case "overpower_percent":
+		valid = gaugeStart <= info.MaxOfficialOverpowerPercent && isScale(gaugeStart, info.GoalGaugeStartDecimalScale)
+	case "avg_score":
+		valid = gaugeStart <= info.TheoreticalScore && isScale(gaugeStart, 0)
+	default:
+		// 件数系と総スコアは整数の現在値を持つため、スタート位置も整数に限る。
+		valid = isScale(gaugeStart, 0)
+	}
+	if !valid {
+		return ErrInvalidGoalGaugeStart
+	}
+	return nil
+}
+
 func validateAttributes(
 	raw []byte,
 	masters *domainmasterdata.GoalMasters,
@@ -952,9 +993,14 @@ func validateDynamicUpperBoundWithStats(ctx context.Context, achievementType str
 	return nil
 }
 
+// isScale は値が小数第scale位までで表せるかを判定します。
+// 10^scale 倍した値の誤差で判定すると、16384.007 のように大きな値では
+// 浮動小数点の丸め誤差が固定の許容誤差を超えて正しい入力を拒否するため、
+// JSON から復元した値の最短表現で小数桁数を数えます。
 func isScale(v float64, scale int) bool {
-	f := math.Pow10(scale)
-	return math.Abs(v*f-math.Round(v*f)) < 1e-9
+	s := strconv.FormatFloat(v, 'f', -1, 64)
+	dot := strings.IndexByte(s, '.')
+	return dot < 0 || len(s)-dot-1 <= scale
 }
 
 func countBoolToInt(b bool) int {
@@ -1006,16 +1052,18 @@ func (u *goalUsecase) toOutputs(ctx context.Context, goals []*entity.Goal) ([]*G
 			return nil, fmt.Errorf("failed to decode attributes: %w", err)
 		}
 		outs = append(outs, &GoalOutput{
-			ID:                g.ID,
-			GroupID:           cloneUint32Pointer(g.GroupID),
-			Title:             g.Title,
-			AchievementType:   typeCode,
-			AchievementParams: p,
-			Attributes:        a,
-			InvertValue:       g.InvertValue,
-			InvertPercentage:  g.InvertPercentage,
-			SortOrder:         g.SortOrder,
-			CreatedAt:         g.CreatedAt,
+			ID:                          g.ID,
+			GroupID:                     cloneUint32Pointer(g.GroupID),
+			Title:                       g.Title,
+			AchievementType:             typeCode,
+			AchievementParams:           p,
+			Attributes:                  a,
+			InvertValue:                 g.InvertValue,
+			InvertPercentage:            g.InvertPercentage,
+			GaugeStart:                  g.GaugeStart,
+			ApplyGaugeStartToPercentage: g.ApplyGaugeStartToPercentage,
+			SortOrder:                   g.SortOrder,
+			CreatedAt:                   g.CreatedAt,
 		})
 	}
 	return outs, nil

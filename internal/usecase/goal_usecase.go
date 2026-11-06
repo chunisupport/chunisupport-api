@@ -16,25 +16,29 @@ type GoalUsecase interface {
 
 // GoalInput は目標の作成・更新入力です。
 type GoalInput struct {
-	GroupID           *uint32
-	Title             string
-	AchievementType   string
-	AchievementParams []byte
-	Attributes        []byte
-	InvertValue       bool
-	InvertPercentage  bool
+	GroupID                     *uint32
+	Title                       string
+	AchievementType             string
+	AchievementParams           []byte
+	Attributes                  []byte
+	InvertValue                 bool
+	InvertPercentage            bool
+	GaugeStart                  float64
+	ApplyGaugeStartToPercentage bool
 }
 
 // GoalOutput は目標API向けの出力です。
 type GoalOutput struct {
-	ID                uint32
-	GroupID           *uint32
-	Title             string
-	AchievementType   string
-	AchievementParams map[string]any
-	Attributes        map[string]any
-	InvertValue       bool
-	InvertPercentage  bool
-	SortOrder         uint16
-	CreatedAt         time.Time
+	ID                          uint32
+	GroupID                     *uint32
+	Title                       string
+	AchievementType             string
+	AchievementParams           map[string]any
+	Attributes                  map[string]any
+	InvertValue                 bool
+	InvertPercentage            bool
+	GaugeStart                  float64
+	ApplyGaugeStartToPercentage bool
+	SortOrder                   uint16
+	CreatedAt                   time.Time
 }

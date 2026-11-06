@@ -159,6 +159,7 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 	return &domainmasterdata.GoalMasters{
 		AchievementTypesByCode: map[string]domainmasterdata.Item{
 			"rating_count":      {ID: 11, Name: "rating_count"},
+			"avg_score":         {ID: 4, Name: "avg_score"},
 			"score_count":       {ID: 2, Name: "score_count"},
 			"rank_count":        {ID: 1, Name: "rank_count"},
 			"rainbow_count":     {ID: 9, Name: "rainbow_count"},
@@ -167,7 +168,7 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 			"overpower_value":   {ID: 7, Name: "overpower_value"},
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
-		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count", 10: "fullchain_count", 11: "rating_count"},
+		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 4: "avg_score", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count", 10: "fullchain_count", 11: "rating_count"},
 		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
 		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
 		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
@@ -1211,6 +1212,211 @@ func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
 			assert.NotNil(t, out)
 		})
 	}
+}
+
+func TestGoalUsecase_CreateGaugeStartValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		achievementType string
+		params          []byte
+		gaugeStart      float64
+		wantErr         bool
+	}{
+		{
+			name:            "件数系の整数のスタート位置を受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000}`),
+			gaugeStart:      50,
+		},
+		{
+			name:            "件数系の小数のスタート位置を拒否する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000}`),
+			gaugeStart:      50.5,
+			wantErr:         true,
+		},
+		{
+			name:            "負のスタート位置を拒否する",
+			achievementType: "rainbow_count",
+			params:          []byte(`{}`),
+			gaugeStart:      -1,
+			wantErr:         true,
+		},
+		{
+			name:            "平均スコアの理論値をスタート位置として受理する",
+			achievementType: "avg_score",
+			params:          []byte(`{"score":1010000}`),
+			gaugeStart:      1010000,
+		},
+		{
+			name:            "平均スコアの理論値を超えるスタート位置を拒否する",
+			achievementType: "avg_score",
+			params:          []byte(`{"score":1010000}`),
+			gaugeStart:      1010001,
+			wantErr:         true,
+		},
+		{
+			name:            "列の上限を超える総スコアのスタート位置を拒否する",
+			achievementType: "total_score",
+			params:          []byte(`{}`),
+			gaugeStart:      10_000_000_000_000,
+			wantErr:         true,
+		},
+		{
+			name:            "OP値の小数第3位までのスタート位置を受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{}`),
+			gaugeStart:      1234.567,
+		},
+		{
+			name:            "OP値の小数第4位のスタート位置を拒否する",
+			achievementType: "overpower_value",
+			params:          []byte(`{}`),
+			gaugeStart:      1234.5678,
+			wantErr:         true,
+		},
+		{
+			name:            "16384以上のOP値でも小数第3位までのスタート位置を受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{}`),
+			gaugeStart:      16384.007,
+		},
+		{
+			name:            "131072以上のOP値でも小数第3位までのスタート位置を受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{}`),
+			gaugeStart:      131072.02,
+		},
+		{
+			name:            "平均スコアの小数のスタート位置を拒否する",
+			achievementType: "avg_score",
+			params:          []byte(`{"score":1010000}`),
+			gaugeStart:      1007000.5,
+			wantErr:         true,
+		},
+		{
+			name:            "OP達成率の小数第4位のスタート位置を拒否する",
+			achievementType: "overpower_percent",
+			params:          []byte(`{"total":99.8}`),
+			gaugeStart:      99.6123,
+			wantErr:         true,
+		},
+		{
+			name:            "OP達成率の小数第3位までのスタート位置を受理する",
+			achievementType: "overpower_percent",
+			params:          []byte(`{"total":99.8}`),
+			gaugeStart:      99.6,
+		},
+		{
+			name:            "OP達成率の100を超えるスタート位置を拒否する",
+			achievementType: "overpower_percent",
+			params:          []byte(`{"total":99.8}`),
+			gaugeStart:      100.001,
+			wantErr:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   tt.achievementType,
+				AchievementParams: tt.params,
+				Attributes:        []byte(`{}`),
+				GaugeStart:        tt.gaugeStart,
+			})
+
+			// Then
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrInvalidGoalGaugeStart)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.gaugeStart, out.GaugeStart)
+		})
+	}
+}
+
+func TestGoalUsecase_CreateGaugeStartPercentageFlag(t *testing.T) {
+	tests := []struct {
+		name            string
+		achievementType string
+		params          []byte
+		gaugeStart      float64
+		expected        bool
+	}{
+		{
+			name:            "スタート位置があれば達成率への適用指定を保存する",
+			achievementType: "overpower_percent",
+			params:          []byte(`{"total":99.8}`),
+			gaugeStart:      99.6,
+			expected:        true,
+		},
+		{
+			name:            "スタート位置が0なら達成率への適用指定をfalseに揃える",
+			achievementType: "overpower_percent",
+			params:          []byte(`{"total":99.8}`),
+			gaugeStart:      0,
+			expected:        false,
+		},
+		{
+			name:            "割合を表示しない平均スコア目標では達成率への適用指定をfalseに揃える",
+			achievementType: "avg_score",
+			params:          []byte(`{"score":1008000}`),
+			gaugeStart:      1007000,
+			expected:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:                       "test",
+				AchievementType:             tt.achievementType,
+				AchievementParams:           tt.params,
+				Attributes:                  []byte(`{}`),
+				GaugeStart:                  tt.gaugeStart,
+				ApplyGaugeStartToPercentage: true,
+			})
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, repo.goal.ApplyGaugeStartToPercentage)
+			assert.Equal(t, tt.expected, out.ApplyGaugeStartToPercentage)
+		})
+	}
+}
+
+func TestGoalUsecase_UpdateOverwritesGaugeStart(t *testing.T) {
+	// Given: スタート位置を持つ既存の Goal
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, AchievementTypeID: 8, AchievementParams: []byte(`{"total":99.8}`), Attributes: []byte(`{}`), GaugeStart: 99.5, ApplyGaugeStartToPercentage: true}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When: 別のスタート位置で更新する
+	out, err := u.Update(context.Background(), 1, 1, &GoalInput{
+		Title:             "updated",
+		AchievementType:   "overpower_percent",
+		AchievementParams: []byte(`{"total":99.8}`),
+		Attributes:        []byte(`{}`),
+		GaugeStart:        99.6,
+	})
+
+	// Then: 完全上書きのため、省略した適用指定は false になる
+	require.NoError(t, err)
+	assert.Equal(t, 99.6, repo.goal.GaugeStart)
+	assert.False(t, repo.goal.ApplyGaugeStartToPercentage)
+	assert.Equal(t, 99.6, out.GaugeStart)
+	assert.False(t, out.ApplyGaugeStartToPercentage)
 }
 
 func TestGoalUsecase_Update(t *testing.T) {

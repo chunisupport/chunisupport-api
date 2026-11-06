@@ -44,6 +44,8 @@ func setupGoalRepositorySQLite(t *testing.T) *sqlx.DB {
 			attributes TEXT NOT NULL,
 			invert_value INTEGER NOT NULL,
 			invert_percentage INTEGER NOT NULL,
+			gauge_start REAL NOT NULL DEFAULT 0,
+			apply_gauge_start_to_percentage INTEGER NOT NULL DEFAULT 0,
 			sort_order INTEGER NOT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
@@ -188,6 +190,45 @@ func TestGoalRepository_PersistsInvertFlagsIndependently(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, updated.InvertValue)
 	assert.True(t, updated.InvertPercentage)
+}
+
+func TestGoalRepository_PersistsGaugeStart(t *testing.T) {
+	// Given
+	db := setupGoalRepositorySQLite(t)
+	repo := &goalRepository{db: db}
+	goal := &entity.Goal{
+		UserID:                      1,
+		Title:                       "スタート位置テスト",
+		AchievementTypeID:           8,
+		AchievementParams:           []byte(`{"total":99.8}`),
+		Attributes:                  []byte(`{}`),
+		GaugeStart:                  99.6,
+		ApplyGaugeStartToPercentage: true,
+		SortOrder:                   1,
+	}
+
+	// When
+	err := repo.Create(context.Background(), db, goal)
+
+	// Then
+	require.NoError(t, err)
+	created, err := repo.FindByIDAndUserID(context.Background(), db, goal.ID, goal.UserID)
+	require.NoError(t, err)
+	assert.Equal(t, 99.6, created.GaugeStart)
+	assert.True(t, created.ApplyGaugeStartToPercentage)
+
+	// When
+	created.GaugeStart = 0
+	created.ApplyGaugeStartToPercentage = false
+	err = repo.Save(context.Background(), db, created)
+
+	// Then
+	require.NoError(t, err)
+	goals, err := repo.ListByUserID(context.Background(), db, goal.UserID)
+	require.NoError(t, err)
+	require.Len(t, goals, 1)
+	assert.Equal(t, float64(0), goals[0].GaugeStart)
+	assert.False(t, goals[0].ApplyGaugeStartToPercentage)
 }
 
 // jsonArgCapturingExecutor は Executor へ渡す引数を記録します。

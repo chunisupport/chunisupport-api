@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -302,6 +304,7 @@ func TestLoadWorkspaceCharts(t *testing.T) {
 	}
 }
 
+// TestResolveChartUpdate はSQLのnullable値を介しても、通常・大型更新の保存方針と定数・ノーツ数が維持されることを検証します。
 func TestResolveChartUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -311,7 +314,7 @@ func TestResolveChartUpdate(t *testing.T) {
 		exists          bool
 		chart           workspaceChart
 		opts            SyncOptions
-		expectedAction  syncAction
+		expectedAction  songbatch.ChartUpdateAction
 		expectedConst   float64
 		expectedUnknown bool
 		expectedNotes   sql.NullInt64
@@ -322,7 +325,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          false,
 			chart:           workspaceChart{Const: 10.5, IsConstUnknown: true, Notes: sql.NullInt64{Valid: true, Int64: 500}},
 			opts:            SyncOptions{},
-			expectedAction:  actionInsert,
+			expectedAction:  songbatch.ChartInsert,
 			expectedConst:   10.5,
 			expectedUnknown: true,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 500},
@@ -332,7 +335,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          false,
 			chart:           workspaceChart{Const: 5.0, IsConstUnknown: true, Notes: sql.NullInt64{Valid: true, Int64: 300}},
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionInsert,
+			expectedAction:  songbatch.ChartInsert,
 			expectedConst:   5.0,
 			expectedUnknown: false, // 既知に強制
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 300},
@@ -342,7 +345,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          false,
 			chart:           workspaceChart{Const: 12.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionInsert,
+			expectedAction:  songbatch.ChartInsert,
 			expectedConst:   12.0,
 			expectedUnknown: true, // 不明に強制
 			expectedNotes:   sql.NullInt64{Valid: false},
@@ -355,7 +358,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.5, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{},
-			expectedAction:  actionSkip,
+			expectedAction:  songbatch.ChartSkip,
 			expectedConst:   10.0, // 既存値を維持
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 400}, // 既存ノーツを維持
@@ -366,7 +369,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: true, Int64: 100}},
 			opts:            SyncOptions{},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   10.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 100},
@@ -377,7 +380,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 14.2, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   14.2,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 600}, // 既存ノーツを維持
@@ -388,7 +391,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: true, Int64: 200}},
 			opts:            SyncOptions{},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   10.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 200},
@@ -399,7 +402,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.0, IsConstUnknown: true, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{},
-			expectedAction:  actionSkip, // ブロック
+			expectedAction:  songbatch.ChartSkip, // ブロック
 			expectedConst:   10.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 350}, // 既存ノーツを維持
@@ -412,7 +415,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 5.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}}, // 公式値 5.0
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   5.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 450}, // 既存ノーツを維持
@@ -423,8 +426,8 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 14.0, IsConstUnknown: true, Notes: sql.NullInt64{Valid: false}}, // レベル14
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionUpdate, // Unknown=true に設定するため更新
-			expectedConst:   14.2,         // 既存値を維持
+			expectedAction:  songbatch.ChartUpdate, // Unknown=true に設定するため更新
+			expectedConst:   14.2,                  // 既存値を維持
 			expectedUnknown: true,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 700}, // 既存ノーツを維持
 		},
@@ -434,7 +437,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 14.0, IsConstUnknown: true, Notes: sql.NullInt64{Valid: false}}, // レベル14
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   14.0, // 上書き
 			expectedUnknown: true,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 800}, // 既存ノーツを維持
@@ -445,7 +448,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 14.0, IsConstUnknown: true, Notes: sql.NullInt64{Valid: false}}, // レベル14
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   14.0, // 上書き
 			expectedUnknown: true,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 900}, // 既存ノーツを維持
@@ -457,7 +460,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{},
-			expectedAction:  actionSkip,
+			expectedAction:  songbatch.ChartSkip,
 			expectedConst:   10.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 500}, // 既存ノーツを保持
@@ -468,7 +471,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 10.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: true, Int64: 250}},
 			opts:            SyncOptions{},
-			expectedAction:  actionUpdate,
+			expectedAction:  songbatch.ChartUpdate,
 			expectedConst:   10.0,
 			expectedUnknown: false,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 250}, // 新しいノーツを設定
@@ -479,7 +482,7 @@ func TestResolveChartUpdate(t *testing.T) {
 			exists:          true,
 			chart:           workspaceChart{Const: 12.0, IsConstUnknown: false, Notes: sql.NullInt64{Valid: false}},
 			opts:            SyncOptions{MajorUpdate: true},
-			expectedAction:  actionUpdate, // Unknown=trueに変更されるため更新
+			expectedAction:  songbatch.ChartUpdate, // Unknown=trueに変更されるため更新
 			expectedConst:   12.0,
 			expectedUnknown: true,
 			expectedNotes:   sql.NullInt64{Valid: true, Int64: 650}, // 既存ノーツを保持
@@ -505,6 +508,7 @@ func TestResolveChartUpdate(t *testing.T) {
 	}
 }
 
+// TestResolveChartUpdatePreservesComplementaryValuesWhileApplyingValidUpdate は定数を確定する更新で補完値が欠落していても、既存のノーツ数と製作者を保持することを検証します。
 func TestResolveChartUpdatePreservesComplementaryValuesWhileApplyingValidUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -520,7 +524,7 @@ func TestResolveChartUpdatePreservesComplementaryValuesWhileApplyingValidUpdate(
 	}
 
 	finalConst, finalUnknown, finalNotes, finalDesigner, action := resolveChartUpdate(existing, true, incoming, SyncOptions{})
-	if action != actionUpdate || finalConst != 14.2 || finalUnknown {
+	if action != songbatch.ChartUpdate || finalConst != 14.2 || finalUnknown {
 		t.Fatalf("valid update was not applied: action=%v const=%v unknown=%v", action, finalConst, finalUnknown)
 	}
 	if !finalNotes.Valid || finalNotes.Int64 != 700 {

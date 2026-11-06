@@ -73,6 +73,7 @@
 | `goal_invalid_achievement_type` | goal達成種別不正 |
 | `goal_invalid_achievement_params` | goal達成条件不正 |
 | `goal_invalid_attributes` | goal属性不正 |
+| `goal_invalid_gauge_start` | goalゲージのスタート位置不正 |
 | `goal_invalid_order` | goal並び順不正 |
 | `invalid_goal_input` | goal入力不正 |
 | `goal_group_not_found` | 目標グループ未検出 |

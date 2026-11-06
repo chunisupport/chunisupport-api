@@ -135,27 +135,31 @@ func toGoalInput(req *internaldto.GoalRequest) (*usecase.GoalInput, error) {
 		}
 	}
 	return &usecase.GoalInput{
-		GroupID:           req.GroupID,
-		Title:             req.Title,
-		AchievementType:   req.AchievementType,
-		AchievementParams: params,
-		Attributes:        attrs,
-		InvertValue:       req.InvertValue,
-		InvertPercentage:  req.InvertPercentage,
+		GroupID:                     req.GroupID,
+		Title:                       req.Title,
+		AchievementType:             req.AchievementType,
+		AchievementParams:           params,
+		Attributes:                  attrs,
+		InvertValue:                 req.InvertValue,
+		InvertPercentage:            req.InvertPercentage,
+		GaugeStart:                  req.GaugeStart,
+		ApplyGaugeStartToPercentage: req.ApplyGaugeStartToPercentage,
 	}, nil
 }
 
 func toGoalResponse(goal *usecase.GoalOutput) *internaldto.GoalResponse {
 	return &internaldto.GoalResponse{
-		ID:                goal.ID,
-		GroupID:           goal.GroupID,
-		Title:             goal.Title,
-		AchievementType:   goal.AchievementType,
-		AchievementParams: goal.AchievementParams,
-		Attributes:        goal.Attributes,
-		InvertValue:       goal.InvertValue,
-		InvertPercentage:  goal.InvertPercentage,
-		SortOrder:         goal.SortOrder,
-		CreatedAt:         goal.CreatedAt,
+		ID:                          goal.ID,
+		GroupID:                     goal.GroupID,
+		Title:                       goal.Title,
+		AchievementType:             goal.AchievementType,
+		AchievementParams:           goal.AchievementParams,
+		Attributes:                  goal.Attributes,
+		InvertValue:                 goal.InvertValue,
+		InvertPercentage:            goal.InvertPercentage,
+		GaugeStart:                  goal.GaugeStart,
+		ApplyGaugeStartToPercentage: goal.ApplyGaugeStartToPercentage,
+		SortOrder:                   goal.SortOrder,
+		CreatedAt:                   goal.CreatedAt,
 	}
 }

@@ -182,6 +182,56 @@ func TestCodecDecodeDefaultsMissingPossessionNameToNormal(t *testing.T) {
 	}
 }
 
+func TestCodecGoalGaugeStart(t *testing.T) {
+	codec, err := NewCodec(codecTestSecret)
+	require.NoError(t, err)
+	snapshot := codecTestSnapshot(t)
+	snapshot.Goals.Ungrouped = []entity.UserDataTransferGoal{{
+		Title:                       "OP達成率99.8%",
+		AchievementType:             "overpower_percent",
+		AchievementParams:           json.RawMessage(`{"total":99.8}`),
+		Attributes:                  json.RawMessage(`{}`),
+		GaugeStart:                  99.6,
+		ApplyGaugeStartToPercentage: true,
+		SortOrder:                   1,
+		CreatedAt:                   time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
+	encoded, err := codec.Encode(snapshot)
+	require.NoError(t, err)
+
+	t.Run("スタート位置と達成率への適用指定を往復で保持する", func(t *testing.T) {
+		// When
+		decoded, err := codec.Decode(encoded)
+
+		// Then
+		require.NoError(t, err)
+		require.Len(t, decoded.Goals.Ungrouped, 1)
+		assert.Equal(t, 99.6, decoded.Goals.Ungrouped[0].GaugeStart)
+		assert.True(t, decoded.Goals.Ungrouped[0].ApplyGaugeStartToPercentage)
+	})
+
+	t.Run("項目追加前のデータは0とfalseとして読み込む", func(t *testing.T) {
+		// Given
+		withoutGaugeStart := mutatePayloadJSON(t, encoded, func(payload map[string]any) {
+			goals := payload["goals"].(map[string]any)
+			for _, rawGoal := range goals["ungrouped"].([]any) {
+				goal := rawGoal.(map[string]any)
+				delete(goal, "gauge_start")
+				delete(goal, "apply_gauge_start_to_percentage")
+			}
+		})
+
+		// When
+		decoded, err := codec.Decode(withoutGaugeStart)
+
+		// Then
+		require.NoError(t, err)
+		require.Len(t, decoded.Goals.Ungrouped, 1)
+		assert.Equal(t, 0.0, decoded.Goals.Ungrouped[0].GaugeStart)
+		assert.False(t, decoded.Goals.Ungrouped[0].ApplyGaugeStartToPercentage)
+	})
+}
+
 func TestCodecDecodeRejectsInvalidEnvelopeAndPayload(t *testing.T) {
 	codec, err := NewCodec(codecTestSecret)
 	require.NoError(t, err)
