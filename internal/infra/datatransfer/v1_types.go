@@ -138,8 +138,12 @@ type goalV1 struct {
 	Attributes        json.RawMessage `json:"attributes"`
 	InvertValue       bool            `json:"invert_value"`
 	InvertPercentage  bool            `json:"invert_percentage"`
-	SortOrder         uint16          `json:"sort_order"`
-	CreatedAt         utcDateTime     `json:"created_at"`
+	// GaugeStart と ApplyGaugeStartToPercentage は後から追加した項目です。
+	// 追加前に出力したデータには含まれないため、省略時は0とfalse（従来の表示）として読み込みます。
+	GaugeStart                  float64     `json:"gauge_start"`
+	ApplyGaugeStartToPercentage bool        `json:"apply_gauge_start_to_percentage"`
+	SortOrder                   uint16      `json:"sort_order"`
+	CreatedAt                   utcDateTime `json:"created_at"`
 }
 
 type recordFilterV1 struct {

@@ -584,6 +584,33 @@ func TestSplitGoalInvertFlagsDown_実数値側を旧カラムへ戻す(t *testin
 	)
 }
 
+func TestAddGoalGaugeStartUp_既存目標は0から始まり達成率へ適用しない(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000062_add_goal_gauge_start.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "ADD COLUMN gauge_start DECIMAL(16,3) NOT NULL DEFAULT 0 AFTER invert_percentage")
+	assert.Contains(t, upSQL, "ADD COLUMN apply_gauge_start_to_percentage BOOLEAN NOT NULL DEFAULT FALSE AFTER gauge_start")
+}
+
+func TestAddGoalGaugeStartDown_追加したカラムを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000062_add_goal_gauge_start.down.sql")
+
+	// Then
+	assert.Contains(t, downSQL, "DROP COLUMN apply_gauge_start_to_percentage")
+	assert.Contains(t, downSQL, "DROP COLUMN gauge_start")
+}
+
+func TestSchemaMySQL_目標はゲージのスタート位置と達成率への適用有無を持つ(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "`gauge_start` decimal(16,3) NOT NULL DEFAULT '0.000'")
+	assert.Contains(t, schemaSQL, "`apply_gauge_start_to_percentage` tinyint(1) NOT NULL DEFAULT '0'")
+}
+
 func TestSchemaMySQL_目標の反転フラグを実数値と割合で分ける(t *testing.T) {
 	// Given
 	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")

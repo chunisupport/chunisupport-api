@@ -2390,6 +2390,8 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
   "invert_value": false,
   "invert_percentage": true,
+  "gauge_start": 0,
+  "apply_gauge_start_to_percentage": false,
   "sort_order": 1,
   "created_at": "2026-01-01T09:00:00+09:00"
 }
@@ -2405,6 +2407,8 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `attributes` | `object` | 双方向 | 対象譜面の絞り込み条件（詳細は後述）。空オブジェクト `{}` は全譜面対象 |
 | `invert_value` | `boolean` | 双方向 | `28/100` などの実数値表示用反転フラグ。サーバー側の達成判定には影響しない |
 | `invert_percentage` | `boolean` | 双方向 | パーセンテージ表示用反転フラグ。サーバー側の達成判定には影響しない |
+| `gauge_start` | `number` | 双方向 | 進捗ゲージを0%として描く値（ゲージのスタート位置）。単位は `achievement_type` の現在値と同じ。`0` は従来どおり0から描く。表示専用でサーバー側の達成判定には影響しない |
+| `apply_gauge_start_to_percentage` | `boolean` | 双方向 | 達成率表示もゲージと同じく `gauge_start` から計算するか。`gauge_start` が `0` の場合と `avg_score` の場合は常に `false` として保存する |
 | `sort_order` | `integer` | レスポンスのみ | 同一グループ内での表示順。1から始まる連番 |
 | `created_at` | `string` | レスポンスのみ | 作成日時（RFC3339、タイムゾーンオフセット付き） |
 
@@ -2414,7 +2418,20 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 - `attributes` は省略可能です。省略時は絞り込み条件なしとして扱います。明示する場合は空オブジェクト `{}` を推奨します。
 - `group_id` は省略可能です。省略または `null` の場合は未分類として扱います。
 - `invert_value` / `invert_percentage` はそれぞれ省略可能です。省略時は `false` として扱います。
+- `gauge_start` / `apply_gauge_start_to_percentage` はそれぞれ省略可能です。省略時は `0` / `false` として扱います。
 - `id` / `sort_order` / `created_at` はレスポンス専用です。作成・更新リクエストには含めません。
+
+**`gauge_start` の制約**（違反時は `goal_invalid_gauge_start`）:
+
+| `achievement_type` | 許可する値 |
+|---|---|
+| `overpower_value` | 0以上、小数第3位まで |
+| `overpower_percent` | 0以上100以下、小数第3位まで |
+| `avg_score` | 0以上1,010,000以下の整数 |
+| 上記以外（件数系・`total_score`） | 0以上の整数 |
+
+- いずれの種別も 9,999,999,999,999.999 以下です（保存列の上限）。
+- 目標値は「すべて」「残数」「割合」で動的に決まるため、`gauge_start` が目標値未満かどうかはサーバー側で検証しません。目標値以上になった場合の扱いはクライアントに委ねます。
 
 ### `achievement_type` 一覧
 
@@ -2668,7 +2685,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 #### 境界（Handler/DTO）での検査
 
-- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` 以外の未知キーを含むと `bad_request` になります。
+- リクエストボディは厳格デコード（`BindStrictJSON`）されるため、`group_id` / `title` / `achievement_type` / `achievement_params` / `attributes` / `invert_value` / `invert_percentage` / `gauge_start` / `apply_gauge_start_to_percentage` 以外の未知キーを含むと `bad_request` になります。
 
 #### Usecase層での業務ルール検査
 
@@ -2676,7 +2693,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
 3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
-5. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
+5. **`gauge_start`**: `achievement_type` ごとの範囲と小数桁数を検証。`0` の場合と `avg_score` の場合は `apply_gauge_start_to_percentage` を `false` に正規化
+6. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
    - `rank_count` / `score_count` / `hardlamp_count` / `combolamp_count` / `fullchain_count` の `count` ≤ 対象譜面数
    - `rating_count` の到達可能譜面数が1件以上で、`count` / `remaining` ≤ 到達可能譜面数
    - `rainbow_count.count` ≤ 対象楽曲数
@@ -2711,6 +2729,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
       "invert_value": false,
       "invert_percentage": true,
+      "gauge_start": 0,
+      "apply_gauge_start_to_percentage": false,
       "sort_order": 1,
       "created_at": "2026-01-01T09:00:00+09:00"
     }
@@ -2734,7 +2754,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "achievement_params": { "score": 1007500, "count": 100 },
   "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
   "invert_value": false,
-  "invert_percentage": true
+  "invert_percentage": true,
+  "gauge_start": 0,
+  "apply_gauge_start_to_percentage": false
 }
 ```
 
@@ -2791,6 +2813,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
 | `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
+| `goal_invalid_gauge_start` | 400 | `gauge_start` が `achievement_type` ごとの範囲外、または許可されない小数桁数 |
 | `goal_invalid_order` | 400 | `goal_ids` が指定グループ（`group_id` の省略・`null` は未分類）に現在所属する目標IDの集合と一致しない、または重複している |
 | `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
 | `goal_group_not_found` | 404 | グループが存在しない、または他ユーザー所有 |

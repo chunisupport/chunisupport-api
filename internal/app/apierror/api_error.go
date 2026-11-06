@@ -136,6 +136,7 @@ var (
 	ErrGoalInvalidAchievementType   = New(CodeGoalInvalidAchievementType, http.StatusBadRequest)
 	ErrGoalInvalidAchievementParams = New(CodeGoalInvalidAchievementParams, http.StatusBadRequest)
 	ErrGoalInvalidAttributes        = New(CodeGoalInvalidAttributes, http.StatusBadRequest)
+	ErrGoalInvalidGaugeStart        = New(CodeGoalInvalidGaugeStart, http.StatusBadRequest)
 	ErrInvalidGoalInput             = New(CodeInvalidGoalInput, http.StatusBadRequest)
 	ErrGoalInvalidOrder             = New(CodeGoalInvalidOrder, http.StatusBadRequest)
 	ErrGoalGroupNotFound            = New(CodeGoalGroupNotFound, http.StatusNotFound)

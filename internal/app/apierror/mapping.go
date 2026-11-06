@@ -192,6 +192,8 @@ func FromUsecaseError(err error) *APIError {
 		return ErrGoalInvalidAchievementParams.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalAttributes):
 		return ErrGoalInvalidAttributes.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidGoalGaugeStart):
+		return ErrGoalInvalidGaugeStart.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidGoalOrder):
 		return ErrGoalInvalidOrder.WithInternal(err)
 	case errors.Is(err, usecase.ErrGoalGroupNotFound):

@@ -81,6 +81,7 @@ const (
 	CodeGoalInvalidAchievementType   = "goal_invalid_achievement_type"
 	CodeGoalInvalidAchievementParams = "goal_invalid_achievement_params"
 	CodeGoalInvalidAttributes        = "goal_invalid_attributes"
+	CodeGoalInvalidGaugeStart        = "goal_invalid_gauge_start"
 	CodeInvalidGoalInput             = "invalid_goal_input"
 	CodeGoalInvalidOrder             = "goal_invalid_order"
 	CodeGoalGroupNotFound            = "goal_group_not_found"

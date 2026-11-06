@@ -139,14 +139,16 @@ type UserDataTransferGoalGroup struct {
 }
 
 type UserDataTransferGoal struct {
-	Title             string
-	AchievementType   string
-	AchievementParams json.RawMessage
-	Attributes        json.RawMessage
-	InvertValue       bool
-	InvertPercentage  bool
-	SortOrder         uint16
-	CreatedAt         time.Time
+	Title                       string
+	AchievementType             string
+	AchievementParams           json.RawMessage
+	Attributes                  json.RawMessage
+	InvertValue                 bool
+	InvertPercentage            bool
+	GaugeStart                  float64
+	ApplyGaugeStartToPercentage bool
+	SortOrder                   uint16
+	CreatedAt                   time.Time
 }
 
 type UserDataTransferRecordFilter struct {

@@ -104,6 +104,11 @@ const (
 	TheoreticalOverpowerBaseAdd = 2.0
 	TheoreticalOverpowerScale   = 5.0
 	TheoreticalOverpowerBonus   = 5.0
+	// GoalGaugeStartMax は goals.gauge_start（DECIMAL(16,3)）へ格納できる上限です。
+	// 総スコアなど目標種別ごとの上限より十分大きく、列あふれによる500エラーだけを防ぎます。
+	GoalGaugeStartMax = 9_999_999_999_999.999
+	// GoalGaugeStartDecimalScale は OVER POWER 系目標のスタート位置で許可する小数桁数です。
+	GoalGaugeStartDecimalScale = 3
 
 	// レートリミット設定: 外部API v1
 	APIRateLimitRequests       = 150

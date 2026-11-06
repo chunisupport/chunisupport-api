@@ -114,6 +114,39 @@ func TestUserDataTransferRepositoryExportSnapshotIncludesPossessionName(t *testi
 	assert.Equal(t, "rainbow", *exported.Player.PossessionName)
 }
 
+func TestUserDataTransferRepositoryRoundTripsGoalGaugeStart(t *testing.T) {
+	// Given: ゲージのスタート位置を持つ目標を含む移行データ
+	db := newTransferRepositoryTestDB(t)
+	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO achievement_types (id, code) VALUES (8, 'overpower_percent')")
+	require.NoError(t, err)
+	repo := NewUserDataTransferRepository(db)
+	snapshot := emptyTransferRepositorySnapshot(t)
+	snapshot.Goals.Ungrouped = []entity.UserDataTransferGoal{{
+		Title:                       "OP達成率99.8%",
+		AchievementType:             "overpower_percent",
+		AchievementParams:           json.RawMessage(`{"total":99.8}`),
+		Attributes:                  json.RawMessage(`{}`),
+		GaugeStart:                  99.6,
+		ApplyGaugeStartToPercentage: true,
+		SortOrder:                   1,
+		CreatedAt:                   time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+	}}
+
+	// When: 取り込んだ後に書き出す
+	_, err = repo.ImportSnapshot(context.Background(), 1, snapshot)
+	require.NoError(t, err)
+	exported, err := repo.(*userDataTransferRepository).exportSnapshot(context.Background(), db, 1)
+
+	// Then: スタート位置と達成率への適用指定が列の対応を誤らずに保持される
+	require.NoError(t, err)
+	require.Len(t, exported.Goals.Ungrouped, 1)
+	assert.Equal(t, 99.6, exported.Goals.Ungrouped[0].GaugeStart)
+	assert.True(t, exported.Goals.Ungrouped[0].ApplyGaugeStartToPercentage)
+	assert.Equal(t, uint16(1), exported.Goals.Ungrouped[0].SortOrder)
+}
+
 func TestUserDataTransferRepositoryImportSnapshotCreatesUnregisteredHonor(t *testing.T) {
 	db := newTransferRepositoryTestDB(t)
 	_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
@@ -370,7 +403,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 	statements := []string{
 		"CREATE TABLE users (id INTEGER PRIMARY KEY, player_id INTEGER NULL, updated_at DATETIME)",
 		"CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, player_name TEXT, player_level INTEGER, official_player_rating REAL, calculated_player_rating REAL, new_average_rating REAL, best_average_rating REAL, class_emblem_id INTEGER NULL, class_emblem_base_id INTEGER NULL, possession_id INTEGER NOT NULL DEFAULT 1, last_played_at DATETIME NULL, overpower_value REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME NULL, created_at DATETIME, updated_at DATETIME)",
-		"CREATE TABLE goals (id INTEGER PRIMARY KEY, user_id INTEGER, group_id INTEGER, title TEXT, achievement_type_id INTEGER, achievement_params BLOB, attributes BLOB, invert_value INTEGER, invert_percentage INTEGER, sort_order INTEGER, created_at DATETIME)",
+		"CREATE TABLE goals (id INTEGER PRIMARY KEY, user_id INTEGER, group_id INTEGER, title TEXT, achievement_type_id INTEGER, achievement_params BLOB, attributes BLOB, invert_value INTEGER, invert_percentage INTEGER, gauge_start REAL NOT NULL DEFAULT 0, apply_gauge_start_to_percentage INTEGER NOT NULL DEFAULT 0, sort_order INTEGER, created_at DATETIME)",
 		"CREATE TABLE goal_groups (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, sort_order INTEGER, created_at DATETIME)",
 		"CREATE TABLE record_filters (id BLOB PRIMARY KEY, user_id INTEGER, name TEXT, filter_value_gzip BLOB, is_worldsend INTEGER, created_at DATETIME, updated_at DATETIME)",
 		"CREATE TABLE songs (id INTEGER PRIMARY KEY, official_idx TEXT, is_deleted INTEGER)",
