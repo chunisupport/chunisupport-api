@@ -76,6 +76,25 @@ func TestFriendScoreComparisonResponse_Worldsend譜面情報未設定はnullを�
 	assert.JSONEq(t, `{"level_star":null,"attribute":null}`, extractFriendComparisonChartJSON(t, body))
 }
 
+func TestFriendScoreComparisonResponse_読み未設定はnullを返す(t *testing.T) {
+	for _, difficulty := range []string{"MASTER", "WORLD'S END"} {
+		t.Run(difficulty, func(t *testing.T) {
+			// Given: 読みが未設定の比較対象楽曲。
+			result := &usecase.FriendScoreComparisonResult{
+				Difficulty: difficulty,
+				Items:      []usecase.FriendScoreComparisonItem{{}},
+			}
+
+			// When: JSONレスポンスへ変換する。
+			body, err := json.Marshal(toFriendScoreComparisonResponse(result))
+
+			// Then: 未設定の読みを省略せずnullで返す。
+			require.NoError(t, err)
+			assert.Contains(t, string(body), `"reading":null`)
+		})
+	}
+}
+
 func extractFriendComparisonChartJSON(t *testing.T, body []byte) string {
 	t.Helper()
 	var response struct {
@@ -102,7 +121,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 		Friend:     usecase.FriendScoreComparisonUser{Username: "frienduser", PlayerName: "FRIEND"},
 		Summary:    usecase.FriendScoreComparisonSummary{TotalCharts: 1, SelfWins: 1, SelfPlayed: 1, FriendPlayed: 1, BothPlayed: 1},
 		Items: []usecase.FriendScoreComparisonItem{{
-			Song:            usecase.FriendScoreComparisonSong{ID: "0000000000000001", Title: "楽曲名", Artist: "アーティスト名", Jacket: &jacket},
+			Song:            usecase.FriendScoreComparisonSong{ID: "0000000000000001", Title: "楽曲名", Reading: new("ガッキョクメイ"), Artist: "アーティスト名", Jacket: &jacket},
 			Chart:           usecase.FriendScoreComparisonChart{Const: &chartConst, IsConstUnknown: false},
 			Self:            usecase.FriendScoreComparisonRecord{IsPlayed: true, Score: 1009000, ClearLamp: &clearLamp, ComboLamp: &comboLamp, UpdatedAt: &updatedAt},
 			Friend:          usecase.FriendScoreComparisonRecord{IsPlayed: false, Score: 0},
@@ -141,7 +160,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 			"both_unplayed": 0
 		},
 		"items": [{
-			"song": {"id": "0000000000000001", "title": "楽曲名", "artist": "アーティスト名", "jacket": "abcdef0123456789"},
+			"song": {"id": "0000000000000001", "title": "楽曲名", "reading": "ガッキョクメイ", "artist": "アーティスト名", "jacket": "abcdef0123456789"},
 			"chart": {"const": 14.5, "is_const_unknown": false},
 			"self": {"is_played": true, "score": 1009000, "clear_lamp": "CLEAR", "combo_lamp": "FULL COMBO", "full_chain": null, "updated_at": "2026-07-20T10:00:00Z"},
 			"friend": {"is_played": false, "score": 0, "clear_lamp": null, "combo_lamp": null, "full_chain": null, "updated_at": null},

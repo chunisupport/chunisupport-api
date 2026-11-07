@@ -38,10 +38,12 @@ type FriendScoreComparisonRecordDTO struct {
 
 // FriendScoreComparisonSongDTO は比較対象楽曲の公開概要です。
 type FriendScoreComparisonSongDTO struct {
-	ID     string  `json:"id"`
-	Title  string  `json:"title"`
-	Artist string  `json:"artist"`
-	Jacket *string `json:"jacket"`
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	// Reading は楽曲名ソート用の読みです。未設定の場合も null を返します。
+	Reading *string `json:"reading"`
+	Artist  string  `json:"artist"`
+	Jacket  *string `json:"jacket"`
 }
 
 // FriendScoreComparisonChartDTO は比較対象譜面の公開概要です。

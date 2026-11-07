@@ -33,8 +33,10 @@ type FriendScoreComparisonPlay struct {
 
 // FriendScoreComparisonChartRecord は指定難易度の1譜面と比較用レコードです。
 type FriendScoreComparisonChartRecord struct {
-	SongDisplayID  string
-	SongTitle      string
+	SongDisplayID string
+	SongTitle     string
+	// SongReading は楽曲名ソート用の読みです。未設定の場合は nil です。
+	SongReading    *string
 	SongArtist     string
 	SongJacket     *string
 	ChartConst     *chartconstant.ChartConstant

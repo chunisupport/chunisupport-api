@@ -11,6 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildFriendScoreComparisonResult_楽曲の読みを保持する(t *testing.T) {
+	for _, difficulty := range []string{"MASTER", "WORLD'S END"} {
+		for _, reading := range []*string{new("ソラ"), nil} {
+			t.Run(difficulty, func(t *testing.T) {
+				// Given: 読みが設定済みまたは未設定の楽曲。
+				rows := []*repository.FriendScoreComparisonChartRecord{{SongReading: reading}}
+
+				// When: 通常譜面とWORLD'S ENDで共通の比較結果を生成する。
+				result := buildFriendScoreComparisonResult(difficulty, acceptedComparisonPair(101, 102), rows)
+
+				// Then: 読みと未設定状態を変更せず公開概要へ渡す。
+				require.Len(t, result.Items, 1)
+				assert.Equal(t, reading, result.Items[0].Song.Reading)
+			})
+		}
+	}
+}
+
 func TestFriendScoreComparisonUsecase_Get_勝敗と未プレイを正規化する(t *testing.T) {
 	updatedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
 	friendUpdatedAt := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)

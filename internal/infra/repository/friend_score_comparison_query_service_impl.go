@@ -36,6 +36,7 @@ type friendScoreComparisonUserRow struct {
 type friendScoreComparisonChartRow struct {
 	SongDisplayID       string                       `db:"song_display_id"`
 	SongTitle           string                       `db:"song_title"`
+	SongReading         *string                      `db:"song_reading"`
 	SongArtist          string                       `db:"song_artist"`
 	SongJacket          *string                      `db:"song_jacket"`
 	ChartConst          *chartconstant.ChartConstant `db:"chart_const"`
@@ -128,6 +129,7 @@ func (q *FriendScoreComparisonQueryService) ListChartRecords(
 			s.title AS song_title,
 			s.artist AS song_artist,
 			s.jacket AS song_jacket,
+			s.reading AS song_reading,
 			c.const AS chart_const,
 			c.is_const_unknown AS is_const_unknown,
 			NULL AS level_star,
@@ -182,6 +184,7 @@ func (q *FriendScoreComparisonQueryService) ListWorldsendChartRecords(
 			s.title AS song_title,
 			s.artist AS song_artist,
 			s.jacket AS song_jacket,
+			s.reading AS song_reading,
 			NULL AS chart_const,
 			1 AS is_const_unknown,
 			wc.level_star AS level_star,
@@ -237,6 +240,7 @@ func mapFriendScoreComparisonRows(rows []friendScoreComparisonChartRow, operatio
 		records = append(records, &domainrepo.FriendScoreComparisonChartRecord{
 			SongDisplayID:  row.SongDisplayID,
 			SongTitle:      row.SongTitle,
+			SongReading:    row.SongReading,
 			SongArtist:     row.SongArtist,
 			SongJacket:     row.SongJacket,
 			ChartConst:     row.ChartConst,
