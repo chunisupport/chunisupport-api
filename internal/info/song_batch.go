@@ -16,6 +16,9 @@ const (
 	// SongBatchJobHistoryLimit は保持し、管理画面へ返す実行履歴の最大件数です。
 	// 新しいジョブを記録した時点で、これを超えた古いジョブを削除します。
 	SongBatchJobHistoryLimit = 50
+	// SongBatchMainframeConflictReportLimit は、mainframe定数が公式表示レベルと矛盾したときに
+	// エラーへ列挙する譜面の最大件数です。超過分は残件数だけを示します。
+	SongBatchMainframeConflictReportLimit = 20
 	// SongBatchJobFinalizeTimeout は実行結果の記録とロック解放に使う猶予です。
 	// 停止シグナルで実行がキャンセルされた後も、中断を記録できるよう独立したタイムアウトを使います。
 	SongBatchJobFinalizeTimeout = 10 * time.Second
