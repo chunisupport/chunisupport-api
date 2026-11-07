@@ -1,6 +1,8 @@
 package api_v1
 
 import (
+	"encoding/json/jsontext"
+
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	sharedto "github.com/chunisupport/chunisupport-api/internal/dto"
@@ -18,12 +20,13 @@ type V1ChartDTO struct {
 // V1OrderedChartsMap はchartsのキーを特定の順序でJSON出力するためのカスタム型です。
 type V1OrderedChartsMap map[string]*V1ChartDTO
 
-// MarshalJSON はJSONマーシャリング時にchartsのキーを
+// MarshalJSONTo はJSONマーシャリング時にchartsのキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順序で出力します。
 // 譜面が存在しない難易度はnullとして出力されます。
 // mapの標準エンコードでは難易度順にならないため、共通の順序付きマーシャラを使います。
-func (o V1OrderedChartsMap) MarshalJSON() ([]byte, error) {
-	return sharedto.MarshalOrderedCharts(o)
+// 呼び出し元のエンコードオプション（API出力時の時刻のタイムゾーン変換など）を各譜面にも引き継ぐため、MarshalJSONTo で実装します。
+func (o V1OrderedChartsMap) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return sharedto.MarshalOrderedChartsTo(enc, o)
 }
 
 // V1SongDTO は外部API v1 用の楽曲情報DTOです。
