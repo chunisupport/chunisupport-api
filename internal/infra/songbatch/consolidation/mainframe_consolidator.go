@@ -2,17 +2,44 @@ package consolidation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch/difficulty"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/importer"
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/songchart"
 )
+
+// errMainframeOfficialMismatch は mainframe の譜面定数が公式表示レベルと矛盾することを表します。
+// 矛盾は個別譜面の欠落ではなくデータソース全体が古い可能性を示すため、呼び出し側はバッチを失敗させます。
+var errMainframeOfficialMismatch = errors.New("mainframe data is inconsistent with official data")
+
+type mainframeChartMatch struct {
+	SongID        int
+	Title         string
+	OfficialConst float64
+}
+
+type mainframeConstConflict struct {
+	songTitle      string
+	difficulty     string
+	officialLevel  string
+	mainframeConst float64
+}
+
+type mainframeConstUpdate struct {
+	songID     int
+	diffID     int
+	constValue float64
+}
 
 // MainframeConsolidator は mainframe 由来の定数を補完します。
 type MainframeConsolidator struct {
@@ -28,7 +55,8 @@ func NewMainframeConsolidator(workspace *songchart.SongChartWorkspace, data *imp
 	}
 }
 
-// Consolidate は mainframe の譜面情報をワークスペースへ反映します。
+// Consolidate は mainframe の譜面定数をワークスペースへ反映します。
+// 公式表示レベルに収まらない定数が1件でもあれば、一部の譜面だけ更新せずエラーを返します。
 func (c *MainframeConsolidator) Consolidate(ctx context.Context) error {
 	if c.data == nil || len(*c.data) == 0 {
 		slog.Warn("Mainframe data is empty; skipping consolidation")
@@ -40,7 +68,8 @@ func (c *MainframeConsolidator) Consolidate(ctx context.Context) error {
 		return err
 	}
 
-	var updated int
+	updates := make([]mainframeConstUpdate, 0, len(*c.data))
+	var conflicts []mainframeConstConflict
 	for _, chart := range *c.data {
 		title := strings.TrimSpace(chart.Title)
 		genre := strings.TrimSpace(chart.Genre)
@@ -53,22 +82,44 @@ func (c *MainframeConsolidator) Consolidate(ctx context.Context) error {
 			continue
 		}
 
-		normalizedTitle := normalizer(title)
-		normalizedGenre := normalizer(genre)
-		matchKey := fmt.Sprintf("%s|%s|%d", normalizedTitle, normalizedGenre, diffID)
-
-		songID, exists := chartMap[matchKey]
+		matchKey := fmt.Sprintf("%s|%s|%d", normalizer(title), normalizer(genre), diffID)
+		matched, exists := chartMap[matchKey]
 		if !exists {
 			continue
 		}
 
+		if !songbatch.DisplayLevelBandContains(matched.OfficialConst, chart.Const) {
+			conflicts = append(conflicts, mainframeConstConflict{
+				songTitle:      matched.Title,
+				difficulty:     difficultyLabel(diffID),
+				officialLevel:  songbatch.FormatOfficialDisplayLevel(matched.OfficialConst),
+				mainframeConst: chart.Const,
+			})
+			continue
+		}
+
+		updates = append(updates, mainframeConstUpdate{
+			songID:     matched.SongID,
+			diffID:     diffID,
+			constValue: chart.Const,
+		})
+	}
+
+	// 1件でも公式レベルと矛盾する定数があれば、mainframe全体を信用できない。
+	// 範囲内の譜面だけ先に書くと不整合なワークスペースがMySQLへ同期されるため、UPDATEの前に中断する。
+	if len(conflicts) > 0 {
+		return newMainframeOfficialMismatchError(conflicts)
+	}
+
+	var updated int
+	for _, update := range updates {
 		result, err := c.workspace.DB().ExecContext(ctx, `
 UPDATE charts
 SET const = ?, is_const_unknown = 0
 WHERE song_id = ? AND difficulty_id = ?
-`, chart.Const, songID, diffID)
+`, update.constValue, update.songID, update.diffID)
 		if err != nil {
-			return fmt.Errorf("failed to update mainframe chart song_id=%d diff=%d: %w", songID, diffID, err)
+			return fmt.Errorf("failed to update mainframe chart song_id=%d diff=%d: %w", update.songID, update.diffID, err)
 		}
 
 		affected, _ := result.RowsAffected()
@@ -81,15 +132,16 @@ WHERE song_id = ? AND difficulty_id = ?
 	return nil
 }
 
-func (c *MainframeConsolidator) buildChartMap(ctx context.Context) (map[string]int, error) {
+func (c *MainframeConsolidator) buildChartMap(ctx context.Context) (map[string]mainframeChartMatch, error) {
 	var rows []struct {
-		SongID       int    `db:"song_id"`
-		DifficultyID int    `db:"difficulty_id"`
-		Title        string `db:"title"`
-		GenreName    string `db:"genre_name"`
+		SongID       int     `db:"song_id"`
+		DifficultyID int     `db:"difficulty_id"`
+		Title        string  `db:"title"`
+		GenreName    string  `db:"genre_name"`
+		Const        float64 `db:"const"`
 	}
 	query := `
-		SELECT c.song_id, c.difficulty_id, s.title, COALESCE(g.name, '') as genre_name
+		SELECT c.song_id, c.difficulty_id, s.title, COALESCE(g.name, '') as genre_name, c.const
 		FROM charts c
 		INNER JOIN songs s ON c.song_id = s.id
 		LEFT JOIN genres g ON s.genre_id = g.id
@@ -99,15 +151,46 @@ func (c *MainframeConsolidator) buildChartMap(ctx context.Context) (map[string]i
 		return nil, fmt.Errorf("failed to build workspace chart map: %w", err)
 	}
 
-	result := make(map[string]int, len(rows))
+	result := make(map[string]mainframeChartMatch, len(rows))
 	for _, row := range rows {
-		normalizedTitle := normalizer(row.Title)
-		normalizedGenre := normalizer(row.GenreName)
-
-		key := fmt.Sprintf("%s|%s|%d", normalizedTitle, normalizedGenre, row.DifficultyID)
-		result[key] = row.SongID
+		key := fmt.Sprintf("%s|%s|%d", normalizer(row.Title), normalizer(row.GenreName), row.DifficultyID)
+		result[key] = mainframeChartMatch{
+			SongID:        row.SongID,
+			Title:         row.Title,
+			OfficialConst: row.Const,
+		}
 	}
 	return result, nil
+}
+
+func newMainframeOfficialMismatchError(conflicts []mainframeConstConflict) error {
+	limit := min(len(conflicts), info.SongBatchMainframeConflictReportLimit)
+	var b strings.Builder
+	for _, conflict := range conflicts[:limit] {
+		fmt.Fprintf(&b, "\n- %s [%s]: official=%s, mainframe=%.1f",
+			conflict.songTitle, conflict.difficulty, conflict.officialLevel, conflict.mainframeConst)
+	}
+	if remaining := len(conflicts) - limit; remaining > 0 {
+		fmt.Fprintf(&b, "\n- ... and %d more", remaining)
+	}
+	return fmt.Errorf("%w:%s", errMainframeOfficialMismatch, b.String())
+}
+
+func difficultyLabel(id int) string {
+	switch difficulty.ID(id) {
+	case difficulty.Basic:
+		return "BASIC"
+	case difficulty.Advanced:
+		return "ADVANCED"
+	case difficulty.Expert:
+		return "EXPERT"
+	case difficulty.Master:
+		return "MASTER"
+	case difficulty.Ultima:
+		return "ULTIMA"
+	default:
+		return strconv.Itoa(id)
+	}
 }
 
 // normalizer はタイトル文字列を正規化します。

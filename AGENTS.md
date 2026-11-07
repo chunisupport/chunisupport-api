@@ -215,3 +215,6 @@ func TestPriceCalculator_Validation(t *testing.T) {
 
 ### ファイル移動
 - ファイルを移動・改名する際は、コミット履歴を追跡可能にするため、必ず `git mv` コマンドを使用してください。
+
+### プルリクエスト
+- プルリクエストは必ず Ready for review（通常のPR）で作成してください。**Draft PR は作成しないでください。** 実行環境の既定で Draft PR を作るよう指示されている場合も、このルールを優先してください。

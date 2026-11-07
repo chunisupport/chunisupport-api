@@ -667,6 +667,92 @@ func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T)
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
 
+func TestGoalUsecase_CreateKeepsConstFilterMode(t *testing.T) {
+	constMin := 13.7
+	constMax := 14.2
+	tests := []struct {
+		name         string
+		attributes   []byte
+		want         map[string]any
+		wantConstMin *float64
+		wantConstMax *float64
+	}{
+		{
+			name:         "レベル指定を保持し、レベル境界と一致しない範囲もそのまま絞り込みに使う",
+			attributes:   []byte(`{"const":{"min":13.7,"max":14.2},"const_filter_mode":"level"}`),
+			want:         map[string]any{"const": map[string]any{"min": 13.7, "max": 14.2}, "const_filter_mode": "level"},
+			wantConstMin: &constMin,
+			wantConstMax: &constMax,
+		},
+		{
+			name:         "譜面定数指定を保持する",
+			attributes:   []byte(`{"const":{"min":13.7,"max":14.2},"const_filter_mode":"number"}`),
+			want:         map[string]any{"const": map[string]any{"min": 13.7, "max": 14.2}, "const_filter_mode": "number"},
+			wantConstMin: &constMin,
+			wantConstMax: &constMax,
+		},
+		{
+			name:       "譜面定数範囲がなくても入力モードを保持し、定数で絞り込まない",
+			attributes: []byte(`{"const_filter_mode":"level"}`),
+			want:       map[string]any{"const_filter_mode": "level"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   "score_count",
+				AchievementParams: []byte(`{"score":1000000,"count":1}`),
+				Attributes:        tt.attributes,
+			})
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, out.Attributes)
+			assert.Equal(t, tt.wantConstMin, repo.lastFilter.ConstMin)
+			assert.Equal(t, tt.wantConstMax, repo.lastFilter.ConstMax)
+		})
+	}
+}
+
+func TestGoalUsecase_CreateRejectsInvalidConstFilterMode(t *testing.T) {
+	tests := []struct {
+		name       string
+		attributes []byte
+	}{
+		{name: "未定義の値を拒否する", attributes: []byte(`{"const":{"min":14.0,"max":14.4},"const_filter_mode":"LEVEL"}`)},
+		{name: "空文字を拒否する", attributes: []byte(`{"const":{"min":14.0,"max":14.4},"const_filter_mode":""}`)},
+		{name: "nullを拒否する", attributes: []byte(`{"const":{"min":14.0,"max":14.4},"const_filter_mode":null}`)},
+		{name: "数値を拒否する", attributes: []byte(`{"const":{"min":14.0,"max":14.4},"const_filter_mode":1}`)},
+		{name: "配列を拒否する", attributes: []byte(`{"const":{"min":14.0,"max":14.4},"const_filter_mode":["level"]}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			_, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   "score_count",
+				AchievementParams: []byte(`{"score":1000000,"count":1}`),
+				Attributes:        tt.attributes,
+			})
+
+			// Then
+			assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+		})
+	}
+}
+
 func TestGoalUsecase_CreateOverpowerPercentRejectsOver100(t *testing.T) {
 	repo := &stubGoalRepo{}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
@@ -912,6 +998,7 @@ func TestGoalUsecase_CreateRejectsChartAttributesForRainbowCount(t *testing.T) {
 		{name: "難易度を拒否する", attributes: []byte(`{"diff":4}`)},
 		{name: "譜面定数を拒否する", attributes: []byte(`{"const":{"min":1.0,"max":16.0}}`)},
 		{name: "OP対象を拒否する", attributes: []byte(`{"chart_target":"OP_TARGET"}`)},
+		{name: "譜面定数の入力モードを拒否する", attributes: []byte(`{"const_filter_mode":"level"}`)},
 	}
 
 	for _, tt := range tests {
@@ -1439,6 +1526,43 @@ func TestGoalUsecase_Update(t *testing.T) {
 	assert.Equal(t, "updated", out.Title)
 	assert.Equal(t, "score_count", out.AchievementType)
 	assert.True(t, tm.called, "Update は Transactional を経由すべき")
+}
+
+func TestGoalUsecase_UpdateSavesConstFilterMode(t *testing.T) {
+	// Given: 入力モードを持たない既存の Goal
+	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"const":{"min":13.7,"max":14.2}}`)}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When: 入力モード付きの属性で更新する
+	out, err := u.Update(context.Background(), 1, 1, &GoalInput{
+		Title:             "updated",
+		AchievementType:   "score_count",
+		AchievementParams: []byte(`{"score":1000000,"count":1}`),
+		Attributes:        []byte(`{"const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`),
+	})
+
+	// Then: 保存値と返却値の両方に入力モードが含まれる
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"const":{"min":14,"max":14.9},"const_filter_mode":"level"}`, string(repo.goal.Attributes))
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(14), "max": 14.9}, "const_filter_mode": "level"}, out.Attributes)
+}
+
+func TestGoalUsecase_ListReturnsConstFilterModeAsStored(t *testing.T) {
+	// Given: 入力モードを持つ目標と、入力モード追加前に保存した目標
+	repo := &stubGoalRepo{goals: []*entity.Goal{
+		{ID: 1, UserID: 1, Title: "level", AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"const":{"min":14,"max":14.9},"const_filter_mode":"level"}`)},
+		{ID: 2, UserID: 1, Title: "legacy", AchievementTypeID: 2, AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{"const":{"min":13.7,"max":14.2}}`)},
+	}}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When
+	outs, err := u.List(context.Background(), 1)
+
+	// Then: 入力モードは保存値のまま返し、未設定の目標には補完しない
+	require.NoError(t, err)
+	require.Len(t, outs, 2)
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": float64(14), "max": 14.9}, "const_filter_mode": "level"}, outs[0].Attributes)
+	assert.Equal(t, map[string]any{"const": map[string]any{"min": 13.7, "max": 14.2}}, outs[1].Attributes)
 }
 
 func TestGoalUsecase_UpdateReturnsNotFoundWhenGoalMissing(t *testing.T) {

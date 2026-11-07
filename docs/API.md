@@ -1909,7 +1909,7 @@ curl -X POST \
 
 1. **本枠の判定**:
    - 登録時は公式 `best` と `new` だけを集計し、候補枠を含めません
-   - 日次バッチでは現行版プレイヤーの正常な公式本枠を保持します
+   - 日次バッチでは現行版プレイヤーの正常な公式本枠を保持します。最終プレイ日時が現行バージョン稼働日のJST 07:00以降であるプレイヤーを現行版として扱います
    - 旧版プレイヤーと、対象となる通常譜面の記録があるのに `best` / `new` 本枠が両方とも空、または本枠の件数・`slot_order` が不正な現行版プレイヤーは、最新マスタと対象となる通常譜面のスコアから枠を再構築します
    - 候補枠だけが不正な現行版プレイヤーは公式本枠を保持し、枠を再構築しません
    - 不正な本枠からの再構築は再計算失敗にせず、再構築した本枠からレーティング3値とOVER POWERを更新します。推定した枠は次回のプレイヤーデータ登録で公式枠に置き換わります
@@ -2593,7 +2593,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `remaining` | `integer \| null` | null または 0〜対象楽曲数 | 動的上限から差し引く残り楽曲数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
 
-`attributes`は`genre`、`ver`、`name_folder`のみ指定できます。`diff`、`const`、`chart_target`は指定できません。削除済み楽曲とBASIC〜MASTERのいずれかが存在しない楽曲は、対象楽曲数から除外します。固定`count`で保存済みの目標は、後から対象楽曲数が減少しても自動補正しません。
+`attributes`は`genre`、`ver`、`name_folder`のみ指定できます。`diff`、`const`、`const_filter_mode`、`chart_target`は指定できません。削除済み楽曲とBASIC〜MASTERのいずれかが存在しない楽曲は、対象楽曲数から除外します。固定`count`で保存済みの目標は、後から対象楽曲数が減少しても自動補正しません。
 
 #### `total_score`
 
@@ -2635,12 +2635,13 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 対象譜面の絞り込み条件です。省略したフィールドは条件なし（全譜面対象）とみなします。空オブジェクト `{}` は全譜面が対象です。
 
-**許可キーは `diff` / `chart_target` / `const` / `genre` / `ver` / `name_folder` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
+**許可キーは `diff` / `chart_target` / `const` / `const_filter_mode` / `genre` / `ver` / `name_folder` のみ**です。未知キーは `goal_invalid_attributes` エラーになります。
 
 ```json
 {
   "chart_target": "OP_TARGET",
   "const": { "min": 14.0, "max": 14.4 },
+  "const_filter_mode": "level",
   "genre": [1, 2],
   "ver": [20, 21],
   "name_folder": ["A", "KA"]
@@ -2652,6 +2653,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `diff` | `integer \| integer[]` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。単一値または配列で指定可能。省略時は全難易度対象 |
 | `chart_target` | `"OP_TARGET"` | 任意 | 曲ごとの理論OVER POWER対象譜面のみを対象にする。`diff` との同時指定は不可 |
 | `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 16.0`。省略時は定数条件なし |
+| `const_filter_mode` | `"level" \| "number"` | 任意 | `const` の入力方法。`level` はレベル指定、`number` は譜面定数指定。クライアントが再編集時に入力方法を復元するための値で、対象譜面の絞り込み・進捗計算には使わず、常に `const` の `min`/`max` を使います。省略時は `number` として扱い、APIは補完しません。`rainbow_count` では指定不可 |
 | `genre` | `integer \| integer[]` | 任意 | ジャンルマスタID。単一値または配列で指定可能。省略時は全ジャンル対象 |
 | `ver` | `integer \| integer[]` | 任意 | バージョンマスタID。単一値または配列で指定可能。省略時は全バージョン対象 |
 | `name_folder` | `string \| string[]` | 任意 | 楽曲名順フォルダのコード（マスタデータの `name_folders[].code`）。単一値または配列で指定可能。省略時は全楽曲名順対象 |
@@ -2672,6 +2674,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - `name_folder` は楽曲名順フォルダマスタに存在するコードのみ許可（完全一致）。存在しないコードや数値は `goal_invalid_attributes` エラー。
 - `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
 - `chart_target` は `"OP_TARGET"` のみ許可。`diff` と同時指定した場合は `goal_invalid_attributes` エラー。
+- `const_filter_mode` は `"level"` / `"number"` の文字列のみ許可。それ以外の値や `null`・数値などの型は `goal_invalid_attributes` エラー。`const` の範囲がレベル境界と一致するかは検証しません。
 
 **配列入力の正規化**:
 - `diff` / `genre` / `ver` は単一値（例: `"diff": 4`）と配列（例: `"diff": [3, 4]`）の両方を受け付けます。
@@ -2691,7 +2694,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const_filter_mode` は `"level"` / `"number"` のみ許可。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **`gauge_start`**: `achievement_type` ごとの範囲と小数桁数を検証。`0` の場合と `avg_score` の場合は `apply_gauge_start_to_percentage` を `false` に正規化
 6. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証

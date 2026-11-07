@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,14 @@ type orderedChartMixed struct {
 	Bad   chan int `json:"bad,omitempty"`
 }
 
-func TestMarshalOrderedCharts(t *testing.T) {
+// orderedChartsForTest は MarshalOrderedChartsTo を json.Marshal から呼び出すためのテスト用マップです。
+type orderedChartsForTest[T any] map[string]*T
+
+func (o orderedChartsForTest[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return MarshalOrderedChartsTo(enc, o)
+}
+
+func TestMarshalOrderedChartsTo(t *testing.T) {
 	tests := []struct {
 		name string
 		// Given: 順不同で入れた譜面マップ
@@ -49,7 +57,7 @@ func TestMarshalOrderedCharts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// When
-			got, err := MarshalOrderedCharts(tt.charts)
+			got, err := json.Marshal(orderedChartsForTest[orderedChartSample](tt.charts))
 
 			// Then
 			require.NoError(t, err)
@@ -58,7 +66,7 @@ func TestMarshalOrderedCharts(t *testing.T) {
 	}
 }
 
-func TestMarshalOrderedCharts_エスケープはjsonMarshalと一致する(t *testing.T) {
+func TestMarshalOrderedChartsTo_エスケープはjsonMarshalと一致する(t *testing.T) {
 	// Given: encoding/json がエスケープする文字を含む値と、順序外のキー
 	value := &orderedChartSample{Name: "A \"B\" <C> & D\\\n\u2028譜面"}
 	encoded, err := json.Marshal(value)
@@ -69,7 +77,7 @@ func TestMarshalOrderedCharts_エスケープはjsonMarshalと一致する(t *te
 	}
 
 	// When
-	got, err := MarshalOrderedCharts(charts)
+	got, err := json.Marshal(orderedChartsForTest[orderedChartSample](charts))
 
 	// Then
 	require.NoError(t, err)
@@ -78,7 +86,7 @@ func TestMarshalOrderedCharts_エスケープはjsonMarshalと一致する(t *te
 	assert.NotContains(t, string(got), "NOPE")
 }
 
-func TestMarshalOrderedCharts_値のエンコード失敗は部分結果を返さない(t *testing.T) {
+func TestMarshalOrderedChartsTo_値のエンコード失敗は部分結果を返さない(t *testing.T) {
 	// Given: 先頭の難易度はエンコードでき、後続で失敗する
 	charts := map[string]*orderedChartMixed{
 		"BASIC":  {Label: "ok"},
@@ -86,7 +94,7 @@ func TestMarshalOrderedCharts_値のエンコード失敗は部分結果を返�
 	}
 
 	// When
-	got, err := MarshalOrderedCharts(charts)
+	got, err := json.Marshal(orderedChartsForTest[orderedChartMixed](charts))
 
 	// Then
 	assert.Nil(t, got)

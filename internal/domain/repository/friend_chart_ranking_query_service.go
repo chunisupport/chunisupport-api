@@ -2,39 +2,21 @@ package repository
 
 import (
 	"context"
-	"time"
-
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 )
 
 // FriendChartRankingChart はフレンドランキング対象の譜面情報です（通常 / WORLD'S END）。
+// 共通項目に加え、譜面IDと難易度IDを持ちます。
 type FriendChartRankingChart struct {
-	SongDisplayID   string
-	SongTitle       string
-	SongArtist      string
-	Difficulty      string
-	Const           *chartconstant.ChartConstant
-	IsConstUnknown  bool
-	LevelStar       *int
-	Attribute       *string
+	ChartRankingChart
 	ChartID         int
 	ChartDifficulty int
-	IsWorldsend     bool
 }
 
 // FriendChartRankingRecord は譜面単位フレンドランキングの1件です。
+// 共通項目に加え、自分の判定に使うユーザーIDを持ちます。
 type FriendChartRankingRecord struct {
-	UserID           int
-	Username         string
-	PlayerName       string
-	Score            uint32
-	Rating           float64
-	Overpower        float64
-	OverpowerPercent float64
-	ClearLamp        string
-	ComboLamp        string
-	FullChain        string
-	UpdatedAt        time.Time
+	ChartRankingRecord
+	UserID int
 }
 
 // FriendChartRankingQueryService は譜面単位フレンドランキングの読み取りを扱います。

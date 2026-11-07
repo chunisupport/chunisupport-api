@@ -509,7 +509,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `remaining` は整数、`remaining >= 0`
 - `percent` は数値、`0 <= percent <= 100`
 - 動的上限は譜面数ではなく対象楽曲数です
-- `rainbow_count` では `diff` / `const` / `chart_target` を指定できません
+- `rainbow_count` では `diff` / `const` / `const_filter_mode` / `chart_target` を指定できません
 
 ## 8. `attributes` 仕様
 
@@ -518,6 +518,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 - `diff`
 - `const`
+- `const_filter_mode`
 - `genre`
 - `ver`
 - `name_folder`
@@ -667,6 +668,36 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
   }
 }
 ```
+
+### 8.5.1 `const_filter_mode`
+
+`const` をどの方法で入力したかを表します。クライアントが再編集時に入力方法を復元するための値です。
+
+入力形状:
+
+```json
+{
+  "const": {
+    "min": 14.0,
+    "max": 14.9
+  },
+  "const_filter_mode": "level"
+}
+```
+
+条件:
+
+- `"level"`（レベル指定）または `"number"`（譜面定数指定）の文字列のみ可
+- `null`、空文字、その他の文字列・型は不可
+- `rainbow_count` では指定不可
+- `const` を省略しても指定できます
+- `const` の範囲がレベル境界と一致するかは検証しません
+
+扱い:
+
+- 対象譜面の絞り込みと動的上限の計算には使いません。常に `const.min` / `const.max` を使います
+- 指定した値をそのまま保存・返却します
+- 省略時は `"number"` として扱います。APIは返却時に補完しないため、入力モード追加前に保存した目標には含まれません
 
 ### 8.6 `name_folder`
 
@@ -865,6 +896,7 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 - `created_at` は常に文字列で返り、UNIX時刻ではありません。
 - `achievement_params` は型安全DTOではなく object 扱いなので、`achievement_type` を見て解釈を切り替える必要があります。
 - `achievement_params` の `count` / `total` は、種別によって省略または `null` の可能性があります。また `remaining` / `percent` が代わりに指定されている場合もあります。受信側は欠落・`null` を許容してください。
+- `attributes.const_filter_mode` は入力方法の復元用で、サーバー側の評価条件には使われていません。省略されている場合は `"number"` として扱ってください。
 - `invert_value` と `invert_percentage` はサーバー側で評価条件に使われていません。それぞれ独立して保存・返却される表示用フラグです。
 - `gauge_start` と `apply_gauge_start_to_percentage` も表示専用で、サーバー側の評価条件には使われていません。`gauge_start` が目標値以上になった目標も一覧ではそのまま返ります。
 
@@ -897,6 +929,8 @@ type GoalAttributes = {
     min: number;
     max: number;
   };
+  /** const の入力方法。省略時は 'number' として扱う */
+  const_filter_mode?: 'level' | 'number';
   genre?: number | number[];
   ver?: number | number[];
   /** 楽曲名順フォルダのコード（マスタの name_folders[].code） */

@@ -396,6 +396,18 @@ func TestPlayerDataRecalculationBatchUsecase_バージョン開始時刻で現�
 			lastPlayedAt:         time.Date(2026, 7, 1, 7, 0, 0, 0, jst),
 			wantCurrentPreserved: 1,
 		},
+		// DBからはloc=UTCで読み出されるため、本番と同じUTC表現でも境界を確認します。
+		{
+			name:               "UTCで読み出した開始直前は旧版",
+			lastPlayedAt:       time.Date(2026, 6, 30, 21, 59, 59, 0, time.UTC),
+			wantLegacyRebuilt:  1,
+			wantSlotsUnchanged: 1,
+		},
+		{
+			name:                 "UTCで読み出した開始時刻は現行",
+			lastPlayedAt:         time.Date(2026, 6, 30, 22, 0, 0, 0, time.UTC),
+			wantCurrentPreserved: 1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -253,7 +253,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 }
 ```
 
-各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、ゲージのスタート位置（`gauge_start`）と達成率への適用指定（`apply_gauge_start_to_percentage`）、表示順、作成日時を格納する。`gauge_start` と `apply_gauge_start_to_percentage` は後から追加した項目のため、含まないファイルは `0` と `false` として読み込む。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。`name_folder`は環境に依存しない楽曲名順フォルダのコードのため、変換せずそのまま格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。`rating_count` も移行先の最新マスタから到達可能譜面数を再計算するため、移行元と分母が異なる場合があり、0件または `count` / `remaining` 超過となる目標はインポートを拒否する。目標IDと目標グループIDは移行先で新規採番する。
+各目標にはタイトル、achievement typeコード、`achievement_params`、`attributes`、反転指定、ゲージのスタート位置（`gauge_start`）と達成率への適用指定（`apply_gauge_start_to_percentage`）、表示順、作成日時を格納する。`gauge_start` と `apply_gauge_start_to_percentage` は後から追加した項目のため、含まないファイルは `0` と `false` として読み込む。`attributes`の`diff`、`genre`、`ver`は、それぞれ難易度名、ジャンル名、バージョン名へ変換して格納する。`name_folder`は環境に依存しない楽曲名順フォルダのコードのため、変換せずそのまま格納する。`const`と`const_filter_mode`も環境に依存しないため、変換せずそのまま格納する。インポート時に移行先の内部IDへ戻し、既存の目標入力検証および動的上限検証を適用する。`rating_count` も移行先の最新マスタから到達可能譜面数を再計算するため、移行元と分母が異なる場合があり、0件または `count` / `remaining` 超過となる目標はインポートを拒否する。目標IDと目標グループIDは移行先で新規採番する。
 
 ### 7.9 保存済みフィルタ
 
