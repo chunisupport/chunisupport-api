@@ -170,6 +170,52 @@ func TestFriendScoreComparisonQueryService_ListWorldsendChartRecords_有効譜�
 	assert.Equal(t, uint32(1007500), records[2].Friend.Score)
 }
 
+func TestFriendScoreComparisonQueryService_通常とWorldsendの楽曲の読みを返す(t *testing.T) {
+	for _, worldsend := range []bool{false, true} {
+		t.Run(map[bool]string{false: "通常", true: "WORLD'S END"}[worldsend], func(t *testing.T) {
+			// Given: 読みあり・なしの楽曲と譜面。
+			db := setupTestDB(t)
+			defer db.Close()
+			setupFriendScoreComparisonDB(t, db)
+			insertFriendScoreComparisonCharts(t, db)
+			_, err := db.Exec(`
+				UPDATE songs SET reading = 'ソラ' WHERE id = 30;
+				CREATE TABLE worldsend_charts (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL, level_star INTEGER, attribute TEXT);
+				CREATE TABLE player_worldsend_records (
+					player_id INTEGER NOT NULL, worldsend_chart_id INTEGER NOT NULL, score INTEGER NOT NULL,
+					clear_lamp_id INTEGER NOT NULL, combo_lamp_id INTEGER NOT NULL, full_chain_id INTEGER NOT NULL,
+					updated_at DATETIME NOT NULL
+				);
+			`)
+			require.NoError(t, err)
+			query := NewFriendScoreComparisonQueryService(db)
+
+			// When: 対象の譜面種別の比較データを取得する。
+			if worldsend {
+				_, err = db.Exec(`
+					UPDATE songs SET is_worldsend = 1 WHERE id IN (10, 30);
+					INSERT INTO worldsend_charts (id, song_id, level_star, attribute) VALUES (10, 10, 3, '光'), (30, 30, 4, '蔵');
+				`)
+				require.NoError(t, err)
+			}
+			records, err := query.ListChartRecords(context.Background(), 101, 102, "MASTER")
+			if worldsend {
+				records, err = query.ListWorldsendChartRecords(context.Background(), 101, 102)
+			}
+
+			// Then: 設定済みの読みとNULLを保持する。
+			require.NoError(t, err)
+			readings := make(map[string]*string, len(records))
+			for _, record := range records {
+				readings[record.SongDisplayID] = record.SongReading
+			}
+			assert.Equal(t, new("ソラ"), readings["0000000000000001"])
+			assert.Contains(t, readings, "0000000000000009")
+			assert.Nil(t, readings["0000000000000009"])
+		})
+	}
+}
+
 func setupFriendScoreComparisonDB(t *testing.T, db *sqlx.DB) {
 	t.Helper()
 	_, err := db.Exec(`

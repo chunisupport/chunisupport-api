@@ -24,9 +24,11 @@ type FriendScoreComparisonUser struct {
 
 // FriendScoreComparisonSong は比較対象楽曲の公開概要です。
 type FriendScoreComparisonSong struct {
-	ID     string
-	Title  string
-	Artist string
+	ID    string
+	Title string
+	// Reading は楽曲名ソート用の読みです。未設定の場合は nil です。
+	Reading *string
+	Artist  string
 	// Jacket はジャケット画像IDです。未登録の場合は nil です。
 	Jacket *string
 }
@@ -160,10 +162,11 @@ func buildFriendScoreComparisonResult(difficulty string, pair *repository.Friend
 		accumulateComparisonSummary(&result.Summary, selfRecord.IsPlayed, friendRecord.IsPlayed, comparisonResult)
 		result.Items = append(result.Items, FriendScoreComparisonItem{
 			Song: FriendScoreComparisonSong{
-				ID:     row.SongDisplayID,
-				Title:  row.SongTitle,
-				Artist: row.SongArtist,
-				Jacket: row.SongJacket,
+				ID:      row.SongDisplayID,
+				Title:   row.SongTitle,
+				Reading: row.SongReading,
+				Artist:  row.SongArtist,
+				Jacket:  row.SongJacket,
 			},
 			Chart: FriendScoreComparisonChart{
 				Const:          row.ChartConst,
