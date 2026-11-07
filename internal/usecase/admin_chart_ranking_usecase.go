@@ -2,47 +2,17 @@ package usecase
 
 import (
 	"context"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/service"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
-type AdminChartRankingSong struct {
-	ID     string
-	Title  string
-	Artist string
-}
-
-type AdminChartRankingChart struct {
-	Difficulty     string
-	Const          *chartconstant.ChartConstant
-	IsConstUnknown bool
-	LevelStar      *int
-	Attribute      *string
-	IsWorldsend    bool
-}
-
-type AdminChartRankingEntry struct {
-	Rank             int
-	Username         string
-	PlayerName       string
-	Score            uint32
-	Rating           float64
-	Overpower        float64
-	OverpowerPercent float64
-	ClearLamp        *string
-	ComboLamp        *string
-	FullChain        *string
-	UpdatedAt        time.Time
-}
-
+// AdminChartRankingResult は管理用の譜面単位ランキングの取得結果です。
+// Total は上位件数に絞る前の全プレイ人数です。
 type AdminChartRankingResult struct {
-	Song    AdminChartRankingSong
-	Chart   AdminChartRankingChart
-	Ranking []AdminChartRankingEntry
+	Song    ChartRankingSong
+	Chart   ChartRankingChart
+	Ranking []ChartRankingEntry
 	Total   int
 }
 
@@ -84,55 +54,16 @@ func (u *adminChartRankingUsecase) GetWorldsend(ctx context.Context, displayID s
 }
 
 func buildAdminChartRankingResult(data *repository.AdminChartRankingData) *AdminChartRankingResult {
-	chart := data.Chart
 	result := &AdminChartRankingResult{
-		Song: AdminChartRankingSong{
-			ID:     chart.SongDisplayID,
-			Title:  chart.SongTitle,
-			Artist: chart.SongArtist,
-		},
-		Chart: AdminChartRankingChart{
-			Difficulty:     chart.Difficulty,
-			Const:          chart.Const,
-			IsConstUnknown: chart.IsConstUnknown,
-			LevelStar:      chart.LevelStar,
-			Attribute:      chart.Attribute,
-			IsWorldsend:    chart.IsWorldsend,
-		},
-		Ranking: make([]AdminChartRankingEntry, 0, len(data.Records)),
+		Song:    newChartRankingSong(data.Chart),
+		Chart:   newChartRankingChart(data.Chart),
+		Ranking: make([]ChartRankingEntry, 0, len(data.Records)),
 		Total:   data.Total,
 	}
 
-	previousScore := uint32(0)
-	currentRank := 0
-	for i, row := range data.Records {
-		if i == 0 || row.Score != previousScore {
-			currentRank = i + 1
-			previousScore = row.Score
-		}
-
-		rating := 0.0
-		overpower := 0.0
-		overpowerPercent := 0.0
-		if !chart.IsWorldsend && chart.Const != nil {
-			rating = service.CalcSingleRating(row.Score, chart.Const.Float64())
-			overpower = service.CalcSingleOverpower(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))
-			overpowerPercent = service.CalcSingleOverpowerPercent(row.Score, chart.Const.Float64(), comboLampID(row.ComboLamp))
-		}
-
-		result.Ranking = append(result.Ranking, AdminChartRankingEntry{
-			Rank:             currentRank,
-			Username:         row.Username,
-			PlayerName:       row.PlayerName,
-			Score:            row.Score,
-			Rating:           rating,
-			Overpower:        overpower,
-			OverpowerPercent: overpowerPercent,
-			ClearLamp:        rankingLampNamePtr(row.ClearLamp),
-			ComboLamp:        rankingLampNamePtr(row.ComboLamp),
-			FullChain:        rankingLampNamePtr(row.FullChain),
-			UpdatedAt:        row.UpdatedAt,
-		})
+	var ranker scoreRanker
+	for _, record := range data.Records {
+		result.Ranking = append(result.Ranking, newChartRankingEntry(result.Chart, ranker.Next(record.Score), record))
 	}
 
 	return result

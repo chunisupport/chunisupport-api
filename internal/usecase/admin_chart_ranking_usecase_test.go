@@ -18,14 +18,14 @@ func TestAdminChartRankingUsecase_GetStandard_上位レコードと全プレイ�
 	updatedAt := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	query := &adminChartRankingQueryMock{
 		standardData: &repository.AdminChartRankingData{
-			Chart: &repository.AdminChartRankingChart{
+			Chart: &repository.ChartRankingChart{
 				SongDisplayID: "0000000000000001",
 				SongTitle:     "楽曲名",
 				SongArtist:    "アーティスト",
 				Difficulty:    "MASTER",
 				Const:         &chartConst,
 			},
-			Records: []*repository.AdminChartRankingRecord{
+			Records: []*repository.ChartRankingRecord{
 				{Username: "user1", PlayerName: "PLAYER1", Score: 1_009_500, ComboLamp: "ALL JUSTICE", UpdatedAt: updatedAt},
 				{Username: "user2", PlayerName: "PLAYER2", Score: 1_009_500, ComboLamp: "FULL COMBO", UpdatedAt: updatedAt},
 				{Username: "user3", PlayerName: "PLAYER3", Score: 1_009_000, ComboLamp: "NONE", UpdatedAt: updatedAt},
@@ -54,7 +54,7 @@ func TestAdminChartRankingUsecase_GetWorldsend_WORLD送信固有情報を返す(
 	attribute := "狂"
 	query := &adminChartRankingQueryMock{
 		worldsendData: &repository.AdminChartRankingData{
-			Chart: &repository.AdminChartRankingChart{
+			Chart: &repository.ChartRankingChart{
 				SongDisplayID:  "0000000000000002",
 				SongTitle:      "WE楽曲名",
 				SongArtist:     "WEアーティスト",
@@ -64,7 +64,7 @@ func TestAdminChartRankingUsecase_GetWorldsend_WORLD送信固有情報を返す(
 				IsConstUnknown: true,
 				IsWorldsend:    true,
 			},
-			Records: []*repository.AdminChartRankingRecord{{Username: "user1", Score: 1_010_000}},
+			Records: []*repository.ChartRankingRecord{{Username: "user1", Score: 1_010_000}},
 			Total:   1,
 		},
 	}

@@ -166,7 +166,7 @@ const worldsendAdminChartRankingListQuery = `
 		LIMIT ?
 	`
 
-func listAdminChartRankingRecords(ctx context.Context, db *sqlx.DB, countQuery string, listQuery string, chartID int, limit int) ([]*domainrepo.AdminChartRankingRecord, int, error) {
+func listAdminChartRankingRecords(ctx context.Context, db *sqlx.DB, countQuery string, listQuery string, chartID int, limit int) ([]*domainrepo.ChartRankingRecord, int, error) {
 	var total int
 	if err := db.GetContext(ctx, &total, countQuery, chartID); err != nil {
 		return nil, 0, wrapAdminChartRankingQueryError("count records", err)
@@ -177,9 +177,9 @@ func listAdminChartRankingRecords(ctx context.Context, db *sqlx.DB, countQuery s
 		return nil, 0, wrapAdminChartRankingQueryError("list records", err)
 	}
 
-	records := make([]*domainrepo.AdminChartRankingRecord, 0, len(rows))
+	records := make([]*domainrepo.ChartRankingRecord, 0, len(rows))
 	for _, row := range rows {
-		records = append(records, &domainrepo.AdminChartRankingRecord{
+		records = append(records, &domainrepo.ChartRankingRecord{
 			Username:   row.Username,
 			PlayerName: row.PlayerName,
 			Score:      uint32(row.Score),
@@ -193,8 +193,8 @@ func listAdminChartRankingRecords(ctx context.Context, db *sqlx.DB, countQuery s
 	return records, total, nil
 }
 
-func toAdminChartRankingChart(row adminChartRankingChartRow) *domainrepo.AdminChartRankingChart {
-	return &domainrepo.AdminChartRankingChart{
+func toAdminChartRankingChart(row adminChartRankingChartRow) *domainrepo.ChartRankingChart {
+	return &domainrepo.ChartRankingChart{
 		SongDisplayID:  row.SongDisplayID,
 		SongTitle:      row.SongTitle,
 		SongArtist:     row.SongArtist,

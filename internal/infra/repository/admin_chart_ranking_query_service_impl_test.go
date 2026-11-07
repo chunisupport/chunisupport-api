@@ -98,7 +98,7 @@ func insertAdminChartRankingBoundaryFixtures(t *testing.T, db *sqlx.DB) {
 	}
 }
 
-func usernamesFromAdminChartRankingRecords(records []*domainrepo.AdminChartRankingRecord) []string {
+func usernamesFromAdminChartRankingRecords(records []*domainrepo.ChartRankingRecord) []string {
 	usernames := make([]string, 0, len(records))
 	for _, record := range records {
 		usernames = append(usernames, record.Username)

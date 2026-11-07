@@ -61,8 +61,8 @@ func TestAdminChartRankingHandler_不正なパスパラメータはHTTP422を返
 func TestAdminChartRankingResponse_管理者向け項目だけを返す(t *testing.T) {
 	// Given
 	result := &usecase.AdminChartRankingResult{
-		Chart: usecase.AdminChartRankingChart{Difficulty: "MASTER"},
-		Ranking: []usecase.AdminChartRankingEntry{{
+		Chart: usecase.ChartRankingChart{Difficulty: "MASTER"},
+		Ranking: []usecase.ChartRankingEntry{{
 			Rank:       1,
 			Username:   "ranking-user",
 			PlayerName: "PLAYER",
@@ -86,8 +86,8 @@ func TestAdminChartRankingResponse_管理者向け項目だけを返す(t *testi
 func TestAdminChartRankingResponse_WORLD送信ではレート項目を返さない(t *testing.T) {
 	// Given
 	result := &usecase.AdminChartRankingResult{
-		Chart:   usecase.AdminChartRankingChart{Difficulty: "WORLD'S END", IsWorldsend: true},
-		Ranking: []usecase.AdminChartRankingEntry{{Rank: 1, Username: "ranking-user", Score: 1_010_000}},
+		Chart:   usecase.ChartRankingChart{Difficulty: "WORLD'S END", IsWorldsend: true},
+		Ranking: []usecase.ChartRankingEntry{{Rank: 1, Username: "ranking-user", Score: 1_010_000}},
 		Total:   1,
 	}
 

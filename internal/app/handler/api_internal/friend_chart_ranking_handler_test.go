@@ -47,7 +47,7 @@ func (stubFriendChartRankingUsecase) GetWorldsend(context.Context, int, string) 
 
 func TestFriendChartRankingResponse_WorldsendOmitsChartConst(t *testing.T) {
 	result := &usecase.FriendChartRankingResult{
-		Chart: usecase.FriendChartRankingChart{Difficulty: "WORLD'S END", IsWorldsend: true},
+		Chart: usecase.ChartRankingChart{Difficulty: "WORLD'S END", IsWorldsend: true},
 	}
 
 	body, err := json.Marshal(toFriendChartRankingResponse(result))
@@ -59,7 +59,7 @@ func TestFriendChartRankingResponse_WorldsendOmitsChartConst(t *testing.T) {
 func TestFriendChartRankingResponse_内部ユーザーIDを公開しない(t *testing.T) {
 	// Given
 	result := &usecase.FriendChartRankingResult{
-		Chart: usecase.FriendChartRankingChart{Difficulty: "MASTER"},
+		Chart: usecase.ChartRankingChart{Difficulty: "MASTER"},
 		Ranking: []usecase.FriendChartRankingEntry{{
 			UserID:   123,
 			Username: "frienduser",
