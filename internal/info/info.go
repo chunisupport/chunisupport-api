@@ -42,6 +42,8 @@ const (
 	ChartConstMin                               = constants.ChartConstMin
 	ChartConstMax                               = constants.ChartConstMax
 	GoalChartTargetOP                           = "OP_TARGET"
+	GoalConstFilterModeLevel                    = "level"
+	GoalConstFilterModeNumber                   = "number"
 	RainbowRequiredDifficultyMinID              = 1
 	RainbowRequiredDifficultyMaxID              = 4
 	RainbowRequiredDifficultyCount              = 4
