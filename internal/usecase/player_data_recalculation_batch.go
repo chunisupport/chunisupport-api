@@ -103,7 +103,8 @@ func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (Play
 			var lastPlayedAt *time.Time
 			status, processErr := u.repository.ProcessPlayer(ctx, key, func(data repository.PlayerBatchData) (repository.PlayerBatchUpdate, error) {
 				lastPlayedAt = data.LastPlayedAt
-				isCurrent = data.LastPlayedAt != nil && !databaseWallClockInJST(*data.LastPlayedAt, prepared.versionStartedAt.Location()).Before(prepared.versionStartedAt)
+				// last_played_at はUTCで保存された時点なので、壁時計を読み替えずに時点同士で比較します。
+				isCurrent = data.LastPlayedAt != nil && !data.LastPlayedAt.Before(prepared.versionStartedAt)
 				update, broken, err := prepared.buildUpdate(data, isCurrent)
 				currentBroken = broken
 				slotsUnchanged = (!isCurrent || broken) && len(update.ClearChartIDs) == 0 && len(update.Assignments) == 0
@@ -386,10 +387,6 @@ func (p preparedBatchSnapshot) diffSlots(records []repository.PlayerBatchRecord,
 
 func databaseDateInLocation(value time.Time, location *time.Location) time.Time {
 	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, location)
-}
-
-func databaseWallClockInJST(value time.Time, jst *time.Location) time.Time {
-	return time.Date(value.Year(), value.Month(), value.Day(), value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), jst)
 }
 
 func playerRebuildReason(current, currentBroken bool, lastPlayedAt *time.Time) string {
