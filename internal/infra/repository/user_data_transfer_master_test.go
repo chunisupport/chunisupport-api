@@ -165,3 +165,22 @@ func TestCalculateTransferDerivedMetrics_通常譜面未解禁の楽曲はULTIMA
 
 	assert.Equal(t, want, got)
 }
+
+func TestTransferGoalAttributesKeepsConstFilterMode(t *testing.T) {
+	// Given: 譜面定数の入力モードを持つ目標属性
+	masters := &transferMasterData{
+		difficultyIDs:   map[string]int{"MASTER": 4},
+		difficultyNames: map[int]string{4: "MASTER"},
+	}
+	internal := json.RawMessage(`{"diff":4,"const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`)
+
+	// When: 移行ファイル形式へ変換して戻す
+	external, err := masters.externalizeGoalAttributes(internal)
+	require.NoError(t, err)
+	restored, err := masters.internalizeGoalAttributes(external)
+	require.NoError(t, err)
+
+	// Then: 入力モードは変換せずに維持される
+	assert.JSONEq(t, `{"diff":"MASTER","const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`, string(external))
+	assert.JSONEq(t, string(internal), string(restored))
+}

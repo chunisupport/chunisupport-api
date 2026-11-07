@@ -368,7 +368,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - `Title` はtrim後に1文字以上30文字（ルーン単位）以内。制御文字を含まない
 - `AchievementTypeID` は `achievement_types` テーブルに存在するIDであること（DBの外部キー制約が最終防衛）
 - `AchievementParams` は `AchievementType` に対応する構造のJSON
-- `Attributes` は許可キー（`diff`, `chart_target`, `const`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
+- `Attributes` は許可キー（`diff`, `chart_target`, `const`, `const_filter_mode`, `genre`, `ver`）のみを含むJSON。空オブジェクト `{}` は許可
 - 同一ユーザー・同一グループ（未分類を含む）の `SortOrder` は1から所属目標件数までの連番。作成・削除・移動・並び替え時にユーザー行ロック下で更新する
 - 1ユーザーあたり最大300件（`GoalMaxPerUser` 定数で管理）
 
@@ -385,6 +385,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | `diff` | `integer` | 難易度ID（`difficulties.id` と同値、1〜5）。IDの数値は順序を表すが、`genre`/`ver` とは異なり固定序列 |
 | `chart_target` | `string` | `"OP_TARGET"` の場合、曲ごとの理論OVER POWER対象譜面のみを対象にする。`diff` との同時指定は不可 |
 | `const` | `object` | 譜面定数レンジ（`min`/`max`。`float64`、小数1桁）。有効範囲: `1.0 ≤ min, max ≤ 16.0` |
+| `const_filter_mode` | `string` | `const` の入力方法（`"level"` / `"number"`）。再編集時の入力方法の復元にのみ使い、対象譜面の絞り込みには使わない。省略時は `"number"` として扱う。`rainbow_count` では指定不可 |
 | `genre` | `integer` | ジャンルマスタID（単値）。IDの数値は順序を表さない |
 | `ver` | `integer` | バージョンマスタID（単値）。IDの数値は順序を表さない |
 

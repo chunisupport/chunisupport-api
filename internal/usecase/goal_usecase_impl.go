@@ -376,14 +376,14 @@ func validateAttributes(
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, nil, ErrInvalidGoalAttributes
 	}
-	allowed := map[string]bool{"diff": true, "const": true, "genre": true, "ver": true, "name_folder": true, "chart_target": true}
+	allowed := map[string]bool{"diff": true, "const": true, "const_filter_mode": true, "genre": true, "ver": true, "name_folder": true, "chart_target": true}
 	for k := range attrs {
 		if !allowed[k] {
 			return nil, nil, ErrInvalidGoalAttributes
 		}
 	}
 	if achievementType == "rainbow_count" {
-		for _, key := range []string{"diff", "const", "chart_target"} {
+		for _, key := range []string{"diff", "const", "const_filter_mode", "chart_target"} {
 			if _, ok := attrs[key]; ok {
 				return nil, nil, ErrInvalidGoalAttributes
 			}
@@ -448,6 +448,13 @@ func validateAttributes(
 		attrs["const"] = normalizedConst
 		result.ConstMin = &minConst
 		result.ConstMax = &maxConst
+	}
+	// 入力モードはクライアントが再編集時に入力方法を復元するための値で、絞り込みには常に const を使う。
+	if v, ok := attrs["const_filter_mode"]; ok {
+		var mode string
+		if err := json.Unmarshal(v, &mode); err != nil || (mode != info.GoalConstFilterModeLevel && mode != info.GoalConstFilterModeNumber) {
+			return nil, nil, ErrInvalidGoalAttributes
+		}
 	}
 	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "genre", func(id int) bool {
 		_, exists := masters.GenreNamesByID[id]
