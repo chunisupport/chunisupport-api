@@ -1,41 +1,29 @@
 package dto
 
 import (
-	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 )
 
 // chartJSONKeyOrder は譜面オブジェクトのキー順です。
 // encoding/json の map はキー順が不定なため、API出力ではこの順に固定します。
 var chartJSONKeyOrder = [...]string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 
-// MarshalOrderedCharts は譜面マップを難易度順の JSON オブジェクトへ変換します。
-// 順序に含まれるキーは常に出力し、マップに無いキーと nil 値は null にします。
-// 順序に無いキーは出力しません。値本体は encoding/json.Marshal のバイト列をそのまま連結し、
-// エスケープや数値表現を個別の手動連結実装と揃えます。
-func MarshalOrderedCharts[T any](charts map[string]*T) ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteByte('{')
-	for i, key := range chartJSONKeyOrder {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		buf.WriteByte('"')
-		buf.WriteString(key)
-		buf.WriteString(`":`)
-
-		chart, exists := charts[key]
-		if !exists || chart == nil {
-			buf.WriteString("null")
-			continue
-		}
-
-		chartJSON, err := json.Marshal(chart)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(chartJSON)
+// MarshalOrderedChartsTo は譜面マップを難易度順の JSON オブジェクトとして enc へ書き込みます。
+// 順序に含まれるキーは常に出力し、マップに無いキーと nil 値は null にします。順序に無いキーは出力しません。
+// API出力時の時刻のタイムゾーン変換など呼び出し元のエンコードオプションを各譜面にも適用するため、
+// 別のエンコードを始める MarshalJSON ではなく、MarshalJSONTo から渡されたエンコーダへ直接書き込みます。
+func MarshalOrderedChartsTo[T any](enc *jsontext.Encoder, charts map[string]*T) error {
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return err
 	}
-	buf.WriteByte('}')
-	return buf.Bytes(), nil
+	for _, key := range chartJSONKeyOrder {
+		if err := enc.WriteToken(jsontext.String(key)); err != nil {
+			return err
+		}
+		if err := jsonv2.MarshalEncode(enc, charts[key]); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

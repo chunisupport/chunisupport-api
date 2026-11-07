@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -32,20 +33,22 @@ type OrderedChartsMap map[string]*ChartDTO
 // EditorOrderedChartsMap は編集者向けchartsのキーを特定の順序でJSON出力するためのカスタム型です。
 type EditorOrderedChartsMap map[string]*EditorChartDTO
 
-// MarshalJSON はJSONマーシャリング時にchartsのキーを
+// MarshalJSONTo はJSONマーシャリング時にchartsのキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順序で出力します。
 // 譜面が存在しない難易度はnullとして出力されます。
 // mapの標準エンコードでは難易度順にならないため、共通の順序付きマーシャラを使います。
-func (o OrderedChartsMap) MarshalJSON() ([]byte, error) {
-	return sharedto.MarshalOrderedCharts(o)
+// 呼び出し元のエンコードオプション（API出力時の時刻のタイムゾーン変換など）を各譜面にも引き継ぐため、MarshalJSONTo で実装します。
+func (o OrderedChartsMap) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return sharedto.MarshalOrderedChartsTo(enc, o)
 }
 
-// MarshalJSON は EditorOrderedChartsMap のキーを
+// MarshalJSONTo は EditorOrderedChartsMap のキーを
 // BASIC→ADVANCED→EXPERT→MASTER→ULTIMA の順序で JSON 出力します。
 // 譜面が存在しない難易度は null として出力されます。
 // mapの標準エンコードでは難易度順にならないため、共通の順序付きマーシャラを使います。
-func (o EditorOrderedChartsMap) MarshalJSON() ([]byte, error) {
-	return sharedto.MarshalOrderedCharts(o)
+// 呼び出し元のエンコードオプション（API出力時の時刻のタイムゾーン変換など）を各譜面にも引き継ぐため、MarshalJSONTo で実装します。
+func (o EditorOrderedChartsMap) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return sharedto.MarshalOrderedChartsTo(enc, o)
 }
 
 // SongDTO は楽曲情報を外部に公開するためのDTOです。
