@@ -91,6 +91,7 @@ func TestOtogeDbImporterValidation(t *testing.T) {
 		{name: "empty", content: `[]`},
 		{name: "null", content: `null`},
 		{name: "non-numeric id", content: `[{"id":"x","title":"Song"}]`},
+		{name: "non-string id", content: `[{"id":1,"title":"Song"}]`},
 		{name: "non-positive id", content: `[{"id":"0","title":"Song"}]`},
 		{name: "missing title", content: `[{"id":"1"}]`},
 	}
