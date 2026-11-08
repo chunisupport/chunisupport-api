@@ -13,7 +13,9 @@ type UserName struct {
 	value string
 }
 
-var usernamePattern = regexp.MustCompile("^[a-z0-9]+$")
+// usernamePattern は小文字英数字とアンダーバーのみで構成され、英数字を1文字以上含むことを表します。
+// アンダーバーだけの名前を許すと、5文字以上という長さ制約や禁止語判定が実質的に効かなくなるためです。
+var usernamePattern = regexp.MustCompile("^[a-z0-9_]*[a-z0-9][a-z0-9_]*$")
 
 var (
 	// ErrEmpty はユーザー名が空文字の場合に返されます。
@@ -23,7 +25,7 @@ var (
 	// ErrTooLong はユーザー名が最大文字数を超える場合に返されます。
 	ErrTooLong = errors.New("username must be 50 characters or less")
 	// ErrInvalidChar はユーザー名に許可されない文字が含まれる場合に返されます。
-	ErrInvalidChar = errors.New("username can only contain lowercase letters and numbers")
+	ErrInvalidChar = errors.New("username can only contain lowercase letters, numbers and underscores, and must contain at least one letter or number")
 )
 
 // NewUserName はバリデーション付きで新しい UserName を作成します
@@ -86,7 +88,7 @@ func (u *UserName) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// validateUserName はユーザー名が空でないこと、5文字以上50文字以内、小文字英数字のみであることをバリデーションします
+// validateUserName はユーザー名が空でないこと、5文字以上50文字以内、小文字英数字とアンダーバーのみで英数字を1文字以上含むことをバリデーションします
 func validateUserName(value string) error {
 	if value == "" {
 		return ErrEmpty

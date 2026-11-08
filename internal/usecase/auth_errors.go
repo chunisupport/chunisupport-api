@@ -16,7 +16,7 @@ var (
 	ErrUsernameEmpty           = errors.New("username cannot be empty")
 	ErrUsernameTooShort        = errors.New("username must be at least 5 characters")
 	ErrUsernameTooLong         = errors.New("username must be 50 characters or less")
-	ErrUsernameInvalidChar     = errors.New("username can only contain lowercase letters and numbers")
+	ErrUsernameInvalidChar     = errors.New("username can only contain lowercase letters, numbers and underscores, and must contain at least one letter or number")
 	ErrUsernameForbidden       = errors.New("username is forbidden")
 	ErrUsernameChangeForbidden = errors.New("username change is forbidden")
 	ErrUsernameChangeConflict  = errors.New("username change conflicts with an existing user")

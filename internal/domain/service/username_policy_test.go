@@ -35,6 +35,18 @@ func TestForbiddenUsernamePolicy_Validate(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name:     "アンダーバーを除くと完全一致の禁止語になるユーザー名を拒否する",
+			exact:    []string{"admin"},
+			username: "_ad_min_",
+			wantErr:  true,
+		},
+		{
+			name:     "アンダーバーを除くと部分一致の禁止語を含むユーザー名を拒否する",
+			contains: []string{"admin"},
+			username: "iam_ad_min",
+			wantErr:  true,
+		},
+		{
 			name:     "禁止語を含まないユーザー名を許可する",
 			exact:    []string{"admin"},
 			contains: []string{"system"},

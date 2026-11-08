@@ -68,6 +68,10 @@ func TestValidateUsername(t *testing.T) {
 			value: "testuser1",
 		},
 		{
+			name:  "アンダーバーを含む5文字以上は有効",
+			value: "test_user",
+		},
+		{
 			name:        "空文字はusername_empty",
 			value:       "",
 			wantErrCode: apierror.CodeUsernameEmpty,

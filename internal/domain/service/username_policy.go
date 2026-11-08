@@ -46,8 +46,9 @@ func NewForbiddenUsernamePolicy(exactWords, containsWords []string) (UsernamePol
 }
 
 // Validate は禁止語に該当するユーザー名を拒否します。
+// アンダーバーで区切って禁止語の判定をすり抜けられないよう、アンダーバーを除いた文字列で判定します。
 func (p *forbiddenUsernamePolicy) Validate(userName username.UserName) error {
-	value := userName.String()
+	value := strings.ReplaceAll(userName.String(), "_", "")
 	if _, forbidden := p.exact[value]; forbidden {
 		return ErrUsernameForbidden
 	}
