@@ -28,6 +28,7 @@ type mockFriendshipUsecase struct {
 	removeFunc       func(ctx context.Context, userID int, friendUsername string) error
 	listReceivedFunc func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
 	listSentFunc     func(ctx context.Context, userID int) ([]*usecase.FriendshipUserOutput, error)
+	getSlotsFunc     func(ctx context.Context, userID int) (*usecase.FriendshipSlotsOutput, error)
 }
 
 func TestFriendshipHandler_SendRequest_不正なUsernameはHTTP422を返す(t *testing.T) {
@@ -105,6 +106,13 @@ func (m *mockFriendshipUsecase) Remove(ctx context.Context, userID int, friendUs
 		return m.removeFunc(ctx, userID, friendUsername)
 	}
 	return nil
+}
+
+func (m *mockFriendshipUsecase) GetSlots(ctx context.Context, userID int) (*usecase.FriendshipSlotsOutput, error) {
+	if m.getSlotsFunc != nil {
+		return m.getSlotsFunc(ctx, userID)
+	}
+	return &usecase.FriendshipSlotsOutput{}, nil
 }
 
 func TestFriendshipHandler_SendRequest(t *testing.T) {
@@ -214,6 +222,29 @@ func TestFriendshipHandler_ListFriends(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"items":[{"username":"frienduser","player_level":42,"player_name":"PLAYER","rating":15.25,"overpower_value":18000.25,"possession_id":3,"is_private":false,"requested_at":"`+now.Add(-time.Hour).Format(time.RFC3339Nano)+`","accepted_at":"`+now.Format(time.RFC3339Nano)+`"}]}`, rec.Body.String())
 	})
+}
+
+func TestFriendshipHandler_GetSlots(t *testing.T) {
+	// Given
+	e := echo.New()
+	handler := NewFriendshipHandler(&mockFriendshipUsecase{
+		getSlotsFunc: func(ctx context.Context, userID int) (*usecase.FriendshipSlotsOutput, error) {
+			assert.Equal(t, 1, userID)
+			return &usecase.FriendshipSlotsOutput{Limit: 100, Used: 3}, nil
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/internal/friends/slots", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	// When
+	err := handler.GetSlots(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"limit":100,"used":3}`, rec.Body.String())
 }
 
 func TestFriendshipHandler_ListSentRequests_非公開ユーザーはUsernameだけ識別情報として返す(t *testing.T) {

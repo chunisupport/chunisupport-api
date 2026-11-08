@@ -226,6 +226,16 @@ func (u *friendshipUsecase) Remove(ctx context.Context, userID int, friendUserna
 	return u.friendshipRepo.DeletePair(ctx, u.db, userID, friend.ID)
 }
 
+// GetSlots はフレンド枠の上限と使用数を返します。
+// 上限判定（ensureOutgoingSlot）と同じ件数を返し、画面側で上限の数え方を再実装させないためのものです。
+func (u *friendshipUsecase) GetSlots(ctx context.Context, userID int) (*FriendshipSlotsOutput, error) {
+	used, err := u.friendshipRepo.CountOutgoingActive(ctx, u.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &FriendshipSlotsOutput{Limit: info.FriendshipMaxOutgoingActive, Used: used}, nil
+}
+
 func (u *friendshipUsecase) findUserByUsername(ctx context.Context, username string) (*entity.User, error) {
 	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
 	if err != nil {

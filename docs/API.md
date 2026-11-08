@@ -278,6 +278,7 @@ Content-Type: application/json
 | `/internal/friends/requests` | POST | Firebase Bearer | username完全一致でフレンド申請 |
 | `/internal/friends/requests/received` | GET | Firebase Bearer | 自分宛てのフレンド申請一覧取得 |
 | `/internal/friends/requests/sent` | GET | Firebase Bearer | 自分が送ったフレンド申請一覧取得 |
+| `/internal/friends/slots` | GET | Firebase Bearer | フレンド枠の上限と使用数取得 |
 | `/internal/friends/requests/:username/accept` | POST | Firebase Bearer | フレンド申請承認 |
 | `/internal/friends/requests/:username/reject` | POST | Firebase Bearer | フレンド申請拒否 |
 | `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
@@ -1391,6 +1392,17 @@ Firebase Bearer Token（必須）
 ### GET `/internal/friends/requests/sent`
 
 自分が送った申請一覧を申請日時降順で取得します。
+
+### GET `/internal/friends/slots`
+
+フレンド枠の上限と使用数を取得します。`used` は申請・承認時の上限判定と同じく、自分から外向きの `pending` / `accepted` の合計です。相手から届いた申請は含みません。
+
+```json
+{
+  "limit": 100,
+  "used": 3
+}
+```
 
 ### POST `/internal/friends/requests/:username/accept`
 

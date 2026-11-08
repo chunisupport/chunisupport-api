@@ -73,6 +73,19 @@ func (h *FriendshipHandler) ListSentRequests(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toFriendshipListResponse(items))
 }
 
+// GetSlots はフレンド枠の上限と使用数を返します。
+func (h *FriendshipHandler) GetSlots(c *echo.Context) error {
+	user, err := getUserEntityFromContext(c)
+	if err != nil {
+		return err
+	}
+	slots, err := h.usecase.GetSlots(c.Request().Context(), user.ID)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	return c.JSON(http.StatusOK, &internaldto.FriendshipSlotsResponse{Limit: slots.Limit, Used: slots.Used})
+}
+
 func (h *FriendshipHandler) AcceptRequest(c *echo.Context) error {
 	user, requesterUsername, err := h.authenticatedUserAndPathUsername(c)
 	if err != nil {

@@ -453,3 +453,64 @@ func TestScoreHistoryUsecase_PrivateUserAccessibleByFriend(t *testing.T) {
 	assert.Equal(t, "privateuser", got.Username.String())
 	userRepo.AssertExpectations(t)
 }
+
+func TestFriendshipUsecase_GetSlots(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 自分から外向きの pending / accepted 件数
+		used int
+		// Then: 返すフレンド枠
+		expected *FriendshipSlotsOutput
+	}{
+		{
+			name:     "外向きの申請中と承認済みの合計を使用数として上限と一緒に返す",
+			used:     3,
+			expected: &FriendshipSlotsOutput{Limit: info.FriendshipMaxOutgoingActive, Used: 3},
+		},
+		{
+			name:     "上限に達している場合も使用数をそのまま返す",
+			used:     info.FriendshipMaxOutgoingActive,
+			expected: &FriendshipSlotsOutput{Limit: info.FriendshipMaxOutgoingActive, Used: info.FriendshipMaxOutgoingActive},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := newStubFriendshipRepo()
+			repo.counts[1] = tt.used
+			u := &friendshipUsecase{db: &MockExecutor{}, friendshipRepo: repo}
+
+			// When
+			got, err := u.GetSlots(context.Background(), 1)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestFriendshipUsecase_GetSlots_件数取得エラーを返す(t *testing.T) {
+	// Given
+	countErr := errors.New("count failed")
+	repo := &errorCountFriendshipRepo{stubFriendshipRepo: newStubFriendshipRepo(), err: countErr}
+	u := &friendshipUsecase{db: &MockExecutor{}, friendshipRepo: repo}
+
+	// When
+	got, err := u.GetSlots(context.Background(), 1)
+
+	// Then
+	require.ErrorIs(t, err, countErr)
+	assert.Nil(t, got)
+}
+
+// errorCountFriendshipRepo は件数取得だけを失敗させるリポジトリです。
+type errorCountFriendshipRepo struct {
+	*stubFriendshipRepo
+	err error
+}
+
+func (r *errorCountFriendshipRepo) CountOutgoingActive(ctx context.Context, exec repository.Executor, userID int) (int, error) {
+	return 0, r.err
+}

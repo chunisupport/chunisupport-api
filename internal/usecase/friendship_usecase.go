@@ -15,6 +15,14 @@ type FriendshipUsecase interface {
 	RejectRequest(ctx context.Context, userID int, requesterUsername string) error
 	CancelRequest(ctx context.Context, userID int, targetUsername string) error
 	Remove(ctx context.Context, userID int, friendUsername string) error
+	GetSlots(ctx context.Context, userID int) (*FriendshipSlotsOutput, error)
+}
+
+// FriendshipSlotsOutput はフレンド枠の上限と使用数です。
+// 使用数は自分から外向きの pending / accepted の合計で、申請・承認時の上限判定と同じ数え方です。
+type FriendshipSlotsOutput struct {
+	Limit int
+	Used  int
 }
 
 // FriendshipUserOutput はフレンド・申請一覧の相手ユーザー概要です。
