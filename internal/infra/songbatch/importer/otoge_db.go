@@ -37,9 +37,13 @@ func (oi *OtogeDbImporter) Import(filePath string) (*songbatch.ImportedSource, e
 
 	data = removeBOM(data)
 
-	var otogeDbData OtogeDbData
-	if err := json.Unmarshal(data, &otogeDbData); err != nil {
+	otogeDbData, discarded, err := decodeOtogeDbData(data)
+	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal otoge-db JSON: %w", err)
+	}
+	if len(discarded) > 0 {
+		// 楽曲ごとに出すと通知が大量になるため、1回の取り込みにつき1件にまとめます。
+		slog.Warn("Discarded otoge-db fields with unexpected types", "count", len(discarded), "fields", strings.Join(discarded, ","))
 	}
 
 	for i := range otogeDbData {
@@ -65,4 +69,32 @@ func (oi *OtogeDbImporter) Import(filePath string) (*songbatch.ImportedSource, e
 		Type: songbatch.DataSourceOtogeDb,
 		Data: &otogeDbData,
 	}, nil
+}
+
+// decodeOtogeDbData は楽曲ごと・フィールドごとに文字列として読み込みます。
+// otoge-db では特定の楽曲のフィールドだけ型が崩れることがあります。
+// 誤ったデータを解釈して取り込まないよう、型の合わない値はそのフィールドだけ捨て、
+// データソース全体を失わないようにします。捨てたフィールドは「楽曲ID:キー」で返します。
+func decodeOtogeDbData(data []byte) (OtogeDbData, []string, error) {
+	var rows []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, nil, err
+	}
+
+	songs := make(OtogeDbData, len(rows))
+	var discarded []string
+	for i, row := range rows {
+		// jsonFields は id を先頭に返すため、他のフィールドを捨てる時点で ID は確定しています。
+		// ID 自体を捨てた場合は後段の検証で行番号つきのエラーになります。
+		for _, field := range songs[i].jsonFields() {
+			value, ok := row[field.key]
+			if !ok {
+				continue
+			}
+			if err := json.Unmarshal(value, field.dst); err != nil {
+				discarded = append(discarded, strings.TrimSpace(songs[i].ID)+":"+field.key)
+			}
+		}
+	}
+	return songs, discarded, nil
 }
