@@ -35,7 +35,7 @@ func (v ValidationErrors) Details() []ValidationErrorDetail {
 		case "max":
 			detail.Message = fmt.Sprintf("%s文字以下で入力してください。", fe.Param())
 		case "username":
-			detail.Message = "5〜50文字の小文字英数字で入力してください。"
+			detail.Message = "5〜50文字の小文字英数字とアンダーバーで、英数字を1文字以上含めて入力してください。"
 		default:
 			detail.Message = "入力値の形式が不正です。"
 		}

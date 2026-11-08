@@ -22,6 +22,12 @@ func TestNewUserName(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name:    "アンダーバーを含むユーザー名は有効",
+			value:   "test_user",
+			want:    UserName{value: "test_user"},
+			wantErr: assert.NoError,
+		},
+		{
 			name:    "無効な空文字列",
 			value:   "",
 			want:    UserName{},
@@ -118,6 +124,16 @@ func TestValidateUserNameReturnsTypedErrors(t *testing.T) {
 		{
 			name:    "英大文字を含むとErrInvalidChar",
 			value:   "Testuser",
+			wantErr: ErrInvalidChar,
+		},
+		{
+			name:    "アンダーバー以外の記号を含むとErrInvalidChar",
+			value:   "test-user",
+			wantErr: ErrInvalidChar,
+		},
+		{
+			name:    "アンダーバーのみで英数字を含まないとErrInvalidChar",
+			value:   "_____",
 			wantErr: ErrInvalidChar,
 		},
 	}
