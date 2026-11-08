@@ -20,6 +20,12 @@ type FriendshipUserResponse struct {
 	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`
 }
 
+// FriendshipSlotsResponse はフレンド枠の上限と使用数のレスポンスです。
+type FriendshipSlotsResponse struct {
+	Limit int `json:"limit"`
+	Used  int `json:"used"`
+}
+
 // FriendshipListResponse はフレンド・申請一覧レスポンスです。
 type FriendshipListResponse struct {
 	Items []*FriendshipUserResponse `json:"items"`

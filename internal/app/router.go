@@ -496,6 +496,7 @@ func registerRoutes(
 		friendshipReadGroup.GET("", handlers.Friendship.ListFriends)
 		friendshipReadGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
 		friendshipReadGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
+		friendshipReadGroup.GET("/slots", handlers.Friendship.GetSlots)
 	}
 
 	friendshipGroup := internal.Group("/friends")
