@@ -57,7 +57,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `compat/chunirec/2.0/music/showall.json` | `GET /compat/chunirec/2.0/music/showall` と同じchunirec互換楽曲配列 |
 | `compat/reiwa/1/chunithm_record/original.json` | `GET /compat/reiwa/1/chunithm_record/original` と同じreiwa互換譜面配列 |
 | `compat/reiwa/1/chunirec_all.json` | `GET /compat/reiwa/1/chunirec_all.json` と同じ通常楽曲・WORLD'S END楽曲のreiwa互換配列 |
-| `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列 |
+| `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列。実行時点で稼働開始済みのバージョンだけを含みます。切り替わりは日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。稼働日の0:00〜7:00に実行した書き出しには、その新バージョンはまだ入りません |
 
 アップロード時の `Content-Type` は `application/json; charset=utf-8` です。
 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、またはreiwa互換バージョンが0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。

@@ -21,6 +21,7 @@ func TestPlayerDataRecalculationBatchUsecase_運用日を07時境界で固定す
 		expected string
 	}{
 		{name: "06時59分は前日", now: time.Date(2026, 7, 6, 6, 59, 0, 0, jst), expected: "2026-07-05"},
+		{name: "06時59分59秒は前日", now: time.Date(2026, 7, 6, 6, 59, 59, 0, jst), expected: "2026-07-05"},
 		{name: "07時00分は当日", now: time.Date(2026, 7, 6, 7, 0, 0, 0, jst), expected: "2026-07-06"},
 	}
 	for _, tt := range tests {

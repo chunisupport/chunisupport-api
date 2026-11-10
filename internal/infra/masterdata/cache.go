@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/gamedate"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -294,7 +295,8 @@ func (c *Cache) AdminVersions() map[int]Version {
 	return maps.Clone(c.allVersionsByID)
 }
 
-// PublicVersionsByID はJST当日までにリリースされたバージョンを返します。
+// PublicVersionsByID は読取時点で稼働開始済みのバージョンを返します。
+// 稼働開始は稼働日の日本時間7時です。暦日の0時では公開しません。
 func (c *Cache) PublicVersionsByID() map[int]Version {
 	if c == nil {
 		return nil
@@ -330,16 +332,13 @@ func (c *Cache) currentTime() time.Time {
 	return time.Now()
 }
 
+// filterReleasedVersions は稼働日の日本時間7時以降のバージョンだけを残します。
+// 公開一覧と再計算バッチの現行バージョンがずれないよう、切り替わりは gamedate に任せます。
 func filterReleasedVersions(allVersions map[string]Version, now time.Time) (map[string]Version, map[int]Version) {
-	japanLoc, err := time.LoadLocation("Asia/Tokyo")
-	if err != nil {
-		japanLoc = time.FixedZone("Asia/Tokyo", 9*60*60)
-	}
-	releaseDate := now.In(japanLoc).Format(time.DateOnly)
 	versions := make(map[string]Version, len(allVersions))
 	versionsByID := make(map[int]Version, len(allVersions))
 	for name, item := range allVersions {
-		if item.ReleasedAt.Format(time.DateOnly) > releaseDate {
+		if !gamedate.IsReleased(item.ReleasedAt, now) {
 			continue
 		}
 		versions[name] = item
