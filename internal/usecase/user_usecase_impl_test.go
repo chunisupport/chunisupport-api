@@ -135,10 +135,7 @@ func TestUserUsecase_DeleteUser_RollsBackWhenUserDeletionFails(t *testing.T) {
 			return deleteErr
 		},
 	}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-	service.(interface {
-		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
-	}).SetPhysicalDeletionDependencies(tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
@@ -167,10 +164,7 @@ func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testin
 			return nil
 		},
 	}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-	service.(interface {
-		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
-	}).SetPhysicalDeletionDependencies(tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
@@ -454,7 +448,7 @@ func (s *stubWorldsendChartRepository) CreateSong(ctx context.Context, exec repo
 }
 
 func TestUserUsecase_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{err: repository.ErrUserNotFound}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "missing", nil)
 	require.ErrorIs(t, err, ErrUserNotFound)
@@ -462,7 +456,7 @@ func TestUserUsecase_GetUserProfileWithRecords_UserNotFound(t *testing.T) {
 
 func TestUserUsecase_GetUserProfileWithRecords_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
 	user := &entity.User{ID: 1}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "no-player", nil)
 	require.NoError(t, err)
@@ -488,7 +482,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PrivateSelf(t *testing.T) {
 		Level:     1,
 		UpdatedAt: now,
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	_, err := service.GetUserProfileWithRecords(context.Background(), "selfuser", &entity.User{ID: 1})
 	require.NoError(t, err)
@@ -501,7 +495,7 @@ func TestUserUsecase_GetUserProfileWithRecords_PlayerRepositoryNoRowsReturnsNilP
 		Username: un,
 		PlayerID: new(1),
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{err: repository.ErrPlayerNotFound}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -518,7 +512,7 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 	scoreUpdatedAt := now.Add(time.Hour)
 
 	t.Run("レコード更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
-		service := NewUserUsecase(
+		service := newUserUsecaseForTest(
 			nil,
 			&stubUserRepository{user: user},
 			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
@@ -543,7 +537,7 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("プロフィール更新の方が新しい場合はその時刻を返す", func(t *testing.T) {
-		service := NewUserUsecase(
+		service := newUserUsecaseForTest(
 			nil,
 			&stubUserRepository{user: user},
 			&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: &entity.Player{
@@ -568,7 +562,7 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("プレイヤー未連携時は nil を返す", func(t *testing.T) {
-		service := NewUserUsecase(
+		service := newUserUsecaseForTest(
 			nil,
 			&stubUserRepository{user: &entity.User{ID: 1}},
 			&stubPlayerRepository{},
@@ -591,7 +585,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.
 	now := time.Now()
 	playerUpdatedAt := now
 	recordsUpdatedAt := now.Add(time.Hour)
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
@@ -611,7 +605,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検証する(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
@@ -627,7 +621,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリでプレイヤー未連携の場合は更新日時がnil(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
@@ -644,7 +638,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリでプレイヤー未連携
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリで存在しないユーザーはエラー(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{err: repository.ErrUserNotFound}
@@ -658,7 +652,7 @@ func TestUserUsecase_GetUserUpdatedAt_専用クエリで存在しないユーザ
 func TestUserUsecase_GetUserUpdatedAt_専用クエリで非公開ユーザー本人は取得できる(t *testing.T) {
 	playerUpdatedAt := time.Now()
 	user := &entity.User{ID: 1, PlayerID: new(10), IsPrivate: true}
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 	impl, ok := service.(*userUsecase)
 	require.True(t, ok)
 	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
@@ -751,7 +745,7 @@ func TestUserUsecase_GetUserProfileWithRecords_Success(t *testing.T) {
 	rating := 15.0
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 100, OfficialRating: rating, UpdatedAt: playerUpdatedAt}
 	user := &entity.User{ID: 1, PlayerID: new(1)}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -776,7 +770,7 @@ func TestUserUsecase_GetUserProfileWithRecords_HonorsIsEmptySliceWhenNoHonors(t 
 	now := time.Now()
 	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 10, UpdatedAt: now}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -807,7 +801,7 @@ func TestUserUsecase_GetUserProfile_OverpowerPercentを最新分母で随時計�
 			SongMaxOPWithoutUltima: map[int]float64{},
 		},
 	}
-	usecase := NewUserUsecaseWithOverpowerDenominator(
+	usecase := newUserUsecaseWithOverpowerDenominatorForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -858,7 +852,7 @@ func TestUserUsecase_GetUserProfile_未解禁設定を分母に反映する(t *t
 			},
 		},
 	}
-	usecase := NewUserUsecaseWithOverpowerDenominator(
+	usecase := newUserUsecaseWithOverpowerDenominatorForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -908,7 +902,7 @@ func TestUserUsecase_GetUserProfile_同一楽曲の通常譜面とUltimaロッ�
 			},
 		},
 	}
-	usecase := NewUserUsecaseWithOverpowerDenominator(
+	usecase := newUserUsecaseWithOverpowerDenominatorForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -956,7 +950,7 @@ func TestUserUsecase_GetUserProfile_通常譜面未解禁はULTIMAを含む楽�
 			},
 		},
 	}
-	usecase := NewUserUsecaseWithOverpowerDenominator(
+	usecase := newUserUsecaseWithOverpowerDenominatorForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -991,7 +985,7 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1076,7 +1070,7 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 			Song:        &entity.Song{ID: 20, DisplayID: "song20", Title: "Song 20"},
 		},
 	}
-	usecase := NewUserUsecase(
+	usecase := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1317,7 +1311,7 @@ func TestUserUsecase_GetUserProfileRatingView_Success(t *testing.T) {
 		{ChartID: 101, SongID: 1001, DifficultyID: 2, Score: score1, ComboLampID: 1, ChartConstant: chartConst},
 		{ChartID: 102, SongID: 1002, DifficultyID: 3, Score: score2, ComboLampID: 2, ChartConstant: chartConst},
 	}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records, ratingRecords: records, opTargetCandidates: opTargetCandidates}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}}, &stubPlayerRecordRepository{records: records, ratingRecords: records, opTargetCandidates: opTargetCandidates}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "tester", nil)
 	require.NoError(t, err)
@@ -1350,7 +1344,7 @@ func TestUserUsecase_GetUserProfileRatingView_OP対象は全譜面候補から�
 		Chart:       &entity.Chart{ID: 101, SongID: 10, DifficultyID: 3, Const: chartConst},
 		Slot:        &master.Slot{ID: 1, Name: "best"},
 	}
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1382,7 +1376,7 @@ func TestUserUsecase_GetUserProfileRatingView_OP対象候補の取得失敗を�
 	expectedErr := errors.New("OP対象候補の取得失敗")
 	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー")}
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1404,7 +1398,7 @@ func TestUserUsecase_GetUserProfileRatingView_OP対象候補の取得失敗を�
 
 func TestUserUsecase_GetUserProfileRatingView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
 	user := &entity.User{ID: 1}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRatingView(context.Background(), "no-player", nil)
 	require.NoError(t, err)
@@ -1426,7 +1420,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1464,7 +1458,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 
 func TestUserUsecase_GetUserProfileRecordView_PlayerNotLinkedReturnsNilPlayerAndRecords(t *testing.T) {
 	user := &entity.User{ID: 1}
-	service := NewUserUsecase(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "no-player", nil)
 	require.NoError(t, err)
@@ -1480,7 +1474,7 @@ func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtFallsBackToPlayerU
 	user := &entity.User{ID: 1, PlayerID: new(1)}
 	player := &entity.Player{ID: 1, Name: playernametest.New(t, "テストプレイヤー"), Level: 1, UpdatedAt: now}
 
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1515,7 +1509,7 @@ func TestUserUsecase_GetUserProfileWithRecords_RecordsUpdatedAtUsesWorldsendLate
 		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
 	}
 
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1549,7 +1543,7 @@ func TestUserUsecase_GetUserProfileRecordView_RecordsUpdatedAtUsesWorldsendLates
 		WorldsendChart:   &entity.WorldsendChart{ID: 3001, SongID: 30},
 	}
 
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
@@ -1617,7 +1611,7 @@ func TestUserUsecase_GetAllUsersForAdmin(t *testing.T) {
 	repo := &stubUserRepository{
 		usersWithPlayer: usersWithPlayer,
 	}
-	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, &stubSongMasterProvider{}, nil)
+	service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, &stubSongMasterProvider{}, nil)
 
 	list, err := service.GetAllUsersForAdmin(context.Background(), 1, 10, "")
 	require.NoError(t, err)
@@ -1686,7 +1680,7 @@ func TestUserUsecase_GetAllUsersForAdmin_pageから負のOFFSETを作らない(t
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubUserRepository{}
-			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+			service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 			// When
 			_, err := service.GetAllUsersForAdmin(context.Background(), tt.page, limit, "")
@@ -1728,7 +1722,7 @@ func TestUserUsecase_GetUserSongRecord_指定難易度を未プレイ補完し�
 			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
 		},
 	}
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{},
@@ -1763,7 +1757,7 @@ func TestUserUsecase_GetUserSongRecord_曲に存在しない難易度はエラ�
 	masters := &masterdata.SongMasters{
 		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
 	}
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
 		&stubPlayerRepository{},
@@ -1797,7 +1791,7 @@ func TestUserUsecase_GetUserWorldsendSongRecord_未プレイ補完を返す(t *t
 		},
 		Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
 	}
-	service := NewUserUsecase(
+	service := newUserUsecaseForTest(
 		nil,
 		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
 		&stubPlayerRepository{},
@@ -1828,7 +1822,7 @@ func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	}
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{user: user, usersByID: map[int]*entity.User{1: user, 99: adminRequester}}
-	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "testuser")
 	require.NoError(t, err)
@@ -1856,11 +1850,7 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 		callOrder = append(callOrder, "user")
 		return nil
 	}}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-	configurable := service.(interface {
-		SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
-	})
-	configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), adminRequester, "testuser")
@@ -1874,7 +1864,7 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: repository.ErrUserNotFound}
-	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), adminRequester, "missing")
 	require.ErrorIs(t, err, ErrUserNotFound)
@@ -1882,7 +1872,7 @@ func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
 
 func TestUserUsecase_DeleteUser_AdminRequired(t *testing.T) {
 	normalUser := &entity.User{ID: 1, AccountTypeID: 1}
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), normalUser, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
@@ -1890,14 +1880,14 @@ func TestUserUsecase_DeleteUser_AdminRequired(t *testing.T) {
 
 func TestUserUsecase_DeleteUser_UnknownRoleRejected(t *testing.T) {
 	unknownRoleUser := &entity.User{ID: 1, AccountTypeID: 5}
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), unknownRoleUser, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
 }
 
 func TestUserUsecase_DeleteUser_NilRequester(t *testing.T) {
-	service := NewUserUsecase(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	err := service.DeleteUser(context.Background(), nil, "testuser")
 	require.ErrorIs(t, err, ErrAdminRequired)
@@ -1909,7 +1899,7 @@ func TestUserUsecase_DeleteUser_自分自身は削除できない(t *testing.T) 
 	require.NoError(t, err)
 	admin := &entity.User{ID: 1, Username: un, AccountTypeID: info.AccountTypeAdmin}
 	repo := &stubUserRepository{user: admin, usersByID: map[int]*entity.User{1: admin}}
-	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	// When
 	err = service.DeleteUser(context.Background(), &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin}, "adminuser")
@@ -1963,10 +1953,7 @@ func TestUserUsecase_DeleteUser_ロック後のユーザー状態で判定する
 				return nil
 			}}
 			repo := &stubUserRepository{user: &entity.User{ID: 1, Username: un}, usersByID: tt.usersByID}
-			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-			service.(interface {
-				SetPhysicalDeletionDependencies(TransactionManager, repository.GoalRepository)
-			}).SetPhysicalDeletionDependencies(&userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo)
+			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, &userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo)
 
 			// When
 			err := service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
@@ -2010,7 +1997,7 @@ func TestUserUsecase_DeleteUser_ユーザー行をIDの昇順でロックする(
 			target := &entity.User{ID: tt.targetID, Username: un}
 			requester := &entity.User{ID: tt.requesterID, AccountTypeID: info.AccountTypeAdmin}
 			repo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{tt.targetID: target, tt.requesterID: requester}}
-			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+			service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 			// When
 			err = service.DeleteUser(context.Background(), requester, "testuser")
@@ -2035,7 +2022,7 @@ func TestUserUsecase_DeleteUser_成功ログに実行者と対象を記録する
 	target := &entity.User{ID: 1, Username: un}
 	requester := &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
 	repo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: requester}}
-	service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+	service := newUserUsecaseForTest(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 
 	// When
 	err = service.DeleteUser(context.Background(), requester, "testuser")

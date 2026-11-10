@@ -579,7 +579,7 @@ func TestApplyHonors_お気に入りからランダムのスロットは更新�
 
 func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
 	assert.PanicsWithValue(t, "player record repository is required", func() {
-		NewPlayerDataUsecase(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+		newPlayerDataUsecaseForTest(nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	})
 }
 
