@@ -61,6 +61,10 @@ func (e *honorEnsureExec) ExecContext(_ context.Context, query string, args ...a
 	return rowsAffectedResult{lastInsertID: 10, rowsAffected: 1}, nil
 }
 
+func (e *honorEnsureExec) Rebind(query string) string {
+	return query
+}
+
 func TestEnsureHonor_SP称号は画像URLの重複を事前確認して新規登録する(t *testing.T) {
 	// Given
 	imageURL := " https://example.com/honor.png "
@@ -283,6 +287,46 @@ func TestDeletePlayerHonorsExceptSlots_指定スロットを削除対象から�
 	require.NoError(t, err)
 	assert.Equal(t, "DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (?, ?)", exec.query)
 	assert.Equal(t, []any{100, 1, 3}, exec.args)
+}
+
+func TestDeletePlayerHonorsExceptSlots_保持スロットが1件のときはそのスロットだけ残す(t *testing.T) {
+	// Given
+	exec := &honorEnsureExec{}
+	repo := &honorRepository{}
+
+	// When
+	err := repo.DeletePlayerHonorsExceptSlots(context.Background(), exec, 100, []int{2})
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, "DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (?)", exec.query)
+	assert.Equal(t, []any{100, 2}, exec.args)
+}
+
+func TestDeletePlayerHonorsExceptSlots_保持スロットが空なら全削除する(t *testing.T) {
+	tests := []struct {
+		name           string
+		preservedSlots []int
+	}{
+		{name: "空スライス", preservedSlots: []int{}},
+		{name: "nil", preservedSlots: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			exec := &honorEnsureExec{}
+			repo := &honorRepository{}
+
+			// When
+			err := repo.DeletePlayerHonorsExceptSlots(context.Background(), exec, 100, tt.preservedSlots)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, "DELETE FROM player_honors WHERE player_id = ?", exec.query)
+			assert.Equal(t, []any{100}, exec.args)
+		})
+	}
 }
 
 type honorExecResultExecutor struct {

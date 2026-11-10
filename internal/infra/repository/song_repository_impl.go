@@ -634,14 +634,14 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 	args = append(args, isNewArgs...)
 	args = append(args, unlockRequiredArgs...)
 
-	for _, id := range songIDs {
-		args = append(args, id)
+	// IN句だけを sqlx.In で展開する。CASE式の引数には nil の *time.Time が含まれ、
+	// sqlx.In は database/sql と異なり nil ポインタの driver.Valuer を Value() して panic するため、
+	// クエリ全体は渡さない。
+	inClause, inArgs, err := sqlx.In(`IN (?)`, songIDs)
+	if err != nil {
+		return err
 	}
-
-	placeholders := make([]string, len(songIDs))
-	for i := range placeholders {
-		placeholders[i] = "?"
-	}
+	args = append(args, inArgs...)
 
 	query := fmt.Sprintf(`
 		UPDATE songs SET
@@ -656,7 +656,7 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 			jacket = CASE %s END,
 			is_new = CASE %s END,
 			unlock_required = %s
-		WHERE id IN (%s)
+		WHERE id %s
 		  AND is_worldsend = 0
 	`,
 		strings.Join(titleCases, " "),
@@ -670,10 +670,10 @@ func (r *songRepository) bulkUpdateSongs(ctx context.Context, exec repository.Ex
 		strings.Join(jacketCases, " "),
 		strings.Join(isNewCases, " "),
 		keepExistingUpdateExpr("unlock_required", unlockRequiredCases),
-		strings.Join(placeholders, ","),
+		inClause,
 	)
 
-	_, err := exec.ExecContext(ctx, query, args...)
+	_, err = exec.ExecContext(ctx, exec.Rebind(query), args...)
 	return err
 }
 

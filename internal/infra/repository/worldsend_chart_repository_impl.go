@@ -347,11 +347,14 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 	args = append(args, isNewArgs...)
 	args = append(args, unlockRequiredArgs...)
 
-	placeholders := make([]string, len(songIDs))
-	for i, id := range songIDs {
-		placeholders[i] = "?"
-		args = append(args, id)
+	// IN句だけを sqlx.In で展開する。CASE式の引数には nil の *time.Time が含まれ、
+	// sqlx.In は database/sql と異なり nil ポインタの driver.Valuer を Value() して panic するため、
+	// クエリ全体は渡さない。
+	inClause, inArgs, err := sqlx.In(`IN (?)`, songIDs)
+	if err != nil {
+		return 0, err
 	}
+	args = append(args, inArgs...)
 
 	query := fmt.Sprintf(`
 		UPDATE songs SET
@@ -366,7 +369,7 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 			jacket = CASE %s END,
 			is_new = CASE %s END,
 			unlock_required = %s
-		WHERE is_worldsend = 1 AND id IN (%s)
+		WHERE is_worldsend = 1 AND id %s
 	`,
 		strings.Join(titleCases, " "),
 		keepExistingUpdateExpr("wiki_page_title", wikiPageTitleCases),
@@ -379,10 +382,10 @@ func (r *worldsendChartRepository) bulkUpdateSongs(ctx context.Context, exec rep
 		strings.Join(jacketCases, " "),
 		strings.Join(isNewCases, " "),
 		keepExistingUpdateExpr("unlock_required", unlockRequiredCases),
-		strings.Join(placeholders, ","),
+		inClause,
 	)
 
-	result, err := exec.ExecContext(ctx, query, args...)
+	result, err := exec.ExecContext(ctx, exec.Rebind(query), args...)
 	if err != nil {
 		return 0, err
 	}
@@ -450,11 +453,13 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 	args = append(args, notesArgs...)
 	args = append(args, notesDesignerArgs...)
 
-	placeholders := make([]string, len(chartIDs))
-	for i, id := range chartIDs {
-		placeholders[i] = "?"
-		args = append(args, id)
+	// IN句だけを sqlx.In で展開する。CASE式の引数は *LevelStar や *Notes のままドライバへ渡し、
+	// sqlx.In が driver.Valuer を先に Value() して変換タイミングを変えないようにする。
+	inClause, inArgs, err := sqlx.In(`IN (?)`, chartIDs)
+	if err != nil {
+		return 0, 0, err
 	}
+	args = append(args, inArgs...)
 
 	query := fmt.Sprintf(`
 		UPDATE worldsend_charts SET
@@ -462,16 +467,16 @@ func (r *worldsendChartRepository) bulkUpdateCharts(ctx context.Context, exec re
 			attribute = CASE %s END,
 			notes = CASE %s END,
 			notes_designer = CASE %s END
-		WHERE id IN (%s)
+		WHERE id %s
 	`,
 		strings.Join(levelCases, " "),
 		strings.Join(attributeCases, " "),
 		strings.Join(notesCases, " "),
 		strings.Join(notesDesignerCases, " "),
-		strings.Join(placeholders, ","),
+		inClause,
 	)
 
-	result, err := exec.ExecContext(ctx, query, args...)
+	result, err := exec.ExecContext(ctx, exec.Rebind(query), args...)
 	if err != nil {
 		return 0, 0, err
 	}
