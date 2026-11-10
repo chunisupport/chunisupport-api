@@ -32,8 +32,9 @@ type moderationRequest struct {
 }
 
 type moderationResponse struct {
+	// 欠落や null を false と区別するため、flagged はポインタで受けます。
 	Results []struct {
-		Flagged bool `json:"flagged"`
+		Flagged *bool `json:"flagged"`
 	} `json:"results"`
 }
 
@@ -52,7 +53,9 @@ func newCommentModerator(apiKey string, baseURL string, client *http.Client) *co
 }
 
 // IsFlagged は Moderation API の flagged をそのまま返します。
-// 通信の失敗、2xx 以外の応答、判定結果のない応答は、判定できなかったものとしてエラーにします。
+// 通信の失敗、2xx 以外の応答、判定結果のない応答、flagged が明示的な true/false でない応答
+// （欠落・null・results の要素が null）は、判定できなかったものとしてエラーにします。
+// 判定できないまま「問題なし」と扱わない（fail-closed）ためです。
 func (m *commentModerator) IsFlagged(ctx context.Context, comment string) (bool, error) {
 	body, err := json.Marshal(moderationRequest{Model: info.OpenAIModerationModel, Input: comment})
 	if err != nil {
@@ -88,7 +91,12 @@ func (m *commentModerator) IsFlagged(ctx context.Context, comment string) (bool,
 		return false, errors.New("moderation response has no result")
 	}
 
-	return result.Results[0].Flagged, nil
+	flagged := result.Results[0].Flagged
+	if flagged == nil {
+		return false, errors.New("moderation response has no flagged")
+	}
+
+	return *flagged, nil
 }
 
 var _ usecase.CommentModerator = (*commentModerator)(nil)

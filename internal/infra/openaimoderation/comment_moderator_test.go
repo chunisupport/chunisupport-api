@@ -61,6 +61,9 @@ func TestCommentModerator_IsFlagged_判定できない応答はエラー(t *test
 		{name: "サーバーエラー", status: http.StatusInternalServerError, body: `{}`},
 		{name: "JSONとして読めない応答", status: http.StatusOK, body: `not json`},
 		{name: "判定結果のない成功応答", status: http.StatusOK, body: `{"results":[]}`},
+		{name: "flaggedが欠落した成功応答", status: http.StatusOK, body: `{"results":[{}]}`},
+		{name: "判定結果がnullの成功応答", status: http.StatusOK, body: `{"results":[null]}`},
+		{name: "flaggedがnullの成功応答", status: http.StatusOK, body: `{"results":[{"flagged":null}]}`},
 	}
 
 	for _, tt := range tests {
