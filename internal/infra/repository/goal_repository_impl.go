@@ -156,21 +156,17 @@ func validateGoalArrangementPersistence(ctx context.Context, exec repository.Exe
 		return nil
 	}
 
-	var query strings.Builder
-	query.WriteString(`SELECT COUNT(*) FROM goals WHERE user_id = ? AND id IN (`)
-	args := make([]any, 0, len(goals)+1)
-	args = append(args, userID)
+	goalIDs := make([]uint32, len(goals))
 	for i, goal := range goals {
-		if i > 0 {
-			query.WriteString(`, `)
-		}
-		query.WriteString(`?`)
-		args = append(args, goal.ID)
+		goalIDs[i] = goal.ID
 	}
-	query.WriteString(`)`)
+	query, args, err := sqlx.In(`SELECT COUNT(*) FROM goals WHERE user_id = ? AND id IN (?)`, userID, goalIDs)
+	if err != nil {
+		return err
+	}
 
 	var matched int
-	if err := exec.GetContext(ctx, &matched, query.String(), args...); err != nil {
+	if err := exec.GetContext(ctx, &matched, exec.Rebind(query), args...); err != nil {
 		return err
 	}
 	if matched != len(goals) {

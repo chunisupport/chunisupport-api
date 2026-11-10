@@ -222,18 +222,21 @@ func (r *honorRepository) DeletePlayerHonors(ctx context.Context, exec repositor
 
 // DeletePlayerHonorsExceptSlots は指定スロットを保持して称号割り当てを削除します。
 func (r *honorRepository) DeletePlayerHonorsExceptSlots(ctx context.Context, exec repository.Executor, playerID int, preservedSlots []int) error {
+	// 保持スロットが空のときは称号割り当てを全削除する。
+	// sqlx.In は空スライスをエラーにするため、NOT IN は組み立てず DeletePlayerHonors へ委譲する。
+	// nil も len が 0 なので同じです。
 	if len(preservedSlots) == 0 {
 		return r.DeletePlayerHonors(ctx, exec, playerID)
 	}
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(preservedSlots)), ", ")
-	query := `DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (` + placeholders + `)`
-	args := make([]any, 0, len(preservedSlots)+1)
-	args = append(args, playerID)
-	for _, slot := range preservedSlots {
-		args = append(args, slot)
+	query, args, err := sqlx.In(
+		`DELETE FROM player_honors WHERE player_id = ? AND slot NOT IN (?)`,
+		playerID, preservedSlots,
+	)
+	if err != nil {
+		return err
 	}
-	_, err := exec.ExecContext(ctx, query, args...)
+	_, err = exec.ExecContext(ctx, exec.Rebind(query), args...)
 	return err
 }
 

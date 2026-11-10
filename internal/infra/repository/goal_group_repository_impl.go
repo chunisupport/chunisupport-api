@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
+	"github.com/jmoiron/sqlx"
 )
 
 type goalGroupRepository struct{}
@@ -138,20 +139,16 @@ func validateGoalGroupOrderPersistence(ctx context.Context, exec repository.Exec
 		return nil
 	}
 
-	var query strings.Builder
-	query.WriteString(`SELECT COUNT(*) FROM goal_groups WHERE user_id = ? AND id IN (`)
-	args := make([]any, 0, len(groups)+1)
-	args = append(args, userID)
+	groupIDs := make([]uint32, len(groups))
 	for i, group := range groups {
-		if i > 0 {
-			query.WriteString(`, `)
-		}
-		query.WriteString(`?`)
-		args = append(args, group.ID)
+		groupIDs[i] = group.ID
 	}
-	query.WriteString(`)`)
+	query, args, err := sqlx.In(`SELECT COUNT(*) FROM goal_groups WHERE user_id = ? AND id IN (?)`, userID, groupIDs)
+	if err != nil {
+		return err
+	}
 	var matched int
-	if err := exec.GetContext(ctx, &matched, query.String(), args...); err != nil {
+	if err := exec.GetContext(ctx, &matched, exec.Rebind(query), args...); err != nil {
 		return err
 	}
 	if matched != len(groups) {

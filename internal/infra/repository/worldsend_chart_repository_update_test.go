@@ -665,6 +665,85 @@ func TestUpdateSongs_UpdatesMultipleRecordsWithMixedChartPresence(t *testing.T) 
 	assert.Equal(t, "新作者2", *chart2.NotesDesigner)
 }
 
+func TestBulkUpdateWorldsend_未設定の発売日と星数はNULLになり対象外は更新しない(t *testing.T) {
+	// Given
+	db := setupWorldsendUpdateDB(t)
+	defer db.Close()
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, is_worldsend)
+		VALUES
+			(1, 'WE001', 'Original Title 1', 'Artist 1', 1, 180, '2024-01-01', 'WEIDX001', 1),
+			(2, 'WE002', 'Original Title 2', 'Artist 2', 1, 200, '2024-02-01', 'WEIDX002', 1),
+			(3, 'WE003', 'Untouched Title', 'Artist 3', 1, 160, '2024-03-01', 'WEIDX003', 1)
+	`)
+	require.NoError(t, err)
+	_, err = db.Exec(`
+		INSERT INTO worldsend_charts (id, song_id, level_star, attribute, notes)
+		VALUES (101, 1, 4, '狂', 1200), (102, 2, 2, '光', 800), (103, 3, 1, '改', 500)
+	`)
+	require.NoError(t, err)
+	repo := &worldsendChartRepository{db: db}
+	genreID := 2
+	bpm := 210
+	releasedAt := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
+	star := levelStarPtrForWorldsendUpdateTest(t, 5)
+	targets := map[string]worldsendUpdateTarget{
+		"WE001": {SongID: 1, ChartID: 101},
+		"WE002": {SongID: 2, ChartID: 102},
+	}
+	updates := []*domainrepo.WorldsendUpdate{
+		{
+			Song: &entity.Song{
+				DisplayID: "WE001", Title: "Updated Title 1", Artist: "Artist 1",
+				GenreID: &genreID, BPM: &bpm, ReleasedAt: nil, Charts: []*entity.Chart{},
+			},
+			Chart: &entity.WorldsendChart{},
+		},
+		{
+			Song: &entity.Song{
+				DisplayID: "WE002", Title: "Updated Title 2", Artist: "Artist 2",
+				GenreID: &genreID, BPM: &bpm, ReleasedAt: &releasedAt, Charts: []*entity.Chart{},
+			},
+			Chart: &entity.WorldsendChart{LevelStar: star},
+		},
+	}
+
+	// When
+	_, err = repo.bulkUpdateSongs(context.Background(), db, updates, targets)
+	require.NoError(t, err)
+	_, _, err = repo.bulkUpdateCharts(context.Background(), db, updates, targets)
+
+	// Then
+	require.NoError(t, err)
+	var songs []struct {
+		ID         int     `db:"id"`
+		Title      string  `db:"title"`
+		ReleasedAt *string `db:"released_at"`
+	}
+	require.NoError(t, db.Select(&songs, `SELECT id, title, released_at FROM songs ORDER BY id`))
+	require.Len(t, songs, 3)
+	assert.Equal(t, "Updated Title 1", songs[0].Title)
+	assert.Nil(t, songs[0].ReleasedAt)
+	assert.Equal(t, "Updated Title 2", songs[1].Title)
+	require.NotNil(t, songs[1].ReleasedAt)
+	assert.Contains(t, *songs[1].ReleasedAt, "2025-04-01")
+	assert.Equal(t, "Untouched Title", songs[2].Title)
+	require.NotNil(t, songs[2].ReleasedAt)
+	assert.Contains(t, *songs[2].ReleasedAt, "2024-03-01")
+
+	var charts []struct {
+		ID        int  `db:"id"`
+		LevelStar *int `db:"level_star"`
+	}
+	require.NoError(t, db.Select(&charts, `SELECT id, level_star FROM worldsend_charts ORDER BY id`))
+	require.Len(t, charts, 3)
+	assert.Nil(t, charts[0].LevelStar)
+	require.NotNil(t, charts[1].LevelStar)
+	assert.Equal(t, 5, *charts[1].LevelStar)
+	require.NotNil(t, charts[2].LevelStar)
+	assert.Equal(t, 1, *charts[2].LevelStar)
+}
+
 func levelStarPtrForWorldsendUpdateTest(t *testing.T, value int) *levelstar.LevelStar {
 	t.Helper()
 

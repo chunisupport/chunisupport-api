@@ -236,31 +236,33 @@ func assignSlots(ctx context.Context, tx *sqlx.Tx, playerID int, assignments []d
 		return nil
 	}
 	// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
-	var slotCase, orderCase, placeholders strings.Builder
+	// CASE式は手書きのままにし、IN句だけを sqlx.In で展開します。引数はすべて整数なのでクエリ全体を渡せます。
+	var slotCase, orderCase strings.Builder
 	slotArgs := make([]any, 0, len(assignments)*2)
 	orderArgs := make([]any, 0, len(assignments)*2)
-	for i, assignment := range assignments {
+	chartIDs := make([]int, 0, len(assignments))
+	for _, assignment := range assignments {
 		slotCase.WriteString(" WHEN ? THEN ?")
 		slotArgs = append(slotArgs, assignment.ChartID, assignment.SlotID)
 		orderCase.WriteString(" WHEN ? THEN ?")
 		orderArgs = append(orderArgs, assignment.ChartID, assignment.Position)
-		if i > 0 {
-			placeholders.WriteString(",")
-		}
-		placeholders.WriteString("?")
+		chartIDs = append(chartIDs, assignment.ChartID)
 	}
-	args := append(slotArgs, orderArgs...)
-	args = append(args, playerID)
-	for _, assignment := range assignments {
-		args = append(args, assignment.ChartID)
-	}
+	args := make([]any, 0, len(slotArgs)+len(orderArgs)+2)
+	args = append(args, slotArgs...)
+	args = append(args, orderArgs...)
+	args = append(args, playerID, chartIDs)
 	query := fmt.Sprintf(`
 		UPDATE player_records
 		SET slot_id = CASE chart_id%s END,
 		    slot_order = CASE chart_id%s END,
 		    updated_at = updated_at
-		WHERE player_id = ? AND chart_id IN (%s)`, slotCase.String(), orderCase.String(), placeholders.String())
-	_, err := tx.ExecContext(ctx, query, args...)
+		WHERE player_id = ? AND chart_id IN (?)`, slotCase.String(), orderCase.String())
+	query, args, err := sqlx.In(query, args...)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, tx.Rebind(query), args...)
 	return err
 }
 
