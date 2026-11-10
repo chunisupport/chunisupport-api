@@ -21,7 +21,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -202,18 +201,11 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	}
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
+		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
+		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, courseRepo, tm, goalRepo,
+	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
-	if configurable, ok := userUsecase.(interface {
-		SetPhysicalDeletionDependencies(usecase.TransactionManager, repository.GoalRepository)
-	}); ok {
-		configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
-	}
-	if configurable, ok := userUsecase.(interface {
-		SetCourseRepository(repository.CourseRepository)
-	}); ok {
-		configurable.SetCourseRepository(courseRepo)
-	}
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, friendshipRepo, masterCache)

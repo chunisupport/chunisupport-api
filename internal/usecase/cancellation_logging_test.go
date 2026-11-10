@@ -49,7 +49,7 @@ func TestCancellationLogging(t *testing.T) {
 		{
 			name: "ユーザー検索",
 			run: func(repoErr error) error {
-				uc := NewUserUsecase(nil, &stubUserRepository{err: repoErr}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+				uc := newUserUsecaseForTest(nil, &stubUserRepository{err: repoErr}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
 				_, err := uc.GetUserProfile(context.Background(), "tester", nil)
 				return err
 			},
@@ -67,7 +67,7 @@ func TestCancellationLogging(t *testing.T) {
 					Player: player,
 					Honors: []*entity.PlayerHonor{},
 				}}
-				uc := NewUserUsecase(nil, &stubUserRepository{user: user}, playerRepo, &stubPlayerRecordRepository{err: repoErr}, nil, nil, nil, nil, nil)
+				uc := newUserUsecaseForTest(nil, &stubUserRepository{user: user}, playerRepo, &stubPlayerRecordRepository{err: repoErr}, nil, nil, nil, nil, nil)
 
 				_, err = uc.GetUserProfileWithRecords(context.Background(), "tester", nil)
 				return err
