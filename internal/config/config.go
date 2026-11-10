@@ -53,6 +53,11 @@ func (l *Logging) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// OpenAI はプロフィールコメントの判定に使う OpenAI Moderation API の認証情報です。
+type OpenAI struct {
+	APIKey string
+}
+
 type Firebase struct {
 	CredentialsFile string
 }
@@ -95,6 +100,7 @@ type Config struct {
 	Firebase               Firebase
 	Turnstile              Turnstile
 	XAPI                   XAPI
+	OpenAI                 OpenAI
 	Database               Database
 	SongBatch              SongBatchConfig   `json:"-"`
 	FeatureFlags           featureflag.Flags `json:"-"`
@@ -276,6 +282,11 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		config.XAPI.ConsumerKey = os.Getenv("X_API_KEY")
 		config.XAPI.ConsumerSecret = os.Getenv("X_API_KEY_SECRET")
 		if err := normalizeAndValidateXAPIConfig(&config.XAPI); err != nil {
+			errors = append(errors, err.Error())
+		}
+
+		config.OpenAI.APIKey = os.Getenv("OPENAI_API_KEY")
+		if err := normalizeAndValidateOpenAIConfig(&config.OpenAI); err != nil {
 			errors = append(errors, err.Error())
 		}
 	}
@@ -482,6 +493,17 @@ func normalizeAndValidateXAPIConfig(xapi *XAPI) error {
 	}
 	if len(errors) > 0 {
 		return fmt.Errorf("%s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+// normalizeAndValidateOpenAIConfig は OpenAI の API キーが設定されていることを検証します。
+// 欠けているとプロフィールコメントを判定できず保存が常に失敗するため、起動時に検出します。
+func normalizeAndValidateOpenAIConfig(openAI *OpenAI) error {
+	openAI.APIKey = strings.TrimSpace(openAI.APIKey)
+	if openAI.APIKey == "" {
+		return fmt.Errorf("OPENAI_API_KEY environment variable is required")
 	}
 
 	return nil

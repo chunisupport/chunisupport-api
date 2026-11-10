@@ -186,6 +186,13 @@ const (
 	XAPIBaseURL = "https://api.x.com"
 	// XAPIRequestTimeout は X API 呼び出し1回あたりの上限時間です。
 	XAPIRequestTimeout = 5 * time.Second
+	// OpenAIAPIBaseURL は OpenAI API のベースURLです。
+	OpenAIAPIBaseURL = "https://api.openai.com"
+	// OpenAIModerationModel はプロフィールコメントの判定に使う Moderation API のモデルです。
+	OpenAIModerationModel = "omni-moderation-latest"
+	// OpenAIModerationRequestTimeout は Moderation API 呼び出し1回あたりの上限時間です。
+	// 判定できない間はコメントを保存しないため、利用者を待たせすぎない長さにします。
+	OpenAIModerationRequestTimeout = 5 * time.Second
 	// XAccountSyncRateLimitRequests は X アカウント情報の取得し直しを許す回数です。
 	// ログインや連携の直後にだけ呼ばれるため、X 側の回数制限に触れない程度に絞ります。
 	XAccountSyncRateLimitRequests = 10

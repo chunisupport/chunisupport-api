@@ -126,6 +126,8 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `username_invalid_char` | ユーザー名に使用できない文字が含まれる |
 | `comment_too_long` | プロフィールコメントが100コードポイントを超えている |
 | `comment_invalid_char` | プロフィールコメントに制御文字などの不正な文字を含む |
+| `comment_inappropriate` | プロフィールコメントが内容判定で不適切とされた |
+| `comment_moderation_unavailable` | OpenAI Moderation API の障害などでプロフィールコメントの内容を判定できない |
 | `not_found` | エンドポイントが見つからない |
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
@@ -1157,6 +1159,8 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 `comment` は必須の文字列です。欠落・null・型不正・未知のフィールドは400です。前後の空白を除去した結果が空なら未設定に戻します（行がなくても成功）。それ以外は100 Unicodeコードポイント以下とし、制御文字（改行・タブを含む）とUnicodeの行区切り・段落区切りを拒否します。文字数と文字種は空白除去後に検証します。
 
+検証を通ったコメントは、保存前に OpenAI Moderation API で内容を判定します。不適切と判定された場合と、判定結果を得られなかった場合は保存しません。未設定に戻す場合は判定しません。
+
 - **レスポンス**: 200 OK
 
 ```json
@@ -1171,8 +1175,10 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 400 Bad Request (`bad_request`): リクエスト形式不正
   - 400 Bad Request (`comment_too_long`): 空白除去後に100コードポイント超過
   - 400 Bad Request (`comment_invalid_char`): 不正な文字を含む
+  - 400 Bad Request (`comment_inappropriate`): 内容判定で不適切とされた
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 500 Internal Server Error (`internal_error`): 保存・削除失敗
+  - 502 Bad Gateway (`comment_moderation_unavailable`): OpenAI Moderation API の障害などで内容を判定できない
 
 ### GET `/internal/me/x-account`
 - **認証**: Firebase Bearer 必須

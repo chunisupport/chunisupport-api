@@ -56,6 +56,7 @@
     TURNSTILE_SECRET_KEY=<Cloudflare Turnstileのシークレットキー>
     X_API_KEY=<XアプリのAPI Key（OAuth 1.0aコンシューマーキー）>
     X_API_KEY_SECRET=<XアプリのAPI Key Secret>
+    OPENAI_API_KEY=<OpenAIのAPIキー（プロフィールコメントの内容判定に使用）>
     DATA_TRANSFER_HMAC_SECRET=<Base64で表現した32バイト以上のランダム値>
     DB_NAME=chunisupport
    DB_HOST=localhost

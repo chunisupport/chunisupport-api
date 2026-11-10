@@ -419,6 +419,33 @@ func TestNormalizeAndValidateTurnstileConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateOpenAIConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  OpenAI
+		wantErr string
+	}{
+		{name: "APIキーがあれば前後の空白を除いて通る", config: OpenAI{APIKey: "  key  "}},
+		{name: "APIキーが空白だけならエラーになる", config: OpenAI{APIKey: "  "}, wantErr: "OPENAI_API_KEY environment variable is required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			err := normalizeAndValidateOpenAIConfig(&tt.config)
+
+			// Then
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, OpenAI{APIKey: "key"}, tt.config)
+		})
+	}
+}
+
 func TestNormalizeAndValidateXAPIConfig(t *testing.T) {
 	tests := []struct {
 		name    string
