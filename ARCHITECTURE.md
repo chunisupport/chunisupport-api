@@ -61,6 +61,8 @@ internal/
 
 chunirec互換APIのユーザー・レコード取得は、`ChunirecUsecase`が公開範囲を判定した後、`domain/repository`の`ChunirecQueryService`を利用します。プロフィールと通常譜面レコードは、それぞれレスポンスに必要な列だけを1回のSQLで取得します。プロフィールの称号はスロット1に限定し、レコードのジャンルはJOINで取得します。単曲レーティングにはドメインサービスを使用します。
 
+プロフィールコメントは `UserProfile` 集約として `User` とは独立した `user_profiles` テーブルに保存します。`UserProfileCommentUsecase` と既存の `UserUsecase` は `user_access.go` の対象ユーザー検索・閲覧判定を共有します。コメントは専用の内部APIだけで取得・更新し、既存プロフィールレスポンスや更新日時キャッシュ、データ移行には含めません。
+
 ### `internal/infra` - インフラストラクチャ層
 
 - **役割**: データベース、外部API、ファイルシステムといった、アプリケーションの関心事の外側にある技術的な詳細を実装します。

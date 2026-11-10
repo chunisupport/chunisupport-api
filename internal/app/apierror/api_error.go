@@ -123,6 +123,9 @@ var (
 	ErrMaintenanceMode            = New(CodeMaintenanceMode, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
+	ErrCommentTooLong     = New(CodeCommentTooLong, http.StatusBadRequest)
+	ErrCommentInvalidChar = New(CodeCommentInvalidChar, http.StatusBadRequest)
+
 	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)
 	ErrUsernameTooShort    = New(CodeUsernameTooShort, http.StatusBadRequest)
 	ErrUsernameTooLong     = New(CodeUsernameTooLong, http.StatusBadRequest)

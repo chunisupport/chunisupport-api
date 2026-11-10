@@ -93,6 +93,7 @@ type Handlers struct {
 	GoalGroup             *api_internal.GoalGroupHandler
 	RecordFilter          *api_internal.RecordFilterHandler
 	XAccount              *api_internal.XAccountHandler
+	UserProfileComment    *api_internal.UserProfileCommentHandler
 	TemporaryPlayerData   *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong      *api_internal.PlayerLockedSongHandler
 	PlayerFavoriteSong    *api_internal.PlayerFavoriteSongHandler
@@ -270,6 +271,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	xAccountUsecase := usecase.NewXAccountUsecase(db, infra.NewXAccountRepository(), firebaseProviderFinder, xapi.NewUserClient(cfg.XAPI.ConsumerKey, cfg.XAPI.ConsumerSecret))
+	userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo)
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -292,6 +294,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
 		RecordFilter:          api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		XAccount:              api_internal.NewXAccountHandler(xAccountUsecase),
+		UserProfileComment:    api_internal.NewUserProfileCommentHandler(userProfileCommentUsecase),
 		TemporaryPlayerData:   api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:      api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
@@ -453,6 +456,7 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
+		meGroup.PUT("/comment", handlers.UserProfileComment.Update)
 		meGroup.PUT("/firebase-account", handlers.Profile.ChangeFirebaseAccount)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
@@ -533,6 +537,7 @@ func registerRoutes(
 	{
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
+		publicUsersGroup.GET("/:username/comment", handlers.UserProfileComment.Get)
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
 		publicUsersGroup.GET("/:username/record/songs/:id", handlers.User.GetUserSongRecord)

@@ -124,6 +124,8 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名に使用できない文字が含まれる |
+| `comment_too_long` | プロフィールコメントが100コードポイントを超えている |
+| `comment_invalid_char` | プロフィールコメントに制御文字などの不正な文字を含む |
 | `not_found` | エンドポイントが見つからない |
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
@@ -302,9 +304,11 @@ Content-Type: application/json
 | `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
 | `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
 | `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
+| `/internal/me/comment` | PUT | Firebase Bearer | プロフィールコメントを保存・削除 |
 | `/internal/me/x-account` | GET | Firebase Bearer | 保存済みの X アカウント（数値IDとユーザー名）を取得 |
 | `/internal/me/x-account` | PUT | Firebase Bearer | X のアクセストークンで本人のユーザー名を取得し直して保存 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
+| `/internal/users/:username/comment` | GET | Firebase Bearer (任意) | 閲覧可能なユーザーのプロフィールコメントを取得 |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
@@ -1140,6 +1144,35 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 401 Unauthorized (`invalid_credentials`): 削除対象アカウントと再認証情報の整合性が取れない認証失敗。詳細理由はレスポンスに含めず、サーバーログで監視します
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
+
+### PUT `/internal/me/comment`
+- **認証**: Firebase Bearer 必須（strict認証。再認証は不要）
+- **リクエストボディ**:
+
+```json
+{
+  "comment": " よろしくお願いします "
+}
+```
+
+`comment` は必須の文字列です。欠落・null・型不正・未知のフィールドは400です。前後の空白を除去した結果が空なら未設定に戻します（行がなくても成功）。それ以外は100 Unicodeコードポイント以下とし、制御文字（改行・タブを含む）とUnicodeの行区切り・段落区切りを拒否します。文字数と文字種は空白除去後に検証します。
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "comment": "よろしくお願いします"
+}
+```
+
+削除時は `{"comment": null}` です。プレイヤー連携解除では消えず、ユーザー物理削除時は削除されます。このPUT固有のレート制限はありません。
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正
+  - 400 Bad Request (`comment_too_long`): 空白除去後に100コードポイント超過
+  - 400 Bad Request (`comment_invalid_char`): 不正な文字を含む
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): 保存・削除失敗
 
 ### GET `/internal/me/x-account`
 - **認証**: Firebase Bearer 必須
@@ -3097,6 +3130,33 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```
 
 ---
+
+### GET `/internal/users/:username/comment`
+- **認証**: Firebase Bearer 任意
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **ミドルウェア・レート制限**: `GET /internal/users/:username/profile` と同じ（任意認証・匿名レート制限）
+- **レスポンス**: 200 OK
+
+```json
+{
+  "comment": "よろしくお願いします"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `comment` | string \| null | 保存済みのコメント。未設定は `null` |
+
+公開ユーザーは誰でも閲覧できます。非公開ユーザーは本人または相互フレンドのみ閲覧でき、許可されていない相手には未発見と同じ404を返します。プレイヤー未連携でも閲覧できます。
+
+コメントは独立したリソースです。既存の `/internal/me` や `/internal/users/:username`、`/profile` などのレスポンスには追加しません。コメント変更では既存の `/updated-at` は更新されないため、コメントはこのエンドポイントから別途取得してください。外部APIとデータ移行の対象には含めません。
+
+- **主なエラー**:
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): ユーザー名の形式不正
+  - 401 Unauthorized (`invalid_token`): 指定された認証情報が不正
+  - 404 Not Found (`user_not_found`): 存在しないユーザー、または閲覧できない非公開ユーザー
+  - 429 Too Many Requests (`too_many_requests`): レート制限超過
+  - 500 Internal Server Error (`internal_error`): 取得失敗
 
 ### GET `/internal/users/:username/profile`
 - **認証**: Firebase Bearer (任意)

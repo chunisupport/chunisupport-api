@@ -165,6 +165,11 @@ func (h *UserHandler) GetUserProfileWithRecords(c *echo.Context) error {
 }
 
 func (h *UserHandler) handleUserProfileError(ctx context.Context, err error, username string, contextDescription string) error {
+	return handleUserProfileError(ctx, err, username, contextDescription)
+}
+
+// handleUserProfileError はプロフィール関連APIで非公開と未発見を区別しない応答を共有します。
+func handleUserProfileError(ctx context.Context, err error, username string, contextDescription string) error {
 	switch {
 	case errors.Is(err, usecase.ErrUserNotFound):
 		return apierror.ErrUserNotFound

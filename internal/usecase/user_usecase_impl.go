@@ -1000,34 +1000,7 @@ func initializeRatingSlotMap() map[string][]*entity.PlayerRecord {
 }
 
 func (s *userUsecase) getAccessibleUser(ctx context.Context, username string, requester *entity.User) (*entity.User, error) {
-	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		if !errors.Is(err, context.Canceled) {
-			slog.ErrorContext(ctx, "failed to find user by username", "username", username, "error", err)
-		}
-		return nil, err
-	}
-
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-
-	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, user, requester)
-	if err != nil {
-		return nil, err
-	}
-	if !accessible {
-		return nil, ErrUserPrivate
-	}
-
-	if !user.HasLinkedPlayer() {
-		return user, nil
-	}
-
-	return user, nil
+	return getAccessibleUser(ctx, s.db, s.userRepo, s.friendshipRepo, username, requester)
 }
 
 func (s *userUsecase) getOptionalPlayer(ctx context.Context, user *entity.User) (*UserPlayerOutput, error) {

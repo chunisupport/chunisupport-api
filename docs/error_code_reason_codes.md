@@ -67,6 +67,8 @@
 | `username_invalid_char` | ユーザー名の文字種不正 |
 | `username_forbidden` | ユーザー名が禁止語に該当 |
 | `username_taken` | ユーザー名が使用済み |
+| `comment_too_long` | プロフィールコメントが100コードポイントを超えている（400） |
+| `comment_invalid_char` | プロフィールコメントに制御文字・行区切り・段落区切りなどの不正な文字を含む（400） |
 | `goal_not_found` | goal未検出 |
 | `goal_limit_exceeded` | goal上限超過 |
 | `goal_invalid_title` | goalタイトル不正 |
