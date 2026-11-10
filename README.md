@@ -20,6 +20,7 @@
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
 - [サーバー新設手順](docs/server_setup.md)
+- [日付の切り替わり](docs/chunithm_specs/date_boundary.md)
 
 ## 技術スタック
 

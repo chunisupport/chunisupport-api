@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/gamedate"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -256,10 +257,8 @@ func insertPreloadMasterRows(t *testing.T, db *sqlx.DB, achievementTypeID int, a
 
 func TestPreload_ExcludesFutureVersions(t *testing.T) {
 	// Given: 3種類のバージョン（過去版・当日版・未リリース版）を投入
-	// Preload と同じ Asia/Tokyo の当日を基準日に使う
-	japanLoc, err := time.LoadLocation("Asia/Tokyo")
-	require.NoError(t, err)
-	today := time.Now().In(japanLoc)
+	// 当日はCHUNITHM日付（日本時間7時切り替え）に合わせる。暦日の0時を基準にすると、7時前の実行で当日版が未公開になる。
+	today := gamedate.Today(time.Now())
 	pastDate := today.AddDate(0, 0, -1)
 	futureDate := today.AddDate(0, 0, 1)
 
@@ -308,22 +307,40 @@ func TestPreload_ExcludesFutureVersions(t *testing.T) {
 	assert.False(t, goalFutureOK, "未リリース版は GoalMasters.VersionsByID に含まれるべき")
 }
 
-func TestCache_PublicVersionsByID_読取時のJST日付で未来版を切り替える(t *testing.T) {
+func TestCache_PublicVersionsByID_稼働日のJST7時で未来版を切り替える(t *testing.T) {
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	future := Version{ID: 2, Name: "CHUNITHM FUTURE", ReleasedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)}
-	now := time.Date(2026, 1, 1, 14, 59, 59, 0, time.UTC)
-	cache := &Cache{
-		now: func() time.Time { return now },
-		allVersions: map[string]Version{
-			future.Name: future,
+	tests := []struct {
+		name    string
+		now     time.Time
+		wantPub bool
+	}{
+		{
+			name:    "稼働日の06時59分59秒は未公開",
+			now:     time.Date(2026, 1, 2, 6, 59, 59, 0, jst),
+			wantPub: false,
 		},
-		allVersionsByID: map[int]Version{int(future.ID): future},
+		{
+			name:    "稼働日の07時00分00秒から公開",
+			now:     time.Date(2026, 1, 2, 7, 0, 0, 0, jst),
+			wantPub: true,
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := &Cache{
+				now: func() time.Time { return tt.now },
+				allVersions: map[string]Version{
+					future.Name: future,
+				},
+				allVersionsByID: map[int]Version{int(future.ID): future},
+			}
 
-	assert.NotContains(t, cache.PublicVersionsByID(), 2)
-	assert.Contains(t, cache.AdminVersions(), 2)
-
-	now = now.Add(time.Second)
-	assert.Contains(t, cache.PublicVersionsByID(), 2)
+			_, published := cache.PublicVersionsByID()[2]
+			assert.Equal(t, tt.wantPub, published)
+			assert.Contains(t, cache.AdminVersions(), 2)
+		})
+	}
 }
 
 func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *testing.T) {

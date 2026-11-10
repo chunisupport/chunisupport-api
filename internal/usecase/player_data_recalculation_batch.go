@@ -13,6 +13,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/gamedate"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -61,14 +62,13 @@ func NewPlayerDataRecalculationBatchUsecase(batchRepository repository.PlayerDat
 
 func (u *PlayerDataRecalculationBatchUsecase) Execute(ctx context.Context) (PlayerDataBatchResult, error) {
 	startedAt := u.now()
-	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
-	operationalTime := startedAt.In(jst).Add(-7 * time.Hour)
-	operationalDate := time.Date(operationalTime.Year(), operationalTime.Month(), operationalTime.Day(), 0, 0, 0, 0, jst)
+	// 運用日はCHUNITHMの「今日」です。公開バージョンと同じく日本時間7時に切り替わります。
+	operationalDate := gamedate.Today(startedAt)
 	snapshot, err := u.repository.LoadSnapshot(ctx, operationalDate)
 	if err != nil {
 		return PlayerDataBatchResult{}, fmt.Errorf("マスタスナップショットの取得に失敗しました: %w", err)
 	}
-	prepared, err := prepareBatchSnapshot(snapshot, operationalDate, jst)
+	prepared, err := prepareBatchSnapshot(snapshot, operationalDate, gamedate.Location())
 	if err != nil {
 		return PlayerDataBatchResult{}, err
 	}
@@ -164,7 +164,7 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 	}
 	prepared := preparedBatchSnapshot{
 		snapshot:         snapshot,
-		versionStartedAt: time.Date(snapshot.Version.ReleasedAt.Year(), snapshot.Version.ReleasedAt.Month(), snapshot.Version.ReleasedAt.Day(), 7, 0, 0, 0, jst),
+		versionStartedAt: gamedate.StartsAt(snapshot.Version.ReleasedAt),
 		songsByID:        make(map[int]repository.BatchSong, len(snapshot.Songs)),
 		chartsByID:       make(map[int]repository.BatchChart, len(snapshot.Charts)),
 		officialIndex:    make(map[int]uint64, len(snapshot.Songs)),
