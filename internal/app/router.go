@@ -21,6 +21,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/domain/featureflag"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -272,7 +273,12 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	xAccountUsecase := usecase.NewXAccountUsecase(db, infra.NewXAccountRepository(), firebaseProviderFinder, xapi.NewUserClient(cfg.XAPI.ConsumerKey, cfg.XAPI.ConsumerSecret))
-	userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo, openaimoderation.NewCommentModerator(cfg.OpenAI.APIKey))
+	// 無効な環境では Moderation クライアントを作らない。キー未設定でも起動でき、APIも呼ばれない。
+	var userProfileCommentHandler *api_internal.UserProfileCommentHandler
+	if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+		userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo, openaimoderation.NewCommentModerator(cfg.OpenAI.APIKey))
+		userProfileCommentHandler = api_internal.NewUserProfileCommentHandler(userProfileCommentUsecase)
+	}
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -295,7 +301,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
 		RecordFilter:          api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		XAccount:              api_internal.NewXAccountHandler(xAccountUsecase),
-		UserProfileComment:    api_internal.NewUserProfileCommentHandler(userProfileCommentUsecase),
+		UserProfileComment:    userProfileCommentHandler,
 		TemporaryPlayerData:   api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:      api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
@@ -457,7 +463,10 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
-		meGroup.PUT("/comment", handlers.UserProfileComment.Update)
+		// 無効時は未登録パスと同じ404にするため、ルート自体を登録しません。
+		if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+			meGroup.PUT("/comment", handlers.UserProfileComment.Update)
+		}
 		meGroup.PUT("/firebase-account", handlers.Profile.ChangeFirebaseAccount)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
@@ -538,7 +547,9 @@ func registerRoutes(
 	{
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
-		publicUsersGroup.GET("/:username/comment", handlers.UserProfileComment.Get)
+		if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+			publicUsersGroup.GET("/:username/comment", handlers.UserProfileComment.Get)
+		}
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
 		publicUsersGroup.GET("/:username/record/songs/:id", handlers.User.GetUserSongRecord)

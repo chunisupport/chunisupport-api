@@ -419,6 +419,29 @@ func TestNormalizeAndValidateTurnstileConfig(t *testing.T) {
 	}
 }
 
+func TestApplyOpenAIConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		wantKey string
+	}{
+		{name: "無効なら空でも通る"},
+		{name: "無効なら空白だけでも通る", key: "  "},
+		{name: "無効でも値は空白を除いて残す", key: "  sk  ", wantKey: "sk"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			openAI := OpenAI{APIKey: tt.key}
+			// When
+			err := applyOpenAIConfig(&openAI, false)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantKey, openAI.APIKey)
+		})
+	}
+}
+
 func TestNormalizeAndValidateOpenAIConfig(t *testing.T) {
 	tests := []struct {
 		name    string

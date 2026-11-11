@@ -42,7 +42,7 @@ go run ./cmd/export-static-data --chart-stats
 | 本番 | `c7e970656a686c79cce6fad84c888d2c` | `https://static.chunisupport.net` |
 
 バッチは既存のログ、タイムゾーン、DB接続設定も使用するため、`APP_ENV`、`DB_NAME`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`も必要です。
-HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`X_API_KEY`、`X_API_KEY_SECRET`、`OPENAI_API_KEY`、`.config/username_forbidden_words.json`は使用しません。
+HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`X_API_KEY`、`X_API_KEY_SECRET`、`OPENAI_API_KEY`、`.config/username_forbidden_words.json`は使用しません。`OPENAI_API_KEY` は API サーバーでも `profile_comment` が有効な環境だけで必須です。
 
 CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します。
 
