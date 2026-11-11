@@ -59,7 +59,8 @@ func newCachePurger(
 	}
 }
 
-// Purge はOrigin別のキャッシュを残さないよう、各公開JSONのファイル名まで含むプレフィックスを指定します。
+// Purge は実行環境の公開ホストに対して、各公開JSONのファイル名まで含むプレフィックスを削除します。
+// ホストは STATIC_DATA_PUBLIC_BASE_URL、Zoneは CLOUDFLARE_ZONE_ID で、別環境の配信先は消しません。
 func (p *CachePurger) Purge(ctx context.Context, objectKeys []string) error {
 	prefixes := make([]string, 0, len(objectKeys))
 	for _, objectKey := range objectKeys {

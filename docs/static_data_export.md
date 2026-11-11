@@ -26,25 +26,20 @@ go run ./cmd/export-static-data --chart-stats
 
 | 環境変数 | 内容 | 例 |
 | --- | --- | --- |
-| `OBJECT_STORAGE_ENDPOINT_URL` | S3互換APIエンドポイント。HTTPSのオリジンのみ指定 | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
+| `OBJECT_STORAGE_ENDPOINT_URL` | その環境のS3互換APIエンドポイント。HTTPSのオリジンのみ指定 | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
 | `OBJECT_STORAGE_ACCESS_KEY_ID` | 対象バケットへ書き込み可能な認証情報のAccess Key ID | `...` |
 | `OBJECT_STORAGE_SECRET_ACCESS_KEY` | 同じ認証情報のSecret Access Key | `...` |
-| `OBJECT_STORAGE_BUCKET_NAME` | 公開用オブジェクトを保存する既存バケット名 | `chunisupport-public` |
-| `CLOUDFLARE_API_TOKEN` | 対象Zoneの`Cache Purge`権限だけを持つAPIトークン | `...` |
-| `CLOUDFLARE_ZONE_ID` | 公開カスタムドメインが属するCloudflare Zone ID | 下表参照 |
-| `STATIC_DATA_PUBLIC_BASE_URL` | オブジェクトを配信するHTTPSカスタムドメイン。パスは指定しない | 下表参照 |
+| `OBJECT_STORAGE_BUCKET_NAME` | その環境の公開用バケット名 | `<bucket>` |
+| `CLOUDFLARE_API_TOKEN` | その環境のZoneの`Cache Purge`権限だけを持つAPIトークン | `...` |
+| `CLOUDFLARE_ZONE_ID` | その環境の公開ホストが属するCloudflare Zone ID | `<32文字の16進数>` |
+| `STATIC_DATA_PUBLIC_BASE_URL` | その環境の公開HTTPSオリジン。パスは指定しない | `https://<public-host>` |
 
-環境ごとの公開先は次のとおりです。開発とステージングは同じ公開先を使用します。
-
-| 環境 | `CLOUDFLARE_ZONE_ID` | `STATIC_DATA_PUBLIC_BASE_URL` |
-| --- | --- | --- |
-| 開発・ステージング | `575f883bc4eb7c2d89c56ee987c73873` | `https://static.chunisup-dev.f5.si` |
-| 本番 | `c7e970656a686c79cce6fad84c888d2c` | `https://static.chunisupport.net` |
+開発、ステージング、本番は、エンドポイント、バケット、Zone、公開ホストが互いに異なります。これらの値はコードにも `.config/<APP_ENV>.settings.json` にも書かず、その環境のEnvironmentFileまたはSecretだけで与えます。`APP_ENV` はログ、タイムゾーン、DBプール用の設定ファイルの選択に使い、公開先の選択には使いません。バイナリは、実行時の環境変数が指すバケットへ書き、同じ実行の `STATIC_DATA_PUBLIC_BASE_URL` のホストと `CLOUDFLARE_ZONE_ID` だけをパージします。
 
 バッチは既存のログ、タイムゾーン、DB接続設定も使用するため、`APP_ENV`、`DB_NAME`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`も必要です。
 HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`X_API_KEY`、`X_API_KEY_SECRET`、`OPENAI_API_KEY`、`.config/username_forbidden_words.json`は使用しません。`OPENAI_API_KEY` は API サーバーでも `profile_comment` が有効な環境だけで必須です。
 
-CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します。
+CORSとバケットの公開設定はリポジトリに含まれず、Cloudflare側で設定します。公開JSONの `Cache-Control` はアップロード時にオブジェクトへ付与します。`.json` はCloudflareの既定では拡張子キャッシュの対象外です。エッジがキャッシュしている場合、それはゾーンのCache Ruleなどリポジトリ外の設定です。その設定がオリジンの `Cache-Control` を書き換えたり、Browser Cache TTLを上書きしたりすると、ここで付けたヘッダーはブラウザへ届きません。Browser Cache TTLはオリジンのヘッダーを尊重してください。
 
 ## 保存するオブジェクト
 
@@ -59,7 +54,14 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `compat/reiwa/1/chunirec_all.json` | `GET /compat/reiwa/1/chunirec_all.json` と同じ通常楽曲・WORLD'S END楽曲のreiwa互換配列 |
 | `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列。実行時点で稼働開始済みのバージョンだけを含みます。切り替わりは日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。稼働日の0:00〜7:00に実行した書き出しには、その新バージョンはまだ入りません |
 
-アップロード時の `Content-Type` は `application/json; charset=utf-8` です。
+アップロード時の `Content-Type` は `application/json; charset=utf-8` です。`Cache-Control` は `public, max-age=300, s-maxage=3600` です（`internal/info` の `StaticDataJSONBrowserMaxAge` が5分、`StaticDataJSONEdgeMaxAge` が1時間）。この値は開発、ステージング、本番で同じです。公開ホストやバケットでは分けません。
+
+オブジェクトキーはAPIの版（`v1` や `compat`）を含む固定パスで、内容のハッシュや世代は含みません。実行のたびに同じキーを上書きし、全PUT成功後にそのファイル名までをプレフィックスパージします。パージが消すのはCloudflareのエッジキャッシュだけで、ブラウザが保持しているコピーは消えません。ブラウザの `max-age` を5分にしているのは、リロードのたびにJSON全体を取り直さず、エクスポート後はおおむね5分以内の再取得で新しい内容を使うためです。期限内の再読み込みはネットワークへ行きません。期限後は `ETag` による再検証になり、内容が同じなら本文は再送されません。
+
+エッジの `s-maxage` は1時間です。パージが成功すればエクスポート直後にエッジのコピーは捨てられるので、この1時間は通常の更新遅延にはなりません。パージが失敗するとバッチは終了コード `1` になりますが、それより前のPUTは残ります。そのときエッジが古いオブジェクトを出し続ける上限が1時間です。楽曲一覧の実行間隔（6時間）より短く、失敗に気づくまでの通知目安（最後の正常終了から12時間）より先にオリジンへ戻します。`immutable` は付けません。同じURLの中身が変わるためです。
+
+`Cache-Control` はオブジェクトのメタデータです。再PUTされるまで既存オブジェクトの値は変わりません。これまでにアップロードしたオブジェクトには `Cache-Control` を付けていないため、再PUTまでメタデータは空のままです。現行の配信が `Cache-Control: no-store` なのは、このバッチが保存した値ではありません。引数なしの実行は6オブジェクトを毎回すべて上書きし、`--chart-stats` は12オブジェクトを毎回すべて上書きします。片方の実行はもう一方のオブジェクトに触れません。譜面統計バッチ（`cmd/chart-stats-batch`）はこのJSONをアップロードしません。デプロイ後は、各モードの次回の正常終了で、そのモードが書くオブジェクトのヘッダーが置き換わります。ヘッダーだけを付け直す処理はないため、スケジュールを待たずに反映する場合は両モードを1回ずつ実行します。途中のPUTが失敗すると、それより前のオブジェクトだけ新しい `Cache-Control` になり、パージは走りません。次回の正常実行で揃います。
+
 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、またはreiwa互換バージョンが0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。
 
 6種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。ただし、各オブジェクトのPUTは単一トランザクションではありません。
@@ -67,7 +69,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 
 6オブジェクトのPUTがすべて成功した後、各公開JSONのファイル名まで含むプレフィックスを1回のCloudflare APIリクエストでパージします。
 
-パージは`POST /zones/{zone_id}/purge_cache`へ、`{"prefixes":["static.chunisupport.net/v1/songs.json", ...]}`の形式で送信します。プレフィックスにはホストとファイル名までのパスを指定し、スキーム・クエリ・フラグメントを含めません。
+パージは`POST /zones/{zone_id}/purge_cache`へ、`{"prefixes":["<公開ホスト>/v1/songs.json", ...]}`の形式で送信します。`{zone_id}` は `CLOUDFLARE_ZONE_ID`、公開ホストは `STATIC_DATA_PUBLIC_BASE_URL` のホストです。プレフィックスにはスキーム・クエリ・フラグメントを含めません。
 
 これにより、Originなどのキャッシュキーヘッダーやクエリの値によらず、対象JSONのキャッシュを削除します。ホスト全体やディレクトリ全体の削除は行いません。ただし、同じファイル名を先頭に持つURLもプレフィックスの一致対象になります。
 
@@ -162,7 +164,7 @@ WORLD'S ENDの行は`const`と`is_const_unknown`の代わりに、nullableな`le
 }
 ```
 
-12種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。すべてのPUTが成功した後、12の公開JSONそれぞれのファイル名まで含むプレフィックスを1回のCloudflare APIリクエストでパージします。途中のPUTが失敗した場合の整合性とパージの再試行規則は、楽曲・譜面一覧と同じです。
+12種類のJSONはオブジェクトストレージへの書き込み開始前に生成します。`Content-Type` と `Cache-Control` は楽曲・譜面一覧と同じです。すべてのPUTが成功した後、12の公開JSONそれぞれのファイル名まで含むプレフィックスを1回のCloudflare APIリクエストでパージします。途中のPUTが失敗した場合の整合性とパージの再試行規則は、楽曲・譜面一覧と同じです。
 
 ## スケジュールと監視
 

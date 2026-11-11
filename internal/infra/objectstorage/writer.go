@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -49,7 +50,8 @@ func newWriter(client putObjectClient, bucketName string) *Writer {
 }
 
 // PutJSON は指定した固定キーへJSONを上書きします。
-// PutObjectが成功するまで既存オブジェクトは置き換わらないため、失敗時は前回のJSONが残ります。
+// PutObjectが成功するまで既存オブジェクトは置き換わらないため、失敗時は前回のJSONとCache-Controlが残ります。
+// Cache-Controlはオブジェクトのメタデータなので、上書きしたキーだけが新しい値になります。
 func (w *Writer) PutJSON(ctx context.Context, objectKey string, body []byte) error {
 	_, err := w.client.PutObject(
 		ctx,
@@ -57,7 +59,10 @@ func (w *Writer) PutJSON(ctx context.Context, objectKey string, body []byte) err
 		objectKey,
 		bytes.NewReader(body),
 		int64(len(body)),
-		minio.PutObjectOptions{ContentType: jsonContentType},
+		minio.PutObjectOptions{
+			ContentType:  jsonContentType,
+			CacheControl: info.StaticDataJSONCacheControl(),
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to put object storage object %s: %w", objectKey, err)

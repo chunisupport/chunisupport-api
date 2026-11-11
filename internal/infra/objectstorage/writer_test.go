@@ -54,4 +54,6 @@ func TestWriterPutJSON_JSON用メタデータでアップロードする(t *test
 	assert.Equal(t, body, client.body)
 	assert.Equal(t, int64(len(body)), client.size)
 	assert.Equal(t, "application/json; charset=utf-8", client.options.ContentType)
+	// 固定キーの上書きなので、ブラウザは短時間だけ再利用し、エッジはパージ失敗時の上限まで保持する。
+	assert.Equal(t, "public, max-age=300, s-maxage=3600", client.options.CacheControl)
 }
