@@ -13,7 +13,7 @@
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
 - `X_API_KEY` (必須。X アプリの OAuth 1.0a コンシューマーキー（API Key）)
 - `X_API_KEY_SECRET` (必須。X アプリの OAuth 1.0a コンシューマーシークレット（API Key Secret）)
-- `OPENAI_API_KEY` (必須。プロフィールコメントの内容判定に使う OpenAI の API キー)
+- `OPENAI_API_KEY` (フィーチャーフラグ `profile_comment` が有効な環境では必須。プロフィールコメントの内容判定に使う OpenAI の API キー。無効な環境では未設定でも起動できます)
 - `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
@@ -186,7 +186,18 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 
 ## feature-flag（機能のリリース切り替え）
 
-`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。現在の登録フラグは0件で、YAMLにはコメントの書式例だけを置いています。
+`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。フラグ自体を切り替える環境変数はありません。`APP_ENV` が `develop` / `staging` / `production` のどれかに対応する値を選びます。
+
+現在の登録フラグは `profile_comment`（プロフィールコメント）だけです。
+
+```yaml
+profile_comment:
+  develop: true
+  staging: true
+  production: false
+```
+
+`develop` と `staging` では `PUT /internal/me/comment` と `GET /internal/users/:username/comment` を登録し、保存時に OpenAI Moderation API を呼びます。`production` は明示的に `false` です。本番の設定ファイルや環境変数へ何も足さなくても無効になり、省略した場合と同じです。無効時は両エンドポイントを登録しないため、未登録パスと同じ 404 になります。Moderation クライアントは作らないので API は呼ばれず、`OPENAI_API_KEY` も不要です。コメントは専用エンドポイント以外のレスポンスには含まれません。フロントへフラグ一覧を返す API はありません。
 
 ### ファイル形式と検証
 
@@ -220,7 +231,7 @@ APIとバッチは共通の `loadConfig` を通り、全環境のYAML定義を�
 
 ### 利用ルール
 
-- フラグで制御するのは機能を使えるかどうかだけです。必須設定や外部サービスの初期化は変更しません。
+- フラグで制御するのは機能を使えるかどうかだけです。必須設定や外部サービスの初期化は変更しません。例外として `profile_comment` が無効なときは、その機能専用の OpenAI Moderation クライアントを作らず、`OPENAI_API_KEY` も必須にしません。有効なときだけキーを必須にし、クライアントを初期化します。
 - 新しいエンドポイントはrouterで登録を切り替え、無効時は404にします。
 - 既存処理の切り替えや、APIとCLIの両方で使う処理はusecaseで判定します。handlerとusecaseでの二重判定は必須ではありません。
 - 無効時に404以外を返す必要があれば、機能を追加する際に決めて `docs/API.md` に記載します。
@@ -277,16 +288,15 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 
 ## OpenAI Moderation API
 
-プロフィールコメントの保存（`PUT /internal/me/comment`）では、文字数と文字種の検証後に OpenAI Moderation API（`POST /v1/moderations`、モデル `omni-moderation-latest`）で内容を判定します。
+プロフィールコメントの保存（`PUT /internal/me/comment`）では、文字数と文字種の検証後に OpenAI Moderation API（`POST /v1/moderations`、モデル `omni-moderation-latest`）で内容を判定します。この処理とコメントAPIの登録は、フィーチャーフラグ `profile_comment` が有効な環境だけです。現在の定義では `develop` と `staging` が有効、`production` が無効です。
 
-- 環境変数 `OPENAI_API_KEY` に OpenAI の API キーを設定してください
+- 有効な環境では、環境変数 `OPENAI_API_KEY` に OpenAI の API キーを設定してください。未設定または空白だけの場合、アプリケーションは起動時にエラーで終了します
+- 無効な環境ではキーが未設定でも起動します。Moderation クライアントは作らず、APIは呼びません
 - 送信するのは空白除去後のコメント本文だけです。ユーザー名やIDなど、利用者を特定できる情報は送信しません
 - 応答の `flagged` が `true` のコメントは保存しません
 - 通信の失敗、タイムアウト（5秒）、2xx 以外の応答など、判定結果を得られなかった場合も保存しません
 - コメントの削除（空文字列の保存）は判定せずに実行します
 - 判定の対象は保存時のコメントだけです。導入前に保存されたコメントは判定しません
-
-`OPENAI_API_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
 ## オブジェクトストレージ静的データ
 

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -96,6 +98,90 @@ func TestEmbeddedFeatureFlags(t *testing.T) {
 			_, err := parseFeatureFlags(featureFlagYAML, env, names)
 			// Then
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestEmbeddedProfileCommentFlag(t *testing.T) {
+	tests := []struct {
+		name        string
+		env         string
+		wantEnabled bool
+	}{
+		{name: "developは有効", env: info.AppEnvDevelop, wantEnabled: true},
+		{name: "stagingは有効", env: info.AppEnvStaging, wantEnabled: true},
+		{name: "productionは無効", env: info.AppEnvProduction},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			names := featureflag.RegisteredNames()
+			// When
+			flags, err := parseFeatureFlags(featureFlagYAML, tt.env, names)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantEnabled, flags.Enabled(featureflag.ProfileComment))
+		})
+	}
+}
+
+func TestLoadConfig_プロフィールコメントの環境とOpenAIキー(t *testing.T) {
+	tests := []struct {
+		name        string
+		env         string
+		apiKey      string
+		wantEnabled bool
+		wantKey     string
+		wantErr     string
+	}{
+		{name: "developは有効でキーが必要", env: info.AppEnvDevelop, wantErr: "OPENAI_API_KEY environment variable is required"},
+		{name: "developはキーがあれば有効", env: info.AppEnvDevelop, apiKey: "  sk-test  ", wantEnabled: true, wantKey: "sk-test"},
+		{name: "stagingは有効でキーが必要", env: info.AppEnvStaging, wantErr: "OPENAI_API_KEY environment variable is required"},
+		{name: "stagingはキーがあれば有効", env: info.AppEnvStaging, apiKey: "sk-test", wantEnabled: true, wantKey: "sk-test"},
+		{name: "productionはキーなしでも起動でき無効", env: info.AppEnvProduction},
+		{name: "productionはキーがあっても無効", env: info.AppEnvProduction, apiKey: "sk-test", wantKey: "sk-test"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			t.Chdir(t.TempDir())
+			require.NoError(t, os.MkdirAll(info.ConfigDir, 0o750))
+			settings := []byte(`{
+				"timezone": "UTC",
+				"logging": {"level": "info", "stdout": true},
+				"shutdown_timeout_seconds": 1,
+				"database": {"pool": {
+					"max_open_conns": 2, "max_idle_conns": 2,
+					"conn_max_lifetime_sec": 300, "conn_max_idle_time_sec": 60
+				}}
+			}`)
+			require.NoError(t, os.WriteFile(filepath.Join(info.ConfigDir, tt.env+".settings.json"), settings, 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile), []byte(`{"exact":[],"contains":[]}`), 0o600))
+			t.Setenv("APP_ENV", tt.env)
+			t.Setenv("DB_NAME", "test")
+			t.Setenv("DB_HOST", "localhost")
+			t.Setenv("DB_PORT", "3306")
+			t.Setenv("DB_USER", "test")
+			t.Setenv("DB_PASS", "test")
+			t.Setenv("FIREBASE_CREDENTIALS_FILE", "firebase.json")
+			t.Setenv("TURNSTILE_SECRET_KEY", "turnstile")
+			t.Setenv("X_API_KEY", "x-key")
+			t.Setenv("X_API_KEY_SECRET", "x-secret")
+			t.Setenv("OPENAI_API_KEY", tt.apiKey)
+			t.Setenv("DATA_TRANSFER_HMAC_SECRET", base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("a"), 32)))
+
+			// When
+			cfg, err := LoadConfig()
+
+			// Then
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantEnabled, cfg.FeatureFlags.Enabled(featureflag.ProfileComment))
+			assert.Equal(t, tt.wantKey, cfg.OpenAI.APIKey)
 		})
 	}
 }

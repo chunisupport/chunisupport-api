@@ -286,7 +286,8 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		}
 
 		config.OpenAI.APIKey = os.Getenv("OPENAI_API_KEY")
-		if err := normalizeAndValidateOpenAIConfig(&config.OpenAI); err != nil {
+		// プロフィールコメントが無効な環境ではキーがなくても起動できるようにします。
+		if err := applyOpenAIConfig(&config.OpenAI, config.FeatureFlags.Enabled(featureflag.ProfileComment)); err != nil {
 			errors = append(errors, err.Error())
 		}
 	}
@@ -496,6 +497,16 @@ func normalizeAndValidateXAPIConfig(xapi *XAPI) error {
 	}
 
 	return nil
+}
+
+// applyOpenAIConfig はプロフィールコメントが有効なときだけ API キーを必須にします。
+// 無効な環境では Moderation クライアントを作らないため、キーがなくても起動できます。
+func applyOpenAIConfig(openAI *OpenAI, required bool) error {
+	if !required {
+		openAI.APIKey = strings.TrimSpace(openAI.APIKey)
+		return nil
+	}
+	return normalizeAndValidateOpenAIConfig(openAI)
 }
 
 // normalizeAndValidateOpenAIConfig は OpenAI の API キーが設定されていることを検証します。

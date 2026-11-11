@@ -306,11 +306,11 @@ Content-Type: application/json
 | `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
 | `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
 | `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
-| `/internal/me/comment` | PUT | Firebase Bearer | プロフィールコメントを保存・削除 |
+| `/internal/me/comment` | PUT | Firebase Bearer | プロフィールコメントを保存・削除（`profile_comment` が有効なときだけ登録） |
 | `/internal/me/x-account` | GET | Firebase Bearer | 保存済みの X アカウント（数値IDとユーザー名）を取得 |
 | `/internal/me/x-account` | PUT | Firebase Bearer | X のアクセストークンで本人のユーザー名を取得し直して保存 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
-| `/internal/users/:username/comment` | GET | Firebase Bearer (任意) | 閲覧可能なユーザーのプロフィールコメントを取得 |
+| `/internal/users/:username/comment` | GET | Firebase Bearer (任意) | 閲覧可能なユーザーのプロフィールコメントを取得（`profile_comment` が有効なときだけ登録） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
@@ -1148,6 +1148,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 
 ### PUT `/internal/me/comment`
+- **フィーチャーフラグ**: `profile_comment` が有効な環境だけルートを登録します。無効なときは未登録パスと同じ 404 (`not_found`) で、認証やメンテナンス判定より前に返します。OpenAI Moderation API は呼びません。現在の定義では `develop` と `staging` が有効、`production` が無効です。設定は [configuration.md](configuration.md) を参照してください
 - **認証**: Firebase Bearer 必須（strict認証。再認証は不要）
 - **リクエストボディ**:
 
@@ -3138,6 +3139,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ---
 
 ### GET `/internal/users/:username/comment`
+- **フィーチャーフラグ**: `profile_comment` が有効な環境だけルートを登録します。無効なときは未登録パスと同じ 404 (`not_found`) です。現在の定義では `develop` と `staging` が有効、`production` が無効です
 - **認証**: Firebase Bearer 任意
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
 - **ミドルウェア・レート制限**: `GET /internal/users/:username/profile` と同じ（任意認証・匿名レート制限）
