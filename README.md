@@ -6,6 +6,7 @@
 
 - **内部API認証**: `/internal` エンドポイントでは Firebase ID トークンによる Bearer 認証を提供します。
 - **APIトークン認証**: 外部クライアント向けに、1ユーザーあたり最大10個の名前付き永続APIキーで保護された `/v1` エンドポイントを提供します。
+- **プロフィールコメント**: 最大100文字の一言コメントを設定できます。閲覧範囲はプロフィールと共通で、プレイヤー連携解除後も保持します。
 - **プレイヤー情報**: ユーザーに紐づくプレイヤー情報を管理します。
 - **楽曲データ**: CHUNITHMの公式楽曲データを元にしたデータベースを提供します。データは同梱の楽曲データ収集バッチ（`cmd/song-batch`）で構築し、ADMINは管理画面からも実行できます。
 - **譜面統計**: ベスト枠平均レーティング帯ごとのランク・ランプ分布とベスト枠採用率を提供します。統計は同梱の譜面統計バッチ（`cmd/chart-stats-batch`）で再構築し、ADMINは管理画面からも実行できます。
@@ -20,6 +21,7 @@
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
 - [サーバー新設手順](docs/server_setup.md)
+- [日付の切り替わり](docs/chunithm_specs/date_boundary.md)
 
 ## 技術スタック
 
@@ -54,6 +56,7 @@
     TURNSTILE_SECRET_KEY=<Cloudflare Turnstileのシークレットキー>
     X_API_KEY=<XアプリのAPI Key（OAuth 1.0aコンシューマーキー）>
     X_API_KEY_SECRET=<XアプリのAPI Key Secret>
+    OPENAI_API_KEY=<OpenAIのAPIキー（profile_comment が有効な環境で必須。develop と staging）>
     DATA_TRANSFER_HMAC_SECRET=<Base64で表現した32バイト以上のランダム値>
     DB_NAME=chunisupport
    DB_HOST=localhost
@@ -189,7 +192,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 
 `go run ./cmd/recalculate-player-data` は最新マスタに基づいて全プレイヤーのRatingとOVER POWERを再計算します。MySQLアドバイザリロックで多重起動を防ぎ、プレイヤー単位のトランザクションで処理します。運用ではJST 07:00（UTC 22:00）前後を避け、cronまたはsystemd timerから1日1回起動してください。cronと、`OnCalendar=` にタイムゾーンを書かないsystemd timerはサーバーのタイムゾーンで動くため、UTCのサーバーではUTCに換算した時刻を指定します。`OnCalendar=` に `Asia/Tokyo` を書いた場合はJSTの時刻をそのまま指定します（[サーバー構築手順](docs/server_setup.md) の「cronの時刻の注意」を参照）。
 
-バッチは開始時に、計算に使うマスタ項目（バージョン、楽曲の配信日・削除・WORLD'S END・`official_idx`、譜面の楽曲・難易度名・譜面定数、枠ID）と `info.PlayerRecalculationLogicVersion` からSHA-256のフィンガープリントを求めます。マスタ項目と処理対象のプレイヤーID上限は読み取り専用の単一 REPEATABLE READ トランザクションでまとめて取得するため、取得中にマスタ編集がコミットされても1回の実行で異なる世代のマスタは混在しません。再計算に成功したプレイヤーには `players.recalculated_master_fingerprint` へその値を記録し、次回以降は記録が一致するプレイヤーを処理対象から除外します。登録と未解禁曲の更新は計算値を変更する際に記録を `NULL` に戻し、楽曲削除に伴う未解禁登録の一括削除も影響するプレイヤーの記録を `NULL` に戻すため、次回のバッチで再計算されます。データ引き継ぎで作成したプレイヤーは記録が `NULL` のまま作成されます。Rating・OVER POWER・枠構築の計算結果が変わる修正をした場合は、`info.PlayerRecalculationLogicVersion` の値を上げて全プレイヤーを再計算させてください。緊急時は `UPDATE players SET recalculated_master_fingerprint = NULL` でも全員を再計算対象に戻せます。
+バッチは開始時に、計算に使うマスタ項目（バージョン、楽曲の配信日・削除・WORLD'S END・`official_idx`、譜面の楽曲・難易度名・譜面定数、枠ID）と `info.PlayerRecalculationLogicVersion` からSHA-256のフィンガープリントを求めます。マスタ項目と処理対象のプレイヤーID上限は読み取り専用の単一 REPEATABLE READ トランザクションでまとめて取得するため、取得中にマスタ編集がコミットされても1回の実行で異なる世代のマスタは混在しません。再計算に成功したプレイヤーには `players.recalculated_master_fingerprint` へその値を記録し、次回以降は記録が一致するプレイヤーを処理対象から除外します。登録と未解禁曲の更新は計算値を変更する際に記録を `NULL` に戻し、楽曲削除に伴う未解禁登録の一括削除も影響するプレイヤーの記録を `NULL` に戻すため、次回のバッチで再計算されます。データ引き継ぎで作成したプレイヤーは記録が `NULL` のまま作成されます。Rating・OVER POWER・枠構築の計算結果が変わる修正をした場合は、`info.PlayerRecalculationLogicVersion` の値を上げて全プレイヤーを再計算させてください。緊急時は `UPDATE players SET recalculated_master_fingerprint = NULL` でも全員を再計算対象に戻せます。mysql CLI などで手作業の SQL を実行する場合は、最初にセッションのタイムゾーンを UTC にしてください（[手作業SQLのタイムゾーン](docs/configuration.md#手作業sqlのタイムゾーン)）。
 
 APIとバッチは `players.recalculated_master_fingerprint` を読み書きするため、マイグレーション `000055` を適用してから新しいバイナリをデプロイしてください。適用直後はすべての記録が `NULL` のため、初回のバッチは全プレイヤーを再計算します。
 

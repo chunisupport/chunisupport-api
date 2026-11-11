@@ -124,6 +124,10 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `username_too_short` | ユーザー名が短すぎる |
 | `username_too_long` | ユーザー名が長すぎる |
 | `username_invalid_char` | ユーザー名に使用できない文字が含まれる |
+| `comment_too_long` | プロフィールコメントが100コードポイントを超えている |
+| `comment_invalid_char` | プロフィールコメントに制御文字などの不正な文字を含む |
+| `comment_inappropriate` | プロフィールコメントが内容判定で不適切とされた |
+| `comment_moderation_unavailable` | OpenAI Moderation API の障害などでプロフィールコメントの内容を判定できない |
 | `not_found` | エンドポイントが見つからない |
 | `too_many_requests` | レートリミット超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
@@ -302,9 +306,11 @@ Content-Type: application/json
 | `/internal/me/record-filters` | POST | Firebase Bearer | レコードフィルタを保存 |
 | `/internal/me/record-filters/:id` | PUT | Firebase Bearer | 保存済みレコードフィルタを更新 |
 | `/internal/me/record-filters/:id` | DELETE | Firebase Bearer | 保存済みレコードフィルタを削除 |
+| `/internal/me/comment` | PUT | Firebase Bearer | プロフィールコメントを保存・削除（`profile_comment` が有効なときだけ登録） |
 | `/internal/me/x-account` | GET | Firebase Bearer | 保存済みの X アカウント（数値IDとユーザー名）を取得 |
 | `/internal/me/x-account` | PUT | Firebase Bearer | X のアクセストークンで本人のユーザー名を取得し直して保存 |
 | `/internal/users/` | GET | Firebase Bearer (ADMIN+) | 全ユーザー一覧取得（プライベート・プレイヤー未紐付けを含む） |
+| `/internal/users/:username/comment` | GET | Firebase Bearer (任意) | 閲覧可能なユーザーのプロフィールコメントを取得（`profile_comment` が有効なときだけ登録） |
 | `/internal/users/:username/profile` | GET | Firebase Bearer (任意) | ユーザー名とプレイヤー情報のみ取得 |
 | `/internal/users/:username/updated-at` | GET | Firebase Bearer (任意) | ユーザー関連データの最終更新日時のみ取得 |
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
@@ -1141,6 +1147,40 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 404 Not Found (`user_not_found`): ユーザーが見つからない
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー（DB削除失敗など）
 
+### PUT `/internal/me/comment`
+- **フィーチャーフラグ**: `profile_comment` が有効な環境だけルートを登録します。無効なときは未登録パスと同じ 404 (`not_found`) で、認証やメンテナンス判定より前に返します。OpenAI Moderation API は呼びません。現在の定義では `develop` と `staging` が有効、`production` が無効です。設定は [configuration.md](configuration.md) を参照してください
+- **認証**: Firebase Bearer 必須（strict認証。再認証は不要）
+- **リクエストボディ**:
+
+```json
+{
+  "comment": " よろしくお願いします "
+}
+```
+
+`comment` は必須の文字列です。欠落・null・型不正・未知のフィールドは400です。前後の空白を除去した結果が空なら未設定に戻します（行がなくても成功）。それ以外は100 Unicodeコードポイント以下とし、制御文字（改行・タブを含む）とUnicodeの行区切り・段落区切りを拒否します。文字数と文字種は空白除去後に検証します。
+
+検証を通ったコメントは、保存前に OpenAI Moderation API で内容を判定します。不適切と判定された場合と、判定結果を得られなかった場合は保存しません。未設定に戻す場合は判定しません。
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "comment": "よろしくお願いします"
+}
+```
+
+削除時は `{"comment": null}` です。プレイヤー連携解除では消えず、ユーザー物理削除時は削除されます。このPUT固有のレート制限はありません。
+
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): リクエスト形式不正
+  - 400 Bad Request (`comment_too_long`): 空白除去後に100コードポイント超過
+  - 400 Bad Request (`comment_invalid_char`): 不正な文字を含む
+  - 400 Bad Request (`comment_inappropriate`): 内容判定で不適切とされた
+  - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
+  - 500 Internal Server Error (`internal_error`): 保存・削除失敗
+  - 502 Bad Gateway (`comment_moderation_unavailable`): OpenAI Moderation API の障害などで内容を判定できない
+
 ### GET `/internal/me/x-account`
 - **認証**: Firebase Bearer 必須
 - **レスポンス**: 200 OK
@@ -1922,7 +1962,7 @@ curl -X POST \
 
 1. **本枠の判定**:
    - 登録時は公式 `best` と `new` だけを集計し、候補枠を含めません
-   - 日次バッチでは現行版プレイヤーの正常な公式本枠を保持します。最終プレイ日時が現行バージョン稼働日のJST 07:00以降であるプレイヤーを現行版として扱います
+   - 日次バッチでは現行版プレイヤーの正常な公式本枠を保持します。最終プレイ日時が現行バージョン稼働日のJST 07:00以降であるプレイヤーを現行版として扱います。今日と現行バージョンの切り替わりは [日付の切り替わり](chunithm_specs/date_boundary.md) のとおりで、公開バージョン一覧も同じ時刻です
    - 旧版プレイヤーと、対象となる通常譜面の記録があるのに `best` / `new` 本枠が両方とも空、または本枠の件数・`slot_order` が不正な現行版プレイヤーは、最新マスタと対象となる通常譜面のスコアから枠を再構築します
    - 候補枠だけが不正な現行版プレイヤーは公式本枠を保持し、枠を再構築しません
    - 不正な本枠からの再構築は再計算失敗にせず、再構築した本枠からレーティング3値とOVER POWERを更新します。推定した枠は次回のプレイヤーデータ登録で公式枠に置き換わります
@@ -3097,6 +3137,34 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```
 
 ---
+
+### GET `/internal/users/:username/comment`
+- **フィーチャーフラグ**: `profile_comment` が有効な環境だけルートを登録します。無効なときは未登録パスと同じ 404 (`not_found`) です。現在の定義では `develop` と `staging` が有効、`production` が無効です
+- **認証**: Firebase Bearer 任意
+- **パスパラメータ**: `username` - 対象ユーザーのユーザー名
+- **ミドルウェア・レート制限**: `GET /internal/users/:username/profile` と同じ（任意認証・匿名レート制限）
+- **レスポンス**: 200 OK
+
+```json
+{
+  "comment": "よろしくお願いします"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `comment` | string \| null | 保存済みのコメント。未設定は `null` |
+
+公開ユーザーは誰でも閲覧できます。非公開ユーザーは本人または相互フレンドのみ閲覧でき、許可されていない相手には未発見と同じ404を返します。プレイヤー未連携でも閲覧できます。
+
+コメントは独立したリソースです。既存の `/internal/me` や `/internal/users/:username`、`/profile` などのレスポンスには追加しません。コメント変更では既存の `/updated-at` は更新されないため、コメントはこのエンドポイントから別途取得してください。外部APIとデータ移行の対象には含めません。
+
+- **主なエラー**:
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): ユーザー名の形式不正
+  - 401 Unauthorized (`invalid_token`): 指定された認証情報が不正
+  - 404 Not Found (`user_not_found`): 存在しないユーザー、または閲覧できない非公開ユーザー
+  - 429 Too Many Requests (`too_many_requests`): レート制限超過
+  - 500 Internal Server Error (`internal_error`): 取得失敗
 
 ### GET `/internal/users/:username/profile`
 - **認証**: Firebase Bearer (任意)
@@ -4824,7 +4892,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `genres` | GenreDTO[] | ジャンル一覧（表示順） |
 | `difficulties` | MasterItemDTO[] | 難易度一覧（sort_order順） |
 | `account_types` | MasterItemDTO[] | アカウント種別一覧（ID順） |
-| `versions` | VersionDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
+| `versions` | VersionDTO[] | バージョン一覧（読取時点で稼働開始済みのバージョンをリリース日昇順。稼働開始は稼働日の日本時間7:00。[日付の切り替わり](chunithm_specs/date_boundary.md)） |
 | `rating_bands` | RatingBandDTO[] | レーティング帯マスタ一覧（sort_order順） |
 | `achievement_types` | MasterItemDTO[] | 成果種別一覧（ID順）。`name` には `achievement_types.code` の値が入ります |
 | `class_emblems` | MasterItemDTO[] | クラスエンブレム一覧（sort_order順）。`class_emblem` に対応するマスタ名を含む |
@@ -4963,7 +5031,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/master/versions`
 
 - **認証**: 不要
-- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを分離取得するためのエンドポイントです。読取時のJST当日までにリリース済みのバージョンのみを返します。
+- **概要**: `/internal/master` の `versions` を単独で取得します。フロントエンドが内部マスタ全体に依存せず、バージョン一覧だけを分離取得するためのエンドポイントです。読取時点で稼働開始済みのバージョンのみを返します。稼働開始は稼働日の日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。フロントエンドの「今日」とスコア履歴のバージョン境界も、同じ7:00を使ってください。
 - **レスポンス**: 200 OK。レスポンス形式は後述の `GET /v1/master/versions` と同一です。
 
 - **主なエラー**:
@@ -5000,7 +5068,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
-- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。読取時のJST当日までにリリース済みのバージョンのみを返します。
+- **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。読取時点で稼働開始済みのバージョンのみを返します。稼働開始は稼働日の日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。
 - **レスポンス**: 200 OK
 
 ```json
@@ -5015,7 +5083,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `versions` | VersionSummaryDTO[] | バージョン一覧（読取時のJST当日までにリリース済みのバージョンをリリース日昇順） |
+| `versions` | VersionSummaryDTO[] | バージョン一覧（読取時点で稼働開始済みのバージョンをリリース日昇順。稼働開始は稼働日の日本時間7:00） |
 
 **VersionSummaryDTO**:
 
@@ -6020,7 +6088,7 @@ WORLD'S END楽曲は楽曲識別子の昇順で並べます。
 ### GET `/compat/reiwa/1/chunithm_versions.json`
 
 - **認証**: APIトークン必須
-- **概要**: 読取時のJST当日までにリリース済みのCHUNITHMバージョン一覧をreiwa互換形式で取得します。
+- **概要**: 読取時点で稼働開始済みのCHUNITHMバージョン一覧をreiwa互換形式で取得します。稼働開始は稼働日の日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。レスポンスの `release` は稼働日の日付であり、7:00という時刻ではありません。
 - **レスポンス**: 200 OK
 
 ```json

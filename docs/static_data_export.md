@@ -42,7 +42,7 @@ go run ./cmd/export-static-data --chart-stats
 | 本番 | `c7e970656a686c79cce6fad84c888d2c` | `https://static.chunisupport.net` |
 
 バッチは既存のログ、タイムゾーン、DB接続設定も使用するため、`APP_ENV`、`DB_NAME`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASS`も必要です。
-HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`X_API_KEY`、`X_API_KEY_SECRET`、`.config/username_forbidden_words.json`は使用しません。
+HTTPサーバー固有の`FIREBASE_CREDENTIALS_FILE`、`TURNSTILE_SECRET_KEY`、`X_API_KEY`、`X_API_KEY_SECRET`、`OPENAI_API_KEY`、`.config/username_forbidden_words.json`は使用しません。`OPENAI_API_KEY` は API サーバーでも `profile_comment` が有効な環境だけで必須です。
 
 CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します。
 
@@ -57,7 +57,7 @@ CORS、CDNキャッシュ、公開ポリシーはCloudflare側で設定します
 | `compat/chunirec/2.0/music/showall.json` | `GET /compat/chunirec/2.0/music/showall` と同じchunirec互換楽曲配列 |
 | `compat/reiwa/1/chunithm_record/original.json` | `GET /compat/reiwa/1/chunithm_record/original` と同じreiwa互換譜面配列 |
 | `compat/reiwa/1/chunirec_all.json` | `GET /compat/reiwa/1/chunirec_all.json` と同じ通常楽曲・WORLD'S END楽曲のreiwa互換配列 |
-| `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列 |
+| `compat/reiwa/1/chunithm_versions.json` | `GET /compat/reiwa/1/chunithm_versions.json` と同じreiwa互換バージョン配列。実行時点で稼働開始済みのバージョンだけを含みます。切り替わりは日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。稼働日の0:00〜7:00に実行した書き出しには、その新バージョンはまだ入りません |
 
 アップロード時の `Content-Type` は `application/json; charset=utf-8` です。
 通常楽曲、WORLD'S END楽曲、reiwa互換譜面、またはreiwa互換バージョンが0件の場合は、異常な空JSONで既存オブジェクトを上書きしないようにバッチを失敗させます。

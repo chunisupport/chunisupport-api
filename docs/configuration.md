@@ -13,6 +13,7 @@
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
 - `X_API_KEY` (必須。X アプリの OAuth 1.0a コンシューマーキー（API Key）)
 - `X_API_KEY_SECRET` (必須。X アプリの OAuth 1.0a コンシューマーシークレット（API Key Secret）)
+- `OPENAI_API_KEY` (フィーチャーフラグ `profile_comment` が有効な環境では必須。プロフィールコメントの内容判定に使う OpenAI の API キー。無効な環境では未設定でも起動できます)
 - `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
@@ -53,6 +54,30 @@
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
 
 MySQL接続はGo側の日時解釈とMySQLセッションの両方をUTCに固定します。DBサーバー全体のタイムゾーン設定には依存しません。
+
+### 手作業SQLのタイムゾーン
+
+アプリケーションの接続は DSN の `loc=UTC` と `time_zone='+00:00'` で、Go の日時解釈と接続プール内の MySQL セッションを UTC に固定します。この固定はアプリケーションの接続にだけ適用され、サーバーの `@@global.time_zone` には依存しません。DATETIME 列はタイムゾーンを持たず、アプリケーションは UTC の壁時計を保存します。TIMESTAMP 列は UTC の瞬間として保存され、読み書きのたびにセッションのタイムゾーンで変換されます。
+
+mysql CLI や管理ツールなど、アプリケーションを経由しない手作業の SQL では、セッションのタイムゾーンはサーバー設定のままです。UTC 以外のセッションで `NOW()` や `CURRENT_TIMESTAMP` を使うと、DATETIME 列へ UTC 以外の壁時計が書き込まれ、アプリケーションが UTC として読むと時刻がずれます。DATETIME 列のオフセットなしの時刻リテラルは変換されず、書いた壁時計がそのまま保存されるため、UTC の壁時計を書いてください。オフセット付きの時刻リテラルは、MySQL 8.4 では保存前にセッションのタイムゾーンへ変換されます。UTC のセッションでは `'2020-01-01 10:10:10+05:30'` は `2020-01-01 04:40:10` として保存されます。TIMESTAMP 列の時刻リテラルはセッションのタイムゾーンから UTC へ変換して保存され、参照時はセッションのタイムゾーンへ戻して表示されます。セッションを UTC にすると、アプリケーションが保存した UTC の値と見た目が一致します。
+
+手作業の SQL を実行するときは、他の文より先に次を実行して、そのセッションだけを UTC にしてください。
+
+```sql
+SET time_zone = '+00:00';
+```
+
+mysql CLI は接続が切れると一度だけ自動再接続し、送ろうとした文を再送します。再接続したセッションでは `time_zone` を含むセッション設定が初期化されるため、先に実行した `SET` は失われます。再接続後も UTC にするには、接続時に `--init-command` を指定してください。この文は接続時と再接続時に実行されます。
+
+```bash
+mysql --init-command="SET time_zone = '+00:00'" -u <DB_USER> -p <DB_NAME>
+```
+
+自動再接続を止め、切断をエラーにする場合は `--skip-reconnect` を指定します。接続し直したあとは、再び他の文より先に `SET time_zone = '+00:00';` を実行してください。
+
+```bash
+mysql --skip-reconnect -u <DB_USER> -p <DB_NAME>
+```
 
 パラメータ付きクエリは、DSNの `interpolateParams=true` によりクライアント側で値を展開します。サーバーサイドプリペアドステートメントの Prepare / Execute / Close をクエリごとに行わないためです。接続の文字セットと照合順序はDSNで上書きせず、go-sql-driver/mysql の既定である utf8mb4（`utf8mb4_general_ci`）を使います。スキーマも `utf8mb4` です。ドライバが展開を拒否する big5 / cp932 / gb2312 / gbk / sjis / gb18030 は指定しません。`NO_BACKSLASH_ESCAPES` はアプリケーションからもマイグレーションからも有効化せず、MySQL 8.4 の既定 `sql_mode` にも含まれません。このSQLモードを有効にした接続では使わないでください。`[]byte` の値は `_binary'...'` に展開され、JSON列へ書き込むとエラー3144になるため、JSON列へ渡す値は `json.RawMessage` にします。
 
@@ -161,7 +186,18 @@ Linux の logrotate 設定は [logrotate設定手順](logrotate.md) を参照し
 
 ## feature-flag（機能のリリース切り替え）
 
-`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。現在の登録フラグは0件で、YAMLにはコメントの書式例だけを置いています。
+`internal/config/feature-flag.yml` を `go:embed` でバイナリに同梱します。秘密値は置きません。変更の反映には再ビルドと再配布が必要で、緊急停止スイッチとしては使えません。フラグ自体を切り替える環境変数はありません。`APP_ENV` が `develop` / `staging` / `production` のどれかに対応する値を選びます。
+
+現在の登録フラグは `profile_comment`（プロフィールコメント）だけです。
+
+```yaml
+profile_comment:
+  develop: true
+  staging: true
+  production: false
+```
+
+`develop` と `staging` では `PUT /internal/me/comment` と `GET /internal/users/:username/comment` を登録し、保存時に OpenAI Moderation API を呼びます。`production` は明示的に `false` です。本番の設定ファイルや環境変数へ何も足さなくても無効になり、省略した場合と同じです。無効時は両エンドポイントを登録しないため、未登録パスと同じ 404 になります。Moderation クライアントは作らないので API は呼ばれず、`OPENAI_API_KEY` も不要です。コメントは専用エンドポイント以外のレスポンスには含まれません。フロントへフラグ一覧を返す API はありません。
 
 ### ファイル形式と検証
 
@@ -195,7 +231,7 @@ APIとバッチは共通の `loadConfig` を通り、全環境のYAML定義を�
 
 ### 利用ルール
 
-- フラグで制御するのは機能を使えるかどうかだけです。必須設定や外部サービスの初期化は変更しません。
+- フラグで制御するのは機能を使えるかどうかだけです。必須設定や外部サービスの初期化は変更しません。例外として `profile_comment` が無効なときは、その機能専用の OpenAI Moderation クライアントを作らず、`OPENAI_API_KEY` も必須にしません。有効なときだけキーを必須にし、クライアントを初期化します。
 - 新しいエンドポイントはrouterで登録を切り替え、無効時は404にします。
 - 既存処理の切り替えや、APIとCLIの両方で使う処理はusecaseで判定します。handlerとusecaseでの二重判定は必須ではありません。
 - 無効時に404以外を返す必要があれば、機能を追加する際に決めて `docs/API.md` に記載します。
@@ -249,6 +285,18 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `GET /2/users/me` は従量課金でも課金対象外とされています（X Developers Community での X スタッフの回答、2026年5月）。念のため Developer Console で支払い上限を設定し、使用量に計上されていないことを確認してください
 
 `X_API_KEY` または `X_API_KEY_SECRET` が未設定の場合、アプリケーションは起動時にエラーで終了します。
+
+## OpenAI Moderation API
+
+プロフィールコメントの保存（`PUT /internal/me/comment`）では、文字数と文字種の検証後に OpenAI Moderation API（`POST /v1/moderations`、モデル `omni-moderation-latest`）で内容を判定します。この処理とコメントAPIの登録は、フィーチャーフラグ `profile_comment` が有効な環境だけです。現在の定義では `develop` と `staging` が有効、`production` が無効です。
+
+- 有効な環境では、環境変数 `OPENAI_API_KEY` に OpenAI の API キーを設定してください。未設定または空白だけの場合、アプリケーションは起動時にエラーで終了します
+- 無効な環境ではキーが未設定でも起動します。Moderation クライアントは作らず、APIは呼びません
+- 送信するのは空白除去後のコメント本文だけです。ユーザー名やIDなど、利用者を特定できる情報は送信しません
+- 応答の `flagged` が `true` のコメントは保存しません
+- 通信の失敗、タイムアウト（5秒）、2xx 以外の応答など、判定結果を得られなかった場合も保存しません
+- コメントの削除（空文字列の保存）は判定せずに実行します
+- 判定の対象は保存時のコメントだけです。導入前に保存されたコメントは判定しません
 
 ## オブジェクトストレージ静的データ
 

@@ -67,6 +67,12 @@ const (
 	CodeMaintenanceMode           = "maintenance_mode"
 
 	// 入力バリデーション詳細エラー
+	CodeCommentTooLong     = "comment_too_long"
+	CodeCommentInvalidChar = "comment_invalid_char"
+	// プロフィールコメントの内容判定エラー
+	CodeCommentInappropriate         = "comment_inappropriate"
+	CodeCommentModerationUnavailable = "comment_moderation_unavailable"
+
 	CodeUsernameEmpty       = "username_empty"
 	CodeUsernameTooShort    = "username_too_short"
 	CodeUsernameTooLong     = "username_too_long"

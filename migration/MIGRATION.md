@@ -32,6 +32,14 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `is_suspicious`: 不審アカウントフラグ（0=正常, 1=不審）。
     - `created_at`, `updated_at`: 作成日時、更新日時。
 
+#### `user_profiles`
+- **役割**: User集約とは独立して、ユーザーごとに1件のプロフィールを保持します。未設定は行なし、空にする操作は行削除です。
+- **主なカラム**:
+    - `user_id`: `users`への外部キー兼主キー。ユーザーの物理削除時はCASCADEで削除され、プレイヤー連携解除では残ります。
+    - `comment`: 前後の空白除去後1〜100コードポイントのコメント。制御文字を禁止し、NULLや空文字は保存しません。
+    - `updated_at`: プロフィールの最終更新日時。`users.updated_at`とは独立しています。
+- **追加マイグレーション**: `000063_create_user_profiles`（upで作成、downで削除）。
+
 #### `user_x_accounts`
 - **役割**: ユーザーが連携している X アカウントの識別情報を、ユーザーごとに1件保持します。X API の `GET /2/users/me` が返した値だけを保存します。
 - **主なカラム**:

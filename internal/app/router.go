@@ -21,13 +21,14 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/reiwa"
 	"github.com/chunisupport/chunisupport-api/internal/app/middleware"
 	"github.com/chunisupport/chunisupport-api/internal/config"
-	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/featureflag"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	vo_username "github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/datatransfer"
 	infradb "github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/infra/openaimoderation"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	infrasongbatch "github.com/chunisupport/chunisupport-api/internal/infra/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
@@ -94,6 +95,7 @@ type Handlers struct {
 	GoalGroup             *api_internal.GoalGroupHandler
 	RecordFilter          *api_internal.RecordFilterHandler
 	XAccount              *api_internal.XAccountHandler
+	UserProfileComment    *api_internal.UserProfileCommentHandler
 	TemporaryPlayerData   *api_internal.TemporaryPlayerDataHandler
 	PlayerLockedSong      *api_internal.PlayerLockedSongHandler
 	PlayerFavoriteSong    *api_internal.PlayerFavoriteSongHandler
@@ -202,18 +204,11 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	}
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo, firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery)
+	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
+		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
+		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, courseRepo, tm, goalRepo,
+	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
-	if configurable, ok := userUsecase.(interface {
-		SetPhysicalDeletionDependencies(usecase.TransactionManager, repository.GoalRepository)
-	}); ok {
-		configurable.SetPhysicalDeletionDependencies(tm, goalRepo)
-	}
-	if configurable, ok := userUsecase.(interface {
-		SetCourseRepository(repository.CourseRepository)
-	}); ok {
-		configurable.SetCourseRepository(courseRepo)
-	}
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, scoreHistoryRepo, friendshipRepo, masterCache)
@@ -278,6 +273,12 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	xAccountUsecase := usecase.NewXAccountUsecase(db, infra.NewXAccountRepository(), firebaseProviderFinder, xapi.NewUserClient(cfg.XAPI.ConsumerKey, cfg.XAPI.ConsumerSecret))
+	// 無効な環境では Moderation クライアントを作らない。キー未設定でも起動でき、APIも呼ばれない。
+	var userProfileCommentHandler *api_internal.UserProfileCommentHandler
+	if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+		userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo, openaimoderation.NewCommentModerator(cfg.OpenAI.APIKey))
+		userProfileCommentHandler = api_internal.NewUserProfileCommentHandler(userProfileCommentUsecase)
+	}
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),
@@ -300,6 +301,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		GoalGroup:             api_internal.NewGoalGroupHandler(goalGroupUsecase),
 		RecordFilter:          api_internal.NewRecordFilterHandler(recordFilterUsecase),
 		XAccount:              api_internal.NewXAccountHandler(xAccountUsecase),
+		UserProfileComment:    userProfileCommentHandler,
 		TemporaryPlayerData:   api_internal.NewTemporaryPlayerDataHandler(temporaryPlayerDataUsecase),
 		PlayerLockedSong:      api_internal.NewPlayerLockedSongHandler(playerLockedSongUsecase),
 		PlayerFavoriteSong:    api_internal.NewPlayerFavoriteSongHandler(playerFavoriteSongUsecase),
@@ -461,6 +463,10 @@ func registerRoutes(
 		meGroup.POST("/data-transfer/import", handlers.DataTransfer.Import, dataTransferRateLimit)
 		meGroup.PUT("/privacy", handlers.Profile.UpdatePrivacy)
 		meGroup.PUT("/username", handlers.Profile.UpdateUsername)
+		// 無効時は未登録パスと同じ404にするため、ルート自体を登録しません。
+		if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+			meGroup.PUT("/comment", handlers.UserProfileComment.Update)
+		}
 		meGroup.PUT("/firebase-account", handlers.Profile.ChangeFirebaseAccount)
 		meGroup.DELETE("", handlers.Profile.DeleteAccount)
 		meGroup.POST("/register-data", handlers.Me.RegisterData, middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
@@ -541,6 +547,9 @@ func registerRoutes(
 	{
 		publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 		publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
+		if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
+			publicUsersGroup.GET("/:username/comment", handlers.UserProfileComment.Get)
+		}
 		publicUsersGroup.GET("/:username/rating", handlers.User.GetUserRating)
 		publicUsersGroup.GET("/:username/rating-op-history", handlers.InternalMetricHistory.Get)
 		publicUsersGroup.GET("/:username/record/songs/:id", handlers.User.GetUserSongRecord)

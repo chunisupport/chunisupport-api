@@ -23,6 +23,15 @@ entity "users" as users {
   updated_at: TIMESTAMP
 }
 
+entity "user_profiles" as user_profiles {
+  + user_id: INT UNSIGNED [PK, FK]
+  --
+  comment: VARCHAR(100) NOT NULL
+  updated_at: TIMESTAMP NOT NULL
+}
+
+users ||--o| user_profiles : "ON DELETE CASCADE"
+
 entity "api_tokens" as api_tokens {
   + id: BIGINT [PK]
   --

@@ -190,6 +190,68 @@ func TestBulkUpdateSongs_ArgumentOrder(t *testing.T) {
 	assert.Equal(t, "new_jacket2.png", *result[1].Jacket, "Song2: Jacket should be 'new_jacket2.png'")
 }
 
+func TestBulkUpdateSongs_未設定の発売日はNULLになり対象外の楽曲は更新しない(t *testing.T) {
+	// Given
+	db := setupTestDB(t)
+	defer db.Close()
+	_, err := db.Exec(`
+		INSERT INTO songs (id, display_id, title, artist, genre_id, bpm, released_at, official_idx, is_worldsend)
+		VALUES
+			(1, 'DISPLAY001', 'Original Title 1', 'Original Artist 1', 1, 180, '2024-01-01', 'IDX001', 0),
+			(2, 'DISPLAY002', 'Original Title 2', 'Original Artist 2', 2, 200, '2024-02-01', 'IDX002', 0),
+			(3, 'DISPLAY003', 'Untouched Title', 'Untouched Artist', 1, 160, '2024-03-01', 'IDX003', 0)
+	`)
+	require.NoError(t, err)
+	repo := &songRepository{db: db}
+	releasedAt := time.Date(2025, 2, 20, 0, 0, 0, 0, time.UTC)
+	genreID := 1
+	bpm := 150
+	songs := []*entity.Song{
+		{
+			DisplayID:  "DISPLAY001",
+			Title:      "Updated Title 1",
+			Artist:     "Updated Artist 1",
+			GenreID:    &genreID,
+			BPM:        &bpm,
+			ReleasedAt: nil,
+			Charts:     []*entity.Chart{},
+		},
+		{
+			DisplayID:  "DISPLAY002",
+			Title:      "Updated Title 2",
+			Artist:     "Updated Artist 2",
+			GenreID:    &genreID,
+			BPM:        &bpm,
+			ReleasedAt: &releasedAt,
+			Charts:     []*entity.Chart{},
+		},
+	}
+
+	// When
+	err = repo.bulkUpdateSongs(context.Background(), db, toSongUpdates(songs), map[string]int{
+		"DISPLAY001": 1,
+		"DISPLAY002": 2,
+	})
+
+	// Then
+	require.NoError(t, err)
+	var rows []struct {
+		ID         int     `db:"id"`
+		Title      string  `db:"title"`
+		ReleasedAt *string `db:"released_at"`
+	}
+	require.NoError(t, db.Select(&rows, `SELECT id, title, released_at FROM songs ORDER BY id`))
+	require.Len(t, rows, 3)
+	assert.Equal(t, "Updated Title 1", rows[0].Title)
+	assert.Nil(t, rows[0].ReleasedAt)
+	assert.Equal(t, "Updated Title 2", rows[1].Title)
+	require.NotNil(t, rows[1].ReleasedAt)
+	assert.Contains(t, *rows[1].ReleasedAt, "2025-02-20")
+	assert.Equal(t, "Untouched Title", rows[2].Title)
+	require.NotNil(t, rows[2].ReleasedAt)
+	assert.Contains(t, *rows[2].ReleasedAt, "2024-03-01")
+}
+
 // TestBulkUpdateCharts_ArgumentOrder はバルク更新時の譜面データのSQL引数順序が正しいかテストします。
 func TestBulkUpdateCharts_ArgumentOrder(t *testing.T) {
 	db := setupTestDB(t)

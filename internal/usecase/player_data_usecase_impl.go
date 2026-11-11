@@ -254,6 +254,7 @@ type playerDataUsecase struct {
 }
 
 // NewPlayerDataUsecaseWithScoreHistory はスコア履歴保存を有効にした実装を生成します。
+// courseRepo はコース記録の解決と保存に使います。nil のままコース記録を含む登録を受けるとエラーになります。
 func NewPlayerDataUsecaseWithScoreHistory(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
@@ -265,20 +266,19 @@ func NewPlayerDataUsecaseWithScoreHistory(
 	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
 	scoreHistoryRepo repository.ScoreHistoryRepository,
-	courseRepos ...repository.CourseRepository,
+	courseRepo repository.CourseRepository,
 ) PlayerDataUsecase {
 	us := newPlayerDataUsecase(
 		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
 		honorRepo, playerDataRepo, lockedRepo, masterCache,
 	)
 	us.scoreHistoryRepo = scoreHistoryRepo
-	if len(courseRepos) > 0 {
-		us.courseRepo = courseRepos[0]
-	}
+	us.courseRepo = courseRepo
 	return us
 }
 
 // NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
+// courseRepo はコース記録の解決と保存に使います。nil のままコース記録を含む登録を受けるとエラーになります。
 func NewPlayerDataUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
@@ -289,15 +289,13 @@ func NewPlayerDataUsecase(
 	playerDataRepo repository.PlayerDataRepository,
 	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
-	courseRepos ...repository.CourseRepository,
+	courseRepo repository.CourseRepository,
 ) PlayerDataUsecase {
 	us := newPlayerDataUsecase(
 		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
 		honorRepo, playerDataRepo, lockedRepo, masterCache,
 	)
-	if len(courseRepos) > 0 {
-		us.courseRepo = courseRepos[0]
-	}
+	us.courseRepo = courseRepo
 	return us
 }
 

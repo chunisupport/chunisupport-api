@@ -409,6 +409,16 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 
 ---
 
+### UserProfile（ユーザープロフィール集約）
+
+User集約やPlayerとは独立して、正の所有ユーザーIDと `profilecomment.ProfileComment` を保持します。コンストラクタ `NewUserProfile` で所有者とコメントを検証し、`UserID()` / `Comment()` で参照します。将来のプロフィール項目はこの集約に追加します。
+
+`user_profiles` の主キーは `user_id` です。未設定は行なしで表し、空文字やNULLのコメントは保存しません。ユーザー物理削除時は外部キーのCASCADEで削除し、プレイヤー連携解除では残します。既存Userの保存処理や `updated_at`、データ移行の対象には含めません。
+
+閲覧時は既存プロフィール取得と共通の `usecase/user_access.go` の検索・認可処理を使います。非公開ユーザーの閲覧は本人と相互フレンドだけに許可し、非公開と未発見はAPIでは同じ404にします。
+
+---
+
 ### XAccount（連携中の X アカウント）
 
 ユーザーが連携している X アカウントの数値ユーザーIDとユーザー名（`@` を除く）を、ユーザーごとに1件保持します。値は X API の `GET /2/users/me` が返したものだけで、Firebase に連携済みの X の数値ユーザーIDと一致した場合にだけ保存します。数値IDは20桁以内の数字、ユーザー名は50文字以内の英数字とアンダースコアに限り、それ以外は生成時に拒否します。
@@ -550,6 +560,13 @@ X の連携を解除・変更しても自動では消えないため、表示側
 ---
 
 ## 値オブジェクト一覧
+
+### profilecomment.ProfileComment
+
+- `NewProfileComment(value string)` は `strings.TrimSpace` により前後の空白を除去します。
+- 正規化後1〜100 Unicodeコードポイント。空は生成不可、ユースケース側で行削除にします。
+- 不正なUTF-8、制御文字（改行・タブを含む）、Unicodeの行区切り・段落区切りを拒否します。判定は前後の空白除去後に行います。
+- `String()` で正規化済みの値を参照します。テストでは `profilecommenttest.New(tb, value)` を使用します。
 
 ### username.UserName
 
