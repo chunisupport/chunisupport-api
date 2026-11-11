@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
-	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 // CloudflareCacheConfig はS3認証とキャッシュパージ権限を分離するため、専用の認証情報を保持します。
@@ -18,6 +16,8 @@ type CloudflareCacheConfig struct {
 }
 
 // LoadCloudflareCacheConfigFromEnv はAPIトークンを設定ファイルへ保存させないため、環境変数だけを参照します。
+// 開発、ステージング、本番は公開ホスト、バケット、Zoneが異なるため、許可リストはコードに持ちません。
+// パージ対象は、その実行環境の CLOUDFLARE_ZONE_ID と STATIC_DATA_PUBLIC_BASE_URL です。
 func LoadCloudflareCacheConfigFromEnv() (CloudflareCacheConfig, error) {
 	apiToken := strings.TrimSpace(os.Getenv("CLOUDFLARE_API_TOKEN"))
 	zoneID := strings.TrimSpace(os.Getenv("CLOUDFLARE_ZONE_ID"))
@@ -56,13 +56,6 @@ func LoadCloudflareCacheConfigFromEnv() (CloudflareCacheConfig, error) {
 
 	if len(validationErrors) > 0 {
 		return CloudflareCacheConfig{}, fmt.Errorf("cloudflare cache configuration validation failed: %s", strings.Join(validationErrors, "; "))
-	}
-	allowedDestinations := map[string]string{
-		info.DevelopStaticDataPublicBaseURL:    info.DevelopCloudflareZoneID,
-		info.ProductionStaticDataPublicBaseURL: info.ProductionCloudflareZoneID,
-	}
-	if expectedZoneID, ok := allowedDestinations[normalizedBaseURL]; !ok || expectedZoneID != zoneID {
-		return CloudflareCacheConfig{}, fmt.Errorf("cloudflare cache configuration validation failed: CLOUDFLARE_ZONE_ID and STATIC_DATA_PUBLIC_BASE_URL must match a configured deployment destination")
 	}
 
 	return CloudflareCacheConfig{

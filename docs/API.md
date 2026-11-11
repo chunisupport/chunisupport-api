@@ -5995,7 +5995,7 @@ reiwa互換APIは外部ツールとの互換性を持つエンドポイントで
 - クエリパラメータ: なし。
 - レスポンス: HTTP 200、トップレベル配列。
 - エラー形式・レート制限・メンテナンス制御: 他のreiwa互換APIと同じです。クライアント切断はHTTP 499です。
-- 静的JSON: `https://static.chunisupport.net/compat/reiwa/1/chunirec_all.json`から認証不要で取得できます。静的JSONはバッチ更新時点のデータです。
+- 静的JSON: 本番は `https://static.chunisupport.net/compat/reiwa/1/chunirec_all.json` から認証不要で取得できます。開発とステージングは別の公開ホストです。エクスポート処理はホストを環境変数から読み、コードには固定しません。静的JSONはバッチ更新時点のデータです。
 
 #### meta
 

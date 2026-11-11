@@ -310,9 +310,9 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `CLOUDFLARE_ZONE_ID`
 - `STATIC_DATA_PUBLIC_BASE_URL`
 
-APIサーバーの起動にはこれらの環境変数は不要です。本番の秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
+APIサーバーの起動にはこれらの環境変数は不要です。開発、ステージング、本番では、エンドポイント、バケット、Zone ID、公開URLをその環境のSecretへ置き、環境間で共有しません。コードはこれらを固定しません。`Cache-Control` の値は3環境で同じです。秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
 
-出力するオブジェクトキーや実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
+出力するオブジェクトキー、`Cache-Control`、実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
 
 ## 楽曲データ収集バッチ
 

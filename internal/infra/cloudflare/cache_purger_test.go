@@ -29,7 +29,7 @@ func TestCachePurgerPurge_公開JSONのプレフィックスだけを削除す�
 		config.CloudflareCacheConfig{
 			APIToken:      "token",
 			ZoneID:        "zone-id",
-			PublicBaseURL: "https://static.chunisupport.net",
+			PublicBaseURL: "https://static.example.test",
 		},
 		server.Client(),
 		server.URL,
@@ -41,9 +41,9 @@ func TestCachePurgerPurge_公開JSONのプレフィックスだけを削除す�
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer token", gotAuthorization)
 	assert.Equal(t, []string{
-		"static.chunisupport.net/v1/songs.json",
-		"static.chunisupport.net/v1/worldsend-songs.json",
-		"static.chunisupport.net/compat/reiwa/1/chunithm_record/original.json",
+		"static.example.test/v1/songs.json",
+		"static.example.test/v1/worldsend-songs.json",
+		"static.example.test/compat/reiwa/1/chunithm_record/original.json",
 	}, gotBody["prefixes"])
 	assert.Len(t, gotBody, 1)
 }
@@ -55,7 +55,7 @@ func TestCachePurgerPurge_一時的な失敗を再試行する(t *testing.T) {
 		attempts++
 		var body map[string][]string
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		assert.Equal(t, map[string][]string{"prefixes": {"static.chunisupport.net/v1/songs.json"}}, body)
+		assert.Equal(t, map[string][]string{"prefixes": {"static.example.test/v1/songs.json"}}, body)
 		w.Header().Set("Content-Type", "application/json")
 		if attempts == 1 {
 			w.Header().Set("Retry-After", "0")
@@ -67,7 +67,7 @@ func TestCachePurgerPurge_一時的な失敗を再試行する(t *testing.T) {
 	}))
 	defer server.Close()
 	purger := newCachePurger(
-		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.chunisupport.net"},
+		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.example.test"},
 		server.Client(),
 		server.URL,
 		func(_ context.Context, duration time.Duration) error {
@@ -93,7 +93,7 @@ func TestCachePurgerPurge_APIエラーを返す(t *testing.T) {
 	}))
 	defer server.Close()
 	purger := newCachePurger(
-		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.chunisupport.net"},
+		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.example.test"},
 		server.Client(),
 		server.URL,
 		func(context.Context, time.Duration) error { return nil },
@@ -116,7 +116,7 @@ func TestCachePurgerPurge_サーバーエラーは最大試行回数で終了す
 	}))
 	defer server.Close()
 	purger := newCachePurger(
-		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.chunisupport.net"},
+		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.example.test"},
 		server.Client(),
 		server.URL,
 		func(context.Context, time.Duration) error { return nil },
