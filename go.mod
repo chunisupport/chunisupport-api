@@ -2,7 +2,7 @@ module github.com/chunisupport/chunisupport-api
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	firebase.google.com/go/v4 v4.22.0
