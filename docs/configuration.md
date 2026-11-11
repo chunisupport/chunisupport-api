@@ -13,6 +13,7 @@
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
 - `X_API_KEY` (必須。X アプリの OAuth 1.0a コンシューマーキー（API Key）)
 - `X_API_KEY_SECRET` (必須。X アプリの OAuth 1.0a コンシューマーシークレット（API Key Secret）)
+- `OPENAI_API_KEY` (必須。プロフィールコメントの内容判定に使う OpenAI の API キー)
 - `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
 - `DB_NAME`
 - `DB_HOST`
@@ -273,6 +274,19 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `GET /2/users/me` は従量課金でも課金対象外とされています（X Developers Community での X スタッフの回答、2026年5月）。念のため Developer Console で支払い上限を設定し、使用量に計上されていないことを確認してください
 
 `X_API_KEY` または `X_API_KEY_SECRET` が未設定の場合、アプリケーションは起動時にエラーで終了します。
+
+## OpenAI Moderation API
+
+プロフィールコメントの保存（`PUT /internal/me/comment`）では、文字数と文字種の検証後に OpenAI Moderation API（`POST /v1/moderations`、モデル `omni-moderation-latest`）で内容を判定します。
+
+- 環境変数 `OPENAI_API_KEY` に OpenAI の API キーを設定してください
+- 送信するのは空白除去後のコメント本文だけです。ユーザー名やIDなど、利用者を特定できる情報は送信しません
+- 応答の `flagged` が `true` のコメントは保存しません
+- 通信の失敗、タイムアウト（5秒）、2xx 以外の応答など、判定結果を得られなかった場合も保存しません
+- コメントの削除（空文字列の保存）は判定せずに実行します
+- 判定の対象は保存時のコメントだけです。導入前に保存されたコメントは判定しません
+
+`OPENAI_API_KEY` が未設定の場合、アプリケーションは起動時にエラーで終了します。
 
 ## オブジェクトストレージ静的データ
 

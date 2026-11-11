@@ -32,6 +32,55 @@ func (s *stubUserProfileRepository) DeleteByUserID(_ context.Context, _ reposito
 	return s.err
 }
 
+type stubCommentModerator struct {
+	flagged bool
+	err     error
+	calls   []string
+}
+
+func (s *stubCommentModerator) IsFlagged(_ context.Context, comment string) (bool, error) {
+	s.calls = append(s.calls, comment)
+	return s.flagged, s.err
+}
+
+func TestUserProfileCommentUsecase_Update_内容判定(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		flagged       bool
+		moderationErr error
+		wantErr       error
+		wantCalls     []string
+	}{
+		{name: "問題なしなら正規化後の本文を判定して保存", input: " よろしく ", wantCalls: []string{"よろしく"}},
+		{name: "不適切と判定されたら保存しない", input: "abc", flagged: true, wantErr: ErrCommentInappropriate, wantCalls: []string{"abc"}},
+		{name: "判定できなければ原因を保持して保存しない", input: "abc", moderationErr: context.Canceled, wantErr: ErrCommentModerationUnavailable, wantCalls: []string{"abc"}},
+		{name: "削除は判定しない", input: " "},
+		{name: "検証エラーは判定しない", input: "a\nb", wantErr: ErrCommentInvalidChar},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubUserProfileRepository{}
+			moderator := &stubCommentModerator{flagged: tt.flagged, err: tt.moderationErr}
+			uc := NewUserProfileCommentUsecase(nil, repo, nil, nil, moderator)
+			// When
+			_, err := uc.Update(context.Background(), 7, tt.input)
+			// Then
+			assert.Equal(t, tt.wantCalls, moderator.calls)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				if tt.moderationErr != nil {
+					assert.ErrorIs(t, err, tt.moderationErr)
+				}
+				assert.Nil(t, repo.saved)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestUserProfileCommentUsecase_Update(t *testing.T) {
 	tests := []struct {
 		name, input      string
@@ -51,7 +100,7 @@ func TestUserProfileCommentUsecase_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &stubUserProfileRepository{err: tt.repoErr}
-			uc := NewUserProfileCommentUsecase(nil, repo, nil, nil)
+			uc := NewUserProfileCommentUsecase(nil, repo, nil, nil, &stubCommentModerator{})
 			// When
 			got, err := uc.Update(context.Background(), 7, tt.input)
 			// Then
@@ -110,7 +159,7 @@ func TestUserProfileCommentUsecase_Get(t *testing.T) {
 			if tt.saved {
 				repo.found = saved
 			}
-			uc := NewUserProfileCommentUsecase(nil, repo, &stubUserRepository{user: tt.target, err: tt.userErr}, &stubFriendshipRepo{exists: map[[2]int]bool{{2, 7}: true}})
+			uc := NewUserProfileCommentUsecase(nil, repo, &stubUserRepository{user: tt.target, err: tt.userErr}, &stubFriendshipRepo{exists: map[[2]int]bool{{2, 7}: true}}, nil)
 			// When
 			got, err := uc.Get(context.Background(), "tester", tt.requester)
 			// Then

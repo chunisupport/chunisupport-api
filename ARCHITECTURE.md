@@ -29,6 +29,7 @@ internal/
 ├── infra/       # インフラストラクチャ層
 │   ├── db/      # データベース接続管理
 │   ├── firebaseauth/ # Firebase IDトークン検証・連携プロバイダの照会
+│   ├── openaimoderation/ # OpenAI Moderation API 呼び出し（プロフィールコメントの内容判定）
 │   ├── models/  # データベース永続化用モデル（db/jsonタグあり）
 │   ├── repository/ # リポジトリ実装
 │   ├── logger/  # ロギング実装
@@ -61,7 +62,7 @@ internal/
 
 chunirec互換APIのユーザー・レコード取得は、`ChunirecUsecase`が公開範囲を判定した後、`domain/repository`の`ChunirecQueryService`を利用します。プロフィールと通常譜面レコードは、それぞれレスポンスに必要な列だけを1回のSQLで取得します。プロフィールの称号はスロット1に限定し、レコードのジャンルはJOINで取得します。単曲レーティングにはドメインサービスを使用します。
 
-プロフィールコメントは `UserProfile` 集約として `User` とは独立した `user_profiles` テーブルに保存します。`UserProfileCommentUsecase` と既存の `UserUsecase` は `user_access.go` の対象ユーザー検索・閲覧判定を共有します。コメントは専用の内部APIだけで取得・更新し、既存プロフィールレスポンスや更新日時キャッシュ、データ移行には含めません。
+プロフィールコメントは `UserProfile` 集約として `User` とは独立した `user_profiles` テーブルに保存します。`UserProfileCommentUsecase` と既存の `UserUsecase` は `user_access.go` の対象ユーザー検索・閲覧判定を共有します。コメントの保存時は `CommentModerator`（実装は `infra/openaimoderation`）で内容を判定し、不適切と判定された場合と判定できなかった場合は保存しません。コメントは専用の内部APIだけで取得・更新し、既存プロフィールレスポンスや更新日時キャッシュ、データ移行には含めません。
 
 ### `internal/infra` - インフラストラクチャ層
 

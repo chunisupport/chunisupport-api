@@ -2,6 +2,7 @@ package apierror
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -292,6 +293,31 @@ func TestFromUsecaseError_Xアカウント連携のエラーを変換する(t *t
 			require.NotNil(t, apiErr)
 			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
 			assert.Equal(t, tt.wantCode, apiErr.Code)
+		})
+	}
+}
+
+func TestFromUsecaseError_プロフィールコメントの内容判定エラーを変換する(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "不適切と判定されたコメントは400", err: usecase.ErrCommentInappropriate, wantStatus: http.StatusBadRequest, wantCode: CodeCommentInappropriate},
+		{name: "判定できない場合は502", err: fmt.Errorf("%w: %w", usecase.ErrCommentModerationUnavailable, errors.New("status 503")), wantStatus: http.StatusBadGateway, wantCode: CodeCommentModerationUnavailable},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			assert.ErrorIs(t, apiErr, tt.err)
 		})
 	}
 }

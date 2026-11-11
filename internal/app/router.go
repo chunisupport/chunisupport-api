@@ -27,6 +27,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/datatransfer"
 	infradb "github.com/chunisupport/chunisupport-api/internal/infra/db"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/infra/openaimoderation"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	infrasongbatch "github.com/chunisupport/chunisupport-api/internal/infra/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
@@ -271,7 +272,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	adminUserStatisticsUsecase := usecase.NewAdminUserStatisticsUsecase(adminUserStatisticsQuery)
 	userSuspiciousUsecase := usecase.NewUserSuspiciousUsecase(db, tm, userRepo)
 	xAccountUsecase := usecase.NewXAccountUsecase(db, infra.NewXAccountRepository(), firebaseProviderFinder, xapi.NewUserClient(cfg.XAPI.ConsumerKey, cfg.XAPI.ConsumerSecret))
-	userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo)
+	userProfileCommentUsecase := usecase.NewUserProfileCommentUsecase(db, infra.NewUserProfileRepository(), userRepo, friendshipRepo, openaimoderation.NewCommentModerator(cfg.OpenAI.APIKey))
 	handlers := &Handlers{
 		Login:                 api_internal.NewLoginHandler(loginUsecase),
 		Signup:                api_internal.NewSignupHandler(signupUsecase),

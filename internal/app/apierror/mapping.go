@@ -174,6 +174,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrCommentTooLong.WithInternal(err)
 	case errors.Is(err, usecase.ErrCommentInvalidChar):
 		return ErrCommentInvalidChar.WithInternal(err)
+	case errors.Is(err, usecase.ErrCommentInappropriate):
+		return ErrCommentInappropriate.WithInternal(err)
+	case errors.Is(err, usecase.ErrCommentModerationUnavailable):
+		return ErrCommentModerationUnavailable.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameEmpty):
 		return ErrUsernameEmpty.WithInternal(err)
 	case errors.Is(err, usecase.ErrUsernameTooShort):

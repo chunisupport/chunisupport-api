@@ -123,8 +123,11 @@ var (
 	ErrMaintenanceMode            = New(CodeMaintenanceMode, http.StatusServiceUnavailable)
 
 	// 入力バリデーション詳細エラー
-	ErrCommentTooLong     = New(CodeCommentTooLong, http.StatusBadRequest)
-	ErrCommentInvalidChar = New(CodeCommentInvalidChar, http.StatusBadRequest)
+	ErrCommentTooLong       = New(CodeCommentTooLong, http.StatusBadRequest)
+	ErrCommentInvalidChar   = New(CodeCommentInvalidChar, http.StatusBadRequest)
+	ErrCommentInappropriate = New(CodeCommentInappropriate, http.StatusBadRequest)
+	// ErrCommentModerationUnavailable は判定できないコメントを保存しない方針のため、外部APIの障害として 502 を返します。
+	ErrCommentModerationUnavailable = New(CodeCommentModerationUnavailable, http.StatusBadGateway)
 
 	ErrUsernameEmpty       = New(CodeUsernameEmpty, http.StatusBadRequest)
 	ErrUsernameTooShort    = New(CodeUsernameTooShort, http.StatusBadRequest)
