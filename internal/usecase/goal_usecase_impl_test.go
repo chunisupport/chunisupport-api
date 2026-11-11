@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,7 +15,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type goalRepoCall struct {
+	operation string
+	ctx       context.Context
+	exec      repository.Executor
+	userID    int
+	id        uint32
+}
+
 type stubGoalRepo struct {
+	calls           []goalRepoCall
+	lockErr         error
 	count           int
 	goal            *entity.Goal
 	goals           []*entity.Goal
@@ -35,16 +46,16 @@ func (s *stubGoalRepo) DeleteByUserID(ctx context.Context, exec repository.Execu
 }
 
 func (s *stubGoalRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.Goal, error) {
-	if s.goals != nil {
-		return s.goals, nil
+	s.calls = append(s.calls, goalRepoCall{operation: "list", ctx: ctx, exec: exec, userID: userID})
+	goals := s.goals
+	if goals == nil && s.goal != nil {
+		goals = []*entity.Goal{s.goal}
 	}
-	if s.goal == nil {
-		return []*entity.Goal{}, nil
-	}
-	return []*entity.Goal{s.goal}, nil
+	return slices.DeleteFunc(slices.Clone(goals), func(goal *entity.Goal) bool { return goal.UserID != userID }), nil
 }
 func (s *stubGoalRepo) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) (*entity.Goal, error) {
-	if s.goal == nil || s.goal.ID != id {
+	s.calls = append(s.calls, goalRepoCall{operation: "find", ctx: ctx, exec: exec, userID: userID, id: id})
+	if s.goal == nil || s.goal.ID != id || s.goal.UserID != userID {
 		return nil, repository.ErrGoalNotFound
 	}
 	return s.goal, nil
@@ -56,6 +67,7 @@ func (s *stubGoalRepo) Create(ctx context.Context, exec repository.Executor, goa
 	return nil
 }
 func (s *stubGoalRepo) Save(ctx context.Context, exec repository.Executor, goal *entity.Goal) error {
+	s.calls = append(s.calls, goalRepoCall{operation: "save", ctx: ctx, exec: exec, userID: goal.UserID, id: goal.ID})
 	if s.updateErr != nil {
 		return s.updateErr
 	}
@@ -63,22 +75,24 @@ func (s *stubGoalRepo) Save(ctx context.Context, exec repository.Executor, goal 
 	return nil
 }
 func (s *stubGoalRepo) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint32, userID int) error {
+	s.calls = append(s.calls, goalRepoCall{operation: "delete", ctx: ctx, exec: exec, userID: userID, id: id})
 	if s.goals != nil {
 		for i, goal := range s.goals {
-			if goal.ID == id {
+			if goal.ID == id && goal.UserID == userID {
 				s.goals = append(s.goals[:i], s.goals[i+1:]...)
 				return nil
 			}
 		}
 		return repository.ErrGoalNotFound
 	}
-	if s.goal == nil || s.goal.ID != id {
+	if s.goal == nil || s.goal.ID != id || s.goal.UserID != userID {
 		return repository.ErrGoalNotFound
 	}
 	s.goal = nil
 	return nil
 }
 func (s *stubGoalRepo) SaveGoalArrangement(ctx context.Context, exec repository.Executor, arrangement *entity.GoalArrangement) error {
+	s.calls = append(s.calls, goalRepoCall{operation: "arrange", ctx: ctx, exec: exec})
 	goals := arrangement.Goals()
 	s.savedOrder = make([]uint32, 0, len(goals))
 	s.savedSorts = make([]uint16, 0, len(goals))
@@ -105,7 +119,8 @@ func (s *stubGoalRepo) CountByUserIDAndGroupID(ctx context.Context, exec reposit
 	return count, nil
 }
 func (s *stubGoalRepo) LockUserByID(ctx context.Context, exec repository.Executor, userID int) error {
-	return nil
+	s.calls = append(s.calls, goalRepoCall{operation: "lock", ctx: ctx, exec: exec, userID: userID})
+	return s.lockErr
 }
 func (s *stubGoalRepo) GetTargetStats(ctx context.Context, exec repository.Executor, filter repository.GoalTargetFilter) (*repository.GoalTargetStats, error) {
 	s.lastFilter = filter

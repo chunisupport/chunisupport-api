@@ -47,6 +47,7 @@ type ratingRecordsRepository struct {
 func (r *ratingRecordsRepository) FindByPlayerIDForRating(_ context.Context, exec repository.Executor, id int) ([]*entity.PlayerRecord, error) {
 	assert.True(r.playerRepo.t, r.playerRepo.locked)
 	assert.Same(r.playerRepo.t, r.playerRepo.tx, exec)
+	assert.Equal(r.playerRepo.t, r.playerRepo.player.ID, id)
 	return nil, nil
 }
 

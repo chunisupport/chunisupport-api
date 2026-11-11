@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -216,12 +217,13 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var receivedToken string
-			var receivedRemoteIP string
+			var receivedForm url.Values
+			var receivedMethod, receivedContentType string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.NoError(t, r.ParseForm())
-				receivedToken = r.Form.Get("response")
-				receivedRemoteIP = r.Form.Get("remoteip")
+				receivedForm = r.Form
+				receivedMethod = r.Method
+				receivedContentType = r.Header.Get("Content-Type")
 				w.WriteHeader(tt.statusCode)
 				if tt.statusCode == http.StatusOK {
 					require.NoError(t, json.NewEncoder(w).Encode(tt.response))
@@ -240,8 +242,13 @@ func TestVerifier_VerifyTurnstile(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.token, receivedToken)
-			assert.Equal(t, tt.remoteIP, receivedRemoteIP)
+			expectedForm := url.Values{"secret": {"secret"}, "response": {tt.token}}
+			if tt.remoteIP != "" {
+				expectedForm.Set("remoteip", tt.remoteIP)
+			}
+			assert.Equal(t, expectedForm, receivedForm)
+			assert.Equal(t, http.MethodPost, receivedMethod)
+			assert.Equal(t, "application/x-www-form-urlencoded", receivedContentType)
 		})
 	}
 }

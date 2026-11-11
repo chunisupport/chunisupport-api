@@ -326,19 +326,30 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, worldsendUsecase, masterDataUsecase, masterCache),
 	}
 
+	registerSystemRoutes(e, firebaseAuthUsecaseStrict, apiTokenUsecase, systemMaintenanceUsecase, cfg)
+
+	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
+
+	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, nil
+}
+
+// registerSystemRoutes は依存サービスの構築と分離し、公開範囲と認可を含む本番の登録経路をテストでも共有します。
+func registerSystemRoutes(
+	e *echo.Echo,
+	firebaseAuthenticator middleware.FirebaseAuthenticator,
+	apiTokenUsecase usecase.APITokenUsecase,
+	maintenanceStateProvider usecase.MaintenanceStateProvider,
+	cfg config.Config,
+) {
 	healthzCORS := echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg))
-	firebaseMaintenance := middleware.FirebaseMaintenanceMiddleware(systemMaintenanceUsecase, firebaseAuthUsecaseStrict)
-	apiTokenMaintenance := middleware.APITokenMaintenanceMiddleware(systemMaintenanceUsecase, apiTokenUsecase)
+	firebaseMaintenance := middleware.FirebaseMaintenanceMiddleware(maintenanceStateProvider, firebaseAuthenticator)
+	apiTokenMaintenance := middleware.APITokenMaintenanceMiddleware(maintenanceStateProvider, apiTokenUsecase)
 	e.OPTIONS("/healthz", func(c *echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}, healthzCORS)
 	e.GET("/healthz", handleExternalHealth, healthzCORS)
 	e.GET("/", handleRoot, firebaseMaintenance)
 	e.GET("/version", handleVersion, apiTokenMaintenance, middleware.APITokenMiddleware(apiTokenUsecase), middleware.RequireRole(info.AccountTypeAdmin))
-
-	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
-
-	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, nil
 }
 
 func configureIPExtractor(e *echo.Echo, cfg config.ClientIP) error {

@@ -18,10 +18,15 @@ import (
 )
 
 type fakeSongBatchLock struct {
-	released bool
+	released           bool
+	releaseHasDeadline bool
 }
 
-func (l *fakeSongBatchLock) Release(context.Context) error {
+func (l *fakeSongBatchLock) Release(ctx context.Context) error {
+	_, l.releaseHasDeadline = ctx.Deadline()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	l.released = true
 	return nil
 }
@@ -42,10 +47,12 @@ func (p *fakeSongBatchLockProvider) TryAcquire(_ context.Context, name string) (
 }
 
 type fakeSongBatchJobRepository struct {
-	mu      sync.Mutex
-	jobs    map[uuid.UUID]entity.SongBatchJob
-	limit   int
-	saveErr error
+	beforeSave          func()
+	lastSaveHasDeadline bool
+	mu                  sync.Mutex
+	jobs                map[uuid.UUID]entity.SongBatchJob
+	limit               int
+	saveErr             error
 }
 
 func newFakeSongBatchJobRepository(jobs ...*entity.SongBatchJob) *fakeSongBatchJobRepository {
@@ -56,7 +63,14 @@ func newFakeSongBatchJobRepository(jobs ...*entity.SongBatchJob) *fakeSongBatchJ
 	return repo
 }
 
-func (r *fakeSongBatchJobRepository) Save(_ context.Context, job *entity.SongBatchJob) error {
+func (r *fakeSongBatchJobRepository) Save(ctx context.Context, job *entity.SongBatchJob) error {
+	if r.beforeSave != nil {
+		r.beforeSave()
+	}
+	_, r.lastSaveHasDeadline = ctx.Deadline()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.saveErr != nil {
@@ -111,6 +125,8 @@ func (r *fakeSongBatchJobRepository) only(t *testing.T) entity.SongBatchJob {
 }
 
 type fakeSongBatchRunner struct {
+	started chan context.Context
+	proceed <-chan struct{}
 	result  SongBatchResult
 	err     error
 	cancel  context.CancelFunc
@@ -120,6 +136,13 @@ type fakeSongBatchRunner struct {
 
 func (r *fakeSongBatchRunner) Execute(ctx context.Context, req songbatch.RunRequest) (SongBatchResult, error) {
 	r.called = true
+	if r.started != nil {
+		r.started <- ctx
+		<-r.proceed
+		if err := ctx.Err(); err != nil {
+			return SongBatchResult{}, err
+		}
+	}
 	r.request = req
 	if r.cancel != nil {
 		r.cancel()
@@ -317,23 +340,53 @@ func TestSongBatchJobUsecase_StartFromAdmin_実行中の場合は受け付けな
 }
 
 func TestSongBatchJobUsecase_StartFromAdmin_リクエストがキャンセルされても実行を続ける(t *testing.T) {
-	// Given: 受付直後に終了する HTTP リクエストの context
-	requestCtx, cancelRequest := context.WithCancel(context.Background())
-	repo := newFakeSongBatchJobRepository()
-	runner := &fakeSongBatchRunner{}
-	uc := newTestSongBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, runner, nil)
-	requester := entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}
-
-	// When
-	job, err := uc.StartFromAdmin(requestCtx, requester, songbatch.NewRunRequest(false, false))
-	cancelRequest()
-	uc.Wait()
-
-	// Then
-	require.NoError(t, err)
-	saved, err := repo.FindByID(context.Background(), job.ID())
-	require.NoError(t, err)
-	assert.Equal(t, entity.SongBatchJobStatusSucceeded, saved.Status())
+	for _, shutdown := range []bool{false, true} {
+		name := "リクエスト切断では継続"
+		if shutdown {
+			name = "サーバー停止では中断"
+		}
+		t.Run(name, func(t *testing.T) {
+			requestCtx, cancelRequest := context.WithCancel(context.Background())
+			defer cancelRequest()
+			backgroundCtx, cancelBackground := context.WithCancel(context.Background())
+			defer cancelBackground()
+			repo := newFakeSongBatchJobRepository()
+			started := make(chan context.Context, 1)
+			proceed := make(chan struct{})
+			var once sync.Once
+			resume := func() { once.Do(func() { close(proceed) }) }
+			defer resume()
+			runner := &fakeSongBatchRunner{started: started, proceed: proceed}
+			locks := &fakeSongBatchLockProvider{acquired: true}
+			uc := newTestSongBatchJobUsecase(backgroundCtx, locks, repo, runner, nil)
+			job, err := uc.StartFromAdmin(requestCtx, entity.SongBatchJobRequester{UserID: 10, Username: usernametest.New(t, "adminuser")}, songbatch.NewRunRequest(false, false))
+			require.NoError(t, err)
+			var executionCtx context.Context
+			select {
+			case executionCtx = <-started:
+			case <-time.After(5 * time.Second):
+				require.FailNow(t, "ジョブが開始しません")
+			}
+			cancelRequest()
+			assert.NoError(t, executionCtx.Err(), "HTTPリクエストの寿命から切り離す")
+			if shutdown {
+				cancelBackground()
+				assert.ErrorIs(t, executionCtx.Err(), context.Canceled)
+			}
+			resume()
+			uc.Wait()
+			saved, err := repo.FindByID(context.Background(), job.ID())
+			require.NoError(t, err)
+			expected := entity.SongBatchJobStatusSucceeded
+			if shutdown {
+				expected = entity.SongBatchJobStatusInterrupted
+			}
+			assert.Equal(t, expected, saved.Status())
+			assert.True(t, locks.lock.released, "停止後もロックを解放する")
+			assert.True(t, repo.lastSaveHasDeadline, "後処理のI/Oに期限を設定する")
+			assert.True(t, locks.lock.releaseHasDeadline, "ロック解放にも期限を設定する")
+		})
+	}
 }
 
 func TestSongBatchJobUsecase_StartFromAdmin_停止処理後は受け付けない(t *testing.T) {

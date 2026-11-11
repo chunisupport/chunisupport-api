@@ -13,13 +13,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type favoriteSongReadRow struct {
-	DisplayID   string  `db:"display_id"`
-	Title       string  `db:"title"`
-	Jacket      *string `db:"jacket"`
-	FavoritedAt string  `db:"favorited_at"`
-}
-
 func TestPlayerFavoriteSongQueryServiceWrapsPersistenceErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -54,7 +47,7 @@ func setupFavoriteSongQueryTestDB(t *testing.T) *sqlx.DB {
 		CREATE TABLE player_favorite_songs (
 			player_id INTEGER NOT NULL,
 			song_id INTEGER NOT NULL,
-			created_at TEXT NOT NULL,
+			created_at TIMESTAMP NOT NULL,
 			PRIMARY KEY (player_id, song_id)
 		);
 		CREATE TABLE songs (
@@ -84,18 +77,7 @@ func setupFavoriteSongQueryTestDB(t *testing.T) *sqlx.DB {
 
 func TestFavoriteSongQuery_JoinsSongDetails(t *testing.T) {
 	db := setupFavoriteSongQueryTestDB(t)
-	ctx := context.Background()
-
-	var rows []favoriteSongReadRow
-	err := sqlx.SelectContext(ctx, db, &rows, `
-		SELECT s.display_id, s.title, s.jacket, pfs.created_at AS favorited_at
-		FROM player_favorite_songs pfs
-		INNER JOIN songs s ON s.id = pfs.song_id
-		WHERE pfs.player_id = ?
-		  AND s.is_deleted = FALSE
-		  AND s.is_worldsend = FALSE
-		ORDER BY pfs.created_at DESC, s.display_id ASC
-	`, 1)
+	rows, err := (&PlayerFavoriteSongQueryService{}).ListWithSongDetailsByPlayerID(context.Background(), db, 1)
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 
@@ -103,9 +85,7 @@ func TestFavoriteSongQuery_JoinsSongDetails(t *testing.T) {
 	assert.Equal(t, "楽曲A", rows[0].Title)
 	require.NotNil(t, rows[0].Jacket)
 	assert.Equal(t, "jacket_a.jpg", *rows[0].Jacket)
-	parsed0, err := time.Parse(time.RFC3339Nano, rows[0].FavoritedAt)
-	require.NoError(t, err)
-	assert.Equal(t, 2026, parsed0.Year())
+	assert.Equal(t, time.Date(2026, 7, 5, 12, 0, 0, 0, time.UTC), rows[0].FavoritedAt)
 
 	assert.Equal(t, "0000000000000002", rows[1].DisplayID)
 	assert.Equal(t, "楽曲B", rows[1].Title)
@@ -116,16 +96,7 @@ func TestFavoriteSongQuery_JoinsSongDetails(t *testing.T) {
 func TestFavoriteSongQuery_EmptyForPlayerWithoutFavorites(t *testing.T) {
 	db := setupFavoriteSongQueryTestDB(t)
 
-	var rows []favoriteSongReadRow
-	err := sqlx.SelectContext(context.Background(), db, &rows, `
-		SELECT s.display_id, s.title, s.jacket, pfs.created_at AS favorited_at
-		FROM player_favorite_songs pfs
-		INNER JOIN songs s ON s.id = pfs.song_id
-		WHERE pfs.player_id = ?
-		  AND s.is_deleted = FALSE
-		  AND s.is_worldsend = FALSE
-		ORDER BY pfs.created_at DESC, s.display_id ASC
-	`, 3)
+	rows, err := (&PlayerFavoriteSongQueryService{}).ListWithSongDetailsByPlayerID(context.Background(), db, 3)
 	require.NoError(t, err)
 	assert.Empty(t, rows)
 }
@@ -139,7 +110,7 @@ func TestFavoriteSongQuery_ExcludesDeletedAndWorldsend(t *testing.T) {
 		CREATE TABLE player_favorite_songs (
 			player_id INTEGER NOT NULL,
 			song_id INTEGER NOT NULL,
-			created_at TEXT NOT NULL,
+			created_at TIMESTAMP NOT NULL,
 			PRIMARY KEY (player_id, song_id)
 		);
 		CREATE TABLE songs (
@@ -163,16 +134,7 @@ func TestFavoriteSongQuery_ExcludesDeletedAndWorldsend(t *testing.T) {
 	require.NoError(t, err)
 
 	// Only Normal song should be returned
-	var rows []favoriteSongReadRow
-	err = sqlx.SelectContext(context.Background(), db, &rows, `
-		SELECT s.display_id, s.title, s.jacket, pfs.created_at AS favorited_at
-		FROM player_favorite_songs pfs
-		INNER JOIN songs s ON s.id = pfs.song_id
-		WHERE pfs.player_id = ?
-		  AND s.is_deleted = FALSE
-		  AND s.is_worldsend = FALSE
-		ORDER BY pfs.created_at DESC, s.display_id ASC
-	`, 1)
+	rows, err := (&PlayerFavoriteSongQueryService{}).ListWithSongDetailsByPlayerID(context.Background(), db, 1)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "N001", rows[0].DisplayID)

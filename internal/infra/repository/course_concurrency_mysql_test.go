@@ -3,9 +3,6 @@ package repository_test
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,8 +11,8 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	infrarepo "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
+	"github.com/chunisupport/chunisupport-api/internal/testutil/mysqltest"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,41 +20,7 @@ import (
 
 func setupCourseConcurrencyMySQL(t *testing.T) *sqlx.DB {
 	t.Helper()
-	dsn := os.Getenv("COURSE_CONCURRENCY_MYSQL_DSN")
-	if dsn == "" {
-		t.Skip("COURSE_CONCURRENCY_MYSQL_DSN が未設定です")
-	}
-	cfg, err := mysql.ParseDSN(dsn)
-	require.NoError(t, err)
-	cfg.DBName = ""
-	cfg.ParseTime = true
-	cfg.Timeout = 5 * time.Second
-	admin, err := sqlx.Connect("mysql", cfg.FormatDSN())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, admin.Close()) })
-	name := fmt.Sprintf("course_concurrency_%d", time.Now().UnixNano())
-	_, err = admin.Exec("CREATE DATABASE " + name + " CHARACTER SET utf8mb4")
-	require.NoError(t, err)
-	t.Cleanup(func() { _, err := admin.Exec("DROP DATABASE " + name); require.NoError(t, err) })
-	cfg.DBName = name
-	db, err := sqlx.Connect("mysql", cfg.FormatDSN())
-	require.NoError(t, err)
-	db.SetMaxOpenConns(5)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-
-	for _, file := range []string{"000030_create_courses.up.sql", "000031_remove_created_at_from_courses.up.sql", "000033_add_display_id_to_courses.up.sql"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "..", "migration", "mysql", file))
-		require.NoError(t, err)
-		// プレイヤー記録は検証対象外のため、別集約への外部キーを持つテーブルは作成しない。
-		schema, _, _ := strings.Cut(string(data), "CREATE TABLE player_course_records")
-		for statement := range strings.SplitSeq(schema, ";") {
-			if strings.TrimSpace(statement) == "" {
-				continue
-			}
-			_, err = db.Exec(statement)
-			require.NoError(t, err)
-		}
-	}
+	db := mysqltest.NewDatabase(t, "COURSE_CONCURRENCY_MYSQL_DSN")
 	var version, engine string
 	require.NoError(t, db.Get(&version, "SELECT VERSION()"))
 	require.NoError(t, db.Get(&engine, "SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='courses'"))
