@@ -229,8 +229,14 @@ func TestGetSongs(t *testing.T) {
 		},
 	}
 
+	// Given: 匿名リクエストのためコンテキストに利用者を設定しない。
+	var gotIncludeDeleted bool
+	var gotRequesterAccountTypeID *int
 	mockUsecase := &testutil.MockSongUsecase{
 		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+			// usecase へ渡る引数を後で検証できるよう記録する。
+			gotIncludeDeleted = includeDeleted
+			gotRequesterAccountTypeID = requesterAccountTypeID
 			return testSongs, nil
 		},
 	}
@@ -302,6 +308,10 @@ func TestGetSongs(t *testing.T) {
 			t.Error("ADVANCED chart should be nil")
 		}
 	}
+
+	// Then: 匿名のため include_deleted は既定値 false、権限は nil がそのまま渡る。
+	assert.False(t, gotIncludeDeleted)
+	assert.Nil(t, gotRequesterAccountTypeID)
 }
 
 func TestSongHandler_DeleteSong(t *testing.T) {
@@ -467,17 +477,22 @@ func TestSongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
 }
 
 func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
+	// 実在の種別ID(1-4)・既定値0・他引数(bool)と紛れない値で権限の素通しを検証する。
+	authenticatedAccountTypeID := 7
 	tests := []struct {
 		name string
 		// Given
 		query string
+		// accountTypeID が nil のときは匿名リクエスト扱いとする。
+		accountTypeID *int
 		// Then
-		wantCalled         bool
-		wantIncludeDeleted bool
-		wantErrCode        string
+		wantCalled                 bool
+		wantIncludeDeleted         bool
+		wantRequesterAccountTypeID *int
+		wantErrCode                string
 	}{
 		{name: "trueは削除済みを含めて取得する", query: "?include_deleted=true", wantCalled: true, wantIncludeDeleted: true},
-		{name: "falseは削除済みを除いて取得する", query: "?include_deleted=false", wantCalled: true, wantIncludeDeleted: false},
+		{name: "falseは削除済みを除いて取得する", query: "?include_deleted=false", accountTypeID: &authenticatedAccountTypeID, wantCalled: true, wantIncludeDeleted: false, wantRequesterAccountTypeID: &authenticatedAccountTypeID},
 		{name: "不正値は既定値にせず検証エラーを返す", query: "?include_deleted=yes", wantErrCode: apierror.CodeValidationFailed},
 	}
 
@@ -486,10 +501,12 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			// Given
 			called := false
 			var gotIncludeDeleted bool
+			var gotRequesterAccountTypeID *int
 			mockUsecase := &testutil.MockSongUsecase{
 				GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 					called = true
 					gotIncludeDeleted = includeDeleted
+					gotRequesterAccountTypeID = requesterAccountTypeID
 					return []*entity.Song{}, nil
 				},
 			}
@@ -498,6 +515,10 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/internal/songs"+tt.query, nil)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
+			if tt.accountTypeID != nil {
+				// 認証済みリクエストを再現するためコンテキストに利用者を設定する。
+				c.Set("userEntity", &entity.User{AccountTypeID: *tt.accountTypeID})
+			}
 
 			// When
 			err := handler.GetSongs(c)
@@ -513,6 +534,8 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantIncludeDeleted, gotIncludeDeleted)
+			// 匿名のときは nil、認証済みのときは設定した種別IDと同じ値が渡る（ポインタは指す値で比較される）。
+			assert.Equal(t, tt.wantRequesterAccountTypeID, gotRequesterAccountTypeID)
 		})
 	}
 }
