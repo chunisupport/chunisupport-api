@@ -10,6 +10,8 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/songchart"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
 
@@ -688,12 +690,14 @@ func TestPrepareSongsForUpsert(t *testing.T) {
 func TestDetectMassiveIdxChange_IgnoreWorldsend(t *testing.T) {
 	t.Parallel()
 
+	// Given: 通常曲15曲は idx に変化がなく、WORLD'S END 12曲だけが
+	// 同じタイトル・アーティストの通常曲として別 idx で登場する。
+	// 通常曲だけでも早期終了のしきい値(10件)を超え、WORLD'S END の12件は
+	// 除外がなければ検知条件(10件以上または20%以上)に届く量である。
 	ctx := context.Background()
 
 	db, err := sqlx.Open("sqlite", "file:"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
-		t.Fatalf("failed to open test db: %v", err)
-	}
+	require.NoError(t, err)
 	defer db.Close()
 
 	// スキーマ作成
@@ -709,34 +713,46 @@ func TestDetectMassiveIdxChange_IgnoreWorldsend(t *testing.T) {
 			is_deleted INTEGER NOT NULL DEFAULT 0
 		)
 	`)
-	if err != nil {
-		t.Fatalf("failed to create songs table: %v", err)
+	require.NoError(t, err)
+
+	// 通常曲15曲は DB と新データで official_idx が一致する
+	for i := 1; i <= 15; i++ {
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO songs (display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
+			VALUES (?, ?, ?, 1, ?, 0, 0)
+		`, fmt.Sprintf("disp-%03d", i), fmt.Sprintf("Title %d", i), fmt.Sprintf("Artist %d", i), fmt.Sprintf("OFF%03d", i))
+		require.NoError(t, err)
 	}
 
-	// テストデータ: DBには WORLD'S END の "Random" がある (ID: 8244)
-	_, err = db.ExecContext(ctx, `
-		INSERT INTO songs (display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
-		VALUES ('disp-we-001', 'Random', 'Sobrem × Silentroom', 1, '8244', 1, 0)
-	`)
-	if err != nil {
-		t.Fatalf("failed to insert test song: %v", err)
+	// WORLD'S END 12曲は DB 上では is_worldsend=1 で別 idx を持つ
+	for i := 1; i <= 12; i++ {
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO songs (display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
+			VALUES (?, ?, ?, 1, ?, 1, 0)
+		`, fmt.Sprintf("disp-we-%03d", i), fmt.Sprintf("WE Title %d", i), fmt.Sprintf("WE Artist %d", i), fmt.Sprintf("WE%03d", i))
+		require.NoError(t, err)
 	}
 
 	ws, err := songchart.NewSongChartWorkspace(ctx, songchart.Config{})
-	if err != nil {
-		t.Fatalf("failed to create workspace: %v", err)
-	}
+	require.NoError(t, err)
 	defer ws.Close()
 
-	// 新しいデータ: 公式データには通常の "Random" がある (ID: 2267)
-	newData := importer.OfficialData{
-		{
-			ID:      "2267",
-			Title:   "Random",
-			Artist:  "Sobrem × Silentroom",
-			Catname: "ORIGINAL",
-			// WeKanji, WeStar は空 -> Standard曲
-		},
+	// 新データ: 通常曲15曲は idx 不変、WORLD'S END に対応する12曲は
+	// 同じタイトル・アーティストの通常曲(WeKanji・WeStar なし)として別 idx で登場する
+	newData := make(importer.OfficialData, 0, 27)
+	for i := 1; i <= 15; i++ {
+		newData = append(newData, importer.OfficialSong{
+			ID:     fmt.Sprintf("OFF%03d", i),
+			Title:  fmt.Sprintf("Title %d", i),
+			Artist: fmt.Sprintf("Artist %d", i),
+		})
+	}
+	for i := 1; i <= 12; i++ {
+		newData = append(newData, importer.OfficialSong{
+			ID:     fmt.Sprintf("NEW-WE%03d", i),
+			Title:  fmt.Sprintf("WE Title %d", i),
+			Artist: fmt.Sprintf("WE Artist %d", i),
+		})
 	}
 
 	consolidator := &OfficialConsolidator{
@@ -746,16 +762,13 @@ func TestDetectMassiveIdxChange_IgnoreWorldsend(t *testing.T) {
 	}
 
 	existingActiveSongs, err := consolidator.loadActiveOfficialSongs(ctx)
-	if err != nil {
-		t.Fatalf("failed to load active songs: %v", err)
-	}
+	require.NoError(t, err)
+	// 通常曲15曲と WORLD'S END 12曲の合計27曲が判定対象になる
+	assert.Len(t, existingActiveSongs, 27)
 
-	// 変更検知ロジックを実行
-	// 期待値: 8244(WE) と 2267(Std) は別物として扱われ、マッチングされない。
-	// 結果として "Detected minor official_idx changes" も発生しない（マッチ数0のため）。
-	// massive change エラーにもならない。
+	// When: 変更検知ロジックを実行する
 	err = consolidator.detectMassiveIdxChange(ctx, existingActiveSongs)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
+
+	// Then: WORLD'S END と通常曲は別物として扱われ、検知されない
+	assert.NoError(t, err)
 }
