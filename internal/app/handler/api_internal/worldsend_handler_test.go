@@ -148,6 +148,16 @@ func TestUpdateWorldsendSongs(t *testing.T) {
 			expectedErrCode: apierror.CodeValidationFailed,
 		},
 		{
+			name:            "null要素を含む配列でvalidation_failedが返る",
+			body:            `[null]`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
+			name:            "トップレベルnullでvalidation_failedが返る",
+			body:            `null`,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+		{
 			name:             "usecaseで入力エラーならvalidation_failedが返る",
 			body:             `[{"id":"1234567890abcdef","title":"WE曲","artist":"WEアーティスト","is_new":false,"charts":{"MASTER":{"level_star":5}}}]`,
 			expectedErrCode:  apierror.CodeValidationFailed,
@@ -343,6 +353,7 @@ func TestWorldsendHandler_GetWorldsendSongs_IncludeDeleted(t *testing.T) {
 	}{
 		{name: "trueは削除済みを含めて取得する", query: "?include_deleted=true", wantCalled: true, wantIncludeDeleted: true},
 		{name: "未指定は削除済みを除いて取得する", query: "", accountTypeID: &authenticatedAccountTypeID, wantCalled: true, wantIncludeDeleted: false, wantRequesterAccountTypeID: &authenticatedAccountTypeID},
+		{name: "trueと認証済み閲覧者をそのまま転送する", query: "?include_deleted=true", accountTypeID: &authenticatedAccountTypeID, wantCalled: true, wantIncludeDeleted: true, wantRequesterAccountTypeID: &authenticatedAccountTypeID},
 		{name: "不正値は既定値にせず検証エラーを返す", query: "?include_deleted=1", wantErrCode: apierror.CodeValidationFailed},
 	}
 

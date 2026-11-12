@@ -3,16 +3,15 @@ package api_internal
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
@@ -30,7 +29,13 @@ func (tv *goalTestValidator) Validate(i any) error {
 
 type mockGoalUsecase struct {
 	createCalled     bool
+	createUserID     int
+	createInput      *usecase.GoalInput
+	createResult     *usecase.GoalOutput
 	updateCalled     bool
+	updateUserID     int
+	updateInput      *usecase.GoalInput
+	updateResult     *usecase.GoalOutput
 	updatedID        uint32
 	deleteCalled     bool
 	deletedID        uint32
@@ -47,17 +52,27 @@ func (m *mockGoalUsecase) List(ctx context.Context, userID int) ([]*usecase.Goal
 
 func (m *mockGoalUsecase) Create(ctx context.Context, userID int, input *usecase.GoalInput) (*usecase.GoalOutput, error) {
 	m.createCalled = true
+	m.createUserID = userID
+	m.createInput = input
 	if m.createErr != nil {
 		return nil, m.createErr
+	}
+	if m.createResult != nil {
+		return m.createResult, nil
 	}
 	return &usecase.GoalOutput{ID: 1, Title: input.Title, AchievementType: input.AchievementType, AchievementParams: map[string]any{}, Attributes: map[string]any{}}, nil
 }
 
 func (m *mockGoalUsecase) Update(ctx context.Context, userID int, id uint32, input *usecase.GoalInput) (*usecase.GoalOutput, error) {
 	m.updateCalled = true
+	m.updateUserID = userID
 	m.updatedID = id
+	m.updateInput = input
 	if m.updateErr != nil {
 		return nil, m.updateErr
+	}
+	if m.updateResult != nil {
+		return m.updateResult, nil
 	}
 	return &usecase.GoalOutput{ID: id, Title: input.Title, AchievementType: input.AchievementType, AchievementParams: map[string]any{}, Attributes: map[string]any{}}, nil
 }
@@ -411,104 +426,114 @@ func TestGoalHandlerDeleteRejectsInvalidPathID(t *testing.T) {
 	assert.False(t, uc.deleteCalled)
 }
 
-func TestToGoalInput(t *testing.T) {
-	req := &internaldto.GoalRequest{
-		Title:           "test",
-		AchievementType: "score_count",
-		AchievementParams: map[string]any{
-			"score": 1000000,
-			"count": 1,
-		},
-		Attributes: map[string]any{
-			"diff": 4,
-		},
-		InvertValue:      true,
-		InvertPercentage: false,
-	}
-
-	in, err := toGoalInput(req)
-	if err != nil {
-		require.Failf(t, "前提条件失敗", "toGoalInput returned error: %v", err)
-	}
-	if in.Title != req.Title {
-		require.Failf(t, "前提条件失敗", "Title = %s, want %s", in.Title, req.Title)
-	}
-	if in.AchievementType != req.AchievementType {
-		require.Failf(t, "前提条件失敗", "AchievementType = %s, want %s", in.AchievementType, req.AchievementType)
-	}
-	var gotParams map[string]any
-	if err := json.Unmarshal(in.AchievementParams, &gotParams); err != nil {
-		require.Failf(t, "前提条件失敗", "unmarshal AchievementParams: %v", err)
-	}
-	if gotParams["score"].(float64) != 1000000 || gotParams["count"].(float64) != 1 {
-		require.Failf(t, "前提条件失敗", "AchievementParams = %#v, want score=1000000,count=1", gotParams)
-	}
-	var gotAttrs map[string]any
-	if err := json.Unmarshal(in.Attributes, &gotAttrs); err != nil {
-		require.Failf(t, "前提条件失敗", "unmarshal Attributes: %v", err)
-	}
-	if gotAttrs["diff"].(float64) != 4 {
-		require.Failf(t, "前提条件失敗", "Attributes = %#v, want diff=4", gotAttrs)
-	}
-	assert.True(t, in.InvertValue)
-	assert.False(t, in.InvertPercentage)
-}
-
-func TestToGoalResponseKeepsInvertFlagsIndependent(t *testing.T) {
-	// Given
-	goal := &usecase.GoalOutput{
-		InvertValue:      false,
-		InvertPercentage: true,
-	}
-
-	// When
-	response := toGoalResponse(goal)
-
-	// Then
-	assert.False(t, response.InvertValue)
-	assert.True(t, response.InvertPercentage)
-
-	encoded, err := json.Marshal(response)
-	require.NoError(t, err)
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(encoded, &body))
-	assert.Equal(t, false, body["invert_value"])
-	assert.Equal(t, true, body["invert_percentage"])
-	assert.NotContains(t, body, "invert")
-}
-
-func TestGoalGaugeStartMapping(t *testing.T) {
-	t.Run("リクエストのスタート位置と達成率への適用指定をユースケース入力へ渡す", func(t *testing.T) {
-		// Given
-		req := &internaldto.GoalRequest{
+func TestGoalHandlerCreateSuccess(t *testing.T) {
+	// Given: 全入力を含む固定リクエストと、usecase が返す固定の作成結果。
+	// 反転フラグは true/false を非対称にして取り違えを検出できるようにする。
+	// ゲージは小数を含む 99.6/true で、小数の受け渡しと応答への含め方を確かめる。
+	fixedTime := time.Date(2026, time.January, 1, 9, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	groupID := uint32(3)
+	e := echo.New()
+	e.Validator = &goalTestValidator{validator: validator.New()}
+	uc := &mockGoalUsecase{
+		createResult: &usecase.GoalOutput{
+			ID:                          7,
+			GroupID:                     &groupID,
 			Title:                       "OP達成率99.8%",
 			AchievementType:             "overpower_percent",
 			AchievementParams:           map[string]any{"total": 99.8},
+			Attributes:                  map[string]any{"diff": float64(4)},
+			InvertValue:                 true,
+			InvertPercentage:            false,
 			GaugeStart:                  99.6,
 			ApplyGaugeStartToPercentage: true,
-		}
+			SortOrder:                   2,
+			CreatedAt:                   fixedTime,
+		},
+	}
+	h := NewGoalHandler(uc)
+	body := `{"group_id":3,"title":"OP達成率99.8%","achievement_type":"overpower_percent","achievement_params":{"total":99.8},"attributes":{"diff":4},"invert_value":true,"invert_percentage":false,"gauge_start":99.6,"apply_gauge_start_to_percentage":true}`
+	req := httptest.NewRequest(http.MethodPost, "/internal/me/goals", bytes.NewBufferString(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
 
-		// When
-		in, err := toGoalInput(req)
+	// When: 公開ハンドラ配線を通して作成する。
+	err := h.Create(c)
 
-		// Then
-		require.NoError(t, err)
-		assert.Equal(t, 99.6, in.GaugeStart)
-		assert.True(t, in.ApplyGaugeStartToPercentage)
-	})
+	// Then: ステータスと usecase へ渡る全入力を固定値で検証する。
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	require.True(t, uc.createCalled)
+	assert.Equal(t, 1, uc.createUserID)
+	require.NotNil(t, uc.createInput)
+	require.NotNil(t, uc.createInput.GroupID)
+	assert.Equal(t, uint32(3), *uc.createInput.GroupID)
+	assert.Equal(t, "OP達成率99.8%", uc.createInput.Title)
+	assert.Equal(t, "overpower_percent", uc.createInput.AchievementType)
+	assert.JSONEq(t, `{"total":99.8}`, string(uc.createInput.AchievementParams))
+	assert.JSONEq(t, `{"diff":4}`, string(uc.createInput.Attributes))
+	assert.True(t, uc.createInput.InvertValue)
+	assert.False(t, uc.createInput.InvertPercentage)
+	assert.Equal(t, 99.6, uc.createInput.GaugeStart)
+	assert.True(t, uc.createInput.ApplyGaugeStartToPercentage)
 
-	t.Run("レスポンスにスタート位置と達成率への適用指定を含める", func(t *testing.T) {
-		// Given
-		goal := &usecase.GoalOutput{GaugeStart: 99.6, ApplyGaugeStartToPercentage: true}
+	// Then: JSON 応答全体を固定値で検証する。キー名の変更や項目の欠落を検出するため。
+	assert.JSONEq(t, `{"id":7,"group_id":3,"title":"OP達成率99.8%","achievement_type":"overpower_percent","achievement_params":{"total":99.8},"attributes":{"diff":4},"invert_value":true,"invert_percentage":false,"gauge_start":99.6,"apply_gauge_start_to_percentage":true,"sort_order":2,"created_at":"2026-01-01T09:00:00+09:00"}`, rec.Body.String())
+}
 
-		// When
-		encoded, err := json.Marshal(toGoalResponse(goal))
+func TestGoalHandlerUpdateSuccess(t *testing.T) {
+	// Given: 作成時とは逆向きの反転フラグ (false/true) で独立性を確かめる。
+	// group_id・attributes・gauge 系を省略し、未分類・空条件・既定値の受け渡しも固定値で検証する。
+	fixedTime := time.Date(2026, time.January, 1, 9, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	e := echo.New()
+	e.Validator = &goalTestValidator{validator: validator.New()}
+	uc := &mockGoalUsecase{
+		updateResult: &usecase.GoalOutput{
+			ID:                          5,
+			GroupID:                     nil,
+			Title:                       "test",
+			AchievementType:             "score_count",
+			AchievementParams:           map[string]any{"score": float64(1000000), "count": float64(1)},
+			Attributes:                  map[string]any{},
+			InvertValue:                 false,
+			InvertPercentage:            true,
+			GaugeStart:                  0,
+			ApplyGaugeStartToPercentage: false,
+			SortOrder:                   1,
+			CreatedAt:                   fixedTime,
+		},
+	}
+	h := NewGoalHandler(uc)
+	body := `{"title":"test","achievement_type":"score_count","achievement_params":{"score":1000000,"count":1},"invert_value":false,"invert_percentage":true}`
+	req := httptest.NewRequest(http.MethodPut, "/internal/me/goals/5", bytes.NewBufferString(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/internal/me/goals/:id")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "5"}})
+	c.Set("userEntity", &entity.User{ID: 1})
 
-		// Then
-		require.NoError(t, err)
-		var body map[string]any
-		require.NoError(t, json.Unmarshal(encoded, &body))
-		assert.Equal(t, 99.6, body["gauge_start"])
-		assert.Equal(t, true, body["apply_gauge_start_to_percentage"])
-	})
+	// When: 公開ハンドラ配線を通して更新する。
+	err := h.Update(c)
+
+	// Then: パス ID と usecase へ渡る全入力を固定値で検証する。
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	require.True(t, uc.updateCalled)
+	assert.Equal(t, 1, uc.updateUserID)
+	assert.Equal(t, uint32(5), uc.updatedID)
+	require.NotNil(t, uc.updateInput)
+	assert.Nil(t, uc.updateInput.GroupID)
+	assert.Equal(t, "test", uc.updateInput.Title)
+	assert.Equal(t, "score_count", uc.updateInput.AchievementType)
+	assert.JSONEq(t, `{"score":1000000,"count":1}`, string(uc.updateInput.AchievementParams))
+	assert.JSONEq(t, `{}`, string(uc.updateInput.Attributes))
+	assert.False(t, uc.updateInput.InvertValue)
+	assert.True(t, uc.updateInput.InvertPercentage)
+	assert.Equal(t, float64(0), uc.updateInput.GaugeStart)
+	assert.False(t, uc.updateInput.ApplyGaugeStartToPercentage)
+
+	// Then: JSON 応答全体を固定値で検証する。invert の独立と gauge 既定値の保持を含む。
+	assert.JSONEq(t, `{"id":5,"group_id":null,"title":"test","achievement_type":"score_count","achievement_params":{"score":1000000,"count":1},"attributes":{},"invert_value":false,"invert_percentage":true,"gauge_start":0,"apply_gauge_start_to_percentage":false,"sort_order":1,"created_at":"2026-01-01T09:00:00+09:00"}`, rec.Body.String())
 }
