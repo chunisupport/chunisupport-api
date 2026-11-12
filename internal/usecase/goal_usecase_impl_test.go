@@ -1076,6 +1076,124 @@ func TestGoalUsecase_CreateRejectsOverpowerValueOverDynamicUpperBound(t *testing
 	assert.True(t, errors.Is(err, ErrInvalidAchievementParam))
 }
 
+// TestGoalUsecase_CreateAcceptsValueAtDynamicUpperBound は動的上限ちょうどの入力を受理することを検証します。
+// 対になる拒否テストと同じ準備で、入力値だけを上限ちょうどにしています。
+// 比較を `>` から `>=` に変える退行を検知するためのテストです。
+func TestGoalUsecase_CreateAcceptsValueAtDynamicUpperBound(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		achievementType string
+		params          []byte
+		attributes      []byte
+		stats           *repository.GoalTargetStats
+		// Then: 期待する保存結果
+		expectedParams string
+	}{
+		{
+			name:            "score_countのcountが対象譜面数ちょうどを受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"count":2}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0},
+			expectedParams:  `{"score":1000000,"count":2}`,
+		},
+		{
+			name:            "score_countのremainingが対象譜面数ちょうどを受理する",
+			achievementType: "score_count",
+			params:          []byte(`{"score":1000000,"remaining":2}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0},
+			expectedParams:  `{"score":1000000,"remaining":2}`,
+		},
+		{
+			name:            "fullchain_countのcountが対象譜面数ちょうどを受理する",
+			achievementType: "fullchain_count",
+			params:          []byte(`{"lamp":"GOLD","count":2}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2},
+			expectedParams:  `{"lamp":"GOLD","count":2}`,
+		},
+		{
+			name:            "fullchain_countのremainingが対象譜面数ちょうどを受理する",
+			achievementType: "fullchain_count",
+			params:          []byte(`{"lamp":"PLATINUM","remaining":2}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2},
+			expectedParams:  `{"lamp":"PLATINUM","remaining":2}`,
+		},
+		{
+			name:            "rainbow_countのcountが対象楽曲数ちょうどを受理する",
+			achievementType: "rainbow_count",
+			params:          []byte(`{"count":2}`),
+			attributes:      []byte(`{"genre":1,"ver":20}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 10, SongCount: 2},
+			expectedParams:  `{"count":2}`,
+		},
+		{
+			name:            "rainbow_countのremainingが対象楽曲数ちょうどを受理する",
+			achievementType: "rainbow_count",
+			params:          []byte(`{"remaining":2}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 10, SongCount: 2},
+			expectedParams:  `{"remaining":2}`,
+		},
+		{
+			name:            "total_scoreのtotalが上限ちょうどを受理する",
+			achievementType: "total_score",
+			params:          []byte(`{"total":2020000}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0},
+			expectedParams:  `{"total":2020000}`,
+		},
+		{
+			name:            "total_scoreのremainingが上限ちょうどを受理する",
+			achievementType: "total_score",
+			params:          []byte(`{"remaining":2020000}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0},
+			expectedParams:  `{"remaining":2020000}`,
+		},
+		{
+			name:            "overpower_valueのtotalが上限ちょうどを受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{"total":80.0}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 10.0},
+			expectedParams:  `{"total":80}`,
+		},
+		{
+			name:            "overpower_valueのremainingが上限ちょうどを受理する",
+			achievementType: "overpower_value",
+			params:          []byte(`{"remaining":80.0}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 10.0},
+			expectedParams:  `{"remaining":80}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{stats: tt.stats}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   tt.achievementType,
+				AchievementParams: tt.params,
+				Attributes:        tt.attributes,
+			})
+
+			// Then: エラーが無く、保存された達成条件パラメータに入力値がそのまま入っている
+			require.NoError(t, err)
+			require.NotNil(t, out)
+			assert.JSONEq(t, tt.expectedParams, string(repo.goal.AchievementParams))
+		})
+	}
+}
+
 func TestGoalUsecase_CreateRejectsUnknownKeyInScoreCountParams(t *testing.T) {
 	repo := &stubGoalRepo{stats: &repository.GoalTargetStats{ChartCount: 2, TotalChartConst: 20.0}}
 	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
