@@ -16,6 +16,11 @@ type stubGoalGroupRepo struct {
 	groups    []*entity.GoalGroup
 	createErr error
 	saveErr   error
+	// saveOrderCalls と savedGroupIDs/savedGroupSorts は SaveOrder 呼び出し時点で値を複製して保持する。
+	// 一覧取得と集約が同一ポインタを共有するため、呼び出し後のポインタ参照だけでは保存省略を検知できない。
+	saveOrderCalls int
+	savedGroupIDs  []uint32
+	savedGroupSort []uint16
 }
 
 func (s *stubGoalGroupRepo) ListByUserID(ctx context.Context, exec repository.Executor, userID int) ([]*entity.GoalGroup, error) {
@@ -55,7 +60,15 @@ func (s *stubGoalGroupRepo) DeleteByIDAndUserID(ctx context.Context, exec reposi
 }
 
 func (s *stubGoalGroupRepo) SaveOrder(ctx context.Context, exec repository.Executor, order *entity.GoalGroupOrder) error {
-	s.groups = order.Groups()
+	s.saveOrderCalls++
+	groups := order.Groups()
+	s.savedGroupIDs = make([]uint32, 0, len(groups))
+	s.savedGroupSort = make([]uint16, 0, len(groups))
+	for _, group := range groups {
+		s.savedGroupIDs = append(s.savedGroupIDs, group.ID)
+		s.savedGroupSort = append(s.savedGroupSort, group.SortOrder)
+	}
+	s.groups = groups
 	return nil
 }
 
@@ -149,15 +162,33 @@ func TestGoalGroupUsecase_DeleteMovesGoalsToUnclassifiedEnd(t *testing.T) {
 	}
 	assert.Equal(t, []uint32{1, 2, 3}, goalRepo.savedOrder)
 	assert.Equal(t, []uint16{1, 2, 3}, goalRepo.savedSorts)
+	// 共有ポインタの書換だけでは保存したことにならないため、呼び出し時の複製で永続化を確認する。
+	require.Len(t, goalRepo.savedGroupIDs, 3)
+	for _, savedGroupID := range goalRepo.savedGroupIDs {
+		assert.Nil(t, savedGroupID)
+	}
+	arrangeCalls := 0
+	for _, call := range goalRepo.calls {
+		if call.operation == "arrange" {
+			arrangeCalls++
+		}
+	}
+	assert.Equal(t, 1, arrangeCalls)
+	// 残存グループの再採番は SaveOrder の保存内容で確認する。ポインタ参照だけでは省略を検知できない。
+	assert.Equal(t, 1, groupRepo.saveOrderCalls)
+	assert.Equal(t, []uint32{20}, groupRepo.savedGroupIDs)
+	assert.Equal(t, []uint16{1}, groupRepo.savedGroupSort)
 }
 
 func TestGoalUsecase_UpdateMovesGoalToGroupEnd(t *testing.T) {
-	// Given
+	// Given: 移動元（未分類）に後続を置き、再採番の保存まで検証できるようにする。
 	groupID := uint32(10)
 	target := &entity.Goal{ID: 1, UserID: 1, SortOrder: 1}
+	successor := &entity.Goal{ID: 3, UserID: 1, SortOrder: 2}
 	goalRepo := &stubGoalRepo{goal: target, goals: []*entity.Goal{
 		target,
 		{ID: 2, UserID: 1, GroupID: &groupID, SortOrder: 1},
+		successor,
 	}}
 	groupRepo := &stubGoalGroupRepo{groups: []*entity.GoalGroup{newTestGoalGroup(t, groupID, 1, "移動先", 1)}}
 	u := NewGoalUsecase(nil, &stubTM{}, goalRepo, &stubGoalMasterProvider{}, groupRepo)
@@ -176,4 +207,22 @@ func TestGoalUsecase_UpdateMovesGoalToGroupEnd(t *testing.T) {
 	require.NotNil(t, target.GroupID)
 	assert.Equal(t, groupID, *target.GroupID)
 	assert.Equal(t, uint16(2), target.SortOrder)
+	// 共有ポインタの書換だけでは保存したことにならないため、呼び出し時の複製で永続化を確認する。
+	assert.Equal(t, []uint32{2, 3, 1}, goalRepo.savedOrder)
+	assert.Equal(t, []uint16{1, 1, 2}, goalRepo.savedSorts)
+	// savedOrderの順（移動先の既存目標、移動元の後続、移動した目標）で所属を比較する。
+	assert.Equal(t, []*uint32{new(groupID), nil, new(groupID)}, goalRepo.savedGroupIDs)
+	// 移動と単体保存の両方が呼ばれることを確認する。どちらか一方の省略も検知できる。
+	arrangeCalls := 0
+	saveCalls := 0
+	for _, call := range goalRepo.calls {
+		switch call.operation {
+		case "arrange":
+			arrangeCalls++
+		case "save":
+			saveCalls++
+		}
+	}
+	assert.Equal(t, 1, arrangeCalls)
+	assert.Equal(t, 1, saveCalls)
 }

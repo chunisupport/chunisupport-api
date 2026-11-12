@@ -24,16 +24,19 @@ type goalRepoCall struct {
 }
 
 type stubGoalRepo struct {
-	calls           []goalRepoCall
-	lockErr         error
-	count           int
-	goal            *entity.Goal
-	goals           []*entity.Goal
-	updateErr       error
-	stats           *repository.GoalTargetStats
-	lastFilter      repository.GoalTargetFilter
-	savedOrder      []uint32
-	savedSorts      []uint16
+	calls      []goalRepoCall
+	lockErr    error
+	count      int
+	goal       *entity.Goal
+	goals      []*entity.Goal
+	updateErr  error
+	stats      *repository.GoalTargetStats
+	lastFilter repository.GoalTargetFilter
+	savedOrder []uint32
+	savedSorts []uint16
+	// savedGroupIDs は SaveGoalArrangement 呼び出し時点で複製した所属を保持する。
+	// 一覧取得と集約が同一ポインタを共有するため、呼び出し後のポインタ参照だけでは永続化の省略を検知できない。
+	savedGroupIDs   []*uint32
 	statsBatchCalls int
 	deleteByUserID  func(context.Context, repository.Executor, int) error
 }
@@ -96,9 +99,16 @@ func (s *stubGoalRepo) SaveGoalArrangement(ctx context.Context, exec repository.
 	goals := arrangement.Goals()
 	s.savedOrder = make([]uint32, 0, len(goals))
 	s.savedSorts = make([]uint16, 0, len(goals))
+	s.savedGroupIDs = make([]*uint32, 0, len(goals))
 	for _, goal := range goals {
 		s.savedOrder = append(s.savedOrder, goal.ID)
 		s.savedSorts = append(s.savedSorts, goal.SortOrder)
+		if goal.GroupID == nil {
+			s.savedGroupIDs = append(s.savedGroupIDs, nil)
+			continue
+		}
+		copied := *goal.GroupID
+		s.savedGroupIDs = append(s.savedGroupIDs, &copied)
 	}
 	return nil
 }

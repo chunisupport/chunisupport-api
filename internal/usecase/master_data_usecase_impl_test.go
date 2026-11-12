@@ -32,6 +32,14 @@ func (m *chartStatsMasterProviderMock) RatingBands() []*ratingband.RatingBand {
 }
 
 func TestMasterDataUsecase_GetMasterData(t *testing.T) {
+	// normal枝とnil枝のRatingBands転送を検証するための帯一覧です。
+	normalBands := []*ratingband.RatingBand{
+		{ID: 1, Label: "～14.9", MaxExclusive: new(15.0), SortOrder: 1},
+		{ID: 2, Label: "15.0", MinInclusive: new(15.0), MaxExclusive: new(15.1), SortOrder: 2},
+	}
+	nilMastersBands := []*ratingband.RatingBand{
+		{ID: 1, Label: "RAINBOW", SortOrder: 0},
+	}
 	tests := []struct {
 		name string
 		// Given
@@ -43,6 +51,10 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 		wantAccountTypeIDs []int
 		wantVersionIDs     []int
 		wantAchievementIDs []int
+		// wantRatingBands はプロバイダの返値の素通し結果です。全行で厳密に比較します。
+		wantRatingBands []*ratingband.RatingBand
+		// wantOutput が非nilの場合、nil分岐の戻り契約として期待Output全体と厳密比較します。
+		wantOutput *usecase.MasterDataOutput
 	}{
 		{
 			name: "難易度はSortOrder昇順に並ぶ",
@@ -59,8 +71,10 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 				Versions:         map[int]masterdata.Version{},
 				AchievementTypes: map[string]masterdata.Item{},
 			},
-			ratingBands:       nil,
+			ratingBands:       normalBands,
 			wantDifficultyIDs: []int{1, 2, 3, 4, 5},
+			// normal枝の素通し代表検証のため他行には持たせません。
+			wantRatingBands: normalBands,
 		},
 		{
 			name: "ジャンルはSortOrder昇順に並ぶ",
@@ -127,16 +141,33 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 			wantAchievementIDs: []int{1, 2, 3},
 		},
 		{
-			name:    "mastersがnilの場合は空スライスとRatingBandsのみ返す",
-			masters: nil,
-			ratingBands: []*ratingband.RatingBand{
-				{ID: 1, Label: "RAINBOW", SortOrder: 0},
+			name:        "mastersがnilの場合は空スライスとRatingBandsのみ返す",
+			masters:     nil,
+			ratingBands: nilMastersBands,
+			// 比較スキップの穴を埋めるため空スライスを指定します。
+			wantDifficultyIDs:  []int{},
+			wantGenreIDs:       []int{},
+			wantAccountTypeIDs: []int{},
+			wantVersionIDs:     []int{},
+			wantAchievementIDs: []int{},
+			wantRatingBands:    nilMastersBands,
+			wantOutput: &usecase.MasterDataOutput{
+				NameFolders:      []masterdata.NameFolder{},
+				Genres:           []masterdata.Genre{},
+				Difficulties:     []masterdata.Item{},
+				AccountTypes:     []masterdata.Item{},
+				Versions:         []masterdata.Version{},
+				RatingBands:      nilMastersBands,
+				AchievementTypes: []masterdata.Item{},
+				ClassEmblems:     []masterdata.Item{},
+				ClassEmblemBases: []masterdata.Item{},
+				ClearLamps:       []masterdata.Item{},
+				ComboLamps:       []masterdata.Item{},
+				FullChains:       []masterdata.Item{},
+				Slots:            []masterdata.Item{},
+				HonorTypes:       []masterdata.Item{},
+				Possessions:      []masterdata.Item{},
 			},
-			wantDifficultyIDs:  nil,
-			wantGenreIDs:       nil,
-			wantAccountTypeIDs: nil,
-			wantVersionIDs:     nil,
-			wantAchievementIDs: nil,
 		},
 	}
 
@@ -188,6 +219,12 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 					actualIDs[i] = a.ID
 				}
 				assert.Equal(t, tt.wantAchievementIDs, actualIDs, "実績タイプの順序が一致しない")
+			}
+			// RatingBands は両枝とも素通しのため、全行で厳密に比較します。
+			assert.Equal(t, tt.wantRatingBands, out.RatingBands, "レーティング帯の転送が一致しない")
+			if tt.wantOutput != nil {
+				// nil分岐の戻り契約を期待Output全体と厳密比較します。
+				assert.Equal(t, tt.wantOutput, out)
 			}
 		})
 	}

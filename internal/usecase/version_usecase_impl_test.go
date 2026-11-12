@@ -23,6 +23,9 @@ type versionRepositoryStub struct {
 	inUse    bool
 	findErr  error
 	writeErr error
+	// rangeFrom/rangeTo は削除時の利用有無判定に使った検索範囲の記録です。
+	rangeFrom time.Time
+	rangeTo   *time.Time
 }
 
 func (s *versionRepositoryStub) FindAll(context.Context, repository.Executor) ([]*entity.Version, error) {
@@ -46,7 +49,12 @@ func (s *versionRepositoryStub) FindByName(context.Context, repository.Executor,
 func (s *versionRepositoryStub) FindLatest(context.Context, repository.Executor) (*entity.Version, error) {
 	return s.versions[len(s.versions)-1], nil
 }
-func (s *versionRepositoryStub) ExistsSongInRange(context.Context, repository.Executor, time.Time, *time.Time) (bool, error) {
+
+// ExistsSongInRange は削除可否判定の検索範囲を記録します。
+// 下限へ対象版のReleasedAt、上限へnilを渡す契約を固定するため引数を捨てません。
+func (s *versionRepositoryStub) ExistsSongInRange(_ context.Context, _ repository.Executor, from time.Time, to *time.Time) (bool, error) {
+	s.rangeFrom = from
+	s.rangeTo = to
 	return s.inUse, nil
 }
 func (s *versionRepositoryStub) Create(_ context.Context, _ repository.Executor, version *entity.Version) (*entity.Version, error) {
@@ -175,10 +183,18 @@ func TestVersionUsecase_Delete(t *testing.T) {
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Zero(t, reloader.calls)
+				assert.Zero(t, repo.deleted)
+				if tt.inUse {
+					// 利用有無判定まで進んだ場合だけ検索範囲を固定する。
+					assert.Equal(t, dateForVersionTest(2025, 1, 1), repo.rangeFrom)
+					assert.Nil(t, repo.rangeTo)
+				}
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantDelete, repo.deleted)
 				assert.Equal(t, 1, reloader.calls)
+				assert.Equal(t, dateForVersionTest(2025, 1, 1), repo.rangeFrom)
+				assert.Nil(t, repo.rangeTo)
 			}
 		})
 	}
