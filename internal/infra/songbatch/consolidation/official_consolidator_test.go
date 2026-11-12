@@ -772,3 +772,103 @@ func TestDetectMassiveIdxChange_IgnoreWorldsend(t *testing.T) {
 	// Then: WORLD'S END と通常曲は別物として扱われ、検知されない
 	assert.NoError(t, err)
 }
+
+// 公開 Consolidate を通し、楽曲だけでなく通常・WE譜面の保存と相互混入の防止を保証します。
+func TestOfficialConsolidator_Consolidate_SavesChartsAndWorldsendCharts(t *testing.T) {
+	t.Parallel()
+
+	// Given: 通常曲1曲と WORLD'S END 曲1曲の公式データ
+	ctx := context.Background()
+	ws, err := songchart.NewSongChartWorkspace(ctx, songchart.Config{
+		DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)",
+	})
+	require.NoError(t, err)
+	defer ws.Close()
+
+	db, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE songs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			official_idx TEXT,
+			title TEXT,
+			artist TEXT,
+			is_deleted INTEGER DEFAULT 0
+		)
+	`)
+	require.NoError(t, err)
+
+	officialData := importer.OfficialData{
+		{
+			ID:      "OFF101",
+			Title:   "通常曲",
+			Artist:  "通常アーティスト",
+			Catname: "POPS & ANIME",
+			LevBas:  "5",
+			LevMas:  "14+",
+		},
+		{
+			ID:      "OFF102",
+			Title:   "WE曲",
+			Artist:  "WEアーティスト",
+			Catname: "ゲキマイ",
+			WeKanji: "招",
+			WeStar:  "3",
+		},
+	}
+
+	consolidator := NewOfficialConsolidator(context.Background(), db, &mockDifficultyRepo{}, &mockGenreRepo{}, ws, &officialData)
+
+	// When: 公開 Consolidate を実行する
+	err = consolidator.Consolidate(ctx)
+	require.NoError(t, err)
+
+	// Then: 両曲の song_id を取得する
+	var normalSongID, weSongID int
+	err = ws.DB().GetContext(ctx, &normalSongID, "SELECT id FROM songs WHERE official_idx = 'OFF101'")
+	require.NoError(t, err)
+	err = ws.DB().GetContext(ctx, &weSongID, "SELECT id FROM songs WHERE official_idx = 'OFF102'")
+	require.NoError(t, err)
+
+	// Then: 通常曲の charts に BASIC 5.0 と MASTER 14.5 が保存される
+	// 空レベル (ADVANCED/EXPERT/ULTIMA) はスキップされるため2行になる
+	type chartRow struct {
+		DifficultyID   int     `db:"difficulty_id"`
+		Const          float64 `db:"const"`
+		IsConstUnknown int     `db:"is_const_unknown"`
+	}
+	var normalCharts []chartRow
+	err = ws.DB().SelectContext(ctx, &normalCharts, "SELECT difficulty_id, const, is_const_unknown FROM charts WHERE song_id = ? ORDER BY difficulty_id", normalSongID)
+	require.NoError(t, err)
+	assert.Equal(t, []chartRow{
+		{DifficultyID: 1, Const: 5.0, IsConstUnknown: 0},
+		{DifficultyID: 4, Const: 14.5, IsConstUnknown: 1},
+	}, normalCharts)
+
+	// Then: WE 曲には通常譜面が保存されない (相互混入なし)
+	var weChartCount int
+	err = ws.DB().GetContext(ctx, &weChartCount, "SELECT COUNT(*) FROM charts WHERE song_id = ?", weSongID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, weChartCount)
+
+	// Then: WE 曲の worldsend_charts に星数と漢字が保存される
+	// 公式 WeStar "3" は星数 2 に換算される (vo.ParseWeStarFromOfficial の仕様)
+	var weChart struct {
+		LevelStar *int    `db:"level_star"`
+		Attribute *string `db:"attribute"`
+	}
+	err = ws.DB().GetContext(ctx, &weChart, "SELECT level_star, attribute FROM worldsend_charts WHERE song_id = ?", weSongID)
+	require.NoError(t, err)
+	require.NotNil(t, weChart.LevelStar)
+	assert.Equal(t, 2, *weChart.LevelStar)
+	require.NotNil(t, weChart.Attribute)
+	assert.Equal(t, "招", *weChart.Attribute)
+
+	// Then: 通常曲には WORLD'S END 譜面が保存されない (相互混入なし)
+	var normalWECount int
+	err = ws.DB().GetContext(ctx, &normalWECount, "SELECT COUNT(*) FROM worldsend_charts WHERE song_id = ?", normalSongID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, normalWECount)
+}
