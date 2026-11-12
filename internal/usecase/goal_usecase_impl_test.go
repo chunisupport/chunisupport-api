@@ -1123,6 +1123,14 @@ func TestGoalUsecase_CreateAcceptsValueAtDynamicUpperBound(t *testing.T) {
 			expectedParams:  `{"lamp":"PLATINUM","remaining":2}`,
 		},
 		{
+			name:            "rating_countのremainingが到達可能譜面数ちょうどを受理する",
+			achievementType: "rating_count",
+			params:          []byte(`{"rating":18.00,"remaining":1}`),
+			attributes:      []byte(`{}`),
+			stats:           &repository.GoalTargetStats{ChartCount: 1},
+			expectedParams:  `{"rating":18,"remaining":1}`,
+		},
+		{
 			name:            "rainbow_countのcountが対象楽曲数ちょうどを受理する",
 			achievementType: "rainbow_count",
 			params:          []byte(`{"count":2}`),
