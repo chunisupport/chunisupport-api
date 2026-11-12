@@ -28,33 +28,58 @@ func (s *userSuspiciousUsecaseStub) ChangeSuspicious(ctx context.Context, reques
 
 func TestUserSuspiciousHandler_UpdateSuspicious(t *testing.T) {
 	t.Run("ADMINの不審フラグ変更をユースケースへ渡し204を返す", func(t *testing.T) {
-		// Given
-		requester := &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin}
-		called := false
-		handler := api_internal.NewUserSuspiciousHandler(&userSuspiciousUsecaseStub{
-			changeSuspicious: func(_ context.Context, actualRequester *entity.User, username string, isSuspicious bool) error {
-				called = true
-				assert.Same(t, requester, actualRequester)
-				assert.Equal(t, "targetuser", username)
-				assert.True(t, isSuspicious)
-				return nil
+		tests := []struct {
+			name string
+			// Given: 前提条件
+			body string
+			// Then: 期待する結果
+			wantSuspicious bool
+		}{
+			{
+				name:           "付与",
+				body:           `{"is_suspicious":true}`,
+				wantSuspicious: true,
 			},
-		})
-		e := newTestEcho()
-		req := httptest.NewRequest(http.MethodPatch, "/internal/users/targetuser/suspicious", bytes.NewBufferString(`{"is_suspicious":true}`))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetPathValues(echo.PathValues{{Name: "username", Value: "targetuser"}})
-		c.Set("userEntity", requester)
+			{
+				name:           "解除",
+				body:           `{"is_suspicious":false}`,
+				wantSuspicious: false,
+			},
+		}
 
-		// When
-		err := handler.UpdateSuspicious(c)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Given
+				requester := &entity.User{ID: 1, AccountTypeID: info.AccountTypeAdmin}
+				called := false
+				var actualFlag bool
+				handler := api_internal.NewUserSuspiciousHandler(&userSuspiciousUsecaseStub{
+					changeSuspicious: func(_ context.Context, actualRequester *entity.User, username string, isSuspicious bool) error {
+						called = true
+						actualFlag = isSuspicious
+						assert.Same(t, requester, actualRequester)
+						assert.Equal(t, "targetuser", username)
+						return nil
+					},
+				})
+				e := newTestEcho()
+				req := httptest.NewRequest(http.MethodPatch, "/internal/users/targetuser/suspicious", bytes.NewBufferString(tt.body))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				c.SetPathValues(echo.PathValues{{Name: "username", Value: "targetuser"}})
+				c.Set("userEntity", requester)
 
-		// Then
-		require.NoError(t, err)
-		assert.True(t, called)
-		assert.Equal(t, http.StatusNoContent, rec.Code)
+				// When
+				err := handler.UpdateSuspicious(c)
+
+				// Then
+				require.NoError(t, err)
+				assert.True(t, called)
+				assert.Equal(t, tt.wantSuspicious, actualFlag)
+				assert.Equal(t, http.StatusNoContent, rec.Code)
+			})
+		}
 	})
 
 	t.Run("保存競合は409を返す", func(t *testing.T) {
