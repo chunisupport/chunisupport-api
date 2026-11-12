@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 
@@ -911,4 +912,106 @@ func TestSyncToMySQLResolvesNameFolderIDsFromDatabase(t *testing.T) {
 		"INSERT-1":   1,
 		"DELETED-WE": 6,
 	}, got)
+}
+
+// TestSyncToMySQLFillMissingReleaseDate はリリース日補完フラグの分岐を最小テーブルで検証します。
+// 仕様は docs/song_batch.md と docs/chunithm_specs/date_boundary.md に従い、
+// フラグ有効かつデータソース・MySQLの両方に日付がない新規楽曲だけへ実行日(JST暦日)を補完します。
+func TestSyncToMySQLFillMissingReleaseDate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		fill             bool
+		sourceReleasedAt sql.NullString
+		existsInMySQL    bool
+		// Then: 期待する結果（wantExecutionDate が真の場合は呼出前後のいずれかの実行日と一致すること）
+		wantExecutionDate bool
+		wantDate          sql.NullString
+	}{
+		{
+			name:              "フラグ無効の新規欠落はNULLのまま",
+			fill:              false,
+			sourceReleasedAt:  sql.NullString{},
+			existsInMySQL:     false,
+			wantExecutionDate: false,
+			wantDate:          sql.NullString{},
+		},
+		{
+			name:              "フラグ有効の新規欠落は実行日で補完",
+			fill:              true,
+			sourceReleasedAt:  sql.NullString{},
+			existsInMySQL:     false,
+			wantExecutionDate: true,
+		},
+		{
+			name:              "フラグ有効でも既存欠落はNULLを維持",
+			fill:              true,
+			sourceReleasedAt:  sql.NullString{},
+			existsInMySQL:     true,
+			wantExecutionDate: false,
+			wantDate:          sql.NullString{},
+		},
+		{
+			name:              "フラグ有効の新規指定日は指定日を保持",
+			fill:              true,
+			sourceReleasedAt:  sql.NullString{String: "2024-01-01", Valid: true},
+			existsInMySQL:     false,
+			wantExecutionDate: false,
+			wantDate:          sql.NullString{String: "2024-01-01", Valid: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			ctx := context.Background()
+			source, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + strings.ReplaceAll(t.Name(), "/", "_") + "_source?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+			require.NoError(t, err)
+			defer source.Close()
+
+			target, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + strings.ReplaceAll(t.Name(), "/", "_") + "_target?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+			require.NoError(t, err)
+			defer target.Close()
+
+			_, err = target.DB().ExecContext(ctx, `ALTER TABLE songs ADD COLUMN name_folder_id INTEGER NOT NULL DEFAULT 17`)
+			require.NoError(t, err)
+			_, err = target.DB().ExecContext(ctx, `CREATE TABLE name_folders (id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE)`)
+			require.NoError(t, err)
+			_, err = target.DB().ExecContext(ctx, `INSERT INTO name_folders (id, code) VALUES (1, 'ABCD'), (17, 'NUMBER')`)
+			require.NoError(t, err)
+
+			if tt.existsInMySQL {
+				_, err = target.DB().ExecContext(ctx, `
+					INSERT INTO songs (display_id, title, artist, genre_id, official_idx, released_at, is_worldsend, is_deleted)
+					VALUES ('disp-001', 'Alpha Song', 'Artist', 1, 'OFF-1', NULL, 0, 0)
+				`)
+				require.NoError(t, err)
+			}
+
+			_, err = source.DB().ExecContext(ctx, `
+				INSERT INTO songs (display_id, title, artist, genre_id, official_idx, released_at, is_worldsend, is_deleted)
+				VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+			`, "disp-001", "Alpha Song", "Artist", 1, "OFF-1", nullableString(tt.sourceReleasedAt))
+			require.NoError(t, err)
+
+			// When
+			jst := time.FixedZone("JST", 9*60*60)
+			before := time.Now().In(jst).Format("2006-01-02")
+			require.NoError(t, source.SyncToMySQL(ctx, target.DB(), SyncOptions{FillMissingReleaseDate: tt.fill}))
+			after := time.Now().In(jst).Format("2006-01-02")
+
+			// Then
+			var got sql.NullString
+			require.NoError(t, target.DB().GetContext(ctx, &got, `SELECT released_at FROM songs WHERE official_idx = ?`, "OFF-1"))
+			if tt.wantExecutionDate {
+				// 実行日の検証は非空や形式だけでは不十分なため、呼出前後のいずれかとの固定比較で日付切替にも耐える
+				require.True(t, got.Valid, "実行日が補完されていません")
+				assert.Contains(t, []string{before, after}, got.String)
+				return
+			}
+			assert.Equal(t, tt.wantDate, got)
+		})
+	}
 }

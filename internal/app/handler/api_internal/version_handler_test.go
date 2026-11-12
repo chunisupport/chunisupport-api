@@ -196,18 +196,36 @@ func TestVersionHandler_Rename(t *testing.T) {
 }
 
 func TestVersionHandler_Rename_不正IDは400(t *testing.T) {
-	uc := &versionUsecaseMock{}
-	handler := NewVersionHandler(uc)
-	e := echo.New()
-	c := e.NewContext(httptest.NewRequest(http.MethodPut, "/internal/admin/versions/invalid", bytes.NewBufferString(`{"name":"CHUNITHM VERSE"}`)), httptest.NewRecorder())
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "invalid"}})
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{name: "不正文字列は拒否する", id: "invalid"},
+		{name: "ID0は拒否する", id: "0"},
+		{name: "IDマイナス1は拒否する", id: "-1"},
+	}
 
-	err := handler.Rename(c)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := &versionUsecaseMock{}
+			handler := NewVersionHandler(uc)
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/"+tt.id, bytes.NewBufferString(`{"name":"CHUNITHM VERSE","short_name":"VRS"}`))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			c := e.NewContext(req, httptest.NewRecorder())
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: tt.id}})
 
-	apiErr := requireVersionAPIError(t, err)
-	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
-	assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
-	assert.False(t, uc.renameCall)
+			// When
+			err := handler.Rename(c)
+
+			// Then
+			apiErr := requireVersionAPIError(t, err)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.False(t, uc.renameCall)
+		})
+	}
 }
 
 func TestVersionHandler_Rename_releasedAtは拒否する(t *testing.T) {
@@ -288,6 +306,37 @@ func TestVersionHandler_Delete_正常系(t *testing.T) {
 			assert.Empty(t, rec.Body.String())
 			assert.True(t, uc.deleteCall)
 			assert.Equal(t, tt.id, uc.deleteID)
+		})
+	}
+}
+
+func TestVersionHandler_Delete_数値下限は400(t *testing.T) {
+	// 0以下は400でusecase未呼出。正の受理は既存正常系に委ねる。
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{name: "ID0は拒否する", id: "0"},
+		{name: "IDマイナス1は拒否する", id: "-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := &versionUsecaseMock{}
+			handler := NewVersionHandler(uc)
+			e := echo.New()
+			c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/"+tt.id, nil), httptest.NewRecorder())
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: tt.id}})
+
+			// When
+			err := handler.Delete(c)
+
+			// Then
+			apiErr := requireVersionAPIError(t, err)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.False(t, uc.deleteCall)
 		})
 	}
 }
