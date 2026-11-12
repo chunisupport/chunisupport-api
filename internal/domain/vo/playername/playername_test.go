@@ -2,6 +2,7 @@ package playername
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,6 +55,24 @@ func TestNewPlayerName(t *testing.T) {
 		{
 			name:    "無効な半角カタカナを含む",
 			value:   "ﾞﾛｳ",
+			want:    PlayerName{},
+			wantErr: assert.Error,
+		},
+		{
+			name:    "無効な小文字を含む",
+			value:   "太郎ab",
+			want:    PlayerName{},
+			wantErr: assert.Error,
+		},
+		{
+			name:    "有効な絵文字8文字",
+			value:   strings.Repeat("😀", 8),
+			want:    PlayerName{value: strings.Repeat("😀", 8)},
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "無効な絵文字9文字",
+			value:   strings.Repeat("😀", 9),
 			want:    PlayerName{},
 			wantErr: assert.Error,
 		},
