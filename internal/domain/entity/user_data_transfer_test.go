@@ -2,6 +2,7 @@ package entity
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -208,6 +209,60 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "sort_order")
 	})
 
+	t.Run("目標が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 目標上限300件ちょうどの妥当な目標群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = []UserDataTransferGoalGroup{}
+		snapshot.Goals.Ungrouped = validTransferGoals(300)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("目標が上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 目標上限300件を1件超える妥当な目標群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = []UserDataTransferGoalGroup{}
+		snapshot.Goals.Ungrouped = validTransferGoals(301)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "goals exceeds its limit")
+	})
+
+	t.Run("目標グループが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 目標グループ上限20件ちょうどの妥当なグループ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = validTransferGoalGroups(t, 20)
+		snapshot.Goals.Ungrouped = []UserDataTransferGoal{}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("目標グループが上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 目標グループ上限20件を1件超える妥当なグループ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = validTransferGoalGroups(t, 21)
+		snapshot.Goals.Ungrouped = []UserDataTransferGoal{}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "goals.groups exceeds its limit")
+	})
+
 	t.Run("保存済みフィルタ本文がJSONオブジェクトでなければ拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.RecordFilters[0].Filter = json.RawMessage(`[]`)
@@ -351,6 +406,40 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
 		}},
 	}
+}
+
+// validTransferGoals は並び順が連続した妥当な目標を指定件数組み立てます。
+func validTransferGoals(count int) []UserDataTransferGoal {
+	goals := make([]UserDataTransferGoal, count)
+	for i := range goals {
+		goals[i] = UserDataTransferGoal{
+			Title:             fmt.Sprintf("目標%03d", i+1),
+			AchievementType:   "rank_count",
+			AchievementParams: json.RawMessage(`{"count":1}`),
+			Attributes:        json.RawMessage(`{"diff":["MASTER"]}`),
+			SortOrder:         uint16(i + 1),
+			CreatedAt:         time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return goals
+}
+
+// validTransferGoalGroups は名前が重複せず並び順が連続した妥当な目標グループを指定件数組み立てます。
+func validTransferGoalGroups(t *testing.T, count int) []UserDataTransferGoalGroup {
+	t.Helper()
+
+	groups := make([]UserDataTransferGoalGroup, count)
+	for i := range groups {
+		name, err := goalgroupname.NewGoalGroupName(fmt.Sprintf("グループ%02d", i+1))
+		require.NoError(t, err)
+		groups[i] = UserDataTransferGoalGroup{
+			Name:      name,
+			SortOrder: uint16(i + 1),
+			CreatedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			Goals:     []UserDataTransferGoal{},
+		}
+	}
+	return groups
 }
 
 func validRecordHistory(updatedAt time.Time) UserDataTransferRecordHistory {
