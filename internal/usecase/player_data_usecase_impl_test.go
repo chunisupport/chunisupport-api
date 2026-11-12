@@ -714,8 +714,12 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// スコア 1,000,000・譜面定数 10.0・コンボランプなしの単曲OPは、仕様 (docs/overpower_calculation.md §1 の SS の式)
+		// より (10.0+1)×5+0=55.0。難易度欠損の1件が外れて解禁済み1件だけ残るため、合計 55.0、分母 100.0 に対する割合も 55.0 になる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.Contains(t, logOutput, "level=WARN")
@@ -765,8 +769,12 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ロック曲 (SongID=100) が外れて通常曲 (SongID=101、単曲OP 55.0) だけ残るため、合計 55.0、割合 55.0 になる。
+		// ロック判定が無効になると2楽曲合算で 110.0 になるため、この固定値で退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
@@ -805,10 +813,16 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		_, err = calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ロック曲は静かに外れ、難易度欠損の記録も外れるため集計対象が残らず、合計 0.0、割合 0.0 になる。
+		// ロック判定が無効になるとロック曲の 55.0 が残るため、この固定値で退行を検知できる。
+		assert.InDelta(t, 0.0, *result.Value, 0.0001)
+		assert.InDelta(t, 0.0, *result.Percent, 0.0001)
 		logOutput := logBuffer.String()
 		assert.Contains(t, logOutput, "level=WARN")
 		assert.Contains(t, logOutput, "chart_difficulty_nil")
@@ -857,8 +871,13 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ULTIMA 限定ロックでは ULTIMA 記録だけが外れ、同曲の MASTER 記録 (単曲OP 55.0) が残る。
+		// 同一楽曲内は最高値1件の採用のため、合計 55.0、割合 55.0 になる。
+		// ULTIMA 限定ロックが通常譜面に波及すると 0.0 になるため、この固定値で退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
@@ -889,10 +908,16 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// 未解禁設定がない場合は判定をバイパスするため、難易度欠損の記録も集計に含まれる。
+		// 単曲OP 55.0 の1件だけなので合計 55.0、割合 55.0 になり、WARN も出ない。
+		// バイパスが外れると 0.0 になり WARN が出るため、この固定値で退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
 		assert.NotContains(t, logOutput, "chart_difficulty_nil")
 		assert.NotContains(t, logOutput, "locked_song")
 	})
@@ -928,8 +953,11 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// 除外が1件もない通常曲1件 (単曲OP 55.0) のため、合計 55.0、割合 55.0 になり、WARN は出ない。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")

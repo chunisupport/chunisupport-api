@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/coursescore"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/goalgroupname"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
@@ -22,10 +25,25 @@ import (
 var codecTestSecret = bytes.Repeat([]byte{0x42}, 32)
 
 func TestCodecEncodeDecode(t *testing.T) {
+	// Given: すべてのコレクションに2件ずつ入った有効なスナップショット
 	codec, err := NewCodec(codecTestSecret)
 	require.NoError(t, err)
 	snapshot := codecTestSnapshot(t)
+	// 入力ヘルパーが空に戻らないための固定点。各コレクションの件数を仕様の固定値で固める。
+	require.Len(t, snapshot.Records, 2)
+	require.Len(t, snapshot.RecordHistories, 2)
+	require.Len(t, snapshot.WorldsendRecords, 2)
+	require.Len(t, snapshot.WorldsendRecordHistories, 2)
+	require.Len(t, snapshot.MetricHistories, 2)
+	require.Len(t, snapshot.CourseRecords, 2)
+	require.Len(t, snapshot.Honors, 2)
+	require.Len(t, snapshot.FavoriteSongs, 2)
+	require.Len(t, snapshot.LockedSongs, 2)
+	require.Len(t, snapshot.Goals.Groups, 2)
+	require.Len(t, snapshot.Goals.Ungrouped, 2)
+	require.Len(t, snapshot.RecordFilters, 2)
 
+	// When: 符号化して復号する
 	encoded, err := codec.Encode(snapshot)
 	require.NoError(t, err)
 
@@ -42,14 +60,8 @@ func TestCodecEncodeDecode(t *testing.T) {
 
 	decoded, err := codec.Decode(encoded)
 	require.NoError(t, err)
-	assert.Equal(t, snapshot.Player.Name.String(), decoded.Player.Name.String())
-	require.NotNil(t, decoded.Player.OfficialOverpowerPercent)
-	assert.Equal(t, 0.0, *decoded.Player.OfficialOverpowerPercent)
-	require.NotNil(t, decoded.Player.PossessionName)
-	assert.Equal(t, "rainbow", *decoded.Player.PossessionName)
-	assert.NotNil(t, decoded.Records)
-	assert.NotNil(t, decoded.Goals.Groups)
-	assert.NotNil(t, decoded.Goals.Ungrouped)
+	// Then: スナップショット全体が往復で保たれる。入力の時刻はUTCの秒精度、配列は空ではなくnilでもないため正規化は不要である。
+	assert.Equal(t, snapshot, decoded)
 }
 func TestCodecDecodeRejectsTampering(t *testing.T) {
 	codec, err := NewCodec(codecTestSecret)
@@ -144,6 +156,8 @@ func TestCodecDecodeAcceptsVersion1WithoutOfficialOverpowerPercent(t *testing.T)
 	decoded, err := codec.Decode(version1)
 
 	require.NoError(t, err)
+	// Then: 指標履歴が2件あることを固定点とし、旧版では割合がnilになる。
+	require.Len(t, decoded.MetricHistories, 2)
 	assert.Nil(t, decoded.Player.OfficialOverpowerPercent)
 	for _, history := range decoded.MetricHistories {
 		assert.Nil(t, history.OfficialOverpowerPercent)
@@ -386,36 +400,291 @@ type testEnvelope struct {
 	Signature string `json:"signature"`
 }
 
+// codecTestSnapshot は往復テスト用の有効なスナップショットを組み立てます。
+// すべてのコレクションに異なる値の2件を入れ、枠順位・指標履歴の割合・称号画像は値ありと値なしの両方を含めます。
+// 時刻はUTCの秒精度に揃えているため、符号化・復号の前後で正規化せずに比較できます。
 func codecTestSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 	t.Helper()
 	name, err := playername.NewPlayerName("テスト")
 	require.NoError(t, err)
-	officialOverpowerPercent := 0.0
+	// プレイヤー単体のnull可能項目は、値ありと値なしを項目ごとに分けて両方を含める。
+	// 所有名はnilだとnormalに補正されるため、往復比較では値ありに固定する。
+	officialOverpowerPercent := 98.75
+	classEmblemName := "inf"
 	possessionName := "rainbow"
+	lastPlayedAt := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	dataCollectedAt := time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC)
+	scoreBest, err := score.NewScore(1_009_000)
+	require.NoError(t, err)
+	scoreNone, err := score.NewScore(850_000)
+	require.NoError(t, err)
+	scoreHistoryA, err := score.NewScore(1_000_000)
+	require.NoError(t, err)
+	scoreHistoryB, err := score.NewScore(950_000)
+	require.NoError(t, err)
+	scoreWorldsend, err := score.NewScore(1_009_000)
+	require.NoError(t, err)
+	scoreWorldsendLow, err := score.NewScore(700_000)
+	require.NoError(t, err)
+	scoreWorldsendHistory, err := score.NewScore(1_000_000)
+	require.NoError(t, err)
+	scoreWorldsendHistoryLow, err := score.NewScore(600_000)
+	require.NoError(t, err)
+	courseScoreClear, err := coursescore.New(3_000_000)
+	require.NoError(t, err)
+	courseScoreUnclear, err := coursescore.New(2_500_000)
+	require.NoError(t, err)
+	groupNameA, err := goalgroupname.NewGoalGroupName("今月")
+	require.NoError(t, err)
+	groupNameB, err := goalgroupname.NewGoalGroupName("来月")
+	require.NoError(t, err)
+	honorImageURL := "https://example.com/honor.png"
+	metricPercent := 98.0
+	bestOrder := 1
 	return &entity.UserDataTransferSnapshot{
 		Player: entity.UserDataTransferPlayer{
 			Name:                     name,
-			Level:                    1,
-			OfficialRating:           0,
-			OfficialOverpower:        0,
+			Level:                    100,
+			OfficialRating:           17.25,
+			OfficialOverpower:        12_345.67,
 			OfficialOverpowerPercent: &officialOverpowerPercent,
+			ClassEmblemName:          &classEmblemName,
+			ClassEmblemBaseName:      nil,
 			PossessionName:           &possessionName,
-			CreatedAt:                time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			LastPlayedAt:             &lastPlayedAt,
+			DataCollectedAt:          &dataCollectedAt,
+			CreatedAt:                time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
 		},
-		Records:                  []entity.UserDataTransferRecord{},
-		RecordHistories:          []entity.UserDataTransferRecordHistory{},
-		WorldsendRecords:         []entity.UserDataTransferWorldsendRecord{},
-		WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},
-		MetricHistories:          []entity.UserDataTransferMetricHistory{},
-		CourseRecords:            []entity.UserDataTransferCourseRecord{},
-		Honors:                   []entity.UserDataTransferHonor{},
-		FavoriteSongs:            []entity.UserDataTransferFavoriteSong{},
-		LockedSongs:              []entity.UserDataTransferLockedSong{},
+		Records: []entity.UserDataTransferRecord{
+			{
+				SongOfficialIdx: "1001",
+				Difficulty:      "MASTER",
+				Score:           scoreBest,
+				ClearLampName:   "CLEAR",
+				ComboLampName:   "FULL COMBO",
+				FullChainName:   "NONE",
+				SlotName:        "best",
+				SlotOrder:       &bestOrder,
+				UpdatedAt:       time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				SongOfficialIdx: "1002",
+				Difficulty:      "ULTIMA",
+				Score:           scoreNone,
+				ClearLampName:   "FAILED",
+				ComboLampName:   "NONE",
+				FullChainName:   "NONE",
+				SlotName:        "none",
+				SlotOrder:       nil,
+				UpdatedAt:       time.Date(2026, 8, 11, 1, 2, 3, 0, time.UTC),
+			},
+		},
+		RecordHistories: []entity.UserDataTransferRecordHistory{
+			{
+				SongOfficialIdx: "1001",
+				Difficulty:      "MASTER",
+				Score:           scoreHistoryA,
+				ClearLampName:   "CLEAR",
+				ComboLampName:   "FULL COMBO",
+				FullChainName:   "FULL CHAIN GOLD",
+				UpdatedAt:       time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				SongOfficialIdx: "1002",
+				Difficulty:      "EXPERT",
+				Score:           scoreHistoryB,
+				ClearLampName:   "FAILED",
+				ComboLampName:   "NONE",
+				FullChainName:   "NONE",
+				UpdatedAt:       time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		WorldsendRecords: []entity.UserDataTransferWorldsendRecord{
+			{
+				SongOfficialIdx: "2001",
+				Score:           scoreWorldsend,
+				ClearLampName:   "CLEAR",
+				ComboLampName:   "FULL COMBO",
+				FullChainName:   "NONE",
+				UpdatedAt:       time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				SongOfficialIdx: "2002",
+				Score:           scoreWorldsendLow,
+				ClearLampName:   "FAILED",
+				ComboLampName:   "NONE",
+				FullChainName:   "NONE",
+				UpdatedAt:       time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{
+			{
+				SongOfficialIdx: "2001",
+				Score:           scoreWorldsendHistory,
+				ClearLampName:   "CLEAR",
+				ComboLampName:   "FULL COMBO",
+				FullChainName:   "FULL CHAIN GOLD",
+				UpdatedAt:       time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				SongOfficialIdx: "2002",
+				Score:           scoreWorldsendHistoryLow,
+				ClearLampName:   "FAILED",
+				ComboLampName:   "NONE",
+				FullChainName:   "NONE",
+				UpdatedAt:       time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		MetricHistories: []entity.UserDataTransferMetricHistory{
+			{
+				OfficialRating:           17.00,
+				OfficialOverpower:        12_000.00,
+				OfficialOverpowerPercent: &metricPercent,
+				DataCollectedAt:          time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				OfficialRating:           17.10,
+				OfficialOverpower:        12_100.50,
+				OfficialOverpowerPercent: nil,
+				DataCollectedAt:          time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		CourseRecords: []entity.UserDataTransferCourseRecord{
+			{
+				CourseOfficialIdx: "course-1",
+				Score:             courseScoreClear,
+				IsClear:           true,
+				ComboLampName:     "ALL JUSTICE",
+				UpdatedAt:         time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				CourseOfficialIdx: "course-2",
+				Score:             courseScoreUnclear,
+				IsClear:           false,
+				ComboLampName:     "FULL COMBO",
+				UpdatedAt:         time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		Honors: []entity.UserDataTransferHonor{
+			{
+				Slot:       1,
+				ImageURL:   &honorImageURL,
+				Name:       "虹色称号",
+				TypeName:   "rainbow",
+				EquippedAt: time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				Slot:       2,
+				ImageURL:   nil,
+				Name:       "金称号",
+				TypeName:   "gold",
+				EquippedAt: time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		FavoriteSongs: []entity.UserDataTransferFavoriteSong{
+			{
+				SongOfficialIdx: "1001",
+				FavoritedAt:     time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				SongOfficialIdx: "1003",
+				FavoritedAt:     time.Date(2026, 8, 10, 1, 2, 3, 0, time.UTC),
+			},
+		},
+		LockedSongs: []entity.UserDataTransferLockedSong{
+			{
+				SongOfficialIdx: "1002",
+				IsUltima:        false,
+			},
+			{
+				SongOfficialIdx: "1004",
+				IsUltima:        true,
+			},
+		},
 		Goals: entity.UserDataTransferGoals{
-			Groups:    []entity.UserDataTransferGoalGroup{},
-			Ungrouped: []entity.UserDataTransferGoal{},
+			Groups: []entity.UserDataTransferGoalGroup{
+				{
+					Name:      groupNameA,
+					SortOrder: 1,
+					CreatedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+					Goals: []entity.UserDataTransferGoal{
+						{
+							Title:             "SSSを取る",
+							AchievementType:   "rank_count",
+							AchievementParams: json.RawMessage(`{"count":1}`),
+							Attributes:        json.RawMessage(`{"diff":["MASTER"]}`),
+							SortOrder:         1,
+							CreatedAt:         time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+						},
+						{
+							Title:                       "OP達成率99.8%",
+							AchievementType:             "overpower_percent",
+							AchievementParams:           json.RawMessage(`{"total":99.8}`),
+							Attributes:                  json.RawMessage(`{}`),
+							InvertValue:                 true,
+							InvertPercentage:            true,
+							GaugeStart:                  99.6,
+							ApplyGaugeStartToPercentage: true,
+							SortOrder:                   2,
+							CreatedAt:                   time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				{
+					Name:      groupNameB,
+					SortOrder: 2,
+					CreatedAt: time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC),
+					Goals: []entity.UserDataTransferGoal{
+						{
+							Title:             "皆伝を取る",
+							AchievementType:   "rank_count",
+							AchievementParams: json.RawMessage(`{"count":5}`),
+							Attributes:        json.RawMessage(`{"diff":["ULTIMA"]}`),
+							SortOrder:         1,
+							CreatedAt:         time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			Ungrouped: []entity.UserDataTransferGoal{
+				{
+					Title:             "ULTIMAを埋める",
+					AchievementType:   "play_count",
+					AchievementParams: json.RawMessage(`{"count":10}`),
+					Attributes:        json.RawMessage(`{"diff":["ULTIMA"]}`),
+					SortOrder:         1,
+					CreatedAt:         time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					Title:             "高難度を攻略する",
+					AchievementType:   "rank_count",
+					AchievementParams: json.RawMessage(`{"count":3}`),
+					Attributes:        json.RawMessage(`{"diff":["MASTER","ULTIMA"]}`),
+					InvertValue:       true,
+					GaugeStart:        10.5,
+					SortOrder:         2,
+					CreatedAt:         time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC),
+				},
+			},
 		},
-		RecordFilters: []entity.UserDataTransferRecordFilter{},
+		RecordFilters: []entity.UserDataTransferRecordFilter{
+			{
+				Name:          "高難度",
+				FilterType:    "standard",
+				SchemaVersion: 1,
+				Filter:        json.RawMessage(`{"difficulties":["MASTER"]}`),
+				CreatedAt:     time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				Name:          "WORLD'S END一覧",
+				FilterType:    "worldsend",
+				SchemaVersion: 2,
+				Filter:        json.RawMessage(`{}`),
+				CreatedAt:     time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC),
+				UpdatedAt:     time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC),
+			},
+		},
 	}
 }
 
