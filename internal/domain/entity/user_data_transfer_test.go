@@ -176,6 +176,18 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "favorite_songs")
 	})
 
+	t.Run("お気に入りが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: お気に入り上限100件ちょうどの妥当なお気に入り群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.FavoriteSongs = validTransferFavoriteSongs(100)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
 	t.Run("未解禁楽曲キーの重複を拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.LockedSongs = append(snapshot.LockedSongs, snapshot.LockedSongs[0])
@@ -281,6 +293,31 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "possession_name")
+	})
+
+	t.Run("保存済みフィルタが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 保存済みフィルタ上限100件ちょうどの妥当なフィルタ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordFilters = validTransferRecordFilters(100)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("保存済みフィルタが上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 保存済みフィルタ上限100件を1件超える妥当なフィルタ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordFilters = validTransferRecordFilters(101)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "record_filters exceeds its limit")
 	})
 
 	t.Run("保存済みフィルタが既存上限を超えたら拒否する", func(t *testing.T) {
@@ -406,6 +443,35 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
 		}},
 	}
+}
+
+// validTransferFavoriteSongs は重複がなく時刻が妥当なお気に入りを指定件数組み立てます。
+func validTransferFavoriteSongs(count int) []UserDataTransferFavoriteSong {
+	songs := make([]UserDataTransferFavoriteSong, count)
+	base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	for i := range songs {
+		songs[i] = UserDataTransferFavoriteSong{
+			SongOfficialIdx: fmt.Sprintf("%010d", i+1),
+			FavoritedAt:     base.Add(time.Duration(i) * time.Second),
+		}
+	}
+	return songs
+}
+
+// validTransferRecordFilters は本文サイズが小さく妥当な保存済みフィルタを指定件数組み立てます。
+func validTransferRecordFilters(count int) []UserDataTransferRecordFilter {
+	filters := make([]UserDataTransferRecordFilter, count)
+	for i := range filters {
+		filters[i] = UserDataTransferRecordFilter{
+			Name:          fmt.Sprintf("フィルタ%03d", i+1),
+			FilterType:    "standard",
+			SchemaVersion: 1,
+			Filter:        json.RawMessage(`{"difficulties":["MASTER"]}`),
+			CreatedAt:     time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return filters
 }
 
 // validTransferGoals は並び順が連続した妥当な目標を指定件数組み立てます。
