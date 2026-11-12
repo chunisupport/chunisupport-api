@@ -628,8 +628,6 @@ func TestUserHandler_GetUserProfileWithRecords_不正なviewは検証エラー(t
 
 func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 	e := newTestEcho()
-	mockUsecase := new(mockUserUsecase)
-	h := api_internal.NewAdminUserHandler(mockUsecase)
 	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := createdAt.Add(2 * time.Hour)
 
@@ -658,44 +656,93 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 		},
 	}
 
-	mockUsecase.On("GetAllUsersForAdmin", mock.Anything, 2, info.DefaultUserListLimit, "user").Return(expected, nil).Once()
+	// page クエリの解釈（未指定・変換不可・0以下は 1 に補正）を表形式で検証する。
+	tests := []struct {
+		name string
+		// Given: リクエストターゲット
+		target string
+		// Then: usecase へ渡されることを期待する page の固定値
+		expectedPage int
+	}{
+		{
+			name:         "page未指定は1で呼ぶ",
+			target:       "/internal/users?name=user",
+			expectedPage: 1,
+		},
+		{
+			name:         "page=0は1で呼ぶ",
+			target:       "/internal/users?page=0&name=user",
+			expectedPage: 1,
+		},
+		{
+			name:         "page=-1は1で呼ぶ",
+			target:       "/internal/users?page=-1&name=user",
+			expectedPage: 1,
+		},
+		{
+			name:         "pageが数値でないときは1で呼ぶ",
+			target:       "/internal/users?page=abc&name=user",
+			expectedPage: 1,
+		},
+		{
+			name:         "page=1は1で呼ぶ",
+			target:       "/internal/users?page=1&name=user",
+			expectedPage: 1,
+		},
+		{
+			name:         "page=2は2で呼ぶ",
+			target:       "/internal/users?page=2&name=user",
+			expectedPage: 2,
+		},
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/internal/users?page=2&name=user", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockUsecase := new(mockUserUsecase)
+			h := api_internal.NewAdminUserHandler(mockUsecase)
+			// page は具体的な値で照合し、補正なしの値が渡されたらテストが落ちるようにする。
+			mockUsecase.On("GetAllUsersForAdmin", mock.Anything, tt.expectedPage, info.DefaultUserListLimit, "user").Return(expected, nil).Once()
+			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
 
-	err := h.GetAllUsers(c)
+			// When
+			err := h.GetAllUsers(c)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, rec.Code)
+			// Then: page の値によらず同じ一覧をそのまま返す
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			mockUsecase.AssertExpectations(t)
 
-	var body []map[string]any
-	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Len(t, body, 2)
-	assert.Equal(t, "user1", body[0]["username"])
-	assert.Equal(t, "EDITOR", body[0]["account_type"])
-	assert.Equal(t, createdAt.Format(time.RFC3339), body[0]["created_at"])
-	assert.Equal(t, updatedAt.Format(time.RFC3339), body[0]["updated_at"])
-	assert.Equal(t, "player1", body[0]["player_name"])
-	assert.Equal(t, 17.25, body[0]["rating"])
-	assert.Equal(t, 9500.0, body[0]["overpower_value"])
-	assert.Equal(t, true, body[0]["is_suspicious"])
-	assert.Equal(t, false, body[0]["is_private"])
-	assert.NotContains(t, body[0], "firebase_uid")
-	assert.NotContains(t, body[0], "is_deleted")
-	assert.NotContains(t, body[0], "email")
-	assert.Equal(t, "user2", body[1]["username"])
-	assert.Equal(t, "PLAYER", body[1]["account_type"])
-	assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
-	assert.Equal(t, updatedAt.Add(time.Hour).Format(time.RFC3339), body[1]["updated_at"])
-	assert.Nil(t, body[1]["player_name"])
-	assert.Nil(t, body[1]["rating"])
-	assert.Nil(t, body[1]["overpower_value"])
-	assert.Equal(t, false, body[1]["is_suspicious"])
-	assert.Equal(t, true, body[1]["is_private"])
-	assert.NotContains(t, body[1], "firebase_uid")
-	assert.NotContains(t, body[1], "email")
-	mockUsecase.AssertExpectations(t)
+			var body []map[string]any
+			assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			assert.Len(t, body, 2)
+			assert.Equal(t, "user1", body[0]["username"])
+			assert.Equal(t, "EDITOR", body[0]["account_type"])
+			assert.Equal(t, createdAt.Format(time.RFC3339), body[0]["created_at"])
+			assert.Equal(t, updatedAt.Format(time.RFC3339), body[0]["updated_at"])
+			assert.Equal(t, "player1", body[0]["player_name"])
+			assert.Equal(t, 17.25, body[0]["rating"])
+			assert.Equal(t, 9500.0, body[0]["overpower_value"])
+			assert.Equal(t, true, body[0]["is_suspicious"])
+			assert.Equal(t, false, body[0]["is_private"])
+			assert.NotContains(t, body[0], "firebase_uid")
+			assert.NotContains(t, body[0], "is_deleted")
+			assert.NotContains(t, body[0], "email")
+			assert.Equal(t, "user2", body[1]["username"])
+			assert.Equal(t, "PLAYER", body[1]["account_type"])
+			assert.Equal(t, createdAt.Add(time.Hour).Format(time.RFC3339), body[1]["created_at"])
+			assert.Equal(t, updatedAt.Add(time.Hour).Format(time.RFC3339), body[1]["updated_at"])
+			assert.Nil(t, body[1]["player_name"])
+			assert.Nil(t, body[1]["rating"])
+			assert.Nil(t, body[1]["overpower_value"])
+			assert.Equal(t, false, body[1]["is_suspicious"])
+			assert.Equal(t, true, body[1]["is_private"])
+			assert.NotContains(t, body[1], "firebase_uid")
+			assert.NotContains(t, body[1], "email")
+		})
+	}
 }
 
 func TestAdminUserHandler_GetAllUsers_クライアント切断は原因エラーを保持する(t *testing.T) {
