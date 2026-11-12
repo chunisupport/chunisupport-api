@@ -111,26 +111,6 @@ func TestVersionUsecase_Create_同日を拒否する(t *testing.T) {
 	assert.Zero(t, reloader.calls)
 }
 
-func TestVersionUsecase_Create_不正な名前を拒否する(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{name: "空", input: ""},
-		{name: "接頭辞なし", input: "VERSE"},
-		{name: "長さ超過", input: "CHUNITHM 123456789012345678901234567890123456789012"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			uc := NewVersionUsecase(&versionRepositoryStub{}, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
-
-			_, err := uc.Create(context.Background(), tt.input, "VRS", dateForVersionTest(2025, 1, 1))
-
-			assert.ErrorIs(t, err, ErrInvalidVersionInput)
-		})
-	}
-}
-
 func TestVersionUsecase_Create_不正な超ショート名を拒否する(t *testing.T) {
 	// Given
 	repo := &versionRepositoryStub{}

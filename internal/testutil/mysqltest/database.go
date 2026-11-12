@@ -51,11 +51,16 @@ func NewDatabase(t *testing.T, legacyEnv string) *sqlx.DB {
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	_, file, _, ok := runtime.Caller(0)
 	require.True(t, ok)
-	files, err := filepath.Glob(filepath.Join(filepath.Dir(file), "..", "..", "..", "migration", "mysql", "*.up.sql"))
+	migrationDir := filepath.Join(filepath.Dir(file), "..", "..", "..", "migration", "mysql")
+	// 読み込みをマイグレーションディレクトリ内に制限し、外部パスを参照させません。
+	root, err := os.OpenRoot(migrationDir)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, root.Close()) })
+	files, err := filepath.Glob(filepath.Join(migrationDir, "*.up.sql"))
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
 	for _, file := range files {
-		data, err := os.ReadFile(file)
+		data, err := root.ReadFile(filepath.Base(file))
 		require.NoError(t, err)
 		_, err = db.Exec(string(data))
 		require.NoError(t, err, filepath.Base(file))

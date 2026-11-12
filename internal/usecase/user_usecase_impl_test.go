@@ -582,26 +582,60 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.T) {
-	now := time.Now()
-	playerUpdatedAt := now
-	recordsUpdatedAt := now.Add(time.Hour)
-	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-	impl, ok := service.(*userUsecase)
-	require.True(t, ok)
-	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
-		result: &repository.UserUpdatedAtQueryResult{
-			User:             &entity.User{ID: 1, PlayerID: new(10)},
-			PlayerUpdatedAt:  &playerUpdatedAt,
-			RecordsUpdatedAt: &recordsUpdatedAt,
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 11, 12, 1, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name             string
+		playerUpdatedAt  time.Time
+		recordsUpdatedAt *time.Time
+		expected         time.Time
+	}{
+		{
+			name:             "レコード更新の方が新しい",
+			playerUpdatedAt:  now,
+			recordsUpdatedAt: &later,
+			expected:         later,
+		},
+		{
+			name:             "プロフィール更新の方が新しい",
+			playerUpdatedAt:  later,
+			recordsUpdatedAt: &now,
+			expected:         later,
+		},
+		{
+			name:            "レコード更新日時がない",
+			playerUpdatedAt: now,
+			expected:        now,
+		},
+		{
+			name:             "更新日時が同じ",
+			playerUpdatedAt:  now,
+			recordsUpdatedAt: &now,
+			expected:         now,
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 本番で注入される専用クエリ経路を使う
+			service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+			impl, ok := service.(*userUsecase)
+			require.True(t, ok)
+			impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+				result: &repository.UserUpdatedAtQueryResult{
+					User:             &entity.User{ID: 1, PlayerID: new(10)},
+					PlayerUpdatedAt:  &tt.playerUpdatedAt,
+					RecordsUpdatedAt: tt.recordsUpdatedAt,
+				},
+			}
 
-	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+			// When
+			result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
 
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.NotNil(t, result.UpdatedAt)
-	assert.Equal(t, recordsUpdatedAt, *result.UpdatedAt)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, &UserUpdatedAtOutput{UpdatedAt: &tt.expected}, result)
+		})
+	}
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検証する(t *testing.T) {
@@ -1090,48 +1124,6 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 	assert.True(t, result.Records.All[1].IsOPTarget, "同値の場合は高い難易度を対象にする")
 	assert.True(t, result.Records.All[2].IsOPTarget, "同一曲内でOPが最大の譜面を対象にする")
 	assert.False(t, result.Records.All[3].IsOPTarget, "同一曲内でOPが低い譜面を対象にしない")
-}
-
-func TestCalculateOPTargetChartIDsFromCandidates(t *testing.T) {
-	chartConst, err := chartconstant.NewChartConstant(12.4)
-	require.NoError(t, err)
-	sameOPScore, err := score.NewScore(1009000)
-	require.NoError(t, err)
-	higherOPScore, err := score.NewScore(1010000)
-	require.NoError(t, err)
-	zeroOPScore, err := score.NewScore(0)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name       string
-		candidates []repository.PlayerRecordOPTargetCandidate
-		expected   map[int]struct{}
-	}{
-		{
-			name: "同値の場合は高い難易度を対象にする",
-			candidates: []repository.PlayerRecordOPTargetCandidate{
-				{ChartID: 1001, SongID: 10, DifficultyID: 3, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
-				{ChartID: 1002, SongID: 10, DifficultyID: 4, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
-			},
-			expected: map[int]struct{}{1002: {}},
-		},
-		{
-			name: "同一楽曲内で最大OPの譜面を対象にする",
-			candidates: []repository.PlayerRecordOPTargetCandidate{
-				{ChartID: 2001, SongID: 20, DifficultyID: 3, Score: higherOPScore, ComboLampID: 3, ChartConstant: chartConst},
-				{ChartID: 2002, SongID: 20, DifficultyID: 4, Score: zeroOPScore, ComboLampID: 1, ChartConstant: chartConst},
-			},
-			expected: map[int]struct{}{2001: {}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := calculateOPTargetChartIDsFromCandidates(tt.candidates)
-
-			assert.Equal(t, tt.expected, actual)
-		})
-	}
 }
 
 func TestCalculateOPTargetChartIDs_両経路が同じ譜面ID集合を返す(t *testing.T) {

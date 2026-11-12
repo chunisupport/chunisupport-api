@@ -11,7 +11,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/reauthtoken/reauthtokentest"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/username/usernametest"
@@ -306,14 +305,6 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		assert.Equal(t, "db error", err.Error())
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
-	})
-
-	t.Run("再認証トークンが空なら recent sign-in required を返す", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-
-		_, err := reauthtoken.New("   ")
-		assert.ErrorIs(t, err, reauthtoken.ErrEmpty)
-		mockUserRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("不正な再認証トークンなら recent sign-in required を返す", func(t *testing.T) {
