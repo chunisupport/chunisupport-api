@@ -110,9 +110,14 @@ func TestUserHandler_GetUserSongRecord(t *testing.T) {
 	e := newTestEcho()
 	mockUsecase := new(mockUserUsecase)
 	h := api_internal.NewUserHandler(mockUsecase)
+	// 本文の検証に使う固定日時と識別値（仕様から決めた固定値で、本番の式からは計算しない）。
+	now := time.Date(2025, 6, 20, 10, 0, 0, 0, time.UTC)
+	standardRecord := testPlayerRecordOutput("0000000000000001")
+	standardRecord.PlayerRecord.UpdatedAt = now
 	expected := &usecase.UserSongRecordOutput{
-		Standard: []*usecase.PlayerRecordOutput{},
-		Meta:     &usecase.UserSongRecordMetaOutput{},
+		Standard:  []*usecase.PlayerRecordOutput{standardRecord},
+		UpdatedAt: &now,
+		Meta:      &usecase.UserSongRecordMetaOutput{},
 	}
 	mockUsecase.On(
 		"GetUserSongRecord",
@@ -136,6 +141,23 @@ func TestUserHandler_GetUserSongRecord(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	// 1件の標準レコードが識別値つきで返ることを確かめる（空配列との取り違えを検知する）。
+	standard, ok := body["standard"].([]any)
+	if assert.True(t, ok) && assert.Len(t, standard, 1) {
+		first, ok := standard[0].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, "0000000000000001", first["id"])
+			assert.Equal(t, now.Format(time.RFC3339), first["updated_at"])
+			assert.Equal(t, true, first["is_played"])
+		}
+	}
+	// メタの更新日時がレコードの更新日時と一致することを確かめる。
+	meta, ok := body["meta"].(map[string]any)
+	if assert.True(t, ok) {
+		assert.Equal(t, now.Format(time.RFC3339), meta["updated_at"])
+	}
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -211,9 +233,8 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		var body map[string]any
-		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Nil(t, body["updated_at"])
+		// キーの存在と null をまとめて固定する（omitempty 付与やキー欠落の退行を検知する）。
+		assert.JSONEq(t, `{"updated_at":null}`, rec.Body.String())
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -287,6 +308,28 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		_, hasWorldsend := recordsBody["worldsend"]
 		assert.True(t, hasStandard)
 		assert.True(t, hasWorldsend)
+		// 各枠の配列に対応する識別値が入っていることを確かめる（best/new の代入入れ替えを検知する）。
+		assertRecordID := func(key, expectedID string) {
+			t.Helper()
+			arr, ok := recordsBody[key].([]any)
+			if assert.True(t, ok) && assert.Len(t, arr, 1) {
+				first, ok := arr[0].(map[string]any)
+				if assert.True(t, ok) {
+					assert.Equal(t, expectedID, first["id"])
+				}
+			}
+		}
+		assertRecordID("best", "best1")
+		assertRecordID("best_candidate", "best_candidate1")
+		assertRecordID("new", "new1")
+		assertRecordID("new_candidate", "new_candidate1")
+		assertRecordID("standard", "standard1")
+		assertRecordID("worldsend", "we1")
+		// 連携済みでコース補完がない場合は course が空配列になることを確かめる（null やキー欠落との区別）。
+		course, ok := recordsBody["course"].([]any)
+		if assert.True(t, ok) {
+			assert.Len(t, course, 0)
+		}
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -308,13 +351,8 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		var body map[string]any
-		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "testuser", body["username"])
-		assert.Nil(t, body["player"])
-		assert.Nil(t, body["records"])
-		_, hasUserID := body["user_id"]
-		assert.False(t, hasUserID)
+		// キーの存在と null をまとめて固定する（omitempty 付与やキー欠落の退行を検知する）。
+		assert.JSONEq(t, `{"username":"testuser","player":null,"records":null,"updated_at":null}`, rec.Body.String())
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -338,6 +376,21 @@ func TestUserHandler_GetUserProfileWithRecords(t *testing.T) {
 		_, hasWorldsend := recordsBody["worldsend"]
 		assert.False(t, hasStandard)
 		assert.False(t, hasWorldsend)
+		// レーティング枠の配列に対応する識別値が入っていることを確かめる（best/new の代入入れ替えを検知する）。
+		assertRecordID := func(key, expectedID string) {
+			t.Helper()
+			arr, ok := recordsBody[key].([]any)
+			if assert.True(t, ok) && assert.Len(t, arr, 1) {
+				first, ok := arr[0].(map[string]any)
+				if assert.True(t, ok) {
+					assert.Equal(t, expectedID, first["id"])
+				}
+			}
+		}
+		assertRecordID("best", "best1")
+		assertRecordID("best_candidate", "best_candidate1")
+		assertRecordID("new", "new1")
+		assertRecordID("new_candidate", "new_candidate1")
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -428,6 +481,21 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 		assert.False(t, hasUsername)
 		_, hasPlayer := body["player"]
 		assert.False(t, hasPlayer)
+		// 各枠の配列に対応する識別値が入っていることを確かめる（best/new の代入入れ替えを検知する）。
+		assertRecordID := func(key, expectedID string) {
+			t.Helper()
+			arr, ok := body[key].([]any)
+			if assert.True(t, ok) && assert.Len(t, arr, 1) {
+				first, ok := arr[0].(map[string]any)
+				if assert.True(t, ok) {
+					assert.Equal(t, expectedID, first["id"])
+				}
+			}
+		}
+		assertRecordID("best", "best1")
+		assertRecordID("best_candidate", "best_candidate1")
+		assertRecordID("new", "new1")
+		assertRecordID("new_candidate", "new_candidate1")
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -448,18 +516,8 @@ func TestUserHandler_GetUserRating(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		var body map[string]any
-		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Empty(t, body["best"])
-		assert.Empty(t, body["best_candidate"])
-		assert.Empty(t, body["new"])
-		assert.Empty(t, body["new_candidate"])
-		assert.Nil(t, body["rating"])
-		assert.Nil(t, body["best_average"])
-		assert.Nil(t, body["new_average"])
-		meta, ok := body["meta"].(map[string]any)
-		assert.True(t, ok)
-		assert.Nil(t, meta["updated_at"])
+		// キーの存在、`[]` と `null` の区別をまとめて固定する（空スライス初期化の削除や omitempty 付与の退行を検知する）。
+		assert.JSONEq(t, `{"rating":null,"best_average":null,"new_average":null,"best":[],"best_candidate":[],"new":[],"new_candidate":[],"meta":{"updated_at":null}}`, rec.Body.String())
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -517,6 +575,21 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 		assert.False(t, hasUsername)
 		_, hasPlayer := body["player"]
 		assert.False(t, hasPlayer)
+		// 各枠の配列に対応する識別値が入っていることを確かめる（standard/worldsend の取り違えを検知する）。
+		standard, ok := body["standard"].([]any)
+		if assert.True(t, ok) && assert.Len(t, standard, 1) {
+			first, ok := standard[0].(map[string]any)
+			if assert.True(t, ok) {
+				assert.Equal(t, "standard1", first["id"])
+			}
+		}
+		worldsend, ok := body["worldsend"].([]any)
+		if assert.True(t, ok) && assert.Len(t, worldsend, 1) {
+			first, ok := worldsend[0].(map[string]any)
+			if assert.True(t, ok) {
+				assert.Equal(t, "we1", first["id"])
+			}
+		}
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -537,13 +610,13 @@ func TestUserHandler_GetUserRecord(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		var body map[string]any
+		// キーの存在と `[]`・`null` の区別を項目ごとに固定する（空スライス初期化の削除や omitempty 付与の退行を検知する）。
+		// course は未連携時に null を返すか [] を返すかの仕様が未確定のため、ここでは固定しない。
+		var body map[string]json.RawMessage
 		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Empty(t, body["standard"])
-		assert.Empty(t, body["worldsend"])
-		meta, ok := body["meta"].(map[string]any)
-		assert.True(t, ok)
-		assert.Nil(t, meta["updated_at"])
+		assert.JSONEq(t, `[]`, string(body["standard"]))
+		assert.JSONEq(t, `[]`, string(body["worldsend"]))
+		assert.JSONEq(t, `{"updated_at":null}`, string(body["meta"]))
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -602,6 +675,21 @@ func TestUserHandler_GetUserProfileWithRecordView(t *testing.T) {
 	assert.True(t, hasWorldsend)
 	assert.False(t, hasBest)
 	assert.False(t, hasNew)
+	// 各枠の配列に対応する識別値が入っていることを確かめる（standard/worldsend の取り違えを検知する）。
+	standard, ok := recordsBody["standard"].([]any)
+	if assert.True(t, ok) && assert.Len(t, standard, 1) {
+		first, ok := standard[0].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, "standard1", first["id"])
+		}
+	}
+	worldsend, ok := recordsBody["worldsend"].([]any)
+	if assert.True(t, ok) && assert.Len(t, worldsend, 1) {
+		first, ok := worldsend[0].(map[string]any)
+		if assert.True(t, ok) {
+			assert.Equal(t, "we1", first["id"])
+		}
+	}
 	mockUsecase.AssertExpectations(t)
 }
 
