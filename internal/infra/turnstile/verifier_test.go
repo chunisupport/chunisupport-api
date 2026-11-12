@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -333,6 +334,46 @@ func TestNewVerifier_許可ホストが0件の場合だけ警告する(t *testin
 			assert.Empty(t, logOutput.String())
 		})
 	}
+}
+
+func TestVerifier_VerifyTurnstile_応答がJSONでなければ内部エラーとして原因を保持する(t *testing.T) {
+	// 前提
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("not json"))
+	}))
+	defer server.Close()
+
+	verifier := newTestVerifier(t, []string{"https://app.example.com"}, server.URL, server.Client())
+
+	// 実行
+	err := verifier.VerifyTurnstile(context.Background(), "turnstile-token", "", "login")
+
+	// 検証
+	require.Error(t, err)
+	assert.ErrorIs(t, err, usecase.ErrInternalError)
+	var syntaxErr *json.SyntaxError
+	assert.ErrorAs(t, err, &syntaxErr)
+}
+
+func TestVerifier_VerifyTurnstile_通信エラーの原因を保持する(t *testing.T) {
+	// 前提
+	sentinel := errors.New("sentinel transport error")
+	called := false
+	client := &http.Client{Transport: requestContractTransport(func(_ *http.Request) (*http.Response, error) {
+		called = true
+		return nil, sentinel
+	})}
+	verifier := newTestVerifier(t, []string{"https://app.example.com"}, "http://example.invalid/siteverify", client)
+
+	// 実行
+	err := verifier.VerifyTurnstile(context.Background(), "turnstile-token", "", "login")
+
+	// 検証
+	require.Error(t, err)
+	assert.ErrorIs(t, err, usecase.ErrInternalError)
+	assert.ErrorIs(t, err, sentinel)
+	assert.True(t, called)
 }
 
 func newTestVerifier(t *testing.T, allowedOrigins []string, endpoint string, client *http.Client) *verifier {
