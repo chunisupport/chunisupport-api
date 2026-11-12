@@ -158,6 +158,79 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "slot_order")
 	})
 
+	t.Run("レーティング枠の上限ちょうどは受理し上限+1は拒否する", func(t *testing.T) {
+		tests := []struct {
+			name string
+			// Given: 前提条件
+			slotName string
+			count    int
+			// Then: 期待する結果
+			wantErr bool
+		}{
+			{
+				name:     "best枠が上限30件ちょうどなら受理する",
+				slotName: "best",
+				count:    30,
+				wantErr:  false,
+			},
+			{
+				name:     "new枠が上限20件ちょうどなら受理する",
+				slotName: "new",
+				count:    20,
+				wantErr:  false,
+			},
+			{
+				name:     "new枠が上限21件なら拒否する",
+				slotName: "new",
+				count:    21,
+				wantErr:  true,
+			},
+			{
+				name:     "best_candidate枠が上限10件ちょうどなら受理する",
+				slotName: "best_candidate",
+				count:    10,
+				wantErr:  false,
+			},
+			{
+				name:     "best_candidate枠が上限11件なら拒否する",
+				slotName: "best_candidate",
+				count:    11,
+				wantErr:  true,
+			},
+			{
+				name:     "new_candidate枠が上限10件ちょうどなら受理する",
+				slotName: "new_candidate",
+				count:    10,
+				wantErr:  false,
+			},
+			{
+				name:     "new_candidate枠が上限11件なら拒否する",
+				slotName: "new_candidate",
+				count:    11,
+				wantErr:  true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Given: 指定スロットに順位1から連番で割り当てた妥当な通常譜面レコード群
+				snapshot := validUserDataTransferSnapshot(t)
+				snapshot.Records = validTransferSlotRecords(tt.slotName, tt.count)
+
+				// When
+				err := snapshot.Validate()
+
+				// Then
+				if tt.wantErr {
+					require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+					assert.Contains(t, err.Error(), "slot_order")
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
 	t.Run("同一スロット内のslot_order重複を拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		duplicateOrder := snapshot.Records[0]
@@ -511,6 +584,27 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
 		}},
 	}
+}
+
+// validTransferSlotRecords は指定スロットに順位1から連番で割り当てた妥当な通常譜面レコードを指定件数組み立てます。
+func validTransferSlotRecords(slotName string, count int) []UserDataTransferRecord {
+	records := make([]UserDataTransferRecord, count)
+	standardScore, _ := score.NewScore(1_009_000)
+	for i := range records {
+		order := i + 1
+		records[i] = UserDataTransferRecord{
+			SongOfficialIdx: fmt.Sprintf("%04d", i+1),
+			Difficulty:      "MASTER",
+			Score:           standardScore,
+			ClearLampName:   "CLEAR",
+			ComboLampName:   "FULL COMBO",
+			FullChainName:   "NONE",
+			SlotName:        slotName,
+			SlotOrder:       &order,
+			UpdatedAt:       time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return records
 }
 
 // validTransferFavoriteSongs は重複がなく時刻が妥当なお気に入りを指定件数組み立てます。
