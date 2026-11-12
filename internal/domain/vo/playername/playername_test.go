@@ -1,11 +1,13 @@
 package playername
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPlayerName(t *testing.T) {
@@ -146,6 +148,96 @@ func TestPlayerName_Scan(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, *p, "Scan(%v)", tt.args.src)
+		})
+	}
+}
+
+func TestPlayerName_JSONRoundTrip(t *testing.T) {
+	// Given: 有効な名前のJSON文字列
+	payload := []byte(`"太郎１２３"`)
+
+	// When: JSONから読み込む
+	var got PlayerName
+	err := json.Unmarshal(payload, &got)
+
+	// Then: 文字列に戻り、再びJSON化しても元と同じになる
+	require.NoError(t, err)
+	assert.Equal(t, "太郎１２３", got.String())
+	marshaled, err := json.Marshal(got)
+	require.NoError(t, err)
+	assert.Equal(t, string(payload), string(marshaled))
+}
+
+func TestPlayerName_UnmarshalJSONRejectsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 生成関数が拒否する代表的な値（種類の異なるもの）
+		value string
+	}{
+		{
+			name:  "空文字列は拒否する",
+			value: "",
+		},
+		{
+			name:  "半角英数字を含む値は拒否する",
+			value: "太郎12AB",
+		},
+		{
+			name:  "9文字は拒否する",
+			value: strings.Repeat("😀", 9),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 変更前の有効な値と、JSONペイロード
+			before, err := NewPlayerName("太郎１２３")
+			require.NoError(t, err)
+			got := before
+			payload, err := json.Marshal(tt.value)
+			require.NoError(t, err)
+			_, wantErr := NewPlayerName(tt.value)
+			require.Error(t, wantErr)
+
+			// When: JSONから読み込む
+			err = json.Unmarshal(payload, &got)
+
+			// Then: 生成関数と同じ内容のエラーになり、値は変更前のまま
+			assert.EqualError(t, err, wantErr.Error())
+			assert.Equal(t, before, got)
+		})
+	}
+}
+
+func TestPlayerName_UnmarshalJSONRejectsNonStringInput(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: JSONペイロードそのもの
+		payload string
+	}{
+		{
+			name:    "nullは拒否する",
+			payload: `null`,
+		},
+		{
+			name:    "文字列でない値は拒否する",
+			payload: `123`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 変更前の有効な値
+			before, err := NewPlayerName("太郎１２３")
+			require.NoError(t, err)
+			got := before
+
+			// When: JSONから読み込む
+			err = json.Unmarshal([]byte(tt.payload), &got)
+
+			// Then: エラーになり、値は変更前のまま
+			assert.Error(t, err)
+			assert.Equal(t, before, got)
 		})
 	}
 }
