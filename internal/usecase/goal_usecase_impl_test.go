@@ -495,11 +495,19 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 }
 
 func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
+	// バージョン期間の期待値はマスタの開始日から手で求めた固定値である。
+	// VERSE(20)は2024-01-01開始、次のバージョン(21)は2025-01-01開始のため、
+	// 20の期間は2024-01-01から2025-01-01まで、最新21の期間の終わりは無い。
+	verseFrom := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	verseEP2From := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
-		name               string
-		attributes         []byte
-		expectedAttributes map[string]any
-		expectError        bool
+		name                  string
+		attributes            []byte
+		expectedAttributes    map[string]any
+		expectError           bool
+		expectedDifficultyIDs []int
+		expectedGenreIDs      []int
+		expectedVersionRanges []repository.VersionRange
 	}{
 		{
 			name:               "難易度を単一要素配列で指定するとスカラーに正規化される",
@@ -508,22 +516,28 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			expectError:        false,
 		},
 		{
-			name:               "難易度を複数配列で指定できる",
-			attributes:         []byte(`{"diff":[3,4]}`),
-			expectedAttributes: map[string]any{"diff": []any{float64(3), float64(4)}},
-			expectError:        false,
+			name:                  "難易度を複数配列で指定できる",
+			attributes:            []byte(`{"diff":[3,4]}`),
+			expectedAttributes:    map[string]any{"diff": []any{float64(3), float64(4)}},
+			expectError:           false,
+			expectedDifficultyIDs: []int{3, 4},
 		},
 		{
 			name:               "ジャンルを複数配列で指定できる",
 			attributes:         []byte(`{"genre":[1,2]}`),
 			expectedAttributes: map[string]any{"genre": []any{float64(1), float64(2)}},
 			expectError:        false,
+			expectedGenreIDs:   []int{1, 2},
 		},
 		{
 			name:               "バージョンを複数配列で指定できる",
 			attributes:         []byte(`{"ver":[20,21]}`),
 			expectedAttributes: map[string]any{"ver": []any{float64(20), float64(21)}},
 			expectError:        false,
+			expectedVersionRanges: []repository.VersionRange{
+				{From: verseFrom, To: &verseEP2From},
+				{From: verseEP2From, To: nil},
+			},
 		},
 		{
 			name:               "楽曲名順を単一コードで指定できる",
@@ -608,6 +622,17 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedAttributes, out.Attributes)
+			// 属性から検索条件への変換が正しいことも固定値で確かめる。
+			// 動的上限の計算対象がずれる退行を検知するための検証である。
+			if tt.expectedDifficultyIDs != nil {
+				assert.Equal(t, tt.expectedDifficultyIDs, repo.lastFilter.DifficultyIDs)
+			}
+			if tt.expectedGenreIDs != nil {
+				assert.Equal(t, tt.expectedGenreIDs, repo.lastFilter.GenreIDs)
+			}
+			if tt.expectedVersionRanges != nil {
+				assert.Equal(t, tt.expectedVersionRanges, repo.lastFilter.VersionRanges)
+			}
 		})
 	}
 }
@@ -706,6 +731,88 @@ func TestGoalUsecase_CreateConstAttributeRejectsMoreThanOneDecimal(t *testing.T)
 		Attributes:        []byte(`{"const":{"min":1.23,"max":16.0}}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+}
+
+// TestGoalUsecase_CreateConstAttributeBoundary は譜面定数の範囲の境界値を検証します。
+// 仕様は docs/goals-api-current-specification.md の「1.0 <= min <= max <= 16.0」であり、
+// 本番も同じ範囲で拒否します。受理側は検索条件に範囲が渡ることも確かめます。
+func TestGoalUsecase_CreateConstAttributeBoundary(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		attributes []byte
+		// Then: 期待する結果
+		expectedAttributes map[string]any
+		wantConstMin       float64
+		wantConstMax       float64
+		wantErr            bool
+	}{
+		{
+			name:               "下限ちょうどを受理する",
+			attributes:         []byte(`{"const":{"min":1.0,"max":14.0}}`),
+			expectedAttributes: map[string]any{"const": map[string]any{"min": float64(1), "max": float64(14)}},
+			wantConstMin:       1.0,
+			wantConstMax:       14.0,
+		},
+		{
+			name:               "上限ちょうどを受理する",
+			attributes:         []byte(`{"const":{"min":14.0,"max":16.0}}`),
+			expectedAttributes: map[string]any{"const": map[string]any{"min": float64(14), "max": float64(16)}},
+			wantConstMin:       14.0,
+			wantConstMax:       16.0,
+		},
+		{
+			name:       "下限のすぐ外を拒否する",
+			attributes: []byte(`{"const":{"min":0.9,"max":14.0}}`),
+			wantErr:    true,
+		},
+		{
+			name:       "上限のすぐ外を拒否する",
+			attributes: []byte(`{"const":{"min":14.0,"max":16.1}}`),
+			wantErr:    true,
+		},
+		{
+			name:               "下限と上限が等しい指定を受理する",
+			attributes:         []byte(`{"const":{"min":14.0,"max":14.0}}`),
+			expectedAttributes: map[string]any{"const": map[string]any{"min": float64(14), "max": float64(14)}},
+			wantConstMin:       14.0,
+			wantConstMax:       14.0,
+		},
+		{
+			name:       "下限が上限を超える指定を拒否する",
+			attributes: []byte(`{"const":{"min":14.1,"max":14.0}}`),
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubGoalRepo{}
+			u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+			// When
+			out, err := u.Create(context.Background(), 1, &GoalInput{
+				Title:             "test",
+				AchievementType:   "score_count",
+				AchievementParams: []byte(`{"score":1000000,"count":1}`),
+				Attributes:        tt.attributes,
+			})
+
+			// Then
+			if tt.wantErr {
+				assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedAttributes, out.Attributes)
+			// 受理した範囲が検索条件にそのまま渡ることを固定値で確かめる。
+			require.NotNil(t, repo.lastFilter.ConstMin)
+			require.NotNil(t, repo.lastFilter.ConstMax)
+			assert.Equal(t, tt.wantConstMin, *repo.lastFilter.ConstMin)
+			assert.Equal(t, tt.wantConstMax, *repo.lastFilter.ConstMax)
+		})
+	}
 }
 
 func TestGoalUsecase_CreateKeepsConstFilterMode(t *testing.T) {
@@ -1307,11 +1414,17 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 		params          []byte
 		stats           *repository.GoalTargetStats
 		wantErr         bool
+		// 受理する行は保存値と出力値の両方を固定値で確かめる。
+		// 検証通過後にremainingを落とす退行を検知するためである。
+		expectedParams string
+		expectedOutput map[string]any
 	}{
 		{
 			name:            "件数系の整数remainingを受理する",
 			achievementType: "score_count",
 			params:          []byte(`{"score":1000000,"remaining":1}`),
+			expectedParams:  `{"score":1000000,"remaining":1}`,
+			expectedOutput:  map[string]any{"score": float64(1000000), "remaining": float64(1)},
 		},
 		{
 			name:            "件数系の小数remainingを拒否する",
@@ -1323,6 +1436,8 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 			name:            "合計スコアの整数remainingを受理する",
 			achievementType: "total_score",
 			params:          []byte(`{"remaining":1000000}`),
+			expectedParams:  `{"remaining":1000000}`,
+			expectedOutput:  map[string]any{"remaining": float64(1000000)},
 		},
 		{
 			name:            "合計スコアの小数remainingを拒否する",
@@ -1334,6 +1449,8 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 			name:            "OP値の小数remainingを受理する",
 			achievementType: "overpower_value",
 			params:          []byte(`{"remaining":1.234}`),
+			expectedParams:  `{"remaining":1.234}`,
+			expectedOutput:  map[string]any{"remaining": float64(1.234)},
 		},
 		{
 			name:            "動的上限を超えるremainingを拒否する",
@@ -1352,16 +1469,22 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 			name:            "nullの件数とremainingの同時指定を受理する",
 			achievementType: "score_count",
 			params:          []byte(`{"score":1000000,"count":null,"remaining":1}`),
+			expectedParams:  `{"score":1000000,"count":null,"remaining":1}`,
+			expectedOutput:  map[string]any{"score": float64(1000000), "count": nil, "remaining": float64(1)},
 		},
 		{
 			name:            "nullの合計値とremainingの同時指定を受理する",
 			achievementType: "total_score",
 			params:          []byte(`{"total":null,"remaining":100}`),
+			expectedParams:  `{"total":null,"remaining":100}`,
+			expectedOutput:  map[string]any{"total": nil, "remaining": float64(100)},
 		},
 		{
 			name:            "nullの合計値とremainingの同時指定を受理する_OP値",
 			achievementType: "overpower_value",
 			params:          []byte(`{"total":null,"remaining":1.234}`),
+			expectedParams:  `{"total":null,"remaining":1.234}`,
+			expectedOutput:  map[string]any{"total": nil, "remaining": float64(1.234)},
 		},
 	}
 
@@ -1385,7 +1508,10 @@ func TestGoalUsecase_CreateRemainingValidation(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.NotNil(t, out)
+			require.NotNil(t, out)
+			// 保存値と出力値の両方にremainingが残っていることを固定値で確かめる。
+			assert.JSONEq(t, tt.expectedParams, string(repo.goal.AchievementParams))
+			assert.Equal(t, tt.expectedOutput, out.AchievementParams)
 		})
 	}
 }
@@ -1396,21 +1522,31 @@ func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
 		achievementType string
 		params          []byte
 		wantErr         bool
+		// 受理する行は保存値と出力値の両方を固定値で確かめる。
+		// 検証通過後にpercentを落とす退行を検知するためである。
+		expectedParams string
+		expectedOutput map[string]any
 	}{
 		{
 			name:            "件数系の割合を受理する",
 			achievementType: "score_count",
 			params:          []byte(`{"score":1000000,"percent":50.5}`),
+			expectedParams:  `{"score":1000000,"percent":50.5}`,
+			expectedOutput:  map[string]any{"score": float64(1000000), "percent": float64(50.5)},
 		},
 		{
 			name:            "0パーセントを受理する",
 			achievementType: "total_score",
 			params:          []byte(`{"percent":0}`),
+			expectedParams:  `{"percent":0}`,
+			expectedOutput:  map[string]any{"percent": float64(0)},
 		},
 		{
 			name:            "100パーセントを受理する",
 			achievementType: "overpower_value",
 			params:          []byte(`{"percent":100}`),
+			expectedParams:  `{"percent":100}`,
+			expectedOutput:  map[string]any{"percent": float64(100)},
 		},
 		{
 			name:            "100を超える割合を拒否する",
@@ -1440,6 +1576,8 @@ func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
 			name:            "nullの件数と割合の同時指定を受理する",
 			achievementType: "score_count",
 			params:          []byte(`{"score":1000000,"count":null,"percent":50}`),
+			expectedParams:  `{"score":1000000,"count":null,"percent":50}`,
+			expectedOutput:  map[string]any{"score": float64(1000000), "count": nil, "percent": float64(50)},
 		},
 	}
 
@@ -1463,7 +1601,10 @@ func TestGoalUsecase_CreatePercentValidation(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.NotNil(t, out)
+			require.NotNil(t, out)
+			// 保存値と出力値の両方にpercentが残っていることを固定値で確かめる。
+			assert.JSONEq(t, tt.expectedParams, string(repo.goal.AchievementParams))
+			assert.Equal(t, tt.expectedOutput, out.AchievementParams)
 		})
 	}
 }
