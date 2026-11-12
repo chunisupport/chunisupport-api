@@ -44,6 +44,12 @@ func TestResolveChartUpdateBoundaries(t *testing.T) {
 			want:     ChartUpdateResult{Values: ChartUpdateValues{Const: 10.49, IsConstUnknown: true}, Action: ChartUpdate},
 		},
 		{
+			name:     "範囲外の既存不明値は公式値へ戻す",
+			existing: &ChartUpdateValues{Const: 9.9, IsConstUnknown: true},
+			incoming: ChartUpdateValues{Const: 10},
+			want:     ChartUpdateResult{Values: ChartUpdateValues{Const: 10, IsConstUnknown: true}, Action: ChartUpdate},
+		},
+		{
 			name:     "範囲上端ちょうどは公式値へ戻す",
 			existing: &ChartUpdateValues{Const: 10.5, IsConstUnknown: true},
 			incoming: ChartUpdateValues{Const: 10},
@@ -86,4 +92,16 @@ func TestResolveChartUpdateFillsEmptyDesigner(t *testing.T) {
 	got := ResolveChartUpdate(ChartUpdateInput{Existing: &existing, Incoming: incoming})
 	// Then: 空文字を欠落として扱わず、補完による更新にする。
 	assert.Equal(t, ChartUpdateResult{Values: incoming, Action: ChartUpdate}, got)
+}
+
+// TestResolveChartUpdateKeepsKnownConstOnMismatch は通常更新で既知定数同士が一致しない場合に既存値を保持することを検証します。
+func TestResolveChartUpdateKeepsKnownConstOnMismatch(t *testing.T) {
+	t.Parallel()
+	// Given: 既知定数の既存譜面へ異なる既知定数が届く。
+	existing := ChartUpdateValues{Const: 14}
+	incoming := ChartUpdateValues{Const: 14.2}
+	// When: 通常更新を判定する。
+	got := ResolveChartUpdate(ChartUpdateInput{Existing: &existing, Incoming: incoming})
+	// Then: 既知定数を上書きせずスキップする。
+	assert.Equal(t, ChartUpdateResult{Values: ChartUpdateValues{Const: 14}, Action: ChartSkip}, got)
 }
