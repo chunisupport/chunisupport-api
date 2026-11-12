@@ -39,23 +39,37 @@ func TestV1WorldsendHandler_GetWorldsendSongRejectsInvalidDisplayID(t *testing.T
 }
 
 func TestV1WorldsendHandler_GetWorldsendSongはidパスパラメータを使用する(t *testing.T) {
-	// Given
+	// Given: usecaseが変換対象のエンティティを返す
 	const id = "0123456789abcdef"
 	var actualID string
 	handler := NewV1WorldsendHandler(&testutil.MockWorldsendUsecase{
 		GetWorldsendSongByDisplayIDFunc: func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.WorldsendSongWithChart, error) {
 			actualID = displayID
-			return &entity.WorldsendSongWithChart{Song: &entity.Song{DisplayID: displayID}}, nil
+			return &entity.WorldsendSongWithChart{
+				Song: &entity.Song{
+					DisplayID:      displayID,
+					Title:          "ハンドラー変換テスト",
+					NameFolderCode: "NUMBER",
+					Artist:         "テストアーティスト",
+					OfficialIdx:    "123",
+				},
+				Chart: nil,
+			}, nil
 		},
-	}, &masterdata.Cache{})
+	}, &masterdata.Cache{GenreNamesByID: map[int]string{}})
 	e := echo.New()
-	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/v1/worldsend-songs/"+id, nil), httptest.NewRecorder())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/v1/worldsend-songs/"+id, nil), rec)
 	c.SetPathValues(echo.PathValues{{Name: "id", Value: id}})
 
-	// When
+	// When: ハンドラーを実行する
 	err := handler.GetWorldsendSong(c)
 
-	// Then
+	// Then: usecaseへIDを渡し、変換結果をそのまま返す
 	assert.NoError(t, err)
 	assert.Equal(t, id, actualID)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"id":"0123456789abcdef"`)
+	assert.Contains(t, rec.Body.String(), `"title":"ハンドラー変換テスト"`)
+	assert.Contains(t, rec.Body.String(), `"WORLDSEND"`)
 }
