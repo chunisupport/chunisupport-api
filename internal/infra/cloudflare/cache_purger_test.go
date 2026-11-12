@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
@@ -246,6 +247,40 @@ func TestCachePurgerPurge_通信失敗は上限まで再試行して原因を残
 	assert.Equal(t, 3, attempts)
 }
 
+func TestCachePurgerPurge_応答本文の読取失敗は再試行しない(t *testing.T) {
+	// Given: 応答本文の読み取りが毎回失敗する。
+	sentinel := errors.New("response body read failure")
+	attempts := 0
+	sleepCalls := 0
+	purger := newCachePurger(
+		config.CloudflareCacheConfig{APIToken: "token", ZoneID: "zone-id", PublicBaseURL: "https://static.example.test"},
+		&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			attempts++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(iotest.ErrReader(sentinel)),
+				Request:    req,
+			}, nil
+		})},
+		"http://example.test/zones/zone-id/purge_cache",
+		func(context.Context, time.Duration) error {
+			sleepCalls++
+			return nil
+		},
+	)
+
+	// When
+	err := purger.Purge(context.Background(), []string{"v1/songs.json"})
+
+	// Then: 原因を残して 1 回で終え、待機しない。
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read cloudflare cache purge response")
+	assert.ErrorIs(t, err, sentinel)
+	assert.Equal(t, 1, attempts)
+	assert.Equal(t, 0, sleepCalls)
+}
+
 func TestCachePurgerPurge_待機中のキャンセルは再送せず中断する(t *testing.T) {
 	// Given: 初回は再試行対象の 429、待機はキャンセルで失敗する。
 	attempts := 0
@@ -285,7 +320,9 @@ func TestCachePurgerPurge_再試行の待機時間(t *testing.T) {
 		name string
 		// Given: 初回の 429 に付ける Retry-After。空文字はヘッダーなし。
 		retryAfter string
-		// Then: 1 回目の再試行前に待つ時間
+		// retryAfterFromNow が 0 でなければ、テスト開始時刻にこの時間を足した HTTP-date を動的に使う。
+		retryAfterFromNow time.Duration
+		// Then: 1 回目の再試行前に待つ時間。未来の HTTP-date は範囲で確かめるため使わない。
 		wantDelay time.Duration
 	}{
 		{
@@ -303,18 +340,35 @@ func TestCachePurgerPurge_再試行の待機時間(t *testing.T) {
 			retryAfter: "invalid",
 			wantDelay:  time.Second,
 		},
+		{
+			// 固定の過去日時はつねに期限切れのため 0 待機になる。時刻境界の不安定化なしに ParseTime 分岐の削除を検知できる。
+			name:       "過去のHTTP-dateは待たずに再試行する",
+			retryAfter: "Mon, 02 Jan 2006 15:04:05 GMT",
+			wantDelay:  0,
+		},
+		{
+			// 未来の HTTP-date は現在時刻に依存するため、呼出前後の時刻から許容範囲で確かめる。固定遅延値を now から手計算しない。
+			name:              "未来のHTTP-dateは指定時刻まで待つ",
+			retryAfterFromNow: 5 * time.Second,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
+			retryAfterValue := tt.retryAfter
+			var retryAt time.Time
+			if tt.retryAfterFromNow != 0 {
+				retryAt = time.Now().Add(tt.retryAfterFromNow).UTC().Truncate(time.Second)
+				retryAfterValue = retryAt.Format(http.TimeFormat)
+			}
 			attempts := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				attempts++
 				w.Header().Set("Content-Type", "application/json")
 				if attempts == 1 {
-					if tt.retryAfter != "" {
-						w.Header().Set("Retry-After", tt.retryAfter)
+					if retryAfterValue != "" {
+						w.Header().Set("Retry-After", retryAfterValue)
 					}
 					w.WriteHeader(http.StatusTooManyRequests)
 					_, _ = w.Write([]byte(`{"success":false,"errors":[{"code":1015,"message":"rate limited"}]}`))
@@ -335,11 +389,19 @@ func TestCachePurgerPurge_再試行の待機時間(t *testing.T) {
 			)
 
 			// When
+			before := time.Now()
 			err := purger.Purge(context.Background(), []string{"v1/songs.json"})
+			after := time.Now()
 
-			// Then: 実際に待たず、待機関数に渡る時間を固定値で確かめる。
+			// Then: 実際に待たず、待機関数に渡る時間で確かめる。
 			require.NoError(t, err)
 			assert.Equal(t, 2, attempts)
+			if tt.retryAfterFromNow != 0 {
+				require.Len(t, delays, 1)
+				assert.GreaterOrEqual(t, delays[0], max(retryAt.Sub(after), time.Duration(0)))
+				assert.LessOrEqual(t, delays[0], max(retryAt.Sub(before), time.Duration(0)))
+				return
+			}
 			assert.Equal(t, []time.Duration{tt.wantDelay}, delays)
 		})
 	}
