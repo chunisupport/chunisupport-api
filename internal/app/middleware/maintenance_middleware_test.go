@@ -108,6 +108,41 @@ func TestFirebaseMaintenanceMiddleware_例外経路はメンテナンス中も�
 	}
 }
 
+func TestFirebaseMaintenanceMiddleware_例外経路はメソッド違いでは遮断する(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "ヘルスチェックのPOSTは遮断", method: http.MethodPost, path: "/healthz"},
+		{name: "状態確認のPOSTは遮断", method: http.MethodPost, path: "/internal/system/status"},
+		{name: "ログインのGETは遮断", method: http.MethodGet, path: "/internal/auth/login"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			authenticator := &firebaseMaintenanceAuthenticatorStub{}
+			gate := FirebaseMaintenanceMiddleware(maintenanceStateProviderStub{enabled: true}, authenticator)
+			e := echo.New()
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			handlerCalled := false
+
+			// When
+			err := gate(func(c *echo.Context) error {
+				handlerCalled = true
+				return c.NoContent(http.StatusOK)
+			})(c)
+
+			// Then
+			assert.False(t, handlerCalled)
+			assertMaintenanceGateError(t, err, rec)
+		})
+	}
+}
+
 func TestFirebaseMaintenanceMiddleware_メンテナンス中はスタッフだけ通過する(t *testing.T) {
 	tests := []struct {
 		name        string

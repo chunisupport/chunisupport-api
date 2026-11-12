@@ -46,6 +46,9 @@ func TestChunirecErrorHandlerMiddleware_メンテナンス中も互換503形式�
 	assert.Equal(t, http.StatusServiceUnavailable, response.Error.Code)
 	assert.Equal(t, "service unavailable.", response.Error.Message)
 	assert.Empty(t, response.Error.AdditionalMessage)
+
+	// 固定JSON全体で比較するため、additional_messageの空文字と欠落も区別できる。
+	assert.JSONEq(t, `{"error":{"code":503,"message":"service unavailable.","additional_message":""}}`, rec.Body.String())
 }
 
 func TestLogChunirecError_メンテナンス応答はアプリケーションエラーログへ出さない(t *testing.T) {
@@ -173,6 +176,9 @@ func TestChunirecErrorHandlerMiddleware_Echoのエラーはステータスを維
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
 			assert.Equal(t, tt.expectedStatus, response.Error.Code)
 			assert.Equal(t, tt.expectedMessage, response.Error.Message)
+
+			// 固定JSON全体で比較するため、additional_messageの空文字と欠落も区別できる。
+			assert.JSONEq(t, fmt.Sprintf(`{"error":{"code":%d,"message":%q,"additional_message":""}}`, tt.expectedStatus, tt.expectedMessage), rec.Body.String())
 		})
 	}
 }

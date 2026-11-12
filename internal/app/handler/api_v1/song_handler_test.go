@@ -59,6 +59,22 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 			},
 		},
 		{
+			name:            "空配列は受理してusecaseへ空sliceを転送する",
+			body:            `[]`,
+			wantStatus:      http.StatusNoContent,
+			wantUsecaseCall: true,
+			assertUsecaseReq: func(t *testing.T, requests []*usecase.UpdateSongInput) {
+				t.Helper()
+				require.NotNil(t, requests)
+				assert.Len(t, requests, 0)
+			},
+		},
+		{
+			name:        "配列内のnull要素はvalidation_failedを返す",
+			body:        `[null]`,
+			wantErrCode: apierror.CodeValidationFailed,
+		},
+		{
 			name:        "トップレベルnullはvalidation_failedを返す",
 			body:        `null`,
 			wantErrCode: apierror.CodeValidationFailed,
@@ -108,59 +124,76 @@ func TestV1SongHandler_UpdateSongs(t *testing.T) {
 }
 
 func TestV1SongHandler_UpdateChartConstant(t *testing.T) {
-	// Given
-	e := echo.New()
-	e.Validator = &testValidator{validator: validator.New()}
-	var got usecase.UpdateChartConstantInput
-	updatedSong := &entity.Song{
-		DisplayID:      "display-id",
-		OfficialIdx:    "123",
-		Title:          "更新対象楽曲",
-		NameFolderCode: "ABCD",
-		Artist:         "アーティスト",
-		Charts:         []*entity.Chart{},
-	}
-	h := NewV1SongHandler(&testutil.MockSongUsecase{
-		UpdateChartConstantFunc: func(_ context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
-			got = input
-			return updatedSong, nil
+	tests := []struct {
+		name string
+		// Given: 入力ボディ
+		body string
+		// Then: usecaseへ転送される入力
+		wantInput usecase.UpdateChartConstantInput
+	}{
+		{
+			name:      "正常な定数更新を転送する",
+			body:      `{"official_idx":"123","difficulty":"MAS","const":14.7}`,
+			wantInput: usecase.UpdateChartConstantInput{OfficialIdx: "123", Difficulty: "MAS", Const: 14.7},
 		},
-	}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
-	req := httptest.NewRequest(http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(
-		`{"official_idx":"123","difficulty":"MAS","const":14.7}`,
-	))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
+		{
+			name:      "公式IDが10文字でも受理して転送する",
+			body:      `{"official_idx":"1234567890","difficulty":"MAS","const":14.7}`,
+			wantInput: usecase.UpdateChartConstantInput{OfficialIdx: "1234567890", Difficulty: "MAS", Const: 14.7},
+		},
+	}
 
-	// When
-	err := h.UpdateChartConstant(c)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			var got usecase.UpdateChartConstantInput
+			updatedSong := &entity.Song{
+				DisplayID:      "display-id",
+				OfficialIdx:    "123",
+				Title:          "更新対象楽曲",
+				NameFolderCode: "ABCD",
+				Artist:         "アーティスト",
+				Charts:         []*entity.Chart{},
+			}
+			h := NewV1SongHandler(&testutil.MockSongUsecase{
+				UpdateChartConstantFunc: func(_ context.Context, input usecase.UpdateChartConstantInput) (*entity.Song, error) {
+					got = input
+					return updatedSong, nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			req := httptest.NewRequest(http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
 
-	// Then
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{
-		"id":"display-id",
-		"title":"更新対象楽曲",
-		"reading":null,
-		"name_folder_code":"ABCD",
-		"artist":"アーティスト",
-		"genre":null,
-		"bpm":null,
-		"release":null,
-		"jacket":null,
-		"official_idx":"123",
-		"maxop":90,
-		"is_maxop_unknown":false,
-		"op_target_difficulty":null,
-		"is_new":false,
-		"charts":{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}
-	}`, rec.Body.String())
-	assert.Equal(t, usecase.UpdateChartConstantInput{
-		OfficialIdx: "123",
-		Difficulty:  "MAS",
-		Const:       14.7,
-	}, got)
+			// When
+			err := h.UpdateChartConstant(c)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.JSONEq(t, `{
+				"id":"display-id",
+				"title":"更新対象楽曲",
+				"reading":null,
+				"name_folder_code":"ABCD",
+				"artist":"アーティスト",
+				"genre":null,
+				"bpm":null,
+				"release":null,
+				"jacket":null,
+				"official_idx":"123",
+				"maxop":90,
+				"is_maxop_unknown":false,
+				"op_target_difficulty":null,
+				"is_new":false,
+				"charts":{"BASIC":null,"ADVANCED":null,"EXPERT":null,"MASTER":null,"ULTIMA":null}
+			}`, rec.Body.String())
+			assert.Equal(t, tt.wantInput, got)
+		})
+	}
 }
 
 func TestV1SongHandler_UpdateChartConstant_const未指定を拒否する(t *testing.T) {
@@ -201,6 +234,54 @@ func TestV1SongHandler_UpdateChartConstant_const未指定を拒否する(t *test
 			var apiErr *apierror.APIError
 			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.False(t, called)
+		})
+	}
+}
+
+func TestV1SongHandler_UpdateChartConstant_長さ境界を拒否する(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "公式IDが11文字",
+			body: `{"official_idx":"12345678901","difficulty":"MAS","const":14.7}`,
+		},
+		{
+			name: "難易度略称が2文字",
+			body: `{"official_idx":"123","difficulty":"MA","const":14.7}`,
+		},
+		{
+			name: "難易度略称が4文字",
+			body: `{"official_idx":"123","difficulty":"MAST","const":14.7}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			called := false
+			h := NewV1SongHandler(&testutil.MockSongUsecase{
+				UpdateChartConstantFunc: func(_ context.Context, _ usecase.UpdateChartConstantInput) (*entity.Song, error) {
+					called = true
+					return nil, nil
+				},
+			}, &testutil.MockChartStatsUsecase{}, &masterdata.Cache{}, &masterdata.StaticCache{})
+			req := httptest.NewRequest(http.MethodPatch, "/v1/songs/chart-constant", bytes.NewBufferString(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			c := e.NewContext(req, httptest.NewRecorder())
+
+			// When
+			err := h.UpdateChartConstant(c)
+
+			// Then
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 			assert.False(t, called)
 		})
 	}
