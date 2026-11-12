@@ -210,7 +210,11 @@ func TestHonorUsecase_UpdateHonor_既存称号を変更して保存する(t *tes
 func TestHonorUsecase_UpdateHonor_不正IDはErrInvalidHonorInputを返す(t *testing.T) {
 	// Given
 	repo := &honorRepositoryMock{}
-	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
+	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{
+		HonorTypes: map[string]master.HonorType{
+			"gold": {ID: 2, Name: "gold"},
+		},
+	})
 
 	// When
 	got, err := uc.UpdateHonor(context.Background(), 0, usecase.HonorInput{Name: "称号A", TypeName: "gold"})
