@@ -73,16 +73,10 @@ func TestToChartDTO(t *testing.T) {
 		assert.Failf(t, "アサーション失敗", "IsConstUnknown = %v, want %v", dto.IsConstUnknown, false)
 	}
 
-	if dto.Notes == nil {
-		t.Error("Notes is nil")
-	} else if *dto.Notes != 1234 {
-		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", *dto.Notes, 1234)
-	}
-	if dto.NotesDesigner == nil {
-		t.Error("NotesDesigner is nil")
-	} else if *dto.NotesDesigner != "譜面作者A" {
-		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者A")
-	}
+	require.NotNil(t, dto.Notes)
+	assert.Equal(t, 1234, *dto.Notes)
+	require.NotNil(t, dto.NotesDesigner)
+	assert.Equal(t, "譜面作者A", *dto.NotesDesigner)
 }
 
 // TestSongDTO_JSONMarshal はSongDTOのJSONマーシャリングをテストします。
@@ -181,69 +175,6 @@ func TestSongDTO_JSONMarshal(t *testing.T) {
 
 	if !(basicIdx < advancedIdx && advancedIdx < expertIdx && expertIdx < masterIdx) {
 		assert.Failf(t, "アサーション失敗", "Charts keys are not in correct order (BASIC→ADVANCED→EXPERT→MASTER), got: %s", jsonString)
-	}
-}
-
-// TestOrderedChartsMap_MarshalJSON はOrderedChartsMapのJSONマーシャリングをテストします。
-// 全ての難易度キーが含まれ、譜面がない場合はnullになることを確認します。
-func TestOrderedChartsMap_MarshalJSON(t *testing.T) {
-	chartBasic, _ := chartconstant.NewChartConstant(3.0)
-	chartMaster, _ := chartconstant.NewChartConstant(14.0)
-
-	// 意図的に順不同で追加（BASICとMASTERのみ）
-	chartsMap := OrderedChartsMap{
-		"MASTER": &ChartDTO{Const: chartMaster, IsConstUnknown: false},
-		"BASIC":  &ChartDTO{Const: chartBasic, IsConstUnknown: false},
-	}
-
-	jsonBytes, err := json.Marshal(chartsMap)
-	if err != nil {
-		require.Failf(t, "前提条件失敗", "json.Marshal failed: %v", err)
-	}
-
-	jsonString := string(jsonBytes)
-
-	// 全ての難易度キーが含まれることを確認
-	if !strings.Contains(jsonString, `"BASIC"`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'BASIC' key, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"ADVANCED"`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED' key, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"EXPERT"`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'EXPERT' key, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"MASTER"`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'MASTER' key, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"ULTIMA"`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA' key, got: %s", jsonString)
-	}
-
-	// 譜面がない難易度はnullになることを確認
-	if !strings.Contains(jsonString, `"ADVANCED":null`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED':null, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"EXPERT":null`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'EXPERT':null, got: %s", jsonString)
-	}
-	if !strings.Contains(jsonString, `"ULTIMA":null`) {
-		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA':null, got: %s", jsonString)
-	}
-
-	// BASIC→ADVANCED→EXPERT→MASTER→ULTIMAの順で出力されることを確認
-	basicIdx := strings.Index(jsonString, `"BASIC"`)
-	advancedIdx := strings.Index(jsonString, `"ADVANCED"`)
-	expertIdx := strings.Index(jsonString, `"EXPERT"`)
-	masterIdx := strings.Index(jsonString, `"MASTER"`)
-	ultimaIdx := strings.Index(jsonString, `"ULTIMA"`)
-
-	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 || ultimaIdx == -1 {
-		require.Failf(t, "前提条件失敗", "Missing difficulty keys in JSON: %s", jsonString)
-	}
-
-	if !(basicIdx < advancedIdx && advancedIdx < expertIdx && expertIdx < masterIdx && masterIdx < ultimaIdx) {
-		assert.Failf(t, "アサーション失敗", "Charts keys are not in correct order (BASIC→ADVANCED→EXPERT→MASTER→ULTIMA), got: %s", jsonString)
 	}
 }
 

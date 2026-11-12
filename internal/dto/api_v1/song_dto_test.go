@@ -2,10 +2,12 @@ package api_v1
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
@@ -74,16 +76,10 @@ func TestToV1ChartDTO(t *testing.T) {
 		assert.Failf(t, "アサーション失敗", "IsConstUnknown = %v, want %v", dto.IsConstUnknown, true)
 	}
 
-	if dto.Notes == nil {
-		t.Error("Notes is nil")
-	} else if *dto.Notes != 999 {
-		assert.Failf(t, "アサーション失敗", "Notes = %v, want %v", *dto.Notes, 999)
-	}
-	if dto.NotesDesigner == nil {
-		t.Error("NotesDesigner is nil")
-	} else if *dto.NotesDesigner != "譜面作者B" {
-		assert.Failf(t, "アサーション失敗", "NotesDesigner = %v, want %v", *dto.NotesDesigner, "譜面作者B")
-	}
+	require.NotNil(t, dto.Notes)
+	assert.Equal(t, 999, *dto.Notes)
+	require.NotNil(t, dto.NotesDesigner)
+	assert.Equal(t, "譜面作者B", *dto.NotesDesigner)
 }
 
 // TestV1SongDTO_JSONMarshal はV1SongDTOのJSONマーシャリングをテストします。
@@ -124,70 +120,70 @@ func TestV1SongDTO_JSONMarshal(t *testing.T) {
 
 	jsonString := string(jsonBytes)
 
-	if !containsString(jsonString, `"maxop":85`) {
+	if !strings.Contains(jsonString, `"maxop":85`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain maxop field, got: %s", jsonString)
 	}
 
 	// is_maxop_unknown がJSONに含まれることを確認
-	if !containsString(jsonString, `"is_maxop_unknown":`) {
+	if !strings.Contains(jsonString, `"is_maxop_unknown":`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain is_maxop_unknown field, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"op_target_difficulty":"EXPERT"`) {
+	if !strings.Contains(jsonString, `"op_target_difficulty":"EXPERT"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain op_target_difficulty field, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"is_new":true`) {
+	if !strings.Contains(jsonString, `"is_new":true`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain is_new field, got: %s", jsonString)
 	}
 
 	// releaseフィールドがreleaseであることを確認（release_dateではない）
-	if !containsString(jsonString, `"release":"2024-01-15"`) {
+	if !strings.Contains(jsonString, `"release":"2024-01-15"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'release' field, got: %s", jsonString)
 	}
 
-	if !containsString(jsonString, `"reading":"ブイワンテスト"`) {
+	if !strings.Contains(jsonString, `"reading":"ブイワンテスト"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain reading field, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"name_folder_code":"ABCD"`) {
+	if !strings.Contains(jsonString, `"name_folder_code":"ABCD"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain name_folder_code field, got: %s", jsonString)
 	}
 
 	// 全ての難易度キーが含まれることを確認
-	if !containsString(jsonString, `"BASIC"`) {
+	if !strings.Contains(jsonString, `"BASIC"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'BASIC' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ADVANCED"`) {
+	if !strings.Contains(jsonString, `"ADVANCED"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"EXPERT"`) {
+	if !strings.Contains(jsonString, `"EXPERT"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'EXPERT' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"MASTER"`) {
+	if !strings.Contains(jsonString, `"MASTER"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'MASTER' key, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA"`) {
+	if !strings.Contains(jsonString, `"ULTIMA"`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA' key, got: %s", jsonString)
 	}
 
 	// 譜面がない難易度はnullになることを確認
-	if !containsString(jsonString, `"ADVANCED":null`) {
+	if !strings.Contains(jsonString, `"ADVANCED":null`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'ADVANCED':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"MASTER":null`) {
+	if !strings.Contains(jsonString, `"MASTER":null`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'MASTER':null, got: %s", jsonString)
 	}
-	if !containsString(jsonString, `"ULTIMA":null`) {
+	if !strings.Contains(jsonString, `"ULTIMA":null`) {
 		assert.Failf(t, "アサーション失敗", "JSON should contain 'ULTIMA':null, got: %s", jsonString)
 	}
 
 	// charts内のキー順序を確認（BASIC→ADVANCED→EXPERT→MASTER→ULTIMA の順）
-	chartsJSON := jsonString[indexOfString(jsonString, `"charts":`):]
-	basicIdx := indexOfString(chartsJSON, `"BASIC"`)
-	advancedIdx := indexOfString(chartsJSON, `"ADVANCED"`)
-	expertIdx := indexOfString(chartsJSON, `"EXPERT"`)
-	masterIdx := indexOfString(chartsJSON, `"MASTER"`)
-	ultimaIdx := indexOfString(chartsJSON, `"ULTIMA"`)
+	chartsJSON := jsonString[strings.Index(jsonString, `"charts":`):]
+	basicIdx := strings.Index(chartsJSON, `"BASIC"`)
+	advancedIdx := strings.Index(chartsJSON, `"ADVANCED"`)
+	expertIdx := strings.Index(chartsJSON, `"EXPERT"`)
+	masterIdx := strings.Index(chartsJSON, `"MASTER"`)
+	ultimaIdx := strings.Index(chartsJSON, `"ULTIMA"`)
 
 	if basicIdx == -1 || advancedIdx == -1 || expertIdx == -1 || masterIdx == -1 || ultimaIdx == -1 {
 		require.Failf(t, "前提条件失敗", "Missing difficulty keys in JSON: %s", jsonString)
@@ -249,19 +245,4 @@ func TestV1OrderedChartsMap_MarshalJSON_現行のバイト列と一致する(t *
 			assert.Equal(t, tt.want, string(got))
 		})
 	}
-}
-
-// containsString はstrがsubstrを含むかどうかを判定します。
-func containsString(str, substr string) bool {
-	return indexOfString(str, substr) != -1
-}
-
-// indexOfString はstrの中でsubstrが最初に現れる位置を返します。見つからない場合は-1を返します。
-func indexOfString(str, substr string) int {
-	for i := 0; i <= len(str)-len(substr); i++ {
-		if str[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }
