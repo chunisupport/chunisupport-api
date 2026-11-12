@@ -185,6 +185,205 @@ func TestUserHandler_GetOfficialRatingBadge(t *testing.T) {
 	}
 }
 
+func TestUserHandler_GetCalculatedRatingBadge(t *testing.T) {
+	// Given: 計算RATINGバッジは小数4桁・レート色で表示し、値が無ければ no data、非公開・未存在は404にする
+	// When: 公開ハンドラー経由でバッジを取得する
+	// Then: レスポンス全体が仕様通りの固定値になり、usecaseへユーザー名が正しく渡る
+	tests := []struct {
+		name        string
+		player      *entity.Player
+		usecaseErr  error
+		wantMessage string
+		wantColor   string
+		wantErr     error
+	}{
+		{
+			// 小数4桁であること（小数2桁なら 17.12 になる）と、色がレート値由来であることが分かる値
+			name:        "計算RATINGを小数第4位まで表示する",
+			player:      &entity.Player{CalculatedRating: new(17.1234)},
+			wantMessage: "17.1234",
+			wantColor:   "#3597ed",
+		},
+		{
+			name:        "計算RATINGが未取得ならno dataを表示する",
+			player:      &entity.Player{},
+			wantMessage: "no data",
+			wantColor:   "lightgrey",
+		},
+		{
+			name:       "存在しないユーザーは404にする",
+			usecaseErr: usecase.ErrUserNotFound,
+			wantErr:    apierror.ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockUsecase := new(mockUserUsecase)
+			mockUsecase.On("GetPublicBadgePlayer", mock.Anything, "testuser").Return(tt.player, tt.usecaseErr).Once()
+			h := api_internal.NewUserHandler(mockUsecase)
+			e := newTestEcho()
+			req := httptest.NewRequest(http.MethodGet, "/badges/users/testuser/rating-calculated", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+
+			// When
+			err := h.GetCalculatedRatingBadge(c)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				mockUsecase.AssertExpectations(t)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			assert.Equal(t, float64(1), body["schemaVersion"])
+			assert.Equal(t, "CHUNITHM RATING", body["label"])
+			assert.Equal(t, tt.wantMessage, body["message"])
+			assert.Equal(t, tt.wantColor, body["color"])
+			mockUsecase.AssertExpectations(t)
+		})
+	}
+}
+
+func TestUserHandler_GetOfficialOverpowerBadge(t *testing.T) {
+	// Given: OVER POWER絶対値バッジは小数2桁・ポゼッション色で表示し、未連携は no data、非公開・未存在は404にする
+	// When: 公開ハンドラー経由でバッジを取得する
+	// Then: レスポンス全体が仕様通りの固定値になり、usecaseへユーザー名が正しく渡る
+	tests := []struct {
+		name        string
+		player      *entity.Player
+		usecaseErr  error
+		wantMessage string
+		wantColor   string
+		wantErr     error
+	}{
+		{
+			// 小数2桁の0埋め（12345.6 が 12345.60 になる）と、色がポゼッション由来（ID3は金色）であることが分かる値
+			name:        "公式OVER POWERの絶対値を小数第2位まで表示する",
+			player:      &entity.Player{OfficialOverpower: 12345.6, PossessionID: 3},
+			wantMessage: "12345.60",
+			wantColor:   "#fcd200",
+		},
+		{
+			name:        "プレイヤー未連携ならno dataを表示する",
+			player:      nil,
+			wantMessage: "no data",
+			wantColor:   "lightgrey",
+		},
+		{
+			name:       "非公開ユーザーは404にする",
+			usecaseErr: usecase.ErrUserPrivate,
+			wantErr:    apierror.ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockUsecase := new(mockUserUsecase)
+			mockUsecase.On("GetPublicBadgePlayer", mock.Anything, "testuser").Return(tt.player, tt.usecaseErr).Once()
+			h := api_internal.NewUserHandler(mockUsecase)
+			e := newTestEcho()
+			req := httptest.NewRequest(http.MethodGet, "/badges/users/testuser/overpower", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+
+			// When
+			err := h.GetOfficialOverpowerBadge(c)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				mockUsecase.AssertExpectations(t)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			assert.Equal(t, float64(1), body["schemaVersion"])
+			assert.Equal(t, "CHUNITHM OVER POWER", body["label"])
+			assert.Equal(t, tt.wantMessage, body["message"])
+			assert.Equal(t, tt.wantColor, body["color"])
+			mockUsecase.AssertExpectations(t)
+		})
+	}
+}
+
+func TestUserHandler_GetOfficialOverpowerPercentBadge(t *testing.T) {
+	// Given: OVER POWER割合バッジは小数2桁と % 接尾辞・ポゼッション色で表示し、割合未取得は no data、非公開・未存在は404にする
+	// When: 公開ハンドラー経由でバッジを取得する
+	// Then: レスポンス全体が仕様通りの固定値になり、usecaseへユーザー名が正しく渡る
+	tests := []struct {
+		name        string
+		player      *entity.Player
+		usecaseErr  error
+		wantMessage string
+		wantColor   string
+		wantErr     error
+	}{
+		{
+			// 絶対値（12345.6）とは異なる割合（76.25）が % 付きで出ることと、色がポゼッション由来（ID4はプラチナ色）であることが分かる値
+			name:        "公式OVER POWERの割合を%付きで表示する",
+			player:      &entity.Player{OfficialOverpower: 12345.6, OfficialOverpowerPercent: new(76.25), PossessionID: 4},
+			wantMessage: "76.25%",
+			wantColor:   "#ffeac9",
+		},
+		{
+			// 割合が無ければ絶対値にフォールバックせず no data になり、ポゼッション色も漏れない
+			name:        "割合が未取得ならno dataを表示する",
+			player:      &entity.Player{OfficialOverpower: 12345.6, PossessionID: 3},
+			wantMessage: "no data",
+			wantColor:   "lightgrey",
+		},
+		{
+			name:       "存在しないユーザーは404にする",
+			usecaseErr: usecase.ErrUserNotFound,
+			wantErr:    apierror.ErrUserNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockUsecase := new(mockUserUsecase)
+			mockUsecase.On("GetPublicBadgePlayer", mock.Anything, "testuser").Return(tt.player, tt.usecaseErr).Once()
+			h := api_internal.NewUserHandler(mockUsecase)
+			e := newTestEcho()
+			req := httptest.NewRequest(http.MethodGet, "/badges/users/testuser/overpower-percent", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPathValues(echo.PathValues{{Name: "username", Value: "testuser"}})
+
+			// When
+			err := h.GetOfficialOverpowerPercentBadge(c)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				mockUsecase.AssertExpectations(t)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			assert.Equal(t, float64(1), body["schemaVersion"])
+			assert.Equal(t, "CHUNITHM OVER POWER", body["label"])
+			assert.Equal(t, tt.wantMessage, body["message"])
+			assert.Equal(t, tt.wantColor, body["color"])
+			mockUsecase.AssertExpectations(t)
+		})
+	}
+}
+
 func (m *mockUserUsecase) GetPublicOfficialRating(ctx context.Context, username string) (*float64, error) {
 	args := m.Called(ctx, username)
 	if args.Get(0) == nil {
