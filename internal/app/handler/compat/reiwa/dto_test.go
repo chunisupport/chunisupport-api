@@ -1,6 +1,7 @@
 package reiwa
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateLevel(t *testing.T) {
@@ -125,6 +127,44 @@ func TestToChunithmRecordOriginalResponse_Basic(t *testing.T) {
 	assert.Equal(t, 10.5, r1.Const)
 	assert.Equal(t, 10.5, r1.Level)
 	assert.Equal(t, 1, r1.Unknown)
+
+	// Then: JSON全体の契約を固定する（項目名・数値と文字列の区別・難易度の大文字を含む）。
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[
+		{
+			"title": "テスト曲",
+			"artist": "テストアーティスト",
+			"img": "testjacket123",
+			"genre": "niconico",
+			"const": 7,
+			"level": 7,
+			"diff": "BAS",
+			"notes": 500,
+			"unknown": 0,
+			"chunirec_id": "song001",
+			"idx": "5",
+			"bpm": 200,
+			"release": 15790140,
+			"version": "PARADISE"
+		},
+		{
+			"title": "テスト曲",
+			"artist": "テストアーティスト",
+			"img": "testjacket123",
+			"genre": "niconico",
+			"const": 10.5,
+			"level": 10.5,
+			"diff": "MAS",
+			"notes": 500,
+			"unknown": 1,
+			"chunirec_id": "song001",
+			"idx": "5",
+			"bpm": 200,
+			"release": 15790140,
+			"version": "PARADISE"
+		}
+	]`, string(body))
 }
 
 func TestToChunithmRecordOriginalResponse_GenrePOPSANIME(t *testing.T) {
@@ -260,6 +300,15 @@ func TestToChunithmRecordOriginalResponse_EmptyList(t *testing.T) {
 
 	result2 := ToChunithmRecordOriginalResponse([]*entity.Song{}, nil)
 	assert.Len(t, result2, 0)
+
+	// Then: 空入力でもJSONは空配列を返し、nullにならないことを固定する。
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(body))
+
+	body2, err := json.Marshal(result2)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(body2))
 }
 
 func TestToChunithmRecordOriginalResponse_SongWithNoCharts(t *testing.T) {
