@@ -570,6 +570,141 @@ func TestTemporaryPlayerDataHandler_CommitTemporaryData_保存済み本文が壊
 	mockUC.AssertExpectations(t)
 }
 
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_容量上限は503(t *testing.T) {
+	// Given
+	e := echo.New()
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	body := gzipJSON(t, map[string]any{"name": "TEST"})
+	req := newTemporaryDataRequest(body, "192.0.2.1:12345")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mockUC.On("Create", mock.Anything, mock.Anything).Return(nil, usecase.ErrTempDataCapacityExceeded).Once()
+
+	// When
+	err := h.CreateTemporaryData(c)
+
+	// Then
+	require.Error(t, err)
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusServiceUnavailable, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeServiceUnavailable, apiErr.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_存在しないトークンは404(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	const uploadToken = "11111111-1111-4111-8111-111111111111"
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", strings.NewReader(`{"uploadToken":"`+uploadToken+`"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{
+		User:        &entity.User{ID: 1},
+		UploadToken: uploadToken,
+	}).Return(nil, usecase.ErrTemporaryPlayerDataNotFound).Once()
+
+	// When
+	err := h.CommitTemporaryData(c)
+
+	// Then
+	require.Error(t, err)
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeNotFound, apiErr.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_入力検証(t *testing.T) {
+	const validToken = "11111111-1111-4111-8111-111111111111"
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		setUser bool
+		body    string
+		// Then: 期待する結果
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "未認証は401",
+			setUser:    false,
+			body:       `{"uploadToken":"` + validToken + `"}`,
+			wantStatus: http.StatusUnauthorized,
+			wantCode:   apierror.CodeUnauthorized,
+		},
+		{
+			name:       "トークン未指定は422",
+			setUser:    true,
+			body:       `{}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "UUIDでない文字列は422",
+			setUser:    true,
+			body:       `{"uploadToken":"not-a-uuid"}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "UUIDだがv4でないものは422",
+			setUser:    true,
+			body:       `{"uploadToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8"}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "未知のキーを含む本文は400",
+			setUser:    true,
+			body:       `{"uploadToken":"` + validToken + `","unknown":1}`,
+			wantStatus: http.StatusBadRequest,
+			wantCode:   apierror.CodeBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			// 本番と同じく検証失敗を 422 の APIError にするテスト用バリデータ（同パッケージの既存定義）を使う。
+			e.Validator = &friendshipTestValidator{validator: validator.New()}
+			mockUC := new(mockTemporaryPlayerDataUsecase)
+			h := NewTemporaryPlayerDataHandler(mockUC)
+
+			req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			if tt.setUser {
+				c.Set("userEntity", &entity.User{ID: 1})
+			}
+
+			// When
+			err := h.CommitTemporaryData(c)
+
+			// Then
+			require.Error(t, err)
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			mockUC.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
+		})
+	}
+}
+
 func TestTemporaryPlayerDataHandler_CommitTemporaryData_処理中のトークンは409(t *testing.T) {
 	// Given
 	e := echo.New()
