@@ -45,6 +45,35 @@ func TestNewUserName(t *testing.T) {
 	}
 }
 
+func TestNewUserName_AcceptsBoundaryLengths(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 前提条件となる境界長の入力
+		value string
+	}{
+		{
+			name:  "5文字ちょうどは受理される",
+			value: "abcde",
+		},
+		{
+			name:  "50文字ちょうどは受理される",
+			value: "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 境界長のユーザー名
+			// When: NewUserNameで生成する
+			got, err := NewUserName(tt.value)
+
+			// Then: エラーなく入力と同じ値が返る
+			require.NoError(t, err)
+			assert.Equal(t, tt.value, got.String())
+		})
+	}
+}
+
 func TestUserName_Scan(t *testing.T) {
 	type args struct {
 		src any
