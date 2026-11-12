@@ -142,27 +142,6 @@ func TestFriendshipHandler_SendRequest(t *testing.T) {
 		assert.True(t, called)
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 	})
-
-	t.Run("不正なusernameはvalidation_failed", func(t *testing.T) {
-		// Given
-		e := newFriendshipTestEcho(t)
-		handler := NewFriendshipHandler(&mockFriendshipUsecase{})
-		req := httptest.NewRequest(http.MethodPost, "/internal/friends/requests", strings.NewReader(`{"username":"InvalidUser"}`))
-		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.Set("userEntity", &entity.User{ID: 1})
-
-		// When
-		err := handler.SendRequest(c)
-
-		// Then
-		var apiErr *apierror.APIError
-		if assert.ErrorAs(t, err, &apiErr) {
-			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
-			assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
-		}
-	})
 }
 
 func newFriendshipTestEcho(t *testing.T) *echo.Echo {

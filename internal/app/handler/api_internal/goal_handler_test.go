@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
-	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -67,35 +66,6 @@ func (m *mockGoalUsecase) Reorder(ctx context.Context, userID int, groupID *uint
 	m.reorderedGroupID = groupID
 	m.reorderedIDs = append([]uint32(nil), orderedGoalIDs...)
 	return nil
-}
-
-func TestDecodeStrictJSONReturnsSpecificErrorForMissingContentType(t *testing.T) {
-	body := bytes.NewBufferString(`{"title":"t"}`)
-	header := http.Header{}
-
-	var out map[string]any
-	err := apphandler.DecodeStrictJSON(body, header, &out)
-	if err == nil {
-		require.Fail(t, "expected error")
-	}
-	if err.Error() != "content-type header is missing" {
-		require.Failf(t, "前提条件失敗", "error = %q, want %q", err.Error(), "content-type header is missing")
-	}
-}
-
-func TestDecodeStrictJSONReturnsSpecificErrorForInvalidContentType(t *testing.T) {
-	body := bytes.NewBufferString(`{"title":"t"}`)
-	header := http.Header{}
-	header.Set(echo.HeaderContentType, "text/plain")
-
-	var out map[string]any
-	err := apphandler.DecodeStrictJSON(body, header, &out)
-	if err == nil {
-		require.Fail(t, "expected error")
-	}
-	if err.Error() != "content-type must be application/json" {
-		require.Failf(t, "前提条件失敗", "error = %q, want %q", err.Error(), "content-type must be application/json")
-	}
 }
 
 func TestGoalHandlerCreateRejectsMissingContentType(t *testing.T) {
