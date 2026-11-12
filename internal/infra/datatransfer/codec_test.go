@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -316,43 +317,65 @@ func TestCodecDecodeRejectsInvalidEnvelopeAndPayload(t *testing.T) {
 }
 
 func TestCodecSizeLimits(t *testing.T) {
+	// Given: 既存fixtureの実データから3上限の実測サイズを取得する。標準のbase64/gzipで復元し、本番判定式で期待値を再計算しない。
+	normalCodec, err := NewCodec(codecTestSecret)
+	require.NoError(t, err)
+	encoded := encodeCodecTestFile(t, normalCodec)
+	var envelope testEnvelope
+	require.NoError(t, json.Unmarshal(encoded, &envelope))
+	compressed, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
+	require.NoError(t, err)
+	payloadReader, err := gzip.NewReader(bytes.NewReader(compressed))
+	require.NoError(t, err)
+	payloadBytes, err := io.ReadAll(payloadReader)
+	require.NoError(t, err)
+	require.NoError(t, payloadReader.Close())
+	// 他上限の影響を除くため、対象外の上限には実測より十分大きな値を置く。
+	const nonLimitTarget = 64 * 1024 * 1024
 	tests := []struct {
 		name   string
-		limits codecLimits
+		size   int
+		limits func(limit int) codecLimits
 	}{
 		{
 			name: "エンベロープ上限",
-			limits: codecLimits{
-				EnvelopeMaxBytes:          1,
-				CompressedPayloadMaxBytes: 1024,
-				PayloadMaxBytes:           4096,
+			size: len(encoded),
+			limits: func(limit int) codecLimits {
+				return codecLimits{EnvelopeMaxBytes: limit, CompressedPayloadMaxBytes: nonLimitTarget, PayloadMaxBytes: nonLimitTarget}
 			},
 		},
 		{
 			name: "圧縮後上限",
-			limits: codecLimits{
-				EnvelopeMaxBytes:          4096,
-				CompressedPayloadMaxBytes: 1,
-				PayloadMaxBytes:           4096,
+			size: len(compressed),
+			limits: func(limit int) codecLimits {
+				return codecLimits{EnvelopeMaxBytes: nonLimitTarget, CompressedPayloadMaxBytes: limit, PayloadMaxBytes: nonLimitTarget}
 			},
 		},
 		{
 			name: "解凍後上限",
-			limits: codecLimits{
-				EnvelopeMaxBytes:          4096,
-				CompressedPayloadMaxBytes: 1024,
-				PayloadMaxBytes:           1,
+			size: len(payloadBytes),
+			limits: func(limit int) codecLimits {
+				return codecLimits{EnvelopeMaxBytes: nonLimitTarget, CompressedPayloadMaxBytes: nonLimitTarget, PayloadMaxBytes: limit}
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			codec, err := newCodec(codecTestSecret, tt.limits)
+			// 実データサイズちょうどではEncodeとDecodeを受理する。
+			acceptCodec, err := newCodec(codecTestSecret, tt.limits(tt.size))
 			require.NoError(t, err)
+			_, err = acceptCodec.Encode(codecTestSnapshot(t))
+			assert.NoError(t, err)
+			_, err = acceptCodec.Decode(encoded)
+			assert.NoError(t, err)
 
-			_, err = codec.Encode(codecTestSnapshot(t))
-
+			// 1バイト不足では実データ（上限+1相当）をEncodeとDecodeで拒否する。
+			rejectCodec, err := newCodec(codecTestSecret, tt.limits(tt.size-1))
+			require.NoError(t, err)
+			_, err = rejectCodec.Encode(codecTestSnapshot(t))
+			assert.ErrorIs(t, err, usecase.ErrDataTransferPayloadTooLarge)
+			_, err = rejectCodec.Decode(encoded)
 			assert.ErrorIs(t, err, usecase.ErrDataTransferPayloadTooLarge)
 		})
 	}
