@@ -80,6 +80,74 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "record_histories")
 	})
 
+	t.Run("1譜面の履歴が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 同一譜面の履歴が上限50件ちょうどの妥当な履歴群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordHistories = make([]UserDataTransferRecordHistory, 50)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.RecordHistories {
+			snapshot.RecordHistories[i] = validRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("別譜面の履歴は上限件数に合算されない", func(t *testing.T) {
+		// Given: 譜面Aに上限50件ちょうど、曲は同じで難易度が異なる別譜面に1件
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordHistories = make([]UserDataTransferRecordHistory, 0, 51)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < 50; i++ {
+			snapshot.RecordHistories = append(snapshot.RecordHistories, validRecordHistory(base.Add(time.Duration(i)*time.Second)))
+		}
+		other := validRecordHistory(base.Add(50 * time.Second))
+		other.Difficulty = "EXPERT"
+		snapshot.RecordHistories = append(snapshot.RecordHistories, other)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("WORLD'S ENDの履歴が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 同一WORLD'S END譜面の履歴が上限50件ちょうどの妥当な履歴群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.WorldsendRecordHistories = make([]UserDataTransferWorldsendRecordHistory, 50)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.WorldsendRecordHistories {
+			snapshot.WorldsendRecordHistories[i] = validWorldsendRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("WORLD'S ENDの履歴が上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 同一WORLD'S END譜面の履歴が上限50件を1件超える51件
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.WorldsendRecordHistories = make([]UserDataTransferWorldsendRecordHistory, 51)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.WorldsendRecordHistories {
+			snapshot.WorldsendRecordHistories[i] = validWorldsendRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "worldsend_record_histories")
+	})
+
 	t.Run("スロットの上限を超えるslot_orderを拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.Records[0].SlotOrder = new(31)
@@ -244,7 +312,7 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		err := snapshot.Validate()
 
 		// Then
-		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "goals exceeds its limit")
 	})
 
@@ -271,7 +339,7 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		err := snapshot.Validate()
 
 		// Then
-		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "goals.groups exceeds its limit")
 	})
 
@@ -316,7 +384,7 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		err := snapshot.Validate()
 
 		// Then
-		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "record_filters exceeds its limit")
 	})
 
@@ -513,6 +581,18 @@ func validRecordHistory(updatedAt time.Time) UserDataTransferRecordHistory {
 	return UserDataTransferRecordHistory{
 		SongOfficialIdx: "1001",
 		Difficulty:      "MASTER",
+		Score:           standardScore,
+		ClearLampName:   "CLEAR",
+		ComboLampName:   "FULL COMBO",
+		FullChainName:   "NONE",
+		UpdatedAt:       updatedAt,
+	}
+}
+
+func validWorldsendRecordHistory(updatedAt time.Time) UserDataTransferWorldsendRecordHistory {
+	standardScore, _ := score.NewScore(1_000_000)
+	return UserDataTransferWorldsendRecordHistory{
+		SongOfficialIdx: "2001",
 		Score:           standardScore,
 		ClearLampName:   "CLEAR",
 		ComboLampName:   "FULL COMBO",
