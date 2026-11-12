@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ type versionUsecaseMock struct {
 	createCall bool
 	renameCall bool
 	deleteCall bool
+	deleteID   int
 }
 
 func (m *versionUsecaseMock) ListAll(context.Context) ([]*entity.Version, error) {
@@ -45,8 +47,9 @@ func (m *versionUsecaseMock) Rename(_ context.Context, id int, name, shortName s
 	}
 	return &entity.Version{ID: id, Name: name, ShortName: shortName, ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}, nil
 }
-func (m *versionUsecaseMock) Delete(context.Context, int) error {
+func (m *versionUsecaseMock) Delete(_ context.Context, id int) error {
 	m.deleteCall = true
+	m.deleteID = id
 	return m.deleteErr
 }
 
@@ -250,23 +253,43 @@ func TestVersionHandler_Delete_競合エラーを対応付ける(t *testing.T) {
 			apiErr := requireVersionAPIError(t, err)
 			assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
 			assert.Equal(t, tt.code, apiErr.Code)
+			assert.Equal(t, 1, uc.deleteID)
 		})
 	}
 }
 
 func TestVersionHandler_Delete_正常系(t *testing.T) {
-	uc := &versionUsecaseMock{}
-	handler := NewVersionHandler(uc)
-	e := echo.New()
-	rec := httptest.NewRecorder()
-	c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/1", nil), rec)
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+	// DELETEは204 No Contentで空本文を返す契約のため、パスIDと転送IDの一致まで検証する。
+	// 固定ID実装を両方向で捉えるため、1以外の2通りで確認する。
+	tests := []struct {
+		name string
+		id   int
+	}{
+		{name: "ID7を削除する", id: 7},
+		{name: "ID12を削除する", id: 12},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := &versionUsecaseMock{}
+			handler := NewVersionHandler(uc)
+			e := echo.New()
+			rec := httptest.NewRecorder()
+			idValue := strconv.Itoa(tt.id)
+			c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/"+idValue, nil), rec)
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: idValue}})
 
-	err := handler.Delete(c)
+			// When
+			err := handler.Delete(c)
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusNoContent, rec.Code)
-	assert.True(t, uc.deleteCall)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusNoContent, rec.Code)
+			assert.Empty(t, rec.Body.String())
+			assert.True(t, uc.deleteCall)
+			assert.Equal(t, tt.id, uc.deleteID)
+		})
+	}
 }
 
 func requireVersionAPIError(t *testing.T, err error) *apierror.APIError {
