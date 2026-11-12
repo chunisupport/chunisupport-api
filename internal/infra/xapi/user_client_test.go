@@ -2,6 +2,7 @@ package xapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// roundTripFunc は通信失敗を再現するための最小の http.RoundTripper です。
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
 
 func TestUserClient_GetAuthenticatedUser_本人情報を署名付きで取得する(t *testing.T) {
 	// Given
@@ -71,4 +79,24 @@ func TestUserClient_GetAuthenticatedUser_失敗時のエラー(t *testing.T) {
 			assert.Equal(t, usecase.XAuthenticatedUser{}, got)
 		})
 	}
+}
+
+func TestUserClient_GetAuthenticatedUser_通信失敗時は原因を保持して利用不可エラーにする(t *testing.T) {
+	// Given
+	sentinel := errors.New("transport failure")
+	called := false
+	base := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		called = true
+		return nil, sentinel
+	})}
+	client := newUserClient("consumer-key", "consumer-secret", "https://api.x.com", base)
+
+	// When
+	got, err := client.GetAuthenticatedUser(context.Background(), "access-token", "access-secret")
+
+	// Then
+	assert.ErrorIs(t, err, usecase.ErrXAPIUnavailable)
+	assert.ErrorIs(t, err, sentinel)
+	assert.Equal(t, usecase.XAuthenticatedUser{}, got)
+	assert.True(t, called)
 }
