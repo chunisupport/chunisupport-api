@@ -75,6 +75,9 @@ func TestGoalGroupHandler_Create(t *testing.T) {
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, recorder.Code)
+	// 作成レスポンス全体が GoalGroup オブジェクトの契約どおりであることを固定値で確かめる。
+	// null や {}、キー名の変更といった退行をステータスだけでは検出できないため。
+	assert.JSONEq(t, `{"id":1,"name":"攻略中","sort_order":1,"created_at":"0001-01-01T00:00:00Z"}`, recorder.Body.String())
 	assert.Equal(t, "攻略中", mock.createdName)
 }
 
