@@ -104,6 +104,25 @@ func TestGoalGroupUsecase_CreateRejectsLimit(t *testing.T) {
 	assert.ErrorIs(t, err, ErrGoalGroupLimitExceeded)
 }
 
+func TestGoalGroupUsecase_CreateAcceptsOneBelowLimit(t *testing.T) {
+	// Given: 上限20件の1つ手前（19件）の状態。拒否ケースと同じ準備で件数だけを変える。
+	groups := make([]*entity.GoalGroup, 0, info.GoalGroupMaxPerUser)
+	for i := range info.GoalGroupMaxPerUser - 1 {
+		groups = append(groups, newTestGoalGroup(t, uint32(i+1), 1, string(rune('A'+i)), uint16(i+1)))
+	}
+	groupRepo := &stubGoalGroupRepo{groups: groups}
+	u := NewGoalGroupUsecase(nil, &stubTM{}, groupRepo, &stubGoalRepo{})
+
+	// When: 目標グループを新規作成する。
+	created, err := u.Create(context.Background(), 1, "T")
+
+	// Then: 上限に達していないため作成でき、末尾の表示順20で保存される。
+	require.NoError(t, err)
+	assert.Equal(t, "T", created.Name)
+	assert.Equal(t, uint16(20), created.SortOrder)
+	assert.Len(t, groupRepo.groups, 20)
+}
+
 func TestGoalGroupUsecase_DeleteMovesGoalsToUnclassifiedEnd(t *testing.T) {
 	// Given
 	groupID := uint32(10)

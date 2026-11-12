@@ -272,6 +272,22 @@ func TestGoalUsecase_CreateLimitExceeded(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrGoalLimitExceeded))
 }
 
+func TestGoalUsecase_CreateAcceptsOneBelowLimit(t *testing.T) {
+	// Given: 上限300件の1つ手前（299件）の状態。拒否ケースと同じ準備で件数だけを変える。
+	repo := &stubGoalRepo{count: 299}
+	u := NewGoalUsecase(nil, &stubTM{}, repo, &stubGoalMasterProvider{}, &stubGoalGroupRepo{})
+
+	// When: 目標を新規作成する。
+	out, err := u.Create(context.Background(), 1, &GoalInput{Title: "test", AchievementType: "score_count", AchievementParams: []byte(`{"score":1000000,"count":1}`), Attributes: []byte(`{}`)})
+
+	// Then: 上限に達していないため作成でき、末尾の表示順300で保存される。
+	require.NoError(t, err)
+	assert.Equal(t, "test", out.Title)
+	assert.Equal(t, "score_count", out.AchievementType)
+	assert.Equal(t, uint16(300), out.SortOrder)
+	assert.Equal(t, uint16(300), repo.goal.SortOrder)
+}
+
 func TestGoalUsecase_Delete(t *testing.T) {
 	repo := &stubGoalRepo{goal: &entity.Goal{ID: 1, UserID: 1, SortOrder: 1}}
 	tm := &trackingTM{}
