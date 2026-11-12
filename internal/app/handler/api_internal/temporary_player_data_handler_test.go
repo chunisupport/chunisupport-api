@@ -32,6 +32,9 @@ type mockTemporaryPlayerDataUsecase struct{ mock.Mock }
 
 const expectedTempDataMaxUncompressedBytes = 5 * 1024 * 1024
 
+// 圧縮本文サイズ上限の仕様値（バイト）。info.TempDataMaxCompressedBytes と一致すること。
+const expectedTempDataMaxCompressedBytes = 512000
+
 func (m *mockTemporaryPlayerDataUsecase) Create(ctx context.Context, input usecase.CreateTemporaryPlayerDataInput) (*usecase.CreateTemporaryPlayerDataOutput, error) {
 	args := m.Called(ctx, input)
 	if args.Get(0) == nil {
@@ -89,6 +92,44 @@ func newTemporaryDataRequest(body []byte, remoteAddr string) *http.Request {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.RemoteAddr = remoteAddr
 	return req
+}
+
+// gzipCompressedWithExactSize は圧縮後のサイズがちょうどtargetになる有効なgzip本文を作ります。
+// 無圧縮の格納方式では出力サイズが入力の長さにほぼ線形で増えるため、
+// 単純な繰り返し文字の詰め物の長さを差分だけ直してもう一度作ることで目標サイズに合わせます。
+// 展開結果は小さな正規のJSONのままなので、解凍後サイズの上限にはかかりません。
+func gzipCompressedWithExactSize(t *testing.T, target int) []byte {
+	t.Helper()
+	compress := func(padLen int) []byte {
+		payload := struct {
+			Name    string `json:"name"`
+			Padding string `json:"padding"`
+		}{Name: "TEST", Padding: strings.Repeat("a", padLen)}
+		raw, err := json.Marshal(payload)
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		zw, err := gzip.NewWriterLevel(&buf, gzip.NoCompression)
+		require.NoError(t, err)
+		_, err = zw.Write(raw)
+		require.NoError(t, err)
+		require.NoError(t, zw.Close())
+		return buf.Bytes()
+	}
+	// Given: 仮の詰め物で一度圧縮して目標との差を測る
+	padLen := target
+	body := compress(padLen)
+	// When: 差の分だけ詰め物を増減させて作り直す（格納方式では詰め物1バイトの増減が圧縮後にも1バイト反映される）
+	for range 5 {
+		if len(body) == target {
+			break
+		}
+		padLen += target - len(body)
+		require.Greater(t, padLen, 0)
+		body = compress(padLen)
+	}
+	// Then: 送信前に目標サイズちょうどであることを確かめる
+	require.Len(t, body, target)
+	return body
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
@@ -168,20 +209,60 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_認証状態を見ない
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testing.T) {
+	// Given
 	e := echo.New()
-	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
 
-	tooLarge := bytes.Repeat([]byte("a"), 512001)
+	// 上限+1バイトの有効なgzip本文（サイズだけが拒否の理由になる）
+	require.Equal(t, expectedTempDataMaxCompressedBytes, info.TempDataMaxCompressedBytes)
+	tooLarge := gzipCompressedWithExactSize(t, expectedTempDataMaxCompressedBytes+1)
+	require.Len(t, tooLarge, expectedTempDataMaxCompressedBytes+1)
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(tooLarge))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
+	// When
 	err := h.CreateTemporaryData(c)
+
+	// Then
 	require.Error(t, err)
 	apiErr := err.(*apierror.APIError)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, apiErr.HTTPStatus)
+	mockUC.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_圧縮サイズが上限ちょうどなら受け付ける(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	require.Equal(t, expectedTempDataMaxCompressedBytes, info.TempDataMaxCompressedBytes)
+	body := gzipCompressedWithExactSize(t, expectedTempDataMaxCompressedBytes)
+	require.Len(t, body, expectedTempDataMaxCompressedBytes)
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	mockUC.On("Create", mock.Anything, mock.MatchedBy(func(input usecase.CreateTemporaryPlayerDataInput) bool {
+		return input.IPAddress == "127.0.0.1" && bytes.Equal(input.Payload, body)
+	})).Return(&usecase.CreateTemporaryPlayerDataOutput{UploadToken: "token", ExpiresAt: time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)}, nil).Once()
+
+	// When
+	err := h.CreateTemporaryData(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Contains(t, rec.Body.String(), "uploadToken")
+	mockUC.AssertExpectations(t)
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後JSONが5MiBなら受け付ける(t *testing.T) {
