@@ -24,6 +24,8 @@ func TestNewVersion(t *testing.T) {
 		{name: "接頭辞がない名前は拒否する", inputName: "VERSE", inputShortName: "VRS", date: time.Now(), wantErr: true},
 		{name: "接頭辞だけの名前は拒否する", inputName: "CHUNITHM ", inputShortName: "VRS", date: time.Now(), wantErr: true},
 		{name: "51文字の名前は拒否する", inputName: "CHUNITHM " + strings.Repeat("あ", 42), inputShortName: "VRS", date: time.Now(), wantErr: true},
+		{name: "50文字の名前を作成できる", inputName: "CHUNITHM " + strings.Repeat("あ", 41), inputShortName: "VRS", date: time.Date(2025, 12, 11, 0, 0, 0, 0, time.UTC), wantName: "CHUNITHM " + strings.Repeat("あ", 41), wantShortName: "VRS"},
+		{name: "JSTの午前8時台でも稼働日当日の0時UTCとして保存する", inputName: "CHUNITHM VERSE", inputShortName: "VRS", date: time.Date(2025, 12, 11, 8, 59, 0, 0, time.FixedZone("JST", 9*60*60)), wantName: "CHUNITHM VERSE", wantShortName: "VRS"},
 		{name: "空白だけの超ショート名は拒否する", inputName: "CHUNITHM VERSE", inputShortName: "  ", date: time.Now(), wantErr: true},
 		{name: "11文字の超ショート名は拒否する", inputName: "CHUNITHM VERSE", inputShortName: strings.Repeat("×", 11), date: time.Now(), wantErr: true},
 		{name: "ゼロ日付は拒否する", inputName: "CHUNITHM VERSE", inputShortName: "VRS", wantErr: true},
@@ -39,8 +41,7 @@ func TestNewVersion(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantName, version.Name)
 			assert.Equal(t, tt.wantShortName, version.ShortName)
-			assert.Equal(t, "2025-12-11", version.ReleasedAt.Format(time.DateOnly))
-			assert.Equal(t, time.UTC, version.ReleasedAt.Location())
+			assert.Equal(t, time.Date(2025, 12, 11, 0, 0, 0, 0, time.UTC), version.ReleasedAt)
 		})
 	}
 }
