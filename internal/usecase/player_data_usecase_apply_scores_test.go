@@ -611,6 +611,93 @@ func TestPlayerDataSlotLimit_枠ごとの上限を返す(t *testing.T) {
 	}
 }
 
+func TestValidateFullRecordSlots_枠ごとの上限ちょうどは受理する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 検証対象の枠
+		slotID int
+		// Given: 枠の上限と同数の件数（仕様で定められた固定値）
+		count int
+	}{
+		{name: "bestは30件まで受理する", slotID: 2, count: 30},
+		{name: "newは20件まで受理する", slotID: 3, count: 20},
+		{name: "best_candidateは10件まで受理する", slotID: 4, count: 10},
+		{name: "new_candidateは10件まで受理する", slotID: 5, count: 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 順位1から上限まで連続した枠を用意し、連続性の規則では拒否されないようにする。
+			records := make([]repository.PlayerRecordForUpsert, 0, tt.count)
+			for i := 1; i <= tt.count; i++ {
+				order := i
+				records = append(records, repository.PlayerRecordForUpsert{ChartID: i, State: repository.PlayerRecordState{SlotID: tt.slotID, SlotOrder: &order}})
+			}
+
+			// When
+			err := validateFullRecordSlots(records, newApplyScoresTestMasters())
+
+			// Then: 上限ちょうどは件数制限と順位範囲のどちらにも掛からず受理される。
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateFullRecordSlots_枠ごとの上限超過は件数制限で拒否する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 検証対象の枠
+		slotID int
+		// Given: 上限より1件多い件数（仕様で定められた固定値）
+		count int
+		// Then: 件数制限の規則で拒否されたことが分かる固定メッセージ
+		wantMessage string
+	}{
+		{name: "newは21件で拒否する", slotID: 3, count: 21, wantMessage: "new slot exceeds its limit: max 20"},
+		{name: "best_candidateは11件で拒否する", slotID: 4, count: 11, wantMessage: "best_candidate slot exceeds its limit: max 10"},
+		{name: "new_candidateは11件で拒否する", slotID: 5, count: 11, wantMessage: "new_candidate slot exceeds its limit: max 10"},
+	}
+	// bestの31件はTestValidateFullRecordSlots_best枠が上限を超えたら拒否するで検証済みのため、重複させない。
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 順位1から上限+1まで連続させ、連続性や順位範囲ではなく件数制限で拒否される入力にする。
+			records := make([]repository.PlayerRecordForUpsert, 0, tt.count)
+			for i := 1; i <= tt.count; i++ {
+				order := i
+				records = append(records, repository.PlayerRecordForUpsert{ChartID: i, State: repository.PlayerRecordState{SlotID: tt.slotID, SlotOrder: &order}})
+			}
+
+			// When
+			err := validateFullRecordSlots(records, newApplyScoresTestMasters())
+
+			// Then
+			var validationErr *PlayerDataValidationError
+			require.ErrorAs(t, err, &validationErr)
+			assert.Equal(t, "scores.standard", validationErr.Field)
+			assert.Contains(t, validationErr.Message, tt.wantMessage)
+		})
+	}
+}
+
+func TestValidateFullRecordSlots_順位0は範囲外で拒否する(t *testing.T) {
+	// Given: 下限側の代表としてbest枠で順位0を用意する。件数は上限以内のため件数制限には掛からない。
+	order := 0
+	records := []repository.PlayerRecordForUpsert{
+		{ChartID: 101, State: repository.PlayerRecordState{SlotID: 2, SlotOrder: &order}},
+	}
+
+	// When
+	err := validateFullRecordSlots(records, newApplyScoresTestMasters())
+
+	// Then: 順位範囲の規則で拒否され、件数制限のメッセージではない。
+	var validationErr *PlayerDataValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "scores.standard", validationErr.Field)
+	assert.Contains(t, validationErr.Message, "best slot_order is out of range: must be between 1 and 30")
+	assert.NotContains(t, validationErr.Message, "exceeds its limit")
+}
+
 func TestValidateFullRecordSlots_best枠が上限を超えたら拒否する(t *testing.T) {
 	// Given
 	masters := newApplyScoresTestMasters()
