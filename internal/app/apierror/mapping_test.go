@@ -321,3 +321,118 @@ func TestFromUsecaseError_プロフィールコメントの内容判定エラー
 		})
 	}
 }
+
+func TestFromUsecaseError_非公開ユーザーは存在を隠すため404へ丸める(t *testing.T) {
+	// Given: 非公開ユーザーを表すエラー（ユーザー列挙を避けるため存在しない場合と同じ応答にする）
+	err := usecase.ErrUserPrivate
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 存在しない場合と同じ 404 user_not_found になり、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, CodeUserNotFound, apiErr.Code)
+	assert.ErrorIs(t, apiErr, usecase.ErrUserPrivate)
+}
+
+func TestFromUsecaseError_使用済みユーザー名は登録失敗に丸める(t *testing.T) {
+	// Given: ユーザー名が既に使われていることを表すエラー（存在を悟らせないため詳細を隠す）
+	err := usecase.ErrUsernameTaken
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 400 registration_failed に丸められ、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeRegistrationFailed, apiErr.Code)
+	assert.ErrorIs(t, apiErr, usecase.ErrUsernameTaken)
+}
+
+func TestFromUsecaseError_未知のエラーは500へ丸める(t *testing.T) {
+	// Given: 対応表にない未知のエラー
+	err := errors.New("unknown error for mapping test")
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 500 internal_error になり、原因エラーを errors.Is で辿れる
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+	assert.Equal(t, CodeInternalError, apiErr.Code)
+	assert.ErrorIs(t, apiErr, err)
+}
+
+func TestFromUsecaseError_nilはnilを返す(t *testing.T) {
+	// Given: nil エラー
+
+	// When
+	apiErr := FromUsecaseError(nil)
+
+	// Then: 変換せず nil を返す
+	assert.Nil(t, apiErr)
+}
+
+func TestFromUsecaseError_プレイヤーデータ未検出を400へ変換する(t *testing.T) {
+	// Given: マスタ未登録などを表す見つからない系の独自エラー
+	err := &usecase.PlayerDataNotFoundError{Resource: "song", Key: "99999"}
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 400 resource_not_found になり、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeResourceNotFound, apiErr.Code)
+	assert.ErrorIs(t, apiErr, err)
+}
+
+func TestFromUsecaseError_譜面統計バッチ関連エラー(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 対応表にある譜面統計バッチ系のエラー
+		err error
+		// Then: 期待する対応付け
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "停止処理中は503",
+			err:        usecase.ErrChartStatsBatchUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   CodeServiceUnavailable,
+		},
+		{
+			name:       "実行中は409",
+			err:        usecase.ErrChartStatsBatchAlreadyRunning,
+			wantStatus: http.StatusConflict,
+			wantCode:   CodeChartStatsBatchAlreadyRunning,
+		},
+		{
+			name:       "ジョブID不正は400",
+			err:        usecase.ErrInvalidChartStatsBatchJobID,
+			wantStatus: http.StatusBadRequest,
+			wantCode:   CodeInvalidChartStatsBatchJobID,
+		},
+		{
+			name:       "ジョブ未検出は404",
+			err:        repository.ErrChartStatsBatchJobNotFound,
+			wantStatus: http.StatusNotFound,
+			wantCode:   CodeChartStatsBatchJobNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			assert.ErrorIs(t, apiErr, tt.err)
+		})
+	}
+}
