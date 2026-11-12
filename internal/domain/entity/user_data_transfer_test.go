@@ -243,6 +243,53 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "slot_order")
 	})
 
+	t.Run("bestとnew枠の順位欠番を受理する", func(t *testing.T) {
+		tests := []struct {
+			name string
+			// Given: 前提条件
+			slotName string
+			orders   []int
+		}{
+			{
+				name:     "best枠の先頭欠番を受理する",
+				slotName: "best",
+				orders:   []int{2, 3},
+			},
+			{
+				name:     "best枠の途中欠番を受理する",
+				slotName: "best",
+				orders:   []int{1, 3},
+			},
+			{
+				name:     "new枠の先頭欠番を受理する",
+				slotName: "new",
+				orders:   []int{2, 3},
+			},
+			{
+				name:     "new枠の途中欠番を受理する",
+				slotName: "new",
+				orders:   []int{1, 3},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Given: 指定スロットに欠番を含む順位を割り当てた妥当な通常譜面レコード群
+				snapshot := validUserDataTransferSnapshot(t)
+				snapshot.Records = validTransferSlotRecords(tt.slotName, len(tt.orders))
+				for i, order := range tt.orders {
+					snapshot.Records[i].SlotOrder = new(order)
+				}
+
+				// When
+				err := snapshot.Validate()
+
+				// Then: データ移行では順位欠番を許容するため検証に成功する
+				assert.NoError(t, err)
+			})
+		}
+	})
+
 	t.Run("公式指標履歴が時系列順でなければ拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.MetricHistories = append(snapshot.MetricHistories, UserDataTransferMetricHistory{

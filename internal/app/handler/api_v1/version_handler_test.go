@@ -2,14 +2,12 @@ package api_v1
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
-	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +49,7 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 
 	releasedAt := time.Date(2026, 2, 5, 0, 0, 0, 0, time.UTC)
 	usecaseMock.On("GetVersions", mock.Anything).Return([]masterdata.Version{
-		{ID: 4, Name: "LUMINOUS", ReleasedAt: releasedAt},
+		{ID: 4, Name: "LUMINOUS", ShortName: "LMN", ReleasedAt: releasedAt},
 	}).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/master/versions", nil)
@@ -63,12 +61,7 @@ func TestV1VersionHandler_GetVersions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	var response dto.VersionSummariesResponse
-	err = json.Unmarshal(rec.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Len(t, response.Versions, 1)
-	assert.Equal(t, "LUMINOUS", response.Versions[0].Name)
-	assert.Equal(t, "2026-02-05", response.Versions[0].ReleasedAt)
+	assert.JSONEq(t, `{"versions":[{"name":"LUMINOUS","short_name":"LMN","released_at":"2026-02-05"}]}`, rec.Body.String())
 	usecaseMock.AssertExpectations(t)
 }
 

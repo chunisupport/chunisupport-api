@@ -418,7 +418,7 @@ Content-Type: application/json
 
 OVER POWERの絶対値・割合にはCHUNITHM-NETから取得した公式値を使い、最新マスタによる再計算は行いません。
 
-RATINGの `color` はそれぞれ表示対象の値に応じたレート色、OVER POWERはポゼッションに応じた色を返します。
+RATINGの `color` はそれぞれ表示対象の値に応じたレート色、OVER POWERはポゼッションに応じた色を返します。色定義にないポゼッションの場合、OVER POWERの値は維持し、`color` は既定色の `lightgrey` を返します。
 
 ```json
 {
@@ -2995,7 +2995,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer 必須（ADMIN権限必須）
 - **説明**: ADMIN専用のエンドポイントです。プライベートアカウント、プレイヤー未紐付けアカウントを含む全ユーザーの一覧を取得します。
 - **クエリパラメータ**:
-    - `page` (任意): ページ番号 (デフォルト: 1)。正の整数として解釈でき、かつ `(page - 1) * 100` が符号付き64bit整数の最大値を超える場合は 422 Unprocessable Entity (`validation_failed`)
+    - `page` (任意): ページ番号 (デフォルト: 1)。正の整数として解釈でき、かつ `(page - 1) * 100` が符号付き64bit整数の最大値を超える場合は 422 Unprocessable Entity (`validation_failed`)。桁数が大きすぎて整数型に収まらない正整数も同様です。未指定・数値形式でない値・0以下は1に補正します。
     - `name` (任意): ユーザー名またはプレイヤー名の前方一致検索
 - **レスポンス**: `AdminUserListResponse` の配列を返します。
 
@@ -3487,7 +3487,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 }
 ```
 
-両APIともユーザー不存在・非公開ユーザー・楽曲不存在・パスと楽曲種別の不一致は `404` を返します。`username` または `id` の形式不正は `400 validation_failed` です。
+両APIともユーザー不存在・非公開ユーザー・楽曲不存在・パスと楽曲種別の不一致は `404` を返します。`id` の形式不正は `422 validation_failed` です。`username` の形式不正は `400`（`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`）を返します。
 
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
@@ -4071,9 +4071,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `ranking[].chart.const` | number | 譜面定数 |
 | `ranking[].chart.is_const_unknown` | boolean | 譜面定数が推定値の場合true |
 | `ranking[].best_player_count` | number | 指定レート帯でこの譜面をベスト枠に持つプレイヤー数 |
-| `ranking[].best_player_percentage` | number | `best_player_count / eligible_player_count * 100`（小数点以下4桁まで） |
+| `ranking[].best_player_percentage` | number | `best_player_count / eligible_player_count * 100`（小数点以下4桁まで。float64で `math.Round(value * 10000) / 10000` を適用） |
 | `ranking[].average_score` | number\|null | 指定レート帯でこの譜面をクリアしたプレイヤーの平均スコア（クリア済み記録が0件の場合はnull） |
 | `next_cursor` | string\|null | 次ページがある場合の不透明カーソル |
+
+採用率の丸めはfloat64の計算結果を使用し、十進数としての厳密な四捨五入は保証しません。例えば `25.12345` は `25.1234` になります。
 
 - **主なエラー**:
   - 422 Unprocessable Entity (`validation_failed`): `rating_band`、`limit`、`cursor` が不正
@@ -4116,7 +4118,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `stats[].rating_band` | string | ベスト枠平均レート帯のラベル |
 | `stats[].best_player_count` | number | この譜面をベスト枠に持つプレイヤー数 |
 | `stats[].eligible_player_count` | number | レート帯の集計対象プレイヤー数 |
-| `stats[].best_player_percentage` | number\|null | ベスト枠採用率。集計対象が0人の場合はnull |
+| `stats[].best_player_percentage` | number\|null | ベスト枠採用率。集計対象が0人の場合はnull。ランキングと同じfloat64の計算で小数点以下4桁へ丸めます |
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度またはWORLD'S END
@@ -4134,7 +4136,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - `difficulty`: `expert`, `master`, `ultima`
 - **レスポンス**: 200 OK。形式は GET `/v1/songs/:id/score-history/:difficulty` と同一です。
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `username` が不正
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): `username` が不正
   - 400 Bad Request (`invalid_difficulty`): 無効な難易度パラメータ
   - 400 Bad Request (`score_history_unsupported_difficulty`): 履歴対象外の難易度
   - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
@@ -4418,7 +4420,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - `id`: WORLD'S END楽曲の表示用ID
 - **レスポンス**: 200 OK。形式は GET `/v1/worldsend-songs/:id/score-history` と同一です。
 - **主なエラー**:
-  - 400 Bad Request (`validation_failed`): `username` が不正
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): `username` が不正
   - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
   - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、またはWORLD'S END楽曲ではない
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない
@@ -4810,9 +4812,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     { "id": 4, "name": "EXTDEV" }
   ],
   "versions": [
-    { "id": 1, "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16T00:00:00+09:00" },
-    { "id": 2, "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04T00:00:00+09:00" },
-    { "id": 3, "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+    { "id": 1, "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16" },
+    { "id": 2, "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04" },
+    { "id": 3, "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25" }
   ],
   "rating_bands": [
     { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
@@ -4926,7 +4928,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `id` | int | バージョンID |
 | `name` | string | バージョン名称 |
 | `short_name` | string | 表示幅を抑えるための超ショート名（例: `CRY+`） |
-| `released_at` | string | リリース日時（ISO8601形式） |
+| `released_at` | string | リリース日（`YYYY-MM-DD`形式） |
 
 **RatingBandDTO**:
 
@@ -5074,9 +5076,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```json
 {
   "versions": [
-    { "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16T00:00:00+09:00" },
-    { "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04T00:00:00+09:00" },
-    { "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25T00:00:00+09:00" }
+    { "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16" },
+    { "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04" },
+    { "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25" }
   ]
 }
 ```
@@ -5223,7 +5225,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | ---------- | -- | ---- | ---- |
 | `official_idx` | string | ✅ | 公式ID（最大10文字） |
 | `difficulty` | string | ✅ | 難易度名の先頭3文字。`BAS` / `ADV` / `EXP` / `MAS` / `ULT`（大文字・小文字を区別しない） |
-| `const` | number | ✅ | 譜面定数（0.0～16.0、小数第1位まで） |
+| `const` | number | ✅ | 譜面定数（1.0～16.0、小数第1位まで） |
 
 - **レスポンス**: 200 OK（成功時）。更新後の楽曲オブジェクトを返します。
 - **主なエラー**:

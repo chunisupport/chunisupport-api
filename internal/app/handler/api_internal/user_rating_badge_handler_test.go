@@ -271,6 +271,12 @@ func TestUserHandler_GetOfficialOverpowerBadge(t *testing.T) {
 			wantColor:   "#fcd200",
 		},
 		{
+			name:        "未知のポゼッションでも絶対値を維持し既定色を返す",
+			player:      &entity.Player{OfficialOverpower: 12345.6, PossessionID: 6},
+			wantMessage: "12345.60",
+			wantColor:   "lightgrey",
+		},
+		{
 			name:        "プレイヤー未連携ならno dataを表示する",
 			player:      nil,
 			wantMessage: "no data",
@@ -335,6 +341,12 @@ func TestUserHandler_GetOfficialOverpowerPercentBadge(t *testing.T) {
 			player:      &entity.Player{OfficialOverpower: 12345.6, OfficialOverpowerPercent: new(76.25), PossessionID: 4},
 			wantMessage: "76.25%",
 			wantColor:   "#ffeac9",
+		},
+		{
+			name:        "未知のポゼッションでも割合を維持し既定色を返す",
+			player:      &entity.Player{OfficialOverpowerPercent: new(76.25), PossessionID: 6},
+			wantMessage: "76.25%",
+			wantColor:   "lightgrey",
 		},
 		{
 			// 割合が無ければ絶対値にフォールバックせず no data になり、ポゼッション色も漏れない

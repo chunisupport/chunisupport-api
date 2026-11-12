@@ -773,6 +773,11 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			expectedPage: 1,
 		},
 		{
+			name:         "負の巨大値は1で呼ぶ",
+			target:       "/internal/users?page=-99999999999999999999&name=user",
+			expectedPage: 1,
+		},
+		{
 			name:         "page=1は1で呼ぶ",
 			target:       "/internal/users?page=1&name=user",
 			expectedPage: 1,
@@ -831,6 +836,26 @@ func TestAdminUserHandler_GetAllUsers(t *testing.T) {
 			assert.NotContains(t, body[1], "email")
 		})
 	}
+}
+
+func TestAdminUserHandler_GetAllUsers_intに収まらないpageは検証エラー(t *testing.T) {
+	// Given: 巨大な正整数だけは1補正せず、usecaseへ渡す前に拒否する。
+	e := newTestEcho()
+	mockUsecase := new(mockUserUsecase)
+	h := api_internal.NewAdminUserHandler(mockUsecase)
+	req := httptest.NewRequest(http.MethodGet, "/internal/users?page=99999999999999999999", nil)
+	c := e.NewContext(req, httptest.NewRecorder())
+
+	// When
+	err := h.GetAllUsers(c)
+
+	// Then
+	var apiErr *apierror.APIError
+	if assert.ErrorAs(t, err, &apiErr) {
+		assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+		assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+	}
+	mockUsecase.AssertNotCalled(t, "GetAllUsersForAdmin", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAdminUserHandler_GetAllUsers_クライアント切断は原因エラーを保持する(t *testing.T) {

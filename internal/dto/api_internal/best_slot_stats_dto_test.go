@@ -58,10 +58,15 @@ func TestBestSlotStatsResponse_採用率を小数点以下4桁へ丸める(t *te
 			input:    25.12344,
 			expected: 25.1234,
 		},
+		{
+			name:     "十進境界はfloat64の計算結果25.1234を返す",
+			input:    25.12345,
+			expected: 25.1234,
+		},
 	}
 
-	// 注意: 25.12345のような十進ちょうどの半端境界はfloat64で正確に表せず、
-	// 本番のmath.Roundでは切り上がりを保証できないため本件では扱わない。
+	// 十進数の厳密な四捨五入ではなくfloat64の計算結果を契約とし、
+	// 表現誤差がある境界25.12345も固定値で検証する。
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
