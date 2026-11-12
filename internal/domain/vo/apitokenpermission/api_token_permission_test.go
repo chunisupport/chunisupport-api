@@ -31,7 +31,27 @@ func TestNewAPITokenPermission(t *testing.T) {
 }
 
 func TestNewAPITokenPermission_Invalid(t *testing.T) {
-	_, err := NewAPITokenPermission("")
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{
+			name:  "空文字はエラー",
+			value: "",
+		},
+		{
+			name:  "大文字のREADはエラー",
+			value: "READ",
+		},
+	}
 
-	assert.ErrorIs(t, err, ErrInvalidAPITokenPermission)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			_, err := NewAPITokenPermission(tt.value)
+
+			// Then
+			assert.ErrorIs(t, err, ErrInvalidAPITokenPermission)
+		})
+	}
 }
