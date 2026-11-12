@@ -18,6 +18,29 @@ import (
 
 var testDataTransferHMACSecret = []byte("0123456789abcdef0123456789abcdef")
 
+// shutdownOrderBatchJobs は Wait 実行時点でDBがまだ利用可能かを記録するスタブです。
+// Shutdown が DB を閉じる前に Wait を終える順序の逆転を検知するために使います。
+type shutdownOrderBatchJobs struct {
+	db      *sqlx.DB
+	pingErr chan error
+}
+
+func (s *shutdownOrderBatchJobs) Wait() {
+	s.pingErr <- s.db.Ping()
+}
+
+// blockingBatchJobs は Wait の終了をテスト側のチャネルで制御するスタブです。
+// 実時間の sleep を使わず、cancel 済みコンテキストとチャネルだけでタイムアウト到達を再現します。
+type blockingBatchJobs struct {
+	release chan struct{}
+	exited  chan struct{}
+}
+
+func (b *blockingBatchJobs) Wait() {
+	<-b.release
+	close(b.exited)
+}
+
 func TestServerAddress(t *testing.T) {
 	// Given: アプリケーションの待受ポート
 	const port = 3000
@@ -147,4 +170,94 @@ func TestNewRouter_永続化済みメンテナンス状態を全体へ適用す�
 
 	assert.Contains(t, accessLog.String(), "uri=/")
 	assert.Contains(t, accessLog.String(), "status=503")
+}
+
+func TestServerShutdown_バッチ終了後にDBを閉じてキャンセルを通知する(t *testing.T) {
+	// Given: 実ネットリスンを使わない直接構築のサーバーと記録用sqlite
+	database, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	// Shutdown が DB を閉じるため、後片付けの二重 Close は結果を無視する。
+	t.Cleanup(func() {
+		_ = database.Close()
+	})
+	cancelNotified := make(chan struct{}, 1)
+	pingErr := make(chan error, 1)
+	server := &Server{
+		db: database,
+		cancelBatchJobs: func() {
+			cancelNotified <- struct{}{}
+		},
+		batchJobs: []backgroundBatchJobs{
+			&shutdownOrderBatchJobs{db: database, pingErr: pingErr},
+		},
+	}
+
+	// When: 正常コンテキストで停止する
+	err = server.Shutdown(context.Background())
+
+	// Then: エラーなく停止する
+	require.NoError(t, err)
+	// Then: Wait 実行時点では DB がまだ利用可能だった（順序逆転があれば失敗する）
+	require.Len(t, pingErr, 1)
+	assert.NoError(t, <-pingErr)
+	// Then: バッチのキャンセルが通知された（cancel 呼び出しの削除を検知する）
+	select {
+	case <-cancelNotified:
+	default:
+		assert.Fail(t, "バッチのキャンセルが通知されませんでした")
+	}
+	// Then: 終了後は DB が閉じられている
+	assert.Error(t, database.Ping())
+}
+
+func TestServerShutdown_バッチ待ちがctx期限で失敗してもDBを閉じる(t *testing.T) {
+	// Given: 終了しないバッチと記録用sqlite（実時間の待機は使わない）
+	database, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	// Shutdown が DB を閉じるため、後片付けの二重 Close は結果を無視する。
+	t.Cleanup(func() {
+		_ = database.Close()
+	})
+	release := make(chan struct{})
+	exited := make(chan struct{})
+	// Shutdown 前に失敗しても Wait を取り残さないため、解放だけを保証する。
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	cancelNotified := make(chan struct{}, 1)
+	server := &Server{
+		db: database,
+		cancelBatchJobs: func() {
+			cancelNotified <- struct{}{}
+		},
+		batchJobs: []backgroundBatchJobs{
+			&blockingBatchJobs{release: release, exited: exited},
+		},
+	}
+	// cancel 済みコンテキストで期限切れ到達を確定的に再現する。
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// When: 終了しないバッチを期限切れコンテキストで停止する
+	err = server.Shutdown(ctx)
+	released = true
+	close(release)
+
+	// Then: 原因を保持したまま期限切れを返す
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	// Then: バッチのキャンセルが通知された（cancel 呼び出しの削除を検知する）
+	select {
+	case <-cancelNotified:
+	default:
+		assert.Fail(t, "バッチのキャンセルが通知されませんでした")
+	}
+	// Then: 期限切れでも DB は閉じられている
+	assert.Error(t, database.Ping())
+
+	// When: 残ったバッチを解放してゴルーチンの終了を待つ（リーク防止）
+	<-exited
 }
