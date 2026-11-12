@@ -265,6 +265,27 @@ func TestFriendScoreComparisonHandler_未認証(t *testing.T) {
 	assert.Zero(t, stub.calls)
 }
 
+func TestFriendScoreComparisonHandler_Worldsend未認証は401を返す(t *testing.T) {
+	// Given: WORLD'S END の比較を未認証で要求する。
+	stub := &stubFriendScoreComparisonUsecase{}
+	e := echo.New()
+	handler := NewFriendScoreComparisonHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/internal/friend-comparisons/frienduser/worldsend", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
+
+	// When
+	err := handler.GetWorldsend(c)
+
+	// Then: usecase を呼ばず 401 を返す。
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
+	assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
+	assert.Zero(t, stub.calls)
+}
+
 func TestFriendScoreComparisonHandler_friend_not_foundはHTTP404(t *testing.T) {
 	// Given
 	stub := &stubFriendScoreComparisonUsecase{err: usecase.ErrFriendNotFound}

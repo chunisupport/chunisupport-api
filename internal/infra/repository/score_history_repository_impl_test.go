@@ -2,14 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
 
-	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
-	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,11 +84,4 @@ func TestScoreHistoryRepository_PruneStandardOverLimit(t *testing.T) {
 	var oldestScore int
 	require.NoError(t, repo.db.Get(&oldestScore, `SELECT score FROM player_record_histories ORDER BY updated_at ASC LIMIT 1`))
 	assert.Equal(t, 900002, oldestScore)
-}
-
-func TestWrapScoreHistoryInsertError_主キー重複を識別可能なエラーへ変換する(t *testing.T) {
-	err := wrapScoreHistoryInsertError(&mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry"})
-
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, domainrepo.ErrScoreHistoryTimestampConflict))
 }

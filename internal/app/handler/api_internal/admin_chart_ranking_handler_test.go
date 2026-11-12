@@ -206,7 +206,7 @@ func TestAdminChartRankingHandler_WORLD送信のランキングを返す(t *test
 func TestAdminChartRankingHandler_usecaseエラーをAPIエラーへ変換する(t *testing.T) {
 	tests := []struct {
 		name string
-		// Given: 呼び出すハンドラーメソッドと usecase の返すエラー。
+		// Given: 呼び出すハンドラーメソッドと usecase の返すエラー。呼び出す側だけに設定し、逆側は nil のままにする。
 		worldsend  bool
 		usecaseErr error
 		// Then: 期待する API エラーのコードとステータス。
@@ -221,11 +221,25 @@ func TestAdminChartRankingHandler_usecaseエラーをAPIエラーへ変換する
 			wantStatus: http.StatusNotFound,
 		},
 		{
+			name:       "通常譜面の内部エラーは500",
+			worldsend:  false,
+			usecaseErr: usecase.ErrInternalError,
+			wantCode:   apierror.CodeInternalError,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
 			name:       "WORLD'S ENDで内部エラーの場合は500",
 			worldsend:  true,
 			usecaseErr: usecase.ErrInternalError,
 			wantCode:   apierror.CodeInternalError,
 			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "WORLD'S ENDの譜面なしは404",
+			worldsend:  true,
+			usecaseErr: usecase.ErrChartNotFound,
+			wantCode:   apierror.CodeChartNotFound,
+			wantStatus: http.StatusNotFound,
 		},
 	}
 
@@ -233,7 +247,12 @@ func TestAdminChartRankingHandler_usecaseエラーをAPIエラーへ変換する
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			const displayID = "abcdef0123456789"
-			stub := &stubAdminChartRankingUsecase{standardErr: tt.usecaseErr, worldsendErr: tt.usecaseErr}
+			stub := &stubAdminChartRankingUsecase{}
+			if tt.worldsend {
+				stub.worldsendErr = tt.usecaseErr
+			} else {
+				stub.standardErr = tt.usecaseErr
+			}
 			e := echo.New()
 			handler := NewAdminChartRankingHandler(stub)
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -242,7 +261,7 @@ func TestAdminChartRankingHandler_usecaseエラーをAPIエラーへ変換する
 			if tt.worldsend {
 				c.SetPathValues(echo.PathValues{{Name: "id", Value: displayID}})
 			} else {
-				c.SetPathValues(echo.PathValues{{Name: "id", Value: displayID}, {Name: "difficulty", Value: "master"}})
+				c.SetPathValues(echo.PathValues{{Name: "id", Value: displayID}, {Name: "difficulty", Value: "MASTER"}})
 			}
 
 			// When
@@ -253,11 +272,18 @@ func TestAdminChartRankingHandler_usecaseエラーをAPIエラーへ変換する
 				err = handler.GetStandard(c)
 			}
 
-			// Then: usecase のエラーが対応する API エラーへ変換される。
+			// Then: 対応する usecase だけが呼ばれ、エラーが対応する API エラーへ変換される。
 			var apiErr *apierror.APIError
 			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, tt.wantCode, apiErr.Code)
 			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			if tt.worldsend {
+				assert.Equal(t, 1, stub.worldsendCalls)
+				assert.Zero(t, stub.standardCalls)
+			} else {
+				assert.Equal(t, 1, stub.standardCalls)
+				assert.Zero(t, stub.worldsendCalls)
+			}
 		})
 	}
 }
