@@ -68,7 +68,15 @@ func TestPlayerDataMySQL_枠だけの変更は最終更新日時を進めない(
 				tx, err := db.BeginTxx(ctx, nil)
 				require.NoError(t, err)
 				defer tx.Rollback()
-				require.NoError(t, NewPlayerDataRepository(db).ClearRankedSlots(ctx, tx, 1))
+				repo := NewPlayerDataRepository(db)
+				ids, err := repo.FindRankedPlayerRecordChartIDs(ctx, tx, 1)
+				require.NoError(t, err)
+				assert.Equal(t, []int{10, 12}, ids)
+				var slots []domainrepo.PlayerRecordSlotUpdate
+				for _, id := range ids {
+					slots = append(slots, domainrepo.PlayerRecordSlotUpdate{PlayerID: 1, ChartID: id, SlotID: 1})
+				}
+				require.NoError(t, repo.SavePlayerData(ctx, tx, domainrepo.PlayerDataSaveInput{FullRecordSlotsToUpdate: slots}))
 				require.NoError(t, tx.Commit())
 			}
 

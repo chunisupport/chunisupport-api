@@ -47,11 +47,11 @@ func TestRegister_AJと理論値の整合性(t *testing.T) {
 						require.NotNil(t, result)
 						assert.Equal(t, 77, result.PlayerID)
 						if recordType == "standard" {
-							require.Len(t, fixture.data.savedInput.FullRecords, 1)
-							assert.Equal(t, tt.score, fixture.data.savedInput.FullRecords[0].State.Score)
+							require.Len(t, fixture.data.savedInput.FullRecordsToInsert, 1)
+							assert.Equal(t, tt.score, fixture.data.savedInput.FullRecordsToInsert[0].State.Score)
 						} else {
-							require.Len(t, fixture.data.savedInput.WorldsendRecords, 1)
-							assert.Equal(t, tt.score, fixture.data.savedInput.WorldsendRecords[0].State.Score)
+							require.Len(t, fixture.data.savedInput.WorldsendRecordsToInsert, 1)
+							assert.Equal(t, tt.score, fixture.data.savedInput.WorldsendRecordsToInsert[0].State.Score)
 						}
 					}
 				})

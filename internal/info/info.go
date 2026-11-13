@@ -7,6 +7,10 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
 
+// PlayerRecordUpdateChunkSize はCASE分岐の評価コストを抑えるため、INSERTとは別に分割します。
+// 6,000行更新の比較で500行が1,000/3,000行より高速。最大7,501プレースホルダーで上限内です。
+const PlayerRecordUpdateChunkSize = 500
+
 const (
 	Name                                        = "chunisupport-api"
 	AppEnvDevelop                               = "develop"
