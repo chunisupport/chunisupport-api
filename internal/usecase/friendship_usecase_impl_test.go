@@ -281,6 +281,27 @@ func TestFriendshipUsecase_SendRequest(t *testing.T) {
 		assert.Empty(t, repo.relations)
 	})
 
+	t.Run("上限到達時でも自分自身への申請は無効エラーを優先する", func(t *testing.T) {
+		// Given
+		repo := newStubFriendshipRepo()
+		repo.counts[1] = info.FriendshipMaxOutgoingActive
+		u := &friendshipUsecase{
+			db:             &MockExecutor{},
+			tm:             &spyTransactionManager{executor: &MockExecutor{}},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 1, "selfuser")},
+			friendshipRepo: repo,
+			now:            func() time.Time { return now },
+		}
+
+		// When
+		err := u.SendRequest(context.Background(), 1, "selfuser")
+
+		// Then
+		// 自己申請は枠の有無と無関係に不正な申請なので、上限超過より先に拒否する。
+		require.ErrorIs(t, err, ErrInvalidFriendRequest)
+		assert.Empty(t, repo.saved)
+	})
+
 	t.Run("上限の1つ手前なら申請を作成できる", func(t *testing.T) {
 		// Given
 		repo := newStubFriendshipRepo()

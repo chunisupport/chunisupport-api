@@ -126,6 +126,20 @@ func TestBuildRatingSlots_レートと定数が同じ時はスコア昇順で並
 	assert.Equal(t, []int{2, 1}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
 }
 
+func TestBuildRatingSlots_レートとスコアが同じ時は定数降順で並ぶ(t *testing.T) {
+	// Given: 500,000点はどの定数でも単曲レートが0になるため、レートとスコアが同じで定数だけが違う
+	records := []RatingSlotRecord{
+		{ChartID: 1, Score: 500_000, ChartConst: 13, OfficialIndex: 1},
+		{ChartID: 2, Score: 500_000, ChartConst: 14, OfficialIndex: 2},
+	}
+
+	// When
+	result := BuildRatingSlots(records, 2, 10)
+
+	// Then: 公式ID順より定数の高さが優先される
+	assert.Equal(t, []int{2, 1}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
+}
+
 func TestAggregateOfficialRating_両枠とも空のときはゼロを返す(t *testing.T) {
 	// Given: ベスト枠も新曲枠も空（データ連携直後の状態）
 	// When: 公式レーティングを集計する
