@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -312,4 +314,152 @@ func TestEnsurePlayer_登録時は再計算済みの記録を無効にする(t *
 	// Then
 	require.NoError(t, err)
 	assert.Nil(t, playerRepo.savedPlayer.RecalculatedMasterFingerprint)
+}
+
+// hookHonorRepositoryForRegisterTest は Register 経由で称号適用の成否を差し替えるための最小スタブです。
+// 称号の削除呼び出しだけを差し替え、それ以外の HonorRepository の振る舞いには依存しません。
+type hookHonorRepositoryForRegisterTest struct {
+	repository.HonorRepository
+	hookErr error
+}
+
+func (r *hookHonorRepositoryForRegisterTest) DeletePlayerHonorsExceptSlots(context.Context, repository.Executor, int, []int) error {
+	return r.hookErr
+}
+
+// saveHookPlayerDataRepositoryForRegisterTest は Register 経由で最新更新日時保存の結果を差し替えるための最小スタブです。
+type saveHookPlayerDataRepositoryForRegisterTest struct {
+	*registrationDataRepository
+	saveErr error
+}
+
+func (r *saveHookPlayerDataRepositoryForRegisterTest) SaveLatestUpdate(context.Context, repository.Executor, *entity.PlayerLatestUpdate) error {
+	return r.saveErr
+}
+
+func TestRegister_成功時は指標の前後値と読み飛ばし件数を固定値で返す(t *testing.T) {
+	// Given: 登録前の計算レート15.0とOVER POWER値100.0を持つ既存プレイヤーで、スコアも称号も有効なものがない登録を受け付ける。
+	// 登録後は集計対象が無いため計算レート0.0・OVER POWER値0.0・OP%0.0になり、最大OP合計200.0に対する登録前OP%は50.0になる。
+	fixture := newRegistrationFixture(t)
+	beforeRating := 15.0
+	beforeOverpower := 100.0
+	fixture.player.player.CalculatedRating = &beforeRating
+	fixture.player.player.OverpowerValue = &beforeOverpower
+	fixture.data.overpowerStats = &repository.OverpowerTargetStats{MaxOverpowerTotal: 200.0}
+	fixture.uc.honorRepo = &hookHonorRepositoryForRegisterTest{}
+	fixture.payload.Honors = map[string]PlayerDataHonorPayload{
+		"0": {Title: "範囲外", Class: "normal"},
+	}
+
+	// When
+	result, err := fixture.uc.Register(context.Background(), fixture.user, fixture.payload, "result-contents-hash")
+
+	// Then: 指標の登録前と登録後は互いに異なる固定値で返り、取り違えるとこのテストが落ちる。
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 77, result.PlayerID)
+	require.NotNil(t, result.MetricDiffs.Rating.Before)
+	assert.Equal(t, 15.0, *result.MetricDiffs.Rating.Before)
+	require.NotNil(t, result.MetricDiffs.Rating.After)
+	assert.Equal(t, 0.0, *result.MetricDiffs.Rating.After)
+	require.NotNil(t, result.MetricDiffs.Rating.Delta)
+	assert.Equal(t, -15.0, *result.MetricDiffs.Rating.Delta)
+	require.NotNil(t, result.MetricDiffs.OverpowerValue.Before)
+	assert.Equal(t, 100.0, *result.MetricDiffs.OverpowerValue.Before)
+	require.NotNil(t, result.MetricDiffs.OverpowerValue.After)
+	assert.Equal(t, 0.0, *result.MetricDiffs.OverpowerValue.After)
+	require.NotNil(t, result.MetricDiffs.OverpowerValue.Delta)
+	assert.Equal(t, -100.0, *result.MetricDiffs.OverpowerValue.Delta)
+	require.NotNil(t, result.MetricDiffs.OverpowerPercent)
+	require.NotNil(t, result.MetricDiffs.OverpowerPercent.Before)
+	assert.Equal(t, 50.0, *result.MetricDiffs.OverpowerPercent.Before)
+	require.NotNil(t, result.MetricDiffs.OverpowerPercent.After)
+	assert.Equal(t, 0.0, *result.MetricDiffs.OverpowerPercent.After)
+	require.NotNil(t, result.MetricDiffs.OverpowerPercent.Delta)
+	assert.Equal(t, -50.0, *result.MetricDiffs.OverpowerPercent.Delta)
+	// Then: 登録結果の表示側にも登録後の値が入り、読み飛ばした称号1件が件数と詳細の両方へ転記される。
+	require.NotNil(t, result.Profile.Rating)
+	assert.Equal(t, 0.0, *result.Profile.Rating)
+	require.NotNil(t, result.Summary.Rating)
+	assert.Equal(t, 0.0, *result.Summary.Rating)
+	assert.Equal(t, 1, result.Counts.HonorsSkipped)
+	require.Len(t, result.SkippedRecords, 1)
+	assert.Equal(t, "honor", result.SkippedRecords[0].RecordType)
+	assert.Equal(t, "slot out of range: 0", result.SkippedRecords[0].Reason)
+}
+
+func TestRegister_下位エラーの扱いを種類ごとに守る(t *testing.T) {
+	// Given: 下位の処理が返すエラーと、Register が守るべき扱い。
+	validationSentinel := &PlayerDataValidationError{Field: "honor", Message: "hook validation"}
+	notFoundSentinel := &PlayerDataNotFoundError{Resource: "honor", Key: "hook"}
+	conflictSentinel := &PlayerDataConflictError{Reason: "hook conflict"}
+	genericCause := errors.New("hook failure")
+	saveConflictCause := fmt.Errorf("latest update save failed: %w", entity.ErrConflictingPlayerDataBody)
+	tests := []struct {
+		name string
+		// Given: 仕掛けるフック。称号適用と最新更新保存のどちらで失敗させるか。
+		honorHookErr error
+		saveHookErr  error
+		// Then: 期待する扱い。同一値で返す場合は wantSame、競合へ変換する場合は wantConflict を設定し、
+		// どちらでもなければ登録失敗として包まれることを確かめる。
+		wantSame     error
+		wantConflict bool
+	}{
+		{
+			name:         "検証エラーは包まずにそのまま返す",
+			honorHookErr: validationSentinel,
+			wantSame:     validationSentinel,
+		},
+		{
+			name:         "未発見エラーは包まずにそのまま返す",
+			honorHookErr: notFoundSentinel,
+			wantSame:     notFoundSentinel,
+		},
+		{
+			name:         "競合エラーは包まずにそのまま返す",
+			honorHookErr: conflictSentinel,
+			wantSame:     conflictSentinel,
+		},
+		{
+			name:         "想定外のエラーは登録失敗として包む",
+			honorHookErr: genericCause,
+		},
+		{
+			name:         "最新更新の保存競合は競合エラーへ変換する",
+			saveHookErr:  saveConflictCause,
+			wantConflict: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			fixture := newRegistrationFixture(t)
+			fixture.payload.Honors = map[string]PlayerDataHonorPayload{}
+			fixture.uc.honorRepo = &hookHonorRepositoryForRegisterTest{hookErr: tt.honorHookErr}
+			if tt.saveHookErr != nil {
+				fixture.uc.playerDataRepo = &saveHookPlayerDataRepositoryForRegisterTest{registrationDataRepository: fixture.data, saveErr: tt.saveHookErr}
+			}
+
+			// When
+			result, err := fixture.uc.Register(context.Background(), fixture.user, fixture.payload, "hook-hash")
+
+			// Then
+			require.Error(t, err)
+			assert.Nil(t, result)
+			if tt.wantSame != nil {
+				assert.Same(t, tt.wantSame, err)
+				return
+			}
+			if tt.wantConflict {
+				var conflictErr *PlayerDataConflictError
+				require.ErrorAs(t, err, &conflictErr)
+				assert.ErrorIs(t, err, entity.ErrConflictingPlayerDataBody)
+				assert.ErrorIs(t, err, tt.saveHookErr)
+				return
+			}
+			assert.ErrorIs(t, err, tt.honorHookErr)
+			assert.Equal(t, "player data registration failed (user_id=7, player_id=77): hook failure", err.Error())
+		})
+	}
 }
