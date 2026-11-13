@@ -337,16 +337,12 @@ func (s *stubWorldsendRecordRepository) FindByPlayerIDAndSongDisplayID(ctx conte
 }
 
 type stubSongRepository struct {
-	songs []*entity.Song
-	song  *entity.Song
-	err   error
+	song *entity.Song
+	err  error
 }
 
 func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.songs, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
@@ -412,16 +408,12 @@ func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
 }
 
 type stubWorldsendChartRepository struct {
-	records []*entity.WorldsendSongWithChart
-	record  *entity.WorldsendSongWithChart
-	err     error
+	record *entity.WorldsendSongWithChart
+	err    error
 }
 
 func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.records, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {

@@ -24,7 +24,7 @@ func New(revision uint64, songs []*entity.Song, worldsendSongs []*entity.Worldse
 		revision:       revision,
 		songs:          cloneSongs(songs, true),
 		worldsendSongs: cloneWorldsendSongs(worldsendSongs, true),
-		updatedAt:      clonePointer(updatedAt),
+		updatedAt:      cloneTime(updatedAt),
 	}
 }
 
@@ -35,7 +35,7 @@ func (c *Catalog) Revision() uint64 {
 
 // UpdatedAt はこの世代の楽曲・譜面の更新時刻の最大値を返します。対象データがない場合は nil です。
 func (c *Catalog) UpdatedAt() *time.Time {
-	return clonePointer(c.updatedAt)
+	return cloneTime(c.updatedAt)
 }
 
 // Songs は通常楽曲を譜面付きで複製して返します。並び順は楽曲IDの昇順です。
@@ -72,9 +72,9 @@ func cloneWorldsendSongs(songs []*entity.WorldsendSongWithChart, includeDeleted 
 	return result
 }
 
-func clonePointer[T any](p *T) *T {
-	if p == nil {
+func cloneTime(t *time.Time) *time.Time {
+	if t == nil {
 		return nil
 	}
-	return new(*p)
+	return new(*t)
 }

@@ -12,7 +12,9 @@ import (
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songcatalog"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/sync/singleflight"
 )
 
 var _ domainrepo.SongCatalogProvider = (*SongCatalogProvider)(nil)
@@ -29,6 +31,9 @@ type SongCatalogProvider struct {
 
 	current   atomic.Pointer[songcatalog.Catalog]
 	refreshMu sync.Mutex
+	// initGroup は未構築時に同時に届いた参照の構築を1回にまとめます。
+	// 初回構築の失敗が続く間に、リクエストごとの全件構築が直列に積み上がるのを防ぐためです。
+	initGroup singleflight.Group
 }
 
 // NewSongCatalogProvider は楽曲カタログProviderを生成します。生成時にはDBへアクセスしません。
@@ -41,12 +46,24 @@ func NewSongCatalogProvider(db *sqlx.DB) *SongCatalogProvider {
 }
 
 // Snapshot は公開中のスナップショットを返します。未構築の場合だけ構築を試みます。
+// 同時に届いた未構築時の参照は1回の構築を共有し、各呼び出し元は自身の ctx が終わればその時点で戻ります。
 func (p *SongCatalogProvider) Snapshot(ctx context.Context) (*songcatalog.Catalog, error) {
 	if catalog := p.current.Load(); catalog != nil {
 		return catalog, nil
 	}
-	if err := p.Refresh(ctx); err != nil {
-		return nil, err
+	result := p.initGroup.DoChan("initial", func() (any, error) {
+		// 共有する構築は先頭の呼び出し元の切断で中断させず、上限時間だけを設けます。
+		buildCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongCatalogRefreshTimeout)
+		defer cancel()
+		return nil, p.Refresh(buildCtx)
+	})
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("%w: wait for song catalog: %w", domainrepo.ErrRepositoryOperationFailed, ctx.Err())
+	case r := <-result:
+		if r.Err != nil {
+			return nil, r.Err
+		}
 	}
 	return p.current.Load(), nil
 }

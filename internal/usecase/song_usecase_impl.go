@@ -119,6 +119,10 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 // 通常はメモリ上の値を返し、DBへ問い合わせません。
 // 楽曲データと同じ世代の値を返すため、DB上の最新値より古い場合がありますが、データより先に進むことはありません。
 func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, error) {
+	// 楽曲カタログを持たない構成（静的データ出力など）は updated-at を提供しないため、誤用を明示的なエラーにします。
+	if s.songCatalog == nil {
+		return nil, errors.Join(ErrInternalError, errors.New("song catalog is not configured"))
+	}
 	catalog, err := s.songCatalog.Snapshot(ctx)
 	if err != nil {
 		return nil, err

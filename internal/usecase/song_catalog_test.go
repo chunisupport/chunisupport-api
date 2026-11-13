@@ -227,3 +227,15 @@ func TestSongBatchJobUsecase_同期に成功した場合だけ楽曲カタログ
 		})
 	}
 }
+
+func TestSongUsecase_GetSongsUpdatedAt_カタログを持たない構成では内部エラーを返す(t *testing.T) {
+	// Given
+	uc := NewSongUsecase(new(MockSongRepository), nil, nil, nil)
+
+	// When
+	result, err := uc.GetSongsUpdatedAt(context.Background())
+
+	// Then
+	assert.ErrorIs(t, err, ErrInternalError)
+	assert.Nil(t, result)
+}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,13 +19,18 @@ import (
 )
 
 // countingSongRepository は全件取得の回数を数え、再構築の回数を観測します。
+// failNext が true の間は、DB障害を再現するため全件取得を失敗させます。
 type countingSongRepository struct {
 	domainrepo.SongRepository
 	findAllCount atomic.Int32
+	failNext     atomic.Bool
 }
 
 func (r *countingSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec domainrepo.Executor, includeDeleted bool) ([]*entity.Song, error) {
 	r.findAllCount.Add(1)
+	if r.failNext.Load() {
+		return nil, errors.New("db unavailable")
+	}
 	return r.SongRepository.FindAllExcludingWorldsend(ctx, exec, includeDeleted)
 }
 
@@ -296,11 +302,11 @@ func TestSongCatalogProviderMySQL_初回構築に失敗した場合はエラー�
 	// Given
 	ctx := context.Background()
 	_, provider, songRepo := setupSongCatalogMySQL(t)
-	canceledCtx, cancel := context.WithCancel(ctx)
-	cancel()
+	songRepo.failNext.Store(true)
 
 	// When
-	_, firstErr := provider.Snapshot(canceledCtx)
+	_, firstErr := provider.Snapshot(ctx)
+	songRepo.failNext.Store(false)
 	catalog, secondErr := provider.Snapshot(ctx)
 
 	// Then
@@ -308,5 +314,43 @@ func TestSongCatalogProviderMySQL_初回構築に失敗した場合はエラー�
 	assert.ErrorIs(t, firstErr, domainrepo.ErrRepositoryOperationFailed)
 	require.NoError(t, secondErr)
 	assert.NotEmpty(t, catalog.Songs(true))
-	assert.Equal(t, int32(1), songRepo.findAllCount.Load(), "失敗した初回はトランザクション開始で止まる")
+	assert.Equal(t, int32(2), songRepo.findAllCount.Load())
+}
+
+func TestSongCatalogProviderMySQL_未構築時の同時参照は1回の構築を共有する(t *testing.T) {
+	// Given
+	ctx := context.Background()
+	_, provider, songRepo := setupSongCatalogMySQL(t)
+
+	// When
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Go(func() {
+			catalog, err := provider.Snapshot(ctx)
+			assert.NoError(t, err)
+			assert.NotNil(t, catalog)
+		})
+	}
+	wg.Wait()
+
+	// Then
+	assert.Equal(t, int32(1), songRepo.findAllCount.Load())
+}
+
+func TestSongCatalogProviderMySQL_未構築時の待機は呼び出し元の切断で戻る(t *testing.T) {
+	// Given
+	_, provider, _ := setupSongCatalogMySQL(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// When
+	catalog, err := provider.Snapshot(ctx)
+
+	// Then
+	// 共有の構築とどちらが先に終わるかは実行順に依存するため、エラーの場合だけ原因を確認します。
+	if err != nil {
+		assert.ErrorIs(t, err, context.Canceled)
+		return
+	}
+	assert.NotNil(t, catalog)
 }

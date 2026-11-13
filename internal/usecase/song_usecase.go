@@ -77,7 +77,8 @@ type SongUsecase interface {
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 
-	// GetSongsUpdatedAt は楽曲関連データの updated_at の最大値を取得します。
+	// GetSongsUpdatedAt は公開中の楽曲カタログ（楽曲データと同じ世代）に対応する updated_at の最大値を取得します。
+	// 通常はDBへ問い合わせません。
 	GetSongsUpdatedAt(ctx context.Context) (*time.Time, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
