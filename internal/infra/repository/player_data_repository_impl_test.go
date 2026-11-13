@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -297,7 +296,7 @@ func TestSavePlayerData_execがnilならエラーを返す(t *testing.T) {
 	assert.ErrorContains(t, err, "executor")
 }
 
-func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する(t *testing.T) {
+func TestSavePlayerData_対象プレイヤーの指定枠だけを解除する(t *testing.T) {
 	// Given
 	db := setupTestDB(t)
 	defer db.Close()
@@ -337,7 +336,16 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	err = repo.ClearRankedSlots(context.Background(), tx, 10)
+	ids, err := repo.FindRankedPlayerRecordChartIDs(context.Background(), tx, 10)
+	require.NoError(t, err)
+	assert.Equal(t, []int{101, 102, 104}, ids)
+	err = repo.SavePlayerData(context.Background(), tx, domainrepo.PlayerDataSaveInput{
+		FullRecordSlotsToUpdate: []domainrepo.PlayerRecordSlotUpdate{
+			{PlayerID: 10, ChartID: 101, SlotID: 1},
+			{PlayerID: 10, ChartID: 102, SlotID: 1},
+			{PlayerID: 10, ChartID: 104, SlotID: 1},
+		},
+	})
 
 	// Then
 	require.NoError(t, err)
@@ -371,106 +379,22 @@ func TestClearRankedSlots_対象プレイヤーのranked枠だけを解除する
 	assert.Equal(t, 1000000, worldsendScore)
 }
 
-func TestClearRankedSlots_execがnilならエラーを返す(t *testing.T) {
+func TestFindRankedPlayerRecordChartIDs_execがnilならエラーを返す(t *testing.T) {
 	// Given
 	db := setupTestDB(t)
 	defer db.Close()
 	repo := NewPlayerDataRepository(db)
 
 	// When
-	err := repo.ClearRankedSlots(context.Background(), nil, 10)
+	_, err := repo.FindRankedPlayerRecordChartIDs(context.Background(), nil, 10)
 
 	// Then
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "executor")
 }
 
-func TestFullRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
-	// Given
-	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
-
-	// When
-	got := fullRecordChangedCondition
-
-	// Then
-	assert.Equal(t, expected, got)
-}
-
-func TestWorldsendRecordChangedCondition_比較対象カラムを過不足なく含む(t *testing.T) {
-	// Given
-	expected := "score <> VALUES(score) OR clear_lamp_id <> VALUES(clear_lamp_id) OR combo_lamp_id <> VALUES(combo_lamp_id) OR full_chain_id <> VALUES(full_chain_id)"
-
-	// When
-	got := worldsendRecordChangedCondition
-
-	// Then
-	assert.Equal(t, expected, got)
-}
-
-func TestFullRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
-	// Given
-	query := fullRecordUpsertQuery
-
-	// When
-	updatedAtIndex := strings.Index(query, "updated_at = IF(")
-	scoreIndex := strings.Index(query, "score = VALUES(score)")
-
-	// Then
-	require.NotEqual(t, -1, updatedAtIndex)
-	require.NotEqual(t, -1, scoreIndex)
-	assert.Less(t, updatedAtIndex, scoreIndex)
-}
-
-func TestWorldsendRecordUpsertQuery_updatedAtの評価が比較対象更新より先に行われる(t *testing.T) {
-	// Given
-	query := worldsendRecordUpsertQuery
-
-	// When
-	updatedAtIndex := strings.Index(query, "updated_at = IF(")
-	scoreIndex := strings.Index(query, "score = VALUES(score)")
-
-	// Then
-	require.NotEqual(t, -1, updatedAtIndex)
-	require.NotEqual(t, -1, scoreIndex)
-	assert.Less(t, updatedAtIndex, scoreIndex)
-}
-
-func TestReplaceQueryPlaceholder_パーセント記号を含む置換文字列もそのまま埋め込める(t *testing.T) {
-	tests := []struct {
-		name          string
-		query         string
-		placeholder   string
-		replacement   string
-		expectedQuery string
-	}{
-		{
-			name:          "LIKE句のパーセント記号を保持する",
-			query:         "SELECT * FROM users WHERE {{CONDITION}}",
-			placeholder:   "{{CONDITION}}",
-			replacement:   "name LIKE 'abc%'",
-			expectedQuery: "SELECT * FROM users WHERE name LIKE 'abc%'",
-		},
-		{
-			name:          "同じプレースホルダをすべて置換する",
-			query:         "{{CONDITION}} OR {{CONDITION}}",
-			placeholder:   "{{CONDITION}}",
-			replacement:   "score >= 1000000",
-			expectedQuery: "score >= 1000000 OR score >= 1000000",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Given
-
-			// When
-			got := replaceQueryPlaceholder(tt.query, tt.placeholder, tt.replacement)
-
-			// Then
-			assert.Equal(t, tt.expectedQuery, got)
-		})
-	}
-}
+// UPSERTの比較条件・評価順とプレースホルダー置換のテストは、
+// 差分計画とINSERT/UPDATEの実動作を検証するテストに置き換えています。
 
 func TestFindPlayerRecordStatesByChartIDs_保存前状態を譜面IDキーで返す(t *testing.T) {
 	// Given

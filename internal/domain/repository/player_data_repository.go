@@ -16,8 +16,19 @@ type PlayerDataMaster struct {
 
 // PlayerDataSaveInput はプレイヤーデータの永続化に必要な入力データです。
 type PlayerDataSaveInput struct {
-	FullRecords      []PlayerRecordForUpsert
-	WorldsendRecords []WorldsendRecordForUpsert
+	FullRecordsToInsert      []PlayerRecordForUpsert
+	FullRecordsToUpdate      []PlayerRecordForUpsert
+	FullRecordSlotsToUpdate  []PlayerRecordSlotUpdate
+	WorldsendRecordsToInsert []WorldsendRecordForUpsert
+	WorldsendRecordsToUpdate []WorldsendRecordForUpsert
+}
+
+// PlayerRecordSlotUpdate は成績と更新日時を維持したまま変更する枠情報です。
+type PlayerRecordSlotUpdate struct {
+	PlayerID  int
+	ChartID   int
+	SlotID    int
+	SlotOrder *int
 }
 
 // OverpowerTargetFilter はOVER POWER集計対象楽曲の絞り込み条件です。
@@ -43,9 +54,8 @@ type PlayerDataRepository interface {
 	// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。
 	SavePlayerData(ctx context.Context, exec Executor, input PlayerDataSaveInput) error
 
-	// ClearRankedSlots は指定プレイヤーの通常譜面からレーティング枠をすべて解除します。
-	// SavePlayerData と同じトランザクション内で公式枠を全置換するため、exec が nil の場合はエラーを返します。
-	ClearRankedSlots(ctx context.Context, exec Executor, playerID int) error
+	// FindRankedPlayerRecordChartIDs は枠付きの通常譜面を同じトランザクション内でロックして取得します。
+	FindRankedPlayerRecordChartIDs(ctx context.Context, exec Executor, playerID int) ([]int, error)
 
 	// FindPlayerRecordStatesByChartIDs は保存前の通常譜面レコード状態を譜面IDキーで取得します。
 	FindPlayerRecordStatesByChartIDs(ctx context.Context, exec Executor, playerID int, chartIDs []int) (map[int]PlayerRecordState, error)

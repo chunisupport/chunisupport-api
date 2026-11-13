@@ -48,7 +48,7 @@ func TestApplyScores_本枠を保存できなければ枠解除前に拒否す�
 				var validationErr *PlayerDataValidationError
 				require.ErrorAs(t, err, &validationErr)
 				assert.Equal(t, "scores.standard", validationErr.Field)
-				assert.Zero(t, repo.clearRankedSlotsCalls)
+				assert.Zero(t, repo.findRankedRecordsCalls)
 				assert.Zero(t, repo.saveCalls)
 			})
 		}

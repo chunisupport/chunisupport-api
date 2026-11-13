@@ -892,7 +892,7 @@ func randomFavoriteHonorSlots(honors map[string]PlayerDataHonorPayload) []int {
 }
 
 // applyScores はプレイヤーのスコア情報を更新します。
-// 通常譜面とWORLD'S END譜面のスコアをUPSERTします。
+// 通常譜面とWORLD'S END譜面の新規・変更行のみを保存します。
 func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time, beforeStatistics service.PlayerRecordStatisticsSnapshot) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
 	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
 	if err := validateMainSlotRecordsResolved(scores.Standard, fullRecordsToUpsert, masters); err != nil {
@@ -919,6 +919,14 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 	worldsendBefore, err := us.playerDataRepo.FindWorldsendRecordStatesByChartIDs(ctx, tx, playerID, collectWorldsendChartIDs(worldsendRecordsToUpsert))
+	if err != nil {
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
+	rankedChartIDs, err := us.playerDataRepo.FindRankedPlayerRecordChartIDs(ctx, tx, playerID)
+	if err != nil {
+		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
+	noneSlotID, err := resolveSlotID(nil, masters)
 	if err != nil {
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
@@ -958,13 +966,8 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 		}
 	}
 
-	if err := us.playerDataRepo.ClearRankedSlots(ctx, tx, playerID); err != nil {
-		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
-	}
-	if err := us.playerDataRepo.SavePlayerData(ctx, tx, repository.PlayerDataSaveInput{
-		FullRecords:      fullRecordsToUpsert,
-		WorldsendRecords: worldsendRecordsToUpsert,
-	}); err != nil {
+	writePlan := planPlayerDataWrites(playerID, noneSlotID, fullRecordsToUpsert, fullBefore, rankedChartIDs, worldsendRecordsToUpsert, worldsendBefore)
+	if err := us.playerDataRepo.SavePlayerData(ctx, tx, writePlan); err != nil {
 		return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
 	if len(courseRecordsToUpsert) > 0 {
@@ -1728,7 +1731,7 @@ func worldsendRecordStateDTO(ctx context.Context, state repository.WorldsendReco
 	}
 }
 
-// playerRecordMeaningfullyChanged はDB側の fullRecordChangedCondition と同じ比較対象だけを差分として扱います。
+// playerRecordMeaningfullyChanged は履歴と更新日時の対象になる成績4項目だけを比較します。
 func playerRecordMeaningfullyChanged(before, after repository.PlayerRecordState) bool {
 	return before.Score != after.Score ||
 		before.ClearLampID != after.ClearLampID ||
@@ -1736,7 +1739,7 @@ func playerRecordMeaningfullyChanged(before, after repository.PlayerRecordState)
 		before.FullChainID != after.FullChainID
 }
 
-// worldsendRecordMeaningfullyChanged はDB側の worldsendRecordChangedCondition と同じ比較対象だけを差分として扱います。
+// worldsendRecordMeaningfullyChanged は履歴と更新日時の対象になる成績4項目だけを比較します。
 func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecordState) bool {
 	return before.Score != after.Score ||
 		before.ClearLampID != after.ClearLampID ||
