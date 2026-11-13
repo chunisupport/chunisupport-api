@@ -97,6 +97,133 @@ func TestTemporaryPlayerDataRepository_総量上限(t *testing.T) {
 	assert.ErrorIs(t, err, domainrepo.ErrTemporaryPlayerDataTotalSizeLimitExceeded)
 }
 
+func TestTemporaryPlayerDataRepository_削除や期限切れで枠が戻る(t *testing.T) {
+	// 期限切れ経路には時計の差し替え手段がないため、既存テストと同様に短いTTLと待ち時間で表す。
+	// 満杯の確認が期限前に終わるよう、TTLには負荷時の遅延を見込んだ余裕を持たせる。
+	const expiryTTL = 200 * time.Millisecond
+	const expiryWait = 300 * time.Millisecond
+
+	tests := []struct {
+		name string
+		// Given: 上限値と上限いっぱいまで預ける内容
+		maxEntriesPerIP int
+		maxTotalBytes   int
+		fillToken       string
+		fillIP          string
+		fillPayload     string
+		fillTTL         time.Duration
+		// When: trueの場合は明示的な削除で枠を空け、falseの場合は期限切れの掃除に任せる
+		freeByDelete bool
+		// Then: 上限超過で拒否される追加分と、枠が戻った後に預け直す内容
+		extraToken   string
+		extraIP      string
+		extraPayload string
+		wantLimitErr error
+	}{
+		{
+			name:            "IPごとの件数上限は削除で枠が戻る",
+			maxEntriesPerIP: 1,
+			maxTotalBytes:   1024,
+			fillToken:       "t1",
+			fillIP:          "127.0.0.1",
+			fillPayload:     "{}",
+			fillTTL:         time.Minute,
+			freeByDelete:    true,
+			extraToken:      "t2",
+			extraIP:         "127.0.0.1",
+			extraPayload:    "{}",
+			wantLimitErr:    domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded,
+		},
+		{
+			name:            "合計サイズ上限は削除で枠が戻る",
+			maxEntriesPerIP: 3,
+			maxTotalBytes:   4,
+			fillToken:       "t1",
+			fillIP:          "127.0.0.1",
+			fillPayload:     "1234",
+			fillTTL:         time.Minute,
+			freeByDelete:    true,
+			extraToken:      "t2",
+			extraIP:         "127.0.0.2",
+			extraPayload:    "1",
+			wantLimitErr:    domainrepo.ErrTemporaryPlayerDataTotalSizeLimitExceeded,
+		},
+		{
+			name:            "IPごとの件数上限は期限切れの掃除で枠が戻る",
+			maxEntriesPerIP: 1,
+			maxTotalBytes:   1024,
+			fillToken:       "t1",
+			fillIP:          "127.0.0.1",
+			fillPayload:     "{}",
+			fillTTL:         expiryTTL,
+			freeByDelete:    false,
+			extraToken:      "t2",
+			extraIP:         "127.0.0.1",
+			extraPayload:    "{}",
+			wantLimitErr:    domainrepo.ErrTemporaryPlayerDataPerIPLimitExceeded,
+		},
+		{
+			name:            "合計サイズ上限は期限切れの掃除で枠が戻る",
+			maxEntriesPerIP: 3,
+			maxTotalBytes:   4,
+			fillToken:       "t1",
+			fillIP:          "127.0.0.1",
+			fillPayload:     "1234",
+			fillTTL:         expiryTTL,
+			freeByDelete:    false,
+			extraToken:      "t2",
+			extraIP:         "127.0.0.2",
+			extraPayload:    "1",
+			wantLimitErr:    domainrepo.ErrTemporaryPlayerDataTotalSizeLimitExceeded,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 上限いっぱいまで預ける
+			repo := NewTemporaryPlayerDataRepository(tt.maxEntriesPerIP, tt.maxTotalBytes)
+			err := repo.Create(context.Background(), nil, &entity.TemporaryPlayerData{
+				Token:     tt.fillToken,
+				IPAddress: tt.fillIP,
+				Payload:   []byte(tt.fillPayload),
+				ExpiresAt: time.Now().UTC().Add(tt.fillTTL),
+			})
+			require.NoError(t, err)
+
+			// 上限が効いていることを示すため、追加が拒否されることを確かめる
+			err = repo.Create(context.Background(), nil, &entity.TemporaryPlayerData{
+				Token:     tt.extraToken,
+				IPAddress: tt.extraIP,
+				Payload:   []byte(tt.extraPayload),
+				ExpiresAt: time.Now().UTC().Add(time.Minute),
+			})
+			require.Error(t, err)
+			assert.ErrorIs(t, err, tt.wantLimitErr)
+
+			// When: 1件分を消す
+			if tt.freeByDelete {
+				require.NoError(t, repo.Delete(context.Background(), nil, tt.fillToken))
+			} else {
+				time.Sleep(expiryWait)
+			}
+
+			// Then: もう1件預けられる
+			err = repo.Create(context.Background(), nil, &entity.TemporaryPlayerData{
+				Token:     tt.extraToken,
+				IPAddress: tt.extraIP,
+				Payload:   []byte(tt.extraPayload),
+				ExpiresAt: time.Now().UTC().Add(time.Minute),
+			})
+			require.NoError(t, err)
+
+			got, err := repo.Claim(context.Background(), nil, tt.extraToken)
+			require.NoError(t, err)
+			assert.Equal(t, tt.extraToken, got.Token)
+			assert.Equal(t, []byte(tt.extraPayload), got.Payload)
+		})
+	}
+}
+
 func TestTemporaryPlayerDataRepository_期限切れは参照不可(t *testing.T) {
 	repo := NewTemporaryPlayerDataRepository(3, 1024)
 	err := repo.Create(context.Background(), nil, &entity.TemporaryPlayerData{Token: "t1", IPAddress: "127.0.0.1", Payload: []byte("{}"), ExpiresAt: time.Now().UTC().Add(-time.Second)})
