@@ -266,43 +266,42 @@ func TestLoadWorkspaceSongs(t *testing.T) {
 func TestLoadWorkspaceCharts(t *testing.T) {
 	t.Parallel()
 
+	// Given: NULL・0・実際の値が区別できる3件の譜面を用意する
 	ctx := context.Background()
 	ws, err := NewSongChartWorkspace(ctx, Config{
 		DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)",
 	})
-	if err != nil {
-		t.Fatalf("failed to create workspace: %v", err)
-	}
+	require.NoError(t, err)
 	defer ws.Close()
 
-	// テストデータ挿入
 	_, err = ws.DB().ExecContext(ctx, `
 		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
-		VALUES (1, 'disp-001', 'Song 1', 'Artist 1', 1, 'OFF001', 0, 0)
+		VALUES
+			(1, 'disp-001', 'Song 1', 'Artist 1', 1, 'OFF001', 0, 0),
+			(2, 'disp-002', 'Song 2', 'Artist 2', 1, 'OFF002', 0, 0)
 	`)
-	if err != nil {
-		t.Fatalf("failed to insert test song: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = ws.DB().ExecContext(ctx, `
-		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes)
-		VALUES 
-			(1, 1, 5.0, 0, 300),
-			(1, 2, 8.0, 0, 500),
-			(1, 3, 10.5, 1, NULL)
+		INSERT INTO charts (song_id, difficulty_id, const, is_const_unknown, notes, notes_designer)
+		VALUES
+			(1, 1, 5.0, 0, 0, 'Designer A'),
+			(1, 2, 8.5, 1, 750, NULL),
+			(2, 3, 12.5, 0, NULL, 'Designer C')
 	`)
-	if err != nil {
-		t.Fatalf("failed to insert test charts: %v", err)
-	}
+	require.NoError(t, err)
 
+	// When: ワークスペースから譜面を読み込む
 	charts, err := ws.loadWorkspaceCharts(ctx)
-	if err != nil {
-		t.Fatalf("loadWorkspaceCharts returned error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(charts) != 3 {
-		t.Errorf("expected 3 charts, got %d", len(charts))
+	// Then: 3件すべての列が固定の期待値と一致する
+	expected := []workspaceChart{
+		{ID: 1, SongID: 1, DifficultyID: 1, Const: 5.0, IsConstUnknown: false, Notes: sql.NullInt64{Int64: 0, Valid: true}, NotesDesigner: sql.NullString{String: "Designer A", Valid: true}},
+		{ID: 2, SongID: 1, DifficultyID: 2, Const: 8.5, IsConstUnknown: true, Notes: sql.NullInt64{Int64: 750, Valid: true}, NotesDesigner: sql.NullString{}},
+		{ID: 3, SongID: 2, DifficultyID: 3, Const: 12.5, IsConstUnknown: false, Notes: sql.NullInt64{}, NotesDesigner: sql.NullString{String: "Designer C", Valid: true}},
 	}
+	assert.Equal(t, expected, charts)
 }
 
 // TestResolveChartUpdate はSQLのnullable値を介しても、通常・大型更新の保存方針と定数・ノーツ数が維持されることを検証します。
