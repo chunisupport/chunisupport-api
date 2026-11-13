@@ -872,3 +872,152 @@ func TestOfficialConsolidator_Consolidate_SavesChartsAndWorldsendCharts(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, 0, normalWECount)
 }
+
+// TestDetectMassiveIdxChange_Boundaries は大量変更検知の3つの境界を表形式で確認する。
+//
+// 検知条件（official_consolidator.go の detectMassiveIdxChange より）は次のとおり。
+//  1. 既存楽曲数が10件未満なら判定せず検知しない。
+//  2. ID が変わった楽曲数が10件以上なら検知する。
+//  3. ID が変わった楽曲の割合（変わった件数/既存楽曲数）が20%以上なら検知する。
+//
+// WORLD'S END 曲は通常曲と区別される（タイトルとアーティストに加えて
+// is_worldsend も突き合わせのキーに含まれる）ため、ここでは通常曲だけを使う。
+func TestDetectMassiveIdxChange_Boundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		existingCount int
+		changedCount  int
+		// Then: 期待する結果
+		wantDetected bool
+	}{
+		// 境界1: 既存楽曲数の下限（10件未満は判定しない）。
+		{
+			name:          "既存9曲がすべて変わっても検知しない",
+			existingCount: 9,
+			changedCount:  9,
+			wantDetected:  false,
+		},
+		{
+			name:          "既存10曲がすべて変われば検知する",
+			existingCount: 10,
+			changedCount:  10,
+			wantDetected:  true,
+		},
+		// 境界2: 件数の閾値（10件以上で検知）。割合は20%未満に抑え、件数だけが結果を決める。
+		{
+			name:          "既存60曲中9曲の変更は検知しない",
+			existingCount: 60,
+			changedCount:  9,
+			wantDetected:  false,
+		},
+		{
+			name:          "既存60曲中10曲の変更は割合16.7%でも件数で検知する",
+			existingCount: 60,
+			changedCount:  10,
+			wantDetected:  true,
+		},
+		// 境界3: 割合の閾値（20%以上で検知）。件数は10件未満に抑え、割合だけが結果を決める。
+		{
+			name:          "既存10曲中1曲の変更は検知しない",
+			existingCount: 10,
+			changedCount:  1,
+			wantDetected:  false,
+		},
+		{
+			name:          "既存10曲中2曲の変更は割合20%ちょうどで検知する",
+			existingCount: 10,
+			changedCount:  2,
+			wantDetected:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 既存楽曲を DB に入れ、新しいデータを組み立てる
+			ctx := context.Background()
+			db := setupIdxChangeBoundaryDB(t, ctx, tt.existingCount)
+			newData := buildIdxChangeBoundaryData(tt.existingCount, tt.changedCount)
+
+			ws, err := songchart.NewSongChartWorkspace(ctx, songchart.Config{})
+			require.NoError(t, err)
+			defer ws.Close()
+
+			consolidator := &OfficialConsolidator{
+				db:        db,
+				workspace: ws,
+				data:      &newData,
+			}
+
+			existingActiveSongs, err := consolidator.loadActiveOfficialSongs(ctx)
+			require.NoError(t, err)
+			require.Len(t, existingActiveSongs, tt.existingCount)
+
+			// When: 大量変更検知を実行する
+			err = consolidator.detectMassiveIdxChange(ctx, existingActiveSongs)
+
+			// Then: 境界の内外で検知の有無が切り替わる
+			if tt.wantDetected {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "massive official_idx change detected")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// setupIdxChangeBoundaryDB は境界テスト用の既存楽曲を SQLite に用意する。
+// official_idx は OFF0001 の形で existingCount 件登録する。
+func setupIdxChangeBoundaryDB(t *testing.T, ctx context.Context, existingCount int) *sqlx.DB {
+	t.Helper()
+
+	db, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE songs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			display_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			artist TEXT NOT NULL,
+			genre_id INTEGER NOT NULL,
+			official_idx TEXT,
+			is_worldsend INTEGER NOT NULL DEFAULT 0,
+			is_deleted INTEGER NOT NULL DEFAULT 0
+		)
+	`)
+	require.NoError(t, err)
+
+	for i := 1; i <= existingCount; i++ {
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO songs (display_id, title, artist, genre_id, official_idx, is_worldsend, is_deleted)
+			VALUES (?, ?, ?, 1, ?, 0, 0)
+		`, fmt.Sprintf("disp-%04d", i), fmt.Sprintf("Boundary Title %d", i), fmt.Sprintf("Boundary Artist %d", i), fmt.Sprintf("OFF%04d", i))
+		require.NoError(t, err)
+	}
+
+	return db
+}
+
+// buildIdxChangeBoundaryData は境界テスト用の新しい公式データを組み立てる。
+// 先頭 changedCount 件はタイトルとアーティストを保ったまま official_idx を
+// 付け替えた変更分、残りは official_idx 不変の未変更分である。
+func buildIdxChangeBoundaryData(existingCount, changedCount int) importer.OfficialData {
+	newData := make(importer.OfficialData, existingCount)
+	for i := 1; i <= existingCount; i++ {
+		officialID := fmt.Sprintf("OFF%04d", i)
+		if i <= changedCount {
+			officialID = fmt.Sprintf("NEW%04d", i)
+		}
+		newData[i-1] = importer.OfficialSong{
+			ID:     officialID,
+			Title:  fmt.Sprintf("Boundary Title %d", i),
+			Artist: fmt.Sprintf("Boundary Artist %d", i),
+		}
+	}
+	return newData
+}
