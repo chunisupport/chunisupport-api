@@ -60,11 +60,7 @@ func setupSongCatalogMySQL(t *testing.T) (*sqlx.DB, *SongCatalogProvider, *count
 	require.NoError(t, err)
 
 	songRepo := &countingSongRepository{SongRepository: NewSongRepository(db)}
-	provider := &SongCatalogProvider{
-		db:            db,
-		songRepo:      songRepo,
-		worldsendRepo: NewWorldsendChartRepository(db),
-	}
+	provider := newSongCatalogProvider(db, songRepo, NewWorldsendChartRepository(db))
 	return db, provider, songRepo
 }
 
@@ -87,7 +83,7 @@ func TestSongCatalogProviderMySQL_初回参照で通常楽曲とWORLDSENDを同�
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, []string{"song000000000001", "song000000000002"}, songDisplayIDs(catalog.Songs(true)))
-	assert.Equal(t, []string{"song000000000001"}, songDisplayIDs(catalog.Songs(false)))
+	require.Equal(t, []string{"song000000000001"}, songDisplayIDs(catalog.Songs(false)))
 	activeSongs := catalog.Songs(false)
 	require.Len(t, activeSongs[0].Charts, 2)
 	assert.InDelta(t, 13.5, activeSongs[0].MaxChartConst, 0.001)
@@ -220,8 +216,9 @@ func TestSongCatalogProviderMySQL_同時に再構築を要求しても1回だけ
 		wg.Go(func() {
 			assert.NoError(t, provider.Refresh(ctx))
 			catalog, err := provider.Snapshot(ctx)
-			assert.NoError(t, err)
-			assert.NotEmpty(t, catalog.Songs(true))
+			if assert.NoError(t, err) {
+				assert.NotEmpty(t, catalog.Songs(true))
+			}
 		})
 	}
 	wg.Wait()

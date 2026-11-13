@@ -143,12 +143,12 @@ func (u *SongBatchJobUsecase) begin(
 	}
 
 	if err := u.interruptOrphanedJobs(ctx); err != nil {
-		u.releaseLockAfterFailure(ctx, lock)
+		u.releaseLockWithTimeout(ctx, lock)
 		return nil, nil, false, err
 	}
 	job := newJob(uuid.NewV4(), u.now())
 	if err := u.jobRepo.Save(ctx, job); err != nil {
-		u.releaseLockAfterFailure(ctx, lock)
+		u.releaseLockWithTimeout(ctx, lock)
 		return nil, nil, false, err
 	}
 	return lock, job, true, nil
@@ -185,7 +185,8 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	// 停止シグナルでキャンセルされた後も結果を記録できるよう、実行とは独立した期限を使う
 	finalizeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
 	defer cancel()
-	defer u.releaseLock(finalizeCtx, lock)
+	// 結果の記録や楽曲カタログの再構築で finalizeCtx の期限を使い切っても解放できるよう、解放専用の期限を使う
+	defer u.releaseLockWithTimeout(ctx, lock)
 
 	finishedAt := u.now()
 	var finishErr error
@@ -215,9 +216,9 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	return execErr
 }
 
-// releaseLockAfterFailure はジョブ開始前の失敗時にロックを解放します。
-// リクエストのキャンセルに関係なく解放できるよう、期限だけを持つ context を使います。
-func (u *SongBatchJobUsecase) releaseLockAfterFailure(ctx context.Context, lock repository.BatchLock) {
+// releaseLockWithTimeout はロックを解放します。
+// リクエストのキャンセルや他の処理の期限に関係なく解放できるよう、解放専用の期限だけを持つ context を使います。
+func (u *SongBatchJobUsecase) releaseLockWithTimeout(ctx context.Context, lock repository.BatchLock) {
 	releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
 	defer cancel()
 	u.releaseLock(releaseCtx, lock)

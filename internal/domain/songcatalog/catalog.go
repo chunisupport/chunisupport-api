@@ -2,6 +2,8 @@
 package songcatalog
 
 import (
+	"cmp"
+	"slices"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -19,11 +21,20 @@ type Catalog struct {
 
 // New は世代番号・通常楽曲・WORLD'S END楽曲・更新時刻からスナップショットを生成します。
 // 引数は複製して保持するため、呼び出し側が後から変更しても公開データは変わりません。
+// 取得時の並び順を保証するため、構築時に楽曲IDの昇順へ並べ替えます。
 func New(revision uint64, songs []*entity.Song, worldsendSongs []*entity.WorldsendSongWithChart, updatedAt *time.Time) *Catalog {
+	clonedSongs := cloneSongs(songs, true)
+	slices.SortStableFunc(clonedSongs, func(a, b *entity.Song) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+	clonedWorldsendSongs := cloneWorldsendSongs(worldsendSongs, true)
+	slices.SortStableFunc(clonedWorldsendSongs, func(a, b *entity.WorldsendSongWithChart) int {
+		return cmp.Compare(a.Song.ID, b.Song.ID)
+	})
 	return &Catalog{
 		revision:       revision,
-		songs:          cloneSongs(songs, true),
-		worldsendSongs: cloneWorldsendSongs(worldsendSongs, true),
+		songs:          clonedSongs,
+		worldsendSongs: clonedWorldsendSongs,
 		updatedAt:      cloneTime(updatedAt),
 	}
 }

@@ -133,3 +133,26 @@ func TestCatalog_RevisionとUpdatedAt(t *testing.T) {
 	assert.Empty(t, empty.Songs(true))
 	assert.Empty(t, empty.WorldsendSongs(true))
 }
+
+func TestNew_楽曲IDの昇順に並べ替えて保持する(t *testing.T) {
+	// Given
+	songs := []*entity.Song{
+		{ID: 2, DisplayID: "song2", Charts: []*entity.Chart{}},
+		{ID: 1, DisplayID: "song1", Charts: []*entity.Chart{}},
+	}
+	worldsendSongs := []*entity.WorldsendSongWithChart{
+		{Song: &entity.Song{ID: 4, DisplayID: "we4", Charts: []*entity.Chart{}}, Chart: &entity.WorldsendChart{ID: 40}},
+		{Song: &entity.Song{ID: 3, DisplayID: "we3", Charts: []*entity.Chart{}}, Chart: &entity.WorldsendChart{ID: 30}},
+	}
+
+	// When
+	catalog := New(1, songs, worldsendSongs, nil)
+
+	// Then
+	actualSongs := catalog.Songs(true)
+	require.Len(t, actualSongs, 2)
+	assert.Equal(t, []string{"song1", "song2"}, []string{actualSongs[0].DisplayID, actualSongs[1].DisplayID})
+	actualWorldsend := catalog.WorldsendSongs(true)
+	require.Len(t, actualWorldsend, 2)
+	assert.Equal(t, []string{"we3", "we4"}, []string{actualWorldsend[0].Song.DisplayID, actualWorldsend[1].Song.DisplayID})
+}

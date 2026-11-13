@@ -20,6 +20,9 @@ type stubSongCatalogProvider struct {
 	snapshotErr  error
 	refreshErr   error
 	refreshCount int
+	// refreshCtxErr と refreshHasDeadline は、最後の Refresh に渡された ctx の状態です。
+	refreshCtxErr      error
+	refreshHasDeadline bool
 }
 
 func (s *stubSongCatalogProvider) Snapshot(context.Context) (*songcatalog.Catalog, error) {
@@ -31,9 +34,8 @@ func (s *stubSongCatalogProvider) Snapshot(context.Context) (*songcatalog.Catalo
 
 func (s *stubSongCatalogProvider) Refresh(ctx context.Context) error {
 	s.refreshCount++
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+	s.refreshCtxErr = ctx.Err()
+	_, s.refreshHasDeadline = ctx.Deadline()
 	return s.refreshErr
 }
 
@@ -59,6 +61,8 @@ func TestRefreshSongCatalog(t *testing.T) {
 
 			// Then
 			assert.Equal(t, 1, catalog.refreshCount)
+			assert.NoError(t, catalog.refreshCtxErr, "切断されたリクエストのキャンセルを引き継がない")
+			assert.True(t, catalog.refreshHasDeadline, "再構築には上限時間を設ける")
 		})
 	}
 }

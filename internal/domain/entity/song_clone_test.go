@@ -18,28 +18,32 @@ func TestSong_Clone_複製を変更しても元の楽曲と譜面は変わらな
 	n, err := notes.NewNotes(1000)
 	require.NoError(t, err)
 	updatedAt := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
-	original := &Song{
-		ID:            1,
-		DisplayID:     "song1",
-		Title:         "曲",
-		WikiPageTitle: new("wiki"),
-		Reading:       new("きょく"),
-		GenreID:       new(1),
-		BPM:           new(180),
-		ReleasedAt:    new(updatedAt),
-		Jacket:        new("jacket.png"),
-		UpdatedAt:     new(updatedAt),
-		Charts: []*Chart{{
-			ID:            10,
-			SongID:        1,
-			DifficultyID:  DifficultyIDMaster,
-			Const:         constant,
-			Notes:         new(n),
-			NotesDesigner: new("作者"),
+	// 期待値は Clone を使わずに同じ内容で別に作り、複製漏れがあれば original の変化として検出します。
+	newFixture := func() *Song {
+		return &Song{
+			ID:            1,
+			DisplayID:     "song1",
+			Title:         "曲",
+			WikiPageTitle: new("wiki"),
+			Reading:       new("きょく"),
+			GenreID:       new(1),
+			BPM:           new(180),
+			ReleasedAt:    new(updatedAt),
+			Jacket:        new("jacket.png"),
 			UpdatedAt:     new(updatedAt),
-		}},
+			Charts: []*Chart{{
+				ID:            10,
+				SongID:        1,
+				DifficultyID:  DifficultyIDMaster,
+				Const:         constant,
+				Notes:         new(n),
+				NotesDesigner: new("作者"),
+				UpdatedAt:     new(updatedAt),
+			}},
+		}
 	}
-	want := original.Clone()
+	original := newFixture()
+	want := newFixture()
 
 	// When
 	cloned := original.Clone()
@@ -75,18 +79,21 @@ func TestWorldsendSongWithChart_Clone_複製を変更しても元の値は変わ
 	require.NoError(t, err)
 	n, err := notes.NewNotes(800)
 	require.NoError(t, err)
-	original := &WorldsendSongWithChart{
-		Song: &Song{ID: 2, DisplayID: "we2", Title: "WE", Charts: []*Chart{}},
-		Chart: &WorldsendChart{
-			ID:            20,
-			SongID:        2,
-			LevelStar:     new(star),
-			Attribute:     new("狂"),
-			Notes:         new(n),
-			NotesDesigner: new("作者"),
-		},
+	newFixture := func() *WorldsendSongWithChart {
+		return &WorldsendSongWithChart{
+			Song: &Song{ID: 2, DisplayID: "we2", Title: "WE", Charts: []*Chart{}},
+			Chart: &WorldsendChart{
+				ID:            20,
+				SongID:        2,
+				LevelStar:     new(star),
+				Attribute:     new("狂"),
+				Notes:         new(n),
+				NotesDesigner: new("作者"),
+			},
+		}
 	}
-	want := original.Clone()
+	original := newFixture()
+	want := newFixture()
 
 	// When
 	cloned := original.Clone()

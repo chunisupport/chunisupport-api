@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,15 +21,16 @@ var _ domainrepo.SongCatalogProvider = (*SongCatalogProvider)(nil)
 // SongCatalogProvider は楽曲・譜面のスナップショットをAPIプロセス内で共有します。
 //
 // 参照は atomic.Pointer から公開中の世代を読むだけで、ロックもDB問い合わせも行いません。
-// 再構築は refreshMu で直列化し、song_catalog_revision の値が公開中の世代と同じなら省略します。
+// 再構築は refreshSem で直列化し、song_catalog_revision の値が公開中の世代と同じなら省略します。
+// refreshSem は容量1のチャネルで、先行する再構築を待つ間も呼び出し元の ctx の終了で戻れるようにしています。
 // 新しい世代は完成後に1回の Store で差し替えるため、構築途中のデータや、データより先に進んだ更新時刻は公開されません。
 type SongCatalogProvider struct {
 	db            *sqlx.DB
 	songRepo      domainrepo.SongRepository
 	worldsendRepo domainrepo.WorldsendChartRepository
 
-	current   atomic.Pointer[songcatalog.Catalog]
-	refreshMu sync.Mutex
+	current    atomic.Pointer[songcatalog.Catalog]
+	refreshSem chan struct{}
 	// initGroup は未構築時に同時に届いた参照の構築を1回にまとめます。
 	// 初回構築の失敗が続く間に、リクエストごとの全件構築が直列に積み上がるのを防ぐためです。
 	initGroup singleflight.Group
@@ -38,10 +38,15 @@ type SongCatalogProvider struct {
 
 // NewSongCatalogProvider は楽曲カタログProviderを生成します。生成時にはDBへアクセスしません。
 func NewSongCatalogProvider(db *sqlx.DB) *SongCatalogProvider {
+	return newSongCatalogProvider(db, NewSongRepository(db), NewWorldsendChartRepository(db))
+}
+
+func newSongCatalogProvider(db *sqlx.DB, songRepo domainrepo.SongRepository, worldsendRepo domainrepo.WorldsendChartRepository) *SongCatalogProvider {
 	return &SongCatalogProvider{
 		db:            db,
-		songRepo:      NewSongRepository(db),
-		worldsendRepo: NewWorldsendChartRepository(db),
+		songRepo:      songRepo,
+		worldsendRepo: worldsendRepo,
+		refreshSem:    make(chan struct{}, 1),
 	}
 }
 
@@ -70,8 +75,12 @@ func (p *SongCatalogProvider) Snapshot(ctx context.Context) (*songcatalog.Catalo
 
 // Refresh はDB上の変更世代が公開中の世代と異なる場合に再構築して差し替えます。
 func (p *SongCatalogProvider) Refresh(ctx context.Context) error {
-	p.refreshMu.Lock()
-	defer p.refreshMu.Unlock()
+	select {
+	case p.refreshSem <- struct{}{}:
+	case <-ctx.Done():
+		return fmt.Errorf("%w: wait for song catalog refresh: %w", domainrepo.ErrRepositoryOperationFailed, ctx.Err())
+	}
+	defer func() { <-p.refreshSem }()
 
 	current := p.current.Load()
 	if current != nil {
@@ -100,11 +109,15 @@ func (p *SongCatalogProvider) Refresh(ctx context.Context) error {
 // Run は interval ごとに Refresh を呼び、別プロセスによる変更を反映します。
 // 開始直後にも1回実行して、最初のリクエストより前に構築を済ませます。
 // 失敗しても公開中のスナップショットを維持し、次の周期で再試行します。ctx の終了で戻ります。
+// DBの応答停止で再構築が止まり、保存後の再構築まで待たされ続けないよう、各回に上限時間を設けます。
 func (p *SongCatalogProvider) Run(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		if err := p.Refresh(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		refreshCtx, cancel := context.WithTimeout(ctx, info.SongCatalogRefreshTimeout)
+		err := p.Refresh(refreshCtx)
+		cancel()
+		if err != nil && !errors.Is(err, context.Canceled) {
 			slog.ErrorContext(ctx, "failed to refresh song catalog", "error", err)
 		}
 		select {
