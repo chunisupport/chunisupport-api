@@ -5440,6 +5440,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 401 Unauthorized (`missing_token`): APIトークン未指定
   - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
   - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 400 Bad Request (`invalid_difficulty`): 難易度名として解釈できない値、または WORLD'S END
   - 400 Bad Request (`score_history_unsupported_difficulty`): 指定された難易度が `expert`, `master`, `ultima` 以外
   - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
   - 404 Not Found (`song_not_found`): 楽曲が存在しない、削除済み、または通常楽曲ではない
