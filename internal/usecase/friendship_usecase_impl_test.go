@@ -259,6 +259,51 @@ func TestFriendshipUsecase_SendRequest(t *testing.T) {
 		// Then
 		require.ErrorIs(t, err, ErrFriendshipAlreadyExists)
 	})
+
+	t.Run("自分自身への申請は無効エラー", func(t *testing.T) {
+		// Given
+		repo := newStubFriendshipRepo()
+		u := &friendshipUsecase{
+			db:             &MockExecutor{},
+			tm:             &spyTransactionManager{executor: &MockExecutor{}},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 1, "selfuser")},
+			friendshipRepo: repo,
+			now:            func() time.Time { return now },
+		}
+
+		// When
+		err := u.SendRequest(context.Background(), 1, "selfuser")
+
+		// Then
+		// 自分自身への関係は禁止されているため、保存せずに拒否する。
+		require.ErrorIs(t, err, ErrInvalidFriendRequest)
+		assert.Empty(t, repo.saved)
+		assert.Empty(t, repo.relations)
+	})
+
+	t.Run("上限の1つ手前なら申請を作成できる", func(t *testing.T) {
+		// Given
+		repo := newStubFriendshipRepo()
+		repo.counts[1] = info.FriendshipMaxOutgoingActive - 1
+		u := &friendshipUsecase{
+			db:             &MockExecutor{},
+			tm:             &spyTransactionManager{executor: &MockExecutor{}},
+			userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "targetuser")},
+			friendshipRepo: repo,
+			now:            func() time.Time { return now },
+		}
+
+		// When
+		err := u.SendRequest(context.Background(), 1, "targetuser")
+
+		// Then
+		// 上限未満なので申請が保存される。比較が1つずれるとここで上限エラーになる。
+		require.NoError(t, err)
+		require.Len(t, repo.saved, 1)
+		got := repo.relations[[2]int{1, 2}]
+		require.NotNil(t, got)
+		assert.Equal(t, entity.FriendshipStatusPending, got.StatusID)
+	})
 }
 
 func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
@@ -369,6 +414,34 @@ func TestFriendshipUsecase_AcceptAndReject(t *testing.T) {
 		// Then
 		require.ErrorIs(t, err, ErrFriendRequestNotFound)
 	})
+}
+
+func TestFriendshipUsecase_Remove_DeletesPair(t *testing.T) {
+	// Given
+	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+	repo := newStubFriendshipRepo()
+	forward, err := entity.NewAcceptedFriendship(1, 2, now.Add(-time.Hour), now)
+	require.NoError(t, err)
+	backward, err := entity.NewAcceptedFriendship(2, 1, now.Add(-time.Hour), now)
+	require.NoError(t, err)
+	repo.relations[[2]int{1, 2}] = forward
+	repo.relations[[2]int{2, 1}] = backward
+	u := &friendshipUsecase{
+		db:             &MockExecutor{},
+		userRepo:       &stubUserRepoForFriendship{target: testUser(t, 2, "frienduser")},
+		friendshipRepo: repo,
+	}
+
+	// When
+	err = u.Remove(context.Background(), 1, "frienduser")
+
+	// Then
+	// 解除は双方向の関係を両方とも消す。片方向だけだと相手側の一覧に残り続ける。
+	require.NoError(t, err)
+	assert.Nil(t, repo.relations[[2]int{1, 2}])
+	assert.Nil(t, repo.relations[[2]int{2, 1}])
+	assert.Contains(t, repo.deleted, [2]int{1, 2})
+	assert.Contains(t, repo.deleted, [2]int{2, 1})
 }
 
 func TestFriendshipUsecase_ListFriends(t *testing.T) {

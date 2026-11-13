@@ -230,6 +230,25 @@ func TestAPITokenUsecase_Generate_RejectsLimitAndDuplicateName(t *testing.T) {
 	}
 }
 
+func TestAPITokenUsecase_Generate_SucceedsAtLimitMinusOne(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	count := info.APITokenMaxPerUser - 1
+	repo.countOverride = &count
+	users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: info.AccountTypeEditor}}
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
+
+	// When
+	generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+
+	// Then
+	// 上限未満なので発行が保存される。比較が1つずれるとここで上限エラーになる。
+	require.NoError(t, err)
+	require.NotNil(t, generated)
+	assert.Equal(t, 1, repo.saveCalls)
+	assert.Contains(t, repo.tokens, generated.Metadata.ID)
+}
+
 func TestAPITokenUsecase_Generate_RejectsInvalidName(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, newStubAPITokenRepository(), &tokenStubUserRepository{user: &entity.User{ID: 10}})
 
@@ -413,12 +432,74 @@ func TestAPITokenUsecase_Delete_IsScopedToOwner(t *testing.T) {
 	assert.NotContains(t, repo.tokens, uint64(1))
 }
 
+func TestAPITokenUsecase_Rename_RejectsOtherOwnersToken(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	repo.tokens[5] = newAPITokenForTest(t, 5, 10, "CLI", "plain-token", new("plain"), nil)
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
+
+	// When
+	_, err := uc.Rename(context.Background(), 11, "5", "Renamed")
+
+	// Then
+	// 所有者で絞って検索するため、他人のトークンは見つからない扱いになり、保存もしない。
+	require.ErrorIs(t, err, ErrAPITokenNotFound)
+	assert.Zero(t, repo.saveCalls)
+	assert.Equal(t, "CLI", repo.tokens[5].Name.String())
+}
+
+func TestAPITokenUsecase_Rename_RejectsBlankName(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	repo.tokens[5] = newAPITokenForTest(t, 5, 10, "CLI", "plain-token", new("plain"), nil)
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
+
+	// When
+	_, err := uc.Rename(context.Background(), 10, "5", "   ")
+
+	// Then
+	// 空白だけの名前は値オブジェクトの検証で弾き、保存もしない。
+	require.ErrorIs(t, err, ErrInvalidAPITokenName)
+	assert.Zero(t, repo.saveCalls)
+	assert.Equal(t, "CLI", repo.tokens[5].Name.String())
+}
+
+func TestAPITokenUsecase_Rename_RejectsNameConflict(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	repo.tokens[5] = newAPITokenForTest(t, 5, 10, "CLI", "plain-token", new("plain"), nil)
+	repo.saveErr = repository.ErrAPITokenConflict
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
+
+	// When
+	_, err := uc.Rename(context.Background(), 10, "5", "Renamed")
+
+	// Then
+	// 同名保存の競合は名前重複エラーに読み替える。
+	require.ErrorIs(t, err, ErrAPITokenNameConflict)
+}
+
 func TestAPITokenUsecase_Delete_RejectsInvalidID(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, newStubAPITokenRepository(), &tokenStubUserRepository{})
 
 	err := uc.Delete(context.Background(), 10, "invalid")
 
 	assert.ErrorIs(t, err, ErrInvalidAPITokenID)
+}
+
+func TestAPITokenUsecase_Delete_RejectsZeroID(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), nil)
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
+
+	// When
+	err := uc.Delete(context.Background(), 10, "0")
+
+	// Then
+	// 数値として解釈できても0はトークンIDとして無効であり、削除もしない。
+	require.ErrorIs(t, err, ErrInvalidAPITokenID)
+	assert.Contains(t, repo.tokens, uint64(1))
 }
 
 func newAPITokenForTest(t *testing.T, id uint64, userID int, name string, raw string, prefix *string, lastUsedAt *time.Time) *entity.APIToken {
