@@ -1,8 +1,10 @@
 package displayid
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDisplayID(t *testing.T) {
@@ -22,22 +24,35 @@ func TestNewDisplayID(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "17文字(長すぎる)",
+			input:   "0123456789abcdef0",
+			wantErr: true,
+		},
+		{
 			name:    "大文字を含む",
 			input:   "0123456789ABCDEF",
+			wantErr: true,
+		},
+		{
+			name:    "16進数でない文字gを含む",
+			input:   "0123456789abcdeg",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// When
 			got, err := NewDisplayID(tt.input)
-			if (err != nil) != tt.wantErr {
-				assert.Failf(t, "アサーション失敗", "NewDisplayID() error = %v, wantErr %v", err, tt.wantErr)
+
+			// Then
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
-			if !tt.wantErr && got.String() != tt.input {
-				assert.Failf(t, "アサーション失敗", "NewDisplayID() = %v, want %v", got, tt.input)
-			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.input, got.String())
 		})
 	}
 }

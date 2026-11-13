@@ -53,7 +53,9 @@ func TestLoginHandler_Login(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Contains(t, rec.Body.String(), "sampleuser")
+		// UserDTO全体を固定値で確かめる。文字列包含では null やキー名の退行を見逃すため。
+		// 内部の数値IDは含めない契約であり、期待JSONにも含めていない。
+		assert.JSONEq(t, `{"username":"sampleuser","account_type":"PLAYER","is_private":false,"last_score_update":null}`, rec.Body.String())
 		loginUsecase.AssertExpectations(t)
 	})
 

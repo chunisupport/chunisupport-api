@@ -90,43 +90,71 @@ func TestSystemMaintenanceHandler_Status(t *testing.T) {
 }
 
 func TestSystemMaintenanceHandler_Update_ADMINの操作をユースケースへ渡す(t *testing.T) {
-	// Given
-	state := usecase.MaintenanceState{
-		Enabled:   true,
-		Comment:   "データ更新中です",
-		UpdatedAt: time.Date(2026, 7, 26, 3, 30, 0, 0, time.UTC),
+	updatedAt := time.Date(2026, 7, 26, 3, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		body  string
+		state usecase.MaintenanceState
+		// Then: 期待する結果
+		wantEnabled bool
+		wantComment string
+		wantStatus  string
+	}{
+		{
+			name:        "開始",
+			body:        `{"enabled":true,"comment":"データ更新中です"}`,
+			state:       usecase.MaintenanceState{Enabled: true, Comment: "データ更新中です", UpdatedAt: updatedAt},
+			wantEnabled: true,
+			wantComment: "データ更新中です",
+			wantStatus:  "maintenance",
+		},
+		{
+			name:        "終了",
+			body:        `{"enabled":false,"comment":""}`,
+			state:       usecase.MaintenanceState{UpdatedAt: updatedAt},
+			wantEnabled: false,
+			wantComment: "",
+			wantStatus:  "operational",
+		},
 	}
-	maintenanceUsecase := &systemMaintenanceUsecaseStub{state: state}
-	handler := NewSystemMaintenanceHandler(maintenanceUsecase)
-	e := echo.New()
-	req := httptest.NewRequestWithContext(
-		context.Background(),
-		http.MethodPut,
-		"/internal/admin/maintenance",
-		bytes.NewBufferString(`{"enabled":true,"comment":"データ更新中です"}`),
-	)
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-	c.Set("userEntity", &entity.User{ID: 42})
 
-	// When
-	err := handler.Update(c)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			maintenanceUsecase := &systemMaintenanceUsecaseStub{state: tt.state}
+			handler := NewSystemMaintenanceHandler(maintenanceUsecase)
+			e := echo.New()
+			req := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodPut,
+				"/internal/admin/maintenance",
+				bytes.NewBufferString(tt.body),
+			)
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set("userEntity", &entity.User{ID: 42})
 
-	// Then
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
-	assert.Equal(t, 1, maintenanceUsecase.updateCalls)
-	assert.Equal(t, 42, maintenanceUsecase.actorUserID)
-	assert.True(t, maintenanceUsecase.enabled)
-	assert.Equal(t, "データ更新中です", maintenanceUsecase.comment)
+			// When
+			err := handler.Update(c)
 
-	var response systemMaintenanceResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, "maintenance", response.Status)
-	assert.Equal(t, state.Comment, response.Comment)
-	assert.Equal(t, state.UpdatedAt, response.UpdatedAt)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
+			assert.Equal(t, 1, maintenanceUsecase.updateCalls)
+			assert.Equal(t, 42, maintenanceUsecase.actorUserID)
+			assert.Equal(t, tt.wantEnabled, maintenanceUsecase.enabled)
+			assert.Equal(t, tt.wantComment, maintenanceUsecase.comment)
+
+			var response systemMaintenanceResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			assert.Equal(t, tt.wantStatus, response.Status)
+			assert.Equal(t, tt.state.Comment, response.Comment)
+			assert.Equal(t, tt.state.UpdatedAt, response.UpdatedAt)
+		})
+	}
 }
 
 func TestSystemMaintenanceHandler_Update_enabled未指定は400(t *testing.T) {

@@ -158,7 +158,9 @@ func TestChartStatsBatchHandler_List(t *testing.T) {
 }
 
 func TestChartStatsBatchHandler_Get(t *testing.T) {
-	job := entity.StartChartStatsBatchJobFromCLI(uuid.NewV4(), chartStatsBatchHandlerStartedAt)
+	// ジョブIDは固定値にし、レスポンス全体を文字列リテラルと比較できるようにする。
+	jobID := uuid.MustParse("0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b")
+	job := entity.StartChartStatsBatchJobFromCLI(jobID, chartStatsBatchHandlerStartedAt)
 
 	tests := []struct {
 		name           string
@@ -193,6 +195,12 @@ func TestChartStatsBatchHandler_Get(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, rec.Code)
+			// ジョブ取得はキャッシュ禁止が契約のため、ヘッダーも確かめる。
+			assert.Equal(t, "no-store", rec.Header().Get(echo.HeaderCacheControl))
+			// 本文全体を固定値で確かめる。DTO経由のデコードではキー名の変更や null の有無を見逃すため。
+			// 内部の数値IDは含めない契約であり、期待JSONにも含めていない。
+			assert.JSONEq(t, `{"id":"0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b","trigger":"CLI","requested_by":null,"status":"RUNNING","started_at":"2026-09-28T03:00:00Z","finished_at":null,"error_message":null}`, rec.Body.String())
+			assert.NotContains(t, rec.Body.String(), "user_id")
 		})
 	}
 }

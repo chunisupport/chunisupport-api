@@ -161,7 +161,7 @@ func hostnameFromOrigin(origin string) (string, bool) {
 	}
 
 	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	if err != nil || parsed.Scheme == "" {
 		return "", false
 	}
 	if parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
@@ -170,6 +170,7 @@ func hostnameFromOrigin(origin string) (string, bool) {
 
 	host := strings.ToLower(parsed.Hostname())
 	// `https://**` のように `*` だけで構成されるホストも全許可になるため、`*` 1文字と同様に除外する。
+	// ホストが空の値（`https://` など）もここで除外される。
 	if strings.Trim(host, "*") == "" {
 		return "", false
 	}

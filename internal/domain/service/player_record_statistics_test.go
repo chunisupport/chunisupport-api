@@ -42,11 +42,17 @@ func TestCalculatePlayerRecordStatistics_スコア境界値を集計する(t *te
 		expected RecordAchievementStatistics
 	}{
 		{name: "MAX", score: 1010000, expected: RecordAchievementStatistics{MAX: 1, SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "MAX直前", score: 1009999, expected: RecordAchievementStatistics{SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
 		{name: "SSS+境界", score: 1009000, expected: RecordAchievementStatistics{SSSPlus: 1, SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SSS+直前", score: 1008999, expected: RecordAchievementStatistics{SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
 		{name: "SSS境界", score: 1007500, expected: RecordAchievementStatistics{SSS: 1, SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SSS直前", score: 1007499, expected: RecordAchievementStatistics{SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
 		{name: "SS+境界", score: 1005000, expected: RecordAchievementStatistics{SSPlus: 1, SS: 1, SPlus: 1, S: 1}},
+		{name: "SS+直前", score: 1004999, expected: RecordAchievementStatistics{SS: 1, SPlus: 1, S: 1}},
 		{name: "SS境界", score: 1000000, expected: RecordAchievementStatistics{SS: 1, SPlus: 1, S: 1}},
+		{name: "SS直前", score: 999999, expected: RecordAchievementStatistics{SPlus: 1, S: 1}},
 		{name: "S+境界", score: 990000, expected: RecordAchievementStatistics{SPlus: 1, S: 1}},
+		{name: "S+直前", score: 989999, expected: RecordAchievementStatistics{S: 1}},
 		{name: "S境界", score: 975000, expected: RecordAchievementStatistics{S: 1}},
 		{name: "S未満", score: 974999, expected: RecordAchievementStatistics{}},
 	}
@@ -89,6 +95,18 @@ func TestCalculatePlayerRecordStatistics_不正な関連情報を拒否する(t 
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestCalculatePlayerRecordStatistics_WEクリアランプ欠損を拒否する(t *testing.T) {
+	// Given
+	record := newWorldsendStatisticsRecord(t, 1009000, "HARD", "FULL COMBO", "FULL CHAIN GOLD")
+	record.ClearLamp = nil
+
+	// When
+	_, err := CalculatePlayerRecordStatistics(nil, []*entity.PlayerWorldsendRecord{record})
+
+	// Then
+	assert.Error(t, err)
 }
 
 func newWorldsendStatisticsRecord(t *testing.T, value uint32, clearLamp string, comboLamp string, fullChain string) *entity.PlayerWorldsendRecord {

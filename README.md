@@ -206,9 +206,16 @@ Playerの既存データは、同一トランザクション内で更新用検�
 
 バッチは一覧取得時とPlayerロック取得後の `data_collected_at` を比較し、異なる場合は競合、行がない場合は削除済みとしてスキップします。取得日時を変えない未解禁曲更新は競合扱いにせず、Playerロック取得後の最新状態で再計算します。再計算値が保存済みの値と同じ場合も成功とし、スロットの変更とPlayer保存は一緒にコミットまたはロールバックします。
 
-MySQLでの並行更新テストは `PLAYER_PERSISTENCE_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestPlayerPersistenceMySQL -count=1` で実行します。一時データベースの作成・削除と `performance_schema.data_lock_waits` / `data_locks` の参照権限が必要です。テストは作成した専用データベースだけを削除します。
+MySQL結合テストは、検証用サーバーへの接続先を `TEST_MYSQL_DSN` に設定して実行します。
 
-コースの編集・削除・復元の並行更新テストは `COURSE_CONCURRENCY_MYSQL_DSN` に検証用接続先を設定し、`go test ./internal/infra/repository -run TestCourseConcurrencyMySQL -count=1` で実行します。同じ権限が必要で、作成した専用データベースだけを削除します。接続先が未設定の場合はスキップします。
+```bash
+TEST_MYSQL_DSN='user:password@tcp(127.0.0.1:3306)/' \
+  go test ./internal/infra/repository -run MySQL -count=1
+```
+
+テストごとに専用データベースを作り、`migration/mysql` の全upを適用します。既存データベースは変更せず、終了時には作成したデータベースだけを削除します。接続ユーザーにはデータベースの作成・削除、マイグレーションの適用（EVENTを含む）、並行更新テスト用の `performance_schema.data_lock_waits` / `data_locks` の参照権限が必要です。CIではMySQL 8.4の専用サービスで実行します。
+
+接続先が未設定のローカル実行ではMySQL結合テストをスキップします。従来の `PLAYER_PERSISTENCE_MYSQL_DSN` と `COURSE_CONCURRENCY_MYSQL_DSN` も、それぞれプレイヤーとコースの並行更新テスト用に引き続き利用できます。`TEST_MYSQL_DSN` が設定されている場合はそちらを優先します。
 
 ## 楽曲名順フォルダの所属設定
 

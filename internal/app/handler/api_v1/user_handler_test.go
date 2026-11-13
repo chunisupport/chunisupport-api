@@ -134,6 +134,7 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 		bestAverage := 17.2345
 		newAverage := 16.9567
 		updatedAt := time.Date(2026, time.August, 27, 12, 34, 56, 0, time.UTC)
+		recordUpdatedAt := time.Date(2026, time.August, 20, 10, 0, 0, 0, time.UTC)
 		e := echo.New()
 		mockUsecase := &mockV1UserUsecase{
 			getUserProfileRatingViewFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
@@ -148,9 +149,12 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 					Records: &usecase.UserRatingRecordOutput{
 						UpdatedAt: updatedAt,
 						Best: []*usecase.PlayerRecordOutput{{
-							PlayerRecord: &entity.PlayerRecord{},
-							IsPlayed:     true,
-							Difficulty:   "MASTER",
+							PlayerRecord: &entity.PlayerRecord{
+								Song: &entity.Song{DisplayID: "0000000000000001"},
+							},
+							UpdatedAt:  &recordUpdatedAt,
+							IsPlayed:   true,
+							Difficulty: "MASTER",
 						}},
 					},
 				}, nil
@@ -167,28 +171,45 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		var response map[string]any
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-		assert.Equal(t, rating, response["rating"])
-		assert.Equal(t, bestAverage, response["best_average"])
-		assert.Equal(t, newAverage, response["new_average"])
-		assert.Len(t, response["best"], 1)
-		assert.Empty(t, response["best_candidate"])
-		assert.Empty(t, response["new"])
-		assert.Empty(t, response["new_candidate"])
-		assert.Equal(t, updatedAt.Format(time.RFC3339), response["meta"].(map[string]any)["updated_at"])
-		assert.NotContains(t, response, "standard")
-		assert.NotContains(t, response, "worldsend")
-		assert.NotContains(t, response, "course")
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		// usecase の結果が変換されて返ることを代表1件で確かめる（変換の詳細はDTOテストで固定する）。
+		assert.JSONEq(t, `17.1234`, string(body["rating"]))
+		assert.JSONEq(t, `17.2345`, string(body["best_average"]))
+		assert.JSONEq(t, `16.9567`, string(body["new_average"]))
+		var best []map[string]any
+		require.NoError(t, json.Unmarshal(body["best"], &best))
+		if assert.Len(t, best, 1) {
+			assert.Equal(t, "0000000000000001", best[0]["id"])
+			assert.Equal(t, "MASTER", best[0]["difficulty"])
+			assert.Equal(t, recordUpdatedAt.Format(time.RFC3339), best[0]["updated_at"])
+			assert.Equal(t, true, best[0]["is_played"])
+		}
+		// 残りの3枠は空配列を返す（null・キー欠落と区別する）。
+		assert.JSONEq(t, `[]`, string(body["best_candidate"]))
+		assert.JSONEq(t, `[]`, string(body["new"]))
+		assert.JSONEq(t, `[]`, string(body["new_candidate"]))
+		assert.JSONEq(t, `{"updated_at":"2026-08-27T12:34:56Z"}`, string(body["meta"]))
+		// レーティング専用APIは standard・worldsend・course を含まない。
+		for _, key := range []string{"standard", "worldsend", "course"} {
+			_, ok := body[key]
+			assert.False(t, ok, "%s を含んではならない", key)
+		}
 	})
 
 	t.Run("認証ユーザーを閲覧者として渡す", func(t *testing.T) {
 		// Given
 		e := echo.New()
 		requester := &entity.User{ID: 10}
+		var gotUsername string
+		var gotRequester *entity.User
+		called := false
 		mockUsecase := &mockV1UserUsecase{
 			getUserProfileRatingViewFunc: func(ctx context.Context, username string, actualRequester *entity.User) (*usecase.UserProfileRatingViewOutput, error) {
-				assert.Same(t, requester, actualRequester)
+				called = true
+				gotUsername = username
+				gotRequester = actualRequester
 				return &usecase.UserProfileRatingViewOutput{}, nil
 			},
 		}
@@ -204,6 +225,10 @@ func TestV1UserHandler_GetUserRating(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
+		// usecase が呼ばれ、認証ユーザーが閲覧者として渡されたことを外側で確かめる。
+		assert.True(t, called)
+		assert.Equal(t, "testuser", gotUsername)
+		assert.Same(t, requester, gotRequester)
 	})
 
 	t.Run("非公開ユーザーはuser_not_foundを返す", func(t *testing.T) {

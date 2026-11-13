@@ -23,7 +23,7 @@ func TestProfileHandler_Me(t *testing.T) {
 	t.Run("正常系: 自分のユーザー情報を取得できる", func(t *testing.T) {
 		// Given
 		user := &entity.User{ID: 1}
-		expected := &usecase.UserOutput{Username: "tester", IsPrivate: true}
+		expected := &usecase.UserOutput{Username: "tester", AccountType: "PLAYER", IsPrivate: true}
 		userCredentialMock.On("GetUser", mock.Anything, 1).Return(expected, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/internal/me", nil)
@@ -37,7 +37,9 @@ func TestProfileHandler_Me(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Contains(t, rec.Body.String(), "tester")
+		// UserDTO全体を固定値で確かめる。文字列包含では null やキー名の退行を見逃すため。
+		// 内部の数値IDは含めない契約であり、期待JSONにも含めていない。
+		assert.JSONEq(t, `{"username":"tester","account_type":"PLAYER","is_private":true,"last_score_update":null}`, rec.Body.String())
 		userCredentialMock.AssertExpectations(t)
 	})
 }
@@ -64,6 +66,8 @@ func TestProfileHandler_UpdatePrivacy(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
+		// 公開設定の応答本文を固定値で確かめる。ステータスだけでは null やキー名の退行を見逃すため。
+		assert.JSONEq(t, `{"is_private":true}`, rec.Body.String())
 		userCredentialMock.AssertExpectations(t)
 	})
 

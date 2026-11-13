@@ -34,41 +34,6 @@ func (tv *testValidator) Validate(i any) error {
 	return tv.validator.Struct(i)
 }
 
-func TestConvertToSongDTO(t *testing.T) {
-	masterCache := &masterdata.Cache{
-		DifficultyNamesByID: map[int]string{
-			1: "BASIC",
-			2: "ADVANCED",
-			3: "EXPERT",
-			4: "MASTER",
-			5: "ULTIMA",
-		},
-	}
-	designer := "譜面作者"
-	song := &entity.Song{
-		Charts: []*entity.Chart{
-			{DifficultyID: 1, Const: 7.5},
-			{DifficultyID: 3, Const: 12.0, NotesDesigner: &designer},
-		},
-	}
-	handler := &SongHandler{
-		songUsecase: &testutil.MockSongUsecase{},
-		masterCache: masterCache,
-	}
-
-	dto := handler.convertToSongDTO(song)
-
-	require.NotNil(t, dto)
-	assert.Equal(t, 90.0, dto.MaxOP)
-	require.NotNil(t, dto.Charts["BASIC"])
-	assert.Equal(t, 7.5, dto.Charts["BASIC"].Const.Float64())
-	require.NotNil(t, dto.Charts["EXPERT"])
-	assert.Equal(t, designer, *dto.Charts["EXPERT"].NotesDesigner)
-	assert.Nil(t, dto.Charts["ADVANCED"])
-	assert.Nil(t, dto.Charts["MASTER"])
-	assert.Nil(t, dto.Charts["ULTIMA"])
-}
-
 // TestUpdateSongs はUpdateSongsハンドラーの入力バリデーションをテストします。
 func TestUpdateSongs(t *testing.T) {
 	masterCache := &masterdata.Cache{}
@@ -192,7 +157,7 @@ func TestUpdateSongs(t *testing.T) {
 
 }
 
-// TestGetSongs はGetSongsハンドラーの基本動作をテストします。
+// TestGetSongs は公開の楽曲一覧ハンドラーがDTO契約どおりの固定応答を返すことを検証します。
 func TestGetSongs(t *testing.T) {
 	masterCache := &masterdata.Cache{
 		GenreNamesByID: map[int]string{
@@ -200,7 +165,10 @@ func TestGetSongs(t *testing.T) {
 		},
 		DifficultyNamesByID: map[int]string{
 			1: "BASIC",
+			2: "ADVANCED",
+			3: "EXPERT",
 			4: "MASTER",
+			5: "ULTIMA",
 		},
 	}
 
@@ -208,6 +176,7 @@ func TestGetSongs(t *testing.T) {
 	bpm := 180
 	notes1Value := 500
 	notes1, _ := notes.NewNotes(notes1Value)
+	designerExpert := "譜面作者"
 
 	testSongs := []*entity.Song{
 		{
@@ -225,12 +194,24 @@ func TestGetSongs(t *testing.T) {
 					Notes:          &notes1,
 					NotesDesigner:  new("譜面作者A"),
 				},
+				{
+					DifficultyID:   3,
+					Const:          12.0,
+					IsConstUnknown: false,
+					NotesDesigner:  &designerExpert,
+				},
 			},
 		},
 	}
 
+	// Given: 匿名リクエストのためコンテキストに利用者を設定しない。
+	var gotIncludeDeleted bool
+	var gotRequesterAccountTypeID *int
 	mockUsecase := &testutil.MockSongUsecase{
 		GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
+			// usecase へ渡る引数を後で検証できるよう記録する。
+			gotIncludeDeleted = includeDeleted
+			gotRequesterAccountTypeID = requesterAccountTypeID
 			return testSongs, nil
 		},
 	}
@@ -282,7 +263,7 @@ func TestGetSongs(t *testing.T) {
 			require.Fail(t, "Charts is nil")
 		}
 
-		// 全難易度のキーが存在するか確認
+		// 全難易度のキーが存在するか確認（入力・出力とも大文字難易度で統一）
 		expectedDiffs := []string{"BASIC", "ADVANCED", "EXPERT", "MASTER", "ULTIMA"}
 		for _, diff := range expectedDiffs {
 			if _, exists := song.Charts[diff]; !exists {
@@ -290,18 +271,33 @@ func TestGetSongs(t *testing.T) {
 			}
 		}
 
-		// BASICは存在するはず
-		if basicChart := song.Charts["BASIC"]; basicChart == nil {
-			t.Error("BASIC chart should not be nil")
-		} else if basicChart.NotesDesigner == nil || *basicChart.NotesDesigner != "譜面作者A" {
-			assert.Failf(t, "アサーション失敗", "BASIC chart NotesDesigner = %v, want %v", basicChart.NotesDesigner, "譜面作者A")
-		}
+		// 譜面対応と代表値を固定値で検証する。MaxOPはモック既定値の90になる。
+		assert.Equal(t, 90.0, song.MaxOP)
 
-		// ADVANCED, EXPERT, MASTER, ULTIMAはnullのはず（テストデータにないため）
-		if advChart := song.Charts["ADVANCED"]; advChart != nil {
-			t.Error("ADVANCED chart should be nil")
-		}
+		// BASICは存在するはず
+		require.NotNil(t, song.Charts["BASIC"], "BASIC譜面が存在すること")
+		assert.Equal(t, 7.5, song.Charts["BASIC"].Const.Float64())
+		require.NotNil(t, song.Charts["BASIC"].NotesDesigner, "BASIC譜面の作者が設定されていること")
+		assert.Equal(t, "譜面作者A", *song.Charts["BASIC"].NotesDesigner)
+
+		// EXPERTは存在するはず
+		require.NotNil(t, song.Charts["EXPERT"], "EXPERT譜面が存在すること")
+		assert.Equal(t, 12.0, song.Charts["EXPERT"].Const.Float64())
+		require.NotNil(t, song.Charts["EXPERT"].NotesDesigner, "EXPERT譜面の作者が設定されていること")
+		assert.Equal(t, "譜面作者", *song.Charts["EXPERT"].NotesDesigner)
+
+		// ADVANCED, MASTER, ULTIMAはnullのはず（テストデータにないため）
+		assert.Nil(t, song.Charts["ADVANCED"], "ADVANCED譜面は存在しないこと")
+		assert.Nil(t, song.Charts["MASTER"], "MASTER譜面は存在しないこと")
+		assert.Nil(t, song.Charts["ULTIMA"], "ULTIMA譜面は存在しないこと")
+
+		// 応答全体を固定JSONと比較する（docsのGET /internal/songsの形式に照合）。
+		assert.JSONEq(t, `{"songs":[{"id":"test123456789012","title":"テスト楽曲","wiki_page_title":null,"reading":null,"name_folder_code":"","artist":"テストアーティスト","genre":"POPS & ANIME","bpm":180,"release":null,"jacket":null,"official_idx":"","maxop":90,"is_maxop_unknown":false,"op_target_difficulty":null,"is_new":true,"unlock_required":false,"charts":{"BASIC":{"const":7.5,"is_const_unknown":false,"notes":500,"notes_designer":"譜面作者A"},"ADVANCED":null,"EXPERT":{"const":12,"is_const_unknown":false,"notes":null,"notes_designer":"譜面作者"},"MASTER":null,"ULTIMA":null}}]}`, rec.Body.String())
 	}
+
+	// Then: 匿名のため include_deleted は既定値 false、権限は nil がそのまま渡る。
+	assert.False(t, gotIncludeDeleted)
+	assert.Nil(t, gotRequesterAccountTypeID)
 }
 
 func TestSongHandler_DeleteSong(t *testing.T) {
@@ -467,17 +463,22 @@ func TestSongHandler_UpdateSongs_不正JSONは400(t *testing.T) {
 }
 
 func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
+	// 実在の種別ID(1-4)・既定値0・他引数(bool)と紛れない値で権限の素通しを検証する。
+	authenticatedAccountTypeID := 7
 	tests := []struct {
 		name string
 		// Given
 		query string
+		// accountTypeID が nil のときは匿名リクエスト扱いとする。
+		accountTypeID *int
 		// Then
-		wantCalled         bool
-		wantIncludeDeleted bool
-		wantErrCode        string
+		wantCalled                 bool
+		wantIncludeDeleted         bool
+		wantRequesterAccountTypeID *int
+		wantErrCode                string
 	}{
 		{name: "trueは削除済みを含めて取得する", query: "?include_deleted=true", wantCalled: true, wantIncludeDeleted: true},
-		{name: "falseは削除済みを除いて取得する", query: "?include_deleted=false", wantCalled: true, wantIncludeDeleted: false},
+		{name: "falseは削除済みを除いて取得する", query: "?include_deleted=false", accountTypeID: &authenticatedAccountTypeID, wantCalled: true, wantIncludeDeleted: false, wantRequesterAccountTypeID: &authenticatedAccountTypeID},
 		{name: "不正値は既定値にせず検証エラーを返す", query: "?include_deleted=yes", wantErrCode: apierror.CodeValidationFailed},
 	}
 
@@ -486,10 +487,12 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			// Given
 			called := false
 			var gotIncludeDeleted bool
+			var gotRequesterAccountTypeID *int
 			mockUsecase := &testutil.MockSongUsecase{
 				GetAllSongsExcludingWorldsendFunc: func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error) {
 					called = true
 					gotIncludeDeleted = includeDeleted
+					gotRequesterAccountTypeID = requesterAccountTypeID
 					return []*entity.Song{}, nil
 				},
 			}
@@ -498,6 +501,10 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/internal/songs"+tt.query, nil)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
+			if tt.accountTypeID != nil {
+				// 認証済みリクエストを再現するためコンテキストに利用者を設定する。
+				c.Set("userEntity", &entity.User{AccountTypeID: *tt.accountTypeID})
+			}
 
 			// When
 			err := handler.GetSongs(c)
@@ -513,6 +520,8 @@ func TestSongHandler_GetSongs_IncludeDeleted(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantIncludeDeleted, gotIncludeDeleted)
+			// 匿名のときは nil、認証済みのときは設定した種別IDと同じ値が渡る（ポインタは指す値で比較される）。
+			assert.Equal(t, tt.wantRequesterAccountTypeID, gotRequesterAccountTypeID)
 		})
 	}
 }

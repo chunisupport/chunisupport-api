@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsRetryableDownloadError(t *testing.T) {
@@ -96,5 +99,118 @@ func TestWithGoogleSheetsGateReturnsWhenCanceled(t *testing.T) {
 	})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}
+
+func TestRetryDownloadGivesUpAfterMaxAttempts(t *testing.T) {
+	// Given: 再試行対象のエラーを返し続けるダウンロード。待ち時間は0にして実時間で待たない。
+	original := retryBackoff
+	backoffCalls := 0
+	retryBackoff = func(int) time.Duration {
+		backoffCalls++
+		return 0
+	}
+	t.Cleanup(func() { retryBackoff = original })
+
+	// 試行ごとに異なる再試行対象ステータスを返し、最後のエラーを区別できるようにする。
+	attempts := 0
+
+	// When
+	err := retryDownload(context.Background(), "additional_songs", func() error {
+		attempts++
+		switch attempts {
+		case 1:
+			return httpStatusError{status: http.StatusTooManyRequests}
+		case 2:
+			return httpStatusError{status: http.StatusBadGateway}
+		default:
+			return httpStatusError{status: http.StatusGatewayTimeout}
+		}
+	})
+
+	// Then: 決められた3回で打ち切り、最後のエラーを返す。待ちは試行間の2回だけ。
+	require.Error(t, err)
+	assert.Equal(t, 3, attempts)
+	assert.Equal(t, 2, backoffCalls)
+	var statusErr httpStatusError
+	require.ErrorAs(t, err, &statusErr)
+	assert.Equal(t, http.StatusGatewayTimeout, statusErr.status)
+}
+
+func TestRetryDownloadDoesNotRetryNonRetryableError(t *testing.T) {
+	// Given: 待ち時間の計算回数を数え、実時間では待たない。
+	original := retryBackoff
+	backoffCalls := 0
+	retryBackoff = func(int) time.Duration {
+		backoffCalls++
+		return 0
+	}
+	t.Cleanup(func() { retryBackoff = original })
+
+	attempts := 0
+
+	// When: 再試行対象外のステータスを返す。
+	err := retryDownload(context.Background(), "official", func() error {
+		attempts++
+		return httpStatusError{status: http.StatusNotFound}
+	})
+
+	// Then: 1回で止め、待ち時間の計算もせず、受けたエラーをそのまま返す。
+	require.Error(t, err)
+	assert.Equal(t, 1, attempts)
+	assert.Equal(t, 0, backoffCalls)
+	var statusErr httpStatusError
+	require.ErrorAs(t, err, &statusErr)
+	assert.Equal(t, http.StatusNotFound, statusErr.status)
+}
+
+func TestIsRetryableDownloadError_StatusTable(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 判定対象のステータスコード
+		status int
+		// Then: 期待する判定結果
+		wantRetryable bool
+	}{
+		{
+			name:          "429は再試行する",
+			status:        http.StatusTooManyRequests,
+			wantRetryable: true,
+		},
+		{
+			name:          "502は再試行する",
+			status:        http.StatusBadGateway,
+			wantRetryable: true,
+		},
+		{
+			name:          "504は再試行する",
+			status:        http.StatusGatewayTimeout,
+			wantRetryable: true,
+		},
+		{
+			name:          "400は再試行しない",
+			status:        http.StatusBadRequest,
+			wantRetryable: false,
+		},
+		{
+			name:          "500は再試行しない",
+			status:        http.StatusInternalServerError,
+			wantRetryable: false,
+		},
+		{
+			name:          "501は再試行しない",
+			status:        http.StatusNotImplemented,
+			wantRetryable: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			got := isRetryableDownloadError(httpStatusError{status: tt.status})
+
+			// Then
+			assert.Equal(t, tt.wantRetryable, got)
+		})
 	}
 }

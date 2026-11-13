@@ -3,8 +3,6 @@ package usecase
 import "errors"
 
 var (
-	ErrInvalidPlayerName = errors.New("invalid player name")
-
 	ErrInvalidDifficulty            = errors.New("invalid difficulty")
 	ErrInvalidRatingBand            = errors.New("invalid rating band")
 	ErrInvalidBestSlotRankingCursor = errors.New("invalid best-slot ranking cursor")

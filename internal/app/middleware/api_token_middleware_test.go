@@ -59,12 +59,17 @@ func (m *mockAPITokenUsecase) Delete(ctx context.Context, userID int, id string)
 }
 
 func TestAPITokenMiddleware(t *testing.T) {
-	e := echo.New()
-	e.Validator = nil
-	mockUsecase := new(mockAPITokenUsecase)
-	middlewareFunc := middleware.APITokenMiddleware(mockUsecase)
+	// 各サブテストでモックとハンドラーを独立生成するための準備。
+	// 共有モックでは Once の消費や AssertExpectations が実行順に依存するため。
+	newMiddleware := func() (*echo.Echo, *mockAPITokenUsecase, echo.MiddlewareFunc) {
+		e := echo.New()
+		e.Validator = nil
+		mockUsecase := new(mockAPITokenUsecase)
+		return e, mockUsecase, middleware.APITokenMiddleware(mockUsecase)
+	}
 
 	t.Run("認証済みユーザーとAPIトークンがContextにある場合は再検証しない", func(t *testing.T) {
+		e, mockUsecase, middlewareFunc := newMiddleware()
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -87,6 +92,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("Bearerトークンが有効な場合は次のハンドラーが実行される", func(t *testing.T) {
+		e, mockUsecase, middlewareFunc := newMiddleware()
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer valid")
 		rec := httptest.NewRecorder()
@@ -110,6 +116,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("トークンが指定されていない場合は401", func(t *testing.T) {
+		e, _, middlewareFunc := newMiddleware()
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -126,6 +133,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("クエリパラメータのみでトークンが指定されている場合も401", func(t *testing.T) {
+		e, _, middlewareFunc := newMiddleware()
 		// クエリパラメータで渡されたトークンでは認証しない。
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs?token=querytoken", nil)
 		rec := httptest.NewRecorder()
@@ -142,6 +150,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("検証に失敗した場合は401", func(t *testing.T) {
+		e, mockUsecase, middlewareFunc := newMiddleware()
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer invalid")
 		rec := httptest.NewRecorder()
@@ -162,6 +171,7 @@ func TestAPITokenMiddleware(t *testing.T) {
 	})
 
 	t.Run("内部エラーの場合は500", func(t *testing.T) {
+		e, mockUsecase, middlewareFunc := newMiddleware()
 		req := httptest.NewRequest(http.MethodGet, "/v1/songs", nil)
 		req.Header.Set(echo.HeaderAuthorization, "Bearer error")
 		rec := httptest.NewRecorder()

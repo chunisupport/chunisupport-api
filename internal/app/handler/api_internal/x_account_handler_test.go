@@ -17,17 +17,23 @@ import (
 
 type stubXAccountUsecase struct {
 	getOutput  *usecase.XAccountOutput
+	getUserID  int
+	getCalls   int
 	syncOutput *usecase.XAccountOutput
 	syncErr    error
 	syncInput  usecase.XAccountSyncInput
 	syncUserID int
+	syncCalls  int
 }
 
-func (s *stubXAccountUsecase) Get(_ context.Context, _ int) (*usecase.XAccountOutput, error) {
+func (s *stubXAccountUsecase) Get(_ context.Context, userID int) (*usecase.XAccountOutput, error) {
+	s.getCalls++
+	s.getUserID = userID
 	return s.getOutput, nil
 }
 
 func (s *stubXAccountUsecase) Sync(_ context.Context, user *entity.User, input usecase.XAccountSyncInput) (*usecase.XAccountOutput, error) {
+	s.syncCalls++
 	s.syncUserID = user.ID
 	s.syncInput = input
 	return s.syncOutput, s.syncErr
@@ -56,7 +62,8 @@ func TestXAccountHandler_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			h := NewXAccountHandler(&stubXAccountUsecase{getOutput: tt.output})
+			stub := &stubXAccountUsecase{getOutput: tt.output}
+			h := NewXAccountHandler(stub)
 			c, rec := newXAccountHandlerContext(http.MethodGet, "")
 
 			// When
@@ -66,6 +73,9 @@ func TestXAccountHandler_Get(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusOK, rec.Code)
 			assert.JSONEq(t, tt.wantBody, rec.Body.String())
+			// 認証ユーザーの ID を usecase へ渡すこと。
+			assert.Equal(t, 10, stub.getUserID)
+			assert.Equal(t, 1, stub.getCalls)
 		})
 	}
 }
@@ -111,6 +121,41 @@ func TestXAccountHandler_Sync_エラー応答(t *testing.T) {
 			var apiErr *apierror.APIError
 			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, tt.wantCode, apiErr.Code)
+		})
+	}
+}
+
+func TestXAccountHandler_未認証は401を返す(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 呼び出す操作。
+		call func(*XAccountHandler, *echo.Context) error
+	}{
+		{name: "取得", call: (*XAccountHandler).Get},
+		{name: "同期", call: (*XAccountHandler).Sync},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 認証コンテキストにユーザーを設定しない。
+			stub := &stubXAccountUsecase{}
+			h := NewXAccountHandler(stub)
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/internal/me/x-account", strings.NewReader(`{"access_token":"token","access_token_secret":"secret"}`))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			// When
+			err := tt.call(h, c)
+
+			// Then: usecase を呼ばず 401 を返す。
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
+			assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
+			assert.Zero(t, stub.getCalls)
+			assert.Zero(t, stub.syncCalls)
 		})
 	}
 }

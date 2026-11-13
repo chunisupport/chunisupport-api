@@ -21,6 +21,16 @@ func TestNewScore(t *testing.T) {
 			want:  Score(1000000),
 		},
 		{
+			name:  "下限値0を受け付ける",
+			value: 0,
+			want:  Score(0),
+		},
+		{
+			name:  "上限値1010000を受け付ける",
+			value: 1010000,
+			want:  Score(1010000),
+		},
+		{
 			name:    "exceeds max",
 			value:   1010001,
 			wantErr: true,
@@ -77,6 +87,11 @@ func TestScore_Scan(t *testing.T) {
 			name: "string",
 			src:  "1000000",
 			want: Score(1000000),
+		},
+		{
+			name: "上限値1010000を受け付ける",
+			src:  int64(1010000),
+			want: Score(1010000),
 		},
 		{
 			name:    "unsupported type",

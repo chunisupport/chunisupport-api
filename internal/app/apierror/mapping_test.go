@@ -321,3 +321,210 @@ func TestFromUsecaseError_プロフィールコメントの内容判定エラー
 		})
 	}
 }
+
+func TestFromUsecaseError_非公開ユーザーは存在を隠すため404へ丸める(t *testing.T) {
+	// Given: 非公開ユーザーを表すエラー（ユーザー列挙を避けるため存在しない場合と同じ応答にする）
+	err := usecase.ErrUserPrivate
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 存在しない場合と同じ 404 user_not_found になり、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, CodeUserNotFound, apiErr.Code)
+	assert.ErrorIs(t, apiErr, usecase.ErrUserPrivate)
+}
+
+func TestFromUsecaseError_使用済みユーザー名は登録失敗に丸める(t *testing.T) {
+	// Given: ユーザー名が既に使われていることを表すエラー（存在を悟らせないため詳細を隠す）
+	err := usecase.ErrUsernameTaken
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 400 registration_failed に丸められ、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeRegistrationFailed, apiErr.Code)
+	assert.ErrorIs(t, apiErr, usecase.ErrUsernameTaken)
+}
+
+func TestFromUsecaseError_未知のエラーは500へ丸める(t *testing.T) {
+	// Given: 対応表にない未知のエラー
+	err := errors.New("unknown error for mapping test")
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 500 internal_error になり、原因エラーを errors.Is で辿れる
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusInternalServerError, apiErr.HTTPStatus)
+	assert.Equal(t, CodeInternalError, apiErr.Code)
+	assert.ErrorIs(t, apiErr, err)
+}
+
+func TestFromUsecaseError_nilはnilを返す(t *testing.T) {
+	// Given: nil エラー
+
+	// When
+	apiErr := FromUsecaseError(nil)
+
+	// Then: 変換せず nil を返す
+	assert.Nil(t, apiErr)
+}
+
+func TestFromUsecaseError_プレイヤーデータ未検出を400へ変換する(t *testing.T) {
+	// Given: マスタ未登録などを表す見つからない系の独自エラー
+	err := &usecase.PlayerDataNotFoundError{Resource: "song", Key: "99999"}
+
+	// When
+	apiErr := FromUsecaseError(err)
+
+	// Then: 400 resource_not_found になり、原因エラーを保持する
+	require.NotNil(t, apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	assert.Equal(t, CodeResourceNotFound, apiErr.Code)
+	assert.ErrorIs(t, apiErr, err)
+}
+
+func TestFromUsecaseError_譜面統計バッチ関連エラー(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 対応表にある譜面統計バッチ系のエラー
+		err error
+		// Then: 期待する対応付け
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "停止処理中は503",
+			err:        usecase.ErrChartStatsBatchUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   CodeServiceUnavailable,
+		},
+		{
+			name:       "実行中は409",
+			err:        usecase.ErrChartStatsBatchAlreadyRunning,
+			wantStatus: http.StatusConflict,
+			wantCode:   CodeChartStatsBatchAlreadyRunning,
+		},
+		{
+			name:       "ジョブID不正は400",
+			err:        usecase.ErrInvalidChartStatsBatchJobID,
+			wantStatus: http.StatusBadRequest,
+			wantCode:   CodeInvalidChartStatsBatchJobID,
+		},
+		{
+			name:       "ジョブ未検出は404",
+			err:        repository.ErrChartStatsBatchJobNotFound,
+			wantStatus: http.StatusNotFound,
+			wantCode:   CodeChartStatsBatchJobNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			assert.ErrorIs(t, apiErr, tt.err)
+		})
+	}
+}
+
+func TestFromUsecaseError_エラーコードとステータスの対応(t *testing.T) {
+	// エラーコードとHTTPステータスはAPIの契約なので、他のテストで個別に扱っていない分岐を1つの表で固定する。
+	// 期待値（ステータス・コード）は docs/API.md と docs/error_code_reason_codes.md から求めた固定値で書く。
+	// usecase.ErrInvalidWorldsendInput は、POST の docs（400）と本番（422）が食い違っているため、仕様が決まるまで固定しない。
+	tests := []struct {
+		name string
+		// Given: FromUsecaseError への直接入力
+		err error
+		// Then: 期待するHTTPステータスとエラーコード
+		wantStatus int
+		wantCode   string
+	}{
+		// リポジトリ層のエラー
+		{name: "楽曲未検出はsong_not_foundの404", err: repository.ErrSongNotFound, wantStatus: 404, wantCode: "song_not_found"},
+		{name: "公式インデックス重複はduplicate_official_idxの409", err: repository.ErrDuplicateOfficialIdx, wantStatus: 409, wantCode: "duplicate_official_idx"},
+		{name: "リポジトリ側のコース未検出も汎用not_foundの404へ丸める", err: repository.ErrCourseNotFound, wantStatus: 404, wantCode: "not_found"},
+		{name: "未知のコースクラスはvalidation_failedの422へ丸める", err: repository.ErrCourseClassNotFound, wantStatus: 422, wantCode: "validation_failed"},
+		{name: "称号未検出は汎用not_foundの404へ丸める", err: repository.ErrHonorNotFound, wantStatus: 404, wantCode: "not_found"},
+		{name: "称号競合は汎用conflictの409へ丸める", err: repository.ErrHonorConflict, wantStatus: 409, wantCode: "conflict"},
+		{name: "バージョン未検出はversion_not_foundの404", err: repository.ErrVersionNotFound, wantStatus: 404, wantCode: "version_not_found"},
+		{name: "バージョン名重複はversion_name_conflictの409へ丸める", err: repository.ErrVersionConflict, wantStatus: 409, wantCode: "version_name_conflict"},
+		// 認証・認可系
+		{name: "IDトークン不正はinvalid_tokenの401へ丸める", err: usecase.ErrInvalidIDToken, wantStatus: 401, wantCode: "invalid_token"},
+		{name: "APIトークン不正もinvalid_tokenの401へ丸める", err: usecase.ErrInvalidAPIToken, wantStatus: 401, wantCode: "invalid_token"},
+		{name: "Turnstileトークン不正はinvalid_turnstile_tokenの401", err: usecase.ErrInvalidTurnstileToken, wantStatus: 401, wantCode: "invalid_turnstile_token"},
+		{name: "連携済みFirebase UIDはfirebase_uid_already_linkedの409", err: usecase.ErrFirebaseUIDAlreadyLinked, wantStatus: 409, wantCode: "firebase_uid_already_linked"},
+		{name: "再認証要求自体もrecent_sign_in_requiredの401", err: usecase.ErrRecentSignInRequired, wantStatus: 401, wantCode: "recent_sign_in_required"},
+		{name: "管理者権限不足はforbiddenの403へ丸める", err: usecase.ErrAdminRequired, wantStatus: 403, wantCode: "forbidden"},
+		{name: "自分自身の削除もforbiddenの403へ丸める", err: usecase.ErrCannotDeleteSelf, wantStatus: 403, wantCode: "forbidden"},
+		// ユーザー・プレイヤー系
+		{name: "ユーザー未検出はuser_not_foundの404", err: usecase.ErrUserNotFound, wantStatus: 404, wantCode: "user_not_found"},
+		{name: "プレイヤー未連携はplayer_not_linkedの404", err: usecase.ErrPlayerNotLinked, wantStatus: 404, wantCode: "player_not_linked"},
+		{name: "操作失敗はoperation_failedの400", err: usecase.ErrOperationFailed, wantStatus: 400, wantCode: "operation_failed"},
+		{name: "内部エラーはinternal_errorの500", err: usecase.ErrInternalError, wantStatus: 500, wantCode: "internal_error"},
+		// 楽曲・譜面系
+		{name: "難易度不正はinvalid_difficultyの400", err: usecase.ErrInvalidDifficulty, wantStatus: 400, wantCode: "invalid_difficulty"},
+		{name: "譜面未検出はchart_not_foundの404", err: usecase.ErrChartNotFound, wantStatus: 404, wantCode: "chart_not_found"},
+		{name: "スコア履歴なしはscore_history_not_foundの404", err: usecase.ErrScoreHistoryNotFound, wantStatus: 404, wantCode: "score_history_not_found"},
+		{name: "対象外難易度の履歴参照はscore_history_unsupported_difficultyの400", err: usecase.ErrScoreHistoryUnsupportedDifficulty, wantStatus: 400, wantCode: "score_history_unsupported_difficulty"},
+		{name: "レート帯不正はvalidation_failedの422へ丸める", err: usecase.ErrInvalidRatingBand, wantStatus: 422, wantCode: "validation_failed"},
+		{name: "ベスト枠カーソル不正はvalidation_failedの422へ丸める", err: usecase.ErrInvalidBestSlotRankingCursor, wantStatus: 422, wantCode: "validation_failed"},
+		{name: "称号入力不正はvalidation_failedの422へ丸める", err: usecase.ErrInvalidHonorInput, wantStatus: 422, wantCode: "validation_failed"},
+		// バージョン系
+		{name: "バージョン入力不正はinvalid_version_inputの422", err: usecase.ErrInvalidVersionInput, wantStatus: 422, wantCode: "invalid_version_input"},
+		{name: "最新版でないバージョン指定はversion_not_latestの409", err: usecase.ErrVersionNotLatest, wantStatus: 409, wantCode: "version_not_latest"},
+		{name: "使用中バージョンの変更はversion_in_useの409", err: usecase.ErrVersionInUse, wantStatus: 409, wantCode: "version_in_use"},
+		// プロフィールコメント・ユーザー名系
+		{name: "長すぎるコメントはcomment_too_longの400", err: usecase.ErrCommentTooLong, wantStatus: 400, wantCode: "comment_too_long"},
+		{name: "不正文字を含むコメントはcomment_invalid_charの400", err: usecase.ErrCommentInvalidChar, wantStatus: 400, wantCode: "comment_invalid_char"},
+		{name: "空のユーザー名はusername_emptyの400", err: usecase.ErrUsernameEmpty, wantStatus: 400, wantCode: "username_empty"},
+		{name: "短すぎるユーザー名はusername_too_shortの400", err: usecase.ErrUsernameTooShort, wantStatus: 400, wantCode: "username_too_short"},
+		{name: "長すぎるユーザー名はusername_too_longの400", err: usecase.ErrUsernameTooLong, wantStatus: 400, wantCode: "username_too_long"},
+		{name: "不正文字のユーザー名はusername_invalid_charの400", err: usecase.ErrUsernameInvalidChar, wantStatus: 400, wantCode: "username_invalid_char"},
+		// 目標系
+		{name: "目標未検出はgoal_not_foundの404", err: usecase.ErrGoalNotFound, wantStatus: 404, wantCode: "goal_not_found"},
+		{name: "目標上限超過はgoal_limit_exceededの400", err: usecase.ErrGoalLimitExceeded, wantStatus: 400, wantCode: "goal_limit_exceeded"},
+		{name: "目標入力不正はinvalid_goal_inputの400", err: usecase.ErrInvalidGoalInput, wantStatus: 400, wantCode: "invalid_goal_input"},
+		{name: "目標タイトル不正はgoal_invalid_titleの400へ丸める", err: usecase.ErrInvalidGoalTitle, wantStatus: 400, wantCode: "goal_invalid_title"},
+		{name: "達成種別不正はgoal_invalid_achievement_typeの400へ丸める", err: usecase.ErrInvalidAchievementType, wantStatus: 400, wantCode: "goal_invalid_achievement_type"},
+		{name: "達成条件不正はgoal_invalid_achievement_paramsの400へ丸める", err: usecase.ErrInvalidAchievementParam, wantStatus: 400, wantCode: "goal_invalid_achievement_params"},
+		{name: "目標属性不正はgoal_invalid_attributesの400へ丸める", err: usecase.ErrInvalidGoalAttributes, wantStatus: 400, wantCode: "goal_invalid_attributes"},
+		{name: "ゲージ開始位置不正はgoal_invalid_gauge_startの400へ丸める", err: usecase.ErrInvalidGoalGaugeStart, wantStatus: 400, wantCode: "goal_invalid_gauge_start"},
+		{name: "目標グループ未検出はgoal_group_not_foundの404", err: usecase.ErrGoalGroupNotFound, wantStatus: 404, wantCode: "goal_group_not_found"},
+		{name: "目標グループ上限超過はgoal_group_limit_exceededの400", err: usecase.ErrGoalGroupLimitExceeded, wantStatus: 400, wantCode: "goal_group_limit_exceeded"},
+		{name: "目標グループ名不正はgoal_group_invalid_nameの400へ丸める", err: usecase.ErrInvalidGoalGroupName, wantStatus: 400, wantCode: "goal_group_invalid_name"},
+		{name: "目標グループ並び順不正はgoal_group_invalid_orderの400へ丸める", err: usecase.ErrInvalidGoalGroupOrder, wantStatus: 400, wantCode: "goal_group_invalid_order"},
+		// 保存済みフィルタ系
+		{name: "フィルタ未検出はrecord_filter_not_foundの404", err: usecase.ErrRecordFilterNotFound, wantStatus: 404, wantCode: "record_filter_not_found"},
+		{name: "フィルタ上限超過はrecord_filter_limit_exceededの400", err: usecase.ErrRecordFilterLimitExceeded, wantStatus: 400, wantCode: "record_filter_limit_exceeded"},
+		{name: "フィルタ入力不正はinvalid_record_filter_inputの400", err: usecase.ErrInvalidRecordFilterInput, wantStatus: 400, wantCode: "invalid_record_filter_input"},
+		{name: "フィルタID不正はinvalid_record_filter_idの400", err: usecase.ErrInvalidRecordFilterID, wantStatus: 400, wantCode: "invalid_record_filter_id"},
+		// フレンド系
+		{name: "フレンド上限超過はfriendship_limit_exceededの400", err: usecase.ErrFriendshipLimitExceeded, wantStatus: 400, wantCode: "friendship_limit_exceeded"},
+		{name: "既存の友情関係はfriendship_conflictの409へ丸める", err: usecase.ErrFriendshipAlreadyExists, wantStatus: 409, wantCode: "friendship_conflict"},
+		{name: "フレンド申請未検出はfriend_request_not_foundの404", err: usecase.ErrFriendRequestNotFound, wantStatus: 404, wantCode: "friend_request_not_found"},
+		{name: "不正なフレンド申請は400のvalidation_failedへ丸める", err: usecase.ErrInvalidFriendRequest, wantStatus: 400, wantCode: "validation_failed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			apiErr := FromUsecaseError(tt.err)
+
+			// Then
+			require.NotNil(t, apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			assert.ErrorIs(t, apiErr, tt.err)
+		})
+	}
+}

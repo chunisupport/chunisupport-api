@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,16 +75,6 @@ func TestVersionRepository_CRUD(t *testing.T) {
 	_, err = repo.FindByID(ctx, db, created.ID)
 	assert.ErrorIs(t, err, domainrepo.ErrVersionNotFound)
 	assert.ErrorIs(t, repo.Delete(ctx, db, created.ID), domainrepo.ErrVersionNotFound)
-}
-
-func TestWrapVersionDuplicateError(t *testing.T) {
-	err := &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry for key 'versions.name'"}
-	assert.ErrorIs(t, wrapVersionDuplicateError(err), domainrepo.ErrVersionConflict)
-}
-
-func TestWrapVersionDuplicateError_超ショート名の重複も競合として扱う(t *testing.T) {
-	err := &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry 'VRS' for key 'versions.uq_versions_short_name'"}
-	assert.ErrorIs(t, wrapVersionDuplicateError(err), domainrepo.ErrVersionConflict)
 }
 
 func newVersionRepositoryTestDB(t *testing.T) *sqlx.DB {

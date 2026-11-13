@@ -20,6 +20,18 @@ func TestValidateDisplayID(t *testing.T) {
 			value: "1234567890abcdef",
 		},
 		{
+			name:         "15桁の小文字16進数はvalidation_failed",
+			value:        "1234567890abcde",
+			wantErrCode:  apierror.CodeValidationFailed,
+			wantHTTPCode: http.StatusUnprocessableEntity,
+		},
+		{
+			name:         "17桁の小文字16進数はvalidation_failed",
+			value:        "1234567890abcdef0",
+			wantErrCode:  apierror.CodeValidationFailed,
+			wantHTTPCode: http.StatusUnprocessableEntity,
+		},
+		{
 			name:         "短いIDはvalidation_failed",
 			value:        "short",
 			wantErrCode:  apierror.CodeValidationFailed,
@@ -75,6 +87,24 @@ func TestValidateUsername(t *testing.T) {
 			name:        "空文字はusername_empty",
 			value:       "",
 			wantErrCode: apierror.CodeUsernameEmpty,
+		},
+		{
+			name:        "4文字はusername_too_short",
+			value:       "abcd",
+			wantErrCode: apierror.CodeUsernameTooShort,
+		},
+		{
+			name:  "5文字ちょうどは有効",
+			value: "abcde",
+		},
+		{
+			name:  "50文字ちょうどは有効",
+			value: "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx",
+		},
+		{
+			name:        "51文字はusername_too_long",
+			value:       "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxy",
+			wantErrCode: apierror.CodeUsernameTooLong,
 		},
 		{
 			name:        "短すぎるユーザー名はusername_too_short",

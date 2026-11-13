@@ -164,8 +164,6 @@ func FromUsecaseError(err error) *APIError {
 		return ErrScoreHistoryNotFound.WithInternal(err)
 	case errors.Is(err, usecase.ErrScoreHistoryUnsupportedDifficulty):
 		return ErrScoreHistoryUnsupportedDifficulty.WithInternal(err)
-	case errors.Is(err, usecase.ErrInvalidPlayerName):
-		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidWorldsendInput):
 		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, usecase.ErrInvalidHonorInput):

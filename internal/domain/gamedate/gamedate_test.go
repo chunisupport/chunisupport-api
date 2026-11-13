@@ -13,28 +13,33 @@ func TestToday_日本時間7時で日付が切り替わる(t *testing.T) {
 		name string
 		// Given
 		now time.Time
-		// Then
-		want string
+		// Then: 日本時間0時の時刻
+		want time.Time
 	}{
 		{
 			name: "06時59分59秒は前日",
 			now:  time.Date(2026, 7, 6, 6, 59, 59, 0, jst),
-			want: "2026-07-05",
+			want: time.Date(2026, 7, 5, 0, 0, 0, 0, jst),
 		},
 		{
 			name: "07時00分00秒は当日",
 			now:  time.Date(2026, 7, 6, 7, 0, 0, 0, jst),
-			want: "2026-07-06",
+			want: time.Date(2026, 7, 6, 0, 0, 0, 0, jst),
 		},
 		{
 			name: "UTCの前日21時59分59秒は前日",
 			now:  time.Date(2026, 7, 5, 21, 59, 59, 0, time.UTC),
-			want: "2026-07-05",
+			want: time.Date(2026, 7, 5, 0, 0, 0, 0, jst),
 		},
 		{
 			name: "UTCの前日22時00分00秒は当日",
 			now:  time.Date(2026, 7, 5, 22, 0, 0, 0, time.UTC),
-			want: "2026-07-06",
+			want: time.Date(2026, 7, 6, 0, 0, 0, 0, jst),
+		},
+		{
+			name: "年跨ぎ2027年1月1日06時59分59秒は前年12月31日",
+			now:  time.Date(2027, 1, 1, 6, 59, 59, 0, jst),
+			want: time.Date(2026, 12, 31, 0, 0, 0, 0, jst),
 		},
 	}
 
@@ -43,8 +48,13 @@ func TestToday_日本時間7時で日付が切り替わる(t *testing.T) {
 			// When
 			got := Today(tt.now)
 
-			// Then
-			assert.Equal(t, tt.want, got.Format(time.DateOnly))
+			// Then: 同じ瞬間であり日本時間0時であること
+			assert.True(t, tt.want.Equal(got), "同じ瞬間であること")
+			assert.True(t, got.Location() == jst, "Locationが日本時間であること")
+			assert.Equal(t, 0, got.Hour())
+			assert.Equal(t, 0, got.Minute())
+			assert.Equal(t, 0, got.Second())
+			assert.Equal(t, 0, got.Nanosecond())
 		})
 	}
 }

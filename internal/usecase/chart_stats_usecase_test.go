@@ -305,6 +305,58 @@ func TestGetChartStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.
 	}
 }
 
+func TestGetChartBestSlotStatsByDisplayIDAndDifficulty_DeletedSongPermission(t *testing.T) {
+	tests := []struct {
+		name          string
+		accountTypeID *int
+		shouldSucceed bool
+	}{
+		{name: "権限がない場合は削除済み楽曲が取得できない"},
+		{name: "PLAYER権限では削除済み楽曲が取得できない", accountTypeID: new(info.AccountTypePlayer)},
+		{name: "EDITOR権限がある場合は削除済み楽曲を取得できる", accountTypeID: new(info.AccountTypeEditor), shouldSucceed: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			ctx := context.Background()
+			mockSongRepo := new(MockSongRepository)
+			mockWorldsendRepo := new(MockWorldsendChartRepository)
+			mockStatsRepo := new(MockChartStatsRepository)
+			mockSongMasterProvider := new(MockSongMasterProvider)
+			mockExec := new(MockExecutor)
+			stubMasterProvider := &StubChartStatsMasterProvider{bands: []*ratingband.RatingBand{{ID: 10, SortOrder: 1}}}
+
+			deletedSong := &entity.Song{DisplayID: "S002", IsDeleted: true, Charts: []*entity.Chart{{ID: 201, DifficultyID: 4}}}
+			mockSongRepo.On("FindByDisplayID", ctx, mockExec, "S002").Return(deletedSong, nil).Once()
+
+			if tt.shouldSucceed {
+				mockSongMasterProvider.On("SongMasters").Return(&masterdata.SongMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}).Once()
+				mockStatsRepo.On("FindChartBestSlotStatsByChartIDs", ctx, mockExec, []int{201}).Return([]*entity.ChartBestSlotStatsByRatingBand{}, nil).Once()
+			}
+
+			u := NewChartStatsUsecase(mockSongRepo, mockWorldsendRepo, mockStatsRepo, mockSongMasterProvider, stubMasterProvider, mockExec)
+
+			// When
+			result, err := u.GetChartBestSlotStatsByDisplayIDAndDifficulty(ctx, "S002", "MASTER", tt.accountTypeID)
+
+			// Then
+			if tt.shouldSucceed {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				assert.Equal(t, "MASTER", result.Difficulty)
+			} else {
+				assert.ErrorIs(t, err, repository.ErrSongNotFound)
+				assert.Nil(t, result)
+				mockStatsRepo.AssertNotCalled(t, "FindChartBestSlotStatsByChartIDs", mock.Anything, mock.Anything, mock.Anything)
+			}
+			mockSongRepo.AssertExpectations(t)
+			mockStatsRepo.AssertExpectations(t)
+			mockSongMasterProvider.AssertExpectations(t)
+		})
+	}
+}
+
 func TestGetChartStatsByDisplayIDAndDifficulty_WorldsendDeletedSongPermission(t *testing.T) {
 	tests := []struct {
 		name               string

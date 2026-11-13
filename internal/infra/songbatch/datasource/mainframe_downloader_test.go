@@ -12,7 +12,7 @@ import (
 )
 
 func TestMainframeDownloader_parseSheetData(t *testing.T) {
-	// テスト用のダミーデータ
+	// テスト用のダミーデータ（末尾2行は短行のため除外される）
 	mockData := &batchGetResponse{
 		ValueRanges: []struct {
 			Range  string     `json:"range"`
@@ -24,6 +24,8 @@ func TestMainframeDownloader_parseSheetData(t *testing.T) {
 					{"曲名1", "BAS", "POPS", "", "10.5"},
 					{"曲名2", "ADV", "niconico", "", "12.3"},
 					{"曲名3", "EXP", "ORIGINAL", "", "13.7"},
+					// 短行のため除外：先頭列が難易度略称でタイトル列が存在しない
+					{"BAS", "POPS", "", "10.5"},
 				},
 			},
 			{
@@ -31,6 +33,8 @@ func TestMainframeDownloader_parseSheetData(t *testing.T) {
 				Values: [][]string{
 					{"曲名4", "MAS", "東方Project", "", "14.2"},
 					{"曲名5", "ULT", "VARIETY", "", "15.0"},
+					// 短行のため除外：ジャンル列はあるが定数列が存在しない
+					{"短行", "ULT", "VARIETY"},
 				},
 			},
 		},
@@ -39,9 +43,15 @@ func TestMainframeDownloader_parseSheetData(t *testing.T) {
 	d := NewMainframeDownloader("test_output", "dummy_key", "dummy_id", "https://sheets.googleapis.com/v4/spreadsheets")
 	charts := d.parseSheetData(mockData)
 
-	if len(charts) != 5 {
-		t.Errorf("Expected 5 charts, got %d", len(charts))
+	// 結果全体を固定し、Diff/Genreの破損も検知できるようにする
+	expected := []MainframeChartData{
+		{Title: "曲名1", Diff: "BAS", Genre: "POPS", Const: 10.5},
+		{Title: "曲名2", Diff: "ADV", Genre: "niconico", Const: 12.3},
+		{Title: "曲名3", Diff: "EXP", Genre: "ORIGINAL", Const: 13.7},
+		{Title: "曲名4", Diff: "MAS", Genre: "東方Project", Const: 14.2},
+		{Title: "曲名5", Diff: "ULT", Genre: "VARIETY", Const: 15.0},
 	}
+	assert.ElementsMatch(t, expected, charts)
 
 	// 重複排除のテスト
 	mockDataWithDuplicates := &batchGetResponse{
@@ -60,9 +70,10 @@ func TestMainframeDownloader_parseSheetData(t *testing.T) {
 	}
 
 	chartsWithDuplicates := d.parseSheetData(mockDataWithDuplicates)
-	if len(chartsWithDuplicates) != 1 {
-		t.Errorf("Expected 1 chart after deduplication, got %d", len(chartsWithDuplicates))
-	}
+	require.Len(t, chartsWithDuplicates, 1)
+	assert.Equal(t, []MainframeChartData{
+		{Title: "曲名1", Diff: "BAS", Genre: "POPS", Const: 10.5},
+	}, chartsWithDuplicates)
 }
 
 func TestMainframeDownloader_parseSheetData_skipsUnfilledConstants(t *testing.T) {
@@ -88,12 +99,12 @@ func TestMainframeDownloader_parseSheetData_skipsUnfilledConstants(t *testing.T)
 	charts := d.parseSheetData(data)
 
 	require.Len(t, charts, 2)
-	got := make(map[string]float64, len(charts))
-	for _, chart := range charts {
-		got[chart.Title] = chart.Const
+	// 結果全体を固定し、Diff/Genreの破損も検知できるようにする
+	expected := []MainframeChartData{
+		{Title: "定数あり", Diff: "MAS", Genre: "ORIGINAL", Const: 14.5},
+		{Title: "空白付き数値", Diff: "BAS", Genre: "niconico", Const: 12.0},
 	}
-	assert.Equal(t, 14.5, got["定数あり"])
-	assert.Equal(t, 12.0, got["空白付き数値"])
+	assert.ElementsMatch(t, expected, charts)
 }
 
 func TestMainframeDownloader_isDifficultyShort(t *testing.T) {
@@ -114,9 +125,7 @@ func TestMainframeDownloader_isDifficultyShort(t *testing.T) {
 
 	for _, tc := range testCases {
 		result := isDifficultyShort(tc.input)
-		if result != tc.expected {
-			t.Errorf("isDifficultyShort(%q) = %v, expected %v", tc.input, result, tc.expected)
-		}
+		assert.Equal(t, tc.expected, result, "isDifficultyShort(%q)", tc.input)
 	}
 }
 

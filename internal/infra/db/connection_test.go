@@ -125,4 +125,28 @@ func TestConnectWithRetry(t *testing.T) {
 		assert.Nil(t, database)
 		assert.True(t, deadlineWasSet)
 	})
+
+	t.Run("初回失敗後に再試行で接続できる", func(t *testing.T) {
+		// Given
+		// 初回は固定失敗、2回目は識別できるDBを返す。待機間隔を0にして実待機なく復帰を確認する。
+		wantDB := &sqlx.DB{}
+		attempts := 0
+
+		// When
+		database, err := connectWithRetry(context.Background(), config.DbConfig{
+			StartupMaxWaitSec:  1,
+			StartupIntervalSec: 0,
+		}, func(context.Context, config.DbConfig) (*sqlx.DB, error) {
+			attempts++
+			if attempts == 1 {
+				return nil, fmt.Errorf("connection failed")
+			}
+			return wantDB, nil
+		})
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, 2, attempts)
+		assert.Same(t, wantDB, database)
+	})
 }

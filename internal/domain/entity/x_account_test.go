@@ -17,6 +17,8 @@ func TestNewXAccount(t *testing.T) {
 		wantErr  error
 	}{
 		{name: "数値IDと英数字・アンダースコアのユーザー名は生成できる", userID: 1, xUserID: "1234567890123456789", username: "Chuni_Support1"},
+		{name: "XのユーザーIDが20桁は生成できる", userID: 1, xUserID: strings.Repeat("1", 20), username: "chuni"},
+		{name: "ユーザー名が50文字は生成できる", userID: 1, xUserID: "123", username: strings.Repeat("a", 50)},
 		{name: "ユーザーIDが0以下はエラー", userID: 0, xUserID: "123", username: "chuni", wantErr: ErrXAccountUserIDInvalid},
 		{name: "XのユーザーIDが空はエラー", userID: 1, xUserID: "", username: "chuni", wantErr: ErrXAccountXUserIDInvalid},
 		{name: "XのユーザーIDに数字以外を含むとエラー", userID: 1, xUserID: "12a", username: "chuni", wantErr: ErrXAccountXUserIDInvalid},

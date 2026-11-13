@@ -3,10 +3,14 @@ package consolidation
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/importer"
 	"github.com/chunisupport/chunisupport-api/internal/infra/songbatch/songchart"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOtogeDbConsolidate_ComplementsWorldsEndData(t *testing.T) {
@@ -156,50 +160,52 @@ func TestOtogeDbConsolidate_DoesNotOverwriteExistingWorldsEndData(t *testing.T) 
 }
 
 func TestOtogeDbConsolidate_FillsOnlyMissingWikiPageTitle(t *testing.T) {
+	// Given: 上限ちょうど・上限超えの複数バイト文字タイトルを含む未設定楽曲と、設定済み楽曲を用意する
 	ctx := context.Background()
 	ws, err := songchart.NewSongChartWorkspace(ctx, songchart.Config{
 		DSN: "file:" + t.Name() + "?mode=memory&cache=shared&_pragma=foreign_keys(ON)",
 	})
-	if err != nil {
-		t.Fatalf("failed to create workspace: %v", err)
-	}
+	require.NoError(t, err)
 	defer ws.Close()
+
+	// 「あ」は3バイトの文字のため、300文字で900バイトになる。
+	// 文字数で数えれば上限ちょうどで取り込まれ、バイト数で数えると誤って除外される。
+	boundaryAccepted := strings.Repeat("あ", 300)
+	boundaryRejected := strings.Repeat("あ", 301)
 
 	_, err = ws.DB().ExecContext(ctx, `
 		INSERT INTO songs (id, display_id, title, wiki_page_title, artist, genre_id, official_idx, is_worldsend, is_deleted)
 		VALUES
 			(1, 'song-1', 'Blow my mind', NULL, 'Artist', 4, '100', 0, 0),
 			(2, 'song-2', 'Other Wiki', NULL, 'Artist', 4, '200', 0, 0),
-			(3, 'song-3', 'ALIVE', 'Existing Title', 'Artist', 4, '300', 0, 0)
+			(3, 'song-3', 'ALIVE', 'Existing Title', 'Artist', 4, '300', 0, 0),
+			(4, 'song-4', 'Boundary Song', NULL, 'Artist', 4, '400', 0, 0),
+			(5, 'song-5', 'Too Long Song', NULL, 'Artist', 4, '500', 0, 0)
 	`)
-	if err != nil {
-		t.Fatalf("failed to insert songs: %v", err)
-	}
+	require.NoError(t, err)
 
+	const baseURL = "https://wikiwiki.jp/chunithmwiki/"
 	data := importer.OtogeDbData{
 		{ID: "100", Title: "Blow my mind", WikiwikiURL: "https://wikiwiki.jp/chunithmwiki/Blow%20my%20mind"},
 		{ID: "200", Title: "Other Wiki", WikiwikiURL: "https://example.com/Other Wiki"},
 		{ID: "300", Title: "ALIVE", WikiwikiURL: "https://wikiwiki.jp/chunithmwiki/ALIVE"},
+		{ID: "400", Title: "Boundary Song", WikiwikiURL: baseURL + boundaryAccepted},
+		{ID: "500", Title: "Too Long Song", WikiwikiURL: baseURL + boundaryRejected},
 	}
 
-	consolidator := NewOtogeDbConsolidator(ws, &data, "https://wikiwiki.jp/chunithmwiki/")
-	if err := consolidator.Consolidate(ctx); err != nil {
-		t.Fatalf("Consolidate returned error: %v", err)
-	}
+	// When: Wikiページタイトルを補完する
+	consolidator := NewOtogeDbConsolidator(ws, &data, baseURL)
+	require.NoError(t, consolidator.Consolidate(ctx))
 
+	// Then: 未設定のものだけ補完され、上限超えは除外されても他の補完は行われる
 	var titles []sql.NullString
-	if err := ws.DB().SelectContext(ctx, &titles, `SELECT wiki_page_title FROM songs ORDER BY id`); err != nil {
-		t.Fatalf("failed to get wiki_page_title: %v", err)
-	}
-	if !titles[0].Valid || titles[0].String != "Blow my mind" {
-		t.Errorf("expected wiki_page_title=Blow my mind, got %v", titles[0])
-	}
-	if titles[1].Valid {
-		t.Errorf("expected wiki_page_title to remain NULL for non-matching base URL, got %v", titles[1].String)
-	}
-	if !titles[2].Valid || titles[2].String != "Existing Title" {
-		t.Errorf("expected wiki_page_title to remain Existing Title, got %v", titles[2])
-	}
+	require.NoError(t, ws.DB().SelectContext(ctx, &titles, `SELECT wiki_page_title FROM songs ORDER BY id`))
+	require.Len(t, titles, 5)
+	assert.Equal(t, sql.NullString{String: "Blow my mind", Valid: true}, titles[0])
+	assert.False(t, titles[1].Valid, "ベースURLが異なる楽曲は補完対象外のためNULLのまま")
+	assert.Equal(t, sql.NullString{String: "Existing Title", Valid: true}, titles[2])
+	assert.Equal(t, sql.NullString{String: boundaryAccepted, Valid: true}, titles[3])
+	assert.False(t, titles[4].Valid, "上限を1文字超えたタイトルは取り込まずNULLのまま")
 }
 
 func TestExtractWikiPageTitle(t *testing.T) {

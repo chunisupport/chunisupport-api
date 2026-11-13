@@ -27,11 +27,35 @@ func TestToPlayerRecordDTO_JusticeCount(t *testing.T) {
 			expected:    new(1),
 		},
 		{
+			// 200×24÷10000=0.48は0へ丸める。常時切り上げへの退行を検知する。
+			name:        "丸め境界の切り捨て側（1009976・ノーツ200）は0になる",
+			score:       1009976,
+			comboLampID: 3,
+			notes:       new(200),
+			expected:    new(0),
+		},
+		{
+			// 200×26÷10000=0.52は1へ丸め、丸め境界の両側を通常譜面側で保証する。
+			name:        "丸め境界の切り上げ側（1009974・ノーツ200）は1になる",
+			score:       1009974,
+			comboLampID: 3,
+			notes:       new(200),
+			expected:    new(1),
+		},
+		{
 			name:        "理論値の場合ノーツ数不明でも0を返す",
 			score:       1010000,
 			comboLampID: 0,
 			notes:       nil,
 			expected:    new(0),
+		},
+		{
+			// 理論値の直前には特例を適用せず、計算条件を満たさないためnilを返す。
+			name:        "理論値直前（1009999）はノーツ数不明かつALL JUSTICEでない場合nilを返す",
+			score:       1009999,
+			comboLampID: 0,
+			notes:       nil,
+			expected:    nil,
 		},
 		{
 			name:        "ALL JUSTICEでない場合nilを返す",

@@ -74,10 +74,8 @@ func TestUserHandler_GetUserProfile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
 
-		var body map[string]any
-		assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-		assert.Equal(t, "testuser", body["username"])
-		assert.Nil(t, body["player"])
+		// キーの存在と null をまとめて固定する（omitempty 付与やキー欠落の退行を検知する）。
+		assert.JSONEq(t, `{"username":"testuser","player":null}`, rec.Body.String())
 		mockUsecase.AssertExpectations(t)
 	})
 

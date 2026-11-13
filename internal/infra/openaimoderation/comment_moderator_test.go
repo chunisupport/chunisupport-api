@@ -51,14 +51,16 @@ func TestCommentModerator_IsFlagged_判定結果を返す(t *testing.T) {
 }
 
 func TestCommentModerator_IsFlagged_判定できない応答はエラー(t *testing.T) {
+	// 非2xxの本文は正常な成功応答にし、ステータス検査の削除が結果欠落検査にすり抜けないようにします。
+	// 本文が{}だと検査削除後も結果欠落でエラーになり、退行を検出できません。
 	tests := []struct {
 		name   string
 		status int
 		body   string
 	}{
-		{name: "APIキーの拒否", status: http.StatusUnauthorized, body: `{}`},
-		{name: "回数制限", status: http.StatusTooManyRequests, body: `{}`},
-		{name: "サーバーエラー", status: http.StatusInternalServerError, body: `{}`},
+		{name: "APIキーの拒否", status: http.StatusUnauthorized, body: `{"results":[{"flagged":false}]}`},
+		{name: "回数制限", status: http.StatusTooManyRequests, body: `{"results":[{"flagged":false}]}`},
+		{name: "サーバーエラー", status: http.StatusInternalServerError, body: `{"results":[{"flagged":false}]}`},
 		{name: "JSONとして読めない応答", status: http.StatusOK, body: `not json`},
 		{name: "判定結果のない成功応答", status: http.StatusOK, body: `{"results":[]}`},
 		{name: "flaggedが欠落した成功応答", status: http.StatusOK, body: `{"results":[{}]}`},

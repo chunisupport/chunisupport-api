@@ -203,26 +203,37 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 		name            string
 		songSource      *stubSongSource
 		worldsendSource *stubWorldsendSource
+		// どの0件検査で止まったかを区別する期待メッセージ断片（本番のエラーメッセージに対応）
+		wantErr string
 	}{
 		{
 			name:            "通常楽曲の取得失敗",
 			songSource:      &stubSongSource{err: errors.New("query failed")},
 			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
+			wantErr:         "failed to get songs for snapshot export",
 		},
 		{
+			// 通常楽曲が空だとreiwa互換データも必ず0件になるため、メッセージで検査を区別する。
 			name:            "通常楽曲が0件",
 			songSource:      &stubSongSource{songs: []*entity.Song{}},
 			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
+			wantErr:         "refusing to export an empty song snapshot",
 		},
 		{
-			name:            "WORLD'S END楽曲が0件",
-			songSource:      &stubSongSource{songs: []*entity.Song{{DisplayID: "0123456789abcdef"}}},
+			// 通常楽曲に譜面を持たせて後段のreiwa検査を通過させ、WORLD'S ENDの検査だけが落ちる入力にする。
+			name: "WORLD'S END楽曲が0件",
+			songSource: &stubSongSource{songs: []*entity.Song{{
+				DisplayID: "0123456789abcdef",
+				Charts:    []*entity.Chart{{DifficultyID: 4}},
+			}}},
 			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{}},
+			wantErr:         "refusing to export an empty worldsend song snapshot",
 		},
 		{
 			name:            "reiwa互換の譜面が0件",
 			songSource:      &stubSongSource{songs: []*entity.Song{{DisplayID: "0123456789abcdef"}}},
 			worldsendSource: &stubWorldsendSource{songs: []*entity.WorldsendSongWithChart{worldsendSong}},
+			wantErr:         "refusing to export an empty reiwa song snapshot",
 		},
 	}
 
@@ -247,7 +258,9 @@ func TestExporterExport_取得または検証失敗時はアップロードし�
 			_, err := exporter.Export(context.Background())
 
 			// Then
-			assert.Error(t, err)
+			// errがnilでないことが後続のメッセージ検査の前提条件のためrequireを使う。
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
 			assert.Empty(t, writer.objects)
 		})
 	}

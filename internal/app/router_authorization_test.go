@@ -435,8 +435,17 @@ func TestVersionRoute_ADMINのAPIトークンを要求する(t *testing.T) {
 		wantStatus int
 	}{
 		{
+			name:       "未認証は拒否される",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
 			name:       "PLAYERは拒否される",
 			token:      "player-token",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "EDITORは拒否される",
+			token:      "editor-token",
 			wantStatus: http.StatusForbidden,
 		},
 		{
@@ -451,7 +460,7 @@ func TestVersionRoute_ADMINのAPIトークンを要求する(t *testing.T) {
 			// Given
 			e := echo.New()
 			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
-			e.GET("/version", handleVersion, appmiddleware.APITokenMiddleware(stubAPITokenUsecase{}), appmiddleware.RequireRole(info.AccountTypeAdmin))
+			registerSystemRoutes(e, stubFirebaseAuthenticator{}, stubAPITokenUsecase{}, stubMaintenanceUsecase{}, config.Config{})
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/version", nil)
 			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)

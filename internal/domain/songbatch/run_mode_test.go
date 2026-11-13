@@ -23,15 +23,33 @@ func TestRunRequestLockConflictIsError(t *testing.T) {
 func TestTargetAndRequiredDatasourceTypes(t *testing.T) {
 	t.Parallel()
 
-	if got := len(RunModeMajorUpdate.TargetSources()); got != 2 {
-		t.Fatalf("major targets=%d", got)
-	}
-	if got := len(RunModeMajorUpdate.RequiredSources()); got != 2 {
-		t.Fatalf("major required=%d", got)
-	}
-	if got := len(RunModeNormal.RequiredSources()); got != 3 {
-		t.Fatalf("normal required=%d", got)
-	}
+	// 通常実行は全データソースを取得対象とし、公式・追加楽曲・Mainframeを必須とする。
+	assert.ElementsMatch(t, []DataSourceType{
+		DataSourceOfficial,
+		DataSourceAdditionalSongs,
+		DataSourceSt1027,
+		DataSourceMainframe,
+		DataSourceOtogeDb,
+	}, RunModeNormal.TargetSources())
+	assert.ElementsMatch(t, []DataSourceType{
+		DataSourceOfficial,
+		DataSourceAdditionalSongs,
+		DataSourceMainframe,
+	}, RunModeNormal.RequiredSources())
+
+	// 大型更新は公式データと追加楽曲だけを取得対象かつ必須とする。
+	assert.ElementsMatch(t, []DataSourceType{
+		DataSourceOfficial,
+		DataSourceAdditionalSongs,
+	}, RunModeMajorUpdate.TargetSources())
+	assert.ElementsMatch(t, []DataSourceType{
+		DataSourceOfficial,
+		DataSourceAdditionalSongs,
+	}, RunModeMajorUpdate.RequiredSources())
+
+	// 必須判定の配線退行を捉えるため、通常と大型更新で変わるMainframeを確認する。
+	assert.True(t, RunModeNormal.IsRequired(DataSourceMainframe))
+	assert.False(t, RunModeMajorUpdate.IsRequired(DataSourceMainframe))
 }
 
 func TestParseRunMode(t *testing.T) {

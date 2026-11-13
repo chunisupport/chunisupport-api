@@ -82,6 +82,12 @@ func TestSongBatchJob_Finish(t *testing.T) {
 			expectedStatus: SongBatchJobStatusSucceeded,
 		},
 		{
+			name:                 "警告1件で完了すると警告付き成功になる",
+			finish:               func(job *SongBatchJob) error { return job.Complete(1, finishedAt) },
+			expectedStatus:       SongBatchJobStatusSucceededWithWarnings,
+			expectedWarningCount: 1,
+		},
+		{
 			name:                 "警告ありで完了すると警告付き成功になる",
 			finish:               func(job *SongBatchJob) error { return job.Complete(2, finishedAt) },
 			expectedStatus:       SongBatchJobStatusSucceededWithWarnings,
@@ -209,17 +215,34 @@ func TestSongBatchJob_CompleteRejectsNegativeWarningCount(t *testing.T) {
 	assert.True(t, job.IsRunning())
 }
 
+func TestSongBatchJob_InterruptRejectsNegativeWarningCount(t *testing.T) {
+	// Given
+	job := newRunningSongBatchJob()
+	finishedAt := songBatchJobStartedAt.Add(time.Minute)
+
+	// When
+	err := job.Interrupt(-1, finishedAt)
+
+	// Then
+	assert.ErrorIs(t, err, ErrInvalidSongBatchJob)
+	assert.True(t, job.IsRunning())
+	assert.Equal(t, SongBatchJobStatusRunning, job.Status())
+	assert.Equal(t, 0, job.WarningCount())
+	assert.Nil(t, job.FinishedAt())
+}
+
 func TestReconstructSongBatchJob(t *testing.T) {
 	finishedAt := songBatchJobStartedAt.Add(time.Minute)
 	requester := &SongBatchJobRequester{UserID: 1, Username: usernametest.New(t, "adminuser")}
 
 	tests := []struct {
-		name       string
-		trigger    SongBatchJobTrigger
-		requester  *SongBatchJobRequester
-		status     SongBatchJobStatus
-		finishedAt *time.Time
-		wantErr    bool
+		name         string
+		trigger      SongBatchJobTrigger
+		requester    *SongBatchJobRequester
+		status       SongBatchJobStatus
+		finishedAt   *time.Time
+		warningCount int
+		wantErr      bool
 	}{
 		{name: "実行中のジョブを復元できる", trigger: SongBatchJobTriggerCLI, status: SongBatchJobStatusRunning},
 		{name: "終了済みのジョブを復元できる", trigger: SongBatchJobTriggerAdmin, requester: requester, status: SongBatchJobStatusSucceeded, finishedAt: &finishedAt},
@@ -228,6 +251,7 @@ func TestReconstructSongBatchJob(t *testing.T) {
 		{name: "未知の起動元はエラー", trigger: "CRON", status: SongBatchJobStatusRunning, wantErr: true},
 		{name: "終了済みなのに終了日時がない場合はエラー", trigger: SongBatchJobTriggerCLI, status: SongBatchJobStatusSucceeded, wantErr: true},
 		{name: "実行中なのに終了日時がある場合はエラー", trigger: SongBatchJobTriggerCLI, status: SongBatchJobStatusRunning, finishedAt: &finishedAt, wantErr: true},
+		{name: "負の警告件数はエラー", trigger: SongBatchJobTriggerCLI, status: SongBatchJobStatusRunning, warningCount: -1, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -241,7 +265,7 @@ func TestReconstructSongBatchJob(t *testing.T) {
 				tt.status,
 				songBatchJobStartedAt,
 				tt.finishedAt,
-				0,
+				tt.warningCount,
 				"",
 			)
 

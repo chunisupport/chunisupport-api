@@ -2,6 +2,7 @@ package api_internal
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -213,4 +214,165 @@ func TestPlayerLockedSongHandler_Batch(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, called)
 	assert.Equal(t, http.StatusNoContent, rec.Code)
+}
+
+// buildPlayerLockedSongBatchBody は指定したID一覧から一括更新のリクエストボディを組み立てる。
+// 既存の各1件のケースと同じく、生JSON文字列を application/json で送信する形に揃えている。
+func buildPlayerLockedSongBatchBody(addIDs []string, deleteIDs []string) string {
+	var sb strings.Builder
+	sb.WriteString(`{"add":[`)
+	for i, id := range addIDs {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		fmt.Fprintf(&sb, `{"id":%q,"is_ultima":false}`, id)
+	}
+	sb.WriteString(`],"delete":[`)
+	for i, id := range deleteIDs {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		fmt.Fprintf(&sb, `{"id":%q,"is_ultima":false}`, id)
+	}
+	sb.WriteString(`]}`)
+	return sb.String()
+}
+
+// newPlayerLockedSongDisplayIDs は形式検証を通る有効なIDを指定件数だけ生成する。
+// addとdeleteで値域を分けて重複しないようにしている。値は小文字16進16文字の固定値である。
+func newPlayerLockedSongDisplayIDs(count int, offset int) []string {
+	ids := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		ids = append(ids, fmt.Sprintf("%016x", offset+i+1))
+	}
+	return ids
+}
+
+func TestPlayerLockedSongHandler_Batch_TotalLimit(t *testing.T) {
+	// addとdeleteの合計件数の上限（100件）の境界を検証する。
+	// 内訳は片方だけでは上限に届かない件数にしており、addだけ・deleteだけを数える誤りでは
+	// 合計101件のケースが受理されてしまうため検知できる。また上限ちょうどの受理により
+	// 比較の1ずれ（>=で拒否する誤り）も検知できる。
+	tests := []struct {
+		name             string
+		addCount         int
+		deleteCount      int
+		expectedErrCode  string
+		expectUsecaseHit bool
+	}{
+		{
+			name:             "合計100件（add60件+delete40件）は受理されusecaseにそのまま渡る",
+			addCount:         60,
+			deleteCount:      40,
+			expectUsecaseHit: true,
+		},
+		{
+			name:            "合計101件（add60件+delete41件）はvalidation_failedでusecaseを呼ばない",
+			addCount:        60,
+			deleteCount:     41,
+			expectedErrCode: apierror.CodeValidationFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			addIDs := newPlayerLockedSongDisplayIDs(tt.addCount, 0)
+			deleteIDs := newPlayerLockedSongDisplayIDs(tt.deleteCount, 10000)
+			body := buildPlayerLockedSongBatchBody(addIDs, deleteIDs)
+			req := httptest.NewRequest(http.MethodPost, "/internal/me/locked-songs/batch", strings.NewReader(body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set("userEntity", &entity.User{ID: 1})
+
+			called := false
+			handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
+				batchFunc: func(ctx context.Context, userID int, input *usecase.PlayerLockedSongBatchInput) error {
+					called = true
+					assert.Equal(t, 1, userID)
+					require.Len(t, input.Add, tt.addCount)
+					for i, in := range input.Add {
+						require.NotNil(t, in)
+						assert.Equal(t, addIDs[i], in.DisplayID.String())
+						assert.False(t, in.IsUltima)
+					}
+					require.Len(t, input.Delete, tt.deleteCount)
+					for i, in := range input.Delete {
+						require.NotNil(t, in)
+						assert.Equal(t, deleteIDs[i], in.DisplayID.String())
+						assert.False(t, in.IsUltima)
+					}
+					return nil
+				},
+			})
+
+			// When
+			err := handler.Batch(c)
+
+			// Then
+			if tt.expectedErrCode == "" {
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusNoContent, rec.Code)
+			} else {
+				require.Error(t, err)
+				apiErr, ok := err.(*apierror.APIError)
+				require.True(t, ok)
+				assert.Equal(t, tt.expectedErrCode, apiErr.Code)
+				assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+			}
+			assert.Equal(t, tt.expectUsecaseHit, called)
+		})
+	}
+}
+
+func TestPlayerLockedSongHandler_Batch_NullItem(t *testing.T) {
+	// add・deleteの配列要素にnullが含まれる場合の拒否を検証する。
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "addにnullを含む場合はvalidation_failedでusecaseを呼ばない",
+			body: `{"add":[null],"delete":[]}`,
+		},
+		{
+			name: "deleteにnullを含む場合はvalidation_failedでusecaseを呼ばない",
+			body: `{"add":[],"delete":[null]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.Validator = &testValidator{validator: validator.New()}
+			req := httptest.NewRequest(http.MethodPost, "/internal/me/locked-songs/batch", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.Set("userEntity", &entity.User{ID: 1})
+
+			called := false
+			handler := NewPlayerLockedSongHandler(&mockPlayerLockedSongUsecase{
+				batchFunc: func(ctx context.Context, userID int, input *usecase.PlayerLockedSongBatchInput) error {
+					called = true
+					return nil
+				},
+			})
+
+			// When
+			err := handler.Batch(c)
+
+			// Then
+			require.Error(t, err)
+			apiErr, ok := err.(*apierror.APIError)
+			require.True(t, ok)
+			assert.Equal(t, apierror.CodeValidationFailed, apiErr.Code)
+			assert.Equal(t, http.StatusUnprocessableEntity, apiErr.HTTPStatus)
+			assert.False(t, called)
+		})
+	}
 }

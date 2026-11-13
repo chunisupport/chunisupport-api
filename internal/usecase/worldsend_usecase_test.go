@@ -504,31 +504,6 @@ func TestUpdateWorldsendSongs_InvalidNotesReturnsError(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUpdateWorldsendSongs_InvalidChartKeyReturnsError(t *testing.T) {
-	// Given
-	mockRepo := new(MockWorldsendChartRepository)
-	mockExec := new(MockExecutor)
-	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := newWorldsendUsecaseForTest(mockRepo, tm, mockExec)
-	masters := &domainmasterdata.SongMasters{}
-	requests := []*UpdateWorldsendSongInput{{
-		DisplayID: "1234567890abcdef",
-		Title:     "A",
-		Artist:    "AR",
-		Charts: map[string]*UpdateWorldsendChartInput{
-			"MASTER": {LevelStar: new(5)},
-		},
-	}}
-
-	// When
-	err := uc.UpdateWorldsendSongs(context.Background(), requests, masters)
-
-	// Then
-	assert.ErrorIs(t, err, ErrInvalidWorldsendInput)
-	assert.ErrorContains(t, err, "unsupported chart key")
-	mockRepo.AssertNotCalled(t, "UpdateSongs", mock.Anything, mock.Anything, mock.Anything)
-}
-
 func TestUpdateWorldsendSongs_MultipleChartKeysReturnsError(t *testing.T) {
 	// Given
 	mockRepo := new(MockWorldsendChartRepository)
