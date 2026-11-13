@@ -61,6 +61,30 @@ func TestNewPlayerName(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
+			name:    "有効な半角カナ範囲の直前（U+FF60）を含む",
+			value:   "あ\uFF60う",
+			want:    PlayerName{value: "あ\uFF60う"},
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "有効な半角カナ範囲の直後（U+FFA0）を含む",
+			value:   "あ\uFFA0う",
+			want:    PlayerName{value: "あ\uFFA0う"},
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "無効な半角カナ範囲の下端（U+FF61）を含む",
+			value:   "あ\uFF61う",
+			want:    PlayerName{},
+			wantErr: assert.Error,
+		},
+		{
+			name:    "無効な半角カナ範囲の上端（U+FF9F）を含む",
+			value:   "あ\uFF9Fう",
+			want:    PlayerName{},
+			wantErr: assert.Error,
+		},
+		{
 			name:    "無効な小文字を含む",
 			value:   "太郎ab",
 			want:    PlayerName{},
