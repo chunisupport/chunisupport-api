@@ -386,3 +386,64 @@ func newTestVerifier(t *testing.T, allowedOrigins []string, endpoint string, cli
 
 	return verifier
 }
+
+func TestVerifier_VerifyTurnstile_不正な形のオリジンは除外する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 正しいオリジンと一緒に設定する不正なオリジン
+		invalidOrigin string
+		// Then: 除外された値と同じオリジンからの検証で使うホスト名
+		invalidHostname string
+	}{
+		{
+			name:            "スキームが無いオリジンは除外する",
+			invalidOrigin:   "//evil-scheme.example",
+			invalidHostname: "evil-scheme.example",
+		},
+		{
+			name:            "パス付きオリジンは除外する",
+			invalidOrigin:   "https://evil-path.example/extra",
+			invalidHostname: "evil-path.example",
+		},
+		{
+			name:            "クエリ付きオリジンは除外する",
+			invalidOrigin:   "https://evil-query.example?x=1",
+			invalidHostname: "evil-query.example",
+		},
+		{
+			name:            "フラグメント付きオリジンは除外する",
+			invalidOrigin:   "https://evil-fragment.example#frag",
+			invalidHostname: "evil-fragment.example",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 正しいオリジンと不正なオリジンを一緒に設定する。
+			allowedOrigins := []string{"https://app.example.com", tt.invalidOrigin}
+			newSuccessVerifier := func(hostname string) *verifier {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					require.NoError(t, json.NewEncoder(w).Encode(siteverifyResponse{
+						Success:  true,
+						Hostname: hostname,
+						Action:   "login",
+					}))
+				}))
+				t.Cleanup(server.Close)
+				return newTestVerifier(t, allowedOrigins, server.URL, server.Client())
+			}
+
+			// When: 正しいオリジンのホストで検証する。
+			err := newSuccessVerifier("app.example.com").VerifyTurnstile(context.Background(), "turnstile-token", "", "login")
+
+			// Then: 正しいものだけが許可される。
+			assert.NoError(t, err)
+
+			// When: 除外された値と同じオリジンのホストで検証する。
+			err = newSuccessVerifier(tt.invalidHostname).VerifyTurnstile(context.Background(), "turnstile-token", "", "login")
+
+			// Then: 拒否される。
+			assert.ErrorIs(t, err, usecase.ErrInvalidTurnstileToken)
+		})
+	}
+}
