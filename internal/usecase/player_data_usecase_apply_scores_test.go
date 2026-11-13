@@ -1292,3 +1292,164 @@ func TestSortAndLimitRecordChanges_idx数値順で並べ最大100件に制限す
 	assert.Equal(t, "WE", limited[2].Diff)
 	assert.Equal(t, "99", limited[99].Idx)
 }
+
+// stubScoreHistoryRepositoryForApplyScoresTest は履歴の保存と上限整理の呼び出しを記録します。
+// BulkInsertへ渡る行の中身とPruneへ渡る譜面IDを確かめるための差し替えです。
+type stubScoreHistoryRepositoryForApplyScoresTest struct {
+	standardRows           []repository.PlayerRecordHistory
+	worldsendRows          []repository.PlayerWorldsendRecordHistory
+	pruneStandardPlayer    int
+	pruneStandardChartIDs  []int
+	pruneWorldsendPlayer   int
+	pruneWorldsendChartIDs []int
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) BulkInsertStandard(_ context.Context, _ repository.Executor, rows []repository.PlayerRecordHistory) error {
+	s.standardRows = append([]repository.PlayerRecordHistory{}, rows...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) BulkInsertWorldsend(_ context.Context, _ repository.Executor, rows []repository.PlayerWorldsendRecordHistory) error {
+	s.worldsendRows = append([]repository.PlayerWorldsendRecordHistory{}, rows...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) PruneStandardOverLimit(_ context.Context, _ repository.Executor, playerID int, chartIDs []int) error {
+	s.pruneStandardPlayer = playerID
+	s.pruneStandardChartIDs = append([]int{}, chartIDs...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) PruneWorldsendOverLimit(_ context.Context, _ repository.Executor, playerID int, chartIDs []int) error {
+	s.pruneWorldsendPlayer = playerID
+	s.pruneWorldsendChartIDs = append([]int{}, chartIDs...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) FindStandardTimeline(_ context.Context, _, _ int) ([]entity.ScoreHistoryEntry, error) {
+	return nil, nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) FindWorldsendTimeline(_ context.Context, _, _ int) ([]entity.ScoreHistoryEntry, error) {
+	return nil, nil
+}
+
+// newApplyScoresHistoryTestMasters は履歴の有無を確かめるための譜面を足したマスタを返します。
+// 新規・更新・変化なし・対象外難易度を同じマスタで扱えるよう、MASTERとBASICの譜面を用意します。
+func newApplyScoresHistoryTestMasters() *playerDataMaster {
+	masters := newApplyScoresTestMasters()
+	masters.Difficulties["BASIC"] = mastervo.ChartDifficulty{ID: 1, Name: "BASIC", SortOrder: 1}
+	masters.DifficultyNamesByID = map[int]string{1: "BASIC", 4: "MASTER"}
+	masters.songs["basic-song"] = entity.PlayerDataSong{ID: 3, OfficialIdx: "basic-song", Title: "Basic Song"}
+	masters.songs["new-song"] = entity.PlayerDataSong{ID: 4, OfficialIdx: "new-song", Title: "New Song"}
+	masters.songs["world-new"] = entity.PlayerDataSong{ID: 5, OfficialIdx: "world-new", Title: "World New"}
+	masters.chartsByKey["3:1"] = entity.PlayerDataChart{ID: 102, SongID: 3, DifficultyID: 1, Const: chartconstant.ChartConstant(9.0)}
+	masters.chartsByKey["4:4"] = entity.PlayerDataChart{ID: 103, SongID: 4, DifficultyID: 4, Const: chartconstant.ChartConstant(14.0)}
+	masters.chartsByID[102] = masters.chartsByKey["3:1"]
+	masters.chartsByID[103] = masters.chartsByKey["4:4"]
+	masters.worldsendBySongID[5] = entity.PlayerDataWorldsendChart{ID: 202, SongID: 5}
+	return masters
+}
+
+func TestApplyScores_履歴保存の対象だけ更新前の値で残し上限整理へ渡す(t *testing.T) {
+	// 更新前の固定時刻と更新後の固定時刻を使い、履歴行が更新前の状態を持つことを確かめます。
+	beforeTime := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	updatedAt := time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		// Given: 保存前の記録と今回送る1件
+		fullBefore  map[int]repository.PlayerRecordState
+		worldBefore map[int]repository.WorldsendRecordState
+		standard    []PlayerDataScoreEntry
+		worldsend   []PlayerDataScoreEntry
+		// Then: 履歴に残る行（更新前の値）と上限整理へ渡る譜面ID（仕様で定められた固定値）
+		wantStandard       []repository.PlayerRecordHistory
+		wantWorldsend      []repository.PlayerWorldsendRecordHistory
+		wantPruneStandard  []int
+		wantPruneWorldsend []int
+	}{
+		{
+			name: "更新されたMASTERは更新前のスコアで履歴を保存する",
+			fullBefore: map[int]repository.PlayerRecordState{
+				101: {Score: 1000000, ClearLampID: 2, ComboLampID: 1, FullChainID: 1, SlotID: 1, UpdatedAt: beforeTime},
+			},
+			standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1005000, ClearLamp: new("clear")}},
+			wantStandard: []repository.PlayerRecordHistory{
+				{PlayerID: 77, ChartID: 101, State: repository.PlayerRecordState{Score: 1000000, ClearLampID: 2, ComboLampID: 1, FullChainID: 1, SlotID: 1, UpdatedAt: beforeTime}},
+			},
+			wantPruneStandard: []int{101},
+		},
+		{
+			name:     "新規のMASTERは履歴を作らない",
+			standard: []PlayerDataScoreEntry{{Idx: "new-song", Diff: "MAS", Score: 1000000}},
+		},
+		{
+			name: "変化の無いMASTERは履歴を作らない",
+			fullBefore: map[int]repository.PlayerRecordState{
+				101: {Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1, UpdatedAt: beforeTime},
+			},
+			standard: []PlayerDataScoreEntry{{Idx: "full-song", Diff: "MAS", Score: 1000000}},
+		},
+		{
+			name: "更新されてもBASICは履歴を作らない",
+			fullBefore: map[int]repository.PlayerRecordState{
+				102: {Score: 900000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 1, UpdatedAt: beforeTime},
+			},
+			standard: []PlayerDataScoreEntry{{Idx: "basic-song", Diff: "BAS", Score: 950000}},
+		},
+		{
+			name: "更新されたWORLDSENDは更新前のスコアで履歴を保存する",
+			worldBefore: map[int]repository.WorldsendRecordState{
+				201: {Score: 990000, ClearLampID: 2, ComboLampID: 1, FullChainID: 1, UpdatedAt: beforeTime},
+			},
+			worldsend: []PlayerDataScoreEntry{{Idx: "world-song", Score: 995000, ClearLamp: new("clear")}},
+			wantWorldsend: []repository.PlayerWorldsendRecordHistory{
+				{PlayerID: 77, WorldsendChartID: 201, State: repository.WorldsendRecordState{Score: 990000, ClearLampID: 2, ComboLampID: 1, FullChainID: 1, UpdatedAt: beforeTime}},
+			},
+			wantPruneWorldsend: []int{201},
+		},
+		{
+			name:      "新規のWORLDSENDは履歴を作らない",
+			worldsend: []PlayerDataScoreEntry{{Idx: "world-new", Score: 990000}},
+		},
+		{
+			name: "変化の無いWORLDSENDは履歴を作らない",
+			worldBefore: map[int]repository.WorldsendRecordState{
+				201: {Score: 990000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, UpdatedAt: beforeTime},
+			},
+			worldsend: []PlayerDataScoreEntry{{Idx: "world-song", Score: 990000}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &stubPlayerDataRepositoryForApplyScoresTest{
+				overpowerStats:  &repository.OverpowerTargetStats{},
+				fullBefore:      tt.fullBefore,
+				worldsendBefore: tt.worldBefore,
+			}
+			historyRepo := &stubScoreHistoryRepositoryForApplyScoresTest{}
+			uc := &playerDataUsecase{
+				playerDataRepo:   repo,
+				playerRecRepo:    &stubPlayerRecordRepositoryForApplyScoresTest{},
+				worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{},
+				scoreHistoryRepo: historyRepo,
+			}
+			payload := PlayerDataScorePayload{Standard: tt.standard, Worldsend: tt.worldsend}
+
+			// When
+			_, _, _, _, _, err := uc.applyScores(context.Background(), nil, 77, payload, newApplyScoresHistoryTestMasters(), updatedAt, service.PlayerRecordStatisticsSnapshot{})
+
+			// Then
+			require.NoError(t, err)
+			// 期待値が空の行では、保存にも上限整理にも何も渡らないこと（nilと空を区別しない）を確かめる。
+			assert.ElementsMatch(t, tt.wantStandard, historyRepo.standardRows)
+			assert.ElementsMatch(t, tt.wantWorldsend, historyRepo.worldsendRows)
+			assert.Equal(t, 77, historyRepo.pruneStandardPlayer)
+			assert.Equal(t, 77, historyRepo.pruneWorldsendPlayer)
+			assert.ElementsMatch(t, tt.wantPruneStandard, historyRepo.pruneStandardChartIDs)
+			assert.ElementsMatch(t, tt.wantPruneWorldsend, historyRepo.pruneWorldsendChartIDs)
+		})
+	}
+}
