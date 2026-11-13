@@ -112,9 +112,10 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 			name: "バージョンはリリース日昇順に並ぶ",
 			masters: &masterdata.MasterDataMasters{
 				Versions: map[int]masterdata.Version{
-					3: {ID: 3, Name: "NEW!!!", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
-					1: {ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
-					2: {ID: 2, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
+					// IDの順とリリース日の順を食い違わせる（後から過去の日付で追加される場合の再現）。
+					1: {ID: 1, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
+					3: {ID: 3, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
+					2: {ID: 2, Name: "NEW!!!", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
 				},
 				Genres:           map[string]master.Genre{},
 				Difficulties:     map[string]master.ChartDifficulty{},
@@ -122,7 +123,7 @@ func TestMasterDataUsecase_GetMasterData(t *testing.T) {
 				AchievementTypes: map[string]masterdata.Item{},
 			},
 			ratingBands:    nil,
-			wantVersionIDs: []int{1, 2, 3},
+			wantVersionIDs: []int{3, 1, 2},
 		},
 		{
 			name: "実績タイプはID昇順に並ぶ",
@@ -274,12 +275,13 @@ func TestMasterDataUsecase_GetVersions(t *testing.T) {
 			name: "リリース日昇順で返る",
 			masters: &masterdata.MasterDataMasters{
 				Versions: map[int]masterdata.Version{
-					2: {ID: 2, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
-					1: {ID: 1, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
-					3: {ID: 3, Name: "NEW", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
+					// IDの順とリリース日の順を食い違わせる（後から過去の日付で追加される場合の再現）。
+					1: {ID: 1, Name: "PLUS", ReleasedAt: time.Date(2015, 9, 24, 0, 0, 0, 0, time.UTC)},
+					3: {ID: 3, Name: "CHUNITHM", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)},
+					2: {ID: 2, Name: "NEW", ReleasedAt: time.Date(2016, 2, 4, 0, 0, 0, 0, time.UTC)},
 				},
 			},
-			wantVersionIDs: []int{1, 2, 3},
+			wantVersionIDs: []int{3, 1, 2},
 		},
 		{
 			name:           "mastersがnilなら空スライスを返す",

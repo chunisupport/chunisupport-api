@@ -119,6 +119,44 @@ func TestVersionUsecase_Create_同日を拒否する(t *testing.T) {
 	assert.Zero(t, reloader.calls)
 }
 
+func TestVersionUsecase_Create_同日でなければ受理する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 既存バージョンのリリース日
+		existing time.Time
+		// When: 登録するリリース日
+		releasedAt time.Time
+	}{
+		{
+			name:       "年と月が同じで日だけ違う日付は受理する",
+			existing:   dateForVersionTest(2025, 1, 1),
+			releasedAt: dateForVersionTest(2025, 1, 15),
+		},
+		{
+			name:       "年と日が同じで月だけ違う日付は受理する",
+			existing:   dateForVersionTest(2025, 1, 15),
+			releasedAt: dateForVersionTest(2025, 2, 15),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, ReleasedAt: tt.existing}}}
+			reloader := &versionCacheReloaderStub{}
+			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
+
+			// When
+			created, err := uc.Create(context.Background(), "CHUNITHM VERSE", "VRS", tt.releasedAt)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.releasedAt, created.ReleasedAt)
+			assert.Equal(t, 1, reloader.calls)
+		})
+	}
+}
+
 func TestVersionUsecase_Create_不正な超ショート名を拒否する(t *testing.T) {
 	// Given
 	repo := &versionRepositoryStub{}
