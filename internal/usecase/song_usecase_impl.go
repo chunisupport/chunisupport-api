@@ -27,6 +27,7 @@ type songUsecaseImpl struct {
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
 	favoriteRepo                 repository.PlayerFavoriteSongRepository
 	lockedRepo                   repository.PlayerLockedSongRepository
+	songCatalog                  repository.SongCatalogProvider
 }
 
 // NewSongUsecase は新しい SongUsecase を生成します。
@@ -62,6 +63,7 @@ func NewSongUsecaseWithOverpowerDenominator(
 }
 
 // NewSongUsecaseWithCascadeDelete はお気に入り・未解禁設定の楽曲削除カスケード連携付きで SongUsecase を生成します。
+// songCatalog は updated-at の参照元で、保存成功後に同期的に再構築します。
 func NewSongUsecaseWithCascadeDelete(
 	songRepo repository.SongRepository,
 	masterCache repository.SongMasterProvider,
@@ -70,6 +72,7 @@ func NewSongUsecaseWithCascadeDelete(
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
 	favoriteRepo repository.PlayerFavoriteSongRepository,
 	lockedRepo repository.PlayerLockedSongRepository,
+	songCatalog repository.SongCatalogProvider,
 ) SongUsecase {
 	usecase := NewSongUsecaseWithOverpowerDenominator(songRepo, masterCache, tm, defaultExecutor, overpowerDenominatorProvider)
 	impl, ok := usecase.(*songUsecaseImpl)
@@ -78,6 +81,7 @@ func NewSongUsecaseWithCascadeDelete(
 	}
 	impl.favoriteRepo = favoriteRepo
 	impl.lockedRepo = lockedRepo
+	impl.songCatalog = songCatalog
 	return impl
 }
 
@@ -111,9 +115,15 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 	return song, nil
 }
 
-// GetSongsUpdatedAt は楽曲関連データの updated_at の最大値を取得します。
+// GetSongsUpdatedAt は公開中の楽曲カタログに対応する更新時刻を返します。
+// 通常はメモリ上の値を返し、DBへ問い合わせません。
+// 楽曲データと同じ世代の値を返すため、DB上の最新値より古い場合がありますが、データより先に進むことはありません。
 func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, error) {
-	return s.songRepo.FindLatestUpdatedAt(ctx, s.defaultExecutor)
+	catalog, err := s.songCatalog.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return catalog.UpdatedAt(), nil
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
@@ -142,7 +152,7 @@ func (s *songUsecaseImpl) DeleteSong(ctx context.Context, displayID string) erro
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator(ctx)
+	s.afterSongDataSaved(ctx)
 	return nil
 }
 
@@ -159,7 +169,7 @@ func (s *songUsecaseImpl) RestoreSong(ctx context.Context, displayID string) err
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator(ctx)
+	s.afterSongDataSaved(ctx)
 	return nil
 }
 
@@ -187,7 +197,7 @@ func (s *songUsecaseImpl) UpdateSongs(ctx context.Context, requests []*UpdateSon
 	}); err != nil {
 		return err
 	}
-	s.invalidateOverpowerDenominator(ctx)
+	s.afterSongDataSaved(ctx)
 	return nil
 }
 
@@ -242,7 +252,7 @@ func (s *songUsecaseImpl) UpdateChartConstant(ctx context.Context, input UpdateC
 		return nil, err
 	}
 
-	s.invalidateOverpowerDenominator(ctx)
+	s.afterSongDataSaved(ctx)
 	return updatedSong, nil
 }
 
@@ -431,12 +441,14 @@ func (s *songUsecaseImpl) CreateSong(ctx context.Context, input *CreateSongInput
 		return nil, err
 	}
 
-	s.invalidateOverpowerDenominator(ctx)
+	s.afterSongDataSaved(ctx)
 	return created, nil
 }
 
-func (s *songUsecaseImpl) invalidateOverpowerDenominator(ctx context.Context) {
+// afterSongDataSaved は楽曲データのコミット後に、楽曲データから作るプロセス内キャッシュを更新します。
+func (s *songUsecaseImpl) afterSongDataSaved(ctx context.Context) {
 	if s.overpowerDenominatorProvider != nil {
 		s.overpowerDenominatorProvider.Invalidate(ctx)
 	}
+	refreshSongCatalog(ctx, s.songCatalog)
 }

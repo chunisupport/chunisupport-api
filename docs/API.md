@@ -3492,7 +3492,15 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
+- **レスポンス**: API が公開中の楽曲データ（[楽曲カタログキャッシュ](master_data_preload_policy.md#楽曲カタログキャッシュ)）に対応する、`songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
+- 通常の参照ではDBへ問い合わせず、メモリ上の値を返します。
+- 値は楽曲データと同じ世代として差し替わり、楽曲データより先に進むことはありません。API の楽曲編集は応答を返す時点で反映済みです。CLI の song-batch による更新は最大10秒＋再構築時間遅れて反映されます。
+
+#### 利用契約と移行
+
+- 以前は「リクエスト時点のDB上の最大値」でしたが、「公開中の楽曲データに対応する値」に変わりました。JSONの形式・型・値の算出元の列は変わらないため、フロントエンドの変更は不要です。
+- 値が前回と異なる場合に楽曲一覧（`GET /internal/songs` など）を再取得する従来の使い方を継続してください。楽曲一覧は現在DBから返すため、取得した一覧は常に `updated-at` の世代以上に新しく、古い一覧を新しいデータとして保持することはありません。
+- 値は秒精度の `updated_at` の最大値です。従来どおり、同じ秒内に重ねた変更は値の変化として現れない場合があります。
 
 #### レスポンス例
 
@@ -3506,7 +3514,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `updated_at` | string \| null | `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null` |
+| `updated_at` | string \| null | 公開中の楽曲データに対応する `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null` |
 
 ### GET `/internal/courses/updated-at`
 - **認証**: Firebase Bearer (任意)

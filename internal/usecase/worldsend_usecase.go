@@ -101,14 +101,17 @@ type worldsendUsecase struct {
 	worldsendChartRepo repository.WorldsendChartRepository
 	defaultExecutor    repository.Executor
 	tm                 TransactionManager
+	songCatalog        repository.SongCatalogProvider
 }
 
 // NewWorldsendUsecase は WorldsendUsecase の実装を生成します。
-func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository, tm TransactionManager, defaultExecutor repository.Executor) WorldsendUsecase {
+// songCatalog は保存成功後に同期的に再構築する共有キャッシュで、持たない場合は nil を渡します。
+func NewWorldsendUsecase(worldsendChartRepo repository.WorldsendChartRepository, tm TransactionManager, defaultExecutor repository.Executor, songCatalog repository.SongCatalogProvider) WorldsendUsecase {
 	return &worldsendUsecase{
 		worldsendChartRepo: worldsendChartRepo,
 		defaultExecutor:    defaultExecutor,
 		tm:                 tm,
+		songCatalog:        songCatalog,
 	}
 }
 
@@ -158,7 +161,7 @@ func (s *worldsendUsecase) GetWorldsendSongByDisplayID(ctx context.Context, disp
 
 // DeleteWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を論理削除します。
 func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID string) error {
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
 		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
@@ -167,12 +170,16 @@ func (s *worldsendUsecase) DeleteWorldsendSong(ctx context.Context, displayID st
 
 		songWithChart.Song.Delete()
 		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
-	})
+	}); err != nil {
+		return err
+	}
+	refreshSongCatalog(ctx, s.songCatalog)
+	return nil
 }
 
 // RestoreWorldsendSong は指定された DisplayID の WORLD'S END 楽曲を復活させます。
 func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID string) error {
-	return s.tm.Transactional(ctx, func(tx repository.Executor) error {
+	if err := s.tm.Transactional(ctx, func(tx repository.Executor) error {
 		// SaveSong は読み取った全列を書き戻す。ロックせずに読むと同時編集が消える。
 		songWithChart, err := s.worldsendChartRepo.FindByDisplayIDForChange(ctx, tx, displayID)
 		if err != nil {
@@ -181,7 +188,11 @@ func (s *worldsendUsecase) RestoreWorldsendSong(ctx context.Context, displayID s
 
 		songWithChart.Song.Restore()
 		return s.worldsendChartRepo.SaveSong(ctx, tx, songWithChart.Song)
-	})
+	}); err != nil {
+		return err
+	}
+	refreshSongCatalog(ctx, s.songCatalog)
+	return nil
 }
 
 // UpdateWorldsendSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
@@ -215,6 +226,7 @@ func (s *worldsendUsecase) UpdateWorldsendSongs(ctx context.Context, requests []
 		return err
 	}
 
+	refreshSongCatalog(ctx, s.songCatalog)
 	return nil
 }
 
@@ -401,5 +413,6 @@ func (s *worldsendUsecase) CreateWorldsendSong(ctx context.Context, input *Creat
 		return nil, err
 	}
 
+	refreshSongCatalog(ctx, s.songCatalog)
 	return created, nil
 }

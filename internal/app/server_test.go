@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -260,4 +261,30 @@ func TestServerShutdown_バッチ待ちがctx期限で失敗してもDBを閉じ
 
 	// When: 残ったバッチを解放してゴルーチンの終了を待つ（リーク防止）
 	<-exited
+}
+
+func TestStartSongCatalogWatcher_コンテキスト終了で停止しWaitが戻る(t *testing.T) {
+	// Given: 楽曲テーブルのないDB（初回構築は失敗する）
+	database, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.Close())
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	watcher := startSongCatalogWatcher(ctx, infra.NewSongCatalogProvider(database))
+
+	// When: サーバー停止と同じくコンテキストを終了する
+	cancel()
+	done := make(chan struct{})
+	go func() {
+		watcher.Wait()
+		close(done)
+	}()
+
+	// Then: 初回構築の失敗で止まらず、停止要求で終了する
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "楽曲カタログの世代確認が停止しませんでした")
+	}
 }

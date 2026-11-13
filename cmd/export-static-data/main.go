@@ -164,6 +164,7 @@ func run() int {
 		infrarepo.NewWorldsendChartRepository(database),
 		transactionManager,
 		database,
+		nil,
 	)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, nil)
 	exporter := staticdataexport.NewExporter(

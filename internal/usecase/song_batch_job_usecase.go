@@ -36,6 +36,7 @@ type SongBatchJobUsecase struct {
 	jobRepo       repository.SongBatchJobRepository
 	runner        SongBatchRunner
 	denominator   repository.OverpowerDenominatorProvider
+	songCatalog   repository.SongCatalogProvider
 	now           func() time.Time
 
 	// mu は受付停止の判定と WaitGroup への登録を不可分にし、Wait 中の登録を防ぎます。
@@ -46,13 +47,15 @@ type SongBatchJobUsecase struct {
 
 // NewSongBatchJobUsecase は SongBatchJobUsecase を生成します。
 // backgroundCtx は管理画面から起動したジョブの寿命で、サーバー停止時にキャンセルされるものを渡します。
-// denominator は同期後に無効化するプロセス内キャッシュで、キャッシュを持たない CLI では nil を渡します。
+// denominator と songCatalog は同期後に更新するプロセス内キャッシュで、キャッシュを持たない CLI では nil を渡します。
+// CLI からの同期は、API プロセスの songCatalog が変更世代の定期確認で検知します。
 func NewSongBatchJobUsecase(
 	backgroundCtx context.Context,
 	lockProvider repository.BatchLockProvider,
 	jobRepo repository.SongBatchJobRepository,
 	runner SongBatchRunner,
 	denominator repository.OverpowerDenominatorProvider,
+	songCatalog repository.SongCatalogProvider,
 ) *SongBatchJobUsecase {
 	return &SongBatchJobUsecase{
 		backgroundCtx: backgroundCtx,
@@ -60,6 +63,7 @@ func NewSongBatchJobUsecase(
 		jobRepo:       jobRepo,
 		runner:        runner,
 		denominator:   denominator,
+		songCatalog:   songCatalog,
 		now:           time.Now,
 	}
 }
@@ -202,8 +206,11 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 		logger.Error("楽曲バッチの結果を記録できませんでした", "error", err)
 	}
 
-	if execErr == nil && u.denominator != nil {
-		u.denominator.Invalidate(finalizeCtx)
+	if execErr == nil {
+		if u.denominator != nil {
+			u.denominator.Invalidate(finalizeCtx)
+		}
+		refreshSongCatalog(finalizeCtx, u.songCatalog)
 	}
 	return execErr
 }

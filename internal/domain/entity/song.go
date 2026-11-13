@@ -103,3 +103,32 @@ func (s *Song) Delete() {
 func (s *Song) Restore() {
 	s.IsDeleted = false
 }
+
+// Clone は楽曲と譜面を深く複製します。
+// 共有キャッシュから取り出した楽曲を呼び出し側が変更しても、他のリクエストへ影響させないためです。
+func (s *Song) Clone() *Song {
+	if s == nil {
+		return nil
+	}
+	cloned := *s
+	cloned.WikiPageTitle = clonePointer(s.WikiPageTitle)
+	cloned.Reading = clonePointer(s.Reading)
+	cloned.GenreID = clonePointer(s.GenreID)
+	cloned.BPM = clonePointer(s.BPM)
+	cloned.ReleasedAt = clonePointer(s.ReleasedAt)
+	cloned.Jacket = clonePointer(s.Jacket)
+	cloned.UpdatedAt = clonePointer(s.UpdatedAt)
+	cloned.Charts = make([]*Chart, len(s.Charts))
+	for i, chart := range s.Charts {
+		cloned.Charts[i] = chart.Clone()
+	}
+	return &cloned
+}
+
+// clonePointer はポインタが指す値を複製します。nil はそのまま返します。
+func clonePointer[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	return new(*p)
+}

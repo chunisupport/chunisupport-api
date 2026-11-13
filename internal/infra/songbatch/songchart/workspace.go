@@ -13,6 +13,7 @@ import (
 	domainservice "github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	apiinfra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/utils"
 
 	"github.com/jmoiron/sqlx"
@@ -295,6 +296,10 @@ func (w *SongChartWorkspace) SyncToMySQL(ctx context.Context, mysql apirepo.Exec
 		return err
 	}
 	if err := bulkUpdateMySQLWorldsendCharts(ctx, mysql, worldsendChartsToUpdate, info.SongBatchBulkInsertChunkSize); err != nil {
+		return err
+	}
+	// APIプロセスの楽曲カタログキャッシュが別プロセスからの変更を検知できるよう、同じトランザクションで世代を進めます。
+	if err := apiinfra.TouchSongCatalogRevision(ctx, mysql); err != nil {
 		return err
 	}
 

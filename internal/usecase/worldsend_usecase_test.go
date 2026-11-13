@@ -73,7 +73,7 @@ func (m *MockTransactionManager) Transactional(ctx context.Context, fn func(tx r
 }
 
 func newWorldsendUsecaseForTest(repo repository.WorldsendChartRepository, tm TransactionManager, exec repository.Executor) WorldsendUsecase {
-	return NewWorldsendUsecase(repo, tm, exec)
+	return NewWorldsendUsecase(repo, tm, exec, nil)
 }
 
 func TestGetAllWorldsendSongs_WithDeletedSongs_RequiresEditorPermission(t *testing.T) {

@@ -22,6 +22,7 @@ internal/
 │   ├── vo/      # 値オブジェクト
 │   ├── service/  # レーティング計算ドメインサービス
 │   ├── songbatch/ # 楽曲データ収集バッチの業務ルールと取り込み用エンティティ・値オブジェクト
+│   ├── songcatalog/ # 楽曲・譜面と更新時刻を同じ世代として扱う不変スナップショット
 │   ├── chartstatsbatch/ # 譜面統計バッチの集計規則
 │   └── repository/ # リポジトリインターフェース
 ├── dto/         # データ転送オブジェクト（API入出力用）
@@ -61,6 +62,8 @@ internal/
 - **注意**: ドメインロジック自体は `domain` 層に配置し、ここではユースケースの orchestration に集中します。
 
 chunirec互換APIのユーザー・レコード取得は、`ChunirecUsecase`が公開範囲を判定した後、`domain/repository`の`ChunirecQueryService`を利用します。プロフィールと通常譜面レコードは、それぞれレスポンスに必要な列だけを1回のSQLで取得します。プロフィールの称号はスロット1に限定し、レコードのジャンルはJOINで取得します。単曲レーティングにはドメインサービスを使用します。
+
+楽曲・譜面の参照には、APIプロセス内で共有する楽曲カタログキャッシュを使います。`domain/songcatalog.Catalog` は同じ世代の楽曲・譜面と更新時刻をまとめた不変のスナップショットで、取得時に複製を返します。Usecase は `domain/repository.SongCatalogProvider` だけに依存し、実装（`infra/repository.SongCatalogProvider`）は `song_catalog_revision` の変更世代を見て再構築します。仕様は [docs/master_data_preload_policy.md](docs/master_data_preload_policy.md#楽曲カタログキャッシュ) を参照してください。
 
 プロフィールコメントは `UserProfile` 集約として `User` とは独立した `user_profiles` テーブルに保存します。`UserProfileCommentUsecase` と既存の `UserUsecase` は `user_access.go` の対象ユーザー検索・閲覧判定を共有します。コメントの保存時は `CommentModerator`（実装は `infra/openaimoderation`）で内容を判定し、不適切と判定された場合と判定できなかった場合は保存しません。コメントは専用の内部APIだけで取得・更新し、既存プロフィールレスポンスや更新日時キャッシュ、データ移行には含めません。取得・更新のルートと Moderation クライアントはフィーチャーフラグ `profile_comment` が有効なときだけ組み立てます。無効時はルートを登録せず、`OPENAI_API_KEY` がなくても起動できます。
 

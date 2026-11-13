@@ -177,7 +177,7 @@ func newTestSongBatchJobUsecase(
 	if denominator != nil {
 		denominatorProvider = denominator
 	}
-	uc := NewSongBatchJobUsecase(backgroundCtx, lockProvider, repo, runner, denominatorProvider)
+	uc := NewSongBatchJobUsecase(backgroundCtx, lockProvider, repo, runner, denominatorProvider, nil)
 	uc.now = func() time.Time { return songBatchJobNow }
 	return uc
 }

@@ -1019,8 +1019,7 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -1032,10 +1031,9 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
@@ -1412,8 +1410,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -1425,10 +1422,9 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)

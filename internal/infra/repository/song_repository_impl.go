@@ -479,9 +479,12 @@ func (r *songRepository) Save(ctx context.Context, exec repository.Executor, son
 	}
 	song.NameFolderCode = nameFolderCode
 
-	return r.bulkUpdateCharts(ctx, exec, []*entity.Song{song}, map[string]int{
+	if err := r.bulkUpdateCharts(ctx, exec, []*entity.Song{song}, map[string]int{
 		song.DisplayID: song.ID,
-	})
+	}); err != nil {
+		return err
+	}
+	return TouchSongCatalogRevision(ctx, exec)
 }
 
 // UpdateSongs は楽曲および譜面情報を一括更新します。
@@ -548,7 +551,7 @@ func (r *songRepository) UpdateSongs(ctx context.Context, exec repository.Execut
 		return fmt.Errorf("failed to bulk update charts: %w", err)
 	}
 
-	return nil
+	return TouchSongCatalogRevision(ctx, exec)
 }
 
 // keepExistingUpdateExpr は一括更新時に、更新指定のある楽曲だけを書き換える代入式を組み立てます。
@@ -826,6 +829,10 @@ func (r *songRepository) Create(ctx context.Context, exec repository.Executor, s
 		); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := TouchSongCatalogRevision(ctx, exec); err != nil {
+		return nil, err
 	}
 
 	// DB側で付与される更新日時を返却エンティティに反映するため再取得します。
