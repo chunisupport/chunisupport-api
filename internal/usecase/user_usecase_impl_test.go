@@ -2269,6 +2269,114 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 	assert.Equal(t, []string{"goals", "user"}, callOrder)
 }
 
+func TestUserUsecase_DeleteUser_Firebase削除連携(t *testing.T) {
+	// newServiceWithDeleter は Firebase 削除役を差し替えた管理者削除のユースケースを作ります。
+	newServiceWithDeleter := func(userRepo *stubUserRepository, deleter FirebaseUserDeleter, goalRepo repository.GoalRepository) UserUsecase {
+		return NewUserUsecaseWithFirebaseDeleter(
+			nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{},
+			nil, nil, nil, nil, nil, deleter, nil,
+			&userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo,
+		)
+	}
+	// newTarget は指定した Firebase UID を持つ削除対象ユーザーを作ります。
+	newTarget := func(t *testing.T, firebaseUID *string) *entity.User {
+		t.Helper()
+		un, err := username.NewUserName("testuser")
+		require.NoError(t, err)
+		return &entity.User{ID: 1, Username: un, FirebaseUID: firebaseUID}
+	}
+	newAdminRequester := func() *entity.User {
+		return &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	}
+
+	t.Run("UID連携済みならアプリ削除の成功後にそのUIDで1回だけ削除する", func(t *testing.T) {
+		// Given
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		var deletedUserID int
+		userRepo.deleteByID = func(_ context.Context, _ repository.Executor, id int) error {
+			// Firebase 削除はアプリ削除より前に呼ばれない
+			assert.Empty(t, deleter.deletedUIDs)
+			assert.Equal(t, 1, id)
+			deletedUserID = id
+			return nil
+		}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: 連携UIDでちょうど1回呼ばれる
+		require.NoError(t, err)
+		assert.Equal(t, 1, deletedUserID)
+		assert.Equal(t, []string{firebaseUID}, deleter.deletedUIDs)
+	})
+
+	t.Run("UID未連携ならFirebase削除を呼ばずに成功する", func(t *testing.T) {
+		// Given: Firebase UIDが無いユーザーの管理者削除はアプリ削除だけで成功する
+		target := newTarget(t, nil)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, 1, userRepo.deletedUserID)
+		assert.Empty(t, deleter.deletedUIDs)
+	})
+
+	t.Run("Firebase側の削除に失敗しても管理者削除は成功として扱う", func(t *testing.T) {
+		// Given: 仕様どおり失敗は記録して成功を維持する
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{err: errors.New("firebase unavailable")}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+		logBuffer := captureDefaultSlog(t)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: 削除自体は成功し失敗だけが記録される
+		require.NoError(t, err)
+		assert.Equal(t, 1, userRepo.deletedUserID)
+		assert.Equal(t, []string{firebaseUID}, deleter.deletedUIDs)
+		assert.Contains(t, logBuffer.String(), "failed to delete firebase user after account deletion")
+	})
+
+	t.Run("アプリ削除に失敗したらFirebase削除を呼ばない", func(t *testing.T) {
+		// Given: アプリ側の削除が先に失敗する
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		deleteErr := errors.New("ユーザー削除失敗")
+		userRepo := &stubUserRepository{
+			user:      target,
+			usersByID: map[int]*entity.User{1: target, 99: adminRequester},
+			deleteByID: func(context.Context, repository.Executor, int) error {
+				return deleteErr
+			},
+		}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: アプリ削除の失敗が返り Firebase 削除は試行しない
+		require.ErrorIs(t, err, deleteErr)
+		assert.Empty(t, deleter.deletedUIDs)
+	})
+}
+
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {
 	adminRequester := &entity.User{ID: 99, AccountTypeID: 3}
 	repo := &stubUserRepository{err: repository.ErrUserNotFound}

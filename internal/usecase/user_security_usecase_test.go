@@ -354,7 +354,31 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		recentSignInVerifier.AssertExpectations(t)
 	})
 
-	t.Run("recent sign-in の auth_time が1分以内の未来なら許容する", func(t *testing.T) {
+	t.Run("recent sign-in が上限ちょうどなら削除する", func(t *testing.T) {
+		// Given: 経過時間が上限ちょうど（5分）の再認証情報は期限切れにしない
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		tm := &mockTransactionManager{}
+		userCredentialUsecase := newTestUserCredentialUsecaseWithDeleteDependencies(
+			tm, mockUserRepo, nil, recentSignInVerifier, currentTime,
+		)
+
+		user := &entity.User{ID: 4, Username: un, FirebaseUID: new("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "boundary-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: currentTime.Add(-info.RecentSignInMaxAge)}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 4).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 4).Return(nil).Once()
+
+		// When
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 4, reauthtokentest.New(t, "boundary-token"))
+
+		// Then: 上限ちょうどは受理されて削除が進む
+		assert.NoError(t, err)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("recent sign-in の auth_time が許容幅ちょうどの未来なら許容する", func(t *testing.T) {
+		// Given: 許容幅ちょうど（1分後）の未来時刻は時計のずれとして受理される
 		mockUserRepo := new(MockUserRepository)
 		recentSignInVerifier := new(mockRecentSignInVerifier)
 		tm := &mockTransactionManager{}
@@ -363,11 +387,14 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		)
 
 		user := &entity.User{ID: 3, Username: un, FirebaseUID: new("firebase-uid")}
-		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "slightly-future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: currentTime.Add(info.RecentSignInFutureAllowance - 30*time.Second)}, nil).Once()
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "boundary-future-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: currentTime.Add(info.RecentSignInFutureAllowance)}, nil).Once()
 		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(user, nil).Once()
 		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 3).Return(nil).Once()
 
-		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, reauthtokentest.New(t, "slightly-future-token"))
+		// When
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, reauthtokentest.New(t, "boundary-future-token"))
+
+		// Then: 許容幅ちょうどは未来すぎる拒否にならない
 		assert.NoError(t, err)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
@@ -445,6 +472,91 @@ func TestUserSecurityUsecase_DeleteUser(t *testing.T) {
 		assert.Contains(t, logBuffer.String(), "delete_account_firebase_uid_not_linked")
 		assert.Contains(t, logBuffer.String(), "firebase-uid")
 		mockUserRepo.AssertNotCalled(t, "DeleteByID", mock.Anything, mock.Anything, mock.Anything)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+}
+
+func TestUserSecurityUsecase_DeleteUser_Firebase削除連携(t *testing.T) {
+	un, _ := username.NewUserName("testuser")
+	currentTime := time.Date(2026, 4, 13, 12, 0, 0, 0, time.UTC)
+	recentAuthTime := currentTime.Add(-1 * time.Minute)
+
+	// newUsecaseWithDeleter は Firebase 削除役を差し替えた本人削除のユースケースを作ります。
+	newUsecaseWithDeleter := func(userRepo repository.UserRepository, verifier RecentSignInVerifier, deleter FirebaseUserDeleter) UserCredentialUsecase {
+		uc := NewUserCredentialUsecaseWithFirebaseServices(&MockExecutor{}, &mockTransactionManager{}, userRepo, &stubPlayerRecordRepository{}, &stubGoalRepo{}, verifier, deleter, newMockMasterCache())
+		uc.(*userCredentialUsecaseImpl).clock = fixedClock{now: currentTime}
+		return uc
+	}
+
+	t.Run("アプリ削除の成功後にFirebaseユーザーを連携UIDで1回だけ削除する", func(t *testing.T) {
+		// Given
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		deleter := &recordingFirebaseUserDeleter{}
+		userCredentialUsecase := newUsecaseWithDeleter(mockUserRepo, recentSignInVerifier, deleter)
+
+		user := &entity.User{ID: 1, Username: un, FirebaseUID: new("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 1).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 1).Run(func(mock.Arguments) {
+			// Firebase 削除はアプリ削除より前に呼ばれない
+			assert.Empty(t, deleter.deletedUIDs)
+		}).Return(nil).Once()
+
+		// When
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 1, reauthtokentest.New(t, "reauth-token"))
+
+		// Then: 連携UIDでちょうど1回呼ばれる
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"firebase-uid"}, deleter.deletedUIDs)
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("Firebase側の削除に失敗してもアカウント削除は成功として扱う", func(t *testing.T) {
+		// Given: 仕様どおり失敗は記録して成功を維持する
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		deleter := &recordingFirebaseUserDeleter{err: errors.New("firebase unavailable")}
+		userCredentialUsecase := newUsecaseWithDeleter(mockUserRepo, recentSignInVerifier, deleter)
+
+		user := &entity.User{ID: 2, Username: un, FirebaseUID: new("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 2).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 2).Return(nil).Once()
+		logBuffer := captureDefaultSlog(t)
+
+		// When
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 2, reauthtokentest.New(t, "reauth-token"))
+
+		// Then: 削除自体は成功し失敗だけが記録される
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"firebase-uid"}, deleter.deletedUIDs)
+		assert.Contains(t, logBuffer.String(), "failed to delete firebase user after account deletion")
+		mockUserRepo.AssertExpectations(t)
+		recentSignInVerifier.AssertExpectations(t)
+	})
+
+	t.Run("アプリ削除に失敗したらFirebase削除を呼ばない", func(t *testing.T) {
+		// Given: アプリ側の削除が先に失敗する
+		mockUserRepo := new(MockUserRepository)
+		recentSignInVerifier := new(mockRecentSignInVerifier)
+		deleter := &recordingFirebaseUserDeleter{}
+		userCredentialUsecase := newUsecaseWithDeleter(mockUserRepo, recentSignInVerifier, deleter)
+		deleteErr := errors.New("db error")
+
+		user := &entity.User{ID: 3, Username: un, FirebaseUID: new("firebase-uid")}
+		recentSignInVerifier.On("VerifyRecentSignIn", mock.Anything, "reauth-token").Return(&RecentSignInInfo{UID: "firebase-uid", AuthTime: recentAuthTime}, nil).Once()
+		mockUserRepo.On("FindByIDForUpdate", mock.Anything, mock.Anything, 3).Return(user, nil).Once()
+		mockUserRepo.On("DeleteByID", mock.Anything, mock.Anything, 3).Return(deleteErr).Once()
+
+		// When
+		err := userCredentialUsecase.DeleteOwnAccount(context.Background(), 3, reauthtokentest.New(t, "reauth-token"))
+
+		// Then: アプリ削除の失敗が返り Firebase 削除は試行しない
+		assert.ErrorIs(t, err, deleteErr)
+		assert.Empty(t, deleter.deletedUIDs)
 		mockUserRepo.AssertExpectations(t)
 		recentSignInVerifier.AssertExpectations(t)
 	})
