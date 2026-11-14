@@ -260,7 +260,8 @@ JSONはgzip圧縮して `result_gzip` に保存する。入力の `updated_at` �
 ## 11. 実装上の参照先
 
 - レスポンスDTO: `internal/dto/api_internal/player_data_dto.go`
-- 登録・差分計算: `internal/usecase/player_data_usecase_impl.go`
+- 登録処理: `internal/usecase/player_data_registration.go`
+- 差分計算: `internal/usecase/player_data_changes.go`
 - 集計条件: `internal/domain/service/player_record_statistics.go`
 - DB upsert条件: `internal/infra/repository/player_data_repository_impl.go`
 - 最新登録結果の変換: `internal/usecase/player_latest_update.go`
