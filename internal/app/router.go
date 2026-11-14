@@ -126,22 +126,23 @@ type Handlers struct {
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
 func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, error) {
-	e, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
+	e, _, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
 	return e, err
 }
 
-// backgroundBatchJobs は管理画面から起動したバッチをバックグラウンドで実行するユースケースです。
+// backgroundBatchJobs は管理画面から起動したバッチや楽曲カタログの世代確認など、DBを使うバックグラウンド処理です。
 // サーバー停止時は DB 接続を閉じる前に Wait で完了を待ちます。
 type backgroundBatchJobs interface {
 	Wait()
 }
 
-// newRouter はルーターを構築し、サーバー停止時に完了を待つ必要があるバッチのユースケースも返します。
+// newRouter はルーターを構築し、サーバー停止時に完了を待つ必要があるバッチのユースケースと、共有の楽曲カタログも返します。
 // ctx は管理画面から起動したバッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
-func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, error) {
+// 楽曲カタログの世代確認はここでは開始しません。起動は NewServer が行います。
+func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, *infra.SongCatalogProvider, error) {
 	e := echo.New()
 	if err := configureIPExtractor(e, cfg.ClientIP); err != nil {
-		return nil, nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to configure client IP extractor: %w", err)
 	}
 	e.Validator = NewCustomValidator()
 	e.JSONSerializer = NewTimezoneJSONSerializer(cfg.Location)
@@ -187,6 +188,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	adminChartRankingQueryService := infra.NewAdminChartRankingQueryService(db)
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
+	songCatalogProvider := infra.NewSongCatalogProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	chunirecQuery := infra.NewChunirecQueryService(db)
 	adminUserStatisticsQuery := infra.NewAdminUserStatisticsQueryService(db)
@@ -195,7 +197,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	tm := transaction.NewTransactionManager(db)
 	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(ctx, systemMaintenanceRepo)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
 	}
 	recentSignInVerifier := requireRecentSignInVerifier(firebaseTokenVerifier)
 	usernamePolicy, err := service.NewForbiddenUsernamePolicy(cfg.UsernamePolicy.Exact, cfg.UsernamePolicy.Contains)
@@ -206,7 +208,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
 	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
-		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, courseRepo, tm, goalRepo,
+		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, songCatalogProvider, courseRepo, tm, goalRepo,
 	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
 	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
@@ -215,12 +217,12 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
 	temporaryPlayerDataUsecase := usecase.NewTemporaryPlayerDataUsecase(db, temporaryPlayerDataRepo, playerDataUsecase, info.TempDataTTL, api_internal.DecodeTemporaryPlayerDataPayload)
-	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo)
+	songUsecase := usecase.NewSongUsecaseWithCascadeDelete(songRepo, masterCache, tm, db, overpowerDenominatorProvider, playerFavoriteSongRepo, playerLockedSongRepo, songCatalogProvider)
 	honorUsecase := usecase.NewHonorUsecase(honorRepo, masterCache, tm, db)
 	versionUsecase := usecase.NewVersionUsecase(versionRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db)
-	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db)
+	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db, songCatalogProvider)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache, goalGroupRepo)
 	goalGroupUsecase := usecase.NewGoalGroupUsecase(db, tm, goalGroupRepo, goalRepo)
 	recordFilterUsecase := usecase.NewRecordFilterUsecase(db, tm, recordFilterRepo, userRepo)
@@ -245,7 +247,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 	dataTransferCodec, err := datatransfer.NewCodec(cfg.DataTransferHMACSecret)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize data transfer codec: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize data transfer codec: %w", err)
 	}
 	dataTransferRepo := infra.NewUserDataTransferRepository(db)
 	dataTransferUsecase := usecase.NewUserDataTransferUsecase(dataTransferCodec, dataTransferRepo, goalUsecase)
@@ -255,6 +257,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 		infra.NewSongBatchJobRepository(db),
 		infrasongbatch.NewSongBatchUsecase(db, cfg.SongBatch.WikiBaseURL),
 		overpowerDenominatorProvider,
+		songCatalogProvider,
 	)
 	chartStatsBatchJobUsecase := usecase.NewChartStatsBatchJobUsecase(
 		ctx,
@@ -330,7 +333,7 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 
 	registerRoutes(e, handlers, firebaseAuthUsecaseStrict, firebaseAuthUsecaseReadOptimized, apiTokenUsecase, systemMaintenanceUsecase, cfg)
 
-	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, nil
+	return e, []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase}, songCatalogProvider, nil
 }
 
 // registerSystemRoutes は依存サービスの構築と分離し、公開範囲と認可を含む本番の登録経路をテストでも共有します。

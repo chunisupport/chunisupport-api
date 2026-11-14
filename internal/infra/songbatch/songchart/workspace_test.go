@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/songbatch"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -874,6 +875,7 @@ func TestSyncToMySQLResolvesNameFolderIDsFromDatabase(t *testing.T) {
 	require.NoError(t, err)
 	_, err = target.DB().ExecContext(ctx, `INSERT INTO name_folders (id, code) VALUES (9, 'KA'), (1, 'ABCD'), (6, 'UVWXYZ'), (17, 'NUMBER')`)
 	require.NoError(t, err)
+	createSongCatalogRevisionTable(ctx, t, target.DB())
 	_, err = target.DB().ExecContext(ctx, `
 		INSERT INTO songs (display_id, title, reading, artist, genre_id, official_idx, is_worldsend, is_deleted)
 		VALUES ('existing', 'Old title', NULL, 'Artist', 1, 'UPDATE-1', 0, 0);
@@ -980,6 +982,7 @@ func TestSyncToMySQLFillMissingReleaseDate(t *testing.T) {
 			require.NoError(t, err)
 			_, err = target.DB().ExecContext(ctx, `INSERT INTO name_folders (id, code) VALUES (1, 'ABCD'), (17, 'NUMBER')`)
 			require.NoError(t, err)
+			createSongCatalogRevisionTable(ctx, t, target.DB())
 
 			if tt.existsInMySQL {
 				_, err = target.DB().ExecContext(ctx, `
@@ -1013,4 +1016,50 @@ func TestSyncToMySQLFillMissingReleaseDate(t *testing.T) {
 			assert.Equal(t, tt.wantDate, got)
 		})
 	}
+}
+
+// createSongCatalogRevisionTable は同期先に楽曲カタログの変更世代テーブルを用意します。
+func createSongCatalogRevisionTable(ctx context.Context, t *testing.T, db *sqlx.DB) {
+	t.Helper()
+	_, err := db.ExecContext(ctx, `CREATE TABLE song_catalog_revision (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO song_catalog_revision (id, revision) VALUES (1, 0)`)
+	require.NoError(t, err)
+}
+
+func TestSyncToMySQL_同じトランザクションで楽曲カタログの世代を進める(t *testing.T) {
+	// Given
+	ctx := context.Background()
+	source, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "_source?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer source.Close()
+	target, err := NewSongChartWorkspace(ctx, Config{DSN: "file:" + t.Name() + "_target?mode=memory&cache=shared&_pragma=foreign_keys(ON)"})
+	require.NoError(t, err)
+	defer target.Close()
+	_, err = target.DB().ExecContext(ctx, `ALTER TABLE songs ADD COLUMN name_folder_id INTEGER NOT NULL DEFAULT 17`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `CREATE TABLE name_folders (id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE)`)
+	require.NoError(t, err)
+	_, err = target.DB().ExecContext(ctx, `INSERT INTO name_folders (id, code) VALUES (1, 'ABCD'), (17, 'NUMBER')`)
+	require.NoError(t, err)
+	createSongCatalogRevisionTable(ctx, t, target.DB())
+	_, err = source.DB().ExecContext(ctx, `
+		INSERT INTO songs (display_id, title, artist, genre_id, official_idx, released_at, is_worldsend, is_deleted)
+		VALUES ('disp-001', 'Alpha Song', 'Artist', 1, 'OFF-1', '2024-01-01', 0, 0)
+	`)
+	require.NoError(t, err)
+	tx, err := target.DB().BeginTxx(ctx, nil)
+	require.NoError(t, err)
+
+	// When
+	err = source.SyncToMySQL(ctx, tx, SyncOptions{})
+
+	// Then
+	require.NoError(t, err)
+	var revision int
+	require.NoError(t, tx.GetContext(ctx, &revision, `SELECT revision FROM song_catalog_revision WHERE id = 1`))
+	assert.Equal(t, 1, revision)
+	require.NoError(t, tx.Rollback())
+	require.NoError(t, target.DB().GetContext(ctx, &revision, `SELECT revision FROM song_catalog_revision WHERE id = 1`))
+	assert.Equal(t, 0, revision, "ロールバックした同期では世代を進めない")
 }

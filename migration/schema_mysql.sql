@@ -468,6 +468,12 @@ CREATE TABLE `slots` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `song_catalog_revision` (
+  `id` tinyint unsigned NOT NULL,
+  `revision` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `chk_song_catalog_revision_singleton` CHECK ((`id` = 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `songs` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,

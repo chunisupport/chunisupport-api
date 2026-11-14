@@ -6,3 +6,14 @@ type WorldsendSongWithChart struct {
 	Song  *Song
 	Chart *WorldsendChart
 }
+
+// Clone は楽曲と譜面を深く複製します。
+func (w *WorldsendSongWithChart) Clone() *WorldsendSongWithChart {
+	if w == nil {
+		return nil
+	}
+	return &WorldsendSongWithChart{
+		Song:  w.Song.Clone(),
+		Chart: w.Chart.Clone(),
+	}
+}

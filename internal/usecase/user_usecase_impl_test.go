@@ -337,16 +337,12 @@ func (s *stubWorldsendRecordRepository) FindByPlayerIDAndSongDisplayID(ctx conte
 }
 
 type stubSongRepository struct {
-	songs []*entity.Song
-	song  *entity.Song
-	err   error
+	song *entity.Song
+	err  error
 }
 
 func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.songs, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
@@ -412,16 +408,12 @@ func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
 }
 
 type stubWorldsendChartRepository struct {
-	records []*entity.WorldsendSongWithChart
-	record  *entity.WorldsendSongWithChart
-	err     error
+	record *entity.WorldsendSongWithChart
+	err    error
 }
 
 func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.records, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
@@ -1019,8 +1011,7 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -1032,10 +1023,9 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
@@ -1412,8 +1402,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -1425,10 +1414,9 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)

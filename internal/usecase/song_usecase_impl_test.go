@@ -419,7 +419,7 @@ func TestDeleteSong_DeletesFavoritesWhenFavoriteRepoIsSet(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, nil)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, nil, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -448,7 +448,7 @@ func TestDeleteSong_DeletesLockedSongsWhenLockedRepoIsSet(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, nil, mockLockedRepo)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, nil, mockLockedRepo, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -478,7 +478,7 @@ func TestDeleteSong_DeletesBothFavoritesAndLockedSongs(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -541,7 +541,7 @@ func TestDeleteSong_カスケード削除失敗時は原因エラーを返し後
 			mockMasterCache := new(MockSongMasterProvider)
 			mockExec := new(MockExecutor)
 			tm := &passthroughTransactionManager{tx: mockExec}
-			uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo)
+			uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo, nil)
 			ctx := context.Background()
 
 			song := &entity.Song{
@@ -630,28 +630,5 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.False(t, song.IsDeleted)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestGetSongsUpdatedAt_ReturnsRepositoryValue(t *testing.T) {
-	// Given
-	mockRepo := new(MockSongRepository)
-	mockMasterCache := new(MockSongMasterProvider)
-	mockTM := new(MockTransactionManager)
-	mockExec := new(MockExecutor)
-	uc := NewSongUsecase(mockRepo, mockMasterCache, mockTM, mockExec)
-	ctx := context.Background()
-	expected := time.Date(2026, 4, 9, 12, 34, 56, 0, time.UTC)
-
-	mockRepo.On("FindLatestUpdatedAt", ctx, mockExec).Return(&expected, nil).Once()
-
-	// When
-	result, err := uc.GetSongsUpdatedAt(ctx)
-
-	// Then
-	assert.NoError(t, err)
-	if assert.NotNil(t, result) {
-		assert.True(t, expected.Equal(*result))
-	}
 	mockRepo.AssertExpectations(t)
 }

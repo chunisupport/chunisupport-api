@@ -168,7 +168,7 @@ func (r *worldsendChartRepository) SaveSong(ctx context.Context, exec repository
 	}
 	song.NameFolderCode = nameFolderCode
 
-	return nil
+	return TouchSongCatalogRevision(ctx, exec)
 }
 
 // UpdateSongs は WORLD'S END 楽曲および譜面情報を一括更新します。
@@ -225,7 +225,7 @@ func (r *worldsendChartRepository) UpdateSongs(ctx context.Context, exec reposit
 		}
 	}
 
-	return nil
+	return TouchSongCatalogRevision(ctx, exec)
 }
 
 func collectSongsFromWorldsendUpdates(updates []*repository.WorldsendUpdate) ([]*entity.Song, error) {
@@ -579,6 +579,10 @@ func (r *worldsendChartRepository) CreateSong(ctx context.Context, exec reposito
 		notesVal,
 		notesDesigner,
 	); err != nil {
+		return nil, err
+	}
+
+	if err := TouchSongCatalogRevision(ctx, exec); err != nil {
 		return nil, err
 	}
 

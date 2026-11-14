@@ -16,7 +16,7 @@ import (
 
 // NewDatabase は既存DBを変更せず、新規DBへ全upを順番に適用します。
 // DSNがないローカル実行だけをスキップし、CIではTEST_MYSQL_DSNを必須設定します。
-func NewDatabase(t *testing.T, legacyEnv string) *sqlx.DB {
+func NewDatabase(t testing.TB, legacyEnv string) *sqlx.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_MYSQL_DSN")
 	if dsn == "" && legacyEnv != "" {

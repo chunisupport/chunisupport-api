@@ -3492,13 +3492,22 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/songs/updated-at`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **レスポンス**: `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値のみを返します。楽曲情報キャッシュの更新判定に使用できます。
+- **レスポンス**: 楽曲データ（`songs`, `charts`, `worldsend_charts`）の `updated_at` の最大値と、楽曲データの変更世代 `revision` を返します。楽曲情報キャッシュの更新判定には `revision` を使用してください。
+- 楽曲データの変更は、短い遅延の後に反映される場合があります。反映のタイミングは[楽曲カタログキャッシュ](master_data_preload_policy.md#楽曲カタログキャッシュ)を参照してください。
+
+#### 利用契約と移行
+
+- キャッシュの更新判定は `revision` の一致・不一致で行ってください。`revision` は楽曲・譜面の変更ごとに必ず変わります。大小は比較しないでください（小さくなる場合があります）。
+- `updated_at` は表示・互換用です。以前は「リクエスト時点のDB上の最大値」でしたが、「返却時点で反映済みの楽曲データに対応する値」に変わりました。形式は変わりません。秒精度のため、同じ秒内に重ねた変更などでは値が変わらず、更新判定に使うと変更を見逃します。
+- `updated_at` と `revision` は、楽曲データの反映より先に進みません。`revision` の変化を検知してから取得した楽曲一覧（`GET /internal/songs` など）は、その `revision` 以降のデータです。
+- 移行方法: `revision` を保存し、前回と異なる場合に楽曲一覧を再取得してください。`revision` を保存していない既存キャッシュは、初回に再取得して移行します。
 
 #### レスポンス例
 
 ```json
 {
-  "updated_at": "2026-04-09T12:34:56Z"
+  "updated_at": "2026-04-09T12:34:56Z",
+  "revision": 128
 }
 ```
 
@@ -3506,7 +3515,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `updated_at` | string \| null | `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null` |
+| `updated_at` | string \| null | 公開中の楽曲データに対応する `songs`, `charts`, `worldsend_charts` の `updated_at` の最大値 (ISO8601)。対象データが存在しない場合は `null`。表示・互換用 |
+| `revision` | integer | 公開中の楽曲データの変更世代。楽曲・譜面の変更ごとに必ず変わる。キャッシュの更新判定に使用し、一致・不一致だけを比較する |
 
 ### GET `/internal/courses/updated-at`
 - **認証**: Firebase Bearer (任意)
