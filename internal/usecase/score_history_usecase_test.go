@@ -244,3 +244,104 @@ func TestScoreHistoryUsecase_GetWorldsend_公開対象外の楽曲は404へ正�
 		})
 	}
 }
+
+func TestScoreHistoryUsecase_GetStandard_履歴を読む前の分岐ごとのエラー(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 指定する難易度、プレイヤー連携の有無、見つかる楽曲（nilは楽曲を検索しない段階で止まる）
+		difficulty   string
+		playerLinked bool
+		lookupUser   bool
+		song         *entity.Song
+		// Then: 期待するエラー
+		wantErr error
+	}{
+		{
+			name:       "履歴を持たないBASICは利用者の確認より先に対象外として弾く",
+			difficulty: "BASIC",
+			wantErr:    ErrScoreHistoryUnsupportedDifficulty,
+		},
+		{
+			name:       "プレイヤー未連携は楽曲を検索せず履歴なしとする",
+			difficulty: "EXPERT",
+			lookupUser: true,
+			wantErr:    ErrScoreHistoryNotFound,
+		},
+		{
+			// テスト用マスタはEXPERTだけを持つため、MASTERはマスタに無い難易度になる。
+			name:         "マスタに無い難易度は不正とする",
+			difficulty:   "MASTER",
+			playerLinked: true,
+			lookupUser:   true,
+			song:         &entity.Song{ID: 20, Charts: []*entity.Chart{{ID: 30, DifficultyID: 3}}},
+			wantErr:      ErrInvalidDifficulty,
+		},
+		{
+			name:         "楽曲に指定難易度の譜面が無ければ譜面なしとする",
+			difficulty:   "EXPERT",
+			playerLinked: true,
+			lookupUser:   true,
+			song:         &entity.Song{ID: 20, Charts: []*entity.Chart{}},
+			wantErr:      ErrChartNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			// 期待を設定していないモックの呼び出しはテストを失敗させるため、
+			// 止まるはずの段階より後ろの読み出し（楽曲・履歴）が呼ばれないことも同時に確かめられる。
+			ctx := context.Background()
+			exec := &MockExecutor{}
+			userRepo := new(MockUserRepository)
+			songRepo := new(MockSongRepository)
+			historyRepo := new(mockScoreHistoryRepository)
+			if tt.lookupUser {
+				user := testUser(t, 1, "testuser")
+				if tt.playerLinked {
+					user = newScoreHistoryReadUser(t)
+				}
+				userRepo.On("FindByUsername", mock.Anything, exec, "testuser").Return(user, nil).Once()
+			}
+			if tt.song != nil {
+				songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(tt.song, nil).Once()
+			}
+			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+
+			// When
+			got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", tt.difficulty)
+
+			// Then
+			assert.Nil(t, got)
+			assert.ErrorIs(t, err, tt.wantErr)
+			userRepo.AssertExpectations(t)
+			songRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestScoreHistoryUsecase_GetWorldsend_履歴が0件の場合は履歴なしエラーを返す(t *testing.T) {
+	// Given: 履歴0件は空配列ではなく404相当のエラーになる。通常譜面と共通の変換のためWORLD'S END側だけで確かめる。
+	ctx := context.Background()
+	exec := &MockExecutor{}
+	userRepo := new(MockUserRepository)
+	worldsendRepo := new(MockWorldsendChartRepository)
+	historyRepo := new(mockScoreHistoryRepository)
+	user := newScoreHistoryReadUser(t)
+	song := &entity.WorldsendSongWithChart{
+		Song:  &entity.Song{ID: 20, IsWorldsend: true},
+		Chart: &entity.WorldsendChart{ID: 40},
+	}
+	setScoreHistoryReadUserExpectation(userRepo, exec, user)
+	worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(song, nil).Once()
+	historyRepo.On("FindWorldsendTimeline", ctx, 10, 40).Return([]entity.ScoreHistoryEntry{}, nil).Once()
+	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+
+	// When
+	got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")
+
+	// Then
+	assert.Nil(t, got)
+	assert.ErrorIs(t, err, ErrScoreHistoryNotFound)
+	historyRepo.AssertExpectations(t)
+}

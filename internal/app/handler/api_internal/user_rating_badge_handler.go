@@ -72,7 +72,10 @@ func (h *UserHandler) getOfficialOverpowerBadge(c *echo.Context, percent bool) e
 		if percent {
 			value = player.OfficialOverpowerPercent
 		}
-		color = info.OverpowerBadgePossessionColors[player.PossessionID]
+		// マスタと色定義の更新時差があっても空色を返さず、既定色を維持します。
+		if possessionColor, ok := info.OverpowerBadgePossessionColors[player.PossessionID]; ok {
+			color = possessionColor
+		}
 	}
 	return c.JSON(http.StatusOK, newBadgeResponse(info.OverpowerBadgeLabel, value, 2, suffix, color))
 }

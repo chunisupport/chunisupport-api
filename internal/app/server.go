@@ -13,6 +13,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
+	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v5"
@@ -36,11 +37,14 @@ type Server struct {
 func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*Server, error) {
 	// 管理画面から起動したバッチを、停止シグナルに加えて Shutdown でもキャンセルできるようにします。
 	routerCtx, cancelBatchJobs := context.WithCancel(ctx)
-	router, batchJobs, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
+	router, batchJobs, songCatalog, err := newRouter(routerCtx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
 	if err != nil {
 		cancelBatchJobs()
 		return nil, err
 	}
+	// 楽曲カタログを先行構築し、別プロセス（CLIのsong-batch）による変更を定期的に取り込みます。
+	// DBを閉じる前に停止を待つため、バッチと同じく停止時に待機する対象へ加えます。
+	batchJobs = append(batchJobs, startSongCatalogWatcher(routerCtx, songCatalog))
 
 	startCtx, cancelStart := context.WithCancel(context.Background())
 	return &Server{
@@ -139,4 +143,25 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	return errors.Join(shutdownErrs...)
+}
+
+// songCatalogWatcher は楽曲カタログの変更世代をバックグラウンドで確認します。
+type songCatalogWatcher struct {
+	done chan struct{}
+}
+
+// startSongCatalogWatcher は ctx が終了するまで楽曲カタログの世代確認を続けます。
+// 開始直後に初回構築を行い、失敗しても起動は止めず、参照時と次の周期で再試行します。
+func startSongCatalogWatcher(ctx context.Context, songCatalog *infra.SongCatalogProvider) *songCatalogWatcher {
+	watcher := &songCatalogWatcher{done: make(chan struct{})}
+	go func() {
+		defer close(watcher.done)
+		songCatalog.Run(ctx, info.SongCatalogRevisionPollInterval)
+	}()
+	return watcher
+}
+
+// Wait は世代確認の停止を待ちます。
+func (w *songCatalogWatcher) Wait() {
+	<-w.done
 }

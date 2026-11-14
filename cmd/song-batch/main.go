@@ -75,6 +75,7 @@ func run() int {
 		infrarepo.NewSongBatchJobRepository(database),
 		infrasongbatch.NewSongBatchUsecase(database, cfg.SongBatch.WikiBaseURL),
 		nil,
+		nil,
 	)
 	acquired, err := jobUsecase.RunFromCLI(ctx, req)
 	if err != nil {

@@ -26,6 +26,7 @@ func TestUsecaseDoesNotDependOnDTO(t *testing.T) {
 			path, err := strconv.Unquote(imported.Path.Value)
 			require.NoError(t, err)
 			assert.Falsef(t, strings.Contains(path, "/internal/dto"), "%s がAPI DTOへ依存しています: %s", file, path)
+			assert.Falsef(t, path == "github.com/chunisupport/chunisupport-api/internal/infra" || strings.HasPrefix(path, "github.com/chunisupport/chunisupport-api/internal/infra/"), "%s がインフラ層へ依存しています: %s", file, path)
 		}
 
 		// astを明示的に参照し、parserが返すimport情報の型をコンパイル時にも固定します。

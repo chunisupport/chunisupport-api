@@ -9,6 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/goalgroupname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,11 +28,16 @@ func TestInternalizeTransferredGoalAttributes(t *testing.T) {
 }
 
 func TestInternalizeTransferredGoalAttributesRejectsInternalIDs(t *testing.T) {
+	// Given: 難易度をマスタ名ではなく内部IDで指定している
 	masters := &domainmasterdata.GoalMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}
 
+	// When: 移行用の属性を内部IDへ戻す
 	_, err := internalizeTransferredGoalAttributes(json.RawMessage("{\"diff\":4}"), masters)
 
-	assert.Error(t, err)
+	// Then: 内部IDの指定であることが分かる理由で拒否する
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "diff")
+	assert.Contains(t, err.Error(), "must contain master names")
 }
 
 func TestValidateTransferredGoalsFetchesDynamicStatsInOneBatch(t *testing.T) {
@@ -135,4 +141,70 @@ func TestValidateTransferredGoals_譜面定数の入力モードを検証する(
 			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
+}
+
+func TestValidateTransferredGoals_グループの目標だけが不正でも拒否する(t *testing.T) {
+	// Given: 未所属の目標は妥当で、グループ内の目標だけ題名が空である
+	groupName, err := goalgroupname.NewGoalGroupName("グループ01")
+	require.NoError(t, err)
+	validator := &goalUsecase{goalRepo: &stubGoalRepo{}, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{
+		Ungrouped: []entity.UserDataTransferGoal{
+			{Title: "妥当な目標", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{}`)},
+		},
+		Groups: []entity.UserDataTransferGoalGroup{{
+			Name:      groupName,
+			SortOrder: 1,
+			CreatedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			Goals: []entity.UserDataTransferGoal{
+				{Title: "", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{}`)},
+			},
+		}},
+	}
+
+	// When
+	err = validator.ValidateTransferredGoals(context.Background(), goals)
+
+	// Then: グループ内の不正が理由で取り込みを拒否する
+	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
+	assert.ErrorIs(t, err, ErrInvalidGoalTitle)
+}
+
+func TestValidateTransferredGoals_属性に未知のマスタ名があれば拒否する(t *testing.T) {
+	// Given: 題名と達成条件は妥当で、ジャンル名だけ存在しない値である
+	validator := &goalUsecase{goalRepo: &stubGoalRepo{}, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "妥当な目標", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{"genre":"存在しないジャンル"}`)},
+	}}
+
+	// When
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	// Then: 未知のマスタ名が理由で取り込みを拒否する
+	assert.ErrorIs(t, err, ErrDataTransferInvalidData)
+	assert.Contains(t, err.Error(), "unknown master name")
+}
+
+// mismatchedStatsGoalRepo は統計の件数を目標の件数と合わなく返す検証用のリポジトリです。
+// 内部不整合の分岐を確かめるために使います。
+type mismatchedStatsGoalRepo struct {
+	*stubGoalRepo
+}
+
+func (s *mismatchedStatsGoalRepo) GetTargetStatsBatch(context.Context, repository.Executor, []repository.GoalTargetFilter) ([]repository.GoalTargetStats, error) {
+	return []repository.GoalTargetStats{}, nil
+}
+
+func TestValidateTransferredGoals_統計の件数が合わなければ内部エラーにする(t *testing.T) {
+	// Given: 目標自体は妥当だが、統計が0件しか返らない状態にする
+	validator := &goalUsecase{goalRepo: &mismatchedStatsGoalRepo{stubGoalRepo: &stubGoalRepo{}}, masterProvider: &stubGoalMasterProvider{}}
+	goals := entity.UserDataTransferGoals{Ungrouped: []entity.UserDataTransferGoal{
+		{Title: "100万点を1譜面", AchievementType: "score_count", AchievementParams: json.RawMessage(`{"score":1000000,"count":1}`), Attributes: json.RawMessage(`{}`)},
+	}}
+
+	// When
+	err := validator.ValidateTransferredGoals(context.Background(), goals)
+
+	// Then: 内部不整合として報告する
+	assert.ErrorIs(t, err, ErrInternalError)
 }

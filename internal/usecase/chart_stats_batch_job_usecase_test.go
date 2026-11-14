@@ -17,10 +17,12 @@ import (
 )
 
 type fakeChartStatsBatchJobRepository struct {
-	mu      sync.Mutex
-	jobs    map[uuid.UUID]entity.ChartStatsBatchJob
-	limit   int
-	saveErr error
+	beforeSave          func()
+	lastSaveHasDeadline bool
+	mu                  sync.Mutex
+	jobs                map[uuid.UUID]entity.ChartStatsBatchJob
+	limit               int
+	saveErr             error
 }
 
 func newFakeChartStatsBatchJobRepository(jobs ...*entity.ChartStatsBatchJob) *fakeChartStatsBatchJobRepository {
@@ -31,7 +33,14 @@ func newFakeChartStatsBatchJobRepository(jobs ...*entity.ChartStatsBatchJob) *fa
 	return repo
 }
 
-func (r *fakeChartStatsBatchJobRepository) Save(_ context.Context, job *entity.ChartStatsBatchJob) error {
+func (r *fakeChartStatsBatchJobRepository) Save(ctx context.Context, job *entity.ChartStatsBatchJob) error {
+	if r.beforeSave != nil {
+		r.beforeSave()
+	}
+	_, r.lastSaveHasDeadline = ctx.Deadline()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.saveErr != nil {
@@ -86,13 +95,22 @@ func (r *fakeChartStatsBatchJobRepository) only(t *testing.T) entity.ChartStatsB
 }
 
 type fakeChartStatsBatchRunner struct {
-	err    error
-	cancel context.CancelFunc
-	called bool
+	started chan context.Context
+	proceed <-chan struct{}
+	err     error
+	cancel  context.CancelFunc
+	called  bool
 }
 
 func (r *fakeChartStatsBatchRunner) Execute(ctx context.Context) (ChartStatsBatchResult, error) {
 	r.called = true
+	if r.started != nil {
+		r.started <- ctx
+		<-r.proceed
+		if err := ctx.Err(); err != nil {
+			return ChartStatsBatchResult{}, err
+		}
+	}
 	if r.cancel != nil {
 		// err がある場合は、キャンセルと同時に別のエラーも返すケースを再現します。
 		r.cancel()
@@ -287,22 +305,53 @@ func TestChartStatsBatchJobUsecase_StartFromAdmin_実行中の場合は受け付
 }
 
 func TestChartStatsBatchJobUsecase_StartFromAdmin_リクエストがキャンセルされても実行を続ける(t *testing.T) {
-	// Given: 受付直後に終了する HTTP リクエストの context
-	requestCtx, cancelRequest := context.WithCancel(context.Background())
-	repo := newFakeChartStatsBatchJobRepository()
-	uc := newTestChartStatsBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, &fakeChartStatsBatchRunner{})
-
-	// When
-	requester := newChartStatsBatchRequester(t)
-	job, err := uc.StartFromAdmin(requestCtx, requester)
-	cancelRequest()
-	uc.Wait()
-
-	// Then
-	require.NoError(t, err)
-	saved, err := repo.FindByID(context.Background(), job.ID())
-	require.NoError(t, err)
-	assert.Equal(t, entity.ChartStatsBatchJobStatusSucceeded, saved.Status())
+	for _, shutdown := range []bool{false, true} {
+		name := "リクエスト切断では継続"
+		if shutdown {
+			name = "サーバー停止では中断"
+		}
+		t.Run(name, func(t *testing.T) {
+			requestCtx, cancelRequest := context.WithCancel(context.Background())
+			defer cancelRequest()
+			backgroundCtx, cancelBackground := context.WithCancel(context.Background())
+			defer cancelBackground()
+			repo := newFakeChartStatsBatchJobRepository()
+			started := make(chan context.Context, 1)
+			proceed := make(chan struct{})
+			var once sync.Once
+			resume := func() { once.Do(func() { close(proceed) }) }
+			defer resume()
+			runner := &fakeChartStatsBatchRunner{started: started, proceed: proceed}
+			locks := &fakeSongBatchLockProvider{acquired: true}
+			uc := newTestChartStatsBatchJobUsecase(backgroundCtx, locks, repo, runner)
+			job, err := uc.StartFromAdmin(requestCtx, newChartStatsBatchRequester(t))
+			require.NoError(t, err)
+			var executionCtx context.Context
+			select {
+			case executionCtx = <-started:
+			case <-time.After(5 * time.Second):
+				require.FailNow(t, "ジョブが開始しません")
+			}
+			cancelRequest()
+			assert.NoError(t, executionCtx.Err(), "HTTPリクエストの寿命から切り離す")
+			if shutdown {
+				cancelBackground()
+				assert.ErrorIs(t, executionCtx.Err(), context.Canceled)
+			}
+			resume()
+			uc.Wait()
+			saved, err := repo.FindByID(context.Background(), job.ID())
+			require.NoError(t, err)
+			expected := entity.ChartStatsBatchJobStatusSucceeded
+			if shutdown {
+				expected = entity.ChartStatsBatchJobStatusInterrupted
+			}
+			assert.Equal(t, expected, saved.Status())
+			assert.True(t, locks.lock.released, "停止後もロックを解放する")
+			assert.True(t, repo.lastSaveHasDeadline, "後処理のI/Oに期限を設定する")
+			assert.True(t, locks.lock.releaseHasDeadline, "ロック解放にも期限を設定する")
+		})
+	}
 }
 
 func TestChartStatsBatchJobUsecase_StartFromAdmin_停止処理後は受け付けない(t *testing.T) {

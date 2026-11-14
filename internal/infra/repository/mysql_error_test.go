@@ -168,6 +168,18 @@ func TestMySQLErrorWrappers_原因エラーを保持する(t *testing.T) {
 			wantErr:  domainrepo.ErrVersionConflict,
 		},
 		{
+			name:     "テーブル名で修飾されたバージョン名の重複",
+			wrap:     wrapVersionDuplicateError,
+			mysqlErr: &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry for key 'versions.name'"},
+			wantErr:  domainrepo.ErrVersionConflict,
+		},
+		{
+			name:     "バージョン超ショート名の重複",
+			wrap:     wrapVersionDuplicateError,
+			mysqlErr: &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry 'VRS' for key 'versions.uq_versions_short_name'"},
+			wantErr:  domainrepo.ErrVersionConflict,
+		},
+		{
 			name:     "スコア履歴の登録日時の重複",
 			wrap:     wrapScoreHistoryInsertError,
 			mysqlErr: &mysql.MySQLError{Number: mysqlDuplicateEntryErrorNumber, Message: "Duplicate entry for key 'PRIMARY'"},

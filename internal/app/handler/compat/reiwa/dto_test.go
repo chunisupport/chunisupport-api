@@ -1,6 +1,7 @@
 package reiwa
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/notes"
 	"github.com/chunisupport/chunisupport-api/internal/infra/masterdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateLevel(t *testing.T) {
@@ -125,6 +127,44 @@ func TestToChunithmRecordOriginalResponse_Basic(t *testing.T) {
 	assert.Equal(t, 10.5, r1.Const)
 	assert.Equal(t, 10.5, r1.Level)
 	assert.Equal(t, 1, r1.Unknown)
+
+	// Then: JSON全体の契約を固定する（項目名・数値と文字列の区別・難易度の大文字を含む）。
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[
+		{
+			"title": "テスト曲",
+			"artist": "テストアーティスト",
+			"img": "testjacket123",
+			"genre": "niconico",
+			"const": 7,
+			"level": 7,
+			"diff": "BAS",
+			"notes": 500,
+			"unknown": 0,
+			"chunirec_id": "song001",
+			"idx": "5",
+			"bpm": 200,
+			"release": 15790140,
+			"version": "PARADISE"
+		},
+		{
+			"title": "テスト曲",
+			"artist": "テストアーティスト",
+			"img": "testjacket123",
+			"genre": "niconico",
+			"const": 10.5,
+			"level": 10.5,
+			"diff": "MAS",
+			"notes": 500,
+			"unknown": 1,
+			"chunirec_id": "song001",
+			"idx": "5",
+			"bpm": 200,
+			"release": 15790140,
+			"version": "PARADISE"
+		}
+	]`, string(body))
 }
 
 func TestToChunithmRecordOriginalResponse_GenrePOPSANIME(t *testing.T) {
@@ -230,6 +270,7 @@ func TestToChunithmRecordOriginalResponse_SortOrder(t *testing.T) {
 }
 
 func TestResolveVersionName_TrimCHUNITHMPrefix(t *testing.T) {
+	// Given: 既存fixtureのまま境界だけを足す。判定は開始日時以下(<=)のため、ちょうどは新バージョン側になる。
 	cache := &masterdata.Cache{
 		VersionsByID: map[int]masterdata.Version{
 			1: {ID: 1, Name: "CHUNITHM NEW", ReleasedAt: time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)},
@@ -238,20 +279,57 @@ func TestResolveVersionName_TrimCHUNITHMPrefix(t *testing.T) {
 		},
 	}
 
-	// 2019-06-15 → CHUNITHM NEW PLUS (released 2019-06-01) → "NEW PLUS"
-	songTime := time.Date(2019, 6, 15, 0, 0, 0, 0, time.UTC)
-	result := resolveVersionName(&songTime, cache)
-	assert.Equal(t, "NEW PLUS", result)
+	tests := []struct {
+		name string
+		// Given: 楽曲のリリース日時
+		releasedAt time.Time
+		// Then: 期待するバージョン表記
+		expected string
+	}{
+		{
+			name:       "NEW PLUS開始ちょうどはNEW PLUSになる",
+			releasedAt: time.Date(2019, 6, 1, 0, 0, 0, 0, time.UTC),
+			expected:   "NEW PLUS",
+		},
+		{
+			name:       "NEW PLUS開始1秒前はNEWのまま",
+			releasedAt: time.Date(2019, 5, 31, 23, 59, 59, 0, time.UTC),
+			expected:   "NEW",
+		},
+		{
+			name:       "最古バージョン開始1秒前は該当なしで空文字",
+			releasedAt: time.Date(2018, 12, 31, 23, 59, 59, 0, time.UTC),
+			expected:   "",
+		},
+		{
+			name:       "2019-06-15はNEW PLUS期間中のためNEW PLUS",
+			releasedAt: time.Date(2019, 6, 15, 0, 0, 0, 0, time.UTC),
+			expected:   "NEW PLUS",
+		},
+		{
+			name:       "2019-03-01はNEW期間中のためNEW",
+			releasedAt: time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC),
+			expected:   "NEW",
+		},
+		{
+			name:       "2020-12-01はPARADISE LOST期間中のためPARADISE LOST",
+			releasedAt: time.Date(2020, 12, 1, 0, 0, 0, 0, time.UTC),
+			expected:   "PARADISE LOST",
+		},
+	}
 
-	// 2019-03-01 → CHUNITHM NEW (released 2019-01-01) → "NEW"
-	songTime2 := time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC)
-	result2 := resolveVersionName(&songTime2, cache)
-	assert.Equal(t, "NEW", result2)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			releasedAt := tt.releasedAt
 
-	// 2020-12-01 → CHUNITHM PARADISE LOST → "PARADISE LOST"
-	songTime3 := time.Date(2020, 12, 1, 0, 0, 0, 0, time.UTC)
-	result3 := resolveVersionName(&songTime3, cache)
-	assert.Equal(t, "PARADISE LOST", result3)
+			// When
+			result := resolveVersionName(&releasedAt, cache)
+
+			// Then
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestToChunithmRecordOriginalResponse_EmptyList(t *testing.T) {
@@ -260,6 +338,15 @@ func TestToChunithmRecordOriginalResponse_EmptyList(t *testing.T) {
 
 	result2 := ToChunithmRecordOriginalResponse([]*entity.Song{}, nil)
 	assert.Len(t, result2, 0)
+
+	// Then: 空入力でもJSONは空配列を返し、nullにならないことを固定する。
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(body))
+
+	body2, err := json.Marshal(result2)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(body2))
 }
 
 func TestToChunithmRecordOriginalResponse_SongWithNoCharts(t *testing.T) {
@@ -307,17 +394,6 @@ func TestResolveVersionName_EmptyForOriginal(t *testing.T) {
 	songTime := time.Date(2015, 8, 1, 0, 0, 0, 0, time.UTC)
 	result := resolveVersionName(&songTime, cache)
 	assert.Equal(t, "", result)
-}
-
-func TestResolveRelease(t *testing.T) {
-	// 2020-01-15 00:00:00 UTC → 2020-01-15 00:00:00 JST
-	releasedAt := time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)
-	result := resolveRelease(&releasedAt)
-
-	// 2020-01-15 00:00:00 JST = 2020-01-14 15:00:00 UTC
-	// Unix: 1579014000
-	// / 100: 15790140
-	assert.Equal(t, int64(15790140), result)
 }
 
 func TestResolveRelease_Nil(t *testing.T) {

@@ -337,16 +337,12 @@ func (s *stubWorldsendRecordRepository) FindByPlayerIDAndSongDisplayID(ctx conte
 }
 
 type stubSongRepository struct {
-	songs []*entity.Song
-	song  *entity.Song
-	err   error
+	song *entity.Song
+	err  error
 }
 
 func (s *stubSongRepository) FindAllExcludingWorldsend(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.Song, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.songs, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubSongRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.Song, error) {
@@ -412,16 +408,12 @@ func (s *stubSongMasterProvider) GetAccountTypeNameByID(id int) string {
 }
 
 type stubWorldsendChartRepository struct {
-	records []*entity.WorldsendSongWithChart
-	record  *entity.WorldsendSongWithChart
-	err     error
+	record *entity.WorldsendSongWithChart
+	err    error
 }
 
 func (s *stubWorldsendChartRepository) FindAll(ctx context.Context, exec repository.Executor, includeDeleted bool) ([]*entity.WorldsendSongWithChart, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	return s.records, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubWorldsendChartRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID string) (*entity.WorldsendSongWithChart, error) {
@@ -582,26 +574,60 @@ func TestUserUsecase_GetUserUpdatedAt(t *testing.T) {
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリを使用する(t *testing.T) {
-	now := time.Now()
-	playerUpdatedAt := now
-	recordsUpdatedAt := now.Add(time.Hour)
-	service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
-	impl, ok := service.(*userUsecase)
-	require.True(t, ok)
-	impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
-		result: &repository.UserUpdatedAtQueryResult{
-			User:             &entity.User{ID: 1, PlayerID: new(10)},
-			PlayerUpdatedAt:  &playerUpdatedAt,
-			RecordsUpdatedAt: &recordsUpdatedAt,
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 11, 12, 1, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name             string
+		playerUpdatedAt  time.Time
+		recordsUpdatedAt *time.Time
+		expected         time.Time
+	}{
+		{
+			name:             "レコード更新の方が新しい",
+			playerUpdatedAt:  now,
+			recordsUpdatedAt: &later,
+			expected:         later,
+		},
+		{
+			name:             "プロフィール更新の方が新しい",
+			playerUpdatedAt:  later,
+			recordsUpdatedAt: &now,
+			expected:         later,
+		},
+		{
+			name:            "レコード更新日時がない",
+			playerUpdatedAt: now,
+			expected:        now,
+		},
+		{
+			name:             "更新日時が同じ",
+			playerUpdatedAt:  now,
+			recordsUpdatedAt: &now,
+			expected:         now,
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 本番で注入される専用クエリ経路を使う
+			service := newUserUsecaseForTest(nil, &stubUserRepository{}, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil)
+			impl, ok := service.(*userUsecase)
+			require.True(t, ok)
+			impl.userUpdatedAtQuery = &stubUserUpdatedAtQueryService{
+				result: &repository.UserUpdatedAtQueryResult{
+					User:             &entity.User{ID: 1, PlayerID: new(10)},
+					PlayerUpdatedAt:  &tt.playerUpdatedAt,
+					RecordsUpdatedAt: tt.recordsUpdatedAt,
+				},
+			}
 
-	result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
+			// When
+			result, err := service.GetUserUpdatedAt(context.Background(), "tester", nil)
 
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.NotNil(t, result.UpdatedAt)
-	assert.Equal(t, recordsUpdatedAt, *result.UpdatedAt)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, &UserUpdatedAtOutput{UpdatedAt: &tt.expected}, result)
+		})
+	}
 }
 
 func TestUserUsecase_GetUserUpdatedAt_専用クエリでも非公開設定を検証する(t *testing.T) {
@@ -985,8 +1011,7 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -998,10 +1023,9 @@ func TestUserUsecase_GetUserProfileWithRecords_未プレイを常に補完する
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileWithRecords(context.Background(), "tester", nil)
@@ -1090,48 +1114,6 @@ func TestUserUsecase_GetUserProfileWithRecords_IsOPTarget(t *testing.T) {
 	assert.True(t, result.Records.All[1].IsOPTarget, "同値の場合は高い難易度を対象にする")
 	assert.True(t, result.Records.All[2].IsOPTarget, "同一曲内でOPが最大の譜面を対象にする")
 	assert.False(t, result.Records.All[3].IsOPTarget, "同一曲内でOPが低い譜面を対象にしない")
-}
-
-func TestCalculateOPTargetChartIDsFromCandidates(t *testing.T) {
-	chartConst, err := chartconstant.NewChartConstant(12.4)
-	require.NoError(t, err)
-	sameOPScore, err := score.NewScore(1009000)
-	require.NoError(t, err)
-	higherOPScore, err := score.NewScore(1010000)
-	require.NoError(t, err)
-	zeroOPScore, err := score.NewScore(0)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name       string
-		candidates []repository.PlayerRecordOPTargetCandidate
-		expected   map[int]struct{}
-	}{
-		{
-			name: "同値の場合は高い難易度を対象にする",
-			candidates: []repository.PlayerRecordOPTargetCandidate{
-				{ChartID: 1001, SongID: 10, DifficultyID: 3, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
-				{ChartID: 1002, SongID: 10, DifficultyID: 4, Score: sameOPScore, ComboLampID: 3, ChartConstant: chartConst},
-			},
-			expected: map[int]struct{}{1002: {}},
-		},
-		{
-			name: "同一楽曲内で最大OPの譜面を対象にする",
-			candidates: []repository.PlayerRecordOPTargetCandidate{
-				{ChartID: 2001, SongID: 20, DifficultyID: 3, Score: higherOPScore, ComboLampID: 3, ChartConstant: chartConst},
-				{ChartID: 2002, SongID: 20, DifficultyID: 4, Score: zeroOPScore, ComboLampID: 1, ChartConstant: chartConst},
-			},
-			expected: map[int]struct{}{2001: {}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := calculateOPTargetChartIDsFromCandidates(tt.candidates)
-
-			assert.Equal(t, tt.expected, actual)
-		})
-	}
 }
 
 func TestCalculateOPTargetChartIDs_両経路が同じ譜面ID集合を返す(t *testing.T) {
@@ -1420,8 +1402,7 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 	weSong := &entity.Song{ID: 30, DisplayID: "we30"}
 	weChart := &entity.WorldsendChart{ID: 3001, SongID: 30}
 
-	service := newUserUsecaseForTest(
-		nil,
+	service := newUserUsecaseWithSongCatalogForTest(
 		&stubUserRepository{user: user},
 		&stubPlayerRepository{playerWithHonors: &repository.PlayerWithHonors{Player: player, Honors: []*entity.PlayerHonor{}}},
 		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
@@ -1433,10 +1414,9 @@ func TestUserUsecase_GetUserProfileRecordView_未プレイを常に補完する(
 			ChartDifficulty: &master.ChartDifficulty{ID: 3, Name: "expert"},
 		}}},
 		&stubWorldsendRecordRepository{},
-		&stubSongRepository{songs: []*entity.Song{playedSong, unplayedSong}},
-		&stubWorldsendChartRepository{records: []*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}}},
 		&stubSongMasterProvider{masters: &masterdata.SongMasters{DifficultyNamesByID: map[int]string{3: "EXPERT", 4: "MASTER"}, Difficulties: map[string]master.ChartDifficulty{"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2}, "MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}}}},
-		nil,
+		[]*entity.Song{playedSong, unplayedSong},
+		[]*entity.WorldsendSongWithChart{{Song: weSong, Chart: weChart}},
 	)
 
 	result, err := service.GetUserProfileRecordView(context.Background(), "tester", nil)
@@ -1814,6 +1794,422 @@ func TestUserUsecase_GetUserWorldsendSongRecord_未プレイ補完を返す(t *t
 	assert.Nil(t, result.Meta.UpdatedAt)
 }
 
+func TestUserUsecase_GetUserSongRecord_対象外の楽曲は見つからないとして返す(t *testing.T) {
+	// Given: 通常譜面用の取得で除外すべき楽曲だけを用意する
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	tests := []struct {
+		name string
+		// Given: 1件だけ当てはめる除外条件
+		song    *entity.Song
+		songErr error
+	}{
+		{
+			name: "削除済みの楽曲",
+			song: &entity.Song{ID: 20, DisplayID: "SONG001", Charts: []*entity.Chart{}, IsDeleted: true},
+		},
+		{
+			name: "WORLD'S ENDの楽曲",
+			song: &entity.Song{ID: 20, DisplayID: "WE001", Charts: []*entity.Chart{}, IsWorldsend: true},
+		},
+		{
+			name: "楽曲なし",
+			song: nil,
+		},
+		{
+			name:    "リポジトリ未検出",
+			songErr: repository.ErrSongNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			service := newUserUsecaseForTest(
+				nil,
+				&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
+				&stubPlayerRepository{},
+				&stubPlayerRecordRepository{},
+				nil,
+				&stubSongRepository{song: tt.song, err: tt.songErr},
+				nil,
+				nil,
+				nil,
+			)
+
+			// When
+			result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "MASTER")
+
+			// Then: 楽曲が無いものとして拒否する
+			assert.Nil(t, result)
+			assert.ErrorIs(t, err, repository.ErrSongNotFound)
+		})
+	}
+}
+
+func TestUserUsecase_GetUserWorldsendSongRecord_対象外の楽曲は見つからないとして返す(t *testing.T) {
+	// Given: WORLD'S END用の取得で除外すべき楽曲だけを用意する
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	tests := []struct {
+		name string
+		// Given: 1件だけ当てはめる除外条件
+		record    *entity.WorldsendSongWithChart
+		recordErr error
+	}{
+		{
+			name: "削除済みの楽曲",
+			record: &entity.WorldsendSongWithChart{
+				Song:  &entity.Song{ID: 20, DisplayID: "WE001", Charts: []*entity.Chart{}, IsDeleted: true, IsWorldsend: true},
+				Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
+			},
+		},
+		{
+			name: "通常の楽曲",
+			record: &entity.WorldsendSongWithChart{
+				Song:  &entity.Song{ID: 20, DisplayID: "SONG001", Charts: []*entity.Chart{}, IsWorldsend: false},
+				Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
+			},
+		},
+		{
+			name:   "楽曲なし",
+			record: nil,
+		},
+		{
+			name:   "楽曲本体なし",
+			record: &entity.WorldsendSongWithChart{Song: nil, Chart: &entity.WorldsendChart{ID: 201, SongID: 20}},
+		},
+		{
+			name: "譜面なし",
+			record: &entity.WorldsendSongWithChart{
+				Song:  &entity.Song{ID: 20, DisplayID: "WE001", Charts: []*entity.Chart{}, IsWorldsend: true},
+				Chart: nil,
+			},
+		},
+		{
+			name:      "リポジトリ未検出",
+			recordErr: repository.ErrSongNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			service := newUserUsecaseForTest(
+				nil,
+				&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
+				&stubPlayerRepository{},
+				&stubPlayerRecordRepository{},
+				&stubWorldsendRecordRepository{},
+				nil,
+				&stubWorldsendChartRepository{record: tt.record, err: tt.recordErr},
+				nil,
+				nil,
+			)
+
+			// When
+			result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001")
+
+			// Then: 楽曲が無いものとして拒否する
+			assert.Nil(t, result)
+			assert.ErrorIs(t, err, repository.ErrSongNotFound)
+		})
+	}
+}
+
+func TestUserUsecase_GetUserSongRecord_小文字難易度を受理する(t *testing.T) {
+	// Given: docs/API.mdではdifficultyの大文字小文字を区別しないと定めている
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Title:     "テスト曲",
+		Charts: []*entity.Chart{
+			{ID: 101, SongID: 20, DifficultyID: 1},
+			{ID: 104, SongID: 20, DifficultyID: 4},
+		},
+	}
+	masters := &masterdata.SongMasters{
+		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
+		Difficulties: map[string]master.ChartDifficulty{
+			"BASIC":  {ID: 1, Name: "BASIC", SortOrder: 1},
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		&stubSongMasterProvider{masters: masters},
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "master")
+
+	// Then: 大文字と同じくMASTERの補完を1件返す
+	require.NoError(t, err)
+	require.Len(t, result.Standard, 1)
+	assert.Equal(t, "MASTER", result.Standard[0].Difficulty)
+	assert.False(t, result.Standard[0].IsPlayed)
+	assert.Nil(t, result.Standard[0].UpdatedAt)
+	assert.Nil(t, result.Meta.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserSongRecord_難易度未指定で全難易度を返す(t *testing.T) {
+	// Given: BASICはプレイ済み、MASTERは未プレイの楽曲
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	playedAt := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	playedScore, err := score.NewScore(1009500)
+	require.NoError(t, err)
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Title:     "テスト曲",
+		Charts: []*entity.Chart{
+			{ID: 101, SongID: 20, DifficultyID: 1},
+			{ID: 104, SongID: 20, DifficultyID: 4},
+		},
+	}
+	masters := &masterdata.SongMasters{
+		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
+		Difficulties: map[string]master.ChartDifficulty{
+			"BASIC":  {ID: 1, Name: "BASIC", SortOrder: 1},
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			PlayerID:        playerID,
+			ChartID:         101,
+			Score:           playedScore,
+			UpdatedAt:       playedAt,
+			Chart:           song.Charts[0],
+			Song:            song,
+			ChartDifficulty: &master.ChartDifficulty{ID: 1, Name: "BASIC", SortOrder: 1},
+		}}},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		&stubSongMasterProvider{masters: masters},
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "")
+
+	// Then: 難易度の並びどおり2件を返し、プレイ済みと補完を見分ける
+	require.NoError(t, err)
+	require.Len(t, result.Standard, 2)
+	assert.Equal(t, "BASIC", result.Standard[0].Difficulty)
+	assert.Equal(t, "MASTER", result.Standard[1].Difficulty)
+	assert.True(t, result.Standard[0].IsPlayed)
+	assert.False(t, result.Standard[1].IsPlayed)
+	require.NotNil(t, result.Standard[0].UpdatedAt)
+	assert.True(t, result.Standard[0].UpdatedAt.Equal(playedAt))
+	assert.Nil(t, result.Standard[1].UpdatedAt)
+	require.NotNil(t, result.UpdatedAt)
+	assert.True(t, result.UpdatedAt.Equal(playedAt))
+	require.NotNil(t, result.Meta.UpdatedAt)
+	assert.True(t, result.Meta.UpdatedAt.Equal(playedAt))
+}
+
+func TestUserUsecase_GetUserSongRecord_プレイヤー未連携は空を返す(t *testing.T) {
+	// Given: プレイヤーと連携していないユーザー
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Title:     "テスト曲",
+		Charts:    []*entity.Chart{{ID: 101, SongID: 20, DifficultyID: 1}},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		nil,
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "")
+
+	// Then: レコードは空で更新日時はなし
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.Standard)
+	assert.Nil(t, result.UpdatedAt)
+	require.NotNil(t, result.Meta)
+	assert.Nil(t, result.Meta.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserSongRecord_プレイ済みレコードの更新日時を返す(t *testing.T) {
+	// Given: MASTERをプレイ済みの楽曲
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	playedAt := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	playedScore, err := score.NewScore(1009500)
+	require.NoError(t, err)
+	song := &entity.Song{
+		ID:        20,
+		DisplayID: "SONG001",
+		Title:     "テスト曲",
+		Charts: []*entity.Chart{
+			{ID: 101, SongID: 20, DifficultyID: 1},
+			{ID: 104, SongID: 20, DifficultyID: 4},
+		},
+	}
+	masters := &masterdata.SongMasters{
+		DifficultyNamesByID: map[int]string{1: "BASIC", 4: "MASTER"},
+		Difficulties: map[string]master.ChartDifficulty{
+			"BASIC":  {ID: 1, Name: "BASIC", SortOrder: 1},
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 4},
+		},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{records: []*entity.PlayerRecord{{
+			PlayerID:        playerID,
+			ChartID:         104,
+			Score:           playedScore,
+			UpdatedAt:       playedAt,
+			Chart:           song.Charts[1],
+			Song:            song,
+			ChartDifficulty: &master.ChartDifficulty{ID: 4, Name: "MASTER", SortOrder: 4},
+		}}},
+		nil,
+		&stubSongRepository{song: song},
+		nil,
+		&stubSongMasterProvider{masters: masters},
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserSongRecord(context.Background(), "testuser", nil, "SONG001", "MASTER")
+
+	// Then: プレイ済みの更新日時が応答に入る
+	require.NoError(t, err)
+	require.Len(t, result.Standard, 1)
+	assert.Equal(t, "MASTER", result.Standard[0].Difficulty)
+	assert.True(t, result.Standard[0].IsPlayed)
+	require.NotNil(t, result.Standard[0].UpdatedAt)
+	assert.True(t, result.Standard[0].UpdatedAt.Equal(playedAt))
+	require.NotNil(t, result.UpdatedAt)
+	assert.True(t, result.UpdatedAt.Equal(playedAt))
+	require.NotNil(t, result.Meta.UpdatedAt)
+	assert.True(t, result.Meta.UpdatedAt.Equal(playedAt))
+}
+
+func TestUserUsecase_GetUserWorldsendSongRecord_プレイヤー未連携はnullを返す(t *testing.T) {
+	// Given: プレイヤーと連携していないユーザー
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	songChart := &entity.WorldsendSongWithChart{
+		Song: &entity.Song{
+			ID:          20,
+			DisplayID:   "WE001",
+			Title:       "WE曲",
+			Charts:      []*entity.Chart{},
+			IsWorldsend: true,
+		},
+		Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		&stubWorldsendRecordRepository{},
+		nil,
+		&stubWorldsendChartRepository{record: songChart},
+		nil,
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001")
+
+	// Then: docsの未連携時の例どおりworldsendはnullで更新日時はなし
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Nil(t, result.Worldsend)
+	assert.Nil(t, result.UpdatedAt)
+	require.NotNil(t, result.Meta)
+	assert.Nil(t, result.Meta.UpdatedAt)
+}
+
+func TestUserUsecase_GetUserWorldsendSongRecord_プレイ済みレコードの更新日時を返す(t *testing.T) {
+	// Given: プレイ済みのWORLD'S END楽曲
+	userName, err := username.NewUserName("testuser")
+	require.NoError(t, err)
+	playerID := 10
+	playedAt := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
+	playedScore, err := score.NewScore(1009500)
+	require.NoError(t, err)
+	songChart := &entity.WorldsendSongWithChart{
+		Song: &entity.Song{
+			ID:          20,
+			DisplayID:   "WE001",
+			Title:       "WE曲",
+			Charts:      []*entity.Chart{},
+			IsWorldsend: true,
+		},
+		Chart: &entity.WorldsendChart{ID: 201, SongID: 20},
+	}
+	service := newUserUsecaseForTest(
+		nil,
+		&stubUserRepository{user: &entity.User{ID: 1, Username: userName, PlayerID: &playerID}},
+		&stubPlayerRepository{},
+		&stubPlayerRecordRepository{},
+		&stubWorldsendRecordRepository{records: []*entity.PlayerWorldsendRecord{{
+			PlayerID:         playerID,
+			WorldsendChartID: 201,
+			Score:            playedScore,
+			UpdatedAt:        playedAt,
+			Song:             songChart.Song,
+			WorldsendChart:   songChart.Chart,
+		}}},
+		nil,
+		&stubWorldsendChartRepository{record: songChart},
+		nil,
+		nil,
+	)
+
+	// When
+	result, err := service.GetUserWorldsendSongRecord(context.Background(), "testuser", nil, "WE001")
+
+	// Then: プレイ済みの更新日時が応答に入る
+	require.NoError(t, err)
+	require.NotNil(t, result.Worldsend)
+	assert.Equal(t, "WE001", result.Worldsend.ID)
+	assert.True(t, result.Worldsend.IsPlayed)
+	require.NotNil(t, result.Worldsend.UpdatedAt)
+	assert.True(t, result.Worldsend.UpdatedAt.Equal(playedAt))
+	require.NotNil(t, result.UpdatedAt)
+	assert.True(t, result.UpdatedAt.Equal(playedAt))
+	require.NotNil(t, result.Meta.UpdatedAt)
+	assert.True(t, result.Meta.UpdatedAt.Equal(playedAt))
+}
+
 func TestUserUsecase_DeleteUser_Success(t *testing.T) {
 	un, _ := username.NewUserName("testuser")
 	user := &entity.User{
@@ -1859,6 +2255,114 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 	require.NoError(t, err)
 	assert.True(t, tm.transactional)
 	assert.Equal(t, []string{"goals", "user"}, callOrder)
+}
+
+func TestUserUsecase_DeleteUser_Firebase削除連携(t *testing.T) {
+	// newServiceWithDeleter は Firebase 削除役を差し替えた管理者削除のユースケースを作ります。
+	newServiceWithDeleter := func(userRepo *stubUserRepository, deleter FirebaseUserDeleter, goalRepo repository.GoalRepository) UserUsecase {
+		return NewUserUsecaseWithFirebaseDeleter(
+			nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{},
+			nil, nil, nil, nil, nil, deleter, nil,
+			&userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo,
+		)
+	}
+	// newTarget は指定した Firebase UID を持つ削除対象ユーザーを作ります。
+	newTarget := func(t *testing.T, firebaseUID *string) *entity.User {
+		t.Helper()
+		un, err := username.NewUserName("testuser")
+		require.NoError(t, err)
+		return &entity.User{ID: 1, Username: un, FirebaseUID: firebaseUID}
+	}
+	newAdminRequester := func() *entity.User {
+		return &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}
+	}
+
+	t.Run("UID連携済みならアプリ削除の成功後にそのUIDで1回だけ削除する", func(t *testing.T) {
+		// Given
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		var deletedUserID int
+		userRepo.deleteByID = func(_ context.Context, _ repository.Executor, id int) error {
+			// Firebase 削除はアプリ削除より前に呼ばれない
+			assert.Empty(t, deleter.deletedUIDs)
+			assert.Equal(t, 1, id)
+			deletedUserID = id
+			return nil
+		}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: 連携UIDでちょうど1回呼ばれる
+		require.NoError(t, err)
+		assert.Equal(t, 1, deletedUserID)
+		assert.Equal(t, []string{firebaseUID}, deleter.deletedUIDs)
+	})
+
+	t.Run("UID未連携ならFirebase削除を呼ばずに成功する", func(t *testing.T) {
+		// Given: Firebase UIDが無いユーザーの管理者削除はアプリ削除だけで成功する
+		target := newTarget(t, nil)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then
+		require.NoError(t, err)
+		assert.Equal(t, 1, userRepo.deletedUserID)
+		assert.Empty(t, deleter.deletedUIDs)
+	})
+
+	t.Run("Firebase側の削除に失敗しても管理者削除は成功として扱う", func(t *testing.T) {
+		// Given: 仕様どおり失敗は記録して成功を維持する
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{err: errors.New("firebase unavailable")}
+		userRepo := &stubUserRepository{user: target, usersByID: map[int]*entity.User{1: target, 99: adminRequester}}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+		logBuffer := captureDefaultSlog(t)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: 削除自体は成功し失敗だけが記録される
+		require.NoError(t, err)
+		assert.Equal(t, 1, userRepo.deletedUserID)
+		assert.Equal(t, []string{firebaseUID}, deleter.deletedUIDs)
+		assert.Contains(t, logBuffer.String(), "failed to delete firebase user after account deletion")
+	})
+
+	t.Run("アプリ削除に失敗したらFirebase削除を呼ばない", func(t *testing.T) {
+		// Given: アプリ側の削除が先に失敗する
+		firebaseUID := "firebase-uid-123"
+		target := newTarget(t, &firebaseUID)
+		adminRequester := newAdminRequester()
+		deleter := &recordingFirebaseUserDeleter{}
+		deleteErr := errors.New("ユーザー削除失敗")
+		userRepo := &stubUserRepository{
+			user:      target,
+			usersByID: map[int]*entity.User{1: target, 99: adminRequester},
+			deleteByID: func(context.Context, repository.Executor, int) error {
+				return deleteErr
+			},
+		}
+		service := newServiceWithDeleter(userRepo, deleter, nil)
+
+		// When
+		err := service.DeleteUser(context.Background(), adminRequester, "testuser")
+
+		// Then: アプリ削除の失敗が返り Firebase 削除は試行しない
+		require.ErrorIs(t, err, deleteErr)
+		assert.Empty(t, deleter.deletedUIDs)
+	})
 }
 
 func TestUserUsecase_DeleteUser_UserNotFound(t *testing.T) {

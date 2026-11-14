@@ -163,7 +163,7 @@ func TestWorldsendUsecase_ConcurrentMutationsPreserveIndependentFields(t *testin
 			var release sync.Once
 			unblock := func() { release.Do(func() { close(repo.release) }) }
 			defer unblock()
-			uc := NewWorldsendUsecase(repo, repo, nil)
+			uc := NewWorldsendUsecase(repo, repo, nil, nil)
 			masters := &domainmasterdata.SongMasters{}
 			edit := func() error {
 				return uc.UpdateWorldsendSongs(context.Background(), []*UpdateWorldsendSongInput{{

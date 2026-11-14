@@ -7,6 +7,30 @@ permissions:
   contents: read
 
 jobs:
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-only-password
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -ptest-only-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TEST_MYSQL_DSN: root:test-only-password@tcp(127.0.0.1:3306)/
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.4'
+      - name: 本番マイグレーション上でMySQL結合テストを実行
+        run: go test -count=1 -v ./internal/infra/repository -run MySQL
   test:
     runs-on: ubuntu-latest
     steps:
@@ -14,7 +38,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - name: Test
         run: go test ./...
       - name: Install and run govulncheck

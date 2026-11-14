@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -418,7 +419,7 @@ func TestDeleteSong_DeletesFavoritesWhenFavoriteRepoIsSet(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, nil)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, nil, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -447,7 +448,7 @@ func TestDeleteSong_DeletesLockedSongsWhenLockedRepoIsSet(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, nil, mockLockedRepo)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, nil, mockLockedRepo, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -477,7 +478,7 @@ func TestDeleteSong_DeletesBothFavoritesAndLockedSongs(t *testing.T) {
 	mockMasterCache := new(MockSongMasterProvider)
 	mockExec := new(MockExecutor)
 	tm := &passthroughTransactionManager{tx: mockExec}
-	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo)
+	uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo, nil)
 	ctx := context.Background()
 
 	song := &entity.Song{
@@ -500,6 +501,78 @@ func TestDeleteSong_DeletesBothFavoritesAndLockedSongs(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 	mockFavoriteRepo.AssertExpectations(t)
 	mockLockedRepo.AssertExpectations(t)
+}
+
+func TestDeleteSong_カスケード削除失敗時は原因エラーを返し後続処理を打ち切る(t *testing.T) {
+	// DeleteSongはSaveの後にfavorite→lockedの順でカスケード削除するため、
+	// 先行失敗時に後続の削除を呼ばず原因エラーをそのまま返すことを検証します。
+	errFavorite := errors.New("favorite delete failed")
+	errLocked := errors.New("locked delete failed")
+	tests := []struct {
+		name string
+		// Given: カスケード各段階の戻りエラー
+		favoriteErr error
+		lockedErr   error
+		// Then: 期待する原因エラーとlocked削除の呼び出し有無
+		wantErr            error
+		expectLockedCalled bool
+	}{
+		{
+			name:               "お気に入り削除失敗時はlocked削除を呼ばず原因エラーを返す",
+			favoriteErr:        errFavorite,
+			wantErr:            errFavorite,
+			expectLockedCalled: false,
+		},
+		{
+			name:               "未解禁削除失敗時は原因エラーを返す",
+			favoriteErr:        nil,
+			lockedErr:          errLocked,
+			wantErr:            errLocked,
+			expectLockedCalled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			mockRepo := new(MockSongRepository)
+			mockFavoriteRepo := new(MockPlayerFavoriteSongRepository)
+			mockLockedRepo := new(MockPlayerLockedSongRepository)
+			mockMasterCache := new(MockSongMasterProvider)
+			mockExec := new(MockExecutor)
+			tm := &passthroughTransactionManager{tx: mockExec}
+			uc := NewSongUsecaseWithCascadeDelete(mockRepo, mockMasterCache, tm, mockExec, nil, mockFavoriteRepo, mockLockedRepo, nil)
+			ctx := context.Background()
+
+			song := &entity.Song{
+				ID:        30,
+				DisplayID: "S030",
+				IsDeleted: false,
+				Charts:    []*entity.Chart{},
+			}
+			mockRepo.On("FindByDisplayIDForChange", ctx, mockExec, "S030").Return(song, nil).Once()
+			mockRepo.On("Save", ctx, mockExec, mock.MatchedBy(func(saved *entity.Song) bool {
+				return saved == song && saved.IsDeleted
+			})).Return(nil).Once()
+			mockFavoriteRepo.On("DeleteBySongID", ctx, mockExec, 30).Return(tt.favoriteErr).Once()
+			if tt.expectLockedCalled {
+				mockLockedRepo.On("DeleteBySongID", ctx, mockExec, 30).Return(tt.lockedErr).Once()
+			}
+
+			// When
+			err := uc.DeleteSong(ctx, "S030")
+
+			// Then
+			assert.ErrorIs(t, err, tt.wantErr)
+			if tt.expectLockedCalled {
+				mockLockedRepo.AssertExpectations(t)
+			} else {
+				mockLockedRepo.AssertNotCalled(t, "DeleteBySongID", ctx, mockExec, 30)
+			}
+			mockRepo.AssertExpectations(t)
+			mockFavoriteRepo.AssertExpectations(t)
+		})
+	}
 }
 
 func TestDeleteSong_SavesDeletedState(t *testing.T) {
@@ -557,28 +630,5 @@ func TestRestoreSong_SavesRestoredState(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.False(t, song.IsDeleted)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestGetSongsUpdatedAt_ReturnsRepositoryValue(t *testing.T) {
-	// Given
-	mockRepo := new(MockSongRepository)
-	mockMasterCache := new(MockSongMasterProvider)
-	mockTM := new(MockTransactionManager)
-	mockExec := new(MockExecutor)
-	uc := NewSongUsecase(mockRepo, mockMasterCache, mockTM, mockExec)
-	ctx := context.Background()
-	expected := time.Date(2026, 4, 9, 12, 34, 56, 0, time.UTC)
-
-	mockRepo.On("FindLatestUpdatedAt", ctx, mockExec).Return(&expected, nil).Once()
-
-	// When
-	result, err := uc.GetSongsUpdatedAt(ctx)
-
-	// Then
-	assert.NoError(t, err)
-	if assert.NotNil(t, result) {
-		assert.True(t, expected.Equal(*result))
-	}
 	mockRepo.AssertExpectations(t)
 }

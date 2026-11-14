@@ -25,3 +25,15 @@ func (c *Chart) ChangeConstant(constant chartconstant.ChartConstant) {
 	c.Const = constant
 	c.IsConstUnknown = false
 }
+
+// Clone は譜面を深く複製します。
+func (c *Chart) Clone() *Chart {
+	if c == nil {
+		return nil
+	}
+	cloned := *c
+	cloned.Notes = clonePointer(c.Notes)
+	cloned.NotesDesigner = clonePointer(c.NotesDesigner)
+	cloned.UpdatedAt = clonePointer(c.UpdatedAt)
+	return &cloned
+}

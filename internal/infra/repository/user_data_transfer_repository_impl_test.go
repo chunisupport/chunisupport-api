@@ -1,8 +1,12 @@
 package repository
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -393,6 +397,94 @@ func TestUserDataTransferRepositoryExportExcludesDeletedSongsAndCourses(t *testi
 	require.Len(t, snapshot.LockedSongs, 1)
 	assert.Equal(t, "100", snapshot.LockedSongs[0].SongOfficialIdx)
 	assert.NoError(t, snapshot.Validate())
+}
+
+func TestUserDataTransferRepositoryExportSnapshotRecordFilterPayload(t *testing.T) {
+	// 仕様11章の保存済みフィルタ8KiB制限（8192バイト）は展開後のバイト数で判定する。
+	// 固定部は前後あわせて38バイトなので、文字列の値の長さだけで境界に合わせる。
+	const prefix = `{"schema_version":1,"filter":{"v":"`
+	const suffix = `"}}`
+	tests := []struct {
+		name string
+		// Given: 圧縮前の本文と、圧縮後に残すバイト数（0は切り詰めない）
+		raw          string
+		truncateGzip int
+		// Then: 期待する結果
+		wantRawLength int
+		check         func(t *testing.T, err error)
+	}{
+		{
+			name:          "展開後8192バイトは受理される",
+			raw:           prefix + strings.Repeat("a", 8154) + suffix,
+			wantRawLength: 8192,
+			check: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name:          "展開後8193バイトは拒否される",
+			raw:           prefix + strings.Repeat("a", 8155) + suffix,
+			wantRawLength: 8193,
+			check: func(t *testing.T, err error) {
+				assert.EqualError(t, err, "record filter exceeds size limit")
+			},
+		},
+		{
+			name:          "gzipとして壊れた入力は展開の失敗を返す",
+			raw:           `{"schema_version":1,"filter":{}}`,
+			truncateGzip:  5,
+			wantRawLength: 32,
+			check: func(t *testing.T, err error) {
+				assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+			},
+		},
+		{
+			name:          "展開できてもJSONとして壊れた入力は構文エラーを返す",
+			raw:           `not-json`,
+			wantRawLength: 8,
+			check: func(t *testing.T, err error) {
+				var syntaxErr *json.SyntaxError
+				assert.ErrorAs(t, err, &syntaxErr)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 本文を圧縮して保存済みフィルタとして保存する
+			require.Len(t, tt.raw, tt.wantRawLength)
+			db := newTransferRepositoryTestDB(t)
+			_, err := db.Exec("INSERT INTO users (id, player_id) VALUES (1, NULL)")
+			require.NoError(t, err)
+			_, err = db.Exec(`INSERT INTO players (id, user_id, player_name, player_level, official_player_rating, official_overpower, created_at) VALUES (10, 1, 'テスト', 1, 0, 0, '2026-08-01 00:00:00')`)
+			require.NoError(t, err)
+			_, err = db.Exec(`UPDATE users SET player_id = 10 WHERE id = 1`)
+			require.NoError(t, err)
+			var buf bytes.Buffer
+			writer := gzip.NewWriter(&buf)
+			_, err = writer.Write([]byte(tt.raw))
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+			stored := buf.Bytes()
+			if tt.truncateGzip > 0 {
+				stored = stored[:tt.truncateGzip]
+			}
+			_, err = db.Exec(`INSERT INTO record_filters (id, user_id, name, filter_value_gzip, is_worldsend, created_at, updated_at) VALUES (x'01', 1, 'フィルタ', ?, 0, '2026-08-01 00:00:00', '2026-08-01 00:00:00')`, stored)
+			require.NoError(t, err)
+
+			// When: 公開メソッドの書き出し経路で圧縮データを展開する
+			exported, err := NewUserDataTransferRepository(db).ExportSnapshot(context.Background(), 1)
+
+			// Then
+			tt.check(t, err)
+			if err != nil {
+				return
+			}
+			require.Len(t, exported.RecordFilters, 1)
+			assert.Equal(t, 1, exported.RecordFilters[0].SchemaVersion)
+			assert.JSONEq(t, `{"v":"`+strings.Repeat("a", 8154)+`"}`, string(exported.RecordFilters[0].Filter))
+		})
+	}
 }
 
 func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {

@@ -78,6 +78,12 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 			FOREIGN KEY (difficulty_id) REFERENCES difficulties(id),
 			UNIQUE (song_id, difficulty_id)
 		);
+
+		CREATE TABLE IF NOT EXISTS song_catalog_revision (
+			id INTEGER PRIMARY KEY,
+			revision INTEGER NOT NULL
+		);
+		INSERT INTO song_catalog_revision (id, revision) VALUES (1, 0);
 	`
 	_, err = db.Exec(schema)
 	require.NoError(t, err)

@@ -36,6 +36,7 @@ type SongBatchJobUsecase struct {
 	jobRepo       repository.SongBatchJobRepository
 	runner        SongBatchRunner
 	denominator   repository.OverpowerDenominatorProvider
+	songCatalog   repository.SongCatalogProvider
 	now           func() time.Time
 
 	// mu は受付停止の判定と WaitGroup への登録を不可分にし、Wait 中の登録を防ぎます。
@@ -46,13 +47,15 @@ type SongBatchJobUsecase struct {
 
 // NewSongBatchJobUsecase は SongBatchJobUsecase を生成します。
 // backgroundCtx は管理画面から起動したジョブの寿命で、サーバー停止時にキャンセルされるものを渡します。
-// denominator は同期後に無効化するプロセス内キャッシュで、キャッシュを持たない CLI では nil を渡します。
+// denominator と songCatalog は同期後に更新するプロセス内キャッシュで、キャッシュを持たない CLI では nil を渡します。
+// CLI からの同期は、API プロセスの songCatalog が変更世代の定期確認で検知します。
 func NewSongBatchJobUsecase(
 	backgroundCtx context.Context,
 	lockProvider repository.BatchLockProvider,
 	jobRepo repository.SongBatchJobRepository,
 	runner SongBatchRunner,
 	denominator repository.OverpowerDenominatorProvider,
+	songCatalog repository.SongCatalogProvider,
 ) *SongBatchJobUsecase {
 	return &SongBatchJobUsecase{
 		backgroundCtx: backgroundCtx,
@@ -60,6 +63,7 @@ func NewSongBatchJobUsecase(
 		jobRepo:       jobRepo,
 		runner:        runner,
 		denominator:   denominator,
+		songCatalog:   songCatalog,
 		now:           time.Now,
 	}
 }
@@ -139,12 +143,12 @@ func (u *SongBatchJobUsecase) begin(
 	}
 
 	if err := u.interruptOrphanedJobs(ctx); err != nil {
-		u.releaseLockAfterFailure(ctx, lock)
+		u.releaseLockWithTimeout(ctx, lock)
 		return nil, nil, false, err
 	}
 	job := newJob(uuid.NewV4(), u.now())
 	if err := u.jobRepo.Save(ctx, job); err != nil {
-		u.releaseLockAfterFailure(ctx, lock)
+		u.releaseLockWithTimeout(ctx, lock)
 		return nil, nil, false, err
 	}
 	return lock, job, true, nil
@@ -177,11 +181,21 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	logger.Info("楽曲バッチを開始します", "fill_missing_release_date", job.Request().FillMissingReleaseDate)
 
 	result, execErr := u.runner.Execute(ctx, job.Request())
+	// 再構築などで時間がかかっても解放できるよう、解放専用の期限を使う
+	defer u.releaseLockWithTimeout(ctx, lock)
+
+	// 管理画面がジョブの完了を検知した時点で楽曲データが反映済みになるよう、完了の記録より先にキャッシュを更新する。
+	// 再構築に失敗してもDB同期は成功しているため、ジョブは成功として記録し、失敗はログと定期確認での再試行に任せる。
+	if execErr == nil {
+		if u.denominator != nil {
+			u.denominator.Invalidate(ctx)
+		}
+		refreshSongCatalog(ctx, u.songCatalog)
+	}
 
 	// 停止シグナルでキャンセルされた後も結果を記録できるよう、実行とは独立した期限を使う
 	finalizeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
 	defer cancel()
-	defer u.releaseLock(finalizeCtx, lock)
 
 	finishedAt := u.now()
 	var finishErr error
@@ -201,16 +215,12 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	} else if err := u.jobRepo.Save(finalizeCtx, job); err != nil {
 		logger.Error("楽曲バッチの結果を記録できませんでした", "error", err)
 	}
-
-	if execErr == nil && u.denominator != nil {
-		u.denominator.Invalidate(finalizeCtx)
-	}
 	return execErr
 }
 
-// releaseLockAfterFailure はジョブ開始前の失敗時にロックを解放します。
-// リクエストのキャンセルに関係なく解放できるよう、期限だけを持つ context を使います。
-func (u *SongBatchJobUsecase) releaseLockAfterFailure(ctx context.Context, lock repository.BatchLock) {
+// releaseLockWithTimeout はロックを解放します。
+// リクエストのキャンセルや他の処理の期限に関係なく解放できるよう、解放専用の期限だけを持つ context を使います。
+func (u *SongBatchJobUsecase) releaseLockWithTimeout(ctx context.Context, lock repository.BatchLock) {
 	releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
 	defer cancel()
 	u.releaseLock(releaseCtx, lock)

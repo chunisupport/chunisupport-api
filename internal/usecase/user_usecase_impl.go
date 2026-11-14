@@ -29,6 +29,7 @@ type userUsecase struct {
 	friendshipRepo               repository.FriendshipRepository
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider
 	userUpdatedAtQuery           repository.UserUpdatedAtQueryService
+	songCatalog                  repository.SongCatalogProvider
 	recordCompletionSvc          *service.RecordCompletionService
 	masterProvider               userMasterProvider
 	firebaseDeleter              FirebaseUserDeleter
@@ -140,6 +141,7 @@ func NewUserUsecaseWithFirebaseDeleter(
 }
 
 // NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
+// songCatalog は未プレイ譜面補完に使う楽曲・譜面の共有キャッシュです。
 func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 	db repository.Executor,
 	userRepo repository.UserRepository,
@@ -154,6 +156,7 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 	playerLockedSongRepo repository.PlayerLockedSongRepository,
 	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
 	userUpdatedAtQuery repository.UserUpdatedAtQueryService,
+	songCatalog repository.SongCatalogProvider,
 	courseRepo repository.CourseRepository,
 	transactionManager TransactionManager,
 	goalRepo repository.GoalRepository,
@@ -166,6 +169,7 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 	impl.playerLockedSongRepo = playerLockedSongRepo
 	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
 	impl.userUpdatedAtQuery = userUpdatedAtQuery
+	impl.songCatalog = songCatalog
 	return impl
 }
 
@@ -845,18 +849,21 @@ func playerRecordChartID(record *entity.PlayerRecord) int {
 	return 0
 }
 
+// completePlayerRecords は通常譜面の未プレイ譜面を補完します。
+// 楽曲・譜面は毎回DBから全件取得せず、共有の楽曲カタログから削除済みを除いて複製したものを使います。
 func (s *userUsecase) completePlayerRecords(ctx context.Context, playerID int, records []*entity.PlayerRecord) ([]*entity.PlayerRecord, error) {
-	if s.songRepo == nil {
+	if s.songCatalog == nil {
 		return records, nil
 	}
 
-	songs, err := s.songRepo.FindAllExcludingWorldsend(ctx, s.db, false)
+	catalog, err := s.songCatalog.Snapshot(ctx)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.ErrorContext(ctx, "failed to find songs for no-play completion", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to load song catalog for no-play completion", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
+	songs := catalog.Songs(false)
 
 	var difficultyNamesByID map[int]string
 	var difficultySortOrderByID map[int]int
@@ -892,20 +899,22 @@ func (s *userUsecase) getUserProfileWorldsendRecords(ctx context.Context, player
 	return records, nil
 }
 
+// completeWorldsendRecords は WORLD'S END の未プレイ譜面を補完します。
+// 通常譜面と同じく、共有の楽曲カタログから削除済みを除いて複製したものを使います。
 func (s *userUsecase) completeWorldsendRecords(ctx context.Context, playerID int, records []*entity.PlayerWorldsendRecord) ([]*entity.PlayerWorldsendRecord, error) {
-	if s.worldsendChartRepo == nil {
+	if s.songCatalog == nil {
 		return records, nil
 	}
 
-	worldsendSongs, err := s.worldsendChartRepo.FindAll(ctx, s.db, false)
+	catalog, err := s.songCatalog.Snapshot(ctx)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			slog.ErrorContext(ctx, "failed to find worldsend songs for no-play completion", "player_id", playerID, "error", err)
+			slog.ErrorContext(ctx, "failed to load song catalog for no-play completion", "player_id", playerID, "error", err)
 		}
 		return nil, err
 	}
 
-	return s.recordCompletionSvc.CompleteWorldsendRecords(records, worldsendSongs), nil
+	return s.recordCompletionSvc.CompleteWorldsendRecords(records, catalog.WorldsendSongs(false)), nil
 }
 
 func latestPlayerRecordUpdatedAt(records []*entity.PlayerRecord) time.Time {

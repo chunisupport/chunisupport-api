@@ -93,6 +93,80 @@ func TestLogError_認証済みユーザーの識別子をログへ出す(t *test
 	assert.Contains(t, output.String(), "player_id=7")
 }
 
+func TestCustomHTTPErrorHandler_フレームワークエラーをステータスに応じたコードへ変換する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: フレームワークが返すステータス
+		status int
+		// Then: 期待するレスポンス本文全体（仕様から求めた固定値）
+		expectedBody string
+	}{
+		{name: "400はリクエスト形式不正", status: http.StatusBadRequest, expectedBody: `{"error":{"status":400,"code":"bad_request"}}`},
+		{name: "401は認証が必要", status: http.StatusUnauthorized, expectedBody: `{"error":{"status":401,"code":"unauthorized"}}`},
+		{name: "403は権限不足", status: http.StatusForbidden, expectedBody: `{"error":{"status":403,"code":"forbidden"}}`},
+		{name: "404はエンドポイント未検出", status: http.StatusNotFound, expectedBody: `{"error":{"status":404,"code":"not_found"}}`},
+		{name: "405はメソッド不正", status: http.StatusMethodNotAllowed, expectedBody: `{"error":{"status":405,"code":"method_not_allowed"}}`},
+		{name: "409は競合", status: http.StatusConflict, expectedBody: `{"error":{"status":409,"code":"conflict"}}`},
+		{name: "413はペイロード過大", status: http.StatusRequestEntityTooLarge, expectedBody: `{"error":{"status":413,"code":"payload_too_large"}}`},
+		{name: "415はメディア種別不正", status: http.StatusUnsupportedMediaType, expectedBody: `{"error":{"status":415,"code":"unsupported_media_type"}}`},
+		{name: "422はバリデーション失敗", status: http.StatusUnprocessableEntity, expectedBody: `{"error":{"status":422,"code":"validation_failed"}}`},
+		{name: "429はレート制限", status: http.StatusTooManyRequests, expectedBody: `{"error":{"status":429,"code":"too_many_requests"}}`},
+		{name: "503はサービス利用不可", status: http.StatusServiceUnavailable, expectedBody: `{"error":{"status":503,"code":"service_unavailable"}}`},
+		{name: "対応表に無い4xxはリクエスト形式不正", status: http.StatusTeapot, expectedBody: `{"error":{"status":418,"code":"bad_request"}}`},
+		{name: "対応表に無い5xxはサーバー内部エラー", status: http.StatusBadGateway, expectedBody: `{"error":{"status":502,"code":"internal_error"}}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			rec := httptest.NewRecorder()
+			c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+			// フレームワーク側のメッセージが利用者へ漏れないことも確かめるため、あえて内部向け文言を付ける。
+			err := echo.NewHTTPError(tt.status, "内部向けの詳細")
+
+			// When
+			CustomHTTPErrorHandler(c, err)
+
+			// Then
+			assert.Equal(t, tt.status, rec.Code)
+			assert.JSONEq(t, tt.expectedBody, rec.Body.String())
+		})
+	}
+}
+
+func TestCustomHTTPErrorHandler_素のエラーは内部エラーを返し原因を公開しない(t *testing.T) {
+	// Given
+	e := echo.New()
+	rec := httptest.NewRecorder()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+	const internalDetail = "機微な内部情報: password=secret"
+	err := errors.New(internalDetail)
+
+	// When
+	CustomHTTPErrorHandler(c, err)
+
+	// Then
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.JSONEq(t, `{"error":{"status":500,"code":"internal_error"}}`, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), internalDetail)
+}
+
+func TestCustomHTTPErrorHandler_書き出し済みなら本文を上書きしない(t *testing.T) {
+	// Given
+	e := echo.New()
+	rec := httptest.NewRecorder()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+	require.NoError(t, c.String(http.StatusOK, "先に書いた応答"))
+
+	// When
+	CustomHTTPErrorHandler(c, errors.New("後から来たエラー"))
+
+	// Then
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "先に書いた応答", rec.Body.String())
+}
+
 func TestCustomHTTPErrorHandler_クライアント切断は499としてINFOログに出す(t *testing.T) {
 	// Given
 	var output bytes.Buffer

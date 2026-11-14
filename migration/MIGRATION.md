@@ -162,6 +162,14 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `notes_designer`: 譜面製作者名（100文字まで、NULL可）。
     - `updated_at`: 更新日時。
 
+#### `song_catalog_revision`
+- **役割**: `songs` / `charts` / `worldsend_charts` の変更世代を1行（`id = 1`）で保持します。APIプロセスの楽曲カタログキャッシュは、この値の変化だけを見て再構築します。
+- **主なカラム**:
+    - `id`: 常に `1`（`CHECK (id = 1)`）。
+    - `revision`: 変更世代。楽曲・譜面を変更するトランザクション（APIの楽曲編集、song-batchのMySQL同期）が、同じトランザクション内で1つ進めます。
+- **追加マイグレーション**: `000064_create_song_catalog_revision`（upで作成と初期行の投入、downで削除）。
+- 楽曲・譜面をSQLで直接変更した場合は、同じトランザクションで `UPDATE song_catalog_revision SET revision = revision + 1 WHERE id = 1` も実行してください。実行しない場合、APIのキャッシュへは反映されません。
+
 ### マスタテーブル
 
 #### ゲームデータマスタ
@@ -221,6 +229,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000045**: 目標成果種別に `fullchain_count` を追加し、`GOLD` / `PLATINUM` のFULL CHAIN達成譜面数を目標に設定できるようにする。downはユーザー目標を暗黙に削除せず、参照が残る場合は外部キー制約により中止する。
 - **000049**: ポゼッションマスタ（`normal`、`silver`、`gold`、`platina`、`rainbow`）を固定IDで追加し、`players.possession_id` から NOT NULL（既定値 `normal`=1）で参照できるようにする。
 - **000057**: `genres` と `versions` に表示幅を抑えるための超ショート名 `short_name`（NOT NULL・一意）を追加し、既存行へ略記を投入。
+- **000064**: 楽曲カタログキャッシュの変更検知に使う `song_catalog_revision`（singleton行）を追加。新しいAPI・song-batchはこの行がないと楽曲の保存に失敗するため、バイナリより先に適用する。API と song-batch は同じアーティファクトで同時に更新する（旧song-batchの同期は世代を進めないため、APIへ反映されない）。
 
 #### 000045のロールバック前確認
 

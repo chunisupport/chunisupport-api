@@ -23,6 +23,9 @@ type versionRepositoryStub struct {
 	inUse    bool
 	findErr  error
 	writeErr error
+	// rangeFrom/rangeTo は削除時の利用有無判定に使った検索範囲の記録です。
+	rangeFrom time.Time
+	rangeTo   *time.Time
 }
 
 func (s *versionRepositoryStub) FindAll(context.Context, repository.Executor) ([]*entity.Version, error) {
@@ -46,7 +49,12 @@ func (s *versionRepositoryStub) FindByName(context.Context, repository.Executor,
 func (s *versionRepositoryStub) FindLatest(context.Context, repository.Executor) (*entity.Version, error) {
 	return s.versions[len(s.versions)-1], nil
 }
-func (s *versionRepositoryStub) ExistsSongInRange(context.Context, repository.Executor, time.Time, *time.Time) (bool, error) {
+
+// ExistsSongInRange は削除可否判定の検索範囲を記録します。
+// 下限へ対象版のReleasedAt、上限へnilを渡す契約を固定するため引数を捨てません。
+func (s *versionRepositoryStub) ExistsSongInRange(_ context.Context, _ repository.Executor, from time.Time, to *time.Time) (bool, error) {
+	s.rangeFrom = from
+	s.rangeTo = to
 	return s.inUse, nil
 }
 func (s *versionRepositoryStub) Create(_ context.Context, _ repository.Executor, version *entity.Version) (*entity.Version, error) {
@@ -111,22 +119,40 @@ func TestVersionUsecase_Create_同日を拒否する(t *testing.T) {
 	assert.Zero(t, reloader.calls)
 }
 
-func TestVersionUsecase_Create_不正な名前を拒否する(t *testing.T) {
+func TestVersionUsecase_Create_同日でなければ受理する(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
+		name string
+		// Given: 既存バージョンのリリース日
+		existing time.Time
+		// When: 登録するリリース日
+		releasedAt time.Time
 	}{
-		{name: "空", input: ""},
-		{name: "接頭辞なし", input: "VERSE"},
-		{name: "長さ超過", input: "CHUNITHM 123456789012345678901234567890123456789012"},
+		{
+			name:       "年と月が同じで日だけ違う日付は受理する",
+			existing:   dateForVersionTest(2025, 1, 1),
+			releasedAt: dateForVersionTest(2025, 1, 15),
+		},
+		{
+			name:       "年と日が同じで月だけ違う日付は受理する",
+			existing:   dateForVersionTest(2025, 1, 15),
+			releasedAt: dateForVersionTest(2025, 2, 15),
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := NewVersionUsecase(&versionRepositoryStub{}, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
+			// Given
+			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, ReleasedAt: tt.existing}}}
+			reloader := &versionCacheReloaderStub{}
+			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-			_, err := uc.Create(context.Background(), tt.input, "VRS", dateForVersionTest(2025, 1, 1))
+			// When
+			created, err := uc.Create(context.Background(), "CHUNITHM VERSE", "VRS", tt.releasedAt)
 
-			assert.ErrorIs(t, err, ErrInvalidVersionInput)
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, tt.releasedAt, created.ReleasedAt)
+			assert.Equal(t, 1, reloader.calls)
 		})
 	}
 }
@@ -195,10 +221,18 @@ func TestVersionUsecase_Delete(t *testing.T) {
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Zero(t, reloader.calls)
+				assert.Zero(t, repo.deleted)
+				if tt.inUse {
+					// 利用有無判定まで進んだ場合だけ検索範囲を固定する。
+					assert.Equal(t, dateForVersionTest(2025, 1, 1), repo.rangeFrom)
+					assert.Nil(t, repo.rangeTo)
+				}
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantDelete, repo.deleted)
 				assert.Equal(t, 1, reloader.calls)
+				assert.Equal(t, dateForVersionTest(2025, 1, 1), repo.rangeFrom)
+				assert.Nil(t, repo.rangeTo)
 			}
 		})
 	}

@@ -2,6 +2,7 @@ package entity
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -79,6 +80,74 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "record_histories")
 	})
 
+	t.Run("1譜面の履歴が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 同一譜面の履歴が上限50件ちょうどの妥当な履歴群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordHistories = make([]UserDataTransferRecordHistory, 50)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.RecordHistories {
+			snapshot.RecordHistories[i] = validRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("別譜面の履歴は上限件数に合算されない", func(t *testing.T) {
+		// Given: 譜面Aに上限50件ちょうど、曲は同じで難易度が異なる別譜面に1件
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordHistories = make([]UserDataTransferRecordHistory, 0, 51)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < 50; i++ {
+			snapshot.RecordHistories = append(snapshot.RecordHistories, validRecordHistory(base.Add(time.Duration(i)*time.Second)))
+		}
+		other := validRecordHistory(base.Add(50 * time.Second))
+		other.Difficulty = "EXPERT"
+		snapshot.RecordHistories = append(snapshot.RecordHistories, other)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("WORLD'S ENDの履歴が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 同一WORLD'S END譜面の履歴が上限50件ちょうどの妥当な履歴群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.WorldsendRecordHistories = make([]UserDataTransferWorldsendRecordHistory, 50)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.WorldsendRecordHistories {
+			snapshot.WorldsendRecordHistories[i] = validWorldsendRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("WORLD'S ENDの履歴が上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 同一WORLD'S END譜面の履歴が上限50件を1件超える51件
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.WorldsendRecordHistories = make([]UserDataTransferWorldsendRecordHistory, 51)
+		base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+		for i := range snapshot.WorldsendRecordHistories {
+			snapshot.WorldsendRecordHistories[i] = validWorldsendRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "worldsend_record_histories")
+	})
+
 	t.Run("スロットの上限を超えるslot_orderを拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.Records[0].SlotOrder = new(31)
@@ -87,6 +156,79 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "slot_order")
+	})
+
+	t.Run("レーティング枠の上限ちょうどは受理し上限+1は拒否する", func(t *testing.T) {
+		tests := []struct {
+			name string
+			// Given: 前提条件
+			slotName string
+			count    int
+			// Then: 期待する結果
+			wantErr bool
+		}{
+			{
+				name:     "best枠が上限30件ちょうどなら受理する",
+				slotName: "best",
+				count:    30,
+				wantErr:  false,
+			},
+			{
+				name:     "new枠が上限20件ちょうどなら受理する",
+				slotName: "new",
+				count:    20,
+				wantErr:  false,
+			},
+			{
+				name:     "new枠が上限21件なら拒否する",
+				slotName: "new",
+				count:    21,
+				wantErr:  true,
+			},
+			{
+				name:     "best_candidate枠が上限10件ちょうどなら受理する",
+				slotName: "best_candidate",
+				count:    10,
+				wantErr:  false,
+			},
+			{
+				name:     "best_candidate枠が上限11件なら拒否する",
+				slotName: "best_candidate",
+				count:    11,
+				wantErr:  true,
+			},
+			{
+				name:     "new_candidate枠が上限10件ちょうどなら受理する",
+				slotName: "new_candidate",
+				count:    10,
+				wantErr:  false,
+			},
+			{
+				name:     "new_candidate枠が上限11件なら拒否する",
+				slotName: "new_candidate",
+				count:    11,
+				wantErr:  true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Given: 指定スロットに順位1から連番で割り当てた妥当な通常譜面レコード群
+				snapshot := validUserDataTransferSnapshot(t)
+				snapshot.Records = validTransferSlotRecords(tt.slotName, tt.count)
+
+				// When
+				err := snapshot.Validate()
+
+				// Then
+				if tt.wantErr {
+					require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+					assert.Contains(t, err.Error(), "slot_order")
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
 	})
 
 	t.Run("同一スロット内のslot_order重複を拒否する", func(t *testing.T) {
@@ -99,6 +241,53 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "slot_order")
+	})
+
+	t.Run("bestとnew枠の順位欠番を受理する", func(t *testing.T) {
+		tests := []struct {
+			name string
+			// Given: 前提条件
+			slotName string
+			orders   []int
+		}{
+			{
+				name:     "best枠の先頭欠番を受理する",
+				slotName: "best",
+				orders:   []int{2, 3},
+			},
+			{
+				name:     "best枠の途中欠番を受理する",
+				slotName: "best",
+				orders:   []int{1, 3},
+			},
+			{
+				name:     "new枠の先頭欠番を受理する",
+				slotName: "new",
+				orders:   []int{2, 3},
+			},
+			{
+				name:     "new枠の途中欠番を受理する",
+				slotName: "new",
+				orders:   []int{1, 3},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Given: 指定スロットに欠番を含む順位を割り当てた妥当な通常譜面レコード群
+				snapshot := validUserDataTransferSnapshot(t)
+				snapshot.Records = validTransferSlotRecords(tt.slotName, len(tt.orders))
+				for i, order := range tt.orders {
+					snapshot.Records[i].SlotOrder = new(order)
+				}
+
+				// When
+				err := snapshot.Validate()
+
+				// Then: データ移行では順位欠番を許容するため検証に成功する
+				assert.NoError(t, err)
+			})
+		}
 	})
 
 	t.Run("公式指標履歴が時系列順でなければ拒否する", func(t *testing.T) {
@@ -175,6 +364,18 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "favorite_songs")
 	})
 
+	t.Run("お気に入りが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: お気に入り上限100件ちょうどの妥当なお気に入り群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.FavoriteSongs = validTransferFavoriteSongs(100)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
 	t.Run("未解禁楽曲キーの重複を拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.LockedSongs = append(snapshot.LockedSongs, snapshot.LockedSongs[0])
@@ -208,6 +409,60 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "sort_order")
 	})
 
+	t.Run("目標が上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 目標上限300件ちょうどの妥当な目標群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = []UserDataTransferGoalGroup{}
+		snapshot.Goals.Ungrouped = validTransferGoals(300)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("目標が上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 目標上限300件を1件超える妥当な目標群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = []UserDataTransferGoalGroup{}
+		snapshot.Goals.Ungrouped = validTransferGoals(301)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "goals exceeds its limit")
+	})
+
+	t.Run("目標グループが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 目標グループ上限20件ちょうどの妥当なグループ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = validTransferGoalGroups(t, 20)
+		snapshot.Goals.Ungrouped = []UserDataTransferGoal{}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("目標グループが上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 目標グループ上限20件を1件超える妥当なグループ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.Goals.Groups = validTransferGoalGroups(t, 21)
+		snapshot.Goals.Ungrouped = []UserDataTransferGoal{}
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "goals.groups exceeds its limit")
+	})
+
 	t.Run("保存済みフィルタ本文がJSONオブジェクトでなければ拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.RecordFilters[0].Filter = json.RawMessage(`[]`)
@@ -226,6 +481,31 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 
 		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
 		assert.Contains(t, err.Error(), "possession_name")
+	})
+
+	t.Run("保存済みフィルタが上限ちょうどなら受理する", func(t *testing.T) {
+		// Given: 保存済みフィルタ上限100件ちょうどの妥当なフィルタ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordFilters = validTransferRecordFilters(100)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		assert.NoError(t, err)
+	})
+
+	t.Run("保存済みフィルタが上限を超えたら拒否する", func(t *testing.T) {
+		// Given: 保存済みフィルタ上限100件を1件超える妥当なフィルタ群
+		snapshot := validUserDataTransferSnapshot(t)
+		snapshot.RecordFilters = validTransferRecordFilters(101)
+
+		// When
+		err := snapshot.Validate()
+
+		// Then
+		require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.Contains(t, err.Error(), "record_filters exceeds its limit")
 	})
 
 	t.Run("保存済みフィルタが既存上限を超えたら拒否する", func(t *testing.T) {
@@ -353,11 +633,107 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 	}
 }
 
+// validTransferSlotRecords は指定スロットに順位1から連番で割り当てた妥当な通常譜面レコードを指定件数組み立てます。
+func validTransferSlotRecords(slotName string, count int) []UserDataTransferRecord {
+	records := make([]UserDataTransferRecord, count)
+	standardScore, _ := score.NewScore(1_009_000)
+	for i := range records {
+		order := i + 1
+		records[i] = UserDataTransferRecord{
+			SongOfficialIdx: fmt.Sprintf("%04d", i+1),
+			Difficulty:      "MASTER",
+			Score:           standardScore,
+			ClearLampName:   "CLEAR",
+			ComboLampName:   "FULL COMBO",
+			FullChainName:   "NONE",
+			SlotName:        slotName,
+			SlotOrder:       &order,
+			UpdatedAt:       time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return records
+}
+
+// validTransferFavoriteSongs は重複がなく時刻が妥当なお気に入りを指定件数組み立てます。
+func validTransferFavoriteSongs(count int) []UserDataTransferFavoriteSong {
+	songs := make([]UserDataTransferFavoriteSong, count)
+	base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	for i := range songs {
+		songs[i] = UserDataTransferFavoriteSong{
+			SongOfficialIdx: fmt.Sprintf("%010d", i+1),
+			FavoritedAt:     base.Add(time.Duration(i) * time.Second),
+		}
+	}
+	return songs
+}
+
+// validTransferRecordFilters は本文サイズが小さく妥当な保存済みフィルタを指定件数組み立てます。
+func validTransferRecordFilters(count int) []UserDataTransferRecordFilter {
+	filters := make([]UserDataTransferRecordFilter, count)
+	for i := range filters {
+		filters[i] = UserDataTransferRecordFilter{
+			Name:          fmt.Sprintf("フィルタ%03d", i+1),
+			FilterType:    "standard",
+			SchemaVersion: 1,
+			Filter:        json.RawMessage(`{"difficulties":["MASTER"]}`),
+			CreatedAt:     time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			UpdatedAt:     time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return filters
+}
+
+// validTransferGoals は並び順が連続した妥当な目標を指定件数組み立てます。
+func validTransferGoals(count int) []UserDataTransferGoal {
+	goals := make([]UserDataTransferGoal, count)
+	for i := range goals {
+		goals[i] = UserDataTransferGoal{
+			Title:             fmt.Sprintf("目標%03d", i+1),
+			AchievementType:   "rank_count",
+			AchievementParams: json.RawMessage(`{"count":1}`),
+			Attributes:        json.RawMessage(`{"diff":["MASTER"]}`),
+			SortOrder:         uint16(i + 1),
+			CreatedAt:         time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		}
+	}
+	return goals
+}
+
+// validTransferGoalGroups は名前が重複せず並び順が連続した妥当な目標グループを指定件数組み立てます。
+func validTransferGoalGroups(t *testing.T, count int) []UserDataTransferGoalGroup {
+	t.Helper()
+
+	groups := make([]UserDataTransferGoalGroup, count)
+	for i := range groups {
+		name, err := goalgroupname.NewGoalGroupName(fmt.Sprintf("グループ%02d", i+1))
+		require.NoError(t, err)
+		groups[i] = UserDataTransferGoalGroup{
+			Name:      name,
+			SortOrder: uint16(i + 1),
+			CreatedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+			Goals:     []UserDataTransferGoal{},
+		}
+	}
+	return groups
+}
+
 func validRecordHistory(updatedAt time.Time) UserDataTransferRecordHistory {
 	standardScore, _ := score.NewScore(1_000_000)
 	return UserDataTransferRecordHistory{
 		SongOfficialIdx: "1001",
 		Difficulty:      "MASTER",
+		Score:           standardScore,
+		ClearLampName:   "CLEAR",
+		ComboLampName:   "FULL COMBO",
+		FullChainName:   "NONE",
+		UpdatedAt:       updatedAt,
+	}
+}
+
+func validWorldsendRecordHistory(updatedAt time.Time) UserDataTransferWorldsendRecordHistory {
+	standardScore, _ := score.NewScore(1_000_000)
+	return UserDataTransferWorldsendRecordHistory{
+		SongOfficialIdx: "2001",
 		Score:           standardScore,
 		ClearLampName:   "CLEAR",
 		ComboLampName:   "FULL COMBO",

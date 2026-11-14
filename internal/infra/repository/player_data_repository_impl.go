@@ -123,39 +123,33 @@ func (r *playerDataRepository) SavePlayerData(ctx context.Context, exec reposito
 	if exec == nil {
 		return fmt.Errorf("SavePlayerData requires a non-nil executor: must be called within a transaction")
 	}
-	executor := exec
-
-	if err := r.saveFullRecords(ctx, executor, input.FullRecords); err != nil {
-		return fmt.Errorf("failed to save player records (count=%d): %w", len(input.FullRecords), err)
+	if err := r.saveFullRecords(ctx, exec, input.FullRecordsToInsert); err != nil {
+		return err
 	}
-
-	if err := r.saveWorldsendRecords(ctx, executor, input.WorldsendRecords); err != nil {
-		return fmt.Errorf("failed to save worldsend records (count=%d): %w", len(input.WorldsendRecords), err)
+	if err := r.saveWorldsendRecords(ctx, exec, input.WorldsendRecordsToInsert); err != nil {
+		return err
 	}
-
-	return nil
+	if err := updateFullRecords(ctx, exec, input.FullRecordsToUpdate); err != nil {
+		return err
+	}
+	if err := updateWorldsendRecords(ctx, exec, input.WorldsendRecordsToUpdate); err != nil {
+		return err
+	}
+	return updateRecordSlots(ctx, exec, input.FullRecordSlotsToUpdate)
 }
 
-// ClearRankedSlots は指定プレイヤーの通常譜面からレーティング枠をすべて解除します。
-// 枠付け替えだけで最終更新日を進めないよう、updated_at への明示代入で ON UPDATE CURRENT_TIMESTAMP の自動更新を抑制します。
-func (r *playerDataRepository) ClearRankedSlots(ctx context.Context, exec repository.Executor, playerID int) error {
+// FindRankedPlayerRecordChartIDs は入力外の枠解除対象も同じトランザクションで取得します。
+func (r *playerDataRepository) FindRankedPlayerRecordChartIDs(ctx context.Context, exec repository.Executor, playerID int) ([]int, error) {
 	if exec == nil {
-		return fmt.Errorf("ClearRankedSlots requires a non-nil executor: must be called within a transaction")
+		return nil, fmt.Errorf("FindRankedPlayerRecordChartIDs requires a non-nil executor")
 	}
-	if _, err := exec.ExecContext(ctx, `
-		UPDATE player_records
-		SET slot_id = (SELECT id FROM slots WHERE name = 'none'),
-			slot_order = NULL,
-			updated_at = updated_at
-		WHERE player_id = ?
-		  AND (
-			slot_id <> (SELECT id FROM slots WHERE name = 'none')
-			OR slot_order IS NOT NULL
-		  )
-	`, playerID); err != nil {
-		return fmt.Errorf("failed to clear ranked slots for player_id=%d: %w", playerID, err)
+	var ids []int
+	if err := exec.SelectContext(ctx, &ids, `SELECT chart_id FROM player_records
+		WHERE player_id = ? AND (slot_id <> (SELECT id FROM slots WHERE name = 'none') OR slot_order IS NOT NULL)
+		ORDER BY chart_id`+r.recordLockClause(), playerID); err != nil {
+		return nil, fmt.Errorf("failed to find ranked records: %w", err)
 	}
-	return nil
+	return ids, nil
 }
 
 // SaveLatestUpdate は収集日時ごとに登録結果を保存し、最新5件を残します。
@@ -487,65 +481,15 @@ type playerDataWorldsendRecordRow struct {
 	UpdatedAt        time.Time `db:"updated_at"`
 }
 
-const (
-	fullRecordChangedCondition = "score <> VALUES(score) OR " +
-		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
-		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
-		"full_chain_id <> VALUES(full_chain_id)"
+const fullRecordInsertQuery = `
+ INSERT INTO player_records (player_id, chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, slot_id, slot_order, updated_at)
+ VALUES (:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id, :full_chain_id, :slot_id, :slot_order, :updated_at)
+`
 
-	worldsendRecordChangedCondition = "score <> VALUES(score) OR " +
-		"clear_lamp_id <> VALUES(clear_lamp_id) OR " +
-		"combo_lamp_id <> VALUES(combo_lamp_id) OR " +
-		"full_chain_id <> VALUES(full_chain_id)"
-
-	changedConditionPlaceholder = "{{CHANGED_CONDITION}}"
-)
-
-var fullRecordUpsertQuery = replaceQueryPlaceholder(`
-		INSERT INTO player_records (
-			player_id, chart_id, score, clear_lamp_id, combo_lamp_id,
-			full_chain_id, slot_id, slot_order, updated_at
-		) VALUES (
-			:player_id, :chart_id, :score, :clear_lamp_id, :combo_lamp_id,
-			:full_chain_id, :slot_id, :slot_order, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			updated_at = IF(
-				{{CHANGED_CONDITION}},
-				VALUES(updated_at),
-				updated_at
-			),
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id),
-			slot_id = VALUES(slot_id),
-			slot_order = VALUES(slot_order)
-	`, changedConditionPlaceholder, fullRecordChangedCondition)
-
-var worldsendRecordUpsertQuery = replaceQueryPlaceholder(`
-		INSERT INTO player_worldsend_records (
-			player_id, worldsend_chart_id, score, clear_lamp_id,
-			combo_lamp_id, full_chain_id, updated_at
-		) VALUES (
-			:player_id, :worldsend_chart_id, :score, :clear_lamp_id,
-			:combo_lamp_id, :full_chain_id, :updated_at
-		)
-		ON DUPLICATE KEY UPDATE
-			updated_at = IF(
-				{{CHANGED_CONDITION}},
-				VALUES(updated_at),
-				updated_at
-			),
-			score = VALUES(score),
-			clear_lamp_id = VALUES(clear_lamp_id),
-			combo_lamp_id = VALUES(combo_lamp_id),
-			full_chain_id = VALUES(full_chain_id)
-	`, changedConditionPlaceholder, worldsendRecordChangedCondition)
-
-func replaceQueryPlaceholder(query string, placeholder string, replacement string) string {
-	return strings.ReplaceAll(query, placeholder, replacement)
-}
+const worldsendRecordInsertQuery = `
+ INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)
+ VALUES (:player_id, :worldsend_chart_id, :score, :clear_lamp_id, :combo_lamp_id, :full_chain_id, :updated_at)
+`
 
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {
 	rows := make([]playerDataRecordRow, 0, len(records))
@@ -563,7 +507,7 @@ func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec reposit
 		})
 	}
 
-	return bulkUpsert(ctx, exec, rows, fullRecordUpsertQuery, "player records")
+	return bulkExec(ctx, exec, rows, fullRecordInsertQuery, "player records")
 }
 
 func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec repository.Executor, records []repository.WorldsendRecordForUpsert) error {
@@ -580,10 +524,10 @@ func (r *playerDataRepository) saveWorldsendRecords(ctx context.Context, exec re
 		})
 	}
 
-	return bulkUpsert(ctx, exec, rows, worldsendRecordUpsertQuery, "worldsend records")
+	return bulkExec(ctx, exec, rows, worldsendRecordInsertQuery, "worldsend records")
 }
 
-func bulkUpsert[T any](ctx context.Context, exec repository.Executor, rows []T, query string, recordType string) error {
+func bulkExec[T any](ctx context.Context, exec repository.Executor, rows []T, query string, recordType string) error {
 	if len(rows) == 0 {
 		return nil
 	}

@@ -114,7 +114,8 @@ func TestToMusicShowResponse(t *testing.T) {
 }
 
 func TestToRecordsShowAllResponse(t *testing.T) {
-	// Given
+	// Given: プレイ済み+日時あり1件だけが残り、除外条件を1つずつ分離した3件は除外される。
+	// 未プレイ+日時ありはIsPlayed判定、日時なしはUpdatedAt判定、nilはnil判定の独立検証用。
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	updatedAt := time.Date(1970, 1, 1, 9, 0, 0, 0, jst)
 	chartConst, err := chartconstant.NewChartConstant(10.7)
@@ -139,10 +140,20 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 			FullChain:      &fullChain,
 		},
 		{
+			UpdatedAt:  &updatedAt,
 			IsPlayed:   false,
 			Difficulty: "MASTER",
-			ID:         "未プレイ",
+			ID:         "未プレイだが日時あり",
+			Const:      chartConst,
 		},
+		{
+			UpdatedAt:  nil,
+			IsPlayed:   true,
+			Difficulty: "MASTER",
+			ID:         "プレイ済みだが日時なし",
+			Const:      chartConst,
+		},
+		nil,
 	}
 
 	// When

@@ -18,3 +18,17 @@ type WorldsendChart struct {
 	NotesDesigner *string
 	UpdatedAt     *time.Time
 }
+
+// Clone は WORLD'S END 譜面を深く複製します。
+func (c *WorldsendChart) Clone() *WorldsendChart {
+	if c == nil {
+		return nil
+	}
+	cloned := *c
+	cloned.LevelStar = clonePointer(c.LevelStar)
+	cloned.Attribute = clonePointer(c.Attribute)
+	cloned.Notes = clonePointer(c.Notes)
+	cloned.NotesDesigner = clonePointer(c.NotesDesigner)
+	cloned.UpdatedAt = clonePointer(c.UpdatedAt)
+	return &cloned
+}

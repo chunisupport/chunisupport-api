@@ -9,16 +9,16 @@ import (
 
 func TestLoadCloudflareCacheConfigFromEnv(t *testing.T) {
 	t.Setenv("CLOUDFLARE_API_TOKEN", "token")
-	t.Setenv("CLOUDFLARE_ZONE_ID", "575f883bc4eb7c2d89c56ee987c73873")
-	t.Setenv("STATIC_DATA_PUBLIC_BASE_URL", " https://static.chunisup-dev.f5.si/ ")
+	t.Setenv("CLOUDFLARE_ZONE_ID", "11111111111111111111111111111111")
+	t.Setenv("STATIC_DATA_PUBLIC_BASE_URL", " https://static-develop.example.test/ ")
 
 	got, err := LoadCloudflareCacheConfigFromEnv()
 
 	require.NoError(t, err)
 	assert.Equal(t, CloudflareCacheConfig{
 		APIToken:      "token",
-		ZoneID:        "575f883bc4eb7c2d89c56ee987c73873",
-		PublicBaseURL: "https://static.chunisup-dev.f5.si",
+		ZoneID:        "11111111111111111111111111111111",
+		PublicBaseURL: "https://static-develop.example.test",
 	}, got)
 }
 
@@ -28,8 +28,9 @@ func TestLoadCloudflareCacheConfigFromEnv_環境ごとの公開先を許可す�
 		zoneID  string
 		baseURL string
 	}{
-		{name: "開発とステージング", zoneID: "575f883bc4eb7c2d89c56ee987c73873", baseURL: "https://static.chunisup-dev.f5.si"},
-		{name: "本番", zoneID: "c7e970656a686c79cce6fad84c888d2c", baseURL: "https://static.chunisupport.net"},
+		{name: "開発", zoneID: "11111111111111111111111111111111", baseURL: "https://static-develop.example.test"},
+		{name: "ステージング", zoneID: "22222222222222222222222222222222", baseURL: "https://static-staging.example.test"},
+		{name: "本番", zoneID: "33333333333333333333333333333333", baseURL: "https://static-production.example.test"},
 	}
 
 	for _, tt := range tests {
@@ -54,12 +55,11 @@ func TestLoadCloudflareCacheConfigFromEnv_不正な設定を拒否する(t *test
 		zoneID  string
 		baseURL string
 	}{
-		{name: "トークンなし", zoneID: "575f883bc4eb7c2d89c56ee987c73873", baseURL: "https://static.chunisup-dev.f5.si"},
-		{name: "Zone IDなし", token: "token", baseURL: "https://static.chunisup-dev.f5.si"},
-		{name: "Zone IDが不正", token: "token", zoneID: "../purge_cache", baseURL: "https://static.chunisup-dev.f5.si"},
-		{name: "Zone IDと公開先が不一致", token: "token", zoneID: "c7e970656a686c79cce6fad84c888d2c", baseURL: "https://static.chunisup-dev.f5.si"},
-		{name: "HTTP", token: "token", zoneID: "575f883bc4eb7c2d89c56ee987c73873", baseURL: "http://static.chunisup-dev.f5.si"},
-		{name: "パスあり", token: "token", zoneID: "575f883bc4eb7c2d89c56ee987c73873", baseURL: "https://static.chunisup-dev.f5.si/path"},
+		{name: "トークンなし", zoneID: "11111111111111111111111111111111", baseURL: "https://static-develop.example.test"},
+		{name: "Zone IDなし", token: "token", baseURL: "https://static-develop.example.test"},
+		{name: "Zone IDが不正", token: "token", zoneID: "../purge_cache", baseURL: "https://static-develop.example.test"},
+		{name: "HTTP", token: "token", zoneID: "11111111111111111111111111111111", baseURL: "http://static-develop.example.test"},
+		{name: "パスあり", token: "token", zoneID: "11111111111111111111111111111111", baseURL: "https://static-develop.example.test/path"},
 	}
 
 	for _, tt := range tests {

@@ -17,6 +17,8 @@ func TestNewAPITokenName(t *testing.T) {
 		{name: "前後の空白を除去する", value: "  Discord Bot  ", expected: "Discord Bot"},
 		{name: "日本語名を受け付ける", value: "スコア取得ツール", expected: "スコア取得ツール"},
 		{name: "50文字を受け付ける", value: strings.Repeat("a", 50), expected: strings.Repeat("a", 50)},
+		{name: "日本語50文字を受け付ける", value: strings.Repeat("あ", 50), expected: strings.Repeat("あ", 50)},
+		{name: "前後の空白付き50文字を除去して受け付ける", value: "  " + strings.Repeat("a", 50) + "  ", expected: strings.Repeat("a", 50)},
 	}
 
 	for _, tt := range tests {
@@ -36,6 +38,8 @@ func TestNewAPITokenName_Invalid(t *testing.T) {
 	}{
 		{name: "空文字", value: ""},
 		{name: "51文字", value: strings.Repeat("a", 51)},
+		{name: "日本語51文字", value: strings.Repeat("あ", 51)},
+		{name: "空白のみ", value: "   "},
 		{name: "制御文字を含む", value: "bot\nname"},
 	}
 

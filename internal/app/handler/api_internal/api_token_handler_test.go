@@ -145,13 +145,16 @@ func TestAPITokenHandler_GenerateRequiresValidPermission(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
+		// Given: ハンドラーがusecaseへ転送すべき権限文字列。未指定は空文字のまま転送される。
+		wantPermission string
 	}{
-		{name: "未指定", body: `{"name":"CLI"}`},
-		{name: "未知の値", body: `{"name":"CLI","permission":"write"}`},
+		{name: "未指定", body: `{"name":"CLI"}`, wantPermission: ""},
+		{name: "未知の値", body: `{"name":"CLI","permission":"write"}`, wantPermission: "write"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Given
 			e := newAPITokenTestEcho()
 			mockUsecase := new(mockAPITokenUsecase)
 			h := api_internal.NewAPITokenHandler(mockUsecase)
@@ -160,13 +163,17 @@ func TestAPITokenHandler_GenerateRequiresValidPermission(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 			c.Set("userEntity", &entity.User{ID: 10})
-			mockUsecase.On("Generate", mock.Anything, 10, "CLI", mock.AnythingOfType("string")).Return(nil, usecase.ErrInvalidAPITokenPermission).Once()
+			mockUsecase.On("Generate", mock.Anything, 10, "CLI", tt.wantPermission).Return(nil, usecase.ErrInvalidAPITokenPermission).Once()
 
+			// When
 			err := h.Generate(c)
 
+			// Then
 			var apiErr *apierror.APIError
 			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, apierror.CodeInvalidAPITokenPermission, apiErr.Code)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+			assert.ErrorIs(t, err, usecase.ErrInvalidAPITokenPermission)
 			mockUsecase.AssertExpectations(t)
 		})
 	}

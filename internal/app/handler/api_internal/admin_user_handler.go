@@ -1,6 +1,8 @@
 package api_internal
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -27,7 +29,14 @@ func (h *AdminUserHandler) GetAllUsers(c *echo.Context) error {
 	pageParam := c.QueryParam("page")
 	page := 1
 	if pageParam != "" {
-		if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		p, err := strconv.Atoi(pageParam)
+		if err != nil {
+			// 正の桁あふれだけ422にし、非数値・空白・負の桁あふれは従来どおり1に補正する。
+			// Atoiは桁あふれ時に最大・最小値へ飽和するため、p>0で正の巨大値だけを区別する。
+			if p > 0 && errors.Is(err, strconv.ErrRange) {
+				return apierror.ErrValidationFailed.WithInternal(fmt.Errorf("pageがintに収まりません: %w", err))
+			}
+		} else if p > 0 {
 			page = p
 		}
 	}

@@ -427,3 +427,116 @@ func TestDownloader_DownloadAll_OversizedSourceStaysIsolated(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(downloader.outputDir, "over.json"))
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
 }
+
+// TestDownloader_DownloadAll_SendsExistingQueryAndParams は、既存クエリ付きURLに
+// 汎用Params（[]anyのkey/value）が付与されることを検証します。
+// buildURLが既存クエリを破棄せずParamsを追加することが仕様のため、受信側でデコード済み値を確認します。
+func TestDownloader_DownloadAll_SendsExistingQueryAndParams(t *testing.T) {
+	// Given
+	requests := make(chan map[string]string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		requests <- map[string]string{
+			"path":     r.URL.Path,
+			"existing": query.Get("existing"),
+			"foo":      query.Get("foo"),
+			"token":    query.Get("token"),
+		}
+		fmt.Fprint(w, `{"status":"ok"}`)
+	}))
+	defer server.Close()
+
+	downloader := NewDownloader(t.TempDir())
+	datasources := []Datasource{
+		{
+			Type: "official",
+			URL:  server.URL + "/data?existing=a%20b",
+			Params: []any{
+				map[string]any{"key": "foo", "value": "bar baz"},
+				map[string]any{"key": "token", "value": "a&b=c"},
+			},
+		},
+	}
+
+	// When
+	results, err := downloader.DownloadAll(context.Background(), datasources)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Success)
+	assert.Equal(t, map[string]string{
+		"path": "/data", "existing": "a b", "foo": "bar baz", "token": "a&b=c",
+	}, <-requests)
+}
+
+// TestDownloader_DownloadAll_FixSongsChartsResponse は、fix_songs_charts応答の
+// success判定が保存可否に反映されることを検証します。
+// 通常ソースの不正JSONは原文保存が仕様のため、本表には含めません。
+func TestDownloader_DownloadAll_FixSongsChartsResponse(t *testing.T) {
+	tests := []struct {
+		name            string
+		payload         string
+		wantSuccess     bool
+		wantErrContains string
+		wantSaved       bool
+	}{
+		{
+			name:        "successがtrueの場合は保存する",
+			payload:     `{"success":true,"songs":[]}`,
+			wantSuccess: true,
+			wantSaved:   true,
+		},
+		{
+			name:            "successがfalseの場合は失敗し保存しない",
+			payload:         `{"success":false}`,
+			wantSuccess:     false,
+			wantErrContains: "success=false",
+			wantSaved:       false,
+		},
+		{
+			name:            "不正JSONの場合は失敗し保存しない",
+			payload:         `not json`,
+			wantSuccess:     false,
+			wantErrContains: "failed to parse",
+			wantSaved:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprint(w, tt.payload)
+			}))
+			defer server.Close()
+
+			downloader := NewDownloader(t.TempDir())
+
+			// When
+			results, err := downloader.DownloadAll(context.Background(), []Datasource{
+				{Type: "fix_songs_charts", URL: server.URL},
+			})
+
+			// Then
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.Equal(t, tt.wantSuccess, results[0].Success)
+			path := filepath.Join(downloader.outputDir, "fix_songs_charts.json")
+			if tt.wantSaved {
+				assert.Empty(t, results[0].Error)
+				assert.Equal(t, path, results[0].Path)
+				assert.NotZero(t, results[0].Bytes)
+				saved, readErr := os.ReadFile(path)
+				require.NoError(t, readErr)
+				assert.JSONEq(t, tt.payload, string(saved))
+				return
+			}
+
+			assert.Contains(t, results[0].Error, tt.wantErrContains)
+			assert.Empty(t, results[0].Path)
+			_, statErr := os.Stat(path)
+			assert.ErrorIs(t, statErr, os.ErrNotExist)
+		})
+	}
+}

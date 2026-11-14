@@ -7,6 +7,14 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
+// SongsUpdatedAtOutput は公開中の楽曲カタログの更新時刻と変更世代です。
+// UpdatedAt は秒精度の updated_at の最大値で、同じ秒内の変更や削除済み行の扱いによっては変化しません。
+// Revision は楽曲・譜面の変更ごとに必ず進むため、キャッシュの更新判定には Revision を使います。
+type SongsUpdatedAtOutput struct {
+	UpdatedAt *time.Time
+	Revision  uint64
+}
+
 // UpdateChartInput は譜面の一括更新値です。
 type UpdateChartInput struct {
 	Const          float64
@@ -77,8 +85,9 @@ type SongUsecase interface {
 	// requesterAccountTypeIDがnilまたはEDITOR権限を満たさない場合、削除済み楽曲はErrSongNotFoundを返します。
 	GetSongByDisplayID(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
 
-	// GetSongsUpdatedAt は楽曲関連データの updated_at の最大値を取得します。
-	GetSongsUpdatedAt(ctx context.Context) (*time.Time, error)
+	// GetSongsUpdatedAt は公開中の楽曲カタログ（楽曲データと同じ世代）の更新時刻と変更世代を取得します。
+	// 通常はDBへ問い合わせません。
+	GetSongsUpdatedAt(ctx context.Context) (*SongsUpdatedAtOutput, error)
 
 	// DeleteSong は指定されたDisplayIDの楽曲を論理削除します。
 	DeleteSong(ctx context.Context, displayID string) error

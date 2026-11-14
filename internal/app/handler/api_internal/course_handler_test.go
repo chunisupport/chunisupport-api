@@ -11,7 +11,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
-	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -110,10 +109,8 @@ func TestCourseHandler_GetCoursesUpdatedAt_更新日時を返す(t *testing.T) {
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	var response internaldto.CourseUpdatedAtDTO
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	require.NotNil(t, response.UpdatedAt)
-	assert.True(t, expected.Equal(*response.UpdatedAt))
+	// 更新日時がある場合の形を固定値で確かめる。DTO経由のデコードではキー名の変更を見逃すため。
+	assert.JSONEq(t, `{"updated_at":"2026-07-14T12:34:56Z"}`, rec.Body.String())
 }
 
 func TestCourseHandler_GetCoursesUpdatedAt_コースが無い場合はnull(t *testing.T) {
@@ -130,7 +127,6 @@ func TestCourseHandler_GetCoursesUpdatedAt_コースが無い場合はnull(t *te
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	var response internaldto.CourseUpdatedAtDTO
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Nil(t, response.UpdatedAt)
+	// キーが存在して値が null であることを固定値で確かめる。{} やキー削除の退行を検出するため。
+	assert.JSONEq(t, `{"updated_at":null}`, rec.Body.String())
 }

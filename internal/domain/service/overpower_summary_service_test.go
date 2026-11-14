@@ -7,19 +7,45 @@ import (
 )
 
 func TestCalcOverpowerSummary_楽曲ごとの最大値を合計する(t *testing.T) {
-	records := []OverpowerRecord{
-		{SongID: 1, Score: 1008000, ChartConst: 15.0, ComboLampID: 3},
-		{SongID: 1, Score: 1007000, ChartConst: 15.0, ComboLampID: 2},
-		{SongID: 2, Score: 1009000, ChartConst: 14.0, ComboLampID: 3},
+	// 手計算の根拠 (docs/overpower_calculation.md の1・2・3・6章)。
+	// コンボランプIDは 3=ALL JUSTICE(+1.0)、2=FULL COMBO(+0.5)。S以上は0.005刻み切り捨て。
+	// 楽曲1の高記録 (1008000/15.0/AJ): (15.0+2)×5 + (1008000-1007500)÷2500×3.75 + 1.0 = 85.0 + 0.75 + 1.0 = 86.75。
+	// 楽曲1の低記録 (1007000/15.0/FC): SS+区間のため (15.0+1.5)×5 + (1007000-1005000)÷2500×2.5 + 0.5 = 82.5 + 2.0 + 0.5 = 85.0。
+	// 楽曲2 (1009000/14.0/AJ): (14.0+2)×5 + (1009000-1007500)÷2500×3.75 + 1.0 = 80.0 + 2.25 + 1.0 = 83.25。
+	// 楽曲ごとの最大値の合計は 86.75 + 83.25 = 170.0。分母は楽曲最大OPの合計で (15.0+3)×5 + (14.0+3)×5 = 90.0 + 85.0 = 175.0。
+	// 割合は 170.0÷175.0×100 = 97.142857... を小数第5位で切り捨てて 97.14285。
+	tests := []struct {
+		name    string
+		records []OverpowerRecord
+	}{
+		{
+			name: "高い記録が先でも楽曲の最大値を採用する",
+			records: []OverpowerRecord{
+				{SongID: 1, Score: 1008000, ChartConst: 15.0, ComboLampID: 3},
+				{SongID: 1, Score: 1007000, ChartConst: 15.0, ComboLampID: 2},
+				{SongID: 2, Score: 1009000, ChartConst: 14.0, ComboLampID: 3},
+			},
+		},
+		{
+			name: "低い記録が先でも楽曲の最大値を採用する",
+			records: []OverpowerRecord{
+				{SongID: 1, Score: 1007000, ChartConst: 15.0, ComboLampID: 2},
+				{SongID: 1, Score: 1008000, ChartConst: 15.0, ComboLampID: 3},
+				{SongID: 2, Score: 1009000, ChartConst: 14.0, ComboLampID: 3},
+			},
+		},
 	}
-	maxTotal := CalcSongMaxOP(15.0) + CalcSongMaxOP(14.0)
 
-	value, percent := CalcOverpowerSummary(records, maxTotal)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			value, percent := CalcOverpowerSummary(tt.records, 175.0)
 
-	wantValue := CalcSingleOverpower(1008000, 15.0, 3) + CalcSingleOverpower(1009000, 14.0, 3)
-	wantPercent := truncN(wantValue/maxTotal*100, 5)
-	assert.InDelta(t, wantValue, value, 0.0001)
-	assert.InDelta(t, wantPercent, percent, 0.0001)
+			// Then
+			assert.Equal(t, 170.0, value)
+			assert.Equal(t, 97.14285, percent)
+		})
+	}
 }
 
 func TestCalcOverpowerPercent(t *testing.T) {

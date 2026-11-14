@@ -269,6 +269,7 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - ログインの `action` は `login`、新規登録の `action` は `signup` です。フロントの Turnstile ウィジェットにも同じ値を設定してください。未設定や不一致のトークンは無効として拒否します
 - `hostname` はスキームとポートを含まないため、`http://localhost:3000` は `localhost` として照合します。`https://*.example.pages.dev` のようなワイルドカードもホスト名に対して同様に判定します
 - `*` や `https://*`、`https://**` のような全許可のオリジン（ホストが `*` だけで構成されるもの）は、Turnstile の許可ホストにはしません。別ホストで取得したトークンの流用を防げなくなるためです
+- スキームやホストがない値（`example.com` など）と、パス・クエリ・フラグメントを含む値（`https://example.com/app` など）は、オリジンとして不正なため許可ホストにしません
 - 許可ホストが1件も残らない場合、ログインと新規登録はすべて無効トークンとして拒否されます。この場合は起動時に警告ログを出力します
 - `/healthz` などに追加する `https://new.chunithm-net.com` は Turnstile の許可ホストに含めません
 - ローカル開発では Cloudflare のテスト用キー（シークレット `1x0000000000000000000000000000000AA` とフロントのサイトキー `1x00000000000000000000AA`）を使えます。テスト用シークレットの応答は `hostname` が `example.com` 固定で `action` も付かないため、siteverify が `metadata.result_with_testing_key: true` を返した場合は `hostname` と `action` を照合しません。実キーではこのフラグが返らないため、本番の照合には影響しません
@@ -310,9 +311,9 @@ Firebase を使ったログイン・連携エンドポイントは常に有効�
 - `CLOUDFLARE_ZONE_ID`
 - `STATIC_DATA_PUBLIC_BASE_URL`
 
-APIサーバーの起動にはこれらの環境変数は不要です。本番の秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
+APIサーバーの起動にはこれらの環境変数は不要です。開発、ステージング、本番では、エンドポイント、バケット、Zone ID、公開URLをその環境のSecretへ置き、環境間で共有しません。コードはこれらを固定しません。`Cache-Control` の値は3環境で同じです。秘密情報はAPIサーバーと共有せず、バッチ専用のsystemd EnvironmentFileやコンテナ基盤のSecretへ保存してください。EnvironmentFileはバッチ実行ユーザーだけが読める`0600`とし、共有`.env`の使用はローカル開発に限定します。
 
-出力するオブジェクトキーや実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
+出力するオブジェクトキー、`Cache-Control`、実行方法は [静的データのオブジェクトストレージエクスポート](static_data_export.md) を参照してください。
 
 ## 楽曲データ収集バッチ
 

@@ -1,10 +1,15 @@
 package info
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 )
+
+// PlayerRecordUpdateChunkSize はCASE分岐の評価コストを抑えるため、INSERTとは別に分割します。
+// 6,000行更新の比較で500行が1,000/3,000行より高速。最大7,501プレースホルダーで上限内です。
+const PlayerRecordUpdateChunkSize = 500
 
 const (
 	Name                                        = "chunisupport-api"
@@ -78,10 +83,6 @@ const (
 	CloudflareCachePurgeRetryBaseDelay          = time.Second
 	CloudflareAPITimeout                        = 15 * time.Second
 	CloudflareAPIResponseMaxBytes               = 1024 * 1024
-	DevelopCloudflareZoneID                     = "575f883bc4eb7c2d89c56ee987c73873"
-	DevelopStaticDataPublicBaseURL              = "https://static.chunisup-dev.f5.si"
-	ProductionCloudflareZoneID                  = "c7e970656a686c79cce6fad84c888d2c"
-	ProductionStaticDataPublicBaseURL           = "https://static.chunisupport.net"
 	PlayerLatestUpdateSchemaVersion             = 3
 	PlayerLatestUpdateMinSupportedSchemaVersion = 1
 	PlayerLatestUpdateMetricDiffSchemaVersion   = 2
@@ -225,6 +226,26 @@ const (
 	HTTPWriteTimeout      = 60 * time.Second
 	HTTPIdleTimeout       = 120 * time.Second
 )
+
+const (
+	// StaticDataJSONBrowserMaxAge は、公開JSONをブラウザがネットワークなしで再利用する時間です。
+	// オブジェクトキーは内容ハッシュを含まず同じURLを上書きします。パージはブラウザのコピーを消さないため、長くすると更新後も古いJSONが残ります。
+	// develop、staging、productionで同じ値です。公開ホストとバケットは環境変数で決まり、この時間には含めません。
+	StaticDataJSONBrowserMaxAge = 5 * time.Minute
+	// StaticDataJSONEdgeMaxAge は、Cloudflareが同じURLを再利用する時間です。
+	// 通常はエクスポート成功後のプレフィックスパージで捨てます。パージが失敗したとき、エッジが古いオブジェクトを出し続ける上限です。
+	StaticDataJSONEdgeMaxAge = time.Hour
+)
+
+// StaticDataJSONCacheControl は公開JSONへ付与するCache-Controlです。
+// ブラウザは max-age だけを使い、共有キャッシュは s-maxage を優先します。
+func StaticDataJSONCacheControl() string {
+	return fmt.Sprintf(
+		"public, max-age=%d, s-maxage=%d",
+		StaticDataJSONBrowserMaxAge/time.Second,
+		StaticDataJSONEdgeMaxAge/time.Second,
+	)
+}
 
 var (
 	BuildDate = "dev"  // ビルド日: YYYYMMDD。開発起動時はdev

@@ -31,6 +31,11 @@ func TestClientIPKey(t *testing.T) {
 			remoteAddr: "[::ffff:192.0.2.1]:1234",
 			expected:   "192.0.2.1",
 		},
+		{
+			name:       "不正なIPは生値を返す",
+			remoteAddr: "invalid-ip:1234",
+			expected:   "invalid-ip",
+		},
 	}
 
 	for _, tt := range tests {

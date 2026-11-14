@@ -2,272 +2,125 @@ package transaction
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
 	apirepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
 
-// TestTransactional_Commit はトランザクションが正常にコミットされることを確認
-func TestTransactional_Commit(t *testing.T) {
-	ctx := context.Background()
-
+func transactionTestDB(t *testing.T) *sqlx.DB {
+	t.Helper()
 	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	// テーブル作成
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE test_table (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			value TEXT NOT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-
-	tm := NewTransactionManager(db)
-
-	// トランザクション内で INSERT
-	err = tm.Transactional(ctx, func(tx apirepo.Executor) error {
-		_, err := tx.ExecContext(ctx, "INSERT INTO test_table (value) VALUES (?)", "test_value")
-		return err
-	})
-	if err != nil {
-		t.Fatalf("Transactional returned error: %v", err)
-	}
-
-	// 検証: データがコミットされている
-	var count int
-	err = db.Get(&count, "SELECT COUNT(*) FROM test_table")
-	if err != nil {
-		t.Fatalf("failed to count rows: %v", err)
-	}
-
-	if count != 1 {
-		t.Errorf("expected 1 row, got %d", count)
-	}
-
-	var value string
-	err = db.Get(&value, "SELECT value FROM test_table WHERE id = 1")
-	if err != nil {
-		t.Fatalf("failed to get value: %v", err)
-	}
-
-	if value != "test_value" {
-		t.Errorf("expected 'test_value', got '%s'", value)
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+	require.NoError(t, err)
+	return db
 }
 
-// TestTransactional_PanicRecovery はパニック時にロールバックされ、パニックが再送出されることを確認
-func TestTransactional_PanicRecovery(t *testing.T) {
-	ctx := context.Background()
+func TestTransactional_Commit(t *testing.T) {
+	db := transactionTestDB(t)
+	err := NewTransactionManager(db).Transactional(context.Background(), func(tx apirepo.Executor) error {
+		_, err := tx.ExecContext(context.Background(), "INSERT INTO test_table (value) VALUES (?), (?)", "first", "second")
+		return err
+	})
+	require.NoError(t, err)
+	var values []string
+	require.NoError(t, db.Select(&values, "SELECT value FROM test_table ORDER BY id"))
+	assert.Equal(t, []string{"first", "second"}, values)
+}
 
-	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	// テーブル作成
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE test_table (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			value TEXT NOT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-
-	tm := NewTransactionManager(db)
-
-	// パニックがキャッチされることを確認
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("expected panic to be re-thrown")
-		}
-	}()
-
-	// トランザクション内でパニック
-	_ = tm.Transactional(ctx, func(tx apirepo.Executor) error {
-		_, err := tx.ExecContext(ctx, "INSERT INTO test_table (value) VALUES (?)", "test_value")
+func TestTransactional_NestedError(t *testing.T) {
+	db := transactionTestDB(t)
+	cause := errors.New("挿入後の失敗")
+	err := NewTransactionManager(db).Transactional(context.Background(), func(tx apirepo.Executor) error {
+		_, err := tx.ExecContext(context.Background(), "INSERT INTO test_table (value) VALUES (?), (?)", "first", "second")
 		if err != nil {
 			return err
 		}
-		panic("intentional panic")
+		return cause
 	})
-
-	// パニックで到達しないはず
-	t.Error("should not reach here after panic")
-}
-
-// TestTransactional_PanicRecovery_DataRolledBack はパニック時にデータがロールバックされることを確認
-func TestTransactional_PanicRecovery_DataRolledBack(t *testing.T) {
-	ctx := context.Background()
-
-	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	// テーブル作成
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE test_table (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			value TEXT NOT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-
-	tm := NewTransactionManager(db)
-
-	// パニックをキャッチ
-	func() {
-		defer func() {
-			_ = recover() // パニックを吸収
-		}()
-
-		_ = tm.Transactional(ctx, func(tx apirepo.Executor) error {
-			_, err := tx.ExecContext(ctx, "INSERT INTO test_table (value) VALUES (?)", "test_value")
-			if err != nil {
-				return err
-			}
-			panic("intentional panic")
-		})
-	}()
-
-	// 検証: データがロールバックされている
+	assert.ErrorIs(t, err, cause)
 	var count int
-	err = db.Get(&count, "SELECT COUNT(*) FROM test_table")
-	if err != nil {
-		t.Fatalf("failed to count rows: %v", err)
-	}
-
-	if count != 0 {
-		t.Errorf("expected 0 rows (rolled back after panic), got %d", count)
-	}
+	require.NoError(t, db.Get(&count, "SELECT COUNT(*) FROM test_table"))
+	assert.Zero(t, count)
 }
 
-// TestTransactional_MultipleOperations はトランザクション内で複数の操作が正しく処理されることを確認
-func TestTransactional_MultipleOperations(t *testing.T) {
-	ctx := context.Background()
-
-	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	// テーブル作成
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE test_table (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			value TEXT NOT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-
-	tm := NewTransactionManager(db)
-
-	// トランザクション内で複数の INSERT
-	err = tm.Transactional(ctx, func(tx apirepo.Executor) error {
-		for i := 1; i <= 5; i++ {
-			_, err := tx.ExecContext(ctx, "INSERT INTO test_table (value) VALUES (?)", "value_"+string(rune('0'+i)))
+func TestTransactional_PanicRecovery(t *testing.T) {
+	db := transactionTestDB(t)
+	marker := &struct{ message string }{"元のpanic"}
+	reached := false
+	require.PanicsWithValue(t, marker, func() {
+		_ = NewTransactionManager(db).Transactional(context.Background(), func(tx apirepo.Executor) error {
+			_, err := tx.ExecContext(context.Background(), "INSERT INTO test_table (value) VALUES (?)", "before panic")
 			if err != nil {
 				return err
 			}
-		}
+			reached = true
+			panic(marker)
+		})
+	})
+	assert.True(t, reached)
+	var count int
+	require.NoError(t, db.Get(&count, "SELECT COUNT(*) FROM test_table"))
+	assert.Zero(t, count)
+}
+
+func TestTransactional_Begin失敗ならコールバックを実行しない(t *testing.T) {
+	db := transactionTestDB(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	called := false
+	err := NewTransactionManager(db).Transactional(ctx, func(apirepo.Executor) error { called = true; return nil })
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.False(t, called)
+}
+
+func TestTransactional_Commit失敗を呼び出し元に返す(t *testing.T) {
+	db := transactionTestDB(t)
+	reached := false
+	err := NewTransactionManager(db).Transactional(context.Background(), func(exec apirepo.Executor) error {
+		// 実トランザクションを先に終了させ、外側のCommitを確実に失敗させる。
+		tx, ok := exec.(*sqlx.Tx)
+		require.True(t, ok)
+		require.NoError(t, tx.Rollback())
+		reached = true
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("Transactional returned error: %v", err)
-	}
-
-	// 検証: すべてのデータがコミットされている
-	var count int
-	err = db.Get(&count, "SELECT COUNT(*) FROM test_table")
-	if err != nil {
-		t.Fatalf("failed to count rows: %v", err)
-	}
-
-	if count != 5 {
-		t.Errorf("expected 5 rows, got %d", count)
-	}
+	assert.True(t, reached)
+	assert.ErrorIs(t, err, sql.ErrTxDone)
 }
 
-// TestTransactional_NestedError は複数操作の途中でエラーが発生した場合にすべてロールバックされることを確認
-func TestTransactional_NestedError(t *testing.T) {
-	ctx := context.Background()
-
-	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	// テーブル作成
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE test_table (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			value TEXT NOT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-
-	tm := NewTransactionManager(db)
-
-	// トランザクション内で 3 件 INSERT した後にエラー
-	err = tm.Transactional(ctx, func(tx apirepo.Executor) error {
-		for i := 1; i <= 3; i++ {
-			_, err := tx.ExecContext(ctx, "INSERT INTO test_table (value) VALUES (?)", "value_"+string(rune('0'+i)))
-			if err != nil {
-				return err
-			}
+func TestTransactional_Rollback失敗でも元のエラーとpanicを保持する(t *testing.T) {
+	for _, panics := range []bool{false, true} {
+		name := "エラー"
+		if panics {
+			name = "panic"
 		}
-		return errors.New("error after inserts")
-	})
-
-	// エラーが返されることを確認
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	// 検証: すべてのデータがロールバックされている
-	var count int
-	err = db.Get(&count, "SELECT COUNT(*) FROM test_table")
-	if err != nil {
-		t.Fatalf("failed to count rows: %v", err)
-	}
-
-	if count != 0 {
-		t.Errorf("expected 0 rows (all rolled back), got %d", count)
-	}
-}
-
-// TestNewTransactionManager は TransactionManager が正しく生成されることを確認
-func TestNewTransactionManager(t *testing.T) {
-	db, err := sqlx.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	defer db.Close()
-
-	tm := NewTransactionManager(db)
-
-	if tm == nil {
-		t.Fatal("expected non-nil TransactionManager")
+		t.Run(name, func(t *testing.T) {
+			db := transactionTestDB(t)
+			cause := errors.New("元の失敗")
+			run := func() error {
+				return NewTransactionManager(db).Transactional(context.Background(), func(exec apirepo.Executor) error {
+					tx, ok := exec.(*sqlx.Tx)
+					require.True(t, ok)
+					require.NoError(t, tx.Rollback())
+					if panics {
+						panic(cause)
+					}
+					return cause
+				})
+			}
+			if panics {
+				require.PanicsWithValue(t, cause, func() { _ = run() })
+			} else {
+				assert.ErrorIs(t, run(), cause)
+			}
+		})
 	}
 }

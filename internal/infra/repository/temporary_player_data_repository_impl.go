@@ -20,6 +20,7 @@ type temporaryPlayerDataRepository struct {
 	totalBytes         int
 	maxEntriesPerIP    int
 	maxTotalBytes      int
+	now                func() time.Time
 }
 
 type temporaryPlayerDataExpiryItem struct {
@@ -65,6 +66,12 @@ func (h *temporaryPlayerDataExpiryHeap) Pop() any {
 
 // NewTemporaryPlayerDataRepository はインメモリ一時データリポジトリを生成します。
 func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domainrepo.TemporaryPlayerDataRepository {
+	return newTemporaryPlayerDataRepositoryWithClock(maxEntriesPerIP, maxTotalBytes, time.Now)
+}
+
+// newTemporaryPlayerDataRepositoryWithClock は期限切れ判定に使う現在時刻の取得元を指定して生成します。
+// テストで実時間の経過を待たずに期限切れを再現できるよう、時計を差し替え可能にしています。
+func newTemporaryPlayerDataRepositoryWithClock(maxEntriesPerIP, maxTotalBytes int, now func() time.Time) *temporaryPlayerDataRepository {
 	r := &temporaryPlayerDataRepository{
 		entriesByToken:     make(map[string]*entity.TemporaryPlayerData),
 		claimedTokens:      make(map[string]struct{}),
@@ -72,6 +79,7 @@ func NewTemporaryPlayerDataRepository(maxEntriesPerIP, maxTotalBytes int) domain
 		expiryItemsByToken: make(map[string]*temporaryPlayerDataExpiryItem),
 		maxEntriesPerIP:    maxEntriesPerIP,
 		maxTotalBytes:      maxTotalBytes,
+		now:                now,
 	}
 	heap.Init(&r.expiryHeap)
 	return r
@@ -83,7 +91,7 @@ func (r *temporaryPlayerDataRepository) Create(ctx context.Context, _ domainrepo
 	}
 	defer r.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := r.now().UTC()
 	r.cleanupExpiredLocked(now)
 	if err := ctx.Err(); err != nil {
 		return err
@@ -127,7 +135,7 @@ func (r *temporaryPlayerDataRepository) Claim(ctx context.Context, _ domainrepo.
 	}
 	defer r.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := r.now().UTC()
 	r.cleanupExpiredLocked(now)
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -158,7 +166,7 @@ func (r *temporaryPlayerDataRepository) Release(ctx context.Context, _ domainrep
 	}
 	defer r.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := r.now().UTC()
 	r.cleanupExpiredLocked(now)
 	if err := ctx.Err(); err != nil {
 		return err
@@ -178,7 +186,7 @@ func (r *temporaryPlayerDataRepository) Delete(ctx context.Context, _ domainrepo
 	}
 	defer r.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := r.now().UTC()
 	r.cleanupExpiredLocked(now)
 	if err := ctx.Err(); err != nil {
 		return err

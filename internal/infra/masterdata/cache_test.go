@@ -362,6 +362,69 @@ func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *t
 	assert.False(t, cache.versionsStale)
 }
 
+// TestCache_PublicVersionsByID_stale再読込失敗時は旧値を保持し回復後に新版が見える は、
+// 再読込失敗時に旧スナップショットを維持し、staleを保持したまま次回回復できることを公開メソッドの返却値で保証します。
+// 失敗時の空値上書き（旧版が見えなくなる変異）と失敗時のstale解除（回復後に新版が見えなくなる変異）をどちらも検知します。
+func TestCache_PublicVersionsByID_stale再読込失敗時は旧値を保持し回復後に新版が見える(t *testing.T) {
+	// Given: 公開済みの旧版ID1だけを持つDBと、そのスナップショットを持つキャッシュを用意する。
+	// 時刻は固定し、実時計やsleepは使わない。判定は返却値で行う。
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	fixedNow := time.Date(2026, 1, 2, 7, 0, 0, 0, jst)
+	releasedOld := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	releasedNew := time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)
+	db, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", releasedOld)
+	require.NoError(t, err)
+	oldVersion := Version{ID: 1, Name: "CHUNITHM VERSE", ShortName: "VRS", ReleasedAt: releasedOld}
+	cache := &Cache{
+		db:              db,
+		now:             func() time.Time { return fixedNow },
+		allVersions:     map[string]Version{oldVersion.Name: oldVersion},
+		allVersionsByID: map[int]Version{int(oldVersion.ID): oldVersion},
+		Versions:        map[string]Version{oldVersion.Name: oldVersion},
+		VersionsByID:    map[int]Version{int(oldVersion.ID): oldVersion},
+	}
+	got := cache.PublicVersionsByID()
+	require.Contains(t, got, 1)
+	require.Equal(t, "CHUNITHM VERSE", got[1].Name)
+
+	// When: DB障害を起こしてstale化し、公開メソッドから再読込させる。
+	// 基点にMarkVersionsStale相当の公開メソッドは無いため、既存成功テストと同様にstale化を直接表す。
+	_, err = db.Exec(`DROP TABLE versions`)
+	require.NoError(t, err)
+	cache.versionsStale = true
+	failed := cache.PublicVersionsByID()
+
+	// Then: 再読込に失敗しても旧スナップショットが維持される。空値上書きの変異ではここが空になる。
+	require.Contains(t, failed, 1)
+	assert.Equal(t, "CHUNITHM VERSE", failed[1].Name)
+	assert.Equal(t, "VRS", failed[1].ShortName)
+	assert.NotContains(t, failed, 2)
+	assert.Len(t, failed, 1)
+
+	// When: DBを復旧して新版ID2を追加し、次回参照で再読込させる。
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", releasedOld)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 2, "CHUNITHM NEW", "NEW", releasedNew)
+	require.NoError(t, err)
+	recovered := cache.PublicVersionsByID()
+
+	// Then: staleが保持されていたため再読込され、新旧両版が見える。失敗時にstale解除する変異ではID2が見えない。
+	require.Contains(t, recovered, 1)
+	require.Contains(t, recovered, 2)
+	assert.Equal(t, "CHUNITHM VERSE", recovered[1].Name)
+	assert.Equal(t, "VRS", recovered[1].ShortName)
+	assert.Equal(t, "CHUNITHM NEW", recovered[2].Name)
+	assert.Equal(t, "NEW", recovered[2].ShortName)
+}
+
 func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate time.Time) {
 	t.Helper()
 

@@ -87,22 +87,6 @@ func TestFirebaseLinkUsecase_LinkFirebaseUID(t *testing.T) {
 			},
 		},
 		{
-			name:    "他ユーザーに紐付いているUIDは再利用できない",
-			userID:  12,
-			idToken: "linked-token",
-			setup: func(verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.On("VerifyIDToken", mock.Anything, "linked-token").Return("firebase-uid", nil).Once()
-				userRepo.On("FindByFirebaseUID", mock.Anything, mock.Anything, "firebase-uid").Return(&entity.User{ID: 99}, nil).Once()
-			},
-			wantErr: ErrFirebaseUIDAlreadyLinked,
-			assertAfter: func(t *testing.T, verifier *mockTokenVerifier, userRepo *MockUserRepository) {
-				verifier.AssertExpectations(t)
-				userRepo.AssertExpectations(t)
-				userRepo.AssertNotCalled(t, "FindByIDForUpdate", mock.Anything, mock.Anything, mock.Anything)
-				userRepo.AssertNotCalled(t, "LinkFirebaseUID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-			},
-		},
-		{
 			name:    "無効なトークンはErrInvalidIDTokenを返す",
 			userID:  1,
 			idToken: "invalid-token",

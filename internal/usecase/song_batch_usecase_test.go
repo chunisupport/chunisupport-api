@@ -189,6 +189,36 @@ func TestExecuteRequiredDatasourceFailuresDoNotConsolidate(t *testing.T) {
 			},
 			wantStage: "validation",
 		},
+		{
+			// 取り込み役が結果なし・エラーなしを返す場合も解析失敗として中断する。
+			name:     "parse_empty_nil_result",
+			resolver: &stubResolver{sources: allResolved()},
+			downloadFn: func(outputDir string, datasources []SongBatchDatasourceRef) ([]SongBatchDownloadResult, error) {
+				return successfulDownloads(t, outputDir, datasources)
+			},
+			importFn: func(sourceType songbatch.DataSourceType, _ string) (*songbatch.ImportedSource, error) {
+				if sourceType == "official" {
+					return nil, nil
+				}
+				return successfulImport(sourceType), nil
+			},
+			wantStage: "parse",
+		},
+		{
+			// 取り込み結果はあるが中身のデータが空の場合も解析失敗として中断する。
+			name:     "parse_empty_nil_data",
+			resolver: &stubResolver{sources: allResolved()},
+			downloadFn: func(outputDir string, datasources []SongBatchDatasourceRef) ([]SongBatchDownloadResult, error) {
+				return successfulDownloads(t, outputDir, datasources)
+			},
+			importFn: func(sourceType songbatch.DataSourceType, _ string) (*songbatch.ImportedSource, error) {
+				if sourceType == "official" {
+					return &songbatch.ImportedSource{Type: sourceType}, nil
+				}
+				return successfulImport(sourceType), nil
+			},
+			wantStage: "parse",
+		},
 	}
 
 	for _, tt := range tests {
@@ -289,6 +319,67 @@ func TestExecuteExcludesComplementarySourceOnValidationFailure(t *testing.T) {
 	}
 	if !consolidator.hasSource(songbatch.DataSourceOtogeDb) {
 		t.Fatal("other valid complementary source must be retained")
+	}
+}
+
+func TestExecuteExcludesEmptyComplementarySourcesWithWarning(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 補完ソースの取り込み役が返す空データの形。
+		importFn func(songbatch.DataSourceType) (*songbatch.ImportedSource, error)
+	}{
+		{
+			name: "結果なし・エラーなしは除外して警告にする",
+			importFn: func(songbatch.DataSourceType) (*songbatch.ImportedSource, error) {
+				return nil, nil
+			},
+		},
+		{
+			name: "結果はあるが中身が空は除外して警告にする",
+			importFn: func(sourceType songbatch.DataSourceType) (*songbatch.ImportedSource, error) {
+				return &songbatch.ImportedSource{Type: sourceType}, nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			consolidator := &stubConsolidator{}
+			var tempDir string
+			uc := newUsecase(
+				&stubResolver{sources: allResolved()},
+				func(outputDir string, datasources []SongBatchDatasourceRef) ([]SongBatchDownloadResult, error) {
+					return successfulDownloads(t, outputDir, datasources)
+				},
+				func(sourceType songbatch.DataSourceType, _ string) (*songbatch.ImportedSource, error) {
+					if sourceType == songbatch.DataSourceSt1027 {
+						return tt.importFn(sourceType)
+					}
+					return successfulImport(sourceType), nil
+				},
+				consolidator,
+				&tempDir,
+			)
+
+			var logs bytes.Buffer
+			previousLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+			// When
+			result, err := uc.Execute(context.Background(), songbatch.NewRunRequest(false, false))
+
+			// Then
+			require.NoError(t, err)
+			assert.True(t, consolidator.called)
+			assert.False(t, consolidator.hasSource(songbatch.DataSourceSt1027))
+			assert.True(t, consolidator.hasSource(songbatch.DataSourceOtogeDb))
+			assert.Equal(t, []string{"official", "additional_songs", "mainframe", "otoge_db"}, consolidator.names())
+			assert.Equal(t, 1, result.WarningCount)
+			assert.Contains(t, logs.String(), "source=st1027")
+			assert.Contains(t, logs.String(), "Completed with Warnings")
+		})
 	}
 }
 

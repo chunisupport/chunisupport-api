@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"context"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
@@ -12,7 +11,7 @@ import (
 type MockSongUsecase struct {
 	GetAllSongsExcludingWorldsendFunc func(ctx context.Context, includeDeleted bool, requesterAccountTypeID *int) ([]*entity.Song, error)
 	GetSongByDisplayIDFunc            func(ctx context.Context, displayID string, requesterAccountTypeID *int) (*entity.Song, error)
-	GetSongsUpdatedAtFunc             func(ctx context.Context) (*time.Time, error)
+	GetSongsUpdatedAtFunc             func(ctx context.Context) (*usecase.SongsUpdatedAtOutput, error)
 	DeleteSongFunc                    func(ctx context.Context, displayID string) error
 	RestoreSongFunc                   func(ctx context.Context, displayID string) error
 	UpdateSongsFunc                   func(ctx context.Context, requests []*usecase.UpdateSongInput) error
@@ -35,7 +34,7 @@ func (m *MockSongUsecase) GetSongByDisplayID(ctx context.Context, displayID stri
 	return nil, nil
 }
 
-func (m *MockSongUsecase) GetSongsUpdatedAt(ctx context.Context) (*time.Time, error) {
+func (m *MockSongUsecase) GetSongsUpdatedAt(ctx context.Context) (*usecase.SongsUpdatedAtOutput, error) {
 	if m.GetSongsUpdatedAtFunc != nil {
 		return m.GetSongsUpdatedAtFunc(ctx)
 	}

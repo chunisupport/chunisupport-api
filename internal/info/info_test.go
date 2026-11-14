@@ -2,9 +2,17 @@ package info
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStaticDataJSONCacheControl(t *testing.T) {
+	// 固定URLの上書きと、ブラウザキャッシュを消さないパージに合わせた値です。
+	assert.Equal(t, 5*time.Minute, StaticDataJSONBrowserMaxAge)
+	assert.Equal(t, time.Hour, StaticDataJSONEdgeMaxAge)
+	assert.Equal(t, "public, max-age=300, s-maxage=3600", StaticDataJSONCacheControl())
+}
 
 func TestIsKnownAccountType(t *testing.T) {
 	tests := []struct {

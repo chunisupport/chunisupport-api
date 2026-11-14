@@ -13,7 +13,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
@@ -577,6 +576,112 @@ func TestApplyHonors_お気に入りからランダムのスロットは更新�
 	assert.Empty(t, registered)
 }
 
+func TestApplyHonors_枠番号と称号クラスが不正な場合は読み飛ばす(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 1件だけ渡す称号ペイロード
+		honors map[string]PlayerDataHonorPayload
+		// Then: 期待する結果
+		wantSkippedReason string
+		wantEnsureCount   int
+		wantAssignCount   int
+		wantAssignSlot    int
+	}{
+		{
+			name:              "枠番号1は有効な最小値として登録する",
+			honors:            map[string]PlayerDataHonorPayload{"1": {Title: "境界最小", Class: "normal"}},
+			wantSkippedReason: "",
+			wantEnsureCount:   1,
+			wantAssignCount:   1,
+			wantAssignSlot:    1,
+		},
+		{
+			name:              "枠番号3は有効な最大値として登録する",
+			honors:            map[string]PlayerDataHonorPayload{"3": {Title: "境界最大", Class: "normal"}},
+			wantSkippedReason: "",
+			wantEnsureCount:   1,
+			wantAssignCount:   1,
+			wantAssignSlot:    3,
+		},
+		{
+			name:              "枠番号0は範囲外で読み飛ばす",
+			honors:            map[string]PlayerDataHonorPayload{"0": {Title: "範囲外", Class: "normal"}},
+			wantSkippedReason: "slot out of range: 0",
+			wantEnsureCount:   0,
+			wantAssignCount:   0,
+		},
+		{
+			name:              "枠番号4は範囲外で読み飛ばす",
+			honors:            map[string]PlayerDataHonorPayload{"4": {Title: "範囲外", Class: "normal"}},
+			wantSkippedReason: "slot out of range: 4",
+			wantEnsureCount:   0,
+			wantAssignCount:   0,
+		},
+		{
+			name:              "数値でない枠番号は読み飛ばす",
+			honors:            map[string]PlayerDataHonorPayload{"abc": {Title: "数値でない枠", Class: "normal"}},
+			wantSkippedReason: "invalid slot abc",
+			wantEnsureCount:   0,
+			wantAssignCount:   0,
+		},
+		{
+			name:              "未知の称号クラスは読み飛ばす",
+			honors:            map[string]PlayerDataHonorPayload{"2": {Title: "未知クラス", Class: "unknown"}},
+			wantSkippedReason: "honor_type not found: unknown",
+			wantEnsureCount:   0,
+			wantAssignCount:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+			uc := &playerDataUsecase{honorRepo: honorRepo}
+			masters := newApplyHonorsTestMasters()
+
+			// When
+			skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, tt.honors, masters)
+
+			// Then
+			require.NoError(t, err)
+			// 称号が1件でも渡された場合は既存称号の削除が走るため、読み飛ばし時も削除は1回行われる。
+			assert.Equal(t, 1, honorRepo.deleteCount)
+			assert.Empty(t, registered)
+			assert.Len(t, honorRepo.ensureCalls, tt.wantEnsureCount)
+			assert.Len(t, honorRepo.assignments, tt.wantAssignCount)
+			if tt.wantSkippedReason == "" {
+				assert.Empty(t, skipped)
+				require.Len(t, honorRepo.assignments, 1)
+				assert.Equal(t, tt.wantAssignSlot, honorRepo.assignments[0].Slot)
+				return
+			}
+			require.Len(t, skipped, 1)
+			assert.Equal(t, "honor", skipped[0].RecordType)
+			assert.Equal(t, tt.wantSkippedReason, skipped[0].Reason)
+		})
+	}
+}
+
+func TestApplyHonors_称号なしでは既存の称号を削除しない(t *testing.T) {
+	// Given
+	honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+	uc := &playerDataUsecase{honorRepo: honorRepo}
+	masters := newApplyHonorsTestMasters()
+
+	// When
+	skipped, registered, err := uc.applyHonors(context.Background(), nil, 100, nil, masters)
+
+	// Then
+	// 称号が1件も渡されない場合は削除も登録も行わず、既存の称号を残す。
+	require.NoError(t, err)
+	assert.Empty(t, skipped)
+	assert.Empty(t, registered)
+	assert.Equal(t, 0, honorRepo.deleteCount)
+	assert.Empty(t, honorRepo.ensureCalls)
+	assert.Empty(t, honorRepo.assignments)
+}
+
 func TestNewPlayerDataUsecase_PlayerRecRepoがnilの場合はpanicする(t *testing.T) {
 	assert.PanicsWithValue(t, "player record repository is required", func() {
 		newPlayerDataUsecaseForTest(nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -714,8 +819,12 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// スコア 1,000,000・譜面定数 10.0・コンボランプなしの単曲OPは、仕様 (docs/overpower_calculation.md §1 の SS の式)
+		// より (10.0+1)×5+0=55.0。難易度欠損の1件が外れて解禁済み1件だけ残るため、合計 55.0、分母 100.0 に対する割合も 55.0 になる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.Contains(t, logOutput, "level=WARN")
@@ -765,8 +874,12 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ロック曲 (SongID=100) が外れて通常曲 (SongID=101、単曲OP 55.0) だけ残るため、合計 55.0、割合 55.0 になる。
+		// ロック判定が無効になると2楽曲合算で 110.0 になるため、この固定値で退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
@@ -805,10 +918,16 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		}
 
 		// When
-		_, err = calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
+		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
 
 		// Then
 		require.NoError(t, err)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ロック曲は静かに外れ、難易度欠損の記録も外れるため集計対象が残らず、合計 0.0、割合 0.0 になる。
+		// ロック判定が無効になるとロック曲の 55.0 が残るため、この固定値で退行を検知できる。
+		assert.InDelta(t, 0.0, *result.Value, 0.0001)
+		assert.InDelta(t, 0.0, *result.Percent, 0.0001)
 		logOutput := logBuffer.String()
 		assert.Contains(t, logOutput, "level=WARN")
 		assert.Contains(t, logOutput, "chart_difficulty_nil")
@@ -822,6 +941,8 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		require.NoError(t, err)
 		chartConst, err := chartconstant.NewChartConstant(10.0)
 		require.NoError(t, err)
+		ultimaConst, err := chartconstant.NewChartConstant(12.0)
+		require.NoError(t, err)
 
 		records := []*entity.PlayerRecord{
 			{
@@ -829,7 +950,7 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 				ChartID:  10,
 				Score:    recordScore,
 				Song:     &entity.Song{ID: 100, Title: "ULTIMA曲"},
-				Chart:    &entity.Chart{ID: 10, Const: chartConst},
+				Chart:    &entity.Chart{ID: 10, Const: ultimaConst},
 				ChartDifficulty: &entity.ChartDifficulty{
 					ID:   5,
 					Name: "ULTIMA",
@@ -857,8 +978,14 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// ULTIMA 限定ロックでは ULTIMA 記録だけが外れ、同曲の MASTER 記録 (単曲OP 55.0) が残る。
+		// 同一楽曲内は最高値1件の採用のため、合計 55.0、割合 55.0 になる。
+		// ULTIMA 限定ロックが通常譜面に波及すると 0.0 に、ULTIMA 記録 (定数 12.0、単曲OP 65.0) が
+		// 除かれないと 65.0 になるため、この固定値で両方向の退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
@@ -889,10 +1016,16 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// 未解禁設定がない場合は判定をバイパスするため、難易度欠損の記録も集計に含まれる。
+		// 単曲OP 55.0 の1件だけなので合計 55.0、割合 55.0 になり、WARN も出ない。
+		// バイパスが外れると 0.0 になり WARN が出るため、この固定値で退行を検知できる。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
+		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
 		assert.NotContains(t, logOutput, "chart_difficulty_nil")
 		assert.NotContains(t, logOutput, "locked_song")
 	})
@@ -928,8 +1061,11 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotNil(t, result.Value)
-		assert.NotNil(t, result.Percent)
+		require.NotNil(t, result.Value)
+		require.NotNil(t, result.Percent)
+		// 除外が1件もない通常曲1件 (単曲OP 55.0) のため、合計 55.0、割合 55.0 になり、WARN は出ない。
+		assert.InDelta(t, 55.0, *result.Value, 0.0001)
+		assert.InDelta(t, 55.0, *result.Percent, 0.0001)
 
 		logOutput := logBuffer.String()
 		assert.NotContains(t, logOutput, "skipped player records during overpower recalculation")
@@ -972,46 +1108,12 @@ func TestCalculateOverpowerSummaryFromPlayerRecords(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		require.NotNil(t, result.Value)
-		assert.InDelta(t, service.CalcSingleOverpower(1_010_000, 15.0, 0), *result.Value, 0.0001)
+		require.NotNil(t, result.Percent)
+		// スコア 1,010,000 は理論値のため、仕様 (docs/overpower_calculation.md §2 の AJC 簡略式)
+		// より (15.0+3)×5=90.0。通常譜面群未解禁では ULTIMA 記録も外れるため、解禁済み曲の 90.0 だけが残る。
+		// ロック判定が無効になると2楽曲合算で 180.0 になるため、この固定値で退行を検知できる。
+		assert.InDelta(t, 90.0, *result.Value, 0.0001)
+		assert.InDelta(t, 90.0, *result.Percent, 0.0001)
 		assert.NotContains(t, logBuffer.String(), "skipped player records during overpower recalculation")
-	})
-
-	t.Run("ULTIMAだけが未解禁の楽曲は通常譜面の記録を残す", func(t *testing.T) {
-		// Given
-		recordScore, err := score.NewScore(1_010_000)
-		require.NoError(t, err)
-		chartConst, err := chartconstant.NewChartConstant(15.0)
-		require.NoError(t, err)
-
-		records := []*entity.PlayerRecord{
-			{
-				PlayerID:        1,
-				ChartID:         10,
-				Score:           recordScore,
-				Song:            &entity.Song{ID: 100, Title: "ULTIMA未解禁曲"},
-				Chart:           &entity.Chart{ID: 10, Const: chartConst},
-				ChartDifficulty: &entity.ChartDifficulty{ID: 5, Name: info.DifficultyNameUltima},
-			},
-			{
-				PlayerID:        1,
-				ChartID:         11,
-				Score:           recordScore,
-				Song:            &entity.Song{ID: 100, Title: "ULTIMA未解禁曲"},
-				Chart:           &entity.Chart{ID: 11, Const: chartConst},
-				ChartDifficulty: &entity.ChartDifficulty{ID: 4, Name: "MASTER"},
-			},
-		}
-
-		lockedSongs := []*entity.PlayerLockedSong{
-			{PlayerID: 1, SongID: 100, IsUltima: true},
-		}
-
-		// When
-		result, err := calculateOverpowerSummaryFromPlayerRecords(context.Background(), records, lockedSongs, 100.0)
-
-		// Then
-		require.NoError(t, err)
-		require.NotNil(t, result.Value)
-		assert.InDelta(t, service.CalcSingleOverpower(1_010_000, 15.0, 0), *result.Value, 0.0001)
 	})
 }

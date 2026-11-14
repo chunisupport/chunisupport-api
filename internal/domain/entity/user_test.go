@@ -104,6 +104,14 @@ func TestUser_ChangeAccountType(t *testing.T) {
 			wantAccountType:    info.AccountTypeEditor,
 		},
 		{
+			name:               "ADMINは他者のADMINをEDITORへ変更できる",
+			userID:             2,
+			requesterID:        1,
+			currentAccountType: info.AccountTypeAdmin,
+			newAccountType:     info.AccountTypeEditor,
+			wantAccountType:    info.AccountTypeEditor,
+		},
+		{
 			name:               "ADMINは自分をEDITORへ降格できない",
 			userID:             1,
 			requesterID:        1,
@@ -148,6 +156,51 @@ func TestUser_ChangeAccountType(t *testing.T) {
 				assert.True(t, user.UpdatedAt.After(baseTime))
 			}
 			assert.Equal(t, tt.wantAccountType, user.AccountTypeID)
+		})
+	}
+}
+
+func TestUser_ChangeAccountType_PersistedAccountTypeID(t *testing.T) {
+	baseTime := time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		// Given: 変更前に保存済みとして記録するかどうか
+		markPersisted bool
+		// Then: 変更直後に競合検出へ渡す保存済み値
+		wantPersisted int
+	}{
+		{
+			name:          "保存済み記録ありでは変更後も競合検出用に旧値PLAYERを返す",
+			markPersisted: true,
+			wantPersisted: info.AccountTypePlayer,
+		},
+		{
+			name:          "保存済み記録なしでは変更後は現在値EDITORを保存済み値として扱う",
+			markPersisted: false,
+			wantPersisted: info.AccountTypeEditor,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			user := &User{ID: 2, AccountTypeID: info.AccountTypePlayer, UpdatedAt: baseTime}
+			if tt.markPersisted {
+				user.MarkPersisted()
+			}
+
+			// When: 公開APIを通して他者として権限を変更する
+			err := user.ChangeAccountType(1, info.AccountTypeEditor)
+
+			// Then: 現在値はEDITORへ進み、保存済み値は記録有無で旧値/現在値に分かれる
+			require.NoError(t, err)
+			assert.Equal(t, info.AccountTypeEditor, user.AccountTypeID)
+			assert.Equal(t, tt.wantPersisted, user.PersistedAccountTypeID())
+
+			// Then: 保存境界で記録し直すと保存済み値がEDITORへ進む
+			user.MarkPersisted()
+			assert.Equal(t, info.AccountTypeEditor, user.PersistedAccountTypeID())
 		})
 	}
 }

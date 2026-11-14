@@ -21,12 +21,14 @@ type stubFriendScoreComparisonUsecase struct {
 	result     *usecase.FriendScoreComparisonResult
 	err        error
 	calls      int
+	selfUserID int
 	username   string
 	difficulty string
 }
 
 func (s *stubFriendScoreComparisonUsecase) Get(ctx context.Context, selfUserID int, friendUsername string, difficulty string) (*usecase.FriendScoreComparisonResult, error) {
 	s.calls++
+	s.selfUserID = selfUserID
 	s.username = friendUsername
 	s.difficulty = difficulty
 	return s.result, s.err
@@ -34,11 +36,14 @@ func (s *stubFriendScoreComparisonUsecase) Get(ctx context.Context, selfUserID i
 
 func (s *stubFriendScoreComparisonUsecase) GetWorldsend(ctx context.Context, selfUserID int, friendUsername string) (*usecase.FriendScoreComparisonResult, error) {
 	s.calls++
+	s.selfUserID = selfUserID
 	s.username = friendUsername
 	return s.result, s.err
 }
 
 func TestFriendScoreComparisonHandler_Worldsend専用の譜面情報を返す(t *testing.T) {
+	// Given: 認証ユーザーの ID は 0 や 1 と紛れない固定値にする。
+	const selfUserID = 7
 	levelStar := 4
 	attribute := "蔵"
 	stub := &stubFriendScoreComparisonUsecase{result: &usecase.FriendScoreComparisonResult{
@@ -53,13 +58,16 @@ func TestFriendScoreComparisonHandler_Worldsend専用の譜面情報を返す(t 
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
-	c.Set("userEntity", &entity.User{ID: 7})
+	c.Set("userEntity", &entity.User{ID: selfUserID})
 
+	// When: WORLD'S END の比較を取得する。
 	err := handler.GetWorldsend(c)
 
+	// Then: 認証ユーザーの ID が比較元としてそのまま渡る。
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, 1, stub.calls)
+	assert.Equal(t, selfUserID, stub.selfUserID)
 	assert.Equal(t, "frienduser", stub.username)
 	assert.JSONEq(t, `{"level_star":4,"attribute":"蔵"}`, extractFriendComparisonChartJSON(t, rec.Body.Bytes()))
 	assert.Contains(t, rec.Body.String(), `"difficulty":"WORLD'S END"`)
@@ -109,6 +117,7 @@ func extractFriendComparisonChartJSON(t *testing.T, body []byte) string {
 
 func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testing.T) {
 	// Given
+	const selfUserID = 7
 	updatedAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
 	clearLamp := "CLEAR"
 	comboLamp := "FULL COMBO"
@@ -132,7 +141,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 	e := echo.New()
 	handler := NewFriendScoreComparisonHandler(stub)
 	c, rec := newFriendScoreComparisonContext(e, "frienduser", "MASTER")
-	c.Set("userEntity", &entity.User{ID: 7})
+	c.Set("userEntity", &entity.User{ID: selfUserID})
 
 	// When
 	err = handler.Get(c)
@@ -141,6 +150,7 @@ func TestFriendScoreComparisonHandler_正常レスポンスのDTO形状(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, 1, stub.calls)
+	assert.Equal(t, selfUserID, stub.selfUserID)
 	assert.Equal(t, "frienduser", stub.username)
 	assert.Equal(t, "MASTER", stub.difficulty)
 	assert.JSONEq(t, `{
@@ -248,6 +258,27 @@ func TestFriendScoreComparisonHandler_未認証(t *testing.T) {
 	err := handler.Get(c)
 
 	// Then
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)
+	assert.Equal(t, http.StatusUnauthorized, apiErr.HTTPStatus)
+	assert.Zero(t, stub.calls)
+}
+
+func TestFriendScoreComparisonHandler_Worldsend未認証は401を返す(t *testing.T) {
+	// Given: WORLD'S END の比較を未認証で要求する。
+	stub := &stubFriendScoreComparisonUsecase{}
+	e := echo.New()
+	handler := NewFriendScoreComparisonHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/internal/friend-comparisons/frienduser/worldsend", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: "frienduser"}})
+
+	// When
+	err := handler.GetWorldsend(c)
+
+	// Then: usecase を呼ばず 401 を返す。
 	var apiErr *apierror.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, apierror.CodeUnauthorized, apiErr.Code)

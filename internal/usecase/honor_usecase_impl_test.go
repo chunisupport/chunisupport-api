@@ -66,18 +66,22 @@ type honorRepositoryMock struct {
 	saveErr        error
 	deleteErr      error
 
-	createCalled bool
-	saveCalled   bool
-	deleteCalled bool
-	createdHonor *entity.Honor
-	savedHonor   *entity.Honor
+	findByIDCalled bool
+	findByIDID     int
+	createCalled   bool
+	saveCalled     bool
+	deleteCalled   bool
+	createdHonor   *entity.Honor
+	savedHonor     *entity.Honor
 }
 
 func (m *honorRepositoryMock) FindAll(context.Context, repository.Executor) ([]*entity.Honor, error) {
 	return []*entity.Honor{}, nil
 }
 
-func (m *honorRepositoryMock) FindByID(context.Context, repository.Executor, int) (*entity.Honor, error) {
+func (m *honorRepositoryMock) FindByID(_ context.Context, _ repository.Executor, id int) (*entity.Honor, error) {
+	m.findByIDCalled = true
+	m.findByIDID = id
 	if m.findByIDErr != nil {
 		return nil, m.findByIDErr
 	}
@@ -210,7 +214,11 @@ func TestHonorUsecase_UpdateHonor_既存称号を変更して保存する(t *tes
 func TestHonorUsecase_UpdateHonor_不正IDはErrInvalidHonorInputを返す(t *testing.T) {
 	// Given
 	repo := &honorRepositoryMock{}
-	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
+	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{
+		HonorTypes: map[string]master.HonorType{
+			"gold": {ID: 2, Name: "gold"},
+		},
+	})
 
 	// When
 	got, err := uc.UpdateHonor(context.Background(), 0, usecase.HonorInput{Name: "称号A", TypeName: "gold"})
@@ -245,4 +253,37 @@ func TestHonorUsecase_DeleteHonor_不正IDはErrInvalidHonorInputを返す(t *te
 	// Then
 	assert.ErrorIs(t, err, usecase.ErrInvalidHonorInput)
 	assert.False(t, repo.deleteCalled)
+}
+
+func TestHonorUsecase_GetHonor_不正IDはErrInvalidHonorInputを返す(t *testing.T) {
+	// Given: IDの境界値である0を渡すと検査で拒否される想定
+	repo := &honorRepositoryMock{}
+	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
+
+	// When
+	got, err := uc.GetHonor(context.Background(), 0)
+
+	// Then: 入力エラーになりリポジトリへ問い合わせないこと
+	assert.Nil(t, got)
+	assert.ErrorIs(t, err, usecase.ErrInvalidHonorInput)
+	assert.False(t, repo.findByIDCalled)
+}
+
+func TestHonorUsecase_GetHonor_IDが1のときリポジトリへそのIDで問い合わせる(t *testing.T) {
+	// Given: 検査を通る最小のIDである1の称号が存在する想定
+	repo := &honorRepositoryMock{
+		findByIDResult: &entity.Honor{ID: 1, Name: "称号A", HonorTypeID: 2, TypeName: "gold"},
+	}
+	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
+
+	// When
+	got, err := uc.GetHonor(context.Background(), 1)
+
+	// Then: リポジトリへIDそのまま問い合わせて結果を返すこと
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, 1, got.ID)
+	assert.Equal(t, "称号A", got.Name)
+	assert.True(t, repo.findByIDCalled)
+	assert.Equal(t, 1, repo.findByIDID)
 }

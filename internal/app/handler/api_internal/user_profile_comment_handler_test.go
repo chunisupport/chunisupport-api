@@ -46,9 +46,11 @@ func TestUserProfileCommentHandler_Update(t *testing.T) {
 		err                error
 		wantCode, wantBody string
 		called             bool
+		// wantInput は成功時にusecaseへ転送されるべき入力コメントの原文。前後の空白除去はusecaseの責務のため原文で検証する。
+		wantInput string
 	}{
-		{name: "保存", body: `{"comment":" よろしく "}`, output: &saved, wantBody: `{"comment":"よろしく"}`, called: true},
-		{name: "削除", body: `{"comment":""}`, wantBody: `{"comment":null}`, called: true},
+		{name: "保存", body: `{"comment":" よろしく "}`, output: &saved, wantBody: `{"comment":"よろしく"}`, called: true, wantInput: " よろしく "},
+		{name: "削除", body: `{"comment":""}`, wantBody: `{"comment":null}`, called: true, wantInput: ""},
 		{name: "未知フィールド", body: `{"comment":"a","extra":1}`, wantCode: apierror.CodeBadRequest},
 		{name: "型不正", body: `{"comment":5}`, wantCode: apierror.CodeBadRequest},
 		{name: "フィールド欠落", body: `{}`, wantCode: apierror.CodeBadRequest},
@@ -93,6 +95,9 @@ func TestUserProfileCommentHandler_Update(t *testing.T) {
 			if tt.called {
 				assert.Equal(t, 1, uc.calls)
 				assert.Equal(t, 7, uc.userID)
+				if tt.wantCode == "" {
+					assert.Equal(t, tt.wantInput, uc.input)
+				}
 			} else {
 				assert.Zero(t, uc.calls)
 			}

@@ -32,6 +32,9 @@ type mockTemporaryPlayerDataUsecase struct{ mock.Mock }
 
 const expectedTempDataMaxUncompressedBytes = 5 * 1024 * 1024
 
+// 圧縮本文サイズ上限の仕様値（バイト）。info.TempDataMaxCompressedBytes と一致すること。
+const expectedTempDataMaxCompressedBytes = 512000
+
 func (m *mockTemporaryPlayerDataUsecase) Create(ctx context.Context, input usecase.CreateTemporaryPlayerDataInput) (*usecase.CreateTemporaryPlayerDataOutput, error) {
 	args := m.Called(ctx, input)
 	if args.Get(0) == nil {
@@ -89,6 +92,44 @@ func newTemporaryDataRequest(body []byte, remoteAddr string) *http.Request {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.RemoteAddr = remoteAddr
 	return req
+}
+
+// gzipCompressedWithExactSize は圧縮後のサイズがちょうどtargetになる有効なgzip本文を作ります。
+// 無圧縮の格納方式では出力サイズが入力の長さにほぼ線形で増えるため、
+// 単純な繰り返し文字の詰め物の長さを差分だけ直してもう一度作ることで目標サイズに合わせます。
+// 展開結果は小さな正規のJSONのままなので、解凍後サイズの上限にはかかりません。
+func gzipCompressedWithExactSize(t *testing.T, target int) []byte {
+	t.Helper()
+	compress := func(padLen int) []byte {
+		payload := struct {
+			Name    string `json:"name"`
+			Padding string `json:"padding"`
+		}{Name: "TEST", Padding: strings.Repeat("a", padLen)}
+		raw, err := json.Marshal(payload)
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		zw, err := gzip.NewWriterLevel(&buf, gzip.NoCompression)
+		require.NoError(t, err)
+		_, err = zw.Write(raw)
+		require.NoError(t, err)
+		require.NoError(t, zw.Close())
+		return buf.Bytes()
+	}
+	// Given: 仮の詰め物で一度圧縮して目標との差を測る
+	padLen := target
+	body := compress(padLen)
+	// When: 差の分だけ詰め物を増減させて作り直す（格納方式では詰め物1バイトの増減が圧縮後にも1バイト反映される）
+	for range 5 {
+		if len(body) == target {
+			break
+		}
+		padLen += target - len(body)
+		require.Greater(t, padLen, 0)
+		body = compress(padLen)
+	}
+	// Then: 送信前に目標サイズちょうどであることを確かめる
+	require.Len(t, body, target)
+	return body
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData(t *testing.T) {
@@ -168,20 +209,60 @@ func TestTemporaryPlayerDataHandler_CreateTemporaryData_認証状態を見ない
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_サイズ超過(t *testing.T) {
+	// Given
 	e := echo.New()
-	h := NewTemporaryPlayerDataHandler(new(mockTemporaryPlayerDataUsecase))
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
 
-	tooLarge := bytes.Repeat([]byte("a"), 512001)
+	// 上限+1バイトの有効なgzip本文（サイズだけが拒否の理由になる）
+	require.Equal(t, expectedTempDataMaxCompressedBytes, info.TempDataMaxCompressedBytes)
+	tooLarge := gzipCompressedWithExactSize(t, expectedTempDataMaxCompressedBytes+1)
+	require.Len(t, tooLarge, expectedTempDataMaxCompressedBytes+1)
 	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(tooLarge))
 	req.Header.Set(echo.HeaderContentEncoding, "gzip")
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
+	// When
 	err := h.CreateTemporaryData(c)
+
+	// Then
 	require.Error(t, err)
 	apiErr := err.(*apierror.APIError)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, apiErr.HTTPStatus)
+	mockUC.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_圧縮サイズが上限ちょうどなら受け付ける(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	require.Equal(t, expectedTempDataMaxCompressedBytes, info.TempDataMaxCompressedBytes)
+	body := gzipCompressedWithExactSize(t, expectedTempDataMaxCompressedBytes)
+	require.Len(t, body, expectedTempDataMaxCompressedBytes)
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/temp", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentEncoding, "gzip")
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	mockUC.On("Create", mock.Anything, mock.MatchedBy(func(input usecase.CreateTemporaryPlayerDataInput) bool {
+		return input.IPAddress == "127.0.0.1" && bytes.Equal(input.Payload, body)
+	})).Return(&usecase.CreateTemporaryPlayerDataOutput{UploadToken: "token", ExpiresAt: time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)}, nil).Once()
+
+	// When
+	err := h.CreateTemporaryData(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Contains(t, rec.Body.String(), "uploadToken")
+	mockUC.AssertExpectations(t)
 }
 
 func TestTemporaryPlayerDataHandler_CreateTemporaryData_解凍後JSONが5MiBなら受け付ける(t *testing.T) {
@@ -487,6 +568,141 @@ func TestTemporaryPlayerDataHandler_CommitTemporaryData_保存済み本文が壊
 	apiErr := err.(*apierror.APIError)
 	assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CreateTemporaryData_容量上限は503(t *testing.T) {
+	// Given
+	e := echo.New()
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	body := gzipJSON(t, map[string]any{"name": "TEST"})
+	req := newTemporaryDataRequest(body, "192.0.2.1:12345")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mockUC.On("Create", mock.Anything, mock.Anything).Return(nil, usecase.ErrTempDataCapacityExceeded).Once()
+
+	// When
+	err := h.CreateTemporaryData(c)
+
+	// Then
+	require.Error(t, err)
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusServiceUnavailable, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeServiceUnavailable, apiErr.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_存在しないトークンは404(t *testing.T) {
+	// Given
+	e := echo.New()
+	e.Validator = &testValidator{validator: validator.New()}
+	mockUC := new(mockTemporaryPlayerDataUsecase)
+	h := NewTemporaryPlayerDataHandler(mockUC)
+
+	const uploadToken = "11111111-1111-4111-8111-111111111111"
+	req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", strings.NewReader(`{"uploadToken":"`+uploadToken+`"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 1})
+
+	mockUC.On("Commit", mock.Anything, usecase.CommitTemporaryPlayerDataInput{
+		User:        &entity.User{ID: 1},
+		UploadToken: uploadToken,
+	}).Return(nil, usecase.ErrTemporaryPlayerDataNotFound).Once()
+
+	// When
+	err := h.CommitTemporaryData(c)
+
+	// Then
+	require.Error(t, err)
+	var apiErr *apierror.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
+	assert.Equal(t, apierror.CodeNotFound, apiErr.Code)
+	mockUC.AssertExpectations(t)
+}
+
+func TestTemporaryPlayerDataHandler_CommitTemporaryData_入力検証(t *testing.T) {
+	const validToken = "11111111-1111-4111-8111-111111111111"
+	tests := []struct {
+		name string
+		// Given: 前提条件
+		setUser bool
+		body    string
+		// Then: 期待する結果
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "未認証は401",
+			setUser:    false,
+			body:       `{"uploadToken":"` + validToken + `"}`,
+			wantStatus: http.StatusUnauthorized,
+			wantCode:   apierror.CodeUnauthorized,
+		},
+		{
+			name:       "トークン未指定は422",
+			setUser:    true,
+			body:       `{}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "UUIDでない文字列は422",
+			setUser:    true,
+			body:       `{"uploadToken":"not-a-uuid"}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "UUIDだがv4でないものは422",
+			setUser:    true,
+			body:       `{"uploadToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8"}`,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   apierror.CodeValidationFailed,
+		},
+		{
+			name:       "未知のキーを含む本文は400",
+			setUser:    true,
+			body:       `{"uploadToken":"` + validToken + `","unknown":1}`,
+			wantStatus: http.StatusBadRequest,
+			wantCode:   apierror.CodeBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			// 本番と同じく検証失敗を 422 の APIError にするテスト用バリデータ（同パッケージの既存定義）を使う。
+			e.Validator = &friendshipTestValidator{validator: validator.New()}
+			mockUC := new(mockTemporaryPlayerDataUsecase)
+			h := NewTemporaryPlayerDataHandler(mockUC)
+
+			req := httptest.NewRequest(http.MethodPost, "/internal/player-data/commit", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			if tt.setUser {
+				c.Set("userEntity", &entity.User{ID: 1})
+			}
+
+			// When
+			err := h.CommitTemporaryData(c)
+
+			// Then
+			require.Error(t, err)
+			var apiErr *apierror.APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			assert.Equal(t, tt.wantCode, apiErr.Code)
+			mockUC.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
+		})
+	}
 }
 
 func TestTemporaryPlayerDataHandler_CommitTemporaryData_処理中のトークンは409(t *testing.T) {

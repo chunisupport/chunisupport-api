@@ -2,15 +2,13 @@ package repository
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
-	"github.com/go-sql-driver/mysql"
+	"github.com/chunisupport/chunisupport-api/internal/testutil/mysqltest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,28 +16,18 @@ import (
 
 func setupPlayerPersistenceMySQL(t *testing.T) *sqlx.DB {
 	t.Helper()
-	dsn := os.Getenv("PLAYER_PERSISTENCE_MYSQL_DSN")
-	if dsn == "" {
-		t.Skip("PLAYER_PERSISTENCE_MYSQL_DSN が未設定です")
-	}
-	cfg, err := mysql.ParseDSN(dsn)
+	db := mysqltest.NewDatabase(t, "PLAYER_PERSISTENCE_MYSQL_DSN")
+	_, err := db.Exec("INSERT INTO users (id, username) VALUES (20, 'persistence')")
 	require.NoError(t, err)
-	cfg.DBName = ""
-	cfg.ParseTime = true
-	admin, err := sqlx.Connect("mysql", cfg.FormatDSN())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, admin.Close()) })
-	name := fmt.Sprintf("player_persistence_%d", time.Now().UnixNano())
-	_, err = admin.Exec("CREATE DATABASE " + name)
-	require.NoError(t, err)
-	t.Cleanup(func() { _, err := admin.Exec("DROP DATABASE " + name); require.NoError(t, err) })
-	cfg.DBName = name
-	db, err := sqlx.Connect("mysql", cfg.FormatDSN())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	setupPlayerRepositorySchema(t, db)
-	setupPlayerBatchSchema(t, db)
 	seedPlayerWithHonors(t, db, 1, false)
+	_, err = db.Exec("UPDATE users SET player_id=1 WHERE id=20")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO songs (id,display_id,title,artist,genre_id,official_idx) VALUES (1,'0000000000000001','テスト曲','作曲者',1,'1')")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO charts (id,song_id,difficulty_id,const) VALUES (10,1,4,15)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO player_records (player_id,chart_id,score,combo_lamp_id,slot_id,slot_order,updated_at) VALUES (1,10,1000000,1,2,1,'2026-09-01 10:00:00')")
+	require.NoError(t, err)
 	return db
 }
 
@@ -125,6 +113,7 @@ func TestPlayerPersistenceMySQL_バッチ後の通常更新が再計算値を保
 		require.NoError(t, ctx.Err())
 	}
 	normalDone := make(chan error, 1)
+	updatedName := playernametest.New(t, "更新後")
 	go func() {
 		repo := NewPlayerRepository(db)
 		tx, err := db.BeginTxx(ctx, nil)
@@ -135,7 +124,7 @@ func TestPlayerPersistenceMySQL_バッチ後の通常更新が再計算値を保
 		defer tx.Rollback()
 		player, err := repo.FindByUserIDForUpdate(ctx, tx, 20)
 		if err == nil {
-			player.ChangeProfile(playernametest.New(t, "更新後"), 40, nil, nil, nil)
+			player.ChangeProfile(updatedName, 40, nil, nil, nil)
 			err = repo.Save(ctx, tx, player)
 		}
 		if err == nil {

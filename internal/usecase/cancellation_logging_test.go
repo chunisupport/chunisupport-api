@@ -42,7 +42,7 @@ func TestCancellationLogging(t *testing.T) {
 				exec := new(MockExecutor)
 				repo.On("FindAll", ctx, exec, false).Return(nil, repoErr).Once()
 
-				_, err := NewWorldsendUsecase(repo, nil, exec).GetAllWorldsendSongs(ctx, false, nil)
+				_, err := NewWorldsendUsecase(repo, nil, exec, nil).GetAllWorldsendSongs(ctx, false, nil)
 				return err
 			},
 		},

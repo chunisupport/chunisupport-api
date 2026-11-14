@@ -16,6 +16,7 @@ func TestNotes_Scan(t *testing.T) {
 		wantError bool
 	}{
 		{name: "int64を読み取れる", value: int64(1200), want: Notes(1200)},
+		{name: "int64の0を読み取れて既存値を更新できる", value: int64(0), initial: Notes(200), want: Notes(0)},
 		{name: "文字列を読み取れる", value: "1500", want: Notes(1500)},
 		{name: "[]byteを読み取れる", value: []byte("1800"), want: Notes(1800)},
 		{name: "nilは0に正規化される", value: nil, initial: Notes(200), want: Notes(0)},
