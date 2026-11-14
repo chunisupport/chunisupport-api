@@ -179,13 +179,36 @@ done
 - cronは**サーバーのタイムゾーン**で動きます。`timedatectl` で確認してから時刻を決めてください。設定ファイルの `timezone` はcronに影響しません。上の例はUTCのサーバーを想定しています。
 - 利用者の少ない時間帯を選び、既存のバッチと重ならないようにします（`crontab -l` と `/etc/cron.d/` を確認）。
 
+## 6. セキュリティヘッダー
+
+付与元は、ヘッダーごとに次のどちらか1か所だけにします。nginxでは付与しません。同じヘッダーを複数の層で付けると、重複した値をブラウザが無効として扱うことがあります。
+
+| ヘッダー | 値 | 付与元 |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | アプリケーション |
+| `X-Frame-Options` | `DENY` | アプリケーション |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` | アプリケーション |
+| `Referrer-Policy` | `no-referrer` | アプリケーション |
+| `Strict-Transport-Security` | `max-age=15552000` | Cloudflare |
+
+- アプリケーションは、エラーやメンテナンスの応答を含むすべての応答に付与します。値は `internal/info/info.go` で固定しており、環境ごとの設定はありません。APIはJSONだけを返すため、最も制限の強い値にしています。
+- HSTSはTLSを終端するCloudflareで付与します。SSL/TLS → Edge Certificates → HTTP Strict Transport Security (HSTS) で、次のとおり設定します。
+  - Max Age：6か月
+  - Apply HSTS policy to subdomains (includeSubDomains)：オフ
+  - Preload：オフ
+  - No-Sniff Header：オフ（アプリケーションが付与するため）
+- HSTSの設定はゾーン内のプロキシ有効なすべてのホスト名に適用され、有効にした後はブラウザが期限までHTTPでの接続を拒否します。ゾーン内のすべてのホスト名がHTTPSで応答できることを確認してから有効にしてください。
+- `includeSubDomains` と `preload` は、ドメイン配下のすべてのホスト名をHTTPSに縛り、取り消しにも長い時間がかかるため、有効にしません。ステージングは共有ドメイン `f5.si` のサブドメインで、preloadは申請できず、`includeSubDomains` も不要です。
+- nginxの設定には `add_header` でこれらのヘッダーを追加しないでください。Cloudflareの Transform Rules や Managed Transforms でも追加しないでください。
+
 ## 動作確認
 
-新設時と、nginxやファイアウォールの変更後に確認します。`<オリジンのIP>` はサーバーの実際のIPです。
+新設時と、nginx、ファイアウォール、Cloudflareの設定、セキュリティヘッダーの変更後に確認します。`<オリジンのIP>` はサーバーの実際のIPです。
 
 | 確認内容 | 期待する結果 |
 |---|---|
 | Cloudflare経由のアクセス | `/healthz` が 204 |
+| Cloudflare経由の応答ヘッダー | 手順6の5つのヘッダーが、それぞれ1つずつ付いている |
 | nginxのアクセスログの接続元 | CloudflareのIPではなく利用者のIP |
 | オリジンの80番と443番へ直接接続 | 接続できない |
 | サーバーの外からMySQLのポートへ接続 | 接続できない |
@@ -194,6 +217,16 @@ done
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://api.example.com/healthz
+```
+
+セキュリティヘッダーを確認します。成功応答とエラー応答の両方で、手順6の5つのヘッダーが1行ずつ表示されることを確認してください。
+
+```bash
+curl -sS -o /dev/null -D - https://api.example.com/healthz | grep -iE '^(strict-transport-security|x-content-type-options|x-frame-options|content-security-policy|referrer-policy):'
+```
+
+```bash
+curl -sS -o /dev/null -D - https://api.example.com/not-found | grep -iE '^(strict-transport-security|x-content-type-options|x-frame-options|content-security-policy|referrer-policy):'
 ```
 
 自分のIPが記録されることを確認します。nginxのreload直後は、古いワーカーが処理したリクエストが混ざることがあります。
