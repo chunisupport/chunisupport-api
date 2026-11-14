@@ -82,6 +82,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 
 - コンテンツタイプは `application/json`。
 - すべてのHTTPレスポンスに相関ID `X-Request-ID` を付けます。クライアントが妥当な `X-Request-ID`（先頭は英数字、以降は英数字・`.`・`_`・`-`、128文字以内）を送った場合はその値を使い、未指定または形式・長さが不正な場合はサーバーがUUIDを生成して置き換えます。同じ値をアクセスログと、リクエストコンテキスト付きのアプリケーションログの `request_id` に記録します。
+- すべてのHTTPレスポンスに `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`、`Referrer-Policy: no-referrer` を付けます。`Strict-Transport-Security` はCloudflareが付けます。付与元と確認手順は[サーバー新設手順](server_setup.md#6-セキュリティヘッダー)を参照してください。
 - カスタムエラーハンドラーは以下形式を返します。
 
 ```json

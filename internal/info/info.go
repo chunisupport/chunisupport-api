@@ -163,6 +163,14 @@ const (
 	TempDataRateLimitWindow      = 1 * time.Minute
 	ExternalCORSAllowOrigin      = "https://new.chunithm-net.com"
 
+	// セキュリティヘッダー
+	// APIはJSONだけを返し、HTMLとして描画・埋め込みされることがないため、最も制限の強い値を使います。
+	// HSTSはドメイン単位の方針で、Cloudflareで付与するためアプリでは扱いません（docs/server_setup.md）。
+	SecurityHeaderContentTypeOptions    = "nosniff"
+	SecurityHeaderFrameOptions          = "DENY"
+	SecurityHeaderContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'"
+	SecurityHeaderReferrerPolicy        = "no-referrer"
+
 	// アカウントタイプ定数
 	AccountTypePlayer = constants.AccountTypePlayer
 	AccountTypeEditor = constants.AccountTypeEditor

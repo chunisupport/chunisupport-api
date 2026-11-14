@@ -151,6 +151,8 @@ func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 
 	// アクセスログは処理後にリクエストヘッダーの X-Request-ID を読むため、先に受理または生成しておく。
 	e.Use(middleware.RequestIDMiddleware())
+	// エラー応答やメンテナンス応答にも付与するため、応答を返しうる後続のミドルウェアより前に置く。
+	e.Use(newSecurityHeadersMiddleware())
 
 	if echoLogWriter != nil {
 		e.Logger = slog.New(slog.NewTextHandler(echoLogWriter, nil))
