@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
@@ -115,10 +114,10 @@ func (s *songUsecaseImpl) GetSongByDisplayID(ctx context.Context, displayID stri
 	return song, nil
 }
 
-// GetSongsUpdatedAt は公開中の楽曲カタログに対応する更新時刻を返します。
+// GetSongsUpdatedAt は公開中の楽曲カタログに対応する更新時刻と変更世代を返します。
 // 通常はメモリ上の値を返し、DBへ問い合わせません。
 // 楽曲データと同じ世代の値を返すため、DB上の最新値より古い場合がありますが、データより先に進むことはありません。
-func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, error) {
+func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*SongsUpdatedAtOutput, error) {
 	// 楽曲カタログを持たない構成（静的データ出力など）は updated-at を提供しないため、誤用を明示的なエラーにします。
 	if s.songCatalog == nil {
 		return nil, errors.Join(ErrInternalError, errors.New("song catalog is not configured"))
@@ -127,7 +126,10 @@ func (s *songUsecaseImpl) GetSongsUpdatedAt(ctx context.Context) (*time.Time, er
 	if err != nil {
 		return nil, err
 	}
-	return catalog.UpdatedAt(), nil
+	return &SongsUpdatedAtOutput{
+		UpdatedAt: catalog.UpdatedAt(),
+		Revision:  catalog.Revision(),
+	}, nil
 }
 
 // DeleteSong は指定されたDisplayIDの楽曲を論理削除します。

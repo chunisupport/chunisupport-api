@@ -23,6 +23,8 @@ type stubSongCatalogProvider struct {
 	// refreshCtxErr と refreshHasDeadline は、最後の Refresh に渡された ctx の状態です。
 	refreshCtxErr      error
 	refreshHasDeadline bool
+	// onRefresh は Refresh の呼び出し時点の状態を検証するためのフックです。
+	onRefresh func()
 }
 
 func (s *stubSongCatalogProvider) Snapshot(context.Context) (*songcatalog.Catalog, error) {
@@ -34,6 +36,9 @@ func (s *stubSongCatalogProvider) Snapshot(context.Context) (*songcatalog.Catalo
 
 func (s *stubSongCatalogProvider) Refresh(ctx context.Context) error {
 	s.refreshCount++
+	if s.onRefresh != nil {
+		s.onRefresh()
+	}
 	s.refreshCtxErr = ctx.Err()
 	_, s.refreshHasDeadline = ctx.Deadline()
 	return s.refreshErr
@@ -85,7 +90,9 @@ func TestSongUsecase_GetSongsUpdatedAt_公開中の楽曲カタログの更新�
 	// Then
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, updatedAt, *result)
+	require.NotNil(t, result.UpdatedAt)
+	assert.Equal(t, updatedAt, *result.UpdatedAt)
+	assert.Equal(t, uint64(3), result.Revision)
 	// DBへ問い合わせないこと
 	mockRepo.AssertNotCalled(t, "FindLatestUpdatedAt")
 }
@@ -242,4 +249,38 @@ func TestSongUsecase_GetSongsUpdatedAt_カタログを持たない構成では�
 	// Then
 	assert.ErrorIs(t, err, ErrInternalError)
 	assert.Nil(t, result)
+}
+
+func TestSongBatchJobUsecase_キャッシュ反映後にジョブの完了を記録する(t *testing.T) {
+	tests := []struct {
+		name       string
+		refreshErr error
+	}{
+		{name: "再構築に成功した場合", refreshErr: nil},
+		{name: "再構築に失敗してもDB同期は成功として記録する", refreshErr: repository.ErrRepositoryOperationFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repo := newFakeSongBatchJobRepository()
+			catalog := &stubSongCatalogProvider{refreshErr: tt.refreshErr}
+			var statusAtRefresh entity.SongBatchJobStatus
+			catalog.onRefresh = func() {
+				job := repo.only(t)
+				statusAtRefresh = job.Status()
+			}
+			uc := newTestSongBatchJobUsecase(context.Background(), &fakeSongBatchLockProvider{acquired: true}, repo, &fakeSongBatchRunner{}, nil)
+			uc.songCatalog = catalog
+
+			// When
+			_, err := uc.RunFromCLI(context.Background(), songbatch.NewRunRequest(false, false))
+
+			// Then: 管理画面が完了を検知した時点で、キャッシュの反映を試み終えている
+			require.NoError(t, err)
+			assert.Equal(t, entity.SongBatchJobStatusRunning, statusAtRefresh)
+			job := repo.only(t)
+			assert.Equal(t, entity.SongBatchJobStatusSucceeded, job.Status())
+		})
+	}
 }

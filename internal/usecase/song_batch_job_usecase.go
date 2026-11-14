@@ -181,12 +181,21 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 	logger.Info("楽曲バッチを開始します", "fill_missing_release_date", job.Request().FillMissingReleaseDate)
 
 	result, execErr := u.runner.Execute(ctx, job.Request())
+	// 再構築などで時間がかかっても解放できるよう、解放専用の期限を使う
+	defer u.releaseLockWithTimeout(ctx, lock)
+
+	// 管理画面がジョブの完了を検知した時点で楽曲データが反映済みになるよう、完了の記録より先にキャッシュを更新する。
+	// 再構築に失敗してもDB同期は成功しているため、ジョブは成功として記録し、失敗はログと定期確認での再試行に任せる。
+	if execErr == nil {
+		if u.denominator != nil {
+			u.denominator.Invalidate(ctx)
+		}
+		refreshSongCatalog(ctx, u.songCatalog)
+	}
 
 	// 停止シグナルでキャンセルされた後も結果を記録できるよう、実行とは独立した期限を使う
 	finalizeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), info.SongBatchJobFinalizeTimeout)
 	defer cancel()
-	// 結果の記録や楽曲カタログの再構築で finalizeCtx の期限を使い切っても解放できるよう、解放専用の期限を使う
-	defer u.releaseLockWithTimeout(ctx, lock)
 
 	finishedAt := u.now()
 	var finishErr error
@@ -205,13 +214,6 @@ func (u *SongBatchJobUsecase) run(ctx context.Context, lock repository.BatchLock
 		logger.Error("楽曲バッチの結果を反映できませんでした", "error", finishErr)
 	} else if err := u.jobRepo.Save(finalizeCtx, job); err != nil {
 		logger.Error("楽曲バッチの結果を記録できませんでした", "error", err)
-	}
-
-	if execErr == nil {
-		if u.denominator != nil {
-			u.denominator.Invalidate(finalizeCtx)
-		}
-		refreshSongCatalog(finalizeCtx, u.songCatalog)
 	}
 	return execErr
 }
