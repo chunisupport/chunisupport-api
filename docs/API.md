@@ -44,7 +44,7 @@
 
 ## レートリミット（現行実装値）
 
-ルーター実装（`internal/app/router.go`）および定数定義（`internal/info/info.go`）に基づく主要なレートリミットは以下です。
+ルーター実装（`internal/app/routes.go`、`internal/app/routes_internal.go`）および定数定義（`internal/info/info.go`）に基づく主要なレートリミットは以下です。
 
 - `/internal/auth/login`: **1分あたり10回/IP**
 - `/internal/auth/signup`: **1分あたり5回/IP**

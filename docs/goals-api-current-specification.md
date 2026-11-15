@@ -3,7 +3,7 @@
 HTTP契約の正本は `docs/API.md` の Goal / GoalGroup 節です。この文書はバリデーションと実装内部の補足です。
 根拠コード:
 
-- `internal/app/router.go`
+- `internal/app/routes_internal.go`
 - `internal/app/handler/api_internal/goal_handler.go`
 - `internal/app/handler/api_internal/goal_group_handler.go`
 - `internal/dto/api_internal/goal_dto.go`
