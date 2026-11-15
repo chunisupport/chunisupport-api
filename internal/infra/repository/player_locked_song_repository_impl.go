@@ -8,7 +8,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 )
 
 var (
@@ -44,7 +43,7 @@ type playerLockedSongRow struct {
 func (r *PlayerLockedSongRepository) ListByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int) ([]*entity.PlayerLockedSong, error) {
 	const q = `SELECT player_id, song_id, is_ultima FROM player_locked_songs WHERE player_id = ? ORDER BY song_id ASC, is_ultima ASC`
 	var rows []playerLockedSongRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, q, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &rows, q, playerID); err != nil {
 		return nil, wrapPlayerLockedSongRepositoryError("list by player id", err)
 	}
 	res := make([]*entity.PlayerLockedSong, 0, len(rows))

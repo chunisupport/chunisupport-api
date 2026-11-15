@@ -43,12 +43,8 @@ func (e *baseExecutor) QueryContext(ctx context.Context, query string, args ...a
 	panic("unexpected call to QueryContext")
 }
 
-func (e *baseExecutor) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
-	panic("unexpected call to QueryxContext")
-}
-
-func (e *baseExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
-	panic("unexpected call to QueryRowxContext")
+func (e *baseExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	panic("unexpected call to QueryRowContext")
 }
 
 var _ domainrepo.Executor = (*baseExecutor)(nil)

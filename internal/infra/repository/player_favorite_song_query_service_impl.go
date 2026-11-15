@@ -6,7 +6,6 @@ import (
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 )
 
 type playerFavoriteSongReadModelRow struct {
@@ -27,7 +26,7 @@ func (s *PlayerFavoriteSongQueryService) ListWithSongDetailsByPlayerID(ctx conte
 		ORDER BY pfs.created_at DESC, s.display_id ASC
 	`
 	var rows []playerFavoriteSongReadModelRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, q, playerID); err != nil {
+	if err := exec.SelectContext(ctx, &rows, q, playerID); err != nil {
 		return nil, wrapPlayerFavoriteSongRepositoryError("list with song details by player id", err)
 	}
 	res := make([]*usecase.PlayerFavoriteSongReadModel, 0, len(rows))

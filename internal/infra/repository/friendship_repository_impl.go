@@ -9,7 +9,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
-	"github.com/jmoiron/sqlx"
 )
 
 var _ domainrepo.FriendshipRepository = (*FriendshipRepository)(nil)
@@ -27,7 +26,7 @@ func (r *FriendshipRepository) Find(ctx context.Context, exec domainrepo.Executo
 		WHERE user_id = ? AND friend_user_id = ?
 	`
 	var model models.FriendshipModel
-	if err := sqlx.GetContext(ctx, exec, &model, q, userID, friendUserID); err != nil {
+	if err := exec.GetContext(ctx, &model, q, userID, friendUserID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -90,7 +89,7 @@ func (r *FriendshipRepository) CountOutgoingActive(ctx context.Context, exec dom
 		  AND status_id IN (?, ?)
 	`
 	var count int
-	if err := sqlx.GetContext(ctx, exec, &count, q, userID, entity.FriendshipStatusPending, entity.FriendshipStatusAccepted); err != nil {
+	if err := exec.GetContext(ctx, &count, q, userID, entity.FriendshipStatusPending, entity.FriendshipStatusAccepted); err != nil {
 		return 0, wrapFriendshipRepositoryError("count outgoing active", err)
 	}
 	return count, nil
@@ -164,7 +163,7 @@ func (r *FriendshipRepository) ExistsMutualAccepted(ctx context.Context, exec do
 		  AND status_id = ?
 	`
 	var count int
-	if err := sqlx.GetContext(ctx, exec, &count, q, userID, friendUserID, friendUserID, userID, entity.FriendshipStatusAccepted); err != nil {
+	if err := exec.GetContext(ctx, &count, q, userID, friendUserID, friendUserID, userID, entity.FriendshipStatusAccepted); err != nil {
 		return false, wrapFriendshipRepositoryError("exists mutual accepted", err)
 	}
 	return count == 2, nil
@@ -184,7 +183,7 @@ type friendshipSummaryRow struct {
 
 func selectFriendshipSummaries(ctx context.Context, exec domainrepo.Executor, query string, args ...any) ([]*domainrepo.FriendshipWithUserSummary, error) {
 	var rows []friendshipSummaryRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, query, args...); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, wrapFriendshipRepositoryError("select summaries", err)
 	}
 	res := make([]*domainrepo.FriendshipWithUserSummary, 0, len(rows))

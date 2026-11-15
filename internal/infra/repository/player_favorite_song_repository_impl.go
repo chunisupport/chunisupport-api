@@ -6,7 +6,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/jmoiron/sqlx"
 )
 
 var _ domainrepo.PlayerFavoriteSongRepository = (*PlayerFavoriteSongRepository)(nil)
@@ -20,7 +19,7 @@ func NewPlayerFavoriteSongRepository() *PlayerFavoriteSongRepository {
 func (r *PlayerFavoriteSongRepository) CountByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int) (int, error) {
 	const q = `SELECT COUNT(*) FROM player_favorite_songs WHERE player_id = ?`
 	var count int
-	if err := sqlx.GetContext(ctx, exec, &count, q, playerID); err != nil {
+	if err := exec.GetContext(ctx, &count, q, playerID); err != nil {
 		return 0, wrapPlayerFavoriteSongRepositoryError("count by player id", err)
 	}
 	return count, nil
@@ -29,7 +28,7 @@ func (r *PlayerFavoriteSongRepository) CountByPlayerID(ctx context.Context, exec
 func (r *PlayerFavoriteSongRepository) Exists(ctx context.Context, exec domainrepo.Executor, playerID int, songID int) (bool, error) {
 	const q = `SELECT EXISTS(SELECT 1 FROM player_favorite_songs WHERE player_id = ? AND song_id = ?)`
 	var exists bool
-	if err := sqlx.GetContext(ctx, exec, &exists, q, playerID, songID); err != nil {
+	if err := exec.GetContext(ctx, &exists, q, playerID, songID); err != nil {
 		return false, wrapPlayerFavoriteSongRepositoryError("exists", err)
 	}
 	return exists, nil

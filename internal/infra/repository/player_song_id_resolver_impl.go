@@ -12,7 +12,7 @@ import (
 func (r *PlayerSongIDResolver) ResolveSongIDByDisplayID(ctx context.Context, exec domainrepo.Executor, displayID string) (*int, error) {
 	const q = `SELECT id FROM songs WHERE display_id = ? LIMIT 1`
 	var id int
-	if err := sqlx.GetContext(ctx, exec, &id, q, displayID); err != nil {
+	if err := exec.GetContext(ctx, &id, q, displayID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -35,7 +35,7 @@ func (r *PlayerSongIDResolver) ResolveSongIDsByDisplayIDs(ctx context.Context, e
 		ID        int    `db:"id"`
 	}
 	results := make([]songIDResult, 0, len(displayIDs))
-	if err := sqlx.SelectContext(ctx, exec, &results, query, args...); err != nil {
+	if err := exec.SelectContext(ctx, &results, query, args...); err != nil {
 		return nil, wrapPlayerLockedSongRepositoryError("resolve song ids by display ids", err)
 	}
 

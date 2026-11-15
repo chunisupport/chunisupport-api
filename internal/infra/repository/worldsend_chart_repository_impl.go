@@ -46,7 +46,7 @@ func (r *worldsendChartRepository) FindAll(ctx context.Context, exec repository.
 	}
 	query += ` ORDER BY s.id`
 
-	rows, err := exec.QueryxContext(ctx, query)
+	rows, err := exec.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (r *worldsendChartRepository) findByDisplayID(ctx context.Context, exec rep
 	var songModel models.SongModel
 	var chartModel models.WorldsendChartModel
 
-	err := exec.QueryRowxContext(ctx, query, displayID).Scan(
+	err := exec.QueryRowContext(ctx, query, displayID).Scan(
 		&songModel.ID, &songModel.DisplayID, &songModel.Title, &songModel.WikiPageTitle,
 		&songModel.Reading, &songModel.Artist, &songModel.GenreID, &songModel.BPM, &songModel.ReleasedAt, &songModel.OfficialIdx,
 		&songModel.Jacket, &songModel.IsWorldsend, &songModel.IsNew, &songModel.UnlockRequired, &songModel.IsDeleted, &songModel.UpdatedAt, &songModel.NameFolderCode,
@@ -261,7 +261,7 @@ func (r *worldsendChartRepository) findUpdateTargetsByDisplayIDs(ctx context.Con
 	}
 	query = exec.Rebind(query)
 
-	rows, err := exec.QueryxContext(ctx, query, args...)
+	rows, err := exec.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +509,7 @@ func (r *worldsendChartRepository) ensureTargetsExist(ctx context.Context, exec 
 	`, strings.Join(pairConditions, " OR "))
 
 	var count int
-	if err := exec.QueryRowxContext(ctx, query, args...).Scan(&count); err != nil {
+	if err := exec.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
 		return false, err
 	}
 

@@ -11,7 +11,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,11 +41,7 @@ func (e *honorNoopExecutor) QueryContext(context.Context, string, ...any) (*sql.
 	return nil, nil
 }
 
-func (e *honorNoopExecutor) QueryxContext(context.Context, string, ...any) (*sqlx.Rows, error) {
-	return nil, nil
-}
-
-func (e *honorNoopExecutor) QueryRowxContext(context.Context, string, ...any) *sqlx.Row {
+func (e *honorNoopExecutor) QueryRowContext(context.Context, string, ...any) *sql.Row {
 	return nil
 }
 
