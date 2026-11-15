@@ -12,7 +12,8 @@ import (
 // errNilFriendshipRepository はフレンド判定に必要なリポジトリが設定されていない場合に返します。
 var errNilFriendshipRepository = errors.New("friendship repository is nil")
 
-// getAccessibleUser はプロフィール関連の取得で、対象の検索と閲覧判定を共通化します。
+// getAccessibleUser はユーザー名で指定された対象ユーザーのデータ取得で、対象の検索と閲覧判定を共通化します。
+// 経路ごとに未発見・非公開の扱いが揺れると非公開ユーザーの存在やデータが漏れるため、通常ユーザー向けの経路は必ずこれを通します。
 func getAccessibleUser(ctx context.Context, exec repository.Executor, userRepo repository.UserRepository, friendshipRepo repository.FriendshipRepository, username string, requester *entity.User) (*entity.User, error) {
 	user, err := userRepo.FindByUsername(ctx, exec, username)
 	if err != nil {

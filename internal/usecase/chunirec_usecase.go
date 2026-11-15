@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -31,7 +30,7 @@ func NewChunirecUsecase(db repository.Executor, userRepo repository.UserReposito
 }
 
 func (s *chunirecUsecase) GetProfile(ctx context.Context, username string, requester *entity.User) (*repository.ChunirecProfile, error) {
-	user, err := s.accessibleUser(ctx, username, requester)
+	user, err := getAccessibleUser(ctx, s.db, s.userRepo, s.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +41,7 @@ func (s *chunirecUsecase) GetProfile(ctx context.Context, username string, reque
 }
 
 func (s *chunirecUsecase) GetRecords(ctx context.Context, username string, requester *entity.User) ([]*ChunirecRecordOutput, error) {
-	user, err := s.accessibleUser(ctx, username, requester)
+	user, err := getAccessibleUser(ctx, s.db, s.userRepo, s.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
 	}
@@ -58,25 +57,4 @@ func (s *chunirecUsecase) GetRecords(ctx context.Context, username string, reque
 		output = append(output, &ChunirecRecordOutput{ChunirecRecord: record, Rating: service.CalcSingleRating(record.Score, record.Const.Float64())})
 	}
 	return output, nil
-}
-
-func (s *chunirecUsecase) accessibleUser(ctx context.Context, username string, requester *entity.User) (*entity.User, error) {
-	user, err := s.userRepo.FindByUsername(ctx, s.db, username)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-	accessible, err := canAccessPrivateUser(ctx, s.db, s.friendshipRepo, user, requester)
-	if err != nil {
-		return nil, err
-	}
-	if !accessible {
-		return nil, ErrUserPrivate
-	}
-	return user, nil
 }
