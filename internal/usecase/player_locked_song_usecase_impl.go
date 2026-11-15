@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
@@ -48,23 +47,9 @@ func NewPlayerLockedSongUsecase(db repository.Executor, tm TransactionManager, u
 }
 
 func (u *playerLockedSongUsecase) List(ctx context.Context, username string, requester *entity.User) ([]*PlayerLockedSongOutput, error) {
-	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		slog.ErrorContext(ctx, "failed to find user by username", "username", username, "error", err)
-		return nil, err
-	}
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-	accessible, err := canAccessPrivateUser(ctx, u.db, u.friendshipRepo, user, requester)
+	user, err := getAccessibleUser(ctx, u.db, u.userRepo, u.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
-	}
-	if !accessible {
-		return nil, ErrUserPrivate
 	}
 	player, err := u.playerRepo.FindByUserID(ctx, u.db, user.ID)
 	if err != nil {
