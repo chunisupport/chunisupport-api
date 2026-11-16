@@ -19,6 +19,7 @@ type fakeChartStatsBatchRepository struct {
 	eligiblePlayers  []chartstatsbatch.EligiblePlayer
 	bestSlotRecords  []chartstatsbatch.BestSlotRecord
 	bestSlotCharts   []int
+	courseRecords    []chartstatsbatch.CourseRecord
 	streamErr        error
 	replaceErr       error
 	replaceCalled    bool
@@ -55,6 +56,11 @@ func (r *fakeChartStatsBatchRepository) StreamSource(_ context.Context, callback
 	}
 	for _, chartID := range r.bestSlotCharts {
 		if err := callbacks.BestSlotChart(chartID); err != nil {
+			return err
+		}
+	}
+	for _, record := range r.courseRecords {
+		if err := callbacks.CourseRecord(record); err != nil {
 			return err
 		}
 	}
@@ -142,4 +148,31 @@ func TestChartStatsBatchUsecase_Execute_エラー(t *testing.T) {
 			assert.Equal(t, tt.expectedReplaceCalled, tt.repo.replaceCalled)
 		})
 	}
+}
+
+func TestChartStatsBatchUsecase_Execute_コース統計を同じスナップショットへ含める(t *testing.T) {
+	// Given: 2コース分の記録。コース11は未クリアだけ。
+	repo := &fakeChartStatsBatchRepository{
+		ratingBands: []*ratingband.RatingBand{{ID: 0}},
+		courseRecords: []chartstatsbatch.CourseRecord{
+			{CourseID: 10, BestAverageRating: 17.0, Score: 3_000_000, IsClear: true, ComboLampID: 2},
+			{CourseID: 10, BestAverageRating: 16.0, Score: 2_800_000, IsClear: true, ComboLampID: 1},
+			{CourseID: 11, BestAverageRating: 16.0, Score: 1_000_000, IsClear: false, ComboLampID: 1},
+		},
+	}
+
+	// When
+	result, err := NewChartStatsBatchUsecase(repo).Execute(context.Background())
+
+	// Then: 他の統計と同じ入れ替え単位に入り、件数も記録される。
+	require.NoError(t, err)
+	assert.Equal(t, ChartStatsBatchResult{CourseRecordCount: 3, CourseStatsCount: 2}, result)
+	require.NotNil(t, repo.replaced)
+	require.Len(t, repo.replaced.CourseStats, 2)
+	assert.Equal(t, 10, repo.replaced.CourseStats[0].CourseID)
+	assert.Equal(t, 2, repo.replaced.CourseStats[0].PlayerCount)
+	require.NotNil(t, repo.replaced.CourseStats[0].AverageScore)
+	assert.Equal(t, float64(2_900_000), *repo.replaced.CourseStats[0].AverageScore)
+	assert.Equal(t, 11, repo.replaced.CourseStats[1].CourseID)
+	assert.Nil(t, repo.replaced.CourseStats[1].AverageScore)
 }

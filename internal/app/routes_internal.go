@@ -302,6 +302,7 @@ func registerInternalCourseRoutes(internal *echo.Group, handlers *Handlers, mw i
 	publicCoursesGroup.GET("/updated-at", handlers.Course.GetCoursesUpdatedAt)
 	publicCoursesGroup.GET("", handlers.Course.List)
 	publicCoursesGroup.GET("/:id", handlers.Course.Get)
+	publicCoursesGroup.GET("/:id/stats", handlers.CourseStats.Get)
 
 	coursesGroup := internal.Group("/courses")
 	coursesGroup.Use(mw.firebaseAuthStrict)

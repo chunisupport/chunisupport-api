@@ -20,6 +20,8 @@ type ChartStatsBatchSourceCallbacks struct {
 	BestSlotRecord func(chartstatsbatch.BestSlotRecord) error
 	// BestSlotChart はベスト枠採用率の集計対象となる譜面IDを受け取ります。
 	BestSlotChart func(chartID int) error
+	// CourseRecord はコースの記録をコースID順に受け取ります。
+	CourseRecord func(chartstatsbatch.CourseRecord) error
 }
 
 // ChartStatsBatchRepository は譜面統計バッチの集計元の読み取りと、統計テーブルの再構築を担当します。

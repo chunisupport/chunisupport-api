@@ -231,6 +231,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000057**: `genres` と `versions` に表示幅を抑えるための超ショート名 `short_name`（NOT NULL・一意）を追加し、既存行へ略記を投入。
 - **000064**: 楽曲カタログキャッシュの変更検知に使う `song_catalog_revision`（singleton行）を追加。新しいAPI・song-batchはこの行がないと楽曲の保存に失敗するため、バイナリより先に適用する。API と song-batch は同じアーティファクトで同時に更新する（旧song-batchの同期は世代を進めないため、APIへ反映されない）。
 - **000065**: コース記録の更新前成績を保持する `player_course_record_histories` を追加。新しいAPIはスコア登録時にこのテーブルへ書き込むため、バイナリより先に適用する。
+- **000066**: コースのプレイヤー統計をレーティング帯ごとに保持する `course_stats_by_rating_band` を追加。新しい譜面統計バッチはこのテーブルも入れ替えるため、バイナリより先に適用する。適用直後は空のため、統計バッチの実行後にコース統計APIへ反映される。
 
 #### 000045のロールバック前確認
 

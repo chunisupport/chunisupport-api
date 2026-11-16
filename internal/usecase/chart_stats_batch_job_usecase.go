@@ -78,6 +78,8 @@ func NewChartStatsBatchJobUsecase(
 				"best_slot_eligible_players", result.EligiblePlayerCount,
 				"best_slot_records", result.BestSlotRecordCount,
 				"best_slot_stats", result.BestSlotStatsCount,
+				"course_records", result.CourseRecordCount,
+				"course_stats", result.CourseStatsCount,
 			}
 		},
 	})

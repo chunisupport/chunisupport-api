@@ -60,6 +60,18 @@ const (
 		  AND u.is_suspicious = 0
 		  AND sl.name = 'best'
 	`
+	// コース統計は削除済みコースを対象外にします。
+	chartStatsBatchCourseRecordQuery = `
+		SELECT pcr.course_id, p.best_average_rating, pcr.score, pcr.is_clear, pcr.combo_lamp_id
+		FROM players p
+		INNER JOIN users u ON u.id = p.user_id
+		INNER JOIN player_course_records pcr ON pcr.player_id = p.id
+		INNER JOIN courses c ON c.id = pcr.course_id
+		WHERE p.best_average_rating IS NOT NULL
+		  AND u.is_suspicious = 0
+		  AND c.is_deleted = 0
+		ORDER BY pcr.course_id, p.id
+	`
 	// ベスト枠採用率は削除済み楽曲と WORLD'S END を除く通常譜面だけを対象にします。
 	chartStatsBatchBestSlotChartQuery = `
 		SELECT c.id
@@ -88,6 +100,12 @@ const (
 			chart_id, rating_band_id, best_player_count, eligible_player_count, best_player_percentage
 		) VALUES `
 	bestSlotStatsInsertPlaceholder = "(?, ?, ?, ?, ?)"
+	courseStatsInsertPrefix        = `
+		INSERT INTO course_stats_by_rating_band (
+			course_id, rating_band_id, combo_none, combo_fc, combo_aj, clear_failed, clear_clear,
+			average_score, median_score, player_count
+		) VALUES `
+	courseStatsInsertPlaceholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
 type chartStatsBatchRepository struct {
@@ -146,6 +164,15 @@ func (r *chartStatsBatchRepository) StreamSource(ctx context.Context, callbacks 
 	}); err != nil {
 		return fmt.Errorf("stream best-slot charts: %w", err)
 	}
+	if err := streamChartStatsBatchRows(ctx, tx, chartStatsBatchCourseRecordQuery, func(rows *sqlx.Rows) error {
+		var record chartstatsbatch.CourseRecord
+		if err := rows.Scan(&record.CourseID, &record.BestAverageRating, &record.Score, &record.IsClear, &record.ComboLampID); err != nil {
+			return err
+		}
+		return callbacks.CourseRecord(record)
+	}); err != nil {
+		return fmt.Errorf("stream course records: %w", err)
+	}
 	return tx.Commit()
 }
 
@@ -175,7 +202,7 @@ func streamChartStatsBatchRows(ctx context.Context, tx *sqlx.Tx, query string, h
 	return rows.Err()
 }
 
-// ReplaceAll は3つの統計テーブルを削除してから snapshot を挿入し、単一トランザクションでコミットします。
+// ReplaceAll は4つの統計テーブルを削除してから snapshot を挿入し、単一トランザクションでコミットします。
 // コミットまでは他のセッションから直前の統計が見え続け、失敗やキャンセル時はロールバックされます。
 func (r *chartStatsBatchRepository) ReplaceAll(ctx context.Context, snapshot *chartstatsbatch.Snapshot) (err error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -194,6 +221,7 @@ func (r *chartStatsBatchRepository) ReplaceAll(ctx context.Context, snapshot *ch
 		"chart_stats_by_rating_band",
 		"worldsend_chart_stats_by_rating_band",
 		"chart_best_slot_stats_by_rating_band",
+		"course_stats_by_rating_band",
 	} {
 		if _, err = tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {
 			return fmt.Errorf("delete %s: %w", table, err)
@@ -207,6 +235,9 @@ func (r *chartStatsBatchRepository) ReplaceAll(ctx context.Context, snapshot *ch
 	}
 	if err = insertChartStatsBatchRows(ctx, tx, bestSlotStatsInsertPrefix, bestSlotStatsInsertPlaceholder, bestSlotStatsRows(snapshot.BestSlotStats)); err != nil {
 		return fmt.Errorf("insert best-slot stats: %w", err)
+	}
+	if err = insertChartStatsBatchRows(ctx, tx, courseStatsInsertPrefix, courseStatsInsertPlaceholder, courseStatsRows(snapshot.CourseStats)); err != nil {
+		return fmt.Errorf("insert course stats: %w", err)
 	}
 	return nil
 }
@@ -229,6 +260,17 @@ func bestSlotStatsRows(stats []*entity.ChartBestSlotStatsByRatingBand) [][]any {
 	rows := make([][]any, 0, len(stats))
 	for _, s := range stats {
 		rows = append(rows, []any{s.ChartID, s.RatingBandID, s.BestPlayerCount, s.EligiblePlayerCount, s.BestPlayerPercentage})
+	}
+	return rows
+}
+
+func courseStatsRows(stats []*entity.CourseStatsByRatingBand) [][]any {
+	rows := make([][]any, 0, len(stats))
+	for _, s := range stats {
+		rows = append(rows, []any{
+			s.CourseID, s.RatingBandID, s.Combo.None, s.Combo.FC, s.Combo.AJ, s.Clear.Failed, s.Clear.Clear,
+			s.AverageScore, s.MedianScore, s.PlayerCount,
+		})
 	}
 	return rows
 }
