@@ -36,19 +36,9 @@ func NewPlayerMetricHistoryUsecase(
 }
 
 func (us *playerMetricHistoryUsecase) Get(ctx context.Context, username string, requester *entity.User) ([]entity.PlayerMetricHistoryEntry, error) {
-	user, err := us.userRepo.FindByUsername(ctx, us.exec, username)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	accessible, err := canAccessPrivateUser(ctx, us.exec, us.friendshipRepo, user, requester)
+	user, err := getAccessibleUser(ctx, us.exec, us.userRepo, us.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
-	}
-	if !accessible {
-		return nil, ErrUserPrivate
 	}
 	if user.PlayerID == nil {
 		return nil, ErrPlayerMetricHistoryNotFound

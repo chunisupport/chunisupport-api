@@ -9,6 +9,12 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// ドメイン層の Executor はsqlxの型を公開しないため、実装がsqlxであることはインフラ層で保証します。
+var (
+	_ repository.Executor = (*sqlx.DB)(nil)
+	_ repository.Executor = (*sqlx.Tx)(nil)
+)
+
 // transactionManager はトランザクションを管理するインフラ層の実装です。
 type transactionManager struct {
 	db *sqlx.DB

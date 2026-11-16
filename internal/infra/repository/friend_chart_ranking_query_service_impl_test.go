@@ -182,9 +182,9 @@ type friendRankingQueryCapture struct {
 	args  []any
 }
 
-func (c *friendRankingQueryCapture) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
+func (c *friendRankingQueryCapture) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
 	c.query, c.args = query, args
-	return c.DB.QueryxContext(ctx, query, args...)
+	return c.DB.SelectContext(ctx, dest, query, args...)
 }
 
 func TestFriendChartRankingQueryService_対象プレイヤーと譜面の複合主キーで記録を取得する(t *testing.T) {

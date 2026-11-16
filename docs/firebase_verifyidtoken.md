@@ -62,14 +62,14 @@ type TokenVerifier interface {
 
 ## 3. ルーティング適用状況
 
-`internal/app/router.go` では、strict 用と read 最適化用の `FirebaseAuthUsecase` を別インスタンスとして生成します。
+`internal/app/dependencies.go` では、strict 用と read 最適化用の `FirebaseAuthUsecase` を別インスタンスとして生成します。
 
 ```go
 firebaseAuthUsecaseStrict := usecase.NewFirebaseAuthUsecase(db, userRepo, firebaseTokenVerifier)
 firebaseAuthUsecaseReadOptimized := usecase.NewFirebaseAuthUsecase(db, userRepo, usecase.NewReadOptimizedTokenVerifier(firebaseTokenVerifier))
 ```
 
-`registerRoutes` では以下のミドルウェアを使い分けます。
+`registerInternalRoutes`（`internal/app/routes_internal.go`）では以下のミドルウェアを使い分けます。
 
 - `firebaseAuthStrict`: strict 必須認証。
 - `firebaseAuthReadOptimized`: read 最適化の必須認証。

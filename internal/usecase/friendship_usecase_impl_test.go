@@ -472,7 +472,7 @@ func TestFriendshipUsecase_ListFriends(t *testing.T) {
 	level := 42
 	rating := 17.25
 	overpowerValue := 31234.56
-	possessionID := 3
+	possession := "gold"
 	friendship, err := entity.NewAcceptedFriendship(1, 2, now.Add(-time.Hour), now)
 	require.NoError(t, err)
 	repo := newStubFriendshipRepo()
@@ -481,7 +481,7 @@ func TestFriendshipUsecase_ListFriends(t *testing.T) {
 		User: &repository.FriendshipUserSummary{
 			UserID: 2, Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
 			OverpowerValue: &overpowerValue,
-			PossessionID:   &possessionID,
+			Possession:     &possession,
 		},
 	}}
 	u := &friendshipUsecase{db: &MockExecutor{}, friendshipRepo: repo}
@@ -495,7 +495,7 @@ func TestFriendshipUsecase_ListFriends(t *testing.T) {
 	assert.Equal(t, &FriendshipUserOutput{
 		Username: "frienduser", PlayerLevel: &level, PlayerName: &name, Rating: &rating,
 		OverpowerValue: &overpowerValue,
-		PossessionID:   &possessionID,
+		Possession:     &possession,
 		RequestedAt:    now.Add(-time.Hour), AcceptedAt: friendship.AcceptedAt,
 	}, got[0])
 }

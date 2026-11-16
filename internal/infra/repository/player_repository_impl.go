@@ -78,12 +78,6 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 		ORDER BY ph.slot
 	`
 
-	rows, err := exec.QueryxContext(ctx, query, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	type playerWithHonorRow struct {
 		models.PlayerModel
 		HonorSlot     *int    `db:"honor_slot"`
@@ -92,13 +86,14 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 		HonorImageURL *string `db:"honor_image_url"`
 	}
 
-	var result *repository.PlayerWithHonors
-	for rows.Next() {
-		var row playerWithHonorRow
-		if err := rows.StructScan(&row); err != nil {
-			return nil, err
-		}
+	// 称号は最大3件のため、全行を取得してから集約します。
+	var rows []playerWithHonorRow
+	if err := exec.SelectContext(ctx, &rows, query, id); err != nil {
+		return nil, err
+	}
 
+	var result *repository.PlayerWithHonors
+	for _, row := range rows {
 		if result == nil {
 			player, err := row.PlayerModel.ToEntity()
 			if err != nil {
@@ -122,10 +117,6 @@ func (r *playerRepository) FindByIDWithHonors(ctx context.Context, exec reposito
 		})
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	if result == nil {
 		return nil, repository.ErrPlayerNotFound
 	}
@@ -143,33 +134,24 @@ func (r *playerRepository) FindHonorsByPlayerID(ctx context.Context, exec reposi
 		WHERE ph.player_id = ?
 		ORDER BY ph.slot
 	`
-	rows, err := exec.QueryxContext(ctx, query, playerID)
-	if err != nil {
+	var rows []struct {
+		Slot     int     `db:"slot"`
+		Name     string  `db:"name"`
+		TypeName string  `db:"type_name"`
+		ImageURL *string `db:"image_url"`
+	}
+	if err := exec.SelectContext(ctx, &rows, query, playerID); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var honors []*entity.PlayerHonor
-	for rows.Next() {
-		var h struct {
-			Slot     int     `db:"slot"`
-			Name     string  `db:"name"`
-			TypeName string  `db:"type_name"`
-			ImageURL *string `db:"image_url"`
-		}
-		if err := rows.StructScan(&h); err != nil {
-			return nil, err
-		}
+	for _, h := range rows {
 		honors = append(honors, &entity.PlayerHonor{
 			Slot:     h.Slot,
 			Name:     h.Name,
 			TypeName: h.TypeName,
 			ImageURL: h.ImageURL,
 		})
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	return honors, nil

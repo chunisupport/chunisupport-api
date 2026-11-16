@@ -148,27 +148,18 @@ func (r *userRepository) findAllWithPlayer(ctx context.Context, exec repository.
 	query += " ORDER BY u.id ASC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
-	rows, err := exec.QueryxContext(ctx, query, args...)
-	if err != nil {
+	var rows []models.UserWithPlayerRow
+	if err := exec.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var results []entity.UserWithPlayer
-	for rows.Next() {
-		var row models.UserWithPlayerRow
-		if err := rows.StructScan(&row); err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
-		}
+	for _, row := range rows {
 		result, err := row.ToEntity()
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, result)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	return results, nil

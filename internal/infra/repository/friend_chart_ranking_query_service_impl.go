@@ -11,7 +11,6 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
-	"github.com/jmoiron/sqlx"
 )
 
 var _ domainrepo.FriendChartRankingQueryService = (*FriendChartRankingQueryService)(nil)
@@ -70,7 +69,7 @@ func (q *FriendChartRankingQueryService) FindChart(ctx context.Context, exec dom
 		  AND s.is_deleted = 0
 	`
 	var row friendChartRankingChartRow
-	if err := sqlx.GetContext(ctx, exec, &row, query, displayID, difficulty); err != nil {
+	if err := exec.GetContext(ctx, &row, query, displayID, difficulty); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -112,7 +111,7 @@ func (q *FriendChartRankingQueryService) FindWorldsendChart(ctx context.Context,
 		  AND s.is_deleted = 0
 	`
 	var row friendChartRankingChartRow
-	if err := sqlx.GetContext(ctx, exec, &row, query, displayID); err != nil {
+	if err := exec.GetContext(ctx, &row, query, displayID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -165,7 +164,7 @@ func (q *FriendChartRankingQueryService) ListRecords(ctx context.Context, exec d
 		ORDER BY pr.score DESC, pr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, chartID); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, chartID); err != nil {
 		return nil, wrapFriendChartRankingQueryError("list records", err)
 	}
 	records := make([]*domainrepo.FriendChartRankingRecord, 0, len(rows))
@@ -216,7 +215,7 @@ func (q *FriendChartRankingQueryService) ListWorldsendRecords(ctx context.Contex
 		ORDER BY pwr.score DESC, pwr.updated_at DESC, u.username ASC
 	`
 	var rows []friendChartRankingRecordRow
-	if err := sqlx.SelectContext(ctx, exec, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, worldsendChartID); err != nil {
+	if err := exec.SelectContext(ctx, &rows, query, userID, entity.FriendshipStatusAccepted, userID, entity.FriendshipStatusAccepted, worldsendChartID); err != nil {
 		return nil, wrapFriendChartRankingQueryError("list worldsend records", err)
 	}
 	records := make([]*domainrepo.FriendChartRankingRecord, 0, len(rows))

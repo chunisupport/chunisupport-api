@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -52,18 +51,10 @@ func (m *MockExecutor) QueryContext(ctx context.Context, query string, args ...a
 	return arg.Get(0).(*sql.Rows), arg.Error(1)
 }
 
-func (m *MockExecutor) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
-	arg := m.Called(ctx, query, args)
-	if arg.Get(0) == nil {
-		return nil, arg.Error(1)
-	}
-	return arg.Get(0).(*sqlx.Rows), arg.Error(1)
-}
-
-func (m *MockExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
+func (m *MockExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	arg := m.Called(ctx, query, args)
 	if arg.Get(0) == nil {
 		return nil
 	}
-	return arg.Get(0).(*sqlx.Row)
+	return arg.Get(0).(*sql.Row)
 }

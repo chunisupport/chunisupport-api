@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/gamedate"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
@@ -462,6 +463,20 @@ func (c *Cache) GetClassEmblemBaseNameByID(id int) string {
 		}
 	}
 	return ""
+}
+
+// GetPossessionNameByID はIDからポゼッション名を取得します。
+// プロフィール取得ごとにDBへ問い合わせないよう、起動時に読み込んだマスタから解決します。
+// 公開契約上ポゼッションは必ず名称を持つため、見つからない場合は既定値の normal を返します。
+func (c *Cache) GetPossessionNameByID(id int) string {
+	if c != nil {
+		for _, item := range c.Possessions {
+			if item.ID == id {
+				return item.Name
+			}
+		}
+	}
+	return entity.PossessionNameNormal
 }
 
 // GetAccountTypeNameByID はIDからAccountType名を取得します。

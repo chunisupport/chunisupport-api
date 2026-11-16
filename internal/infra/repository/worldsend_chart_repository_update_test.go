@@ -22,12 +22,12 @@ type deletingChartExecutor struct {
 	execCount int
 }
 
-func (e *deletingChartExecutor) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
-	return e.db.QueryxContext(ctx, query, args...)
+func (e *deletingChartExecutor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return e.db.QueryContext(ctx, query, args...)
 }
 
-func (e *deletingChartExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
-	return e.db.QueryRowxContext(ctx, query, args...)
+func (e *deletingChartExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return e.db.QueryRowContext(ctx, query, args...)
 }
 
 func (e *deletingChartExecutor) Rebind(query string) string {
@@ -59,12 +59,12 @@ type softDeletingSongExecutor struct {
 	execCount int
 }
 
-func (e *softDeletingSongExecutor) QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error) {
-	return e.db.QueryxContext(ctx, query, args...)
+func (e *softDeletingSongExecutor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return e.db.QueryContext(ctx, query, args...)
 }
 
-func (e *softDeletingSongExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
-	return e.db.QueryRowxContext(ctx, query, args...)
+func (e *softDeletingSongExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return e.db.QueryRowContext(ctx, query, args...)
 }
 
 func (e *softDeletingSongExecutor) Rebind(query string) string {

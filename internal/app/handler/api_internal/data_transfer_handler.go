@@ -83,7 +83,7 @@ func (handler *DataTransferHandler) Import(context *echo.Context) error {
 	}
 	slog.InfoContext(context.Request().Context(), "data transfer imported", "event", "data_transfer_imported", "user_id", user.ID, "player_id", output.PlayerID, "duration_ms", time.Since(started).Milliseconds())
 	context.Response().Header().Set(echo.HeaderCacheControl, "no-store")
-	return context.JSON(http.StatusOK, &dto_internal.DataTransferImportResponse{PlayerID: output.PlayerID, Counts: toDataTransferCountsResponse(output.Counts)})
+	return context.JSON(http.StatusOK, &dto_internal.DataTransferImportResponse{Counts: toDataTransferCountsResponse(output.Counts)})
 }
 
 // readDataTransferBody は移行ファイル本体を読み取ります。

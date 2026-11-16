@@ -28,6 +28,11 @@ func TestFriendshipRepository_ListPendingRequests_非公開ユーザーのプロ
 			overpower_value REAL,
 			possession_id INTEGER NOT NULL
 		);
+		CREATE TABLE possessions (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL
+		);
+		INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold');
 		CREATE TABLE friendships (
 			user_id INTEGER NOT NULL,
 			friend_user_id INTEGER NOT NULL,
@@ -73,14 +78,14 @@ func TestFriendshipRepository_ListPendingRequests_非公開ユーザーのプロ
 		assert.Nil(t, requests[0].playerLevel)
 		assert.Nil(t, requests[0].rating)
 		assert.Nil(t, requests[0].overpowerValue)
-		assert.Nil(t, requests[0].possessionID)
+		assert.Nil(t, requests[0].possession)
 		assert.Equal(t, "publicuser", requests[1].username)
 		assert.False(t, requests[1].isPrivate)
 		assert.Equal(t, "PUBLIC", *requests[1].playerName)
 		assert.Equal(t, 40, *requests[1].playerLevel)
 		assert.Equal(t, 15.0, *requests[1].rating)
 		assert.Equal(t, 18000.25, *requests[1].overpowerValue)
-		assert.Equal(t, 2, *requests[1].possessionID)
+		assert.Equal(t, "silver", *requests[1].possession)
 	}
 }
 
@@ -103,6 +108,11 @@ func TestFriendshipRepository_ListFriends_非公開ユーザーでも承認済�
 			overpower_value REAL,
 			possession_id INTEGER NOT NULL
 		);
+		CREATE TABLE possessions (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL
+		);
+		INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold');
 		CREATE TABLE friendships (
 			user_id INTEGER NOT NULL,
 			friend_user_id INTEGER NOT NULL,
@@ -140,7 +150,7 @@ func TestFriendshipRepository_ListFriends_非公開ユーザーでも承認済�
 	assert.True(t, got[0].isPrivate)
 	assert.Equal(t, "PRIVATE", *got[0].playerName)
 	assert.Equal(t, 20000.5, *got[0].overpowerValue)
-	assert.Equal(t, 3, *got[0].possessionID)
+	assert.Equal(t, "gold", *got[0].possession)
 }
 
 type domainFriendshipSummary struct {
@@ -150,7 +160,7 @@ type domainFriendshipSummary struct {
 	playerLevel    *int
 	rating         *float64
 	overpowerValue *float64
-	possessionID   *int
+	possession     *string
 }
 
 func toDomainFriendshipSummaries(items []*domainrepo.FriendshipWithUserSummary) []*domainFriendshipSummary {
@@ -163,7 +173,7 @@ func toDomainFriendshipSummaries(items []*domainrepo.FriendshipWithUserSummary) 
 			playerLevel:    item.User.PlayerLevel,
 			rating:         item.User.Rating,
 			overpowerValue: item.User.OverpowerValue,
-			possessionID:   item.User.PossessionID,
+			possession:     item.User.Possession,
 		})
 	}
 	return result

@@ -314,7 +314,7 @@ func toFriendshipUserOutputs(rows []*repository.FriendshipWithUserSummary) []*Fr
 			PlayerName:     row.User.PlayerName,
 			Rating:         row.User.Rating,
 			OverpowerValue: row.User.OverpowerValue,
-			PossessionID:   row.User.PossessionID,
+			Possession:     row.User.Possession,
 			IsPrivate:      row.User.IsPrivate,
 			RequestedAt:    row.Friendship.RequestedAt,
 			AcceptedAt:     row.Friendship.AcceptedAt,

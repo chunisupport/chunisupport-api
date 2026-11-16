@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,10 +18,10 @@ type worldsendLockQueryExecutor struct {
 	args  []any
 }
 
-func (e *worldsendLockQueryExecutor) QueryRowxContext(ctx context.Context, query string, args ...any) *sqlx.Row {
+func (e *worldsendLockQueryExecutor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	e.query = query
 	e.args = args
-	return e.Executor.QueryRowxContext(ctx, strings.TrimSuffix(query, " FOR UPDATE OF s"), args...)
+	return e.Executor.QueryRowContext(ctx, strings.TrimSuffix(query, " FOR UPDATE OF s"), args...)
 }
 
 func TestWorldsendChartRepository_FindByDisplayIDForChange_楽曲を排他ロックする(t *testing.T) {

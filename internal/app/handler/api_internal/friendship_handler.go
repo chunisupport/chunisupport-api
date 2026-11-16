@@ -153,7 +153,7 @@ func toFriendshipListResponse(items []*usecase.FriendshipUserOutput) *internaldt
 			PlayerName:     item.PlayerName,
 			Rating:         item.Rating,
 			OverpowerValue: item.OverpowerValue,
-			PossessionID:   item.PossessionID,
+			Possession:     item.Possession,
 			IsPrivate:      item.IsPrivate,
 			RequestedAt:    item.RequestedAt,
 			AcceptedAt:     item.AcceptedAt,

@@ -119,6 +119,16 @@ const (
 	APIRateLimitAdminRequests  = 150000
 	APIRateLimitWindow         = 15 * time.Minute
 
+	// レートリミット設定: 内部APIの認証済み参照系（ユーザーIDベース、エンドポイント共通）
+	// 未認証の60回/分より厳しくならず、1画面で複数APIを呼ぶSPAの通常操作では届かない値です。
+	InternalAuthenticatedReadRateLimitRequests = 300
+	InternalAuthenticatedReadRateLimitWindow   = 1 * time.Minute
+
+	// 重い参照処理（フレンド比較・全件取得など）の同時実行数の上限。
+	// 全体の上限は、DB接続（既定25本）のうち軽い処理や書き込み用の余裕を残すための値です。
+	HeavyReadConcurrencyPerClient = 2
+	HeavyReadConcurrencyGlobal    = 12
+
 	// レートリミット設定: 認証エンドポイント（IPベース）
 	LoginRateLimitRequests          = 10
 	LoginRateLimitWindow            = 1 * time.Minute

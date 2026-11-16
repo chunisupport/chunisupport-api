@@ -195,19 +195,9 @@ func (u *courseUsecase) setDeleted(ctx context.Context, displayID string, delete
 // 対象プレイヤーのコースレコード最大更新日時のうち新しい方とする。
 // 一覧レスポンスが名称・クラス・未プレイ補完などマスタ情報にも依存するため。
 func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, requester *entity.User) (*CourseRecordResult, error) {
-	user, err := u.userRepo.FindByUsername(ctx, u.db, username)
-	if errors.Is(err, repository.ErrUserNotFound) {
-		return nil, ErrUserNotFound
-	}
+	user, err := getAccessibleUser(ctx, u.db, u.userRepo, u.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
-	}
-	ok, err := canAccessPrivateUser(ctx, u.db, u.friendshipRepo, user, requester)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, ErrUserPrivate
 	}
 
 	// マスタ最大更新はプレイヤー連携有無に依存しない。

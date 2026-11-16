@@ -21,6 +21,9 @@ type MetricDiffs struct {
 	OverpowerValue   Float64Diff
 	OverpowerPercent Float64Diff
 }
+
+// Profile は登録後のプロフィールです。
+// 数値IDは保存済み結果の内部整合性に使い、APIへは名称（ClassEmblem など）だけを公開します。
 type Profile struct {
 	PlayerID          int
 	Name              string
@@ -29,6 +32,9 @@ type Profile struct {
 	ClassEmblemID     *int
 	ClassEmblemBaseID *int
 	PossessionID      int
+	ClassEmblem       *string
+	ClassEmblemBase   *string
+	Possession        string
 	LastPlayedAt      *time.Time
 	OverpowerValue    *float64
 	OverpowerPercent  *float64
