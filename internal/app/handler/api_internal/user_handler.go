@@ -271,6 +271,7 @@ func toUserPlayerDTO(value *usecase.UserPlayerOutput) *dto.PlayerDTO {
 	result := dto.ToPlayerDTO(value.Player)
 	result.ClassEmblem = value.ClassEmblem
 	result.ClassEmblemBase = value.ClassEmblemBase
+	result.Possession = value.Possession
 	result.Honors = make([]*dto.HonorDTO, 0, len(value.Honors))
 	for _, honor := range value.Honors {
 		if honor == nil {

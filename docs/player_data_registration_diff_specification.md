@@ -19,7 +19,6 @@
 
 ```json
 {
-  "player_id": 42,
   "app_ver": "0.1.0",
   "imported_at": "2026-06-21T12:00:00Z",
   "profile": {},
@@ -33,6 +32,8 @@
 ```
 
 `changes` と `skipped_records` は該当データがない場合も省略せず、空配列 `[]` を返す。
+
+DBの数値IDはレスポンスに含めない。`profile` のマスタ参照は `class_emblem` / `class_emblem_base` / `possession` の名称で返す。
 
 ## 3. レート・OVER POWER・OP%差分 (`metric_diffs`)
 
@@ -247,7 +248,9 @@
 
 ## 10. 登録結果の保存
 
-登録成功時の結果は `player_latest_updates` にプレイヤーごとに収集日時の新しい順で最大5件保存する。保存内容はレスポンスと同じ `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
+登録成功時の結果は `player_latest_updates` にプレイヤーごとに収集日時の新しい順で最大5件保存する。保存内容は `player_id`、`app_ver`、`imported_at`、`profile`、`summary`、`metric_diffs`、`statistics`、`counts`、`changes` に `schema_version` を加えたJSONである。診断用の詳細情報である `skipped_records` は保存しないが、`counts` 内のスキップ件数は保存する。
+
+保存内容の `player_id` と `profile` 内の `player_id` / `class_emblem_id` / `class_emblem_base_id` / `possession_id` は、取得時の本人整合性の検証とマスタ名の解決に使う内部情報である。取得APIでは返却時にこれらのDB数値IDを除去し、`profile.class_emblem` / `profile.class_emblem_base` / `profile.possession` の名称へ変換する。`possession_id` を持たない旧形式は `normal` として扱う。
 
 最新の保存形式はschema version 3であり、`metric_diffs.overpower_percent` を含む。schema version 1の保存済み結果も取得可能だが `metric_diffs` は含まれず、schema version 2には `rating` と `overpower_value` の差分だけが含まれる。
 

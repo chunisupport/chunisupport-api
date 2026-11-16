@@ -132,6 +132,10 @@ func TestMeHandler_GetLatestPlayerUpdate(t *testing.T) {
 		profile := response["profile"].(map[string]any)
 		assert.Equal(t, "2026-07-16T10:00:00+09:00", profile["last_played_at"])
 		assert.NotContains(t, response, "skipped_records")
+		// usecase が内部IDを含む値を返しても、公開DTOに無い項目は出力しない
+		assert.NotContains(t, response, "player_id")
+		assert.NotContains(t, profile, "player_id")
+		assert.NotContains(t, profile, "class_emblem_id")
 		mockUsecase.AssertExpectations(t)
 	})
 
@@ -230,9 +234,15 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		Level:      100,
 	}
 
+	possession := "gold"
+	classEmblem := "MEDAL_V"
 	expectedResult := &playerdataresult.Result{
 		PlayerID:   1,
 		AppVersion: "1.0.0",
+		Profile: playerdataresult.Profile{
+			PlayerID: 1, ClassEmblemID: new(int), PossessionID: 3,
+			ClassEmblem: &classEmblem, Possession: possession,
+		},
 	}
 
 	testUser := &entity.User{
@@ -266,8 +276,15 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		var result dto_internal.PlayerDataResult
 		err = json.Unmarshal(rec.Body.Bytes(), &result)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedResult.PlayerID, result.PlayerID)
+		assert.NotContains(t, rec.Body.String(), "player_id")
 		assert.Equal(t, expectedResult.AppVersion, result.AppVersion)
+		// マスタ参照はDBの数値IDではなく名称で返す
+		assert.Equal(t, &classEmblem, result.Profile.ClassEmblem)
+		assert.Nil(t, result.Profile.ClassEmblemBase)
+		assert.Equal(t, possession, result.Profile.Possession)
+		for _, key := range []string{"class_emblem_id", "class_emblem_base_id", "possession_id"} {
+			assert.NotContains(t, rec.Body.String(), key)
+		}
 	})
 
 	t.Run("ハッピーパス: format=jsonでの生JSON形式データ登録", func(t *testing.T) {
@@ -289,7 +306,7 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		var result dto_internal.PlayerDataResult
 		err = json.Unmarshal(rec.Body.Bytes(), &result)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedResult.PlayerID, result.PlayerID)
+		assert.NotContains(t, rec.Body.String(), "player_id")
 		assert.Equal(t, expectedResult.AppVersion, result.AppVersion)
 	})
 
@@ -322,7 +339,7 @@ func TestMeHandler_RegisterData(t *testing.T) {
 		var result dto_internal.PlayerDataResult
 		err = json.Unmarshal(rec.Body.Bytes(), &result)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedResult.PlayerID, result.PlayerID)
+		assert.NotContains(t, rec.Body.String(), "player_id")
 		assert.Equal(t, expectedResult.AppVersion, result.AppVersion)
 	})
 

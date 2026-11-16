@@ -24,7 +24,7 @@ type PlayerDTO struct {
 	NewAverageRating         *float64    `json:"-"`
 	ClassEmblem              *string     `json:"class_emblem"`
 	ClassEmblemBase          *string     `json:"class_emblem_base"`
-	PossessionID             int         `json:"possession_id"`
+	Possession               string      `json:"possession"`
 	LastPlayedAt             *time.Time  `json:"last_played_at"`
 	OverpowerValue           *float64    `json:"overpower_value"`
 	OverpowerPercent         *float64    `json:"overpower_percent"`
@@ -34,9 +34,10 @@ type PlayerDTO struct {
 	CreatedAt                time.Time   `json:"created_at"`
 	UpdatedAt                time.Time   `json:"updated_at"`
 
-	// v1への変換に必要なIDは内部APIのJSONには公開しません。
+	// 外部API v1 の後方互換フィールドと chunirec互換APIの変換に使うIDです。内部APIのJSONには公開しません。
 	ClassEmblemID     *int `json:"-"`
 	ClassEmblemBaseID *int `json:"-"`
+	PossessionID      int  `json:"-"`
 }
 
 // ToPlayerDTO はエンティティからDTOへ変換します。

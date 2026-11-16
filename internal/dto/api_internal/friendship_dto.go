@@ -14,7 +14,7 @@ type FriendshipUserResponse struct {
 	PlayerName     *string    `json:"player_name"`
 	Rating         *float64   `json:"rating"`
 	OverpowerValue *float64   `json:"overpower_value"`
-	PossessionID   *int       `json:"possession_id"`
+	Possession     *string    `json:"possession"`
 	IsPrivate      bool       `json:"is_private"`
 	RequestedAt    time.Time  `json:"requested_at"`
 	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`

@@ -3,6 +3,7 @@ package masterdata
 import (
 	"time"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 )
 
@@ -49,6 +50,49 @@ type PlayerDataMasters struct {
 	HonorTypes         map[string]master.HonorType
 	Possessions        map[string]master.Possession
 	Difficulties       map[string]master.ChartDifficulty
+}
+
+// ProfileMasterNames はプレイヤープロフィールのマスタ参照をAPI公開用の名称で表します。
+type ProfileMasterNames struct {
+	// ClassEmblem はクラスエンブレム名です。未設定または未知のIDでは nil です。
+	ClassEmblem *string
+	// ClassEmblemBase はクラスエンブレムベース名です。未設定または未知のIDでは nil です。
+	ClassEmblemBase *string
+	// Possession はポゼッション名です。未知のIDでは既定値の normal です。
+	Possession string
+}
+
+// ProfileNames はプロフィールが保持するマスタIDを名称へ解決します。
+// DBの数値IDをAPI契約に含めないため、登録直後の結果と保存済み結果の両方で同じ解決規則を使います。
+func (m *PlayerDataMasters) ProfileNames(classEmblemID, classEmblemBaseID *int, possessionID int) ProfileMasterNames {
+	// ポゼッションは公開契約上必ず名称を持つため、解決できない場合は既定値にします。
+	names := ProfileMasterNames{Possession: entity.PossessionNameNormal}
+	if m == nil {
+		return names
+	}
+	if classEmblemID != nil {
+		for _, item := range m.ClassEmblems {
+			if item.ID == *classEmblemID {
+				names.ClassEmblem = &item.Name
+				break
+			}
+		}
+	}
+	if classEmblemBaseID != nil {
+		for _, item := range m.ClassEmblemBases {
+			if item.ID == *classEmblemBaseID {
+				names.ClassEmblemBase = &item.Name
+				break
+			}
+		}
+	}
+	for _, item := range m.Possessions {
+		if item.ID == possessionID {
+			names.Possession = item.Name
+			break
+		}
+	}
+	return names
 }
 
 // SongMasters は楽曲関連で必要になるマスタ集合です。

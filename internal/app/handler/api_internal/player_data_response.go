@@ -22,11 +22,11 @@ func toPlayerDataResponse(result *playerdataresult.Result) *dto.PlayerDataResult
 	overpowerPercentDiff := toPlayerDataFloat64Diff(result.MetricDiffs.OverpowerPercent)
 
 	return &dto.PlayerDataResult{
-		PlayerID: result.PlayerID, AppVersion: result.AppVersion, ImportedAt: result.ImportedAt,
+		AppVersion: result.AppVersion, ImportedAt: result.ImportedAt,
 		Profile: dto.PlayerDataProfile{
-			PlayerID: result.Profile.PlayerID, Name: result.Profile.Name, Level: result.Profile.Level,
-			Rating: result.Profile.Rating, ClassEmblemID: result.Profile.ClassEmblemID,
-			ClassEmblemBaseID: result.Profile.ClassEmblemBaseID, PossessionID: result.Profile.PossessionID, LastPlayedAt: result.Profile.LastPlayedAt,
+			Name: result.Profile.Name, Level: result.Profile.Level,
+			Rating: result.Profile.Rating, ClassEmblem: result.Profile.ClassEmblem,
+			ClassEmblemBase: result.Profile.ClassEmblemBase, Possession: result.Profile.Possession, LastPlayedAt: result.Profile.LastPlayedAt,
 			OverpowerValue: result.Profile.OverpowerValue, OverpowerPercent: result.Profile.OverpowerPercent,
 		},
 		Summary: dto.PlayerDataSummary{

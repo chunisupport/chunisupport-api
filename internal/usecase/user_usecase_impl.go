@@ -974,6 +974,7 @@ func (s *userUsecase) buildPlayerOutput(playerWithHonors *repository.PlayerWithH
 	if s.masterProvider != nil {
 		result.ClassEmblem = resolveOptionalMasterName(result.ClassEmblemID, s.masterProvider.GetClassEmblemNameByID)
 		result.ClassEmblemBase = resolveOptionalMasterName(result.ClassEmblemBaseID, s.masterProvider.GetClassEmblemBaseNameByID)
+		result.Possession = s.masterProvider.GetPossessionNameByID(result.PossessionID)
 	}
 	return result
 }

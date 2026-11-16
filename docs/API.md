@@ -1393,7 +1393,7 @@ Firebase Bearer Token（必須）
       "player_name": "PLAYER",
       "rating": 15.25,
       "overpower_value": 18000.25,
-      "possession_id": 3,
+      "possession": "gold",
       "is_private": false,
       "requested_at": "2026-07-08T12:00:00Z",
       "accepted_at": "2026-07-08T12:05:00Z"
@@ -1402,7 +1402,7 @@ Firebase Bearer Token（必須）
 }
 ```
 
-`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。`overpower_value` はOVER POWER値、`possession_id` は `MasterDataDTO.possessions` の `id` です。プレイヤーデータ未連携の場合、プレイヤー由来の項目（`player_level`、`player_name`、`rating`、`overpower_value`、`possession_id`）はすべて `null` です。
+`username` とアカウントの存在は公開情報です。数値の内部ユーザーIDはレスポンスおよび操作パスへ公開しません。`overpower_value` はOVER POWER値、`possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）です。DBの数値IDは返しません。プレイヤーデータ未連携の場合、プレイヤー由来の項目（`player_level`、`player_name`、`rating`、`overpower_value`、`possession`）はすべて `null` です。
 未承認の送受信申請では、非公開ユーザーのプレイヤー由来の項目をすべて `null` とし、公開ユーザーの概要だけを表示できます。承認済みフレンドは非公開設定でも概要を返します。
 
 ### GET `/internal/friends`
@@ -2119,17 +2119,15 @@ curl -X POST \
 
 ```json
 {
-  "player_id": 42,
   "app_ver": "0.0.1a",
   "imported_at": "2025-11-27T10:45:00+09:00",
   "profile": {
-    "player_id": 42,
     "name": "プレイヤー名",
     "level": 217,
     "rating": 17.29,
-    "class_emblem_id": 6,
-    "class_emblem_base_id": 4,
-    "possession_id": 5,
+    "class_emblem": "inf",
+    "class_emblem_base": "4",
+    "possession": "rainbow",
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27011
@@ -2247,10 +2245,9 @@ curl -X POST \
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `player_id` | number | 登録されたプレイヤーID |
 | `app_ver` | string | リクエストのアプリバージョン |
 | `imported_at` | string | インポート実行日時 (ISO8601) |
-| `profile` | object | 登録後のプレイヤープロフィール情報。`class_emblem_id` / `class_emblem_base_id` / `possession_id` を含みます |
+| `profile` | object | 登録後のプレイヤープロフィール情報。マスタ参照は名称で返し、DBの数値ID（プレイヤーID・マスタID）は含みません。`class_emblem` / `class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）で、未設定または解決できない場合は `null` です。`possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）です |
 | `summary` | object | プレイヤーサマリー情報 |
 | `metric_diffs` | object | 計算レート、OVER POWER値、OP%の登録前後差分。各項目は `before` / `after` / `delta` を含みます |
 | `statistics` | object | 通常譜面とWORLD'S ENDの登録前後集計。全体と難易度別の `before` / `after` / `delta` を含みます |
@@ -2294,13 +2291,13 @@ curl -X POST \
 - **認証**: Firebase Bearer必須
 - **成功レスポンス**: `200 OK`
 - **レスポンス形式**: `POST /internal/me/register-data` の成功レスポンスから `skipped_records` を除き、保存形式の `schema_version` を追加したJSON
+- DBの数値ID（プレイヤーID・マスタID）は返さず、`profile.class_emblem` / `profile.class_emblem_base` / `profile.possession` は名称で返します。ポゼッションを記録していない古い登録結果は `"normal"` として返します
 - `counts` 内の各スキップ件数はそのまま含みます
 - 保存済みの結果がない場合は `204 No Content` を返します。既存プレイヤーが本機能の導入後にまだデータ登録していない場合などが該当します
 
 ```json
 {
   "schema_version": 3,
-  "player_id": 42,
   "app_ver": "0.1.0",
   "imported_at": "2026-07-16T12:00:00+09:00",
   "profile": {},
@@ -3050,6 +3047,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/internal/users/:username`
 - **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。内部APIの `PlayerDTO` に数値IDの2項目は含まれません。プロフィールのみの取得と各 `view` でも同じ形式です。
+- **ポゼッション**: `player.possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）を文字列で返します。DBの数値IDである `possession_id` は返しません。
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしは1分60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
@@ -3071,7 +3069,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 17.29,
     "class_emblem": "inf",
     "class_emblem_base": "4",
-    "possession_id": 5,
+    "possession": "rainbow",
     "last_played_at": "2025-11-02T16:42:00+09:00",
     "overpower_value": 96123.91,
     "overpower_percent": 76.27,
@@ -3187,7 +3185,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "rating": 16.5,
     "class_emblem": "3",
     "class_emblem_base": "1",
-    "possession_id": 5,
+    "possession": "rainbow",
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
@@ -4918,7 +4916,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `full_chains` | MasterItemDTO[] | フルチェインランプ一覧（sort_order順）。`PlayerRecordDTO.full_chain` の取りうる値 |
 | `slots` | MasterItemDTO[] | スロット一覧（ID順）。`PlayerRecordDTO.slot` の取りうる値 |
 | `honor_types` | MasterItemDTO[] | 称号タイプ一覧（ID順）。`HonorDTO.type_name` の取りうる値 |
-| `possessions` | MasterItemDTO[] | ポゼッション一覧（ID順）。`PlayerDTO.possession_id` の解決に使用 |
+| `possessions` | MasterItemDTO[] | ポゼッション一覧（ID順）。`name` は `PlayerDTO.possession` などで返すポゼッション名に対応 |
 
 **MasterItemDTO**:
 
@@ -5550,6 +5548,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/users/:username`
 - **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。互換性のため `player.class_emblem_id` / `player.class_emblem_base_id` も数値または `null` で返します。
+- **ポゼッション**: `player.possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）を文字列で返します。互換性のため `player.possession_id`（1: normal、2: silver、3: gold、4: platina、5: rainbow）も返します。新規利用では名称のフィールドを参照してください。
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
@@ -5574,6 +5573,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "class_emblem": "3",
     "class_emblem_base": "1",
     "possession_id": 5,
+    "possession": "rainbow",
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
     "overpower_percent": 98.76,
@@ -6252,7 +6252,7 @@ interface PlayerDTO {
   rating: number;
   class_emblem: string | null;
   class_emblem_base: string | null;
-  possession_id: number;
+  possession: PossessionName;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
@@ -6263,9 +6263,14 @@ interface PlayerDTO {
   updated_at: string;
 }
 
+// ポゼッション名。DBの数値IDは公開しない
+type PossessionName = 'normal' | 'silver' | 'gold' | 'platina' | 'rainbow';
+
+// 外部API v1 のプレイヤー情報。後方互換のため数値IDも返す
 interface V1PlayerDTO extends PlayerDTO {
   class_emblem_id: number | null;
   class_emblem_base_id: number | null;
+  possession_id: number;
 }
 
 interface HonorDTO {
@@ -6365,7 +6370,6 @@ interface ErrorResponse {
 
 // プレイヤーデータ登録結果
 interface PlayerDataResult {
-  player_id: number;
   app_ver: string;
   imported_at: string;
   profile: PlayerDataProfile;
@@ -6390,13 +6394,12 @@ interface PlayerDataMetricDiffs {
 }
 
 interface PlayerDataProfile {
-  player_id: number;
   name: string;
   level: number;
   rating: number | null;
-  class_emblem_id: number | null;
-  class_emblem_base_id: number | null;
-  possession_id: number;
+  class_emblem: string | null;
+  class_emblem_base: string | null;
+  possession: PossessionName;
   last_played_at: string | null;
   overpower_value: number | null;
   overpower_percent: number | null;
@@ -6489,6 +6492,6 @@ interface SkippedRecord {
 
 ### POST /internal/me/data-transfer/import
 
-validateと同じファイルを再送します。すべての検証を再実行し、ユーザー行をロックして空状態を再確認した後、移行対象を1トランザクションで保存します。移行先に存在しない称号は、移行データの名称、称号タイプ、画像URLを使用して同じトランザクション内で称号マスタへ追加します。成功時は新しいplayer_idとセクション別保存件数を返します。
+validateと同じファイルを再送します。すべての検証を再実行し、ユーザー行をロックして空状態を再確認した後、移行対象を1トランザクションで保存します。移行先に存在しない称号は、移行データの名称、称号タイプ、画像URLを使用して同じトランザクション内で称号マスタへ追加します。成功時はセクション別保存件数（`counts`）を返します。新しいプレイヤーのDB内部IDは返しません。
 
 移行先が空でない場合は409 data_transfer_destination_not_empty、参照を解決できない場合は400 data_transfer_unresolved_referenceを返します。リクエスト上限は32MiB、3つの操作APIはユーザー単位で1分間に5回までです。

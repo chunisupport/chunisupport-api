@@ -147,6 +147,46 @@ func TestCache_GetClassEmblemBaseNameByID(t *testing.T) {
 	}
 }
 
+func TestCache_GetPossessionNameByID(t *testing.T) {
+	tests := []struct {
+		name     string
+		cache    *Cache
+		id       int
+		expected string
+	}{
+		{
+			name: "正常系: 存在するIDの場合は名前を返す",
+			cache: &Cache{
+				Possessions: map[string]master.Possession{
+					"normal":  {ID: 1, Name: "normal"},
+					"rainbow": {ID: 5, Name: "rainbow"},
+				},
+			},
+			id:       5,
+			expected: "rainbow",
+		},
+		{
+			name:     "異常系: 存在しないIDの場合はnormalを返す",
+			cache:    &Cache{Possessions: map[string]master.Possession{"normal": {ID: 1, Name: "normal"}}},
+			id:       999,
+			expected: "normal",
+		},
+		{
+			name:     "異常系: キャッシュがnilの場合はnormalを返す",
+			cache:    nil,
+			id:       1,
+			expected: "normal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.cache.GetPossessionNameByID(tt.id)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestPreload_AchievementTypesUsesCodeColumn(t *testing.T) {
 	const achievementTypeID = 8
 	const achievementCode = "overpower_percent"

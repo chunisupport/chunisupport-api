@@ -19,6 +19,8 @@ type V1HonorDTO struct {
 }
 
 // V1PlayerDTO は外部API v1 用のプレイヤー情報DTOです。
+// ClassEmblemID / ClassEmblemBaseID / PossessionID は既存利用者との後方互換のために維持し、
+// 新規利用向けには名称の ClassEmblem / ClassEmblemBase / Possession を返します。
 type V1PlayerDTO struct {
 	Name                     string        `json:"name"`
 	Level                    int           `json:"level"`
@@ -28,6 +30,7 @@ type V1PlayerDTO struct {
 	ClassEmblem              *string       `json:"class_emblem"`
 	ClassEmblemBase          *string       `json:"class_emblem_base"`
 	PossessionID             int           `json:"possession_id"`
+	Possession               string        `json:"possession"`
 	LastPlayedAt             *time.Time    `json:"last_played_at"`
 	OverpowerValue           *float64      `json:"overpower_value"`
 	OverpowerPercent         *float64      `json:"overpower_percent"`
@@ -315,6 +318,7 @@ func ToV1UserProfileDTO(profile *api_internal.UserProfileWithRecordsDTO) *V1User
 			ClassEmblemID:            profile.Player.ClassEmblemID,
 			ClassEmblemBaseID:        profile.Player.ClassEmblemBaseID,
 			PossessionID:             profile.Player.PossessionID,
+			Possession:               profile.Player.Possession,
 			LastPlayedAt:             profile.Player.LastPlayedAt,
 			OverpowerValue:           profile.Player.OverpowerValue,
 			OverpowerPercent:         profile.Player.OverpowerPercent,
