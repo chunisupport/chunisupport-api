@@ -3567,54 +3567,6 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
-### GET `/v1/courses/:id/score-history`
-- **認証**: APIトークン必須
-- **概要**: 指定コースのスコア履歴を取得します。現行ベストを先頭に、過去のベストを新しい順で返します。非公開ユーザーは本人または承認済みフレンドが参照できます。
-- **制限**: 履歴はコースごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。履歴はスコア登録でコースの成績（スコア・クリア状態・コンボランプ）が変化したときだけ追加されます。
-- **パスパラメータ**:
-
-| パラメータ | 型 | 説明 |
-| ---------- | -- | ---- |
-| `id` | string | コースID |
-
-- **クエリパラメータ**:
-
-| パラメータ | 型 | 必須 | 説明 |
-| ---------- | -- | ---- | ---- |
-| `username` | string | ✓ | 対象ユーザー名 |
-
-- **レスポンス**: 200 OK
-
-```json
-{
-  "entries": [
-    {
-      "score": 3010000,
-      "is_clear": true,
-      "combo_lamp": "ALL JUSTICE",
-      "updated_at": "2026-11-01T12:34:56Z"
-    }
-  ]
-}
-```
-
-| フィールド | 型 | 説明 |
-| ---------- | -- | ---- |
-| `entries` | array | スコア履歴エントリの配列（先頭が現行ベスト、以降は新しい順） |
-| `entries[].score` | number | スコア（0〜3,030,000） |
-| `entries[].is_clear` | boolean | クリアしたかどうか |
-| `entries[].combo_lamp` | string \| null | コンボランプ名称。未設定または解決不能の場合は `null` |
-| `entries[].updated_at` | string | 更新日時（ISO8601） |
-
-- **主なエラー**:
-  - 401 Unauthorized (`missing_token`): APIトークン未指定
-  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
-  - 400 Bad Request (`validation_failed`): `username` 未指定
-  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
-  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
-  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
-  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
-
 ### POST `/internal/courses`
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
@@ -5728,6 +5680,54 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **概要**: 有効なコースマスタ単件を取得します。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+
+### GET `/v1/courses/:id/score-history`
+- **認証**: APIトークン必須
+- **概要**: 指定コースのスコア履歴を取得します。現行ベストを先頭に、過去のベストを新しい順で返します。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **制限**: 履歴はコースごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。履歴はスコア登録でコースの成績（スコア・クリア状態・コンボランプ）が変化したときだけ追加されます。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | コースID |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `username` | string | ✓ | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "entries": [
+    {
+      "score": 3010000,
+      "is_clear": true,
+      "combo_lamp": "ALL JUSTICE",
+      "updated_at": "2026-11-01T12:34:56Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | array | スコア履歴エントリの配列（先頭が現行ベスト、以降は新しい順） |
+| `entries[].score` | number | スコア（0〜3,030,000） |
+| `entries[].is_clear` | boolean | クリアしたかどうか |
+| `entries[].combo_lamp` | string \| null | コンボランプ名称。未設定または解決不能の場合は `null` |
+| `entries[].updated_at` | string | 更新日時（ISO8601） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### POST `/v1/courses`
 - **認証**: `read_write` APIトークンかつADMIN以上
