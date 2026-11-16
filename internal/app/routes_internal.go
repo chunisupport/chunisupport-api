@@ -19,6 +19,8 @@ type internalRouteMiddlewares struct {
 	firebaseAuthReadOptimized         echo.MiddlewareFunc
 	optionalFirebaseAuthReadOptimized echo.MiddlewareFunc
 	anonymousRateLimit                echo.MiddlewareFunc
+	authenticatedReadRateLimit        echo.MiddlewareFunc
+	heavyReadConcurrencyLimit         echo.MiddlewareFunc
 	dataTransferRateLimit             echo.MiddlewareFunc
 	requireEditor                     echo.MiddlewareFunc
 	requireAdmin                      echo.MiddlewareFunc
@@ -48,6 +50,12 @@ func registerInternalRoutes(
 			Requests: info.InternalPublicRateLimitRequests,
 			Window:   info.InternalPublicRateLimitWindow,
 		}),
+		// 認証済みユーザーの参照系は全グループで1つの枠を共有し、エンドポイントを変えた回避を防ぎます。
+		authenticatedReadRateLimit: middleware.AuthenticatedUserRateLimitMiddleware(middleware.RateLimitConfig{
+			Requests: info.InternalAuthenticatedReadRateLimitRequests,
+			Window:   info.InternalAuthenticatedReadRateLimitWindow,
+		}),
+		heavyReadConcurrencyLimit: middleware.ConcurrencyLimitMiddleware(info.HeavyReadConcurrencyPerClient, info.HeavyReadConcurrencyGlobal),
 		dataTransferRateLimit: middleware.UserRateLimitMiddleware(middleware.RateLimitConfig{
 			Requests: info.DataTransferRateLimitRequests,
 			Window:   info.DataTransferRateLimitWindow,
@@ -90,7 +98,7 @@ func registerInternalAuthRoutes(internal *echo.Group, handlers *Handlers, mw int
 // 同じパスプレフィックスで読み取りと書き込みの認証方式が異なるため、Group を分けて登録します。
 func registerInternalMeRoutes(internal *echo.Group, handlers *Handlers, mw internalRouteMiddlewares, cfg config.Config) {
 	meReadGroup := internal.Group("/me")
-	meReadGroup.Use(mw.firebaseAuthReadOptimized)
+	meReadGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit)
 	meReadGroup.GET("", handlers.Profile.Me)
 	meReadGroup.GET("/player-data/latest-update", handlers.Me.GetLatestPlayerUpdate)
 	meReadGroup.GET("/player-data/updates", handlers.Me.GetRecentPlayerUpdates)
@@ -142,7 +150,7 @@ func registerInternalMeRoutes(internal *echo.Group, handlers *Handlers, mw inter
 // registerInternalFriendRoutes はフレンド関係とフレンド間比較のルートを登録します。
 func registerInternalFriendRoutes(internal *echo.Group, handlers *Handlers, mw internalRouteMiddlewares) {
 	friendshipReadGroup := internal.Group("/friends")
-	friendshipReadGroup.Use(mw.firebaseAuthReadOptimized)
+	friendshipReadGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit)
 	friendshipReadGroup.GET("", handlers.Friendship.ListFriends)
 	friendshipReadGroup.GET("/requests/received", handlers.Friendship.ListReceivedRequests)
 	friendshipReadGroup.GET("/requests/sent", handlers.Friendship.ListSentRequests)
@@ -157,12 +165,12 @@ func registerInternalFriendRoutes(internal *echo.Group, handlers *Handlers, mw i
 	friendshipGroup.DELETE("/:username", handlers.Friendship.Remove)
 
 	friendRankingGroup := internal.Group("/friend-rankings")
-	friendRankingGroup.Use(mw.firebaseAuthReadOptimized)
+	friendRankingGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit, mw.heavyReadConcurrencyLimit)
 	friendRankingGroup.GET("/songs/:id/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
 	friendRankingGroup.GET("/worldsend-songs/:id", handlers.FriendChartRanking.GetWorldsend)
 
 	friendComparisonGroup := internal.Group("/friend-comparisons")
-	friendComparisonGroup.Use(mw.firebaseAuthReadOptimized)
+	friendComparisonGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit, mw.heavyReadConcurrencyLimit)
 	friendComparisonGroup.GET("/:username/charts/:difficulty", handlers.FriendScoreComparison.Get)
 	friendComparisonGroup.GET("/:username/worldsend", handlers.FriendScoreComparison.GetWorldsend)
 }
@@ -186,7 +194,7 @@ func registerInternalTemporaryPlayerDataRoutes(internal *echo.Group, handlers *H
 // registerInternalUserRoutes はユーザー公開情報と管理者向けユーザー管理のルートを登録します。
 func registerInternalUserRoutes(internal *echo.Group, handlers *Handlers, mw internalRouteMiddlewares, cfg config.Config) {
 	publicUsersGroup := internal.Group("/users")
-	publicUsersGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit)
+	publicUsersGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit, mw.authenticatedReadRateLimit)
 	publicUsersGroup.GET("/:username/updated-at", handlers.User.GetUserUpdatedAt)
 	publicUsersGroup.GET("/:username/profile", handlers.User.GetUserProfile)
 	if cfg.FeatureFlags.Enabled(featureflag.ProfileComment) {
@@ -200,10 +208,10 @@ func registerInternalUserRoutes(internal *echo.Group, handlers *Handlers, mw int
 	publicUsersGroup.GET("/:username/record/courses", handlers.Course.GetUserRecords)
 	publicUsersGroup.GET("/:username/record/courses/:id", handlers.Course.GetUserRecord)
 	publicUsersGroup.GET("/:username/record/worldsend-songs/:id/history", handlers.InternalScoreHistory.GetWorldsend)
-	publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord)
+	publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord, mw.heavyReadConcurrencyLimit)
 	publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)
 	publicUsersGroup.GET("/:username/favorite-songs", handlers.PlayerFavoriteSong.List)
-	publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords)
+	publicUsersGroup.GET("/:username", handlers.User.GetUserProfileWithRecords, mw.heavyReadConcurrencyLimit)
 
 	usersGroup := internal.Group("/users")
 	usersGroup.Use(mw.firebaseAuthStrict)
@@ -245,7 +253,7 @@ func registerInternalAdminRoutes(internal *echo.Group, handlers *Handlers, mw in
 // registerInternalSongRoutes は楽曲・WORLD'S END楽曲・ベスト枠統計のルートを登録します。
 func registerInternalSongRoutes(internal *echo.Group, handlers *Handlers, mw internalRouteMiddlewares) {
 	publicSongsGroup := internal.Group("/songs")
-	publicSongsGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit)
+	publicSongsGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit, mw.authenticatedReadRateLimit)
 	publicSongsGroup.GET("/updated-at", handlers.Song.GetSongsUpdatedAt)
 	publicSongsGroup.GET("", handlers.Song.GetSongs)
 	publicSongsGroup.GET("/:id", handlers.Song.GetSong)
@@ -253,11 +261,11 @@ func registerInternalSongRoutes(internal *echo.Group, handlers *Handlers, mw int
 	publicSongsGroup.GET("/:id/best-slot-stats/:difficulty", handlers.BestSlotStats.GetChartStats)
 
 	bestSlotRankingGroup := internal.Group("/best-slot-rankings")
-	bestSlotRankingGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit)
-	bestSlotRankingGroup.GET("", handlers.BestSlotStats.GetRanking)
+	bestSlotRankingGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit, mw.authenticatedReadRateLimit)
+	bestSlotRankingGroup.GET("", handlers.BestSlotStats.GetRanking, mw.heavyReadConcurrencyLimit)
 
 	publicWorldsendGroup := internal.Group("/worldsend-songs")
-	publicWorldsendGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit)
+	publicWorldsendGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit, mw.authenticatedReadRateLimit)
 	publicWorldsendGroup.GET("", handlers.Worldsend.GetWorldsendSongs)
 	publicWorldsendGroup.GET("/:id", handlers.Worldsend.GetWorldsendSong)
 
@@ -289,7 +297,7 @@ func registerInternalSongRoutes(internal *echo.Group, handlers *Handlers, mw int
 // registerInternalCourseRoutes はコースのルートを登録します。
 func registerInternalCourseRoutes(internal *echo.Group, handlers *Handlers, mw internalRouteMiddlewares) {
 	publicCoursesGroup := internal.Group("/courses")
-	publicCoursesGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit)
+	publicCoursesGroup.Use(mw.optionalFirebaseAuthReadOptimized, mw.anonymousRateLimit, mw.authenticatedReadRateLimit)
 	publicCoursesGroup.GET("/updated-at", handlers.Course.GetCoursesUpdatedAt)
 	publicCoursesGroup.GET("", handlers.Course.List)
 	publicCoursesGroup.GET("/:id", handlers.Course.Get)
