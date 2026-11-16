@@ -24,7 +24,7 @@ type PlayerDTO struct {
 	NewAverageRating         *float64    `json:"-"`
 	ClassEmblem              *string     `json:"class_emblem"`
 	ClassEmblemBase          *string     `json:"class_emblem_base"`
-	PossessionID             int         `json:"possession_id"`
+	Possession               string      `json:"possession"`
 	LastPlayedAt             *time.Time  `json:"last_played_at"`
 	OverpowerValue           *float64    `json:"overpower_value"`
 	OverpowerPercent         *float64    `json:"overpower_percent"`
@@ -34,7 +34,7 @@ type PlayerDTO struct {
 	CreatedAt                time.Time   `json:"created_at"`
 	UpdatedAt                time.Time   `json:"updated_at"`
 
-	// v1への変換に必要なIDは内部APIのJSONには公開しません。
+	// chunirec互換APIの変換に使うIDです。DBの数値IDのため、どのAPIのJSONにも公開しません。
 	ClassEmblemID     *int `json:"-"`
 	ClassEmblemBaseID *int `json:"-"`
 }
@@ -55,7 +55,6 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 		NewAverageRating:         player.NewAverageRating,
 		ClassEmblemID:            player.ClassEmblemID,
 		ClassEmblemBaseID:        player.ClassEmblemBaseID,
-		PossessionID:             player.PossessionID,
 		LastPlayedAt:             player.LastPlayedAt,
 		OverpowerValue:           player.OverpowerValue,
 		OverpowerPercent:         player.OverpowerPercent,

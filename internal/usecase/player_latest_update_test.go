@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
 	"github.com/stretchr/testify/assert"
@@ -124,7 +126,7 @@ func TestPlayerDataUsecase_GetLatestUpdate(t *testing.T) {
 	update, err := buildPlayerLatestUpdate(result, result.ImportedAt.Add(-time.Minute), "body-hash")
 	require.NoError(t, err)
 	repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}
-	u := &playerDataUsecase{playerDataRepo: repo}
+	u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: repo}
 
 	// When
 	raw, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -147,7 +149,7 @@ func TestPlayerDataUsecase_GetRecentUpdates_保存済み結果を配列で返す
 	}
 	update, err := buildPlayerLatestUpdate(result, result.ImportedAt.Add(-time.Minute), "body-hash")
 	require.NoError(t, err)
-	u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
+	u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
 
 	// When
 	results, err := u.GetRecentUpdates(context.Background(), &entity.User{PlayerID: &playerID})
@@ -187,7 +189,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_schema1の保存結果も返す(t *te
 	)
 	require.NoError(t, err)
 	repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}
-	u := &playerDataUsecase{playerDataRepo: repo}
+	u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: repo}
 
 	// When
 	got, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -215,7 +217,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_未連携と未保存を区別する(
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdateErr: tt.repoErr}}
+			u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdateErr: tt.repoErr}}
 
 			// When
 			_, err := u.GetLatestUpdate(context.Background(), tt.user)
@@ -280,7 +282,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_不正な保存内容は内部エラ�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: tt.update}}
+			u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: tt.update}}
 
 			// When
 			_, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -369,7 +371,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_schema2の保存結果も返す(t *te
 	)
 	require.NoError(t, err)
 	repo := &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}
-	u := &playerDataUsecase{playerDataRepo: repo}
+	u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: repo}
 
 	// When
 	got, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -427,7 +429,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_schema3のOP割合差分形式を検�
 				"body-hash",
 			)
 			require.NoError(t, err)
-			u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
+			u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
 
 			// When
 			_, err = u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -443,7 +445,7 @@ func TestPlayerDataUsecase_GetLatestUpdate_gzip破損時は原因エラーを保
 	playerID := 12
 	brokenGzipUpdate, err := entity.NewPlayerLatestUpdate(playerID, playerLatestUpdateSchemaVersion, []byte("broken-gzip"), time.Now().UTC(), time.Now().UTC(), "broken-hash")
 	require.NoError(t, err)
-	u := &playerDataUsecase{playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: brokenGzipUpdate}}
+	u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: brokenGzipUpdate}}
 
 	// When
 	_, err = u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
@@ -451,4 +453,94 @@ func TestPlayerDataUsecase_GetLatestUpdate_gzip破損時は原因エラーを保
 	// Then
 	assert.ErrorIs(t, err, ErrInternalError)
 	assert.ErrorIs(t, err, gzip.ErrHeader)
+}
+
+// stubProfileMasterProvider は保存済み結果のマスタIDを名称へ解決するためのマスタを返します。
+type stubProfileMasterProvider struct{}
+
+func (stubProfileMasterProvider) PlayerDataMasters() *masterdata.PlayerDataMasters {
+	return &masterdata.PlayerDataMasters{
+		ClassEmblems:     map[string]master.ClassEmblem{"MEDAL_V": {ID: 5, Name: "MEDAL_V"}},
+		ClassEmblemBases: map[string]master.ClassEmblemBase{"BASE_IV": {ID: 4, Name: "BASE_IV"}},
+		Possessions: map[string]master.Possession{
+			"normal": {ID: 1, Name: "normal"},
+			"gold":   {ID: 3, Name: "gold"},
+		},
+	}
+}
+
+func TestPlayerDataUsecase_GetLatestUpdate_保存済み結果のDB内部IDを公開しない(t *testing.T) {
+	playerID := 12
+	classEmblemID := 5
+	classEmblemBaseID := 4
+	tests := []struct {
+		name string
+		// Given: 保存済みプロフィールの加工
+		editProfile func(profile map[string]any)
+		// Then: 公開されるプロフィールのマスタ名
+		wantClassEmblem     any
+		wantClassEmblemBase any
+		wantPossession      string
+	}{
+		{
+			name:                "マスタIDを名称へ変換する",
+			editProfile:         func(map[string]any) {},
+			wantClassEmblem:     "MEDAL_V",
+			wantClassEmblemBase: "BASE_IV",
+			wantPossession:      "gold",
+		},
+		{
+			name: "possession_idを持たない旧形式はnormalとして返す",
+			editProfile: func(profile map[string]any) {
+				profile["class_emblem_id"] = nil
+				profile["class_emblem_base_id"] = nil
+				delete(profile, "possession_id")
+			},
+			wantClassEmblem:     nil,
+			wantClassEmblemBase: nil,
+			wantPossession:      "normal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			result := &playerdataresult.Result{
+				PlayerID: playerID, AppVersion: "1.2.3", ImportedAt: time.Date(2026, 7, 16, 2, 3, 4, 0, time.UTC),
+				Profile: playerdataresult.Profile{
+					PlayerID: playerID, Name: "TEST", ClassEmblemID: &classEmblemID, ClassEmblemBaseID: &classEmblemBaseID, PossessionID: 3,
+				},
+				Changes: []playerdataresult.RecordChange{},
+			}
+			payload := playerLatestUpdatePayload(result)
+			profile, ok := payload["profile"].(map[string]any)
+			require.True(t, ok)
+			tt.editProfile(profile)
+			raw, err := json.Marshal(payload)
+			require.NoError(t, err)
+			compressed, err := gzipBytes(raw)
+			require.NoError(t, err)
+			update, err := entity.NewPlayerLatestUpdate(playerID, playerLatestUpdateSchemaVersion, compressed, result.ImportedAt, result.ImportedAt, "body-hash")
+			require.NoError(t, err)
+			u := &playerDataUsecase{masterCache: stubProfileMasterProvider{}, playerDataRepo: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdate: update}}
+
+			// When
+			got, err := u.GetLatestUpdate(context.Background(), &entity.User{PlayerID: &playerID})
+
+			// Then
+			require.NoError(t, err)
+			var gotPayload map[string]any
+			require.NoError(t, json.Unmarshal(got, &gotPayload))
+			assert.NotContains(t, gotPayload, "player_id")
+			gotProfile, ok := gotPayload["profile"].(map[string]any)
+			require.True(t, ok)
+			for _, key := range []string{"player_id", "class_emblem_id", "class_emblem_base_id", "possession_id"} {
+				assert.NotContains(t, gotProfile, key)
+			}
+			assert.Equal(t, "TEST", gotProfile["name"])
+			assert.Equal(t, tt.wantClassEmblem, gotProfile["class_emblem"])
+			assert.Equal(t, tt.wantClassEmblemBase, gotProfile["class_emblem_base"])
+			assert.Equal(t, tt.wantPossession, gotProfile["possession"])
+		})
+	}
 }

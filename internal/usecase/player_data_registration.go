@@ -223,6 +223,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		result.Counts = counts
 		result.Counts.HonorsSkipped = len(honorSkipped)
 		result.Changes = changes
+		profileNames := masters.ProfileNames(summaryInput.ClassEmblemID, summaryInput.ClassBaseID, summaryInput.PossessionID)
 		result.Profile = api_internal.PlayerDataProfile{
 			PlayerID:          playerID,
 			Name:              summaryInput.Name,
@@ -231,6 +232,9 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			ClassEmblemID:     summaryInput.ClassEmblemID,
 			ClassEmblemBaseID: summaryInput.ClassBaseID,
 			PossessionID:      summaryInput.PossessionID,
+			ClassEmblem:       profileNames.ClassEmblem,
+			ClassEmblemBase:   profileNames.ClassEmblemBase,
+			Possession:        profileNames.Possession,
 			LastPlayedAt:      summaryInput.LastPlayedAt,
 			OverpowerValue:    summaryInput.OverpowerValue,
 			OverpowerPercent:  summaryInput.OverpowerPercent,

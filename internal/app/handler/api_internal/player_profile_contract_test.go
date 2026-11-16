@@ -13,31 +13,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPlayerProfile_エンブレムのJSON契約(t *testing.T) {
+func TestPlayerProfile_マスタ参照のJSON契約(t *testing.T) {
 	id, baseID := 42, 17
 	emblem, base := "inf", "3"
 	tests := []struct {
 		name         string
 		id, baseID   *int
 		emblem, base *string
+		possessionID int
+		possession   string
 	}{
-		{name: "マスタ名を返す", id: &id, baseID: &baseID, emblem: &emblem, base: &base},
-		{name: "未設定はnullを返す"},
+		{name: "マスタ名を返す", id: &id, baseID: &baseID, emblem: &emblem, base: &base, possessionID: 5, possession: "rainbow"},
+		{name: "未設定のエンブレムはnullを返す", possessionID: 1, possession: "normal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output := &usecase.UserProfileWithRecordsOutput{Player: &usecase.UserPlayerOutput{
-				Player:      &entity.Player{Name: playernametest.New(t, "テスト"), ClassEmblemID: tt.id, ClassEmblemBaseID: tt.baseID},
-				ClassEmblem: tt.emblem, ClassEmblemBase: tt.base,
+				Player: &entity.Player{
+					Name: playernametest.New(t, "テスト"), ClassEmblemID: tt.id, ClassEmblemBaseID: tt.baseID, PossessionID: tt.possessionID,
+				},
+				ClassEmblem: tt.emblem, ClassEmblemBase: tt.base, Possession: tt.possession,
 			}}
 			internal := api_internal.ToUserProfileWithRecordsDTO(output)
 			for _, api := range []struct {
-				name    string
-				value   any
-				keepIDs bool
+				name  string
+				value any
 			}{
 				{name: "internal", value: internal},
-				{name: "v1", value: v1.ToV1UserProfileDTO(internal), keepIDs: true},
+				{name: "v1", value: v1.ToV1UserProfileDTO(internal)},
 			} {
 				t.Run(api.name, func(t *testing.T) {
 					data, err := json.Marshal(api.value)
@@ -46,19 +49,14 @@ func TestPlayerProfile_エンブレムのJSON契約(t *testing.T) {
 						Player map[string]json.RawMessage `json:"player"`
 					}
 					require.NoError(t, json.Unmarshal(data, &body))
-					for key, expected := range map[string]any{"class_emblem": tt.emblem, "class_emblem_base": tt.base} {
+					for key, expected := range map[string]any{"class_emblem": tt.emblem, "class_emblem_base": tt.base, "possession": tt.possession} {
 						want, err := json.Marshal(expected)
 						require.NoError(t, err)
 						assert.JSONEq(t, string(want), string(body.Player[key]))
 					}
-					for key, expected := range map[string]*int{"class_emblem_id": tt.id, "class_emblem_base_id": tt.baseID} {
-						if api.keepIDs {
-							want, err := json.Marshal(expected)
-							require.NoError(t, err)
-							assert.JSONEq(t, string(want), string(body.Player[key]))
-						} else {
-							assert.NotContains(t, body.Player, key)
-						}
+					// DBの数値IDはどのAPIにも公開しない
+					for _, key := range []string{"class_emblem_id", "class_emblem_base_id", "possession_id"} {
+						assert.NotContains(t, body.Player, key)
 					}
 				})
 			}

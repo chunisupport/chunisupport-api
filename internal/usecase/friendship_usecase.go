@@ -33,9 +33,9 @@ type FriendshipUserOutput struct {
 	Rating      *float64
 	// OverpowerValue はOVER POWER値です。
 	OverpowerValue *float64
-	// PossessionID はポゼッションマスタのIDです。
-	PossessionID *int
-	IsPrivate    bool
-	RequestedAt  time.Time
-	AcceptedAt   *time.Time
+	// Possession はポゼッション名です。
+	Possession  *string
+	IsPrivate   bool
+	RequestedAt time.Time
+	AcceptedAt  *time.Time
 }

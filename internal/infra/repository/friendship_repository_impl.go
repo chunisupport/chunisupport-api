@@ -104,10 +104,11 @@ func (r *FriendshipRepository) ListFriends(ctx context.Context, exec domainrepo.
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating,
 			p.overpower_value AS summary_overpower_value,
-			p.possession_id AS summary_possession_id
+			ps.name AS summary_possession
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.friend_user_id
 		LEFT JOIN players p ON p.id = u.player_id
+		LEFT JOIN possessions ps ON ps.id = p.possession_id
 		WHERE f.user_id = ?
 		  AND f.status_id = ?
 		ORDER BY f.accepted_at DESC, f.friend_user_id ASC
@@ -124,10 +125,11 @@ func (r *FriendshipRepository) ListReceivedRequests(ctx context.Context, exec do
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating,
 			p.overpower_value AS summary_overpower_value,
-			p.possession_id AS summary_possession_id
+			ps.name AS summary_possession
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.user_id
 		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
+		LEFT JOIN possessions ps ON ps.id = p.possession_id
 		WHERE f.friend_user_id = ?
 		  AND f.status_id = ?
 		ORDER BY f.requested_at DESC, f.user_id ASC
@@ -144,10 +146,11 @@ func (r *FriendshipRepository) ListSentRequests(ctx context.Context, exec domain
 			p.player_name AS summary_player_name,
 			p.calculated_player_rating AS summary_rating,
 			p.overpower_value AS summary_overpower_value,
-			p.possession_id AS summary_possession_id
+			ps.name AS summary_possession
 		FROM friendships f
 		INNER JOIN users u ON u.id = f.friend_user_id
 		LEFT JOIN players p ON p.id = u.player_id AND u.is_private = FALSE
+		LEFT JOIN possessions ps ON ps.id = p.possession_id
 		WHERE f.user_id = ?
 		  AND f.status_id = ?
 		ORDER BY f.requested_at DESC, f.friend_user_id ASC
@@ -177,7 +180,7 @@ type friendshipSummaryRow struct {
 	SummaryPlayerName  *string  `db:"summary_player_name"`
 	SummaryRating      *float64 `db:"summary_rating"`
 	SummaryOverpower   *float64 `db:"summary_overpower_value"`
-	SummaryPossession  *int     `db:"summary_possession_id"`
+	SummaryPossession  *string  `db:"summary_possession"`
 	SummaryIsPrivate   bool     `db:"summary_is_private"`
 }
 
@@ -197,7 +200,7 @@ func selectFriendshipSummaries(ctx context.Context, exec domainrepo.Executor, qu
 				PlayerName:     row.SummaryPlayerName,
 				Rating:         row.SummaryRating,
 				OverpowerValue: row.SummaryOverpower,
-				PossessionID:   row.SummaryPossession,
+				Possession:     row.SummaryPossession,
 				IsPrivate:      row.SummaryIsPrivate,
 			},
 		})

@@ -24,9 +24,11 @@ type AccountTypeMasterProvider interface {
 }
 
 // PlayerEmblemMasterProvider はプロフィールの数値IDを表示用のマスタ名へ解決します。
+// DBの数値IDをAPIへ公開しないため、プロフィールのマスタ参照は名称で返します。
 type PlayerEmblemMasterProvider interface {
 	GetClassEmblemNameByID(id int) string
 	GetClassEmblemBaseNameByID(id int) string
+	GetPossessionNameByID(id int) string
 }
 
 // ChartStatsMasterProvider は譜面統計取得で必要なマスタデータを提供します。

@@ -388,6 +388,7 @@ type stubSongMasterProvider struct {
 	masters         *masterdata.SongMasters
 	emblemNames     map[int]string
 	emblemBaseNames map[int]string
+	possessionNames map[int]string
 }
 
 func (s *stubSongMasterProvider) SongMasters() *masterdata.SongMasters {
@@ -2545,6 +2546,10 @@ func (s *stubSongMasterProvider) GetClassEmblemBaseNameByID(id int) string {
 	return s.emblemBaseNames[id]
 }
 
+func (s *stubSongMasterProvider) GetPossessionNameByID(id int) string {
+	return s.possessionNames[id]
+}
+
 func TestBuildPlayerOutput_マスタ名を解決する(t *testing.T) {
 	id, baseID, unknownID := 42, 17, 99
 	emblem, base := "inf", "3"
@@ -2569,6 +2574,31 @@ func TestBuildPlayerOutput_マスタ名を解決する(t *testing.T) {
 			assert.Equal(t, tt.base, result.ClassEmblemBase)
 			assert.Equal(t, tt.id, result.ClassEmblemID)
 			assert.Equal(t, tt.baseID, result.ClassEmblemBaseID)
+		})
+	}
+}
+
+func TestBuildPlayerOutput_ポゼッション名を解決する(t *testing.T) {
+	provider := &stubSongMasterProvider{possessionNames: map[int]string{1: "normal", 5: "rainbow"}}
+	tests := []struct {
+		name         string
+		possessionID int
+		provider     userMasterProvider
+		expected     string
+	}{
+		{name: "IDではなくポゼッション名を返す", possessionID: 5, provider: provider, expected: "rainbow"},
+		{name: "マスタなしでは名称を設定しない", possessionID: 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := &userUsecase{masterProvider: tt.provider}
+
+			// When
+			result := uc.buildPlayerOutput(&repository.PlayerWithHonors{Player: &entity.Player{PossessionID: tt.possessionID}})
+
+			// Then
+			assert.Equal(t, tt.expected, result.Possession)
 		})
 	}
 }

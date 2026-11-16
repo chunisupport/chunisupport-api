@@ -23,11 +23,9 @@ type V1PlayerDTO struct {
 	Name                     string        `json:"name"`
 	Level                    int           `json:"level"`
 	Rating                   *float64      `json:"rating"`
-	ClassEmblemID            *int          `json:"class_emblem_id"`
-	ClassEmblemBaseID        *int          `json:"class_emblem_base_id"`
 	ClassEmblem              *string       `json:"class_emblem"`
 	ClassEmblemBase          *string       `json:"class_emblem_base"`
-	PossessionID             int           `json:"possession_id"`
+	Possession               string        `json:"possession"`
 	LastPlayedAt             *time.Time    `json:"last_played_at"`
 	OverpowerValue           *float64      `json:"overpower_value"`
 	OverpowerPercent         *float64      `json:"overpower_percent"`
@@ -127,9 +125,6 @@ func ToV1PlayerDTO(player *entity.Player) *V1PlayerDTO {
 		Name:                     player.Name.String(),
 		Level:                    player.Level,
 		Rating:                   player.CalculatedRating,
-		ClassEmblemID:            player.ClassEmblemID,
-		ClassEmblemBaseID:        player.ClassEmblemBaseID,
-		PossessionID:             player.PossessionID,
 		LastPlayedAt:             player.LastPlayedAt,
 		OverpowerValue:           player.OverpowerValue,
 		OverpowerPercent:         player.OverpowerPercent,
@@ -312,9 +307,7 @@ func ToV1UserProfileDTO(profile *api_internal.UserProfileWithRecordsDTO) *V1User
 			Name:                     profile.Player.Name,
 			Level:                    profile.Player.Level,
 			Rating:                   profile.Player.CalculatedRating,
-			ClassEmblemID:            profile.Player.ClassEmblemID,
-			ClassEmblemBaseID:        profile.Player.ClassEmblemBaseID,
-			PossessionID:             profile.Player.PossessionID,
+			Possession:               profile.Player.Possession,
 			LastPlayedAt:             profile.Player.LastPlayedAt,
 			OverpowerValue:           profile.Player.OverpowerValue,
 			OverpowerPercent:         profile.Player.OverpowerPercent,

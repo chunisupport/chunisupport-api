@@ -14,6 +14,8 @@ type UserPlayerOutput struct {
 	Honors          []*entity.PlayerHonor
 	ClassEmblem     *string
 	ClassEmblemBase *string
+	// Possession はポゼッション名です。DBの数値IDは公開しません。
+	Possession string
 }
 
 type UserRecordOutput struct {

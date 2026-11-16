@@ -20,17 +20,19 @@ type PlayerDataMetricDiffs struct {
 	OverpowerValue   PlayerDataFloat64Diff  `json:"overpower_value"`
 	OverpowerPercent *PlayerDataFloat64Diff `json:"overpower_percent,omitempty"`
 }
+
+// PlayerDataProfile は登録結果のプロフィールです。
+// DBの数値IDは公開せず、マスタ参照は名称で返します。
 type PlayerDataProfile struct {
-	PlayerID          int        `json:"player_id"`
-	Name              string     `json:"name"`
-	Level             int        `json:"level"`
-	Rating            *float64   `json:"rating"`
-	ClassEmblemID     *int       `json:"class_emblem_id"`
-	ClassEmblemBaseID *int       `json:"class_emblem_base_id"`
-	PossessionID      int        `json:"possession_id"`
-	LastPlayedAt      *time.Time `json:"last_played_at"`
-	OverpowerValue    *float64   `json:"overpower_value"`
-	OverpowerPercent  *float64   `json:"overpower_percent"`
+	Name             string     `json:"name"`
+	Level            int        `json:"level"`
+	Rating           *float64   `json:"rating"`
+	ClassEmblem      *string    `json:"class_emblem"`
+	ClassEmblemBase  *string    `json:"class_emblem_base"`
+	Possession       string     `json:"possession"`
+	LastPlayedAt     *time.Time `json:"last_played_at"`
+	OverpowerValue   *float64   `json:"overpower_value"`
+	OverpowerPercent *float64   `json:"overpower_percent"`
 }
 type PlayerDataInt64Diff struct {
 	Before int64 `json:"before"`
@@ -97,7 +99,6 @@ type PlayerDataRecordChange struct {
 	After       PlayerDataRecordState  `json:"after"`
 }
 type PlayerDataResult struct {
-	PlayerID       int                      `json:"player_id"`
 	AppVersion     string                   `json:"app_ver"`
 	ImportedAt     time.Time                `json:"imported_at"`
 	Profile        PlayerDataProfile        `json:"profile"`
@@ -112,7 +113,6 @@ type PlayerDataResult struct {
 // PlayerLatestUpdateResult は保存済みの最新プレイヤーデータ登録結果です。
 type PlayerLatestUpdateResult struct {
 	SchemaVersion int                      `json:"schema_version"`
-	PlayerID      int                      `json:"player_id"`
 	AppVersion    string                   `json:"app_ver"`
 	ImportedAt    time.Time                `json:"imported_at"`
 	Profile       PlayerDataProfile        `json:"profile"`

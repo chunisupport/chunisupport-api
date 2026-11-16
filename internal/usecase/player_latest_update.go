@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	playerdataresult "github.com/chunisupport/chunisupport-api/internal/usecase/playerdataresult"
@@ -58,7 +59,15 @@ func (us *playerDataUsecase) GetLatestUpdate(ctx context.Context, user *entity.U
 		}
 		return nil, err
 	}
-	return decodePlayerUpdate(update, *user.PlayerID)
+	raw, err := decodePlayerUpdate(update, *user.PlayerID)
+	if err != nil {
+		return nil, err
+	}
+	masters, err := us.profileMasters()
+	if err != nil {
+		return nil, err
+	}
+	return toPublicPlayerUpdate(raw, masters)
 }
 
 // GetRecentUpdates は保存済み登録結果を収集日時の新しい順に展開します。
@@ -70,13 +79,21 @@ func (us *playerDataUsecase) GetRecentUpdates(ctx context.Context, user *entity.
 	if err != nil {
 		return nil, err
 	}
+	masters, err := us.profileMasters()
+	if err != nil {
+		return nil, err
+	}
 	results := make([]json.RawMessage, 0, len(updates))
 	for _, update := range updates {
 		raw, err := decodePlayerUpdate(update, *user.PlayerID)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, raw)
+		public, err := toPublicPlayerUpdate(raw, masters)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, public)
 	}
 	return results, nil
 }
@@ -127,6 +144,68 @@ func decodePlayerUpdate(update *entity.PlayerLatestUpdate, playerID int) (json.R
 	}
 
 	return json.RawMessage(append([]byte(nil), raw...)), nil
+}
+
+// profileMasters は保存済み結果のマスタIDを名称へ解決するためのマスタを返します。
+// マスタなしで名称を空のまま返すと公開契約を満たさないため、内部エラーとします。
+func (us *playerDataUsecase) profileMasters() (*masterdata.PlayerDataMasters, error) {
+	if us.masterCache == nil {
+		return nil, fmt.Errorf("%w: master cache is not initialized", ErrInternalError)
+	}
+	masters := us.masterCache.PlayerDataMasters()
+	if masters == nil {
+		return nil, fmt.Errorf("%w: master cache is not initialized", ErrInternalError)
+	}
+	return masters, nil
+}
+
+// toPublicPlayerUpdate は保存済み登録結果からDBの数値IDを除去し、マスタ参照を名称へ置き換えます。
+// 保存形式は本人整合性の検証に player_id を使うため変更せず、返却時だけ公開形式へ変換します。
+// 旧スキーマには possession_id が無いため、未指定時は normal として扱います。
+func toPublicPlayerUpdate(raw json.RawMessage, masters *masterdata.PlayerDataMasters) (json.RawMessage, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("%w: failed to decode player latest update: %w", ErrInternalError, err)
+	}
+	var profile map[string]json.RawMessage
+	if err := json.Unmarshal(envelope["profile"], &profile); err != nil || profile == nil {
+		return nil, fmt.Errorf("%w: player latest update field is invalid: profile", ErrInternalError)
+	}
+	var classEmblemID, classEmblemBaseID *int
+	possessionID := entity.DefaultPossessionID
+	for key, target := range map[string]any{
+		"class_emblem_id": &classEmblemID, "class_emblem_base_id": &classEmblemBaseID, "possession_id": &possessionID,
+	} {
+		if value, ok := profile[key]; ok && string(value) != "null" {
+			if err := json.Unmarshal(value, target); err != nil {
+				return nil, fmt.Errorf("%w: player latest update field is invalid: profile.%s: %w", ErrInternalError, key, err)
+			}
+		}
+		delete(profile, key)
+	}
+	names := masters.ProfileNames(classEmblemID, classEmblemBaseID, possessionID)
+	delete(profile, "player_id")
+	delete(envelope, "player_id")
+
+	// 保存済みの値は RawMessage のまま再出力し、公開用の名称だけを追加します。
+	publicProfile := make(map[string]any, len(profile)+3)
+	for key, value := range profile {
+		publicProfile[key] = value
+	}
+	publicProfile["class_emblem"] = names.ClassEmblem
+	publicProfile["class_emblem_base"] = names.ClassEmblemBase
+	publicProfile["possession"] = names.Possession
+	public := make(map[string]any, len(envelope))
+	for key, value := range envelope {
+		public[key] = value
+	}
+	public["profile"] = publicProfile
+
+	encoded, err := json.Marshal(public)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to encode public player update: %w", ErrInternalError, err)
+	}
+	return encoded, nil
 }
 
 func playerLatestUpdatePayload(result *playerdataresult.Result) map[string]any {

@@ -24,7 +24,7 @@ type DataTransferValidationResponse struct {
 	UnresolvedReferenceCount int                        `json:"unresolved_reference_count"`
 }
 
+// DataTransferImportResponse は取り込み結果です。DBの数値IDは公開しません。
 type DataTransferImportResponse struct {
-	PlayerID int                        `json:"player_id"`
-	Counts   DataTransferCountsResponse `json:"counts"`
+	Counts DataTransferCountsResponse `json:"counts"`
 }

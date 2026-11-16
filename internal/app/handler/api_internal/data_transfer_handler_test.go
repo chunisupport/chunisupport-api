@@ -181,12 +181,14 @@ func TestDataTransferHandlerImportReturnsImportedPlayer(t *testing.T) {
 	// When: 取り込みを実行する
 	err := handler.Import(ctx)
 
-	// Then: 新しいプレイヤーIDと件数が返り、受信した本文がそのままusecaseへ渡る
+	// Then: 件数が返り、DBの数値IDであるプレイヤーIDは含まれず、受信した本文がそのままusecaseへ渡る
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	var response dto_internal.DataTransferImportResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, 42, response.PlayerID)
+	var rawResponse map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &rawResponse))
+	assert.NotContains(t, rawResponse, "player_id")
 	assert.Equal(t, 3, response.Counts.Records)
 	assert.Equal(t, 2, response.Counts.Goals)
 	assert.True(t, stub.importCalled)
