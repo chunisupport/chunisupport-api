@@ -54,11 +54,14 @@
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
 - `/internal/users/*`、`/internal/songs/*`、`/internal/worldsend-songs/*`、`/internal/courses` の公開参照系、および `/internal/best-slot-rankings`（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
+- 内部APIの認証済み参照系（`GET /internal/me/*`、`/internal/friends/*`、`/internal/friend-rankings/*`、`/internal/friend-comparisons/*`、および上記の公開参照系を認証済みで呼んだ場合）: **全エンドポイント合計で1分あたり300回/ユーザー**
 - `/v1/*`: **15分あたり150回（PLAYER） / 3,000回（EDITOR/EXTDEV） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 - `/compat/reiwa/1/*`: **`/v1` と同一**
 
 IP単位の制限では、IPv4はアドレスごと、IPv6は `/64` ごとに1つの送信元として数えます。
+
+重い参照処理には、回数制限に加えて同時実行数の上限があります。対象は `/internal/friend-rankings/*`、`/internal/friend-comparisons/*`、`GET /internal/users/:username`、`GET /internal/users/:username/record`、`GET /internal/best-slot-rankings` です。処理中のリクエストが **1送信元あたり2本**（認証済みはユーザー単位、未認証はIP単位）または **全体で12本** に達している間は、待機せずに `429 too_many_requests` を返します。
 
 実際の制限値を変更した場合は、`internal/info/info.go` と本ドキュメントの両方を更新してください。
 
@@ -130,7 +133,7 @@ JSONボディを受け取るエンドポイントは、原則として `BindStri
 | `comment_inappropriate` | プロフィールコメントが内容判定で不適切とされた |
 | `comment_moderation_unavailable` | OpenAI Moderation API の障害などでプロフィールコメントの内容を判定できない |
 | `not_found` | エンドポイントが見つからない |
-| `too_many_requests` | レートリミット超過 |
+| `too_many_requests` | レートリミット超過、または同時実行数の上限超過 |
 | `service_unavailable` | サービス利用不可（DB接続失敗など） |
 | `maintenance_mode` | APIメンテナンス中の利用制限 |
 | `internal_error` | 予期しないサーバーエラー |
@@ -209,7 +212,7 @@ Content-Type: application/json
 | 400 | `bad request.` | 互換元仕様との対応のため定義（入力検証エラーは422扱いで503になるため、現行では通常発生しない） |
 | 404 | `not found.` | 対象の楽曲・ユーザーが存在しない、未登録パス、登録済みパスへのメソッド不一致 |
 | 405 | `the requested method is not allowed.` | 互換元仕様との対応のため定義（現行ルーティングではメソッド不一致も404） |
-| 429 | `too many requests.` | レートリミット超過 |
+| 429 | `too many requests.` | レートリミット超過、または同時実行数の上限超過 |
 | 503 | `service unavailable.` | メンテナンス中、および上記以外のすべてのエラー |
 
 互換元の仕様は上記5種類のステータスだけを定義しているため、APIトークン未指定・無効（標準APIの401）、クエリパラメータの入力検証エラー（422）、サーバー内部エラー（500）などは `503 service unavailable.` に変換します。chunirec API 2.0は更新が終了しており、この対応表は変更しません。

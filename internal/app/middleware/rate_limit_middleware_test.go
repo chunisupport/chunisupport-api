@@ -734,3 +734,55 @@ func TestAPIRateLimitMiddleware_権限変更後は同一時間枠の現在の上
 		})
 	}
 }
+
+func TestAuthenticatedUserRateLimitMiddleware(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 上限2回の設定で送るリクエストのユーザー
+		users []any
+		// Then: 各リクエストの期待ステータス
+		expected []int
+	}{
+		{
+			name:     "同じ認証済みユーザーは上限を超えると429になる",
+			users:    []any{&entity.User{ID: 1}, &entity.User{ID: 1}, &entity.User{ID: 1}},
+			expected: []int{http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
+		},
+		{
+			name:     "異なる認証済みユーザーは別々に数える",
+			users:    []any{&entity.User{ID: 1}, &entity.User{ID: 1}, &entity.User{ID: 2}},
+			expected: []int{http.StatusOK, http.StatusOK, http.StatusOK},
+		},
+		{
+			name:     "未認証リクエストは数えない",
+			users:    []any{nil, nil, nil},
+			expected: []int{http.StatusOK, http.StatusOK, http.StatusOK},
+		},
+		{
+			name:     "不正なユーザー情報は401になる",
+			users:    []any{"invalid"},
+			expected: []int{http.StatusUnauthorized},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := setupEchoWithErrorHandler(t)
+			handler := AuthenticatedUserRateLimitMiddleware(RateLimitConfig{
+				Requests: 2,
+				Window:   time.Minute,
+			})(func(c *echo.Context) error {
+				return c.String(http.StatusOK, "OK")
+			})
+
+			for i, user := range tt.users {
+				// When
+				rec := performUserRateLimitRequest(t, e, handler, user)
+
+				// Then
+				assert.Equal(t, tt.expected[i], rec.Code)
+			}
+		})
+	}
+}

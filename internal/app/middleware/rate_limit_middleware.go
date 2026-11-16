@@ -239,3 +239,30 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 		}
 	}
 }
+
+// AuthenticatedUserRateLimitMiddleware は認証済みユーザーにのみユーザーIDベースのレートリミットを適用します。
+// Bearer任意の公開GETでは未認証時の制限をAnonymousIPRateLimitMiddlewareが担うため、未認証リクエストは数えません。
+// 内部APIの参照系で1つのインスタンスを共有し、エンドポイントをまたいだユーザー単位の上限とします。
+func AuthenticatedUserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
+	store := newFixedWindowStoreWithCleanup(config.Window)
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			userObj := c.Get("userEntity")
+			if userObj == nil {
+				return next(c)
+			}
+			user, ok := userObj.(*entity.User)
+			if !ok {
+				return apierror.ErrUnauthorized
+			}
+
+			allowed, _, _ := store.Allow(strconv.Itoa(user.ID), config.Requests)
+			if !allowed {
+				return apierror.ErrTooManyRequests
+			}
+
+			return next(c)
+		}
+	}
+}
