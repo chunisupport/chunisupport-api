@@ -369,6 +369,10 @@ func TestUserDataTransferRepositoryExportExcludesDeletedSongsAndCourses(t *testi
 		(10, 50, 1000000, 1, 1, '2026-08-01 00:00:00'),
 		(10, 60, 1000000, 1, 1, '2026-08-01 00:00:00')`)
 	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO player_course_record_histories (player_id, course_id, score, is_clear, combo_lamp_id, updated_at) VALUES
+		(10, 50, 990000, 0, 1, '2026-07-01 00:00:00'),
+		(10, 60, 990000, 0, 1, '2026-07-01 00:00:00')`)
+	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO player_favorite_songs (player_id, song_id, created_at) VALUES
 		(10, 1, '2026-08-01 00:00:00'), (10, 2, '2026-08-01 00:00:00')`)
 	require.NoError(t, err)
@@ -392,6 +396,12 @@ func TestUserDataTransferRepositoryExportExcludesDeletedSongsAndCourses(t *testi
 	assert.Equal(t, "300", snapshot.WorldsendRecordHistories[0].SongOfficialIdx)
 	require.Len(t, snapshot.CourseRecords, 1)
 	assert.Equal(t, "500", snapshot.CourseRecords[0].CourseOfficialIdx)
+	require.Len(t, snapshot.CourseRecordHistories, 1)
+	assert.Equal(t, "500", snapshot.CourseRecordHistories[0].CourseOfficialIdx)
+	assert.Equal(t, uint32(990000), snapshot.CourseRecordHistories[0].Score.Uint32())
+	assert.False(t, snapshot.CourseRecordHistories[0].IsClear)
+	assert.Equal(t, "NONE", snapshot.CourseRecordHistories[0].ComboLampName)
+	assert.Equal(t, time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), snapshot.CourseRecordHistories[0].UpdatedAt)
 	require.Len(t, snapshot.FavoriteSongs, 1)
 	assert.Equal(t, "100", snapshot.FavoriteSongs[0].SongOfficialIdx)
 	require.Len(t, snapshot.LockedSongs, 1)
@@ -522,6 +532,7 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"CREATE TABLE honors (id INTEGER PRIMARY KEY, name TEXT, honor_type_id INTEGER, image_url TEXT NULL, UNIQUE(name, honor_type_id), UNIQUE(image_url))",
 		"CREATE TABLE player_metric_histories (player_id INTEGER, official_rating REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME)",
 		"CREATE TABLE player_course_records (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",
+		"CREATE TABLE player_course_record_histories (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_honors (player_id INTEGER, honor_id INTEGER, slot INTEGER, created_at DATETIME)",
 		"CREATE TABLE player_favorite_songs (player_id INTEGER, song_id INTEGER, created_at DATETIME)",
 		"CREATE TABLE player_locked_songs (player_id INTEGER, song_id INTEGER, is_ultima INTEGER)",
@@ -545,6 +556,7 @@ func emptyTransferRepositorySnapshot(t *testing.T) *entity.UserDataTransferSnaps
 		WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},
 		MetricHistories:          []entity.UserDataTransferMetricHistory{},
 		CourseRecords:            []entity.UserDataTransferCourseRecord{},
+		CourseRecordHistories:    []entity.UserDataTransferCourseRecordHistory{},
 		Honors:                   []entity.UserDataTransferHonor{},
 		FavoriteSongs:            []entity.UserDataTransferFavoriteSong{},
 		LockedSongs:              []entity.UserDataTransferLockedSong{},

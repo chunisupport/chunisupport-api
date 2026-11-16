@@ -837,3 +837,33 @@ func TestSchemaMySQL_ジャンルとバージョンの超ショート名列を�
 		assert.Contains(t, tableSQL, "UNIQUE KEY `uq_"+tableName+"_short_name` (`short_name`)")
 	}
 }
+
+func TestCreatePlayerCourseRecordHistoriesUp_コース記録履歴テーブルを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000065_create_player_course_record_histories.up.sql")
+
+	// Then
+	assert.Contains(t, upSQL, "CREATE TABLE player_course_record_histories")
+	assert.Contains(t, upSQL, "player_id INT UNSIGNED NOT NULL")
+	assert.Contains(t, upSQL, "PRIMARY KEY (player_id, course_id, updated_at)")
+	assert.Contains(t, upSQL, "FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE")
+	assert.Contains(t, upSQL, "CHECK (score BETWEEN 0 AND 3030000)")
+}
+
+func TestCreatePlayerCourseRecordHistoriesDown_コース記録履歴テーブルを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000065_create_player_course_record_histories.down.sql")
+
+	// Then
+	assert.Equal(t, "DROP TABLE IF EXISTS player_course_record_histories;", downSQL)
+}
+
+func TestSchemaMySQL_コース記録履歴テーブルを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "CREATE TABLE `player_course_record_histories`")
+	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`,`course_id`,`updated_at`)")
+	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_player_course_record_histories_score` CHECK ((`score` between 0 and 3030000))")
+}

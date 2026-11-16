@@ -50,6 +50,20 @@ func (r *scoreHistoryRepository) BulkInsertWorldsend(ctx context.Context, exec d
 	return bulkInsertScoreHistories(ctx, exec, query, historyModels)
 }
 
+func (r *scoreHistoryRepository) BulkInsertCourse(ctx context.Context, exec domainrepo.Executor, rows []domainrepo.PlayerCourseRecordHistory) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	historyModels := make([]models.PlayerCourseRecordHistoryModel, 0, len(rows))
+	for _, row := range rows {
+		historyModels = append(historyModels, models.PlayerCourseRecordHistoryModelFromEntity(row))
+	}
+	const query = `INSERT INTO player_course_record_histories
+		(player_id, course_id, score, is_clear, combo_lamp_id, updated_at)
+		VALUES (:player_id, :course_id, :score, :is_clear, :combo_lamp_id, :updated_at)`
+	return bulkInsertScoreHistories(ctx, exec, query, historyModels)
+}
+
 func bulkInsertScoreHistories[T any](ctx context.Context, exec domainrepo.Executor, query string, rows []T) error {
 	for start := 0; start < len(rows); start += info.BulkInsertChunkSize {
 		end := min(start+info.BulkInsertChunkSize, len(rows))
@@ -73,6 +87,10 @@ func (r *scoreHistoryRepository) PruneStandardOverLimit(ctx context.Context, exe
 
 func (r *scoreHistoryRepository) PruneWorldsendOverLimit(ctx context.Context, exec domainrepo.Executor, playerID int, chartIDs []int) error {
 	return pruneHistories(ctx, exec, r.db.DriverName(), "player_worldsend_record_histories", "worldsend_chart_id", playerID, chartIDs)
+}
+
+func (r *scoreHistoryRepository) PruneCourseOverLimit(ctx context.Context, exec domainrepo.Executor, playerID int, courseIDs []int) error {
+	return pruneHistories(ctx, exec, r.db.DriverName(), "player_course_record_histories", "course_id", playerID, courseIDs)
 }
 
 func pruneHistories(ctx context.Context, exec domainrepo.Executor, driverName, table, chartColumn string, playerID int, chartIDs []int) error {
@@ -164,6 +182,36 @@ func (r *scoreHistoryRepository) FindWorldsendTimeline(ctx context.Context, play
 		ORDER BY is_current DESC, updated_at DESC
 		LIMIT ?`
 	return r.findTimeline(ctx, query, playerID, worldsendChartID, playerID, worldsendChartID, playerID, worldsendChartID, info.MaxScoreHistoryEntriesPerChart+1)
+}
+
+// FindCourseTimeline は現行のコース記録を先頭に、過去の成績を新しい順で返します。
+// 現行記録がないコースは、履歴が残っていても空で返します。
+func (r *scoreHistoryRepository) FindCourseTimeline(ctx context.Context, playerID, courseID int) ([]entity.CourseScoreHistoryEntry, error) {
+	const query = `SELECT score, is_clear, combo_lamp_id, updated_at
+		FROM (
+			SELECT score, is_clear, combo_lamp_id, updated_at, 1 AS is_current
+			FROM player_course_records
+			WHERE player_id = ? AND course_id = ?
+			UNION ALL
+			SELECT history.score, history.is_clear, history.combo_lamp_id, history.updated_at, 0 AS is_current
+			FROM player_course_record_histories AS history
+			WHERE history.player_id = ? AND history.course_id = ?
+				AND EXISTS (
+					SELECT 1 FROM player_course_records AS current
+					WHERE current.player_id = ? AND current.course_id = ?
+				)
+		) AS timeline
+		ORDER BY is_current DESC, updated_at DESC
+		LIMIT ?`
+	rows := make([]models.CourseScoreHistoryTimelineModel, 0, info.MaxScoreHistoryEntriesPerChart+1)
+	if err := r.db.SelectContext(ctx, &rows, query, playerID, courseID, playerID, courseID, playerID, courseID, info.MaxScoreHistoryEntriesPerChart+1); err != nil {
+		return nil, fmt.Errorf("failed to find course score history timeline: %w", err)
+	}
+	entries := make([]entity.CourseScoreHistoryEntry, 0, len(rows))
+	for _, row := range rows {
+		entries = append(entries, row.ToEntity())
+	}
+	return entries, nil
 }
 
 func (r *scoreHistoryRepository) findTimeline(ctx context.Context, query string, args ...any) ([]entity.ScoreHistoryEntry, error) {

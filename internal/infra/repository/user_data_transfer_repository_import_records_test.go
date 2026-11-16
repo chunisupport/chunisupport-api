@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/coursescore"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,7 @@ func TestUserDataTransferRepository_記録と履歴を内部IDへ解決して全
 				INSERT INTO combo_lamp_types (id, name) VALUES (3, 'ALL JUSTICE'), (2, 'FULL COMBO');
 				INSERT INTO full_chain_types (id, name) VALUES (2, 'FULL CHAIN'), (1, 'NONE');
 				INSERT INTO slots (id, name) VALUES (8, 'best'), (9, 'none');
+				INSERT INTO courses (id, official_idx, is_deleted) VALUES (301, 'course-a', 0);
 				CREATE UNIQUE INDEX history_key ON player_record_histories (player_id, chart_id, updated_at);
 				CREATE UNIQUE INDEX worldsend_history_key ON player_worldsend_record_histories (player_id, worldsend_chart_id, updated_at);`)
 			require.NoError(t, err)
@@ -120,6 +122,13 @@ func TestUserDataTransferRepository_記録と履歴を内部IDへ解決して全
 					SongOfficialIdx: fmt.Sprint(20000 + i/50), Score: worldsendHistoryScore, ClearLampName: "ABSOLUTE", ComboLampName: "ALL JUSTICE", FullChainName: "FULL CHAIN", UpdatedAt: historyAt.Add(time.Duration(i) * time.Minute)})
 			}
 
+			courseScore, err := coursescore.New(3_010_000)
+			require.NoError(t, err)
+			courseHistoryScore, err := coursescore.New(2_900_000)
+			require.NoError(t, err)
+			snapshot.CourseRecords = []entity.UserDataTransferCourseRecord{{CourseOfficialIdx: "course-a", Score: courseScore, IsClear: true, ComboLampName: "ALL JUSTICE", UpdatedAt: currentAt}}
+			snapshot.CourseRecordHistories = []entity.UserDataTransferCourseRecordHistory{{CourseOfficialIdx: "course-a", Score: courseHistoryScore, IsClear: false, ComboLampName: "FULL COMBO", UpdatedAt: historyAt}}
+
 			require.NoError(t, snapshot.Validate())
 
 			// When: 非公開の保存部品ではなく、トランザクションを開始する公開メソッドを呼ぶ。
@@ -151,6 +160,17 @@ func TestUserDataTransferRepository_記録と履歴を内部IDへ解決して全
 			var worldsend []storedRecord
 			require.NoError(t, db.Select(&worldsend, `SELECT player_id, worldsend_chart_id AS chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at FROM player_worldsend_records`))
 			assert.Equal(t, []storedRecord{{PlayerID: playerID, ChartID: 201, Score: 987654, ClearLampID: 4, ComboLampID: 2, FullChainID: 1, UpdatedAt: currentAt.Add(2 * time.Hour)}}, worldsend)
+			type storedCourse struct {
+				PlayerID    int       `db:"player_id"`
+				CourseID    int       `db:"course_id"`
+				Score       int       `db:"score"`
+				IsClear     bool      `db:"is_clear"`
+				ComboLampID int       `db:"combo_lamp_id"`
+				UpdatedAt   time.Time `db:"updated_at"`
+			}
+			var courseHistories []storedCourse
+			require.NoError(t, db.Select(&courseHistories, `SELECT player_id, course_id, score, is_clear, combo_lamp_id, updated_at FROM player_course_record_histories`))
+			assert.Equal(t, []storedCourse{{playerID, 301, 2_900_000, false, 2, historyAt}}, courseHistories)
 			for _, tt := range []struct {
 				table  string
 				column string

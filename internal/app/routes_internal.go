@@ -207,6 +207,7 @@ func registerInternalUserRoutes(internal *echo.Group, handlers *Handlers, mw int
 	publicUsersGroup.GET("/:username/record/worldsend-songs/:id", handlers.User.GetUserWorldsendSongRecord)
 	publicUsersGroup.GET("/:username/record/courses", handlers.Course.GetUserRecords)
 	publicUsersGroup.GET("/:username/record/courses/:id", handlers.Course.GetUserRecord)
+	publicUsersGroup.GET("/:username/record/courses/:id/history", handlers.InternalScoreHistory.GetCourse)
 	publicUsersGroup.GET("/:username/record/worldsend-songs/:id/history", handlers.InternalScoreHistory.GetWorldsend)
 	publicUsersGroup.GET("/:username/record", handlers.User.GetUserRecord, mw.heavyReadConcurrencyLimit)
 	publicUsersGroup.GET("/:username/locked-songs", handlers.PlayerLockedSong.List)

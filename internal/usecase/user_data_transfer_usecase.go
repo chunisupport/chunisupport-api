@@ -27,6 +27,7 @@ type UserDataTransferCounts struct {
 	WorldsendRecordHistories int
 	MetricHistories          int
 	CourseRecords            int
+	CourseRecordHistories    int
 	Honors                   int
 	FavoriteSongs            int
 	LockedSongs              int
@@ -162,7 +163,7 @@ func countUserDataTransfer(snapshot *entity.UserDataTransferSnapshot) UserDataTr
 	return UserDataTransferCounts{
 		Records: len(snapshot.Records), RecordHistories: len(snapshot.RecordHistories),
 		WorldsendRecords: len(snapshot.WorldsendRecords), WorldsendRecordHistories: len(snapshot.WorldsendRecordHistories),
-		MetricHistories: len(snapshot.MetricHistories), CourseRecords: len(snapshot.CourseRecords), Honors: len(snapshot.Honors),
+		MetricHistories: len(snapshot.MetricHistories), CourseRecords: len(snapshot.CourseRecords), CourseRecordHistories: len(snapshot.CourseRecordHistories), Honors: len(snapshot.Honors),
 		FavoriteSongs: len(snapshot.FavoriteSongs), LockedSongs: len(snapshot.LockedSongs), GoalGroups: len(snapshot.Goals.Groups),
 		Goals: goals, RecordFilters: len(snapshot.RecordFilters),
 	}

@@ -7,6 +7,7 @@ type DataTransferCountsResponse struct {
 	WorldsendRecordHistories int `json:"worldsend_record_histories"`
 	MetricHistories          int `json:"metric_histories"`
 	CourseRecords            int `json:"course_records"`
+	CourseRecordHistories    int `json:"course_record_histories"`
 	Honors                   int `json:"honors"`
 	FavoriteSongs            int `json:"favorite_songs"`
 	LockedSongs              int `json:"locked_songs"`

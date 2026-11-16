@@ -79,7 +79,7 @@ func (r *userDataTransferRepository) exportSnapshot(ctx context.Context, exec do
 			LastPlayedAt: transferUTCOptional(playerRow.LastPlayedAt), DataCollectedAt: transferUTCOptional(playerRow.DataCollectedAt), CreatedAt: transferUTC(playerRow.CreatedAt)},
 		Records: []entity.UserDataTransferRecord{}, RecordHistories: []entity.UserDataTransferRecordHistory{},
 		WorldsendRecords: []entity.UserDataTransferWorldsendRecord{}, WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},
-		MetricHistories: []entity.UserDataTransferMetricHistory{}, CourseRecords: []entity.UserDataTransferCourseRecord{}, Honors: []entity.UserDataTransferHonor{},
+		MetricHistories: []entity.UserDataTransferMetricHistory{}, CourseRecords: []entity.UserDataTransferCourseRecord{}, CourseRecordHistories: []entity.UserDataTransferCourseRecordHistory{}, Honors: []entity.UserDataTransferHonor{},
 		FavoriteSongs: []entity.UserDataTransferFavoriteSong{}, LockedSongs: []entity.UserDataTransferLockedSong{},
 		Goals:         entity.UserDataTransferGoals{Groups: []entity.UserDataTransferGoalGroup{}, Ungrouped: []entity.UserDataTransferGoal{}},
 		RecordFilters: []entity.UserDataTransferRecordFilter{},
@@ -240,6 +240,18 @@ func (r *userDataTransferRepository) exportAuxiliaryPlayerData(ctx context.Conte
 			return err
 		}
 		snapshot.CourseRecords = append(snapshot.CourseRecords, entity.UserDataTransferCourseRecord{CourseOfficialIdx: row.OfficialIdx, Score: score, IsClear: row.IsClear, ComboLampName: row.ComboLampName, UpdatedAt: transferUTC(row.UpdatedAt)})
+	}
+	// 現在記録と同じ列構成のため、行の受け皿を共有します。
+	courses = courses[:0]
+	if err := exec.SelectContext(ctx, &courses, `SELECT c.official_idx, h.score, h.is_clear, cl.name AS combo_lamp_name, h.updated_at FROM player_course_record_histories h INNER JOIN courses c ON c.id = h.course_id INNER JOIN combo_lamp_types cl ON cl.id = h.combo_lamp_id WHERE h.player_id = ? AND c.is_deleted = 0 ORDER BY c.official_idx, h.updated_at`, playerID); err != nil {
+		return fmt.Errorf("failed to export course record histories: %w", err)
+	}
+	for _, row := range courses {
+		score, err := newTransferCourseScore(row.Score)
+		if err != nil {
+			return err
+		}
+		snapshot.CourseRecordHistories = append(snapshot.CourseRecordHistories, entity.UserDataTransferCourseRecordHistory{CourseOfficialIdx: row.OfficialIdx, Score: score, IsClear: row.IsClear, ComboLampName: row.ComboLampName, UpdatedAt: transferUTC(row.UpdatedAt)})
 	}
 	var honors []struct {
 		Slot       int       `db:"slot"`

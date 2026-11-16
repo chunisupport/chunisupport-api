@@ -258,6 +258,19 @@ CREATE TABLE `name_folders` (
   UNIQUE KEY `uq_name_folders_name` (`name`),
   UNIQUE KEY `uq_name_folders_sort_order` (`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_course_record_histories` (
+  `player_id` int unsigned NOT NULL,
+  `course_id` mediumint unsigned NOT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `is_clear` tinyint(1) NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `updated_at` timestamp NOT NULL,
+  PRIMARY KEY (`player_id`,`course_id`,`updated_at`),
+  KEY `fk_player_course_record_histories_course` (`course_id`),
+  CONSTRAINT `fk_player_course_record_histories_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`),
+  CONSTRAINT `fk_player_course_record_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_course_record_histories_score` CHECK ((`score` between 0 and 3030000))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_course_records` (
   `player_id` int unsigned NOT NULL,
   `course_id` mediumint unsigned NOT NULL,

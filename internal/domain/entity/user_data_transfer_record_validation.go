@@ -223,31 +223,73 @@ func validateUserDataTransferCourseRecords(records []UserDataTransferCourseRecor
 	seen := make(map[string]struct{}, len(records))
 	for i, record := range records {
 		path := fmt.Sprintf("course_records[%d]", i)
-		if strings.TrimSpace(record.CourseOfficialIdx) == "" || len(record.CourseOfficialIdx) > 32 {
-			return invalidUserDataTransfer(path + ".course_official_idx is invalid")
+		if err := validateCourseOfficialIdx(path, record.CourseOfficialIdx); err != nil {
+			return err
 		}
 		if _, exists := seen[record.CourseOfficialIdx]; exists {
 			return invalidUserDataTransfer(path + " duplicates a course")
 		}
 		seen[record.CourseOfficialIdx] = struct{}{}
-		if _, err := coursescore.New(record.Score.Uint32()); err != nil {
-			return invalidUserDataTransfer(path + ".score is invalid")
-		}
-		if strings.TrimSpace(record.ComboLampName) == "" {
-			return invalidUserDataTransfer(path + ".combo_lamp_name is required")
-		}
-		if record.IsClear && record.Score == 0 {
-			return invalidUserDataTransfer(path + ".score cannot be zero when cleared")
-		}
-		if record.Score.Uint32() == coursescore.Max && record.ComboLampName != "ALL JUSTICE" {
-			return invalidUserDataTransfer(path + ".combo_lamp_name must be ALL JUSTICE at the theoretical score")
-		}
-		if record.ComboLampName == "ALL JUSTICE" && record.Score < 3_000_000 {
-			return invalidUserDataTransfer(path + ".score is too low for ALL JUSTICE")
+		if err := validateCourseScoreAndLampName(path, record.Score, record.IsClear, record.ComboLampName); err != nil {
+			return err
 		}
 		if err := validateUTCDateTime(path+".updated_at", record.UpdatedAt); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateUserDataTransferCourseRecordHistories(histories []UserDataTransferCourseRecordHistory) error {
+	seen := make(map[string]struct{}, len(histories))
+	counts := make(map[string]int)
+	for i, history := range histories {
+		path := fmt.Sprintf("course_record_histories[%d]", i)
+		if err := validateCourseOfficialIdx(path, history.CourseOfficialIdx); err != nil {
+			return err
+		}
+		if err := validateCourseScoreAndLampName(path, history.Score, history.IsClear, history.ComboLampName); err != nil {
+			return err
+		}
+		if err := validateUTCDateTime(path+".updated_at", history.UpdatedAt); err != nil {
+			return err
+		}
+		counts[history.CourseOfficialIdx]++
+		if counts[history.CourseOfficialIdx] > constants.MaxScoreHistoryEntriesPerChart {
+			return invalidUserDataTransfer(path + " exceeds the per-course history limit")
+		}
+		key := history.CourseOfficialIdx + "\x00" + databaseSecond(history.UpdatedAt).Format(time.RFC3339)
+		if _, exists := seen[key]; exists {
+			return invalidUserDataTransfer(path + " duplicates a history timestamp")
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
+}
+
+func validateCourseOfficialIdx(path, officialIdx string) error {
+	if strings.TrimSpace(officialIdx) == "" || len(officialIdx) > 32 {
+		return invalidUserDataTransfer(path + ".course_official_idx is invalid")
+	}
+	return nil
+}
+
+// validateCourseScoreAndLampName はコースの現在記録と履歴に共通する成績の整合性を検証します。
+func validateCourseScoreAndLampName(path string, value coursescore.CourseScore, isClear bool, comboLamp string) error {
+	if _, err := coursescore.New(value.Uint32()); err != nil {
+		return invalidUserDataTransfer(path + ".score is invalid")
+	}
+	if strings.TrimSpace(comboLamp) == "" {
+		return invalidUserDataTransfer(path + ".combo_lamp_name is required")
+	}
+	if isClear && value == 0 {
+		return invalidUserDataTransfer(path + ".score cannot be zero when cleared")
+	}
+	if value.Uint32() == coursescore.Max && comboLamp != "ALL JUSTICE" {
+		return invalidUserDataTransfer(path + ".combo_lamp_name must be ALL JUSTICE at the theoretical score")
+	}
+	if comboLamp == "ALL JUSTICE" && value < 3_000_000 {
+		return invalidUserDataTransfer(path + ".score is too low for ALL JUSTICE")
 	}
 	return nil
 }

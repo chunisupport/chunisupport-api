@@ -47,6 +47,39 @@ func PlayerWorldsendRecordHistoryModelFromEntity(row repository.PlayerWorldsendR
 	}
 }
 
+// PlayerCourseRecordHistoryModel はコース記録履歴の永続化モデルです。
+type PlayerCourseRecordHistoryModel struct {
+	PlayerID    int       `db:"player_id"`
+	CourseID    int       `db:"course_id"`
+	Score       int       `db:"score"`
+	IsClear     bool      `db:"is_clear"`
+	ComboLampID int       `db:"combo_lamp_id"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+// PlayerCourseRecordHistoryModelFromEntity はコース記録の履歴状態を永続化モデルへ変換します。
+func PlayerCourseRecordHistoryModelFromEntity(row repository.PlayerCourseRecordHistory) PlayerCourseRecordHistoryModel {
+	return PlayerCourseRecordHistoryModel{
+		PlayerID: row.PlayerID, CourseID: row.CourseID, Score: row.State.Score,
+		IsClear: row.State.IsClear, ComboLampID: row.State.ComboLampID, UpdatedAt: row.State.UpdatedAt,
+	}
+}
+
+// CourseScoreHistoryTimelineModel は現行値を含むコース履歴タイムラインの読み取りモデルです。
+type CourseScoreHistoryTimelineModel struct {
+	Score       int       `db:"score"`
+	IsClear     bool      `db:"is_clear"`
+	ComboLampID int       `db:"combo_lamp_id"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+// ToEntity は読み取りモデルをドメインエンティティへ変換します。
+func (m CourseScoreHistoryTimelineModel) ToEntity() entity.CourseScoreHistoryEntry {
+	return entity.CourseScoreHistoryEntry{
+		Score: m.Score, IsClear: m.IsClear, ComboLampID: m.ComboLampID, UpdatedAt: m.UpdatedAt,
+	}
+}
+
 // ScoreHistoryTimelineModel は現行値を含むタイムラインの読み取りモデルです。
 type ScoreHistoryTimelineModel struct {
 	Score       int       `db:"score"`

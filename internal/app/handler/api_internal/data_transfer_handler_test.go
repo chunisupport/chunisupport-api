@@ -144,7 +144,7 @@ func TestDataTransferHandlerValidateReturnsEmptyArraysForNoValidationIssues(t *t
 
 	// Then: 空配列を含む応答が返り、受信した本文がそのままusecaseへ渡る
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"importable":true,"player_name":"TEST","counts":{"records":0,"record_histories":0,"worldsend_records":0,"worldsend_record_histories":0,"metric_histories":0,"course_records":0,"honors":0,"favorite_songs":0,"locked_songs":0,"goal_groups":0,"goals":0,"record_filters":0},"blockers":[],"unresolved_references":[],"unresolved_reference_count":0}`, rec.Body.String())
+	assert.JSONEq(t, `{"importable":true,"player_name":"TEST","counts":{"records":0,"record_histories":0,"worldsend_records":0,"worldsend_record_histories":0,"metric_histories":0,"course_records":0,"course_record_histories":0,"honors":0,"favorite_songs":0,"locked_songs":0,"goal_groups":0,"goals":0,"record_filters":0},"blockers":[],"unresolved_references":[],"unresolved_reference_count":0}`, rec.Body.String())
 	assert.True(t, stub.validateCalled)
 	assert.Equal(t, dataTransferTestUserID, stub.validateUserID)
 	assert.Equal(t, body, stub.validateBody)

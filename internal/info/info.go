@@ -190,7 +190,7 @@ const (
 	// リクエストボディサイズ上限
 	RequestBodyLimit                      = 5 * 1024 * 1024
 	DataTransferFormat                    = "chunisupport-user-transfer"
-	DataTransferSchemaVersion             = 3
+	DataTransferSchemaVersion             = 4
 	DataTransferMinSupportedSchemaVersion = 1
 	DataTransferHMACSecretMinBytes        = 32
 	DataTransferEnvelopeMaxBytes          = 32 * 1024 * 1024
@@ -198,6 +198,10 @@ const (
 	DataTransferPayloadMaxBytes           = 128 * 1024 * 1024
 	DataTransferRateLimitRequests         = 5
 	DataTransferRateLimitWindow           = time.Minute
+
+	// DataTransferCourseRecordHistoriesSchemaVersion は course_record_histories を持つ最初のスキーマバージョンです。
+	// これより古いファイルはコース履歴なしとして読み込みます。
+	DataTransferCourseRecordHistoriesSchemaVersion = 4
 
 	// FirebaseProviderIDX は Firebase Authentication で X 連携を表す providerId です。
 	FirebaseProviderIDX = "twitter.com"

@@ -46,6 +46,7 @@ func TestFindTransferUnresolvedReferencesCollectsAndSorts(t *testing.T) {
 		WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},
 		MetricHistories:          []entity.UserDataTransferMetricHistory{},
 		CourseRecords:            []entity.UserDataTransferCourseRecord{},
+		CourseRecordHistories:    []entity.UserDataTransferCourseRecordHistory{},
 		Honors:                   []entity.UserDataTransferHonor{},
 		FavoriteSongs:            []entity.UserDataTransferFavoriteSong{},
 		LockedSongs:              []entity.UserDataTransferLockedSong{},
