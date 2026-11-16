@@ -36,11 +36,13 @@ func TestPlayerProfile_マスタ参照のJSON契約(t *testing.T) {
 			}}
 			internal := api_internal.ToUserProfileWithRecordsDTO(output)
 			for _, api := range []struct {
-				name  string
-				value any
+				name    string
+				value   any
+				keepIDs bool
 			}{
 				{name: "internal", value: internal},
-				{name: "v1", value: v1.ToV1UserProfileDTO(internal)},
+				// 外部API v1 は後方互換のため数値IDも維持し、名称を追加で返す
+				{name: "v1", value: v1.ToV1UserProfileDTO(internal), keepIDs: true},
 			} {
 				t.Run(api.name, func(t *testing.T) {
 					data, err := json.Marshal(api.value)
@@ -54,9 +56,15 @@ func TestPlayerProfile_マスタ参照のJSON契約(t *testing.T) {
 						require.NoError(t, err)
 						assert.JSONEq(t, string(want), string(body.Player[key]))
 					}
-					// DBの数値IDはどのAPIにも公開しない
-					for _, key := range []string{"class_emblem_id", "class_emblem_base_id", "possession_id"} {
-						assert.NotContains(t, body.Player, key)
+					for key, expected := range map[string]any{"class_emblem_id": tt.id, "class_emblem_base_id": tt.baseID, "possession_id": tt.possessionID} {
+						if api.keepIDs {
+							want, err := json.Marshal(expected)
+							require.NoError(t, err)
+							assert.JSONEq(t, string(want), string(body.Player[key]))
+						} else {
+							// 内部APIにはDBの数値IDを公開しない
+							assert.NotContains(t, body.Player, key)
+						}
 					}
 				})
 			}

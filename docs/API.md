@@ -5547,9 +5547,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
 
 ### GET `/v1/users/:username`
-- **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。DBの数値IDである `player.class_emblem_id` / `player.class_emblem_base_id` は返しません。
-- **ポゼッション**: `player.possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）を文字列で返します。DBの数値IDである `player.possession_id` は返しません。
-- **破壊的変更**: `player.class_emblem_id` / `player.class_emblem_base_id` / `player.possession_id` は廃止しました。それぞれ `player.class_emblem` / `player.class_emblem_base` / `player.possession` を参照してください。
+- **クラスエンブレム**: `player.class_emblem` / `player.class_emblem_base` はマスタ名（`"1"`〜`"5"`、`"inf"`）を文字列で返します。未設定または解決できない場合は `null` です。互換性のため `player.class_emblem_id` / `player.class_emblem_base_id` も数値または `null` で返します。
+- **ポゼッション**: `player.possession` はポゼッション名（`"normal"` / `"silver"` / `"gold"` / `"platina"` / `"rainbow"`）を文字列で返します。互換性のため `player.possession_id`（1: normal、2: silver、3: gold、4: platina、5: rainbow）も返します。新規利用では名称のフィールドを参照してください。
 - **認証**: APIトークン必須
 - **概要**: 指定されたユーザーのプロファイルとスコアレコードを取得します。非公開設定のユーザーは本人（APIトークンの所有者）または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `player` と `records` が `null` になります。
 - `player.rating` は保存済みスコアから算出した `calculated_player_rating` です。入力データの公式RATINGではありません。
@@ -5569,8 +5568,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     "name": "プレイヤー名",
     "level": 50,
     "rating": 16.50,
+    "class_emblem_id": 3,
+    "class_emblem_base_id": 1,
     "class_emblem": "3",
     "class_emblem_base": "1",
+    "possession_id": 5,
     "possession": "rainbow",
     "last_played_at": "2024-12-01T15:30:00Z",
     "overpower_value": 1234.56,
@@ -6264,8 +6266,12 @@ interface PlayerDTO {
 // ポゼッション名。DBの数値IDは公開しない
 type PossessionName = 'normal' | 'silver' | 'gold' | 'platina' | 'rainbow';
 
-// 外部API v1 のプレイヤー情報は内部APIの PlayerDTO と同じ形式
-type V1PlayerDTO = PlayerDTO;
+// 外部API v1 のプレイヤー情報。後方互換のため数値IDも返す
+interface V1PlayerDTO extends PlayerDTO {
+  class_emblem_id: number | null;
+  class_emblem_base_id: number | null;
+  possession_id: number;
+}
 
 interface HonorDTO {
   slot: number;

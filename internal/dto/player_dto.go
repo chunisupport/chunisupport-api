@@ -34,9 +34,10 @@ type PlayerDTO struct {
 	CreatedAt                time.Time   `json:"created_at"`
 	UpdatedAt                time.Time   `json:"updated_at"`
 
-	// chunirec互換APIの変換に使うIDです。DBの数値IDのため、どのAPIのJSONにも公開しません。
+	// 外部API v1 の後方互換フィールドと chunirec互換APIの変換に使うIDです。内部APIのJSONには公開しません。
 	ClassEmblemID     *int `json:"-"`
 	ClassEmblemBaseID *int `json:"-"`
+	PossessionID      int  `json:"-"`
 }
 
 // ToPlayerDTO はエンティティからDTOへ変換します。
@@ -55,6 +56,7 @@ func ToPlayerDTO(player *entity.Player) *PlayerDTO {
 		NewAverageRating:         player.NewAverageRating,
 		ClassEmblemID:            player.ClassEmblemID,
 		ClassEmblemBaseID:        player.ClassEmblemBaseID,
+		PossessionID:             player.PossessionID,
 		LastPlayedAt:             player.LastPlayedAt,
 		OverpowerValue:           player.OverpowerValue,
 		OverpowerPercent:         player.OverpowerPercent,
