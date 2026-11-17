@@ -57,7 +57,7 @@ func ConcurrencyLimitMiddleware(perClientLimit, globalLimit int) echo.Middleware
 		return func(c *echo.Context) error {
 			// ユーザーIDとIPが同じ文字列にならないよう、種別の接頭辞を付けます。
 			key := "ip:" + ClientIPKey(c)
-			if userObj := c.Get("userEntity"); userObj != nil {
+			if userObj := c.Get(contextKeyUserEntity); userObj != nil {
 				user, ok := userObj.(*entity.User)
 				if !ok {
 					return apierror.ErrUnauthorized
