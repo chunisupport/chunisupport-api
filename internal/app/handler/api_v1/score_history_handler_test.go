@@ -18,6 +18,11 @@ import (
 type stubScoreHistoryUsecase struct {
 	getStandard  func(context.Context, string, *entity.User, string, string) ([]usecase.ScoreHistoryEntry, error)
 	getWorldsend func(context.Context, string, *entity.User, string) ([]usecase.ScoreHistoryEntry, error)
+	getCourse    func(context.Context, string, *entity.User, string) ([]usecase.CourseScoreHistoryEntry, error)
+}
+
+func (s *stubScoreHistoryUsecase) GetCourse(ctx context.Context, username string, requester *entity.User, displayID string) ([]usecase.CourseScoreHistoryEntry, error) {
+	return s.getCourse(ctx, username, requester, displayID)
 }
 
 func (s *stubScoreHistoryUsecase) GetStandard(ctx context.Context, username string, requester *entity.User, displayID, difficulty string) ([]usecase.ScoreHistoryEntry, error) {
@@ -177,4 +182,75 @@ func TestScoreHistoryHandler_GetWorldsend_正常系は代表1件の契約を返�
 	assert.Equal(t, "testuser", gotUsername)
 	assert.Equal(t, "0123456789abcdef", gotDisplayID)
 	assert.JSONEq(t, `{"entries":[{"score":950000,"clear_lamp":"CLEAR","combo_lamp":null,"full_chain":null,"updated_at":"2026-04-27T12:34:56Z"}]}`, rec.Body.String())
+}
+
+func TestScoreHistoryHandler_GetCourse_コース用の履歴形式で返す(t *testing.T) {
+	// Given
+	updatedAt := time.Date(2026, time.November, 1, 12, 34, 56, 0, time.UTC)
+	var gotUsername, gotDisplayID string
+	h := NewScoreHistoryHandler(&stubScoreHistoryUsecase{
+		getCourse: func(_ context.Context, username string, _ *entity.User, displayID string) ([]usecase.CourseScoreHistoryEntry, error) {
+			gotUsername, gotDisplayID = username, displayID
+			return []usecase.CourseScoreHistoryEntry{
+				{Score: 3010000, IsClear: true, ComboLamp: new("ALL JUSTICE"), UpdatedAt: updatedAt},
+				{Score: 2900000, IsClear: false, ComboLamp: nil, UpdatedAt: updatedAt.Add(-time.Hour)},
+			}, nil
+		},
+	})
+	c, rec := newScoreHistoryContextWithRecorder("/v1/courses/0123456789abcdef/score-history?username=testuser", "0123456789abcdef", "", "testuser")
+
+	// When
+	err := h.GetCourse(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "testuser", gotUsername)
+	assert.Equal(t, "0123456789abcdef", gotDisplayID)
+	assert.JSONEq(t, `{"entries":[
+		{"score":3010000,"is_clear":true,"combo_lamp":"ALL JUSTICE","updated_at":"2026-11-01T12:34:56Z"},
+		{"score":2900000,"is_clear":false,"combo_lamp":null,"updated_at":"2026-11-01T11:34:56Z"}
+	]}`, rec.Body.String())
+}
+
+func TestScoreHistoryHandler_GetCourse_エラー(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		displayID  string
+		username   string
+		usecaseErr error
+		// Then
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "不正なコースIDはUsecaseへ渡さない", displayID: "invalid", username: "testuser", wantStatus: http.StatusUnprocessableEntity, wantCode: apierror.CodeValidationFailed},
+		{name: "usernameクエリがなければ400", displayID: "0123456789abcdef", wantStatus: http.StatusBadRequest},
+		{name: "非公開ユーザーは404", displayID: "0123456789abcdef", username: "testuser", usecaseErr: usecase.ErrUserPrivate, wantStatus: http.StatusNotFound},
+		{name: "履歴なしは404", displayID: "0123456789abcdef", username: "testuser", usecaseErr: usecase.ErrScoreHistoryNotFound, wantStatus: http.StatusNotFound, wantCode: apierror.CodeScoreHistoryNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: usecaseErr がないケースでUsecaseが呼ばれるとnil関数呼び出しで失敗する。
+			stub := &stubScoreHistoryUsecase{}
+			if tt.usecaseErr != nil {
+				stub.getCourse = func(context.Context, string, *entity.User, string) ([]usecase.CourseScoreHistoryEntry, error) {
+					return nil, tt.usecaseErr
+				}
+			}
+			c := newScoreHistoryContext("/v1/courses/"+tt.displayID+"/score-history", tt.displayID, "", tt.username)
+
+			// When
+			err := NewScoreHistoryHandler(stub).GetCourse(c)
+
+			// Then
+			apiErr, ok := err.(*apierror.APIError)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			if tt.wantCode != "" {
+				assert.Equal(t, tt.wantCode, apiErr.Code)
+			}
+		})
+	}
 }

@@ -79,6 +79,12 @@ func findTransferUnresolvedReferences(snapshot *entity.UserDataTransferSnapshot,
 		_, ok = masters.comboLampIDs[course.ComboLampName]
 		add("combo_lamp", course.ComboLampName, ok)
 	}
+	for _, history := range snapshot.CourseRecordHistories {
+		_, ok := masters.courseIDs[history.CourseOfficialIdx]
+		add("course", history.CourseOfficialIdx, ok)
+		_, ok = masters.comboLampIDs[history.ComboLampName]
+		add("combo_lamp", history.ComboLampName, ok)
+	}
 	for _, honor := range snapshot.Honors {
 		_, ok := masters.honorTypeIDs[honor.TypeName]
 		add("honor_type", honor.TypeName, ok)
@@ -372,6 +378,13 @@ func saveTransferAuxiliaryData(ctx context.Context, exec domainrepo.Executor, pl
 		courses = append(courses, courseRow{playerID, masters.courseIDs[item.CourseOfficialIdx], item.Score.Uint32(), item.IsClear, masters.comboLampIDs[item.ComboLampName], item.UpdatedAt})
 	}
 	if err := bulkTransferNamedExec(ctx, exec, `INSERT INTO player_course_records (player_id,course_id,score,is_clear,combo_lamp_id,updated_at) VALUES (:player_id,:course_id,:score,:is_clear,:combo_lamp_id,:updated_at)`, courses); err != nil {
+		return err
+	}
+	courseHistories := make([]courseRow, 0, len(snapshot.CourseRecordHistories))
+	for _, item := range snapshot.CourseRecordHistories {
+		courseHistories = append(courseHistories, courseRow{playerID, masters.courseIDs[item.CourseOfficialIdx], item.Score.Uint32(), item.IsClear, masters.comboLampIDs[item.ComboLampName], item.UpdatedAt})
+	}
+	if err := bulkTransferNamedExec(ctx, exec, `INSERT INTO player_course_record_histories (player_id,course_id,score,is_clear,combo_lamp_id,updated_at) VALUES (:player_id,:course_id,:score,:is_clear,:combo_lamp_id,:updated_at)`, courseHistories); err != nil {
 		return err
 	}
 	type honorRow struct {

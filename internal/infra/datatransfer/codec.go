@@ -151,6 +151,10 @@ func (codec *Codec) Decode(encoded []byte) (*entity.UserDataTransferSnapshot, er
 	if err := decodeStrictJSON(payloadBytes, &payload); err != nil {
 		return nil, fmt.Errorf("%w: invalid payload", usecase.ErrDataTransferInvalidFile)
 	}
+	// コース履歴を持たない旧スキーマは、履歴なしとして読み込みます。
+	if header.SchemaVersion < info.DataTransferCourseRecordHistoriesSchemaVersion && payload.CourseRecordHistories == nil {
+		payload.CourseRecordHistories = []courseRecordV1{}
+	}
 	snapshot, err := payload.toSnapshot()
 	if err != nil {
 		return nil, fmt.Errorf("%w: payload conversion failed", usecase.ErrDataTransferInvalidData)

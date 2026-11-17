@@ -108,5 +108,5 @@ func toDataTransferValidationResponse(output *usecase.UserDataTransferValidation
 }
 
 func toDataTransferCountsResponse(counts usecase.UserDataTransferCounts) dto_internal.DataTransferCountsResponse {
-	return dto_internal.DataTransferCountsResponse{Records: counts.Records, RecordHistories: counts.RecordHistories, WorldsendRecords: counts.WorldsendRecords, WorldsendRecordHistories: counts.WorldsendRecordHistories, MetricHistories: counts.MetricHistories, CourseRecords: counts.CourseRecords, Honors: counts.Honors, FavoriteSongs: counts.FavoriteSongs, LockedSongs: counts.LockedSongs, GoalGroups: counts.GoalGroups, Goals: counts.Goals, RecordFilters: counts.RecordFilters}
+	return dto_internal.DataTransferCountsResponse{Records: counts.Records, RecordHistories: counts.RecordHistories, WorldsendRecords: counts.WorldsendRecords, WorldsendRecordHistories: counts.WorldsendRecordHistories, MetricHistories: counts.MetricHistories, CourseRecords: counts.CourseRecords, CourseRecordHistories: counts.CourseRecordHistories, Honors: counts.Honors, FavoriteSongs: counts.FavoriteSongs, LockedSongs: counts.LockedSongs, GoalGroups: counts.GoalGroups, Goals: counts.Goals, RecordFilters: counts.RecordFilters}
 }

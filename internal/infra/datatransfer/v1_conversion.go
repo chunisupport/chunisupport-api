@@ -33,6 +33,7 @@ func newPayloadV1(snapshot *entity.UserDataTransferSnapshot) payloadV1 {
 		WorldsendRecordHistories: make([]worldsendRecordHistoryV1, len(snapshot.WorldsendRecordHistories)),
 		MetricHistories:          make([]metricHistoryV1, len(snapshot.MetricHistories)),
 		CourseRecords:            make([]courseRecordV1, len(snapshot.CourseRecords)),
+		CourseRecordHistories:    make([]courseRecordV1, len(snapshot.CourseRecordHistories)),
 		Honors:                   make([]honorV1, len(snapshot.Honors)),
 		FavoriteSongs:            make([]favoriteSongV1, len(snapshot.FavoriteSongs)),
 		LockedSongs:              make([]lockedSongV1, len(snapshot.LockedSongs)),
@@ -102,6 +103,15 @@ func newPayloadV1(snapshot *entity.UserDataTransferSnapshot) payloadV1 {
 			IsClear:           record.IsClear,
 			ComboLampName:     record.ComboLampName,
 			UpdatedAt:         newUTCDateTime(record.UpdatedAt),
+		}
+	}
+	for i, history := range snapshot.CourseRecordHistories {
+		payload.CourseRecordHistories[i] = courseRecordV1{
+			CourseOfficialIdx: history.CourseOfficialIdx,
+			Score:             history.Score.Uint32(),
+			IsClear:           history.IsClear,
+			ComboLampName:     history.ComboLampName,
+			UpdatedAt:         newUTCDateTime(history.UpdatedAt),
 		}
 	}
 	for i, honor := range snapshot.Honors {
@@ -193,6 +203,10 @@ func (payload payloadV1) toSnapshot() (*entity.UserDataTransferSnapshot, error) 
 	if err != nil {
 		return nil, err
 	}
+	courseHistories, err := convertSlice(payload.CourseRecordHistories, courseRecordV1.toHistoryEntity)
+	if err != nil {
+		return nil, err
+	}
 	groups, err := convertSlice(payload.Goals.Groups, goalGroupV1.toEntity)
 	if err != nil {
 		return nil, err
@@ -224,7 +238,8 @@ func (payload payloadV1) toSnapshot() (*entity.UserDataTransferSnapshot, error) 
 				DataCollectedAt:          history.DataCollectedAt.Time,
 			}
 		}),
-		CourseRecords: courseRecords,
+		CourseRecords:         courseRecords,
+		CourseRecordHistories: courseHistories,
 		Honors: mapSlice(payload.Honors, func(honor honorV1) entity.UserDataTransferHonor {
 			return entity.UserDataTransferHonor{
 				Slot:       honor.Slot,
@@ -339,6 +354,15 @@ func (record courseRecordV1) toEntity() (entity.UserDataTransferCourseRecord, er
 		ComboLampName:     record.ComboLampName,
 		UpdatedAt:         record.UpdatedAt.Time,
 	}, nil
+}
+
+// toHistoryEntity は現在記録と同じJSON形式のコース履歴をドメインの履歴へ変換します。
+func (record courseRecordV1) toHistoryEntity() (entity.UserDataTransferCourseRecordHistory, error) {
+	converted, err := record.toEntity()
+	if err != nil {
+		return entity.UserDataTransferCourseRecordHistory{}, err
+	}
+	return entity.UserDataTransferCourseRecordHistory(converted), nil
 }
 
 func (group goalGroupV1) toEntity() (entity.UserDataTransferGoalGroup, error) {

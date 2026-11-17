@@ -366,6 +366,7 @@ Content-Type: application/json
 | `/internal/editor/courses/:id` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース詳細取得 |
 | `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
 | `/internal/users/:username/record/courses/:id` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
+| `/internal/users/:username/record/courses/:id/history` | GET | Firebase Bearer (任意) | コーススコア履歴取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
 | `/internal/master/name-folders` | GET | 不要 | 楽曲名順フォルダ一覧取得 |
@@ -386,6 +387,7 @@ Content-Type: application/json
 | `/v1/users/:username/rating-op-history` | GET | APIトークン | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/courses/:id/score-history` | GET | APIトークン | コーススコア履歴取得 |
 | `/v1/courses` | POST | APIトークン (`read_write`、ADMIN+) | コース追加 |
 | `/v1/courses/:id` | PUT | APIトークン (`read_write`、EDITOR+) | コース名称・クラス更新 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -3676,6 +3678,21 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開で閲覧できない
   - 404 Not Found (`not_found`): コースが存在しない
 
+### GET `/internal/users/:username/record/courses/:id/history`
+- **認証**: Firebase Bearer（任意）
+- **レート制限**: 認証なしの場合 1分間60回/IP
+- **概要**: パスで指定したユーザーについて、コースの現行ベストと過去のベストを新しい順で取得します。公開範囲はコースレコード取得と同じで、公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **パスパラメータ**:
+  - `username`: 対象ユーザー名
+  - `id`: コースの表示用ID
+- **レスポンス**: 200 OK。形式は GET `/v1/courses/:id/score-history` と同一です。
+- **主なエラー**:
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): `username` が不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
 #### UserRecordResponseDTO スキーマ
 
 | フィールド | 型 | 説明 |
@@ -5664,6 +5681,54 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
+### GET `/v1/courses/:id/score-history`
+- **認証**: APIトークン必須
+- **概要**: 指定コースのスコア履歴を取得します。現行ベストを先頭に、過去のベストを新しい順で返します。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **制限**: 履歴はコースごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。履歴はスコア登録でコースの成績（スコア・クリア状態・コンボランプ）が変化したときだけ追加されます。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | コースID |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `username` | string | ✓ | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "entries": [
+    {
+      "score": 3010000,
+      "is_clear": true,
+      "combo_lamp": "ALL JUSTICE",
+      "updated_at": "2026-11-01T12:34:56Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | array | スコア履歴エントリの配列（先頭が現行ベスト、以降は新しい順） |
+| `entries[].score` | number | スコア（0〜3,030,000） |
+| `entries[].is_clear` | boolean | クリアしたかどうか |
+| `entries[].combo_lamp` | string \| null | コンボランプ名称。未設定または解決不能の場合は `null` |
+| `entries[].updated_at` | string | 更新日時（ISO8601） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
 ### POST `/v1/courses`
 - **認証**: `read_write` APIトークンかつADMIN以上
 - **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
@@ -6482,7 +6547,7 @@ interface SkippedRecord {
 
 ### POST /internal/me/data-transfer/export
 
-認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。現在のスキーマバージョンは2で、プレイヤー現在値と公式指標履歴に`official_overpower_percent`（記録開始前は`null`）を含みます。移行元にプレイヤーがない場合は400を返します。
+認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。現在のスキーマバージョンは4で、プレイヤー現在値と公式指標履歴に`official_overpower_percent`（記録開始前は`null`）、プレイヤーに`possession_name`、コース記録の履歴`course_record_histories`を含みます。移行元にプレイヤーがない場合は400を返します。
 
 ### POST /internal/me/data-transfer/validate
 

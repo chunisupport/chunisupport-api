@@ -298,6 +298,7 @@ func validTransferSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 		WorldsendRecordHistories: []entity.UserDataTransferWorldsendRecordHistory{},
 		MetricHistories:          []entity.UserDataTransferMetricHistory{},
 		CourseRecords:            []entity.UserDataTransferCourseRecord{},
+		CourseRecordHistories:    []entity.UserDataTransferCourseRecordHistory{},
 		Honors:                   []entity.UserDataTransferHonor{},
 		FavoriteSongs:            []entity.UserDataTransferFavoriteSong{},
 		LockedSongs:              []entity.UserDataTransferLockedSong{},

@@ -75,6 +75,7 @@ POST /internal/me/data-transfer/validate
     "worldsend_record_histories": 80,
     "metric_histories": 20,
     "course_records": 8,
+    "course_record_histories": 12,
     "honors": 3,
     "favorite_songs": 25,
     "locked_songs": 12,
@@ -157,16 +158,16 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 ```json
 {
   "format": "chunisupport-user-transfer",
-  "schema_version": 3
+  "schema_version": 4
 }
 ```
 
-- エクスポートではスキーマバージョン3を出力する。
-- インポートではスキーマバージョン1、2および3を受け付ける。
+- エクスポートではスキーマバージョン4を出力する。
+- インポートではスキーマバージョン1、2、3および4を受け付ける。
 - 未対応の`format`または`schema_version`は拒否する。
 - サーバーID、移行ID、エクスポート日時は持たない。
 
-スキーマバージョン2では、プレイヤー現在値および公式指標履歴に`official_overpower_percent`を追加している。スキーマバージョン3では、プレイヤーに`possession_name`を追加している。スキーマバージョン1および2の読み込み時、`official_overpower_percent`は`null`、`possession_name`は`normal`として扱う。
+スキーマバージョン2では、プレイヤー現在値および公式指標履歴に`official_overpower_percent`を追加している。スキーマバージョン3では、プレイヤーに`possession_name`を追加している。スキーマバージョン4では、コース記録の履歴`course_record_histories`を追加している。スキーマバージョン1および2の読み込み時、`official_overpower_percent`は`null`、`possession_name`は`normal`として扱う。スキーマバージョン1、2および3の読み込み時、`course_record_histories`がなければ空配列として扱う。
 
 ### 6.3 サイズ上限
 
@@ -180,9 +181,9 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 
 ## 7. ペイロード仕様
 
-ペイロードには、移行元の`user_id`、`player_id`、楽曲ID、譜面ID、コースID、称号ID、各種マスターIDを含めない。時刻はUTCで保存する。すべての配列フィールドは必須であり、データがない場合も`null`ではなく空配列を使用する。
+ペイロードには、移行元の`user_id`、`player_id`、楽曲ID、譜面ID、コースID、称号ID、各種マスターIDを含めない。時刻はUTCで保存する。すべての配列フィールドは必須であり、データがない場合も`null`ではなく空配列を使用する。旧スキーマバージョンに存在しない配列の扱いは6.2に従う。
 
-エクスポートでは、論理削除済みの楽曲に属するレコード・履歴・お気に入り・未解禁設定、および論理削除済みのコースに属するコース記録は除外する。インポート時のマスター照合では論理削除済みも対象に含める。
+エクスポートでは、論理削除済みの楽曲に属するレコード・履歴・お気に入り・未解禁設定、および論理削除済みのコースに属するコース記録・履歴は除外する。インポート時のマスター照合では論理削除済みも対象に含める。
 
 ```json
 {
@@ -193,6 +194,7 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
   "worldsend_record_histories": [],
   "metric_histories": [],
   "course_records": [],
+  "course_record_histories": [],
   "honors": [],
   "favorite_songs": [],
   "locked_songs": [],
@@ -221,9 +223,11 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 
 公式RATING、公式OVER POWER、公式OVER POWER割合、データ取得日時を格納する。公式指標はゲームから取得した値として移行元の値を維持する。
 
-### 7.5 コース記録
+### 7.5 コース記録と履歴
 
 コース`official_idx`、スコア、クリア状態、コンボランプ名、更新日時を格納する。コースの`display_id`および内部IDは使用しない。
+
+履歴`course_record_histories`にも現在記録と同じ項目を格納する。現在記録と履歴は別の配列として保持し、現在値を履歴へ重複格納しない。履歴は1コースあたり最大50件である。
 
 ### 7.6 称号
 
@@ -321,7 +325,8 @@ Firebase UID、APIトークン、フレンド申請・フレンド関係、公�
 
 - プレイヤー名、レベル、公式指標がドメイン制約内である。
 - 通常譜面、WORLD'S END、コースの現在レコードに重複がない。
-- 各履歴の譜面キーと更新日時の組み合わせに重複がない。
+- 各履歴の譜面キーまたはコースキーと更新日時の組み合わせに重複がない。
+- 通常譜面、WORLD'S END、コースの履歴が、譜面またはコースごとの件数上限以内である。
 - DBの時刻精度へ正規化した後にも履歴キーが重複しない。
 - スコア、ランプ、スロット、`slot_order`が有効である。
 - Best、New、候補枠の件数、`slot_order`の範囲と枠内一意性が既存ルールに一致する。ただし、データ移行では移行元の状態を維持するため、Best、Newの順位は先頭・途中の欠番を許容する。通常のプレイヤーデータ登録APIの連続性制約は適用せず、順位の詰め直しも行わない。
@@ -364,7 +369,7 @@ Firebase UID、APIトークン、フレンド申請・フレンド関係、公�
 - Infra Layerは、HMAC、Base64URL、gzip、バージョン別JSON変換、スナップショット取得、マスター参照の一括解決、トランザクション保存を担当する。
 - Presentation Layerは、認証ユーザーの取得、上限付きリクエスト読み込み、Usecase呼び出し、HTTPレスポンス変換を担当する。
 
-新しいテーブルまたはカラムは使用しない。データ移行は、ユーザーに属する複数テーブルを一つの集約として取得および保存する。
+データ移行専用のテーブルまたはカラムは使用しない。データ移行は、ユーザーに属する複数テーブルを一つの集約として取得および保存する。
 
 ## 15. 運用上の注意
 

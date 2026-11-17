@@ -23,6 +23,7 @@ type UserDataTransferSnapshot struct {
 	WorldsendRecordHistories []UserDataTransferWorldsendRecordHistory
 	MetricHistories          []UserDataTransferMetricHistory
 	CourseRecords            []UserDataTransferCourseRecord
+	CourseRecordHistories    []UserDataTransferCourseRecordHistory
 	Honors                   []UserDataTransferHonor
 	FavoriteSongs            []UserDataTransferFavoriteSong
 	LockedSongs              []UserDataTransferLockedSong
@@ -101,6 +102,15 @@ type UserDataTransferMetricHistory struct {
 }
 
 type UserDataTransferCourseRecord struct {
+	CourseOfficialIdx string
+	Score             coursescore.CourseScore
+	IsClear           bool
+	ComboLampName     string
+	UpdatedAt         time.Time
+}
+
+// UserDataTransferCourseRecordHistory はコース記録の過去の成績を表します。現在値は含めません。
+type UserDataTransferCourseRecordHistory struct {
 	CourseOfficialIdx string
 	Score             coursescore.CourseScore
 	IsClear           bool
@@ -189,6 +199,9 @@ func (s *UserDataTransferSnapshot) Validate() error {
 	if err := validateUserDataTransferCourseRecords(s.CourseRecords); err != nil {
 		return err
 	}
+	if err := validateUserDataTransferCourseRecordHistories(s.CourseRecordHistories); err != nil {
+		return err
+	}
 	if err := validateUserDataTransferHonors(s.Honors); err != nil {
 		return err
 	}
@@ -215,6 +228,7 @@ func (s *UserDataTransferSnapshot) validateNonNilCollections() error {
 		{name: "worldsend_record_histories", isNil: s.WorldsendRecordHistories == nil},
 		{name: "metric_histories", isNil: s.MetricHistories == nil},
 		{name: "course_records", isNil: s.CourseRecords == nil},
+		{name: "course_record_histories", isNil: s.CourseRecordHistories == nil},
 		{name: "honors", isNil: s.Honors == nil},
 		{name: "favorite_songs", isNil: s.FavoriteSongs == nil},
 		{name: "locked_songs", isNil: s.LockedSongs == nil},

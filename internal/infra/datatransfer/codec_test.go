@@ -37,6 +37,7 @@ func TestCodecEncodeDecode(t *testing.T) {
 	require.Len(t, snapshot.WorldsendRecordHistories, 2)
 	require.Len(t, snapshot.MetricHistories, 2)
 	require.Len(t, snapshot.CourseRecords, 2)
+	require.Len(t, snapshot.CourseRecordHistories, 2)
 	require.Len(t, snapshot.Honors, 2)
 	require.Len(t, snapshot.FavoriteSongs, 2)
 	require.Len(t, snapshot.LockedSongs, 2)
@@ -193,6 +194,45 @@ func TestCodecDecodeDefaultsMissingPossessionNameToNormal(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, decoded.Player.PossessionName)
 			assert.Equal(t, entity.PossessionNameNormal, *decoded.Player.PossessionName)
+		})
+	}
+}
+
+func TestCodecDecodeCourseRecordHistories_スキーマバージョンごとの欠落の扱い(t *testing.T) {
+	tests := []struct {
+		name          string
+		schemaVersion float64
+		wantErr       error
+	}{
+		{name: "スキーマバージョン1は履歴なしとして読む", schemaVersion: 1},
+		{name: "スキーマバージョン3は履歴なしとして読む", schemaVersion: 3},
+		{name: "スキーマバージョン4では必須配列の欠落を拒否する", schemaVersion: 4, wantErr: usecase.ErrDataTransferInvalidData},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: course_record_histories を持たないペイロード
+			codec, err := NewCodec(codecTestSecret)
+			require.NoError(t, err)
+			withoutHistories := mutatePayloadJSON(t, encodeCodecTestFile(t, codec), func(payload map[string]any) {
+				delete(payload, "course_record_histories")
+			})
+			versioned := mutateProtectedJSON(t, withoutHistories, func(header map[string]any) {
+				header["schema_version"] = tt.schemaVersion
+			})
+
+			// When
+			decoded, err := codec.Decode(versioned)
+
+			// Then
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotNil(t, decoded.CourseRecordHistories)
+			assert.Empty(t, decoded.CourseRecordHistories)
+			assert.Len(t, decoded.CourseRecords, 2)
 		})
 	}
 }
@@ -586,6 +626,22 @@ func codecTestSnapshot(t *testing.T) *entity.UserDataTransferSnapshot {
 				IsClear:           false,
 				ComboLampName:     "FULL COMBO",
 				UpdatedAt:         time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		CourseRecordHistories: []entity.UserDataTransferCourseRecordHistory{
+			{
+				CourseOfficialIdx: "course-1",
+				Score:             courseScoreUnclear,
+				IsClear:           false,
+				ComboLampName:     "FULL COMBO",
+				UpdatedAt:         time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
+			},
+			{
+				CourseOfficialIdx: "course-1",
+				Score:             courseScoreUnclear,
+				IsClear:           true,
+				ComboLampName:     "FULL COMBO",
+				UpdatedAt:         time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		Honors: []entity.UserDataTransferHonor{
