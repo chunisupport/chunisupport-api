@@ -78,7 +78,7 @@ func TestAPITokenHandler_List(t *testing.T) {
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 10})
 	mockUsecase.On("List", mock.Anything, 10).Return([]*usecase.APITokenOutput{{
-		ID:         1,
+		ID:         "0000000000000001",
 		Name:       "既存のトークン",
 		Permission: "read_write",
 		CreatedAt:  createdAt,
@@ -88,7 +88,7 @@ func TestAPITokenHandler_List(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"tokens":[{"id":1,"name":"既存のトークン","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"tokens":[{"id":"0000000000000001","name":"既存のトークン","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -107,7 +107,7 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot", "read").Return(&usecase.GeneratedAPITokenOutput{
 		Token: "abcde-secret",
 		Metadata: &usecase.APITokenOutput{
-			ID:          2,
+			ID:          "0000000000000002",
 			Name:        "Discord Bot",
 			Permission:  "read",
 			TokenPrefix: &prefix,
@@ -119,7 +119,7 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
-	assert.JSONEq(t, `{"id":2,"name":"Discord Bot","permission":"read","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":"0000000000000002","name":"Discord Bot","permission":"read","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -185,20 +185,20 @@ func TestAPITokenHandler_Rename(t *testing.T) {
 	h := api_internal.NewAPITokenHandler(mockUsecase)
 	createdAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
 
-	req := httptest.NewRequest(http.MethodPatch, "/internal/auth/api-tokens/2", bytes.NewBufferString(`{"name":"Batch"}`))
+	req := httptest.NewRequest(http.MethodPatch, "/internal/auth/api-tokens/0000000000000002", bytes.NewBufferString(`{"name":"Batch"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPath("/internal/auth/api-tokens/:id")
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "2"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "0000000000000002"}})
 	c.Set("userEntity", &entity.User{ID: 10})
-	mockUsecase.On("Rename", mock.Anything, 10, "2", "Batch").Return(&usecase.APITokenOutput{ID: 2, Name: "Batch", Permission: "read_write", CreatedAt: createdAt}, nil).Once()
+	mockUsecase.On("Rename", mock.Anything, 10, "0000000000000002", "Batch").Return(&usecase.APITokenOutput{ID: "0000000000000002", Name: "Batch", Permission: "read_write", CreatedAt: createdAt}, nil).Once()
 
 	err := h.Rename(c)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"id":2,"name":"Batch","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":"0000000000000002","name":"Batch","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -206,13 +206,13 @@ func TestAPITokenHandler_Delete(t *testing.T) {
 	e := newAPITokenTestEcho()
 	mockUsecase := new(mockAPITokenUsecase)
 	h := api_internal.NewAPITokenHandler(mockUsecase)
-	req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens/2", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/internal/auth/api-tokens/0000000000000002", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetPath("/internal/auth/api-tokens/:id")
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "2"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "0000000000000002"}})
 	c.Set("userEntity", &entity.User{ID: 10})
-	mockUsecase.On("Delete", mock.Anything, 10, "2").Return(nil).Once()
+	mockUsecase.On("Delete", mock.Anything, 10, "0000000000000002").Return(nil).Once()
 
 	err := h.Delete(c)
 

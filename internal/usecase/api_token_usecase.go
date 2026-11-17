@@ -9,7 +9,7 @@ import (
 
 // APITokenOutput は管理APIへ返すAPIトークン情報です。
 type APITokenOutput struct {
-	ID          uint64
+	ID          string
 	Name        string
 	Permission  string
 	TokenPrefix *string

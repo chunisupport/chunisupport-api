@@ -3,11 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,20 +65,29 @@ func (s *stubAPITokenRepository) ListByUserID(_ context.Context, _ repository.Ex
 	return tokens, nil
 }
 
-func (s *stubAPITokenRepository) FindByIDAndUserID(_ context.Context, _ repository.Executor, id uint64, userID int) (*entity.APIToken, error) {
+func (s *stubAPITokenRepository) FindByDisplayIDAndUserID(_ context.Context, _ repository.Executor, displayID displayid.DisplayID, userID int) (*entity.APIToken, error) {
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
-	token, ok := s.tokens[id]
-	if !ok || token.UserID != userID {
+	token := s.tokenByDisplayID(displayID.String())
+	if token == nil || token.UserID != userID {
 		return nil, repository.ErrAPITokenNotFound
 	}
 	return cloneAPITokenForTest(token), nil
 }
 
-func (s *stubAPITokenRepository) FindByIDAndUserIDForUpdate(ctx context.Context, exec repository.Executor, id uint64, userID int) (*entity.APIToken, error) {
+func (s *stubAPITokenRepository) FindByDisplayIDAndUserIDForUpdate(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID, userID int) (*entity.APIToken, error) {
 	s.forUpdateCalls++
-	return s.FindByIDAndUserID(ctx, exec, id, userID)
+	return s.FindByDisplayIDAndUserID(ctx, exec, displayID, userID)
+}
+
+func (s *stubAPITokenRepository) tokenByDisplayID(displayID string) *entity.APIToken {
+	for _, token := range s.tokens {
+		if token.DisplayID.String() == displayID {
+			return token
+		}
+	}
+	return nil
 }
 
 func (s *stubAPITokenRepository) FindByHashedToken(_ context.Context, _ repository.Executor, hashedToken string) (*entity.APIToken, error) {
@@ -112,15 +123,15 @@ func (s *stubAPITokenRepository) CountByUserID(_ context.Context, _ repository.E
 	return count, nil
 }
 
-func (s *stubAPITokenRepository) DeleteByIDAndUserID(_ context.Context, _ repository.Executor, id uint64, userID int) error {
+func (s *stubAPITokenRepository) DeleteByDisplayIDAndUserID(_ context.Context, _ repository.Executor, displayID displayid.DisplayID, userID int) error {
 	if s.deleteErr != nil {
 		return s.deleteErr
 	}
-	token, ok := s.tokens[id]
-	if !ok || token.UserID != userID {
+	token := s.tokenByDisplayID(displayID.String())
+	if token == nil || token.UserID != userID {
 		return repository.ErrAPITokenNotFound
 	}
-	delete(s.tokens, id)
+	delete(s.tokens, token.ID)
 	return nil
 }
 
@@ -187,7 +198,7 @@ func TestAPITokenUsecase_Generate_ExistingTokenRemainsAvailable(t *testing.T) {
 	assert.Equal(t, "Discord Bot", generated.Metadata.Name)
 	require.NotNil(t, generated.Metadata.TokenPrefix)
 	assert.Equal(t, generated.Token[:info.APITokenPrefixLength], *generated.Metadata.TokenPrefix)
-	assert.Equal(t, hashToken(generated.Token), repo.tokens[generated.Metadata.ID].HashedToken)
+	assert.Equal(t, hashToken(generated.Token), repo.tokenByDisplayID(generated.Metadata.ID).HashedToken)
 	assert.Contains(t, repo.tokens, legacy.ID)
 	assert.True(t, users.locked)
 }
@@ -246,7 +257,23 @@ func TestAPITokenUsecase_Generate_SucceedsAtLimitMinusOne(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, generated)
 	assert.Equal(t, 1, repo.saveCalls)
-	assert.Contains(t, repo.tokens, generated.Metadata.ID)
+	assert.NotNil(t, repo.tokenByDisplayID(generated.Metadata.ID))
+}
+
+func TestAPITokenUsecase_Generate_表示用IDを採番してDBの数値IDを出力しない(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	repo.nextID = 42
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
+
+	// When
+	generated, err := uc.Generate(context.Background(), 10, "CLI", "read")
+
+	// Then
+	require.NoError(t, err)
+	_, displayIDErr := displayid.NewDisplayID(generated.Metadata.ID)
+	assert.NoError(t, displayIDErr)
+	assert.NotEqual(t, "42", generated.Metadata.ID)
 }
 
 func TestAPITokenUsecase_Generate_RejectsInvalidName(t *testing.T) {
@@ -266,7 +293,7 @@ func TestAPITokenUsecase_Generate_PersistsReadPermission(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, generated)
 	assert.Equal(t, "read", generated.Metadata.Permission)
-	assert.Equal(t, "read", repo.tokens[generated.Metadata.ID].Permission.String())
+	assert.Equal(t, "read", repo.tokenByDisplayID(generated.Metadata.ID).Permission.String())
 }
 
 func TestAPITokenUsecase_Generate_RejectsReadWriteForNonEditor(t *testing.T) {
@@ -336,7 +363,7 @@ func TestAPITokenUsecase_ListAndRename(t *testing.T) {
 	assert.Equal(t, "CLI", tokens[0].Name)
 	assert.Equal(t, "read_write", tokens[0].Permission)
 
-	renamed, err := uc.Rename(context.Background(), 10, "5", "  Batch  ")
+	renamed, err := uc.Rename(context.Background(), 10, apiTokenDisplayIDForTest(5), "  Batch  ")
 	require.NoError(t, err)
 	assert.Equal(t, "Batch", renamed.Name)
 	assert.Equal(t, "Batch", repo.tokens[5].Name.String())
@@ -424,11 +451,11 @@ func TestAPITokenUsecase_Delete_IsScopedToOwner(t *testing.T) {
 	repo.tokens[1] = newAPITokenForTest(t, 1, 10, "CLI", "plain-token", new("plain"), nil)
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
-	err := uc.Delete(context.Background(), 11, "1")
+	err := uc.Delete(context.Background(), 11, apiTokenDisplayIDForTest(1))
 	assert.ErrorIs(t, err, ErrAPITokenNotFound)
 	assert.Contains(t, repo.tokens, uint64(1))
 
-	require.NoError(t, uc.Delete(context.Background(), 10, "1"))
+	require.NoError(t, uc.Delete(context.Background(), 10, apiTokenDisplayIDForTest(1)))
 	assert.NotContains(t, repo.tokens, uint64(1))
 }
 
@@ -439,7 +466,7 @@ func TestAPITokenUsecase_Rename_RejectsOtherOwnersToken(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
 	// When
-	_, err := uc.Rename(context.Background(), 11, "5", "Renamed")
+	_, err := uc.Rename(context.Background(), 11, apiTokenDisplayIDForTest(5), "Renamed")
 
 	// Then
 	// 所有者で絞って検索するため、他人のトークンは見つからない扱いになり、保存もしない。
@@ -455,7 +482,7 @@ func TestAPITokenUsecase_Rename_RejectsBlankName(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
 	// When
-	_, err := uc.Rename(context.Background(), 10, "5", "   ")
+	_, err := uc.Rename(context.Background(), 10, apiTokenDisplayIDForTest(5), "   ")
 
 	// Then
 	// 空白だけの名前は値オブジェクトの検証で弾き、保存もしない。
@@ -472,7 +499,7 @@ func TestAPITokenUsecase_Rename_RejectsNameConflict(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{})
 
 	// When
-	_, err := uc.Rename(context.Background(), 10, "5", "Renamed")
+	_, err := uc.Rename(context.Background(), 10, apiTokenDisplayIDForTest(5), "Renamed")
 
 	// Then
 	// 同名保存の競合は名前重複エラーに読み替える。
@@ -504,15 +531,20 @@ func TestAPITokenUsecase_Delete_RejectsZeroID(t *testing.T) {
 
 func newAPITokenForTest(t *testing.T, id uint64, userID int, name string, raw string, prefix *string, lastUsedAt *time.Time) *entity.APIToken {
 	t.Helper()
-	token, err := entity.RestoreAPIToken(id, userID, name, hashToken(raw), prefix, lastUsedAt, time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC), "read_write")
+	token, err := entity.RestoreAPIToken(id, apiTokenDisplayIDForTest(id), userID, name, hashToken(raw), prefix, lastUsedAt, time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC), "read_write")
 	require.NoError(t, err)
 	return token
 }
 
 func cloneAPITokenForTest(token *entity.APIToken) *entity.APIToken {
-	cloned, err := entity.RestoreAPIToken(token.ID, token.UserID, token.Name.String(), token.HashedToken, token.TokenPrefix, token.LastUsedAt, token.CreatedAt, token.Permission.String())
+	cloned, err := entity.RestoreAPIToken(token.ID, token.DisplayID.String(), token.UserID, token.Name.String(), token.HashedToken, token.TokenPrefix, token.LastUsedAt, token.CreatedAt, token.Permission.String())
 	if err != nil {
 		panic(err)
 	}
 	return cloned
+}
+
+// apiTokenDisplayIDForTest はテスト用に数値IDから決定的な表示用IDを作ります。
+func apiTokenDisplayIDForTest(id uint64) string {
+	return fmt.Sprintf("%016x", id)
 }

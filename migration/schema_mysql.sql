@@ -12,6 +12,7 @@ CREATE TABLE `achievement_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `api_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` int unsigned NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '既存のトークン',
   `permission` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'read_write',
@@ -20,6 +21,7 @@ CREATE TABLE `api_tokens` (
   `last_used_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_api_tokens_display_id` (`display_id`),
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
   UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   KEY `idx_api_tokens_user_created_id` (`user_id`,`created_at` DESC,`id` DESC),

@@ -966,7 +966,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 ```json
 {
-  "id": 42,
+  "id": "3f9a1c0b7d2e4a51",
   "name": "Discord Bot",
   "permission": "read",
   "token": "plain-text-api-token",
@@ -977,6 +977,8 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ```
 
 平文の `token` はこのレスポンスでのみ取得できます。サーバーにはSHA-256ハッシュと表示用の先頭5文字だけを保存します。
+
+`id` はトークンを指定するための16文字の小文字16進数です。名前変更・削除のパスに使います。DBの数値IDは返しません。
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_name`): 名前が不正
@@ -993,7 +995,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 {
   "tokens": [
     {
-      "id": 42,
+      "id": "3f9a1c0b7d2e4a51",
       "name": "Discord Bot",
       "permission": "read",
       "token_prefix": "plain",
@@ -1001,7 +1003,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
       "created_at": "2026-07-22T12:34:56+09:00"
     },
     {
-      "id": 1,
+      "id": "8b04e6d2c19f7a30",
       "name": "既存のトークン",
       "permission": "read_write",
       "token_prefix": null,
@@ -1025,7 +1027,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - **リクエスト**: `name` のみ。`permission` は変更できません。
 - **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
 - **主なエラー**:
-  - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDまたは名前が不正
+  - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDが16文字の小文字16進数でない、または名前が不正
   - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
   - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 
@@ -1035,7 +1037,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - 自分が所有するAPIトークンをID指定で削除します。削除後はそのトークンを認証に使用できません。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-  - 400 Bad Request (`invalid_api_token_id`): IDが不正
+  - 400 Bad Request (`invalid_api_token_id`): IDが16文字の小文字16進数でない
   - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
 
 ---
