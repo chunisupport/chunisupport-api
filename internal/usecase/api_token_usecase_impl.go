@@ -71,7 +71,11 @@ func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string,
 	if err != nil {
 		return nil, err
 	}
-	token, err := entity.NewAPIToken(userID, displayid.DisplayID(rawDisplayID), validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String())
+	displayID, err := displayid.NewDisplayID(rawDisplayID)
+	if err != nil {
+		return nil, err
+	}
+	token, err := entity.NewAPIToken(userID, displayID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String())
 	if err != nil {
 		return nil, err
 	}
