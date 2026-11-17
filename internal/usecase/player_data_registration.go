@@ -35,9 +35,9 @@ type playerDataUsecase struct {
 	courseRepo       repository.CourseRepository
 }
 
-// NewPlayerDataUsecaseWithScoreHistory はスコア履歴保存を有効にした実装を生成します。
-// courseRepo はコース記録の解決と保存に使います。nil のままコース記録を含む登録を受けるとエラーになります。
-func NewPlayerDataUsecaseWithScoreHistory(
+// NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
+// scoreHistoryRepo はスコア履歴の保存、courseRepo はコース記録の保存に使います。
+func NewPlayerDataUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
 	playerRepo repository.PlayerRepository,
@@ -50,48 +50,6 @@ func NewPlayerDataUsecaseWithScoreHistory(
 	scoreHistoryRepo repository.ScoreHistoryRepository,
 	courseRepo repository.CourseRepository,
 ) PlayerDataUsecase {
-	us := newPlayerDataUsecase(
-		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
-		honorRepo, playerDataRepo, lockedRepo, masterCache,
-	)
-	us.scoreHistoryRepo = scoreHistoryRepo
-	us.courseRepo = courseRepo
-	return us
-}
-
-// NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
-// courseRepo はコース記録の解決と保存に使います。nil のままコース記録を含む登録を受けるとエラーになります。
-func NewPlayerDataUsecase(
-	tm TransactionManager,
-	userRepo repository.UserRepository,
-	playerRepo repository.PlayerRepository,
-	playerRecRepo repository.PlayerRecordRepository,
-	worldsendRecRepo repository.WorldsendRecordRepository,
-	honorRepo repository.HonorRepository,
-	playerDataRepo repository.PlayerDataRepository,
-	lockedRepo repository.PlayerLockedSongRepository,
-	masterCache repository.PlayerDataMasterProvider,
-	courseRepo repository.CourseRepository,
-) PlayerDataUsecase {
-	us := newPlayerDataUsecase(
-		tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo,
-		honorRepo, playerDataRepo, lockedRepo, masterCache,
-	)
-	us.courseRepo = courseRepo
-	return us
-}
-
-func newPlayerDataUsecase(
-	tm TransactionManager,
-	userRepo repository.UserRepository,
-	playerRepo repository.PlayerRepository,
-	playerRecRepo repository.PlayerRecordRepository,
-	worldsendRecRepo repository.WorldsendRecordRepository,
-	honorRepo repository.HonorRepository,
-	playerDataRepo repository.PlayerDataRepository,
-	lockedRepo repository.PlayerLockedSongRepository,
-	masterCache repository.PlayerDataMasterProvider,
-) *playerDataUsecase {
 	if playerRecRepo == nil {
 		panic("player record repository is required")
 	}
@@ -109,6 +67,8 @@ func newPlayerDataUsecase(
 		playerDataRepo:   playerDataRepo,
 		lockedRepo:       lockedRepo,
 		masterCache:      masterCache,
+		scoreHistoryRepo: scoreHistoryRepo,
+		courseRepo:       courseRepo,
 	}
 }
 

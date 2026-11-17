@@ -135,7 +135,7 @@ func TestUserUsecase_DeleteUser_RollsBackWhenUserDeletionFails(t *testing.T) {
 			return deleteErr
 		},
 	}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
@@ -164,7 +164,7 @@ func TestUserUsecase_DeleteUser_DoesNotDeleteUserWhenGoalDeletionFails(t *testin
 			return nil
 		},
 	}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
@@ -2247,7 +2247,7 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 		callOrder = append(callOrder, "user")
 		return nil
 	}}
-	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, tm, goalRepo)
+	service := NewUserUsecase(nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, tm, goalRepo)
 
 	// When
 	err = service.DeleteUser(context.Background(), adminRequester, "testuser")
@@ -2261,9 +2261,9 @@ func TestUserUsecase_DeleteUser_DeletesGoalsBeforeUserInTransaction(t *testing.T
 func TestUserUsecase_DeleteUser_Firebase削除連携(t *testing.T) {
 	// newServiceWithDeleter は Firebase 削除役を差し替えた管理者削除のユースケースを作ります。
 	newServiceWithDeleter := func(userRepo *stubUserRepository, deleter FirebaseUserDeleter, goalRepo repository.GoalRepository) UserUsecase {
-		return NewUserUsecaseWithFirebaseDeleter(
+		return NewUserUsecase(
 			nil, userRepo, &stubPlayerRepository{}, &stubPlayerRecordRepository{},
-			nil, nil, nil, nil, nil, deleter, nil,
+			nil, nil, nil, nil, nil, deleter, nil, nil, nil, nil, nil,
 			&userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo,
 		)
 	}
@@ -2458,7 +2458,7 @@ func TestUserUsecase_DeleteUser_ロック後のユーザー状態で判定する
 				return nil
 			}}
 			repo := &stubUserRepository{user: &entity.User{ID: 1, Username: un}, usersByID: tt.usersByID}
-			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, &userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo)
+			service := NewUserUsecase(nil, repo, &stubPlayerRepository{}, &stubPlayerRecordRepository{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &userDeletionTransactionManagerStub{exec: &MockExecutor{}}, goalRepo)
 
 			// When
 			err := service.DeleteUser(context.Background(), &entity.User{ID: 99, AccountTypeID: info.AccountTypeAdmin}, "testuser")
