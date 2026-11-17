@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -49,8 +52,15 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 	}
 
 	assignments := make([]repository.HonorAssignment, 0, len(honors))
+	// "1" と "01" のように表記違いで同じスロットが来ると player_honors の主キーが重複するため、キーの昇順で先勝ちにする。
+	// ランダム称号で維持したスロットは削除していないため、最初から使用済みとして扱う。
+	assignedSlots := make(map[int]struct{}, len(honors))
+	for _, slot := range preservedSlots {
+		assignedSlots[slot] = struct{}{}
+	}
 
-	for slotKey, honor := range honors {
+	for _, slotKey := range slices.Sorted(maps.Keys(honors)) {
+		honor := honors[slotKey]
 		slotKey = strings.TrimSpace(slotKey)
 		if slotKey == "" {
 			continue
@@ -105,15 +115,31 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 			imageURL = nil
 		}
 
-		ensureResult, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, imageURL)
-		if err != nil {
+		// DBが拒否する入力はここでスキップする。DBエラーをスキップ扱いにすると、
+		// デッドロックでトランザクションが巻き戻った後も処理を続け、後半の書き込みだけがコミットされるため。
+		if utf8.RuneCountInString(strings.TrimSpace(honorTitle)) > info.HonorNameMaxLength ||
+			(imageURL != nil && utf8.RuneCountInString(strings.TrimSpace(*imageURL)) > info.HonorImageURLMaxLength) {
 			skipped = append(skipped, api_internal.SkippedRecord{
 				RecordType: "honor",
-				Reason:     "failed to create honor",
-				Details:    fmt.Sprintf("slot=%d, title=%s, error=%s", slot, honor.Title, err.Error()),
+				Reason:     "honor too long",
+				Details:    fmt.Sprintf("slot=%d", slot),
 			})
 			continue
 		}
+		if _, dup := assignedSlots[slot]; dup {
+			skipped = append(skipped, api_internal.SkippedRecord{
+				RecordType: "honor",
+				Reason:     fmt.Sprintf("duplicate slot: %d", slot),
+				Details:    fmt.Sprintf("slot=%d, title=%s", slot, honor.Title),
+			})
+			continue
+		}
+
+		ensureResult, err := us.honorRepo.EnsureHonor(ctx, tx, honorTitle, typeItem.ID, imageURL)
+		if err != nil {
+			return skipped, registered, fmt.Errorf("failed to ensure honor: slot=%d: %w", slot, err)
+		}
+		assignedSlots[slot] = struct{}{}
 		if honorTypeKey == "sp" && ensureResult.ImageURLRegistered {
 			registered = append(registered, registeredSPHonor{
 				ID:            ensureResult.ID,
@@ -131,13 +157,7 @@ func (us *playerDataUsecase) applyHonors(ctx context.Context, tx repository.Exec
 
 	if len(assignments) > 0 {
 		if err := us.honorRepo.BulkAssignHonors(ctx, tx, assignments); err != nil {
-			for _, a := range assignments {
-				skipped = append(skipped, api_internal.SkippedRecord{
-					RecordType: "honor",
-					Reason:     "failed to insert player_honor (bulk)",
-					Details:    fmt.Sprintf("slot=%d, honor_id=%d, error=%s", a.Slot, a.HonorID, err.Error()),
-				})
-			}
+			return skipped, registered, fmt.Errorf("failed to assign player honors: %w", err)
 		}
 	}
 

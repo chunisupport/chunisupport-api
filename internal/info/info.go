@@ -53,6 +53,8 @@ const (
 	RainbowRequiredDifficultyMaxID              = 4
 	RainbowRequiredDifficultyCount              = 4
 	RandomFavoriteHonorTitle                    = "お気に入りからランダム"
+	HonorNameMaxLength                          = 500 // honors.name の varchar 長。超える入力はDBが拒否するため登録前にスキップする
+	HonorImageURLMaxLength                      = 255 // honors.image_url の varchar 長
 	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
 	PlayerRecalculationLogicVersion             = 4 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
