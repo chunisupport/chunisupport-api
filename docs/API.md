@@ -358,6 +358,7 @@ Content-Type: application/json
 | `/internal/courses/updated-at` | GET | Firebase Bearer (任意) | コースマスタキャッシュ用の最終更新日時のみ取得 |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
 | `/internal/courses/:id` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses/:id/stats` | GET | Firebase Bearer (任意) | コース統計取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
 | `/internal/courses/:id` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
 | `/internal/courses/:id` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
@@ -388,6 +389,7 @@ Content-Type: application/json
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
 | `/v1/courses/:id/score-history` | GET | APIトークン | コーススコア履歴取得 |
+| `/v1/courses/:id/stats` | GET | APIトークン | コース統計取得 |
 | `/v1/courses` | POST | APIトークン (`read_write`、ADMIN+) | コース追加 |
 | `/v1/courses/:id` | PUT | APIトークン (`read_write`、EDITOR+) | コース名称・クラス更新 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -3567,6 +3569,70 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
+### GET `/internal/courses/:id/stats`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしは1分60回/IP
+- **パスパラメータ**:
+  - `id` - コースの表示用ID
+- **概要**: 指定コースのプレイヤー統計を、ベスト枠平均レーティング帯ごとに取得します。統計は譜面統計バッチが再集計した時点の内容です。削除済みコースは集計対象外のため取得できません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "course_id": "0000000000000001",
+  "stats": [
+    {
+      "rating_band": "ALL",
+      "combo": {
+        "none": 70,
+        "fc": 22,
+        "aj": 8
+      },
+      "clear": {
+        "failed": 35,
+        "clear": 65
+      },
+      "average_score": 2954321.5,
+      "median_score": 2961000,
+      "player_count": 100
+    },
+    {
+      "rating_band": "15.0",
+      "combo": {
+        "none": 6,
+        "fc": 0,
+        "aj": 0
+      },
+      "clear": {
+        "failed": 6,
+        "clear": 0
+      },
+      "average_score": null,
+      "median_score": null,
+      "player_count": 6
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `course_id` | string | コースの表示用ID |
+| `stats` | array | レーティング帯別統計。レーティング帯の表示順に並び、集計済みなら先頭要素は `rating_band: "ALL"`。プレイ済みプレイヤーがいない帯の要素は含まない。未集計、または誰もプレイしていないコースでは空配列 |
+| `stats[].rating_band` | string | レーティング帯のラベル（`ALL`、`-14.9`、`15.0` など） |
+| `stats[].combo.none` / `fc` / `aj` | number | コンボランプ別の人数。理論値（3,030,000点）は `aj` に含める |
+| `stats[].clear.failed` / `clear` | number | 未クリア・クリア済みの人数 |
+| `stats[].average_score` | number \| null | クリア済み記録の平均スコア。クリア済み記録が0件の場合は `null` |
+| `stats[].median_score` | number \| null | クリア済み記録の中央値。クリア済み記録が0件の場合は `null` |
+| `stats[].player_count` | number | プレイ済み人数（未クリアを含む） |
+
+コースには公式のランク区分がないため、譜面統計の `rank` に相当する項目はありません。集計規則は [譜面統計バッチの集計仕様](chart_statistics_aggregation.md) を参照してください。
+
+- **主なエラー**:
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
 ### POST `/internal/courses`
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
@@ -3793,7 +3859,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 `is_suspicious` は必須の真偽値です。
 
-不審アカウントのプレイヤーは譜面統計（`/internal/songs/:id/stats/:difficulty` など）とベスト枠採用率の集計から除外されます。フラグの変更は次回の譜面統計バッチ実行時に反映されます。
+不審アカウントのプレイヤーは譜面統計（`/internal/songs/:id/stats/:difficulty` など）、ベスト枠採用率、コース統計の集計から除外されます。フラグの変更は次回の譜面統計バッチ実行時に反映されます。
 
 - **レスポンス**: 204 No Content
 - **主なエラー**:
@@ -5728,6 +5794,22 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
   - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
+### GET `/v1/courses/:id/stats`
+- **認証**: APIトークン必須
+- **概要**: 指定コースのプレイヤー統計を、ベスト枠平均レーティング帯ごとに取得します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | コースID |
+
+- **レスポンス**: 200 OK。形式は GET `/internal/courses/:id/stats` と同一です。
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
 ### POST `/v1/courses`
 - **認証**: `read_write` APIトークンかつADMIN以上

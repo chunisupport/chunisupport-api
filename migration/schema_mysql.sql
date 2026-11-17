@@ -136,6 +136,22 @@ CREATE TABLE `course_classes` (
   UNIQUE KEY `uq_course_classes_name` (`name`),
   UNIQUE KEY `uq_course_classes_sort_order` (`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_stats_by_rating_band` (
+  `course_id` mediumint unsigned NOT NULL,
+  `rating_band_id` tinyint unsigned NOT NULL,
+  `combo_none` int unsigned NOT NULL DEFAULT '0',
+  `combo_fc` int unsigned NOT NULL DEFAULT '0',
+  `combo_aj` int unsigned NOT NULL DEFAULT '0',
+  `clear_failed` int unsigned NOT NULL DEFAULT '0',
+  `clear_clear` int unsigned NOT NULL DEFAULT '0',
+  `average_score` double DEFAULT NULL,
+  `median_score` double DEFAULT NULL,
+  `player_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`course_id`,`rating_band_id`),
+  KEY `fk_course_stats_by_rating_band_rating_band` (`rating_band_id`),
+  CONSTRAINT `fk_course_stats_by_rating_band_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_course_stats_by_rating_band_rating_band` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `courses` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
   `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,

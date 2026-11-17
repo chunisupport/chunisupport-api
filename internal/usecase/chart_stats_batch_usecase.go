@@ -18,6 +18,8 @@ type ChartStatsBatchResult struct {
 	EligiblePlayerCount       int
 	BestSlotRecordCount       int
 	BestSlotStatsCount        int
+	CourseRecordCount         int
+	CourseStatsCount          int
 }
 
 // ChartStatsBatchUsecase は譜面統計を集計し、統計テーブルを再構築します。
@@ -30,7 +32,7 @@ func NewChartStatsBatchUsecase(repo repository.ChartStatsBatchRepository) *Chart
 	return &ChartStatsBatchUsecase{repo: repo}
 }
 
-// Execute は譜面統計・WORLD'S END譜面統計・ベスト枠採用率を集計し、統計テーブルを丸ごと入れ替えます。
+// Execute は譜面統計・WORLD'S END譜面統計・ベスト枠採用率・コース統計を集計し、統計テーブルを丸ごと入れ替えます。
 // すべてを集計し終えてから単一トランザクションで入れ替えるため、実行中や失敗時にも公開APIからは直前の統計が見え続けます。
 func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchResult, error) {
 	ratingBands, err := u.repo.FindRatingBands(ctx)
@@ -41,6 +43,7 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 	chartStats := chartstatsbatch.NewChartStatsCalculator(ratingBands)
 	worldsendChartStats := chartstatsbatch.NewChartStatsCalculator(ratingBands)
 	bestSlotStats := chartstatsbatch.NewBestSlotStatsCalculator(ratingBands)
+	courseStats := chartstatsbatch.NewCourseStatsCalculator(ratingBands)
 	var result ChartStatsBatchResult
 	var bestSlotChartIDs []int
 	err = u.repo.StreamSource(ctx, repository.ChartStatsBatchSourceCallbacks{
@@ -66,6 +69,10 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 			bestSlotChartIDs = append(bestSlotChartIDs, chartID)
 			return nil
 		},
+		CourseRecord: func(record chartstatsbatch.CourseRecord) error {
+			courseStats.Add(record)
+			return nil
+		},
 	})
 	if err != nil {
 		return ChartStatsBatchResult{}, fmt.Errorf("read chart stats source: %w", err)
@@ -75,12 +82,15 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 		ChartStats:          chartStats.Results(),
 		WorldsendChartStats: worldsendChartStats.Results(),
 		BestSlotStats:       bestSlotStats.Results(bestSlotChartIDs),
+		CourseStats:         courseStats.Results(),
 	}
 	result.ChartRecordCount = chartStats.RecordCount()
 	result.ChartStatsCount = len(snapshot.ChartStats)
 	result.WorldsendChartRecordCount = worldsendChartStats.RecordCount()
 	result.WorldsendChartStatsCount = len(snapshot.WorldsendChartStats)
 	result.BestSlotStatsCount = len(snapshot.BestSlotStats)
+	result.CourseRecordCount = courseStats.RecordCount()
+	result.CourseStatsCount = len(snapshot.CourseStats)
 
 	if err := u.repo.ReplaceAll(ctx, snapshot); err != nil {
 		return ChartStatsBatchResult{}, fmt.Errorf("replace chart stats: %w", err)

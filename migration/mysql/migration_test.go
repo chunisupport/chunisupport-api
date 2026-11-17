@@ -867,3 +867,33 @@ func TestSchemaMySQL_コース記録履歴テーブルを含む(t *testing.T) {
 	assert.Contains(t, schemaSQL, "PRIMARY KEY (`player_id`,`course_id`,`updated_at`)")
 	assert.Contains(t, schemaSQL, "CONSTRAINT `chk_player_course_record_histories_score` CHECK ((`score` between 0 and 3030000))")
 }
+
+func TestCreateCourseStatsByRatingBandUp_コース統計テーブルを作成する(t *testing.T) {
+	// Given
+	upSQL := readNormalizedMigrationSQL(t, "000066_create_course_stats_by_rating_band.up.sql")
+
+	// Then: コースには公式のランク区分がないため、ランク分布の列は持たない。
+	assert.Contains(t, upSQL, "CREATE TABLE course_stats_by_rating_band")
+	assert.Contains(t, upSQL, "PRIMARY KEY (course_id, rating_band_id)")
+	assert.Contains(t, upSQL, "average_score DOUBLE NULL")
+	assert.Contains(t, upSQL, "median_score DOUBLE NULL")
+	assert.Contains(t, upSQL, "FOREIGN KEY (rating_band_id) REFERENCES rating_bands (id)")
+	assert.NotContains(t, upSQL, "rank_")
+}
+
+func TestCreateCourseStatsByRatingBandDown_コース統計テーブルを削除する(t *testing.T) {
+	// Given
+	downSQL := readNormalizedMigrationSQL(t, "000066_create_course_stats_by_rating_band.down.sql")
+
+	// Then
+	assert.Equal(t, "DROP TABLE IF EXISTS course_stats_by_rating_band;", downSQL)
+}
+
+func TestSchemaMySQL_コース統計テーブルを含む(t *testing.T) {
+	// Given
+	schemaSQL := readNormalizedMigrationSQL(t, "../schema_mysql.sql")
+
+	// Then
+	assert.Contains(t, schemaSQL, "CREATE TABLE `course_stats_by_rating_band`")
+	assert.Contains(t, schemaSQL, "PRIMARY KEY (`course_id`,`rating_band_id`)")
+}

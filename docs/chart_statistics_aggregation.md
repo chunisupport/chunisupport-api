@@ -2,13 +2,13 @@
 
 ## 概要
 
-譜面統計バッチ（`cmd/chart-stats-batch`）は、プレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、APIが参照する統計テーブルを再構築する。通常譜面と WORLD'S END 譜面には同じ集計規則を適用する。実行方法と運用は [譜面統計バッチ](chart_stats_batch.md) を参照。
+譜面統計バッチ（`cmd/chart-stats-batch`）は、プレイヤーの譜面別・コース別記録をベスト枠平均レーティング帯ごとに集計し、APIが参照する統計テーブルを再構築する。通常譜面と WORLD'S END 譜面には同じ集計規則を適用する。コースには専用の集計規則を適用する。実行方法と運用は [譜面統計バッチ](chart_stats_batch.md) を参照。
 
 ## 集計単位
 
-通常譜面は `chart_id × rating_band_id`、WORLD'S END 譜面は `worldsend_chart_id × rating_band_id` を集計単位とする。
+通常譜面は `chart_id × rating_band_id`、WORLD'S END 譜面は `worldsend_chart_id × rating_band_id`、コースは `course_id × rating_band_id` を集計単位とする。
 
-レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーと、不正利用疑い（`users.is_suspicious = 1`）のユーザーのプレイヤーは対象外とする。削除済み楽曲（`songs.is_deleted = 1`）の譜面も対象外とする。これらの条件は譜面統計・WORLD'S END 譜面統計・ベスト枠採用率のすべてに共通である。
+レーティング帯の判定には `best_average_rating` を使用する。下限は包含、上限は除外とし、`ALL` にも同じ記録を加える。`best_average_rating` が `NULL` のプレイヤーと、不正利用疑い（`users.is_suspicious = 1`）のユーザーのプレイヤーは対象外とする。削除済み楽曲（`songs.is_deleted = 1`）の譜面も対象外とする。これらの条件は譜面統計・WORLD'S END 譜面統計・ベスト枠採用率のすべてに共通である。コース統計もプレイヤーの条件は同じで、削除済みコース（`courses.is_deleted = 1`）を対象外とする。
 
 不審フラグの変更は即時には統計へ反映されず、次回の再集計で反映される。
 
@@ -82,14 +82,56 @@
 
 不正利用疑いのないプレイヤーのうち、`best_average_rating` が `NULL` でないプレイヤーを集計対象人数とする。各レーティング帯について、現在の `best` 枠にその譜面を持つ人数を数える。採用率は `best_player_count / eligible_player_count × 100` を小数点以下4桁に丸め、集計対象人数が0人の場合は `NULL` とする。
 
+## コース統計
+
+コース記録（`player_course_records`）を `course_id × rating_band_id` で集計する。コースには公式のランク区分がないため、スコアランク分布は集計しない。
+
+### 未クリアの判定
+
+`is_clear = 0` を未クリアとする。未クリア記録は記録自体を除外せず、スコアに関する統計からだけ除外する。未クリアのコースは途中で終了した分のスコアしか持たないため、クリア済み記録と混ぜると平均・中央値が完走時の実力を表さなくなる。譜面統計が FAILED をスコア統計から除外するのと同じ扱いである。
+
+### フィールドごとの母集団
+
+| 統計 | 母集団 | 未クリアの扱い |
+|---|---|---|
+| `player_count` | 全記録 | 含む |
+| `clear.*` | 全記録 | `clear.failed` に含む |
+| `combo.*` | 全記録 | 含む |
+| `average_score` | クリア済み記録 | 除外 |
+| `median_score` | クリア済み記録 | 除外 |
+
+`player_count` はプレイ済み人数であり、`clear.failed + clear.clear` と一致する。
+
+### 平均・中央値
+
+譜面統計と同じ方法で求める。`average_score` はクリア済み記録のスコア合計をクリア済み記録数で除算し、`median_score` は昇順に並べて奇数件なら中央の値、偶数件なら中央2件の算術平均とする。クリア済み記録が0件の場合は、どちらも `NULL` とする。
+
+### クリア状態の分布
+
+| 条件 | フィールド |
+|---|---|
+| `is_clear = 0` | `clear.failed` |
+| `is_clear = 1` | `clear.clear` |
+
+### コンボランプ分布
+
+全記録を `combo_lamp_id` により排他的に分類する。コースの理論値（3,030,000点）は `combo.aj` に含め、譜面統計の `combo.ajc` に相当する区分は持たない。
+
+| 条件 | フィールド |
+|---|---|
+| `combo_lamp_id == 1` | `combo.none` |
+| `combo_lamp_id == 2` | `combo.fc` |
+| `combo_lamp_id == 3` | `combo.aj` |
+
 ## 読み取りと保存
 
-譜面統計・WORLD'S END 譜面統計・ベスト枠採用率の集計元は、単一の REPEATABLE READ スナップショット内で読み取る。
+譜面統計・WORLD'S END 譜面統計・ベスト枠採用率・コース統計の集計元は、単一の REPEATABLE READ スナップショット内で読み取る。
 
-集計結果は次のテーブルへ保存する。3つのテーブルは単一トランザクション内で削除・挿入して入れ替えるため、再集計中や失敗時も直前の統計が参照される。
+集計結果は次のテーブルへ保存する。4つのテーブルは単一トランザクション内で削除・挿入して入れ替えるため、再集計中や失敗時も直前の統計が参照される。
 
 - `chart_stats_by_rating_band`
 - `worldsend_chart_stats_by_rating_band`
 - `chart_best_slot_stats_by_rating_band`
+- `course_stats_by_rating_band`
 
 APIレスポンスのフィールド構造はDBカラムに対応する。`average_score` と `median_score` が `NULL` になり得る一方、`player_count` と各分布のカウントは整数で返す。

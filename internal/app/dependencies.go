@@ -60,6 +60,7 @@ type Handlers struct {
 	InternalScoreHistory  *api_internal.ScoreHistoryHandler
 	InternalMetricHistory *api_internal.PlayerMetricHistoryHandler
 	Course                *api_internal.CourseHandler
+	CourseStats           *api_internal.CourseStatsHandler
 	SystemMaintenance     *api_internal.SystemMaintenanceHandler
 	SongBatch             *api_internal.SongBatchHandler
 	ChartStatsBatch       *api_internal.ChartStatsBatchHandler
@@ -71,6 +72,7 @@ type Handlers struct {
 	ScoreHistory  *api_v1.ScoreHistoryHandler
 	MetricHistory *api_v1.PlayerMetricHistoryHandler
 	V1Course      *api_v1.V1CourseHandler
+	V1CourseStats *api_v1.CourseStatsHandler
 	// chunirec互換APIハンドラ
 	Chunirec *chunirec.ChunirecHandler
 	// reiwa互換APIハンドラ
@@ -155,6 +157,7 @@ func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config
 	versionUsecase := usecase.NewVersionUsecase(versionRepo, masterCache, tm, db)
 	chartStatsMasterProvider := masterdata.NewChartStatsMasterProviderAdapter(staticMasterCache)
 	chartStatsUsecase := usecase.NewChartStatsUsecase(songRepo, worldsendChartRepo, chartStatsRepo, masterCache, chartStatsMasterProvider, db)
+	courseStatsUsecase := usecase.NewCourseStatsUsecase(courseRepo, infra.NewCourseStatsRepository(db), chartStatsMasterProvider, db)
 	worldsendUsecase := usecase.NewWorldsendUsecase(worldsendChartRepo, tm, db, songCatalogProvider)
 	goalUsecase := usecase.NewGoalUsecase(db, tm, goalRepo, masterCache, goalGroupRepo)
 	goalGroupUsecase := usecase.NewGoalGroupUsecase(db, tm, goalGroupRepo, goalRepo)
@@ -248,6 +251,7 @@ func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config
 		InternalScoreHistory:  api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
 		InternalMetricHistory: api_internal.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		Course:                api_internal.NewCourseHandler(courseUsecase),
+		CourseStats:           api_internal.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
 		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
@@ -258,6 +262,7 @@ func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config
 		ScoreHistory:          api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
 		MetricHistory:         api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		V1Course:              api_v1.NewV1CourseHandler(courseUsecase),
+		V1CourseStats:         api_v1.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),
 		Chunirec:              chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
 		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, worldsendUsecase, masterDataUsecase, masterCache),
 	}

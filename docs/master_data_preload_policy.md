@@ -153,5 +153,6 @@ TEST_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/' go test -run '^$' -bench S
 | `chart_stats_by_rating_band` | 譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `chart_best_slot_stats_by_rating_band` | 通常譜面×レーティング帯別のベスト枠採用統計。定期バッチで更新されます。 |
+| `course_stats_by_rating_band` | コース×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 
-`rating_bands`は起動時にプリロードし、統計3表はリクエスト時に参照します。
+`rating_bands`は起動時にプリロードし、統計4表はリクエスト時に参照します。
