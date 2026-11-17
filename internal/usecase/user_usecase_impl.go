@@ -51,98 +51,12 @@ type userProfilePlayerRecords struct {
 
 // NewUserUsecase は UserUsecase の実装を生成します。
 // friendshipRepo は非公開ユーザーをフレンドが閲覧する際の認可に使います。
+// firebaseDeleter が nil のときは Firebase ユーザーを削除しません。
+// songCatalog は未プレイ譜面補完に使う楽曲・譜面の共有キャッシュです。
 // courseRepo はユーザーレコードへコース記録を統合します。nil のときはコース記録を空にします。
 // transactionManager と goalRepo は、ユーザー物理削除で目標削除とユーザー削除を同じトランザクションに載せます。
-// transactionManager が nil のときはトランザクションなしで、goalRepo が nil のときは目標を削除せずに物理削除します。
+// goalRepo が nil のときは目標を削除せずに物理削除します。
 func NewUserUsecase(
-	db repository.Executor,
-	userRepo repository.UserRepository,
-	playerRepo repository.PlayerRepository,
-	playerRecordRepo repository.PlayerRecordRepository,
-	worldsendRecordRepo repository.WorldsendRecordRepository,
-	songRepo repository.SongRepository,
-	worldsendChartRepo repository.WorldsendChartRepository,
-	masterProvider userMasterProvider,
-	friendshipRepo repository.FriendshipRepository,
-	courseRepo repository.CourseRepository,
-	transactionManager TransactionManager,
-	goalRepo repository.GoalRepository,
-) UserUsecase {
-	return &userUsecase{
-		db:                  db,
-		userRepo:            userRepo,
-		playerRepo:          playerRepo,
-		playerRecordRepo:    playerRecordRepo,
-		worldsendRecordRepo: worldsendRecordRepo,
-		courseRepo:          courseRepo,
-		songRepo:            songRepo,
-		worldsendChartRepo:  worldsendChartRepo,
-		friendshipRepo:      friendshipRepo,
-		recordCompletionSvc: service.NewRecordCompletionService(),
-		masterProvider:      masterProvider,
-		firebaseDeleter:     noopFirebaseUserDeleter{},
-		transactionManager:  transactionManager,
-		goalRepo:            goalRepo,
-	}
-}
-
-// NewUserUsecaseWithOverpowerDenominator はOVER POWER割合の随時計算Provider付きで UserUsecase を生成します。
-func NewUserUsecaseWithOverpowerDenominator(
-	db repository.Executor,
-	userRepo repository.UserRepository,
-	playerRepo repository.PlayerRepository,
-	playerRecordRepo repository.PlayerRecordRepository,
-	worldsendRecordRepo repository.WorldsendRecordRepository,
-	songRepo repository.SongRepository,
-	worldsendChartRepo repository.WorldsendChartRepository,
-	masterProvider userMasterProvider,
-	friendshipRepo repository.FriendshipRepository,
-	playerLockedSongRepo repository.PlayerLockedSongRepository,
-	overpowerDenominatorProvider repository.OverpowerDenominatorProvider,
-	courseRepo repository.CourseRepository,
-	transactionManager TransactionManager,
-	goalRepo repository.GoalRepository,
-) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, courseRepo, transactionManager, goalRepo)
-	impl, ok := usecase.(*userUsecase)
-	if !ok {
-		return usecase
-	}
-	impl.playerLockedSongRepo = playerLockedSongRepo
-	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
-	return impl
-}
-
-// NewUserUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserUsecase を生成します。
-func NewUserUsecaseWithFirebaseDeleter(
-	db repository.Executor,
-	userRepo repository.UserRepository,
-	playerRepo repository.PlayerRepository,
-	playerRecordRepo repository.PlayerRecordRepository,
-	worldsendRecordRepo repository.WorldsendRecordRepository,
-	songRepo repository.SongRepository,
-	worldsendChartRepo repository.WorldsendChartRepository,
-	masterProvider userMasterProvider,
-	friendshipRepo repository.FriendshipRepository,
-	firebaseDeleter FirebaseUserDeleter,
-	courseRepo repository.CourseRepository,
-	transactionManager TransactionManager,
-	goalRepo repository.GoalRepository,
-) UserUsecase {
-	usecase := NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, courseRepo, transactionManager, goalRepo)
-	impl, ok := usecase.(*userUsecase)
-	if !ok {
-		return usecase
-	}
-	if firebaseDeleter != nil {
-		impl.firebaseDeleter = firebaseDeleter
-	}
-	return impl
-}
-
-// NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator はFirebase連携とOVER POWER随時計算Provider付きで UserUsecase を生成します。
-// songCatalog は未プレイ譜面補完に使う楽曲・譜面の共有キャッシュです。
-func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 	db repository.Executor,
 	userRepo repository.UserRepository,
 	playerRepo repository.PlayerRepository,
@@ -161,16 +75,29 @@ func NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
 	transactionManager TransactionManager,
 	goalRepo repository.GoalRepository,
 ) UserUsecase {
-	usecase := NewUserUsecaseWithFirebaseDeleter(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, firebaseDeleter, courseRepo, transactionManager, goalRepo)
-	impl, ok := usecase.(*userUsecase)
-	if !ok {
-		return usecase
+	if firebaseDeleter == nil {
+		firebaseDeleter = noopFirebaseUserDeleter{}
 	}
-	impl.playerLockedSongRepo = playerLockedSongRepo
-	impl.overpowerDenominatorProvider = overpowerDenominatorProvider
-	impl.userUpdatedAtQuery = userUpdatedAtQuery
-	impl.songCatalog = songCatalog
-	return impl
+	return &userUsecase{
+		db:                           db,
+		userRepo:                     userRepo,
+		playerRepo:                   playerRepo,
+		playerRecordRepo:             playerRecordRepo,
+		worldsendRecordRepo:          worldsendRecordRepo,
+		courseRepo:                   courseRepo,
+		songRepo:                     songRepo,
+		worldsendChartRepo:           worldsendChartRepo,
+		playerLockedSongRepo:         playerLockedSongRepo,
+		friendshipRepo:               friendshipRepo,
+		overpowerDenominatorProvider: overpowerDenominatorProvider,
+		userUpdatedAtQuery:           userUpdatedAtQuery,
+		songCatalog:                  songCatalog,
+		recordCompletionSvc:          service.NewRecordCompletionService(),
+		masterProvider:               masterProvider,
+		firebaseDeleter:              firebaseDeleter,
+		transactionManager:           transactionManager,
+		goalRepo:                     goalRepo,
+	}
 }
 
 // GetUserProfile はユーザー名をキーにプロファイル（username + player）を軽量に取得します。
@@ -506,13 +433,7 @@ func (s *userUsecase) performPhysicalUserDeletion(ctx context.Context, requester
 		return s.userRepo.DeleteByID(ctx, exec, userID)
 	}
 
-	var err error
-	if s.transactionManager != nil {
-		err = s.transactionManager.Transactional(ctx, deleteUser)
-	} else {
-		err = deleteUser(s.db)
-	}
-	if err != nil {
+	if err := s.transactionManager.Transactional(ctx, deleteUser); err != nil {
 		if errors.Is(err, ErrAdminRequired) {
 			return err
 		}

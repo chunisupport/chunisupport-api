@@ -141,12 +141,12 @@ func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config
 	}
 	userCredentialUsecase := usecase.NewUserCredentialUsecaseWithUsernamePolicy(db, tm, userRepo, playerRecordRepo, goalRepo, recentSignInVerifier, firebaseUserDeleter, masterCache, usernamePolicy)
 	apiTokenUsecase := usecase.NewAPITokenUsecase(db, tm, apiTokenRepo, userRepo)
-	userUsecase := usecase.NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
+	userUsecase := usecase.NewUserUsecase(
 		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
 		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, songCatalogProvider, courseRepo, tm, goalRepo,
 	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
-	playerDataUsecase := usecase.NewPlayerDataUsecaseWithScoreHistory(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
+	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, courseRepo, scoreHistoryRepo, friendshipRepo, masterCache)
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)

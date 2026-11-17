@@ -20,7 +20,7 @@ type apiTokenGenerateRequest struct {
 }
 
 type apiTokenResponse struct {
-	ID          uint64     `json:"id"`
+	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Permission  string     `json:"permission"`
 	TokenPrefix *string    `json:"token_prefix"`

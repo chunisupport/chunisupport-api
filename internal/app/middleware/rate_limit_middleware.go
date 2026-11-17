@@ -135,7 +135,7 @@ func APIRateLimitMiddleware(normalLimit, editorLimit, adminLimit int, window tim
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			userObj := c.Get("userEntity")
+			userObj := c.Get(contextKeyUserEntity)
 			if userObj == nil {
 				return apierror.ErrUnauthorized
 			}
@@ -197,7 +197,7 @@ func UserRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			user, ok := c.Get("userEntity").(*entity.User)
+			user, ok := c.Get(contextKeyUserEntity).(*entity.User)
 			if !ok || user == nil {
 				return apierror.ErrUnauthorized
 			}
@@ -220,7 +220,7 @@ func AnonymousIPRateLimitMiddleware(config RateLimitConfig) echo.MiddlewareFunc 
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			userObj := c.Get("userEntity")
+			userObj := c.Get(contextKeyUserEntity)
 			if userObj != nil {
 				if _, ok := userObj.(*entity.User); !ok {
 					return apierror.ErrUnauthorized
@@ -248,7 +248,7 @@ func AuthenticatedUserRateLimitMiddleware(config RateLimitConfig) echo.Middlewar
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			userObj := c.Get("userEntity")
+			userObj := c.Get(contextKeyUserEntity)
 			if userObj == nil {
 				return next(c)
 			}

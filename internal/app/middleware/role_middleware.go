@@ -12,7 +12,7 @@ import (
 func RequireRole(requiredRoleID int) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			userObj := c.Get("userEntity")
+			userObj := c.Get(contextKeyUserEntity)
 			if userObj == nil {
 				return apierror.ErrUnauthorized
 			}
