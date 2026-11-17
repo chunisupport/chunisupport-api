@@ -11,6 +11,7 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -267,9 +268,10 @@ func bestSlotStatsRows(stats []*entity.ChartBestSlotStatsByRatingBand) [][]any {
 func courseStatsRows(stats []*entity.CourseStatsByRatingBand) [][]any {
 	rows := make([][]any, 0, len(stats))
 	for _, s := range stats {
+		m := models.CourseStatsByRatingBandModelFromEntity(s)
 		rows = append(rows, []any{
-			s.CourseID, s.RatingBandID, s.Combo.None, s.Combo.FC, s.Combo.AJ, s.Clear.Failed, s.Clear.Clear,
-			s.AverageScore, s.MedianScore, s.PlayerCount,
+			m.CourseID, m.RatingBandID, m.ComboNone, m.ComboFC, m.ComboAJ, m.ClearFailed, m.ClearClear,
+			m.AverageScore, m.MedianScore, m.PlayerCount,
 		})
 	}
 	return rows
