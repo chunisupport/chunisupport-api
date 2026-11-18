@@ -189,7 +189,7 @@ func TestAPITokenUsecase_Generate_ExistingTokenRemainsAvailable(t *testing.T) {
 	uc := newAPITokenUsecaseWithClock(nil, apiTokenPassthroughTransactionManager{}, repo, users, time.Now)
 
 	// When
-	generated, err := uc.Generate(context.Background(), 10, "  Discord Bot  ", "read_write")
+	generated, err := uc.Generate(context.Background(), 10, "  Discord Bot  ", "read_write", false)
 
 	// Then
 	require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestAPITokenUsecase_Generate_RejectsLimitAndDuplicateName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, tt.repo, &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: info.AccountTypeEditor}})
 
-			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write", false)
 
 			assert.ErrorIs(t, err, tt.wantErr)
 		})
@@ -250,7 +250,7 @@ func TestAPITokenUsecase_Generate_SucceedsAtLimitMinusOne(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
 
 	// When
-	generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+	generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write", false)
 
 	// Then
 	// 上限未満なので発行が保存される。比較が1つずれるとここで上限エラーになる。
@@ -267,7 +267,7 @@ func TestAPITokenUsecase_Generate_表示用IDを採番してDBの数値IDを出�
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
 
 	// When
-	generated, err := uc.Generate(context.Background(), 10, "CLI", "read")
+	generated, err := uc.Generate(context.Background(), 10, "CLI", "read", false)
 
 	// Then
 	require.NoError(t, err)
@@ -279,7 +279,7 @@ func TestAPITokenUsecase_Generate_表示用IDを採番してDBの数値IDを出�
 func TestAPITokenUsecase_Generate_RejectsInvalidName(t *testing.T) {
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, newStubAPITokenRepository(), &tokenStubUserRepository{user: &entity.User{ID: 10}})
 
-	_, err := uc.Generate(context.Background(), 10, " ", "read_write")
+	_, err := uc.Generate(context.Background(), 10, " ", "read_write", false)
 
 	assert.ErrorIs(t, err, ErrInvalidAPITokenName)
 }
@@ -288,12 +288,27 @@ func TestAPITokenUsecase_Generate_PersistsReadPermission(t *testing.T) {
 	repo := newStubAPITokenRepository()
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
 
-	generated, err := uc.Generate(context.Background(), 10, "Read only tool", "read")
+	generated, err := uc.Generate(context.Background(), 10, "Read only tool", "read", false)
 
 	require.NoError(t, err)
 	require.NotNil(t, generated)
 	assert.Equal(t, "read", generated.Metadata.Permission)
 	assert.Equal(t, "read", repo.tokenByDisplayID(generated.Metadata.ID).Permission.String())
+}
+
+func TestAPITokenUsecase_Generate_PersistsPublicOnly(t *testing.T) {
+	// Given
+	repo := newStubAPITokenRepository()
+	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
+
+	// When
+	generated, err := uc.Generate(context.Background(), 10, "Public tool", "read", true)
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, generated)
+	assert.True(t, generated.Metadata.PublicOnly)
+	assert.True(t, repo.tokenByDisplayID(generated.Metadata.ID).PublicOnly)
 }
 
 func TestAPITokenUsecase_Generate_RejectsReadWriteForNonEditor(t *testing.T) {
@@ -311,7 +326,7 @@ func TestAPITokenUsecase_Generate_RejectsReadWriteForNonEditor(t *testing.T) {
 			users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: tt.accountTypeID}}
 			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
 
-			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+			_, err := uc.Generate(context.Background(), 10, "CLI", "read_write", false)
 
 			assert.ErrorIs(t, err, ErrAPITokenWritePermissionDenied)
 			assert.Zero(t, repo.saveCalls)
@@ -332,7 +347,7 @@ func TestAPITokenUsecase_Generate_AllowsReadWriteForEditorAndAdmin(t *testing.T)
 			users := &tokenStubUserRepository{user: &entity.User{ID: 10, AccountTypeID: tt.accountTypeID}}
 			uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, users)
 
-			generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write")
+			generated, err := uc.Generate(context.Background(), 10, "CLI", "read_write", false)
 
 			require.NoError(t, err)
 			require.NotNil(t, generated)
@@ -345,7 +360,7 @@ func TestAPITokenUsecase_Generate_RejectsInvalidPermission(t *testing.T) {
 	repo := newStubAPITokenRepository()
 	uc := NewAPITokenUsecase(nil, apiTokenPassthroughTransactionManager{}, repo, &tokenStubUserRepository{user: &entity.User{ID: 10}})
 
-	_, err := uc.Generate(context.Background(), 10, "CLI", "write")
+	_, err := uc.Generate(context.Background(), 10, "CLI", "write", false)
 
 	assert.ErrorIs(t, err, ErrInvalidAPITokenPermission)
 	assert.Zero(t, repo.saveCalls)
@@ -531,13 +546,13 @@ func TestAPITokenUsecase_Delete_RejectsZeroID(t *testing.T) {
 
 func newAPITokenForTest(t *testing.T, id uint64, userID int, name string, raw string, prefix *string, lastUsedAt *time.Time) *entity.APIToken {
 	t.Helper()
-	token, err := entity.RestoreAPIToken(id, apiTokenDisplayIDForTest(id), userID, name, hashToken(raw), prefix, lastUsedAt, time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC), "read_write")
+	token, err := entity.RestoreAPIToken(id, apiTokenDisplayIDForTest(id), userID, name, hashToken(raw), prefix, lastUsedAt, time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC), "read_write", false)
 	require.NoError(t, err)
 	return token
 }
 
 func cloneAPITokenForTest(token *entity.APIToken) *entity.APIToken {
-	cloned, err := entity.RestoreAPIToken(token.ID, token.DisplayID.String(), token.UserID, token.Name.String(), token.HashedToken, token.TokenPrefix, token.LastUsedAt, token.CreatedAt, token.Permission.String())
+	cloned, err := entity.RestoreAPIToken(token.ID, token.DisplayID.String(), token.UserID, token.Name.String(), token.HashedToken, token.TokenPrefix, token.LastUsedAt, token.CreatedAt, token.Permission.String(), token.PublicOnly)
 	if err != nil {
 		panic(err)
 	}

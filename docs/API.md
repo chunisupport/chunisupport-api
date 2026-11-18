@@ -956,10 +956,11 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - **リクエスト**:
 
 ```json
-{"name":"Discord Bot","permission":"read"}
+{"name":"Discord Bot","permission":"read","public_only":true}
 ```
 
 - `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
+- `public_only` は任意で、省略時は `false` です。`true` のトークンは本人や承認済みフレンドであっても非公開ユーザーを参照できず、未認証と同じく `404 user_not_found`（chunirec互換APIでは互換エラー形式の404）になります。`user_name` を省略して自分自身を対象にするchunirec互換APIも、自分が非公開なら404です。発行後に変更できません。変更する場合はトークンを削除して再発行してください。
 - `permission` は必須で、`read` または `read_write` を指定します。発行後に変更できません。権限を変更する場合はトークンを削除して再発行してください。
 - `read_write` はEDITORまたはADMINのみ指定できます。PLAYERやEXTDEVが指定した場合は403 Forbiddenになります。
 - **レスポンス**: 201 Created
@@ -969,6 +970,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   "id": "3f9a1c0b7d2e4a51",
   "name": "Discord Bot",
   "permission": "read",
+  "public_only": true,
   "token": "plain-text-api-token",
   "token_prefix": "plain",
   "last_used_at": null,
@@ -998,6 +1000,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
       "id": "3f9a1c0b7d2e4a51",
       "name": "Discord Bot",
       "permission": "read",
+      "public_only": true,
       "token_prefix": "plain",
       "last_used_at": "2026-07-22T13:00:00+09:00",
       "created_at": "2026-07-22T12:34:56+09:00"
@@ -1006,6 +1009,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
       "id": "8b04e6d2c19f7a30",
       "name": "既存のトークン",
       "permission": "read_write",
+      "public_only": false,
       "token_prefix": null,
       "last_used_at": null,
       "created_at": "2026-04-16T12:34:56+09:00"
@@ -1017,6 +1021,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - 未発行の場合は `tokens` が空配列になります。
 - 旧仕様から移行したトークンは平文を復元できないため `token_prefix=null` のままです。認証には引き続き使用できます。
 - 旧仕様から移行したトークンの `permission` は `read_write` です。
+- `public_only` を追加する前に発行したトークンは `false` です。
 - `last_used_at` は認証成功時に更新されます。DB書き込みを抑えるため、最大1時間の遅延があります。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -1024,7 +1029,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 ### PATCH `/internal/auth/api-tokens/:id`
 - **認証**: Firebase Bearer 必須
-- **リクエスト**: `name` のみ。`permission` は変更できません。
+- **リクエスト**: `name` のみ。`permission` と `public_only` は変更できません。
 - **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDが16文字の小文字16進数でない、または名前が不正
@@ -5165,6 +5170,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 公開APIはAPIトークン認証を使用します。トークンは `Authorization: Bearer <token>` ヘッダーで送信してください。
 
+各エンドポイントの「非公開ユーザーは本人または承認済みフレンドが参照できます」は、`public_only=false` のトークンでの扱いです。`public_only=true` のトークンでは、本人やフレンドであっても非公開ユーザーを参照できず、未認証と同じ404になります（`POST /internal/auth/api-tokens` を参照）。
+
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
 - **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。読取時点で稼働開始済みのバージョンのみを返します。稼働開始は稼働日の日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。
@@ -5881,7 +5888,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ## chunirec互換API `/compat/chunirec/2.0`
 
-chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法は`/v1`と同様です。  
+chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法と、`public_only` トークンでの非公開ユーザーの扱いは`/v1`と同様です。  
 なお、楽曲IDにはChuniSupportのIDを使用します。chunirecの楽曲IDとは異なるため、他のchunirec互換APIから取得した楽曲IDを使用してください。
 
 メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。

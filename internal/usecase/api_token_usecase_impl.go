@@ -53,7 +53,7 @@ func newAPITokenUsecaseWithClock(db repository.Executor, tm TransactionManager, 
 }
 
 // Generate は既存トークンを維持したまま、権限付きの名前付きAPIトークンを追加発行します。
-func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error) {
+func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string, permission string, publicOnly bool) (*GeneratedAPITokenOutput, error) {
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
 		return nil, ErrInvalidAPITokenName
@@ -75,7 +75,7 @@ func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string,
 	if err != nil {
 		return nil, err
 	}
-	token, err := entity.NewAPIToken(userID, displayID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String())
+	token, err := entity.NewAPIToken(userID, displayID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String(), publicOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +248,7 @@ func toAPITokenOutput(token *entity.APIToken) *APITokenOutput {
 		ID:          token.DisplayID.String(),
 		Name:        token.Name.String(),
 		Permission:  token.Permission.String(),
+		PublicOnly:  token.PublicOnly,
 		TokenPrefix: token.TokenPrefix,
 		LastUsedAt:  token.LastUsedAt,
 		CreatedAt:   token.CreatedAt,

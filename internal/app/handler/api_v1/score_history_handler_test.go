@@ -254,3 +254,27 @@ func TestScoreHistoryHandler_GetCourse_エラー(t *testing.T) {
 		})
 	}
 }
+
+// 3種のスコア履歴は閲覧者の取り出しを scoreHistoryRequestParams で共有しているため、代表としてコースで確認します。
+func TestScoreHistoryHandler_GetCourse_公開ユーザーのみのトークンでは閲覧者を渡さない(t *testing.T) {
+	// Given
+	called := false
+	var gotRequester *entity.User
+	h := NewScoreHistoryHandler(&stubScoreHistoryUsecase{
+		getCourse: func(_ context.Context, _ string, requester *entity.User, _ string) ([]usecase.CourseScoreHistoryEntry, error) {
+			called, gotRequester = true, requester
+			return nil, usecase.ErrUserPrivate
+		},
+	})
+	c := newScoreHistoryContext("/v1/courses/0123456789abcdef/score-history?username=owner", "0123456789abcdef", "", "owner")
+	c.Set("userEntity", &entity.User{ID: 1})
+	c.Set("apiToken", &entity.APIToken{PublicOnly: true})
+
+	// When
+	err := h.GetCourse(c)
+
+	// Then: 本人として閲覧判定させないため、閲覧者は未認証と同じ nil になる
+	assert.Error(t, err)
+	assert.True(t, called)
+	assert.Nil(t, gotRequester)
+}

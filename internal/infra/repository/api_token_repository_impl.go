@@ -14,7 +14,7 @@ import (
 )
 
 // カラム名の列挙であり、認証情報をハードコードしているものではありません。
-const apiTokenColumns = "id, display_id, user_id, name, permission, hashed_token, token_prefix, last_used_at, created_at" // #nosec G101
+const apiTokenColumns = "id, display_id, user_id, name, permission, public_only, hashed_token, token_prefix, last_used_at, created_at" // #nosec G101
 
 type apiTokenRepository struct {
 	db *sqlx.DB
@@ -30,9 +30,9 @@ func (r *apiTokenRepository) Save(ctx context.Context, exec repository.Executor,
 	model := models.FromAPITokenEntity(token)
 	if token.ID == 0 {
 		result, err := exec.ExecContext(ctx, `
-INSERT INTO api_tokens (display_id, user_id, name, permission, hashed_token, token_prefix)
-VALUES (?, ?, ?, ?, ?, ?)
-`, model.DisplayID, model.UserID, model.Name, model.Permission, model.HashedToken, model.TokenPrefix)
+INSERT INTO api_tokens (display_id, user_id, name, permission, public_only, hashed_token, token_prefix)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+`, model.DisplayID, model.UserID, model.Name, model.Permission, model.PublicOnly, model.HashedToken, model.TokenPrefix)
 		if err != nil {
 			return wrapAPITokenDuplicateError(err)
 		}

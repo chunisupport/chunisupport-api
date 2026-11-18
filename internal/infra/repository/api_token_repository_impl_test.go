@@ -30,6 +30,7 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 			user_id INTEGER NOT NULL,
 			name TEXT NOT NULL,
 			permission TEXT NOT NULL DEFAULT 'read_write',
+			public_only BOOLEAN NOT NULL DEFAULT FALSE,
 			hashed_token TEXT NOT NULL UNIQUE,
 			token_prefix TEXT NULL,
 			last_used_at DATETIME NULL,
@@ -45,7 +46,7 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("a", 64), "abcde", "read_write")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("a", 64), "abcde", "read_write", false)
 	require.NoError(t, err)
 
 	require.NoError(t, repo.Save(context.Background(), db, token))
@@ -74,7 +75,7 @@ func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 func TestAPITokenRepository_SaveAndLoad_ReadPermission(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "0123456789abcdef", "Read only", strings.Repeat("d", 64), "abcde", "read")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "Read only", strings.Repeat("d", 64), "abcde", "read", false)
 	require.NoError(t, err)
 
 	require.NoError(t, repo.Save(context.Background(), db, token))
@@ -82,6 +83,23 @@ func TestAPITokenRepository_SaveAndLoad_ReadPermission(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "read", loaded.Permission.String())
+}
+
+func TestAPITokenRepository_SaveAndLoad_PublicOnly(t *testing.T) {
+	// Given
+	db := setupAPITokenRepositorySQLite(t)
+	repo := &apiTokenRepository{}
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "Public", strings.Repeat("e", 64), "abcde", "read", true)
+	require.NoError(t, err)
+	require.NoError(t, repo.Save(context.Background(), db, token))
+
+	// When
+	loaded, err := repo.FindByHashedToken(context.Background(), db, strings.Repeat("e", 64))
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+	assert.True(t, loaded.PublicOnly)
 }
 
 func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T) {
@@ -112,7 +130,7 @@ func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T
 func TestAPITokenRepository_DeleteByDisplayIDAndUserID_IsScopedToOwner(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("c", 64), "abcde", "read_write")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("c", 64), "abcde", "read_write", false)
 	require.NoError(t, err)
 	require.NoError(t, repo.Save(context.Background(), db, token))
 

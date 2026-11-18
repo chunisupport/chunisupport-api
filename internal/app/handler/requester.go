@@ -10,12 +10,26 @@ import (
 // internal/app/middleware の contextKeyUserEntity と同じ値に揃えています。
 const contextKeyUserEntity = "userEntity"
 
+// contextKeyAPIToken はAPIトークン認証ミドルウェアが検証済みトークンを格納するキーです。
+// internal/app/middleware の contextKeyAPIToken と同じ値に揃えています。
+const contextKeyAPIToken = "apiToken"
+
 // Requester はコンテキストからリクエストユーザーを取り出します。
 // 未設定、または *entity.User でない場合は nil を返します。
 // 認証を必須としないエンドポイントで、未認証を nil として扱う現行の取り出しに使います。
 func Requester(c *echo.Context) *entity.User {
 	user, _ := c.Get(contextKeyUserEntity).(*entity.User)
 	return user
+}
+
+// Viewer は非公開ユーザーの閲覧判定に使う閲覧者を返します。
+// 公開ユーザーのみに制限されたAPIトークンでは、本人・フレンドとしての閲覧を許さないため未認証と同じ nil を返します。
+// 役割判定やレート制限はトークン所有者で行う必要があるため、Requester 自体は変えずに閲覧判定の箇所だけで使います。
+func Viewer(c *echo.Context) *entity.User {
+	if token, ok := c.Get(contextKeyAPIToken).(*entity.APIToken); ok && token != nil && !token.CanViewPrivateUsers() {
+		return nil
+	}
+	return Requester(c)
 }
 
 // RequireRequester は認証必須エンドポイント向けにリクエストユーザーを取り出します。

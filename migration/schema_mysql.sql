@@ -16,6 +16,7 @@ CREATE TABLE `api_tokens` (
   `user_id` int unsigned NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '既存のトークン',
   `permission` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'read_write',
+  `public_only` tinyint(1) NOT NULL DEFAULT '0',
   `hashed_token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `token_prefix` char(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_used_at` datetime DEFAULT NULL,

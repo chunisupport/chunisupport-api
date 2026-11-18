@@ -24,8 +24,8 @@ type mockAPITokenUsecase struct {
 	mock.Mock
 }
 
-func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*usecase.GeneratedAPITokenOutput, error) {
-	args := m.Called(ctx, userID, name, permission)
+func (m *mockAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string, publicOnly bool) (*usecase.GeneratedAPITokenOutput, error) {
+	args := m.Called(ctx, userID, name, permission, publicOnly)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -88,7 +88,7 @@ func TestAPITokenHandler_List(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"tokens":[{"id":"0000000000000001","name":"既存のトークン","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"tokens":[{"id":"0000000000000001","name":"既存のトークン","permission":"read_write","public_only":false,"token_prefix":null,"last_used_at":null,"created_at":"2026-04-16T12:34:56Z"}]}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -104,7 +104,7 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userEntity", &entity.User{ID: 10})
-	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot", "read").Return(&usecase.GeneratedAPITokenOutput{
+	mockUsecase.On("Generate", mock.Anything, 10, "Discord Bot", "read", false).Return(&usecase.GeneratedAPITokenOutput{
 		Token: "abcde-secret",
 		Metadata: &usecase.APITokenOutput{
 			ID:          "0000000000000002",
@@ -119,7 +119,41 @@ func TestAPITokenHandler_Generate(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
-	assert.JSONEq(t, `{"id":"0000000000000002","name":"Discord Bot","permission":"read","token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":"0000000000000002","name":"Discord Bot","permission":"read","public_only":false,"token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestAPITokenHandler_GeneratePassesPublicOnly(t *testing.T) {
+	// Given
+	e := newAPITokenTestEcho()
+	mockUsecase := new(mockAPITokenUsecase)
+	h := api_internal.NewAPITokenHandler(mockUsecase)
+	createdAt := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
+	prefix := "abcde"
+	req := httptest.NewRequest(http.MethodPost, "/internal/auth/api-tokens", bytes.NewBufferString(`{"name":"Public Bot","permission":"read","public_only":true}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("userEntity", &entity.User{ID: 10})
+	mockUsecase.On("Generate", mock.Anything, 10, "Public Bot", "read", true).Return(&usecase.GeneratedAPITokenOutput{
+		Token: "abcde-secret",
+		Metadata: &usecase.APITokenOutput{
+			ID:          "0000000000000003",
+			Name:        "Public Bot",
+			Permission:  "read",
+			PublicOnly:  true,
+			TokenPrefix: &prefix,
+			CreatedAt:   createdAt,
+		},
+	}, nil).Once()
+
+	// When
+	err := h.Generate(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.JSONEq(t, `{"id":"0000000000000003","name":"Public Bot","permission":"read","public_only":true,"token":"abcde-secret","token_prefix":"abcde","last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -163,7 +197,7 @@ func TestAPITokenHandler_GenerateRequiresValidPermission(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 			c.Set("userEntity", &entity.User{ID: 10})
-			mockUsecase.On("Generate", mock.Anything, 10, "CLI", tt.wantPermission).Return(nil, usecase.ErrInvalidAPITokenPermission).Once()
+			mockUsecase.On("Generate", mock.Anything, 10, "CLI", tt.wantPermission, false).Return(nil, usecase.ErrInvalidAPITokenPermission).Once()
 
 			// When
 			err := h.Generate(c)
@@ -198,7 +232,7 @@ func TestAPITokenHandler_Rename(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"id":"0000000000000002","name":"Batch","permission":"read_write","token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":"0000000000000002","name":"Batch","permission":"read_write","public_only":false,"token_prefix":null,"last_used_at":null,"created_at":"2026-07-22T12:00:00Z"}`, rec.Body.String())
 	mockUsecase.AssertExpectations(t)
 }
 

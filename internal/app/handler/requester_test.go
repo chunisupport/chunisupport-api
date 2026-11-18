@@ -182,6 +182,52 @@ func TestGetRequesterAccountTypeID(t *testing.T) {
 	}
 }
 
+func TestViewer(t *testing.T) {
+	user := &entity.User{ID: 7}
+
+	tests := []struct {
+		name string
+		// Given
+		token *entity.APIToken
+		// Then
+		want *entity.User
+	}{
+		{
+			name: "APIトークンを使わない認証ではリクエストユーザーを返す",
+			want: user,
+		},
+		{
+			name:  "制限のないAPIトークンではリクエストユーザーを返す",
+			token: &entity.APIToken{PublicOnly: false},
+			want:  user,
+		},
+		{
+			name:  "公開ユーザーのみのAPIトークンでは未認証と同じくnilを返す",
+			token: &entity.APIToken{PublicOnly: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			c := newRequesterContext(t, true, user)
+			if tt.token != nil {
+				c.Set(contextKeyAPIToken, tt.token)
+			}
+
+			// When
+			got := Viewer(c)
+
+			// Then
+			if tt.want == nil {
+				assert.Nil(t, got)
+				return
+			}
+			assert.Same(t, tt.want, got)
+		})
+	}
+}
+
 func newRequesterContext(t *testing.T, set bool, value any) *echo.Context {
 	t.Helper()
 	e := echo.New()

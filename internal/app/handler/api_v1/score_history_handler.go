@@ -32,12 +32,12 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 	if !ok || difficulty == "WORLD'S END" {
 		return apierror.ErrInvalidDifficulty
 	}
-	username, requester, apiErr := scoreHistoryRequestParams(c)
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetStandard(
-		c.Request().Context(), username, requester, displayID, difficulty,
+		c.Request().Context(), username, viewer, displayID, difficulty,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -51,12 +51,12 @@ func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	username, requester, apiErr := scoreHistoryRequestParams(c)
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetWorldsend(
-		c.Request().Context(), username, requester, displayID,
+		c.Request().Context(), username, viewer, displayID,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -70,12 +70,12 @@ func (h *ScoreHistoryHandler) GetCourse(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	username, requester, apiErr := scoreHistoryRequestParams(c)
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetCourse(
-		c.Request().Context(), username, requester, displayID,
+		c.Request().Context(), username, viewer, displayID,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -98,8 +98,8 @@ func scoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror
 	if apiErr != nil {
 		return "", nil, apiErr
 	}
-	requester := handler.Requester(c)
-	return username, requester, nil
+	viewer := handler.Viewer(c)
+	return username, viewer, nil
 }
 
 func toScoreHistoryResponse(entries []usecase.ScoreHistoryEntry) *dto.ScoreHistoryResponse {

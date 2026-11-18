@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
 	internalhandler "github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_v1"
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/compat/chunirec"
@@ -111,7 +112,7 @@ func authenticateTestUser(idToken string) *entity.User {
 
 type stubAPITokenUsecase struct{}
 
-func (stubAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*usecase.GeneratedAPITokenOutput, error) {
+func (stubAPITokenUsecase) Generate(ctx context.Context, userID int, name string, permission string, publicOnly bool) (*usecase.GeneratedAPITokenOutput, error) {
 	return nil, nil
 }
 
@@ -128,7 +129,7 @@ func (stubAPITokenUsecase) Validate(ctx context.Context, rawToken string) (*enti
 	if rawToken == "read-editor-token" {
 		permission = apitokenpermission.Read
 	}
-	return authenticateTestUser(rawToken), &entity.APIToken{ID: 1, Permission: permission}, nil
+	return authenticateTestUser(rawToken), &entity.APIToken{ID: 1, Permission: permission, PublicOnly: rawToken == "public-only-token"}, nil
 }
 
 func (stubAPITokenUsecase) Delete(ctx context.Context, userID int, id string) error {
@@ -317,6 +318,48 @@ func TestRegisterRoutes_外部楽曲更新はEDITOR以上のAPIトークンを�
 			// Then
 			require.Equal(t, tt.wantStatus, rec.Code)
 			assert.Equal(t, tt.wantCalled, called)
+		})
+	}
+}
+
+// TestUseAPITokenGroupMiddlewares_公開ユーザーのみのトークンは閲覧者を持たない は、
+// APIトークン認証ミドルウェアが格納したトークンをハンドラーの Viewer が読めることを確認します。
+// コンテキストキーがずれると制限が静かに効かなくなるため、実際のミドルウェアを通して検証します。
+func TestUseAPITokenGroupMiddlewares_公開ユーザーのみのトークンは閲覧者を持たない(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		token string
+		// Then
+		wantViewer bool
+	}{
+		{name: "制限のないトークンは所有者が閲覧者になる", token: "player-token", wantViewer: true},
+		{name: "公開ユーザーのみのトークンは閲覧者がnilになる", token: "public-only-token", wantViewer: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			group := e.Group("/test")
+			useAPITokenGroupMiddlewares(group, stubAPITokenUsecase{}, stubMaintenanceUsecase{})
+			var viewer, requester *entity.User
+			group.GET("", func(c *echo.Context) error {
+				viewer, requester = apphandler.Viewer(c), apphandler.Requester(c)
+				return c.NoContent(http.StatusNoContent)
+			})
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusNoContent, rec.Code)
+			assert.NotNil(t, requester)
+			assert.Equal(t, tt.wantViewer, viewer != nil)
 		})
 	}
 }
