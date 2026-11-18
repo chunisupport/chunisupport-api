@@ -9,6 +9,7 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/testutil/mysqltest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,26 @@ func setupChartStatsBatchRepositorySQLite(t *testing.T) *sqlx.DB {
 			average_score REAL NULL, median_score REAL NULL, player_count INTEGER NOT NULL,
 			PRIMARY KEY (worldsend_chart_id, rating_band_id)
 		);
+		CREATE TABLE courses (
+			id INTEGER NOT NULL PRIMARY KEY,
+			is_deleted INTEGER NOT NULL DEFAULT 0
+		);
+		CREATE TABLE player_course_records (
+			player_id INTEGER NOT NULL,
+			course_id INTEGER NOT NULL,
+			score INTEGER NOT NULL,
+			is_clear INTEGER NOT NULL,
+			combo_lamp_id INTEGER NOT NULL,
+			PRIMARY KEY (player_id, course_id)
+		);
+		CREATE TABLE course_stats_by_rating_band (
+			course_id INTEGER NOT NULL,
+			rating_band_id INTEGER NOT NULL,
+			combo_none INTEGER NOT NULL, combo_fc INTEGER NOT NULL, combo_aj INTEGER NOT NULL,
+			clear_failed INTEGER NOT NULL, clear_clear INTEGER NOT NULL,
+			average_score REAL NULL, median_score REAL NULL, player_count INTEGER NOT NULL,
+			PRIMARY KEY (course_id, rating_band_id)
+		);
 		CREATE TABLE chart_best_slot_stats_by_rating_band (
 			chart_id INTEGER NOT NULL,
 			rating_band_id INTEGER NOT NULL,
@@ -121,6 +142,7 @@ type chartStatsBatchSourceResult struct {
 	eligiblePlayers  []chartstatsbatch.EligiblePlayer
 	bestSlotRecords  []chartstatsbatch.BestSlotRecord
 	bestSlotCharts   []int
+	courseRecords    []chartstatsbatch.CourseRecord
 }
 
 func streamChartStatsBatchSource(t *testing.T, repo domainrepo.ChartStatsBatchRepository) chartStatsBatchSourceResult {
@@ -145,6 +167,10 @@ func streamChartStatsBatchSource(t *testing.T, repo domainrepo.ChartStatsBatchRe
 		},
 		BestSlotChart: func(chartID int) error {
 			result.bestSlotCharts = append(result.bestSlotCharts, chartID)
+			return nil
+		},
+		CourseRecord: func(record chartstatsbatch.CourseRecord) error {
+			result.courseRecords = append(result.courseRecords, record)
 			return nil
 		},
 	})
@@ -316,4 +342,181 @@ func TestChartStatsBatchRepository_ReplaceAll_失敗した場合は既存の統�
 		require.NoError(t, db.Select(&chartIDs, query))
 		assert.Equal(t, []int{999}, chartIDs, query)
 	}
+}
+
+func TestChartStatsBatchRepository_StreamSource_コース記録(t *testing.T) {
+	// Given
+	db := setupChartStatsBatchRepositorySQLite(t)
+	_, err := db.Exec(`
+		INSERT INTO users (id, is_suspicious) VALUES (1, 0), (2, 0), (3, 1), (4, 0);
+		-- プレイヤー3は不審ユーザー、プレイヤー4はベスト枠平均レーティングが未計算のため集計対象外
+		INSERT INTO players (id, user_id, best_average_rating) VALUES (1, 1, 17.0), (2, 2, 16.5), (3, 3, 17.2), (4, 4, NULL);
+		-- コース30は削除済みのため集計対象外
+		INSERT INTO courses (id, is_deleted) VALUES (10, 0), (20, 0), (30, 1);
+		INSERT INTO player_course_records (player_id, course_id, score, is_clear, combo_lamp_id) VALUES
+			(2, 20, 2800000, 1, 1),
+			(2, 10, 1500000, 0, 1),
+			(1, 10, 3030000, 1, 3),
+			(1, 30, 3000000, 1, 2),
+			(3, 10, 3000000, 1, 2),
+			(4, 10, 3000000, 1, 2);
+	`)
+	require.NoError(t, err)
+
+	// When
+	result := streamChartStatsBatchSource(t, NewChartStatsBatchRepository(db))
+
+	// Then: 譜面統計と同じ条件で除外し、コースID順、同じコース内はプレイヤーID順に返す
+	assert.Equal(t, []chartstatsbatch.CourseRecord{
+		{CourseID: 10, BestAverageRating: 17.0, Score: 3030000, IsClear: true, ComboLampID: 3},
+		{CourseID: 10, BestAverageRating: 16.5, Score: 1500000, IsClear: false, ComboLampID: 1},
+		{CourseID: 20, BestAverageRating: 16.5, Score: 2800000, IsClear: true, ComboLampID: 1},
+	}, result.courseRecords)
+}
+
+func TestChartStatsBatchRepository_ReplaceAll_コース統計を入れ替える(t *testing.T) {
+	// Given: 前回の集計結果
+	db := setupChartStatsBatchRepositorySQLite(t)
+	_, err := db.Exec(`INSERT INTO course_stats_by_rating_band VALUES (999, 0, 0,0,0, 0,0, NULL, NULL, 0)`)
+	require.NoError(t, err)
+	average, median := 2900000.5, 2950000.0
+	snapshot := &chartstatsbatch.Snapshot{
+		CourseStats: []*entity.CourseStatsByRatingBand{
+			{
+				CourseID: 10, RatingBandID: 0,
+				Combo: entity.CourseComboStats{None: 1, FC: 2, AJ: 3}, Clear: entity.CourseClearStats{Failed: 4, Clear: 5},
+				AverageScore: &average, MedianScore: &median, PlayerCount: 9,
+			},
+			{CourseID: 10, RatingBandID: 22, Combo: entity.CourseComboStats{None: 1}, Clear: entity.CourseClearStats{Failed: 1}, PlayerCount: 1},
+		},
+	}
+
+	// When
+	err = NewChartStatsBatchRepository(db).ReplaceAll(context.Background(), snapshot)
+
+	// Then: 前回の行は消え、全列が保存される
+	require.NoError(t, err)
+	repo := NewCourseStatsRepository(db)
+	stats, err := repo.FindByCourseID(context.Background(), db, 10)
+	require.NoError(t, err)
+	assert.Equal(t, snapshot.CourseStats, stats)
+	previous, err := repo.FindByCourseID(context.Background(), db, 999)
+	require.NoError(t, err)
+	assert.Empty(t, previous)
+}
+
+func TestChartStatsBatchRepository_ReplaceAll_失敗した場合は既存のコース統計も維持する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given: 入れ替えに失敗するスナップショット
+		snapshot func() *chartstatsbatch.Snapshot
+	}{
+		{
+			name: "コース統計より前の挿入が失敗する",
+			snapshot: func() *chartstatsbatch.Snapshot {
+				invalidPercentage := 200.0
+				return &chartstatsbatch.Snapshot{
+					BestSlotStats: []*entity.ChartBestSlotStatsByRatingBand{
+						{ChartID: 10, RatingBandID: 0, BestPlayerCount: 1, EligiblePlayerCount: 1, BestPlayerPercentage: &invalidPercentage},
+					},
+					CourseStats: []*entity.CourseStatsByRatingBand{{CourseID: 10, RatingBandID: 0, PlayerCount: 1}},
+				}
+			},
+		},
+		{
+			name: "最後に挿入するコース統計が主キー重複で失敗する",
+			snapshot: func() *chartstatsbatch.Snapshot {
+				return &chartstatsbatch.Snapshot{
+					ChartStats: []*entity.ChartStatsByRatingBand{{ChartID: 10, RatingBandID: 0, PlayerCount: 1}},
+					CourseStats: []*entity.CourseStatsByRatingBand{
+						{CourseID: 10, RatingBandID: 0, PlayerCount: 1},
+						{CourseID: 10, RatingBandID: 0, PlayerCount: 2},
+					},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: 前回の集計結果
+			db := setupChartStatsBatchRepositorySQLite(t)
+			_, err := db.Exec(`
+				INSERT INTO chart_stats_by_rating_band VALUES (999, 0, 0,0,0,0,0,0,0,0, 0,0,0,0, 0,0,0,0,0,0, NULL, NULL, 0);
+				INSERT INTO chart_best_slot_stats_by_rating_band VALUES (999, 0, 1, 1, 100);
+				INSERT INTO course_stats_by_rating_band VALUES (999, 0, 0,0,0, 0,0, NULL, NULL, 0);
+			`)
+			require.NoError(t, err)
+
+			// When
+			err = NewChartStatsBatchRepository(db).ReplaceAll(context.Background(), tt.snapshot())
+
+			// Then: どの統計テーブルも前回の内容のまま
+			assert.Error(t, err)
+			for _, query := range []string{
+				`SELECT chart_id FROM chart_stats_by_rating_band`,
+				`SELECT chart_id FROM chart_best_slot_stats_by_rating_band`,
+				`SELECT course_id FROM course_stats_by_rating_band`,
+			} {
+				var ids []int
+				require.NoError(t, db.Select(&ids, query))
+				assert.Equal(t, []int{999}, ids, query)
+			}
+		})
+	}
+}
+
+func TestCourseStatsMySQL_バッチの入れ替え結果をレーティング帯ごとに取得できる(t *testing.T) {
+	// Given: 本番マイグレーションを適用したDBに、集計対象と対象外のプレイヤー・コースがある
+	db := mysqltest.NewDatabase(t, "")
+	_, err := db.Exec(`INSERT INTO users (id, username, is_suspicious) VALUES (1, 'stats_one', 0), (2, 'stats_two', 0), (3, 'stats_three', 1);
+		INSERT INTO players (id, user_id, player_name, player_level, official_player_rating, official_overpower, best_average_rating)
+			VALUES (1, 1, '一', 10, 17.00, 100.00, 17.05), (2, 2, '二', 10, 16.00, 100.00, 16.55), (3, 3, '三', 10, 17.00, 100.00, 17.05);
+		INSERT INTO courses (id, display_id, official_idx, name, course_class_id, is_deleted) VALUES
+			(10, '0000000000000010', 'c10', 'コース10', 1, 0), (11, '0000000000000011', 'c11', '削除済み', 1, 1);
+		INSERT INTO player_course_records (player_id, course_id, score, is_clear, combo_lamp_id, updated_at) VALUES
+			(1, 10, 3030000, 1, 3, '2026-11-01 00:00:00'),
+			(2, 10, 1500000, 0, 1, '2026-11-01 00:00:00'),
+			(3, 10, 3000000, 1, 2, '2026-11-01 00:00:00'),
+			(1, 11, 3000000, 1, 2, '2026-11-01 00:00:00');
+		INSERT INTO course_stats_by_rating_band (course_id, rating_band_id, player_count) VALUES (11, 0, 99);`)
+	require.NoError(t, err)
+	ctx := context.Background()
+	batchRepo := NewChartStatsBatchRepository(db)
+	bands, err := batchRepo.FindRatingBands(ctx)
+	require.NoError(t, err)
+	calculator := chartstatsbatch.NewCourseStatsCalculator(bands)
+	source := streamChartStatsBatchSource(t, batchRepo)
+	for _, record := range source.courseRecords {
+		calculator.Add(record)
+	}
+
+	// When
+	require.NoError(t, batchRepo.ReplaceAll(ctx, &chartstatsbatch.Snapshot{CourseStats: calculator.Results()}))
+
+	// Then: ALL と、各プレイヤーが属する帯だけに行ができる。不審ユーザーと削除済みコースは含まれない。
+	type row struct {
+		Label        string   `db:"label"`
+		PlayerCount  int      `db:"player_count"`
+		ClearFailed  int      `db:"clear_failed"`
+		ClearClear   int      `db:"clear_clear"`
+		ComboNone    int      `db:"combo_none"`
+		ComboFC      int      `db:"combo_fc"`
+		ComboAJ      int      `db:"combo_aj"`
+		AverageScore *float64 `db:"average_score"`
+		MedianScore  *float64 `db:"median_score"`
+	}
+	var got []row
+	require.NoError(t, db.Select(&got, `SELECT rb.label, s.player_count, s.clear_failed, s.clear_clear, s.combo_none, s.combo_fc, s.combo_aj, s.average_score, s.median_score
+		FROM course_stats_by_rating_band s INNER JOIN rating_bands rb ON rb.id = s.rating_band_id
+		WHERE s.course_id = 10 ORDER BY rb.sort_order`))
+	theoretical := 3030000.0
+	assert.Equal(t, []row{
+		{Label: "ALL", PlayerCount: 2, ClearFailed: 1, ClearClear: 1, ComboNone: 1, ComboAJ: 1, AverageScore: &theoretical, MedianScore: &theoretical},
+		{Label: "16.5", PlayerCount: 1, ClearFailed: 1, ComboNone: 1},
+		{Label: "17.0", PlayerCount: 1, ClearClear: 1, ComboAJ: 1, AverageScore: &theoretical, MedianScore: &theoretical},
+	}, got)
+	deleted, err := NewCourseStatsRepository(db).FindByCourseID(ctx, db, 11)
+	require.NoError(t, err)
+	assert.Empty(t, deleted)
 }

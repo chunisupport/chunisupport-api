@@ -7,13 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenname"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenpermission"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -53,7 +53,7 @@ func newAPITokenUsecaseWithClock(db repository.Executor, tm TransactionManager, 
 }
 
 // Generate は既存トークンを維持したまま、権限付きの名前付きAPIトークンを追加発行します。
-func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error) {
+func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string, permission string, publicOnly bool) (*GeneratedAPITokenOutput, error) {
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
 		return nil, ErrInvalidAPITokenName
@@ -67,7 +67,15 @@ func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string,
 	if err != nil {
 		return nil, err
 	}
-	token, err := entity.NewAPIToken(userID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String())
+	rawDisplayID, err := generateDisplayID()
+	if err != nil {
+		return nil, err
+	}
+	displayID, err := displayid.NewDisplayID(rawDisplayID)
+	if err != nil {
+		return nil, err
+	}
+	token, err := entity.NewAPIToken(userID, displayID, validatedName.String(), hashToken(plain), plain[:info.APITokenPrefixLength], validatedPermission.String(), publicOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +101,7 @@ func (u *apiTokenUsecase) Generate(ctx context.Context, userID int, name string,
 			}
 			return err
 		}
-		created, err := u.tokenRepo.FindByIDAndUserID(ctx, tx, token.ID, userID)
+		created, err := u.tokenRepo.FindByDisplayIDAndUserID(ctx, tx, token.DisplayID, userID)
 		if err != nil {
 			return err
 		}
@@ -128,7 +136,7 @@ func (u *apiTokenUsecase) Rename(ctx context.Context, userID int, id string, nam
 	}
 	var token *entity.APIToken
 	err = u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		found, err := u.tokenRepo.FindByIDAndUserIDForUpdate(ctx, tx, tokenID, userID)
+		found, err := u.tokenRepo.FindByDisplayIDAndUserIDForUpdate(ctx, tx, tokenID, userID)
 		if errors.Is(err, repository.ErrAPITokenNotFound) {
 			return ErrAPITokenNotFound
 		}
@@ -212,7 +220,7 @@ func (u *apiTokenUsecase) Delete(ctx context.Context, userID int, id string) err
 	if err != nil {
 		return err
 	}
-	err = u.tokenRepo.DeleteByIDAndUserID(ctx, u.db, tokenID, userID)
+	err = u.tokenRepo.DeleteByDisplayIDAndUserID(ctx, u.db, tokenID, userID)
 	if errors.Is(err, repository.ErrAPITokenNotFound) {
 		return ErrAPITokenNotFound
 	}
@@ -227,19 +235,20 @@ func generateAPIToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func parseAPITokenID(id string) (uint64, error) {
-	parsed, err := strconv.ParseUint(id, 10, 64)
-	if err != nil || parsed == 0 {
-		return 0, ErrInvalidAPITokenID
+func parseAPITokenID(id string) (displayid.DisplayID, error) {
+	parsed, err := displayid.NewDisplayID(id)
+	if err != nil {
+		return "", ErrInvalidAPITokenID
 	}
 	return parsed, nil
 }
 
 func toAPITokenOutput(token *entity.APIToken) *APITokenOutput {
 	return &APITokenOutput{
-		ID:          token.ID,
+		ID:          token.DisplayID.String(),
 		Name:        token.Name.String(),
 		Permission:  token.Permission.String(),
+		PublicOnly:  token.PublicOnly,
 		TokenPrefix: token.TokenPrefix,
 		LastUsedAt:  token.LastUsedAt,
 		CreatedAt:   token.CreatedAt,

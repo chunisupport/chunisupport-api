@@ -500,6 +500,114 @@ func TestApplyHonors_登録済みSP称号は通知対象にしない(t *testing.
 	assert.Empty(t, registered)
 }
 
+func TestApplyHonors_DBエラーはスキップせずトランザクションを失敗させる(t *testing.T) {
+	dbErr := errors.New("Deadlock found when trying to get lock")
+	tests := []struct {
+		name      string
+		honorRepo *stubHonorRepositoryForApplyHonorsTest
+	}{
+		{name: "称号の作成に失敗した場合", honorRepo: &stubHonorRepositoryForApplyHonorsTest{ensureErr: dbErr}},
+		{name: "称号の割り当てに失敗した場合", honorRepo: &stubHonorRepositoryForApplyHonorsTest{assignErr: dbErr}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			uc := &playerDataUsecase{honorRepo: tt.honorRepo}
+
+			// When
+			_, _, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+				"1": {Title: "通常称号", Class: "normal"},
+			}, newApplyHonorsTestMasters())
+
+			// Then
+			assert.ErrorIs(t, err, dbErr)
+		})
+	}
+}
+
+func TestApplyHonors_DBが受け付けない入力はDBへ送らずスキップする(t *testing.T) {
+	longURL := "https://example.com/" + strings.Repeat("a", info.HonorImageURLMaxLength) + ".png"
+	tests := []struct {
+		name            string
+		honors          map[string]PlayerDataHonorPayload
+		wantSkipped     int
+		wantEnsureCalls int
+		wantAssignments int
+	}{
+		{
+			name:            "称号名が上限文字数を超える場合",
+			honors:          map[string]PlayerDataHonorPayload{"1": {Title: strings.Repeat("あ", info.HonorNameMaxLength+1), Class: "normal"}},
+			wantSkipped:     1,
+			wantEnsureCalls: 0,
+			wantAssignments: 0,
+		},
+		{
+			name:            "SP称号の画像URLが上限文字数を超える場合",
+			honors:          map[string]PlayerDataHonorPayload{"1": {Class: "sp", Img: &longURL}},
+			wantSkipped:     1,
+			wantEnsureCalls: 0,
+			wantAssignments: 0,
+		},
+		{
+			name: "同じスロットが表記違いで重複する場合",
+			honors: map[string]PlayerDataHonorPayload{
+				"1":  {Title: "称号A", Class: "normal"},
+				"01": {Title: "称号B", Class: "normal"},
+			},
+			wantSkipped:     1,
+			wantEnsureCalls: 1,
+			wantAssignments: 1,
+		},
+		{
+			name: "ランダム称号で維持するスロットと表記違いで重複する場合",
+			honors: map[string]PlayerDataHonorPayload{
+				"1":  {Title: info.RandomFavoriteHonorTitle, Class: "normal"},
+				"01": {Title: "称号X", Class: "normal"},
+			},
+			wantSkipped:     1,
+			wantEnsureCalls: 0,
+			wantAssignments: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+			uc := &playerDataUsecase{honorRepo: honorRepo}
+
+			// When
+			skipped, _, err := uc.applyHonors(context.Background(), nil, 100, tt.honors, newApplyHonorsTestMasters())
+
+			// Then
+			require.NoError(t, err)
+			assert.Len(t, skipped, tt.wantSkipped)
+			assert.Len(t, honorRepo.ensureCalls, tt.wantEnsureCalls)
+			assert.Len(t, honorRepo.assignments, tt.wantAssignments)
+		})
+	}
+}
+
+func TestApplyHonors_表記違いで重複するスロットはキーの昇順で先の入力を採用する(t *testing.T) {
+	for range 20 {
+		// Given
+		honorRepo := &stubHonorRepositoryForApplyHonorsTest{}
+		uc := &playerDataUsecase{honorRepo: honorRepo}
+
+		// When
+		_, _, err := uc.applyHonors(context.Background(), nil, 100, map[string]PlayerDataHonorPayload{
+			"1":  {Title: "称号A", Class: "normal"},
+			"01": {Title: "称号B", Class: "normal"},
+		}, newApplyHonorsTestMasters())
+
+		// Then
+		require.NoError(t, err)
+		require.Len(t, honorRepo.ensureCalls, 1)
+		assert.Equal(t, "称号B", honorRepo.ensureCalls[0].title)
+	}
+}
+
 func TestLogRegisteredSPHonors_通常ログ形式でWarnを出力する(t *testing.T) {
 	var buffer bytes.Buffer
 	original := slog.Default()
@@ -701,6 +809,8 @@ type stubHonorRepositoryForApplyHonorsTest struct {
 	assignments    []repository.HonorAssignment
 	nextHonorID    int
 	existing       bool
+	ensureErr      error
+	assignErr      error
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) FindAll(_ context.Context, _ repository.Executor) ([]*entity.Honor, error) {
@@ -729,6 +839,9 @@ func (s *stubHonorRepositoryForApplyHonorsTest) EnsureHonor(_ context.Context, _
 		honorTypeID: honorTypeID,
 		imageURL:    imageURL,
 	})
+	if s.ensureErr != nil {
+		return repository.HonorEnsureResult{}, s.ensureErr
+	}
 	s.nextHonorID++
 	return repository.HonorEnsureResult{ID: s.nextHonorID, ImageURLRegistered: imageURL != nil && !s.existing}, nil
 }
@@ -745,6 +858,9 @@ func (s *stubHonorRepositoryForApplyHonorsTest) DeletePlayerHonorsExceptSlots(_ 
 }
 
 func (s *stubHonorRepositoryForApplyHonorsTest) BulkAssignHonors(_ context.Context, _ repository.Executor, assignments []repository.HonorAssignment) error {
+	if s.assignErr != nil {
+		return s.assignErr
+	}
 	s.assignments = append(s.assignments, assignments...)
 	return nil
 }

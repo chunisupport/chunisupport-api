@@ -14,6 +14,15 @@ type ChartRecord struct {
 	ComboLampID       int
 }
 
+// CourseRecord は集計対象プレイヤーのコース別記録です。
+type CourseRecord struct {
+	CourseID          int
+	BestAverageRating float64
+	Score             int
+	IsClear           bool
+	ComboLampID       int
+}
+
 // EligiblePlayer はベスト枠採用率の母数に含めるプレイヤーです。
 type EligiblePlayer struct {
 	BestAverageRating float64
@@ -32,4 +41,5 @@ type Snapshot struct {
 	// WorldsendChartStats の ChartID は WORLD'S END 譜面IDです。
 	WorldsendChartStats []*entity.ChartStatsByRatingBand
 	BestSlotStats       []*entity.ChartBestSlotStatsByRatingBand
+	CourseStats         []*entity.CourseStatsByRatingBand
 }

@@ -12,14 +12,17 @@ CREATE TABLE `achievement_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `api_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` int unsigned NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '既存のトークン',
   `permission` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'read_write',
+  `public_only` tinyint(1) NOT NULL DEFAULT '0',
   `hashed_token` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `token_prefix` char(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_used_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_api_tokens_display_id` (`display_id`),
   UNIQUE KEY `uq_api_tokens_hashed_token` (`hashed_token`),
   UNIQUE KEY `uq_api_tokens_user_name` (`user_id`,`name`),
   KEY `idx_api_tokens_user_created_id` (`user_id`,`created_at` DESC,`id` DESC),
@@ -135,6 +138,22 @@ CREATE TABLE `course_classes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_course_classes_name` (`name`),
   UNIQUE KEY `uq_course_classes_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_stats_by_rating_band` (
+  `course_id` mediumint unsigned NOT NULL,
+  `rating_band_id` tinyint unsigned NOT NULL,
+  `combo_none` int unsigned NOT NULL DEFAULT '0',
+  `combo_fc` int unsigned NOT NULL DEFAULT '0',
+  `combo_aj` int unsigned NOT NULL DEFAULT '0',
+  `clear_failed` int unsigned NOT NULL DEFAULT '0',
+  `clear_clear` int unsigned NOT NULL DEFAULT '0',
+  `average_score` double DEFAULT NULL,
+  `median_score` double DEFAULT NULL,
+  `player_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`course_id`,`rating_band_id`),
+  KEY `fk_course_stats_by_rating_band_rating_band` (`rating_band_id`),
+  CONSTRAINT `fk_course_stats_by_rating_band_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_course_stats_by_rating_band_rating_band` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `courses` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
@@ -257,6 +276,19 @@ CREATE TABLE `name_folders` (
   UNIQUE KEY `uq_name_folders_code` (`code`),
   UNIQUE KEY `uq_name_folders_name` (`name`),
   UNIQUE KEY `uq_name_folders_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_course_record_histories` (
+  `player_id` int unsigned NOT NULL,
+  `course_id` mediumint unsigned NOT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `is_clear` tinyint(1) NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `updated_at` timestamp NOT NULL,
+  PRIMARY KEY (`player_id`,`course_id`,`updated_at`),
+  KEY `fk_player_course_record_histories_course` (`course_id`),
+  CONSTRAINT `fk_player_course_record_histories_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`),
+  CONSTRAINT `fk_player_course_record_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_course_record_histories_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_course_records` (
   `player_id` int unsigned NOT NULL,

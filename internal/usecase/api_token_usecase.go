@@ -9,9 +9,10 @@ import (
 
 // APITokenOutput は管理APIへ返すAPIトークン情報です。
 type APITokenOutput struct {
-	ID          uint64
+	ID          string
 	Name        string
 	Permission  string
+	PublicOnly  bool
 	TokenPrefix *string
 	LastUsedAt  *time.Time
 	CreatedAt   time.Time
@@ -26,7 +27,8 @@ type GeneratedAPITokenOutput struct {
 // APITokenUsecase はAPIトークンに関するユースケースを提供します。
 type APITokenUsecase interface {
 	// Generate は権限付きの名前付きAPIトークンを追加発行します。read_writeはEDITOR以上に限ります。
-	Generate(ctx context.Context, userID int, name string, permission string) (*GeneratedAPITokenOutput, error)
+	// publicOnly を true にすると、本人やフレンドであっても非公開ユーザーを参照できないトークンになります。
+	Generate(ctx context.Context, userID int, name string, permission string, publicOnly bool) (*GeneratedAPITokenOutput, error)
 	// List はユーザーが所有するAPIトークンを返します。
 	List(ctx context.Context, userID int) ([]*APITokenOutput, error)
 	// Rename は所有するAPIトークンの名前を変更します。

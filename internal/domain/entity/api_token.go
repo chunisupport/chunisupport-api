@@ -7,12 +7,14 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenname"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/apitokenpermission"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 const apiTokenHashLength = 64
 
 var (
 	ErrAPITokenIDInvalid         = errors.New("API token id is invalid")
+	ErrAPITokenDisplayIDInvalid  = errors.New("API token display id is invalid")
 	ErrAPITokenUserIDInvalid     = errors.New("API token user id is invalid")
 	ErrAPITokenHashInvalid       = errors.New("API token hash is invalid")
 	ErrAPITokenPrefixInvalid     = errors.New("API token prefix is invalid")
@@ -21,10 +23,13 @@ var (
 
 // APIToken は外部APIで利用する永続化トークンを表します。
 type APIToken struct {
-	ID          uint64
-	UserID      int
-	Name        apitokenname.APITokenName
-	Permission  apitokenpermission.APITokenPermission
+	ID         uint64
+	DisplayID  displayid.DisplayID
+	UserID     int
+	Name       apitokenname.APITokenName
+	Permission apitokenpermission.APITokenPermission
+	// PublicOnly が true のトークンは、本人やフレンドであっても非公開ユーザーを参照できません。
+	PublicOnly  bool
 	HashedToken string
 	TokenPrefix *string
 	LastUsedAt  *time.Time
@@ -32,13 +37,16 @@ type APIToken struct {
 }
 
 // NewAPIToken は権限付きの新規APIトークンを生成します。
-func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string, permission string) (*APIToken, error) {
+func NewAPIToken(userID int, displayID displayid.DisplayID, name string, hashedToken string, tokenPrefix string, permission string, publicOnly bool) (*APIToken, error) {
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
 		return nil, err
 	}
 	if userID <= 0 {
 		return nil, ErrAPITokenUserIDInvalid
+	}
+	if !displayID.IsValid() {
+		return nil, ErrAPITokenDisplayIDInvalid
 	}
 	if !isValidAPITokenHash(hashedToken) {
 		return nil, ErrAPITokenHashInvalid
@@ -52,9 +60,11 @@ func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string
 	}
 	prefix := tokenPrefix
 	return &APIToken{
+		DisplayID:   displayID,
 		UserID:      userID,
 		Name:        validatedName,
 		Permission:  validatedPermission,
+		PublicOnly:  publicOnly,
 		HashedToken: hashedToken,
 		TokenPrefix: &prefix,
 	}, nil
@@ -62,9 +72,13 @@ func NewAPIToken(userID int, name string, hashedToken string, tokenPrefix string
 
 // RestoreAPIToken は永続化済みデータからAPIトークンを復元します。
 // 旧仕様のトークンは表示用prefixを保持していないため、nilを許容します。
-func RestoreAPIToken(id uint64, userID int, name string, hashedToken string, tokenPrefix *string, lastUsedAt *time.Time, createdAt time.Time, permission string) (*APIToken, error) {
+func RestoreAPIToken(id uint64, displayID string, userID int, name string, hashedToken string, tokenPrefix *string, lastUsedAt *time.Time, createdAt time.Time, permission string, publicOnly bool) (*APIToken, error) {
 	if id == 0 {
 		return nil, ErrAPITokenIDInvalid
+	}
+	validatedDisplayID, err := displayid.NewDisplayID(displayID)
+	if err != nil {
+		return nil, ErrAPITokenDisplayIDInvalid
 	}
 	validatedName, err := apitokenname.NewAPITokenName(name)
 	if err != nil {
@@ -85,9 +99,11 @@ func RestoreAPIToken(id uint64, userID int, name string, hashedToken string, tok
 	}
 	return &APIToken{
 		ID:          id,
+		DisplayID:   validatedDisplayID,
 		UserID:      userID,
 		Name:        validatedName,
 		Permission:  validatedPermission,
+		PublicOnly:  publicOnly,
 		HashedToken: hashedToken,
 		TokenPrefix: cloneStringPointer(tokenPrefix),
 		LastUsedAt:  cloneTimePointer(lastUsedAt),
@@ -108,6 +124,11 @@ func (t *APIToken) Rename(name string) error {
 // CanWrite は更新系APIを利用できるトークンかを返します。
 func (t *APIToken) CanWrite() bool {
 	return t.Permission.CanWrite()
+}
+
+// CanViewPrivateUsers は非公開ユーザーを、本人・相互フレンドとして参照できるトークンかを返します。
+func (t *APIToken) CanViewPrivateUsers() bool {
+	return !t.PublicOnly
 }
 
 // ShouldRecordUsage は最終利用日時を永続化する間隔を経過したか判定します。

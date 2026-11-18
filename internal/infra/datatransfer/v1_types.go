@@ -25,6 +25,7 @@ type payloadV1 struct {
 	WorldsendRecordHistories []worldsendRecordHistoryV1 `json:"worldsend_record_histories"`
 	MetricHistories          []metricHistoryV1          `json:"metric_histories"`
 	CourseRecords            []courseRecordV1           `json:"course_records"`
+	CourseRecordHistories    []courseRecordV1           `json:"course_record_histories"`
 	Honors                   []honorV1                  `json:"honors"`
 	FavoriteSongs            []favoriteSongV1           `json:"favorite_songs"`
 	LockedSongs              []lockedSongV1             `json:"locked_songs"`

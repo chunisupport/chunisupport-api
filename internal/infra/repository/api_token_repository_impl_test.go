@@ -26,9 +26,11 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 	_, err = db.Exec(`
 		CREATE TABLE api_tokens (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			display_id TEXT NOT NULL UNIQUE,
 			user_id INTEGER NOT NULL,
 			name TEXT NOT NULL,
 			permission TEXT NOT NULL DEFAULT 'read_write',
+			public_only BOOLEAN NOT NULL DEFAULT FALSE,
 			hashed_token TEXT NOT NULL UNIQUE,
 			token_prefix TEXT NULL,
 			last_used_at DATETIME NULL,
@@ -44,7 +46,7 @@ func setupAPITokenRepositorySQLite(t *testing.T) *sqlx.DB {
 func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("a", 64), "abcde", "read_write")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("a", 64), "abcde", "read_write", false)
 	require.NoError(t, err)
 
 	require.NoError(t, repo.Save(context.Background(), db, token))
@@ -63,7 +65,7 @@ func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 	tokens[0].RecordUsage(usedAt)
 	require.NoError(t, repo.Save(context.Background(), db, tokens[0]))
 
-	updated, err := repo.FindByIDAndUserID(context.Background(), db, token.ID, 10)
+	updated, err := repo.FindByDisplayIDAndUserID(context.Background(), db, token.DisplayID, 10)
 	require.NoError(t, err)
 	assert.Equal(t, "Batch", updated.Name.String())
 	require.NotNil(t, updated.LastUsedAt)
@@ -73,14 +75,31 @@ func TestAPITokenRepository_SaveListAndUpdate(t *testing.T) {
 func TestAPITokenRepository_SaveAndLoad_ReadPermission(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "Read only", strings.Repeat("d", 64), "abcde", "read")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "Read only", strings.Repeat("d", 64), "abcde", "read", false)
 	require.NoError(t, err)
 
 	require.NoError(t, repo.Save(context.Background(), db, token))
-	loaded, err := repo.FindByIDAndUserID(context.Background(), db, token.ID, 10)
+	loaded, err := repo.FindByDisplayIDAndUserID(context.Background(), db, token.DisplayID, 10)
 
 	require.NoError(t, err)
 	assert.Equal(t, "read", loaded.Permission.String())
+}
+
+func TestAPITokenRepository_SaveAndLoad_PublicOnly(t *testing.T) {
+	// Given
+	db := setupAPITokenRepositorySQLite(t)
+	repo := &apiTokenRepository{}
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "Public", strings.Repeat("e", 64), "abcde", "read", true)
+	require.NoError(t, err)
+	require.NoError(t, repo.Save(context.Background(), db, token))
+
+	// When
+	loaded, err := repo.FindByHashedToken(context.Background(), db, strings.Repeat("e", 64))
+
+	// Then
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+	assert.True(t, loaded.PublicOnly)
 }
 
 func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T) {
@@ -89,8 +108,9 @@ func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T
 	createdAt := time.Date(2026, 4, 16, 12, 34, 56, 0, time.UTC)
 
 	_, err := db.Exec(
-		`INSERT INTO api_tokens (id, user_id, name, hashed_token, token_prefix, created_at) VALUES (?, ?, ?, ?, NULL, ?)`,
+		`INSERT INTO api_tokens (id, display_id, user_id, name, hashed_token, token_prefix, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)`,
 		1,
+		"fedcba9876543210",
 		10,
 		"既存のトークン",
 		strings.Repeat("b", 64),
@@ -102,21 +122,22 @@ func TestAPITokenRepository_FindByHashedToken_LegacyPrefixCanBeNull(t *testing.T
 	require.NoError(t, err)
 	require.NotNil(t, token)
 	assert.Equal(t, uint64(1), token.ID)
+	assert.Equal(t, "fedcba9876543210", token.DisplayID.String())
 	assert.Nil(t, token.TokenPrefix)
 	assert.True(t, token.CreatedAt.Equal(createdAt))
 }
 
-func TestAPITokenRepository_DeleteByIDAndUserID_IsScopedToOwner(t *testing.T) {
+func TestAPITokenRepository_DeleteByDisplayIDAndUserID_IsScopedToOwner(t *testing.T) {
 	db := setupAPITokenRepositorySQLite(t)
 	repo := &apiTokenRepository{}
-	token, err := entity.NewAPIToken(10, "CLI", strings.Repeat("c", 64), "abcde", "read_write")
+	token, err := entity.NewAPIToken(10, "0123456789abcdef", "CLI", strings.Repeat("c", 64), "abcde", "read_write", false)
 	require.NoError(t, err)
 	require.NoError(t, repo.Save(context.Background(), db, token))
 
-	err = repo.DeleteByIDAndUserID(context.Background(), db, token.ID, 11)
+	err = repo.DeleteByDisplayIDAndUserID(context.Background(), db, token.DisplayID, 11)
 	assert.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
 
-	require.NoError(t, repo.DeleteByIDAndUserID(context.Background(), db, token.ID, 10))
-	_, err = repo.FindByIDAndUserID(context.Background(), db, token.ID, 10)
+	require.NoError(t, repo.DeleteByDisplayIDAndUserID(context.Background(), db, token.DisplayID, 10))
+	_, err = repo.FindByDisplayIDAndUserID(context.Background(), db, token.DisplayID, 10)
 	assert.ErrorIs(t, err, domainrepo.ErrAPITokenNotFound)
 }

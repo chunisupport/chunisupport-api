@@ -125,6 +125,33 @@ func TestChunirecHandler_対象ユーザーと互換エラー(t *testing.T) {
 		})
 	}
 }
+
+func TestChunirecHandler_公開ユーザーのみのトークンでは閲覧者を渡さない(t *testing.T) {
+	for _, endpoint := range []struct {
+		path    string
+		handler func(*ChunirecHandler, *echo.Context) error
+	}{
+		{"/records/profile", (*ChunirecHandler).GetRecordsProfile},
+		{"/records/showall", (*ChunirecHandler).GetRecordsShowAll},
+	} {
+		t.Run(endpoint.path, func(t *testing.T) {
+			// Given: user_name を省略し、トークン所有者自身を対象にする
+			query := &stubChunirecUserUsecase{}
+			h := NewChunirecHandler(nil, query, nil, time.UTC)
+			c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, endpoint.path, nil), httptest.NewRecorder())
+			c.Set("userEntity", &entity.User{ID: 1, Username: usernametest.New(t, "tester")})
+			c.Set("apiToken", &entity.APIToken{PublicOnly: true})
+
+			// When
+			require.NoError(t, endpoint.handler(h, c))
+
+			// Then: 本人として閲覧判定させないため、閲覧者は未認証と同じ nil になる
+			assert.Equal(t, "tester", query.username)
+			assert.Nil(t, query.requester)
+		})
+	}
+}
+
 func TestChunirecHandler_GetRecordsShowAll_未連携では空配列を返す(t *testing.T) {
 	e := echo.New()
 	h := NewChunirecHandler(nil, &stubChunirecUserUsecase{}, nil, time.UTC)

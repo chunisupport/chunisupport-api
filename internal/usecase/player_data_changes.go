@@ -29,7 +29,7 @@ func computeCourseRecordChanges(ctx context.Context, before map[int]repository.C
 	result := make([]api_internal.PlayerDataRecordChange, 0, len(after))
 	for _, record := range after {
 		old, exists := before[record.CourseID]
-		if exists && old.Score == record.State.Score && old.IsClear == record.State.IsClear && old.ComboLampID == record.State.ComboLampID {
+		if exists && !courseRecordMeaningfullyChanged(old, record.State) {
 			continue
 		}
 		course := byID[record.CourseID]
@@ -394,4 +394,11 @@ func worldsendRecordMeaningfullyChanged(before, after repository.WorldsendRecord
 		before.ClearLampID != after.ClearLampID ||
 		before.ComboLampID != after.ComboLampID ||
 		before.FullChainID != after.FullChainID
+}
+
+// courseRecordMeaningfullyChanged は履歴と更新日時の対象になるコース成績3項目だけを比較します。
+func courseRecordMeaningfullyChanged(before, after repository.CourseRecordState) bool {
+	return before.Score != after.Score ||
+		before.IsClear != after.IsClear ||
+		before.ComboLampID != after.ComboLampID
 }

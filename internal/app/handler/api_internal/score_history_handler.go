@@ -63,6 +63,31 @@ func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toInternalScoreHistoryResponse(entries))
 }
 
+// GetCourse はコースのスコア履歴を返します。
+func (h *ScoreHistoryHandler) GetCourse(c *echo.Context) error {
+	displayID, apiErr := apphandler.ValidateDisplayID(c.Param("id"))
+	if apiErr != nil {
+		return apiErr
+	}
+	username, requester, apiErr := internalScoreHistoryRequestParams(c)
+	if apiErr != nil {
+		return apiErr
+	}
+	entries, err := h.usecase.GetCourse(
+		c.Request().Context(), username, requester, displayID,
+	)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	result := make([]internaldto.CourseScoreHistoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		result = append(result, internaldto.CourseScoreHistoryEntry{
+			Score: entry.Score, IsClear: entry.IsClear, ComboLamp: entry.ComboLamp, UpdatedAt: entry.UpdatedAt,
+		})
+	}
+	return c.JSON(http.StatusOK, &internaldto.CourseScoreHistoryResponse{Entries: result})
+}
+
 func internalScoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror.APIError) {
 	username, apiErr := apphandler.ValidateUsername(c.Param("username"))
 	if apiErr != nil {

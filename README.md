@@ -175,7 +175,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 
 ## 譜面統計バッチ
 
-`go run ./cmd/chart-stats-batch` はプレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chart_stats_by_rating_band` / `worldsend_chart_stats_by_rating_band` / `chart_best_slot_stats_by_rating_band` を再構築します。
+`go run ./cmd/chart-stats-batch` はプレイヤーの譜面別記録をベスト枠平均レーティング帯ごとに集計し、`chart_stats_by_rating_band` / `worldsend_chart_stats_by_rating_band` / `chart_best_slot_stats_by_rating_band` / `course_stats_by_rating_band` を再構築します。
 
 | 実行方法 | 内容 |
 |---|---|
@@ -183,7 +183,7 @@ cd /home/ubuntu/apps/chunisupport/api && ./chunisupport-song-batch-linux-amd64
 | 管理画面 `/admin/batch/chart-stats`（譜面統計バッチタブ） | ADMINが同じ処理を任意のタイミングで実行（API プロセス内でバックグラウンド実行） |
 
 - CLI と管理画面は同じ MySQL アドバイザリロックを使うため、同時に実行される譜面統計バッチは常に1つです。
-- 3つの統計テーブルは集計後に単一トランザクションで入れ替えるため、実行中や失敗時も直前の統計が参照されます。
+- 4つの統計テーブルは集計後に単一トランザクションで入れ替えるため、実行中や失敗時も直前の統計が参照されます。
 - 実行結果は `chart_stats_batch_jobs` テーブルに記録され、管理画面で確認できます。保持するのは最新50件までです。
 
 旧 stat-batch からの切り替え手順と実行履歴の状態は [譜面統計バッチ](docs/chart_stats_batch.md)、集計規則は [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md) を参照してください。

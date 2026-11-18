@@ -32,12 +32,12 @@ func (h *ScoreHistoryHandler) GetStandard(c *echo.Context) error {
 	if !ok || difficulty == "WORLD'S END" {
 		return apierror.ErrInvalidDifficulty
 	}
-	username, requester, apiErr := scoreHistoryRequestParams(c)
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetStandard(
-		c.Request().Context(), username, requester, displayID, difficulty,
+		c.Request().Context(), username, viewer, displayID, difficulty,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
@@ -51,17 +51,42 @@ func (h *ScoreHistoryHandler) GetWorldsend(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	username, requester, apiErr := scoreHistoryRequestParams(c)
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
 	if apiErr != nil {
 		return apiErr
 	}
 	entries, err := h.usecase.GetWorldsend(
-		c.Request().Context(), username, requester, displayID,
+		c.Request().Context(), username, viewer, displayID,
 	)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
 	return c.JSON(http.StatusOK, toScoreHistoryResponse(entries))
+}
+
+// GetCourse はコースのスコア履歴を返します。
+func (h *ScoreHistoryHandler) GetCourse(c *echo.Context) error {
+	displayID, apiErr := handler.ValidateDisplayID(c.Param("id"))
+	if apiErr != nil {
+		return apiErr
+	}
+	username, viewer, apiErr := scoreHistoryRequestParams(c)
+	if apiErr != nil {
+		return apiErr
+	}
+	entries, err := h.usecase.GetCourse(
+		c.Request().Context(), username, viewer, displayID,
+	)
+	if err != nil {
+		return apierror.FromUsecaseError(err)
+	}
+	result := make([]dto.CourseScoreHistoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		result = append(result, dto.CourseScoreHistoryEntry{
+			Score: entry.Score, IsClear: entry.IsClear, ComboLamp: entry.ComboLamp, UpdatedAt: entry.UpdatedAt,
+		})
+	}
+	return c.JSON(http.StatusOK, &dto.CourseScoreHistoryResponse{Entries: result})
 }
 
 func scoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror.APIError) {
@@ -73,8 +98,8 @@ func scoreHistoryRequestParams(c *echo.Context) (string, *entity.User, *apierror
 	if apiErr != nil {
 		return "", nil, apiErr
 	}
-	requester := handler.Requester(c)
-	return username, requester, nil
+	viewer := handler.Viewer(c)
+	return username, viewer, nil
 }
 
 func toScoreHistoryResponse(entries []usecase.ScoreHistoryEntry) *dto.ScoreHistoryResponse {

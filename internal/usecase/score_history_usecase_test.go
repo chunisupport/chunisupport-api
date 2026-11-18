@@ -54,6 +54,24 @@ func (m *mockScoreHistoryRepository) FindWorldsendTimeline(ctx context.Context, 
 	return args.Get(0).([]entity.ScoreHistoryEntry), args.Error(1)
 }
 
+func (m *mockScoreHistoryRepository) BulkInsertCourse(ctx context.Context, exec repository.Executor, rows []repository.PlayerCourseRecordHistory) error {
+	args := m.Called(ctx, exec, rows)
+	return args.Error(0)
+}
+
+func (m *mockScoreHistoryRepository) PruneCourseOverLimit(ctx context.Context, exec repository.Executor, playerID int, courseIDs []int) error {
+	args := m.Called(ctx, exec, playerID, courseIDs)
+	return args.Error(0)
+}
+
+func (m *mockScoreHistoryRepository) FindCourseTimeline(ctx context.Context, playerID, courseID int) ([]entity.CourseScoreHistoryEntry, error) {
+	args := m.Called(ctx, playerID, courseID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]entity.CourseScoreHistoryEntry), args.Error(1)
+}
+
 type scoreHistoryReadMasterProvider struct {
 	masters *domainmasterdata.PlayerDataMasters
 }
@@ -101,7 +119,7 @@ func TestScoreHistoryUsecase_GetStandard_公開中の通常楽曲だけ履歴を
 	setScoreHistoryReadUserExpectation(userRepo, exec, user)
 	songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(song, nil).Once()
 	historyRepo.On("FindStandardTimeline", ctx, 10, 30).Return(wantRows, nil).Once()
-	uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+	uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 	got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", "EXPERT")
 
@@ -142,7 +160,7 @@ func TestScoreHistoryUsecase_GetStandard_公開対象外の楽曲は404へ正規
 
 			setScoreHistoryReadUserExpectation(userRepo, exec, user)
 			songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(tt.song, nil).Once()
-			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 			got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", "EXPERT")
 
@@ -171,7 +189,7 @@ func TestScoreHistoryUsecase_GetWorldsend_公開中のWORLDsend楽曲だけ履�
 	setScoreHistoryReadUserExpectation(userRepo, exec, user)
 	worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(song, nil).Once()
 	historyRepo.On("FindWorldsendTimeline", ctx, 10, 40).Return(wantRows, nil).Once()
-	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 	got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")
 
@@ -232,7 +250,7 @@ func TestScoreHistoryUsecase_GetWorldsend_公開対象外の楽曲は404へ正�
 
 			setScoreHistoryReadUserExpectation(userRepo, exec, user)
 			worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(tt.songChart, nil).Once()
-			uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+			uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 			got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")
 
@@ -306,7 +324,7 @@ func TestScoreHistoryUsecase_GetStandard_履歴を読む前の分岐ごとのエ
 			if tt.song != nil {
 				songRepo.On("FindByDisplayID", ctx, exec, "0123456789abcdef").Return(tt.song, nil).Once()
 			}
-			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+			uc := NewScoreHistoryUsecase(exec, userRepo, songRepo, nil, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 			// When
 			got, err := uc.GetStandard(ctx, "testuser", nil, "0123456789abcdef", tt.difficulty)
@@ -335,7 +353,7 @@ func TestScoreHistoryUsecase_GetWorldsend_履歴が0件の場合は履歴なし�
 	setScoreHistoryReadUserExpectation(userRepo, exec, user)
 	worldsendRepo.On("FindByDisplayID", ctx, exec, "fedcba9876543210").Return(song, nil).Once()
 	historyRepo.On("FindWorldsendTimeline", ctx, 10, 40).Return([]entity.ScoreHistoryEntry{}, nil).Once()
-	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
+	uc := NewScoreHistoryUsecase(exec, userRepo, nil, worldsendRepo, nil, historyRepo, &stubFriendshipRepo{}, newScoreHistoryReadMasterProvider())
 
 	// When
 	got, err := uc.GetWorldsend(ctx, "testuser", nil, "fedcba9876543210")

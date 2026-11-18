@@ -26,8 +26,8 @@ func (h *PlayerMetricHistoryHandler) Get(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	requester := handler.Requester(c)
-	entries, err := h.usecase.Get(c.Request().Context(), username, requester)
+	viewer := handler.Viewer(c)
+	entries, err := h.usecase.Get(c.Request().Context(), username, viewer)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

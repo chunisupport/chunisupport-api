@@ -38,8 +38,8 @@ func (h *V1CourseHandler) Get(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toV1CourseDTO(item))
 }
 func (h *V1CourseHandler) GetUserRecords(c *echo.Context) error {
-	requester := handler.Requester(c)
-	result, err := h.usecase.GetUserRecords(c.Request().Context(), c.Param("username"), requester)
+	viewer := handler.Viewer(c)
+	result, err := h.usecase.GetUserRecords(c.Request().Context(), c.Param("username"), viewer)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

@@ -98,6 +98,32 @@ func TestV1UserHandler_GetUser(t *testing.T) {
 		}
 	})
 
+	t.Run("公開ユーザーのみのトークンでは閲覧者を渡さない", func(t *testing.T) {
+		// Given
+		e := echo.New()
+		var gotRequester *entity.User
+		mockUsecase := &mockV1UserUsecase{
+			getUserProfileWithRecordsFunc: func(ctx context.Context, username string, requester *entity.User) (*usecase.UserProfileWithRecordsOutput, error) {
+				gotRequester = requester
+				return nil, usecase.ErrUserPrivate
+			},
+		}
+		handler := NewV1UserHandler(mockUsecase)
+		req := httptest.NewRequest(http.MethodGet, "/v1/users/owner", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPathValues(echo.PathValues{{Name: "username", Value: "owner"}})
+		c.Set("userEntity", &entity.User{ID: 1})
+		c.Set("apiToken", &entity.APIToken{PublicOnly: true})
+
+		// When
+		err := handler.GetUser(c)
+
+		// Then: 本人として閲覧判定させないため、閲覧者は未認証と同じ nil になる
+		assert.Error(t, err)
+		assert.Nil(t, gotRequester)
+	})
+
 	t.Run("不正なusernameは境界で拒否する", func(t *testing.T) {
 		// Given
 		called := false

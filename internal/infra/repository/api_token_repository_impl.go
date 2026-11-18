@@ -8,12 +8,13 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 	"github.com/jmoiron/sqlx"
 )
 
 // カラム名の列挙であり、認証情報をハードコードしているものではありません。
-const apiTokenColumns = "id, user_id, name, permission, hashed_token, token_prefix, last_used_at, created_at" // #nosec G101
+const apiTokenColumns = "id, display_id, user_id, name, permission, public_only, hashed_token, token_prefix, last_used_at, created_at" // #nosec G101
 
 type apiTokenRepository struct {
 	db *sqlx.DB
@@ -29,9 +30,9 @@ func (r *apiTokenRepository) Save(ctx context.Context, exec repository.Executor,
 	model := models.FromAPITokenEntity(token)
 	if token.ID == 0 {
 		result, err := exec.ExecContext(ctx, `
-INSERT INTO api_tokens (user_id, name, permission, hashed_token, token_prefix)
-VALUES (?, ?, ?, ?, ?)
-`, model.UserID, model.Name, model.Permission, model.HashedToken, model.TokenPrefix)
+INSERT INTO api_tokens (display_id, user_id, name, permission, public_only, hashed_token, token_prefix)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+`, model.DisplayID, model.UserID, model.Name, model.Permission, model.PublicOnly, model.HashedToken, model.TokenPrefix)
 		if err != nil {
 			return wrapAPITokenDuplicateError(err)
 		}
@@ -80,23 +81,23 @@ func (r *apiTokenRepository) ListByUserID(ctx context.Context, exec repository.E
 	return apiTokenModelsToEntities(rows)
 }
 
-// FindByIDAndUserID は所有者を限定してAPIトークンを取得します。
-func (r *apiTokenRepository) FindByIDAndUserID(ctx context.Context, exec repository.Executor, id uint64, userID int) (*entity.APIToken, error) {
-	return r.findByIDAndUserID(ctx, exec, id, userID, false)
+// FindByDisplayIDAndUserID は所有者を限定してAPIトークンを表示用IDで取得します。
+func (r *apiTokenRepository) FindByDisplayIDAndUserID(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID, userID int) (*entity.APIToken, error) {
+	return r.findByDisplayIDAndUserID(ctx, exec, displayID, userID, false)
 }
 
-// FindByIDAndUserIDForUpdate は所有者を限定し、更新用行ロック付きでAPIトークンを取得します。
-func (r *apiTokenRepository) FindByIDAndUserIDForUpdate(ctx context.Context, exec repository.Executor, id uint64, userID int) (*entity.APIToken, error) {
-	return r.findByIDAndUserID(ctx, exec, id, userID, true)
+// FindByDisplayIDAndUserIDForUpdate は所有者を限定し、更新用行ロック付きでAPIトークンを表示用IDで取得します。
+func (r *apiTokenRepository) FindByDisplayIDAndUserIDForUpdate(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID, userID int) (*entity.APIToken, error) {
+	return r.findByDisplayIDAndUserID(ctx, exec, displayID, userID, true)
 }
 
-func (r *apiTokenRepository) findByIDAndUserID(ctx context.Context, exec repository.Executor, id uint64, userID int, forUpdate bool) (*entity.APIToken, error) {
+func (r *apiTokenRepository) findByDisplayIDAndUserID(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID, userID int, forUpdate bool) (*entity.APIToken, error) {
 	var row models.APITokenModel
-	query := `SELECT ` + apiTokenColumns + ` FROM api_tokens WHERE id = ? AND user_id = ?`
+	query := `SELECT ` + apiTokenColumns + ` FROM api_tokens WHERE display_id = ? AND user_id = ?`
 	if forUpdate {
 		query += ` FOR UPDATE`
 	}
-	if err := exec.GetContext(ctx, &row, query, id, userID); err != nil {
+	if err := exec.GetContext(ctx, &row, query, displayID.String(), userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrAPITokenNotFound
 		}
@@ -139,9 +140,9 @@ func (r *apiTokenRepository) CountByUserID(ctx context.Context, exec repository.
 	return count, nil
 }
 
-// DeleteByIDAndUserID は所有者を限定してAPIトークンを削除します。
-func (r *apiTokenRepository) DeleteByIDAndUserID(ctx context.Context, exec repository.Executor, id uint64, userID int) error {
-	result, err := exec.ExecContext(ctx, `DELETE FROM api_tokens WHERE id = ? AND user_id = ?`, id, userID)
+// DeleteByDisplayIDAndUserID は所有者を限定してAPIトークンを表示用IDで削除します。
+func (r *apiTokenRepository) DeleteByDisplayIDAndUserID(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID, userID int) error {
+	result, err := exec.ExecContext(ctx, `DELETE FROM api_tokens WHERE display_id = ? AND user_id = ?`, displayID.String(), userID)
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,14 @@ type ScoreHistoryEntry struct {
 	UpdatedAt   time.Time
 }
 
+// CourseScoreHistoryEntry はコースごとの過去または現行のベスト状態を表します。
+type CourseScoreHistoryEntry struct {
+	Score       int
+	IsClear     bool
+	ComboLampID int
+	UpdatedAt   time.Time
+}
+
 // SupportsScoreHistory は履歴保存・参照の対象難易度かを判定します。
 func SupportsScoreHistory(difficulty string) bool {
 	switch difficulty {

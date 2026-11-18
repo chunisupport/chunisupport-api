@@ -27,8 +27,8 @@ func (h *V1UserHandler) GetUser(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	requester := handler.Requester(c)
-	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, requester)
+	viewer := handler.Viewer(c)
+	result, err := h.userUsecase.GetUserProfileWithRecords(c.Request().Context(), username, viewer)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}
@@ -42,9 +42,9 @@ func (h *V1UserHandler) GetUserRating(c *echo.Context) error {
 	if apiErr != nil {
 		return apiErr
 	}
-	requester := handler.Requester(c)
+	viewer := handler.Viewer(c)
 
-	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, requester)
+	result, err := h.userUsecase.GetUserProfileRatingView(c.Request().Context(), username, viewer)
 	if err != nil {
 		return apierror.FromUsecaseError(err)
 	}

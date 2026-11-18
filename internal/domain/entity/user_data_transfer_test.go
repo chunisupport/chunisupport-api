@@ -598,6 +598,9 @@ func validUserDataTransferSnapshot(t *testing.T) *UserDataTransferSnapshot {
 			ComboLampName:     "ALL JUSTICE",
 			UpdatedAt:         time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC),
 		}},
+		CourseRecordHistories: []UserDataTransferCourseRecordHistory{
+			validCourseRecordHistory(time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC)),
+		},
 		Honors: []UserDataTransferHonor{{
 			Slot:       1,
 			ImageURL:   &imageURL,
@@ -742,6 +745,17 @@ func validWorldsendRecordHistory(updatedAt time.Time) UserDataTransferWorldsendR
 	}
 }
 
+func validCourseRecordHistory(updatedAt time.Time) UserDataTransferCourseRecordHistory {
+	courseScore, _ := coursescore.New(2_900_000)
+	return UserDataTransferCourseRecordHistory{
+		CourseOfficialIdx: "course-1",
+		Score:             courseScore,
+		IsClear:           false,
+		ComboLampName:     "FULL COMBO",
+		UpdatedAt:         updatedAt,
+	}
+}
+
 func validMetricHistories(count int) []UserDataTransferMetricHistory {
 	histories := make([]UserDataTransferMetricHistory, count)
 	oldest := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -753,4 +767,84 @@ func validMetricHistories(count int) []UserDataTransferMetricHistory {
 		}
 	}
 	return histories
+}
+
+func TestUserDataTransferSnapshotValidate_コース履歴(t *testing.T) {
+	base := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	histories := func(count int) []UserDataTransferCourseRecordHistory {
+		result := make([]UserDataTransferCourseRecordHistory, count)
+		for i := range result {
+			result[i] = validCourseRecordHistory(base.Add(time.Duration(i) * time.Second))
+		}
+		return result
+	}
+	tests := []struct {
+		name    string
+		mutate  func(*UserDataTransferSnapshot)
+		wantErr string
+	}{
+		{
+			name:   "1コースの履歴が上限ちょうどなら受理する",
+			mutate: func(s *UserDataTransferSnapshot) { s.CourseRecordHistories = histories(50) },
+		},
+		{
+			name:    "1コースの履歴が上限を超えたら拒否する",
+			mutate:  func(s *UserDataTransferSnapshot) { s.CourseRecordHistories = histories(51) },
+			wantErr: "course_record_histories[50] exceeds the per-course history limit",
+		},
+		{
+			name: "別コースの履歴は上限件数に合算されない",
+			mutate: func(s *UserDataTransferSnapshot) {
+				other := validCourseRecordHistory(base)
+				other.CourseOfficialIdx = "course-2"
+				s.CourseRecordHistories = append(histories(50), other)
+			},
+		},
+		{
+			name: "DB時刻精度で重複する履歴を拒否する",
+			mutate: func(s *UserDataTransferSnapshot) {
+				s.CourseRecordHistories = []UserDataTransferCourseRecordHistory{
+					validCourseRecordHistory(base), validCourseRecordHistory(base.Add(400 * time.Millisecond)),
+				}
+			},
+			wantErr: "course_record_histories[1] duplicates a history timestamp",
+		},
+		{
+			name: "クリア済みで0点の履歴を拒否する",
+			mutate: func(s *UserDataTransferSnapshot) {
+				s.CourseRecordHistories[0].Score = 0
+				s.CourseRecordHistories[0].IsClear = true
+			},
+			wantErr: "course_record_histories[0].score cannot be zero when cleared",
+		},
+		{
+			name:    "コースのofficial_idxが空の履歴を拒否する",
+			mutate:  func(s *UserDataTransferSnapshot) { s.CourseRecordHistories[0].CourseOfficialIdx = " " },
+			wantErr: "course_record_histories[0].course_official_idx is invalid",
+		},
+		{
+			name:    "配列がnilなら拒否する",
+			mutate:  func(s *UserDataTransferSnapshot) { s.CourseRecordHistories = nil },
+			wantErr: "course_record_histories must be an array",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			snapshot := validUserDataTransferSnapshot(t)
+			tt.mutate(snapshot)
+
+			// When
+			err := snapshot.Validate()
+
+			// Then
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }

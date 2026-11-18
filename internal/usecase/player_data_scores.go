@@ -85,11 +85,15 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 
 	standardHistories, standardHistoryChartIDs := buildStandardHistories(playerID, fullBefore, fullRecordsToUpsert, masters)
 	worldsendHistories, worldsendHistoryChartIDs := buildWorldsendHistories(playerID, worldsendBefore, worldsendRecordsToUpsert)
+	courseHistories, courseHistoryCourseIDs := buildCourseHistories(playerID, courseBefore, courseRecordsToUpsert)
 	if us.scoreHistoryRepo != nil {
 		if err := us.scoreHistoryRepo.BulkInsertStandard(ctx, tx, standardHistories); err != nil {
 			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 		}
 		if err := us.scoreHistoryRepo.BulkInsertWorldsend(ctx, tx, worldsendHistories); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+		if err := us.scoreHistoryRepo.BulkInsertCourse(ctx, tx, courseHistories); err != nil {
 			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 		}
 	}
@@ -108,6 +112,9 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 		}
 		if err := us.scoreHistoryRepo.PruneWorldsendOverLimit(ctx, tx, playerID, worldsendHistoryChartIDs); err != nil {
+			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+		}
+		if err := us.scoreHistoryRepo.PruneCourseOverLimit(ctx, tx, playerID, courseHistoryCourseIDs); err != nil {
 			return counts, skipped, changes, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 		}
 	}
@@ -249,6 +256,30 @@ func buildWorldsendHistories(
 		}
 	}
 	return rows, chartIDs
+}
+
+// buildCourseHistories は成績が変化するコースの更新前状態を退避対象として返します。
+// after は normalizeCourseRecordsForUpsert によりコースごとに1件へ正規化済みである前提です。
+func buildCourseHistories(
+	playerID int,
+	before map[int]repository.CourseRecordState,
+	after []repository.CourseRecordForUpsert,
+) ([]repository.PlayerCourseRecordHistory, []int) {
+	rows := make([]repository.PlayerCourseRecordHistory, 0, len(after))
+	courseIDs := make([]int, 0, len(after))
+	for _, record := range after {
+		beforeState, exists := before[record.CourseID]
+		if !exists || !courseRecordMeaningfullyChanged(beforeState, record.State) {
+			continue
+		}
+		rows = append(rows, repository.PlayerCourseRecordHistory{
+			PlayerID: playerID,
+			CourseID: record.CourseID,
+			State:    beforeState,
+		})
+		courseIDs = append(courseIDs, record.CourseID)
+	}
+	return rows, courseIDs
 }
 
 type resolvedLampIDs struct {

@@ -837,7 +837,7 @@ func CalcSingleOverpower(score uint32, chartConst float64, comboLampID int) floa
 
 ## UserDataTransferSnapshot集約
 
-UserDataTransferSnapshotは、ユーザーに属するプレイヤー、通常譜面・WORLD'S ENDの現在レコードと履歴、公式指標履歴、コース、称号、お気に入り、未解禁楽曲、目標、保存済みフィルタを一括移行する集約です。
+UserDataTransferSnapshotは、ユーザーに属するプレイヤー、通常譜面・WORLD'S ENDの現在レコードと履歴、公式指標履歴、コースの現在記録と履歴、称号、お気に入り、未解禁楽曲、目標、保存済みフィルタを一括移行する集約です。
 
 移行ファイルにはサーバー固有IDを含めません。楽曲とコースはofficial_idx、譜面はofficial_idxと大文字の難易度名、各種マスターは名称で参照します。目標属性のdiff、genre、verも名称へ外部化し、移行先で一括解決します。name_folderは楽曲名順フォルダのコードのまま移行します。称号タイプは移行先マスターから名称で解決し、称号本体が存在しない場合は移行データの名称、称号タイプ、画像URLから追加します。
 

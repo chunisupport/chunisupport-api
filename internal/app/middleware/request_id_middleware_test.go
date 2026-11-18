@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/config"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	echoMiddleware "github.com/labstack/echo/v5/middleware"
 	"github.com/stretchr/testify/assert"

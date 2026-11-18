@@ -1,0 +1,2 @@
+ALTER TABLE api_tokens
+    ADD COLUMN public_only BOOLEAN NOT NULL DEFAULT FALSE AFTER permission;

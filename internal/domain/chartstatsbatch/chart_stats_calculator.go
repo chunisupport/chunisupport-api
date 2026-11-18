@@ -1,8 +1,6 @@
 package chartstatsbatch
 
 import (
-	"slices"
-
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 )
@@ -146,18 +144,6 @@ func (a *chartStatsAccumulator) addClearedScore(score int) {
 // result は平均・中央値を確定した統計を返します。クリア済み記録がない場合、平均・中央値は nil です。
 func (a *chartStatsAccumulator) result() *entity.ChartStatsByRatingBand {
 	stats := a.stats
-	count := len(a.clearedScores)
-	if count == 0 {
-		return &stats
-	}
-
-	average := float64(a.clearedScoreTotal) / float64(count)
-	slices.Sort(a.clearedScores)
-	median := float64(a.clearedScores[count/2])
-	if count%2 == 0 {
-		median = (float64(a.clearedScores[count/2-1]) + median) / 2
-	}
-	stats.AverageScore = &average
-	stats.MedianScore = &median
+	stats.AverageScore, stats.MedianScore = averageAndMedian(a.clearedScoreTotal, a.clearedScores)
 	return &stats
 }

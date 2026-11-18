@@ -2,10 +2,10 @@ package middleware
 
 import (
 	"strings"
+	"uuid"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/logger"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 )
 
@@ -33,7 +33,7 @@ func resolveRequestID(headerValue string) string {
 	if acceptableRequestID(candidate) {
 		return candidate
 	}
-	return uuid.NewString()
+	return uuid.NewV4().String()
 }
 
 // acceptableRequestID はログ注入やヘッダー肥大にならないIDだけを受理します。

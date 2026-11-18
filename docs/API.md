@@ -358,6 +358,7 @@ Content-Type: application/json
 | `/internal/courses/updated-at` | GET | Firebase Bearer (任意) | コースマスタキャッシュ用の最終更新日時のみ取得 |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
 | `/internal/courses/:id` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses/:id/stats` | GET | Firebase Bearer (任意) | コース統計取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
 | `/internal/courses/:id` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
 | `/internal/courses/:id` | DELETE | Firebase Bearer (ADMIN+) | コース論理削除 |
@@ -366,6 +367,7 @@ Content-Type: application/json
 | `/internal/editor/courses/:id` | GET | Firebase Bearer (EDITOR+) | 削除済みを含むコース詳細取得 |
 | `/internal/users/:username/record/courses` | GET | Firebase Bearer (任意) | ユーザーのコースレコード取得 |
 | `/internal/users/:username/record/courses/:id` | GET | Firebase Bearer (任意) | ユーザーのコースレコード単件取得 |
+| `/internal/users/:username/record/courses/:id/history` | GET | Firebase Bearer (任意) | コーススコア履歴取得 |
 | `/internal/master` | GET | 不要 | フロントエンド向けマスターデータ取得 |
 | `/internal/master/permissions` | GET | Firebase Bearer (ADMIN) | 権限一覧取得 |
 | `/internal/master/name-folders` | GET | 不要 | 楽曲名順フォルダ一覧取得 |
@@ -386,6 +388,8 @@ Content-Type: application/json
 | `/v1/users/:username/rating-op-history` | GET | APIトークン | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/v1/courses` | GET | APIトークン | 有効なコースマスタ一覧取得 |
 | `/v1/courses/:id` | GET | APIトークン | コースマスタ単件取得 |
+| `/v1/courses/:id/score-history` | GET | APIトークン | コーススコア履歴取得 |
+| `/v1/courses/:id/stats` | GET | APIトークン | コース統計取得 |
 | `/v1/courses` | POST | APIトークン (`read_write`、ADMIN+) | コース追加 |
 | `/v1/courses/:id` | PUT | APIトークン (`read_write`、EDITOR+) | コース名称・クラス更新 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
@@ -952,19 +956,21 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - **リクエスト**:
 
 ```json
-{"name":"Discord Bot","permission":"read"}
+{"name":"Discord Bot","permission":"read","public_only":true}
 ```
 
 - `name` は前後の空白を除いた1〜50文字で、同一ユーザー内で一意です。
+- `public_only` は任意で、省略時は `false` です。`true` のトークンは本人や承認済みフレンドであっても非公開ユーザーを参照できず、未認証と同じく `404 user_not_found`（chunirec互換APIでは互換エラー形式の404）になります。`user_name` を省略して自分自身を対象にするchunirec互換APIも、自分が非公開なら404です。発行後に変更できません。変更する場合はトークンを削除して再発行してください。
 - `permission` は必須で、`read` または `read_write` を指定します。発行後に変更できません。権限を変更する場合はトークンを削除して再発行してください。
 - `read_write` はEDITORまたはADMINのみ指定できます。PLAYERやEXTDEVが指定した場合は403 Forbiddenになります。
 - **レスポンス**: 201 Created
 
 ```json
 {
-  "id": 42,
+  "id": "3f9a1c0b7d2e4a51",
   "name": "Discord Bot",
   "permission": "read",
+  "public_only": true,
   "token": "plain-text-api-token",
   "token_prefix": "plain",
   "last_used_at": null,
@@ -973,6 +979,8 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ```
 
 平文の `token` はこのレスポンスでのみ取得できます。サーバーにはSHA-256ハッシュと表示用の先頭5文字だけを保存します。
+
+`id` はトークンを指定するための16文字の小文字16進数です。名前変更・削除のパスに使います。DBの数値IDは返しません。
 
 - **主なエラー**:
   - 400 Bad Request (`invalid_api_token_name`): 名前が不正
@@ -989,17 +997,19 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 {
   "tokens": [
     {
-      "id": 42,
+      "id": "3f9a1c0b7d2e4a51",
       "name": "Discord Bot",
       "permission": "read",
+      "public_only": true,
       "token_prefix": "plain",
       "last_used_at": "2026-07-22T13:00:00+09:00",
       "created_at": "2026-07-22T12:34:56+09:00"
     },
     {
-      "id": 1,
+      "id": "8b04e6d2c19f7a30",
       "name": "既存のトークン",
       "permission": "read_write",
+      "public_only": false,
       "token_prefix": null,
       "last_used_at": null,
       "created_at": "2026-04-16T12:34:56+09:00"
@@ -1011,6 +1021,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - 未発行の場合は `tokens` が空配列になります。
 - 旧仕様から移行したトークンは平文を復元できないため `token_prefix=null` のままです。認証には引き続き使用できます。
 - 旧仕様から移行したトークンの `permission` は `read_write` です。
+- `public_only` を追加する前に発行したトークンは `false` です。
 - `last_used_at` は認証成功時に更新されます。DB書き込みを抑えるため、最大1時間の遅延があります。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
@@ -1018,10 +1029,10 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 ### PATCH `/internal/auth/api-tokens/:id`
 - **認証**: Firebase Bearer 必須
-- **リクエスト**: `name` のみ。`permission` は変更できません。
+- **リクエスト**: `name` のみ。`permission` と `public_only` は変更できません。
 - **レスポンス**: 200 OK。変更後のトークン管理情報を返します。平文の `token` は返しません。
 - **主なエラー**:
-  - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDまたは名前が不正
+  - 400 Bad Request (`invalid_api_token_id` / `invalid_api_token_name`): IDが16文字の小文字16進数でない、または名前が不正
   - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
   - 409 Conflict (`api_token_name_conflict`): 同名のトークンが存在する
 
@@ -1031,7 +1042,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 - 自分が所有するAPIトークンをID指定で削除します。削除後はそのトークンを認証に使用できません。
 - **主なエラー**:
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
-  - 400 Bad Request (`invalid_api_token_id`): IDが不正
+  - 400 Bad Request (`invalid_api_token_id`): IDが16文字の小文字16進数でない
   - 404 Not Found (`api_token_not_found`): 自分が所有する対象トークンが存在しない
 
 ---
@@ -3565,6 +3576,70 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
+### GET `/internal/courses/:id/stats`
+- **認証**: Firebase Bearer (任意)
+- **レートリミット**: 認証なしは1分60回/IP
+- **パスパラメータ**:
+  - `id` - コースの表示用ID
+- **概要**: 指定コースのプレイヤー統計を、ベスト枠平均レーティング帯ごとに取得します。統計は譜面統計バッチが再集計した時点の内容です。削除済みコースは集計対象外のため取得できません。
+- **レスポンス**: 200 OK
+
+```json
+{
+  "course_id": "0000000000000001",
+  "stats": [
+    {
+      "rating_band": "ALL",
+      "combo": {
+        "none": 70,
+        "fc": 22,
+        "aj": 8
+      },
+      "clear": {
+        "failed": 35,
+        "clear": 65
+      },
+      "average_score": 2954321.5,
+      "median_score": 2961000,
+      "player_count": 100
+    },
+    {
+      "rating_band": "15.0",
+      "combo": {
+        "none": 6,
+        "fc": 0,
+        "aj": 0
+      },
+      "clear": {
+        "failed": 6,
+        "clear": 0
+      },
+      "average_score": null,
+      "median_score": null,
+      "player_count": 6
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `course_id` | string | コースの表示用ID |
+| `stats` | array | レーティング帯別統計。レーティング帯の表示順に並び、集計済みなら先頭要素は `rating_band: "ALL"`。プレイ済みプレイヤーがいない帯の要素は含まない。未集計、または誰もプレイしていないコースでは空配列 |
+| `stats[].rating_band` | string | レーティング帯のラベル（`ALL`、`-14.9`、`15.0` など） |
+| `stats[].combo.none` / `fc` / `aj` | number | コンボランプ別の人数。理論値（3,030,000点）は `aj` に含める |
+| `stats[].clear.failed` / `clear` | number | 未クリア・クリア済みの人数 |
+| `stats[].average_score` | number \| null | クリア済み記録の平均スコア。クリア済み記録が0件の場合は `null` |
+| `stats[].median_score` | number \| null | クリア済み記録の中央値。クリア済み記録が0件の場合は `null` |
+| `stats[].player_count` | number | プレイ済み人数（未クリアを含む） |
+
+コースには公式のランク区分がないため、譜面統計の `rank` に相当する項目はありません。集計規則は [譜面統計バッチの集計仕様](chart_statistics_aggregation.md) を参照してください。
+
+- **主なエラー**:
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
 ### POST `/internal/courses`
 - **認証**: Firebase Bearer (ADMIN)
 - **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
@@ -3676,6 +3751,21 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開で閲覧できない
   - 404 Not Found (`not_found`): コースが存在しない
 
+### GET `/internal/users/:username/record/courses/:id/history`
+- **認証**: Firebase Bearer（任意）
+- **レート制限**: 認証なしの場合 1分間60回/IP
+- **概要**: パスで指定したユーザーについて、コースの現行ベストと過去のベストを新しい順で取得します。公開範囲はコースレコード取得と同じで、公開ユーザーは未認証で参照でき、非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **パスパラメータ**:
+  - `username`: 対象ユーザー名
+  - `id`: コースの表示用ID
+- **レスポンス**: 200 OK。形式は GET `/v1/courses/:id/score-history` と同一です。
+- **主なエラー**:
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): `username` が不正
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
 #### UserRecordResponseDTO スキーマ
 
 | フィールド | 型 | 説明 |
@@ -3776,7 +3866,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 `is_suspicious` は必須の真偽値です。
 
-不審アカウントのプレイヤーは譜面統計（`/internal/songs/:id/stats/:difficulty` など）とベスト枠採用率の集計から除外されます。フラグの変更は次回の譜面統計バッチ実行時に反映されます。
+不審アカウントのプレイヤーは譜面統計（`/internal/songs/:id/stats/:difficulty` など）、ベスト枠採用率、コース統計の集計から除外されます。フラグの変更は次回の譜面統計バッチ実行時に反映されます。
 
 - **レスポンス**: 204 No Content
 - **主なエラー**:
@@ -5080,6 +5170,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 公開APIはAPIトークン認証を使用します。トークンは `Authorization: Bearer <token>` ヘッダーで送信してください。
 
+各エンドポイントの「非公開ユーザーは本人または承認済みフレンドが参照できます」は、`public_only=false` のトークンでの扱いです。`public_only=true` のトークンでは、本人やフレンドであっても非公開ユーザーを参照できず、未認証と同じ404になります（`POST /internal/auth/api-tokens` を参照）。
+
 ### GET `/v1/master/versions`
 - **認証**: APIトークン必須
 - **概要**: バージョン一覧をリリース日昇順で返します。クライアントがバージョン辞書だけを独立取得する用途を想定しており、`id` は含みません。読取時点で稼働開始済みのバージョンのみを返します。稼働開始は稼働日の日本時間7:00です（[日付の切り替わり](chunithm_specs/date_boundary.md)）。
@@ -5664,6 +5756,70 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
+### GET `/v1/courses/:id/score-history`
+- **認証**: APIトークン必須
+- **概要**: 指定コースのスコア履歴を取得します。現行ベストを先頭に、過去のベストを新しい順で返します。非公開ユーザーは本人または承認済みフレンドが参照できます。
+- **制限**: 履歴はコースごとに最大50件で、レスポンス先頭の現行ベストを含めると最大51件です。履歴はスコア登録でコースの成績（スコア・クリア状態・コンボランプ）が変化したときだけ追加されます。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | コースID |
+
+- **クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `username` | string | ✓ | 対象ユーザー名 |
+
+- **レスポンス**: 200 OK
+
+```json
+{
+  "entries": [
+    {
+      "score": 3010000,
+      "is_clear": true,
+      "combo_lamp": "ALL JUSTICE",
+      "updated_at": "2026-11-01T12:34:56Z"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | array | スコア履歴エントリの配列（先頭が現行ベスト、以降は新しい順） |
+| `entries[].score` | number | スコア（0〜3,030,000） |
+| `entries[].is_clear` | boolean | クリアしたかどうか |
+| `entries[].combo_lamp` | string \| null | コンボランプ名称。未設定または解決不能の場合は `null` |
+| `entries[].updated_at` | string | 更新日時（ISO8601） |
+
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 400 Bad Request (`validation_failed`): `username` 未指定
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+  - 404 Not Found (`score_history_not_found`): スコア履歴が存在しない（未プレイ、またはプレイヤー未連携）
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+
+### GET `/v1/courses/:id/stats`
+- **認証**: APIトークン必須
+- **概要**: 指定コースのプレイヤー統計を、ベスト枠平均レーティング帯ごとに取得します。
+- **パスパラメータ**:
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | コースID |
+
+- **レスポンス**: 200 OK。形式は GET `/internal/courses/:id/stats` と同一です。
+- **主なエラー**:
+  - 401 Unauthorized (`missing_token`): APIトークン未指定
+  - 401 Unauthorized (`invalid_token`): 無効なAPIトークン
+  - 422 Unprocessable Entity (`validation_failed`): `id` の形式が不正
+  - 404 Not Found (`not_found`): コースが存在しない、または削除済み
+
 ### POST `/v1/courses`
 - **認証**: `read_write` APIトークンかつADMIN以上
 - **概要**: コースを追加します。`class` の `6` は `inf` に正規化します。
@@ -5732,7 +5888,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ## chunirec互換API `/compat/chunirec/2.0`
 
-chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法は`/v1`と同様です。  
+chunirec互換APIはchunirec APIとの互換性を持つエンドポイントです。認証方法と、`public_only` トークンでの非公開ユーザーの扱いは`/v1`と同様です。  
 なお、楽曲IDにはChuniSupportのIDを使用します。chunirecの楽曲IDとは異なるため、他のchunirec互換APIから取得した楽曲IDを使用してください。
 
 メンテナンス中の遮断でも既存の互換エラー形式を維持し、文字列の `maintenance_mode` はレスポンス本文へ含めません。本文とヘッダーは「互換APIのメンテナンス応答」を参照してください。
@@ -6482,7 +6638,7 @@ interface SkippedRecord {
 
 ### POST /internal/me/data-transfer/export
 
-認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。現在のスキーマバージョンは2で、プレイヤー現在値と公式指標履歴に`official_overpower_percent`（記録開始前は`null`）を含みます。移行元にプレイヤーがない場合は400を返します。
+認証ユーザーの移行対象データを、HMAC-SHA256署名付きJSONファイルとして返します。成功時のContent-Typeはapplication/json、Content-Dispositionは`attachment; filename="chunisupport-transfer.json"`です。現在のスキーマバージョンは4で、プレイヤー現在値と公式指標履歴に`official_overpower_percent`（記録開始前は`null`）、プレイヤーに`possession_name`、コース記録の履歴`course_record_histories`を含みます。移行元にプレイヤーがない場合は400を返します。
 
 ### POST /internal/me/data-transfer/validate
 

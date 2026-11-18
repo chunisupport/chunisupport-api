@@ -1306,6 +1306,9 @@ type stubScoreHistoryRepositoryForApplyScoresTest struct {
 	pruneStandardChartIDs  []int
 	pruneWorldsendPlayer   int
 	pruneWorldsendChartIDs []int
+	courseRows             []repository.PlayerCourseRecordHistory
+	pruneCoursePlayer      int
+	pruneCourseIDs         []int
 }
 
 func (s *stubScoreHistoryRepositoryForApplyScoresTest) BulkInsertStandard(_ context.Context, _ repository.Executor, rows []repository.PlayerRecordHistory) error {
@@ -1328,6 +1331,21 @@ func (s *stubScoreHistoryRepositoryForApplyScoresTest) PruneWorldsendOverLimit(_
 	s.pruneWorldsendPlayer = playerID
 	s.pruneWorldsendChartIDs = append([]int{}, chartIDs...)
 	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) BulkInsertCourse(_ context.Context, _ repository.Executor, rows []repository.PlayerCourseRecordHistory) error {
+	s.courseRows = append([]repository.PlayerCourseRecordHistory{}, rows...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) PruneCourseOverLimit(_ context.Context, _ repository.Executor, playerID int, courseIDs []int) error {
+	s.pruneCoursePlayer = playerID
+	s.pruneCourseIDs = append([]int{}, courseIDs...)
+	return nil
+}
+
+func (s *stubScoreHistoryRepositoryForApplyScoresTest) FindCourseTimeline(_ context.Context, _, _ int) ([]entity.CourseScoreHistoryEntry, error) {
+	return nil, nil
 }
 
 func (s *stubScoreHistoryRepositoryForApplyScoresTest) FindStandardTimeline(_ context.Context, _, _ int) ([]entity.ScoreHistoryEntry, error) {

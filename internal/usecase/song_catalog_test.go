@@ -120,7 +120,7 @@ func newUserUsecaseWithSongCatalogForTest(
 	songs []*entity.Song,
 	worldsendSongs []*entity.WorldsendSongWithChart,
 ) UserUsecase {
-	return NewUserUsecaseWithFirebaseDeleterAndOverpowerDenominator(
+	return NewUserUsecase(
 		nil, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo,
 		nil, nil, masterProvider, nil, nil, nil, nil, nil,
 		&stubSongCatalogProvider{catalog: songcatalog.New(1, songs, worldsendSongs, nil)},

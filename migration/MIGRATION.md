@@ -52,14 +52,17 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 #### `api_tokens`
 - **役割**: API認証用のトークンを管理します。
 - **主なカラム**:
-    - `id`: トークンのユニークID。
+    - `id`: トークンのユニークID。内部の参照専用で、APIには出さない。
+    - `display_id`: API上の `id` として使う16文字の小文字16進数（一意制約）。
     - `user_id`: `users`テーブルへの外部キー。
     - `name`: ユーザー内で一意の管理用名。
     - `permission`: `read`または`read_write`。旧仕様から移行したトークンは`read_write`。
+    - `public_only`: `TRUE` のトークンは本人・フレンドであっても非公開ユーザーを参照できない。既存トークンは`FALSE`。
     - `hashed_token`: トークンのハッシュ値。
     - `token_prefix`: 新規発行トークンの表示用先頭5文字。旧仕様から移行したトークンはNULL。
     - `last_used_at`: 認証に最後に使用した日時。
     - `created_at`: 作成日時。
+- **追加マイグレーション**: `000067_add_display_id_to_api_tokens`（upで追加と既存行への採番、downで削除）、`000068_add_public_only_to_api_tokens`（upで既定値`FALSE`の列を追加、downで削除）。
 
 ### システム運用関連
 
@@ -230,6 +233,10 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000049**: ポゼッションマスタ（`normal`、`silver`、`gold`、`platina`、`rainbow`）を固定IDで追加し、`players.possession_id` から NOT NULL（既定値 `normal`=1）で参照できるようにする。
 - **000057**: `genres` と `versions` に表示幅を抑えるための超ショート名 `short_name`（NOT NULL・一意）を追加し、既存行へ略記を投入。
 - **000064**: 楽曲カタログキャッシュの変更検知に使う `song_catalog_revision`（singleton行）を追加。新しいAPI・song-batchはこの行がないと楽曲の保存に失敗するため、バイナリより先に適用する。API と song-batch は同じアーティファクトで同時に更新する（旧song-batchの同期は世代を進めないため、APIへ反映されない）。
+- **000065**: コース記録の更新前成績を保持する `player_course_record_histories` を追加。新しいAPIはスコア登録時にこのテーブルへ書き込むため、バイナリより先に適用する。
+- **000066**: コースのプレイヤー統計をレーティング帯ごとに保持する `course_stats_by_rating_band` を追加。新しい譜面統計バッチはこのテーブルも入れ替えるため、バイナリより先に適用する。適用直後は空のため、統計バッチの実行後にコース統計APIへ反映される。
+- **000067**: `api_tokens` に表示用ID `display_id` を追加し、既存行へ採番する。新しいAPIは発行時にこの列へ書き込み、名前変更・削除でこの値を `id` として受け取るため、バイナリより先に適用する。MySQLのDDLは暗黙コミットされ、列追加から `NOT NULL` 化までの間に旧バイナリが発行したトークンは `display_id` がNULLのまま残り最後の `NOT NULL` 化が失敗し得るため、適用開始から完了までAPIトークンの発行を停止する。適用後から新バイナリへ切り替えるまでの間、旧バイナリでのAPIトークン発行は `display_id` 未指定のため失敗する。
+- **000068**: `api_tokens` に公開ユーザーのみ参照する設定 `public_only`（既定値 `FALSE`）を追加する。新しいAPIは発行時にこの列へ書き込み、認証時に読み込むため、バイナリより先に適用する。既定値があるため旧バイナリはそのまま動作する。
 
 #### 000045のロールバック前確認
 
@@ -243,6 +250,16 @@ WHERE at.code = 'fullchain_count';
 ```
 
 1件以上返る場合、対象目標をバックアップしたうえでAPIから削除してからdownを実行してください。参照が残った状態でdownを実行すると、`fk_goals_achievement_type_id` の外部キー制約により中止されます。
+
+#### 000068のロールバック前確認
+
+旧バイナリへ戻す、または `000068` のdownを実行すると `public_only` が読まれなくなり、`public_only=TRUE` のトークンが本人・承認済みフレンドとして非公開ユーザーを参照できるようになります。次のSQLで対象トークンを確認し、削除するか利用者へ周知してから戻してください。
+
+```sql
+SELECT t.display_id, t.user_id, t.name
+FROM api_tokens AS t
+WHERE t.public_only = TRUE;
+```
 
 #### 000028の失敗時復旧
 

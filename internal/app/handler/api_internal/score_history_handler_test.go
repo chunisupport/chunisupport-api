@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,11 @@ import (
 type stubInternalScoreHistoryUsecase struct {
 	getStandard  func(context.Context, string, *entity.User, string, string) ([]usecase.ScoreHistoryEntry, error)
 	getWorldsend func(context.Context, string, *entity.User, string) ([]usecase.ScoreHistoryEntry, error)
+	getCourse    func(context.Context, string, *entity.User, string) ([]usecase.CourseScoreHistoryEntry, error)
+}
+
+func (s *stubInternalScoreHistoryUsecase) GetCourse(ctx context.Context, username string, requester *entity.User, displayID string) ([]usecase.CourseScoreHistoryEntry, error) {
+	return s.getCourse(ctx, username, requester, displayID)
 }
 
 func (s *stubInternalScoreHistoryUsecase) GetStandard(ctx context.Context, username string, requester *entity.User, displayID, difficulty string) ([]usecase.ScoreHistoryEntry, error) {
@@ -261,4 +267,90 @@ func TestInternalScoreHistoryHandler_GetStandard_空履歴は空配列で返す(
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.JSONEq(t, `{"entries": []}`, rec.Body.String())
+}
+
+func newInternalCourseHistoryContext(username, displayID string) (*echo.Context, *httptest.ResponseRecorder) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/internal/users/"+username+"/record/courses/"+displayID+"/history", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/internal/users/:username/record/courses/:id/history")
+	c.SetPathValues(echo.PathValues{{Name: "username", Value: username}, {Name: "id", Value: displayID}})
+	return c, rec
+}
+
+func TestInternalScoreHistoryHandler_GetCourse_コース用の履歴形式で返す(t *testing.T) {
+	// Given
+	requester := &entity.User{ID: 1}
+	updatedAt := time.Date(2026, time.November, 1, 12, 34, 56, 0, time.UTC)
+	var gotUsername, gotDisplayID string
+	var gotRequester *entity.User
+	h := NewScoreHistoryHandler(&stubInternalScoreHistoryUsecase{
+		getCourse: func(_ context.Context, username string, requester *entity.User, displayID string) ([]usecase.CourseScoreHistoryEntry, error) {
+			gotUsername, gotRequester, gotDisplayID = username, requester, displayID
+			return []usecase.CourseScoreHistoryEntry{
+				{Score: 3010000, IsClear: true, ComboLamp: new("ALL JUSTICE"), UpdatedAt: updatedAt},
+				{Score: 2900000, IsClear: false, ComboLamp: nil, UpdatedAt: updatedAt.Add(-time.Hour)},
+			}, nil
+		},
+	})
+	c, rec := newInternalCourseHistoryContext("testuser", "0123456789abcdef")
+	c.Set("userEntity", requester)
+
+	// When
+	err := h.GetCourse(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "testuser", gotUsername)
+	assert.Same(t, requester, gotRequester)
+	assert.Equal(t, "0123456789abcdef", gotDisplayID)
+	assert.JSONEq(t, `{"entries":[
+		{"score":3010000,"is_clear":true,"combo_lamp":"ALL JUSTICE","updated_at":"2026-11-01T12:34:56Z"},
+		{"score":2900000,"is_clear":false,"combo_lamp":null,"updated_at":"2026-11-01T11:34:56Z"}
+	]}`, rec.Body.String())
+}
+
+func TestInternalScoreHistoryHandler_GetCourse_エラー(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		username   string
+		displayID  string
+		usecaseErr error
+		// Then
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "不正なコースIDはUsecaseへ渡さない", username: "testuser", displayID: "invalid", wantStatus: http.StatusUnprocessableEntity, wantCode: apierror.CodeValidationFailed},
+		{name: "不正なユーザー名はUsecaseへ渡さない", username: "-", displayID: "0123456789abcdef", wantStatus: http.StatusBadRequest},
+		{name: "非公開ユーザーは404", username: "testuser", displayID: "0123456789abcdef", usecaseErr: usecase.ErrUserPrivate, wantStatus: http.StatusNotFound},
+		{name: "コースなしは404", username: "testuser", displayID: "0123456789abcdef", usecaseErr: repository.ErrCourseNotFound, wantStatus: http.StatusNotFound},
+		{name: "履歴なしは404", username: "testuser", displayID: "0123456789abcdef", usecaseErr: usecase.ErrScoreHistoryNotFound, wantStatus: http.StatusNotFound, wantCode: apierror.CodeScoreHistoryNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given: usecaseErr がないケースでUsecaseが呼ばれるとnil関数呼び出しで失敗する。
+			stub := &stubInternalScoreHistoryUsecase{}
+			if tt.usecaseErr != nil {
+				stub.getCourse = func(context.Context, string, *entity.User, string) ([]usecase.CourseScoreHistoryEntry, error) {
+					return nil, tt.usecaseErr
+				}
+			}
+			c, _ := newInternalCourseHistoryContext(tt.username, tt.displayID)
+
+			// When
+			err := NewScoreHistoryHandler(stub).GetCourse(c)
+
+			// Then
+			apiErr, ok := err.(*apierror.APIError)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantStatus, apiErr.HTTPStatus)
+			if tt.wantCode != "" {
+				assert.Equal(t, tt.wantCode, apiErr.Code)
+			}
+		})
+	}
 }

@@ -94,9 +94,9 @@ func (h *ChunirecHandler) GetRecordsShowAll(c *echo.Context) error {
 		return apiErr
 	}
 
-	requester := handler.Requester(c)
+	viewer := handler.Viewer(c)
 
-	result, err := h.chunirecUsecase.GetRecords(ctx, username, requester)
+	result, err := h.chunirecUsecase.GetRecords(ctx, username, viewer)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
@@ -141,10 +141,10 @@ func (h *ChunirecHandler) getProfile(c *echo.Context) (*repository.ChunirecProfi
 		return nil, apiErr
 	}
 
-	// requester はAPIトークン所有者（非公開ユーザーの本人アクセス判定用）
-	requester := handler.Requester(c)
+	// viewer は非公開ユーザーの閲覧判定に使う閲覧者（公開ユーザーのみのトークンでは nil）
+	viewer := handler.Viewer(c)
 
-	result, err := h.chunirecUsecase.GetProfile(ctx, validUsername, requester)
+	result, err := h.chunirecUsecase.GetProfile(ctx, validUsername, viewer)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound):
