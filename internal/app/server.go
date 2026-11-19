@@ -21,16 +21,14 @@ import (
 
 // Server はアプリケーションサーバーを表します
 type Server struct {
-	echo              *echo.Echo
-	startCtx          context.Context
-	cancelStart       context.CancelFunc
-	startDone         chan struct{}
-	db                *sqlx.DB
-	cfg               config.Config
-	masterCache       *masterdata.Cache
-	staticMasterCache *masterdata.StaticCache
-	cancelBatchJobs   context.CancelFunc
-	batchJobs         []backgroundBatchJobs
+	echo            *echo.Echo
+	startCtx        context.Context
+	cancelStart     context.CancelFunc
+	startDone       chan struct{}
+	db              *sqlx.DB
+	cfg             config.Config
+	cancelBatchJobs context.CancelFunc
+	batchJobs       []backgroundBatchJobs
 }
 
 // NewServer は永続化済みの運用状態を読み込んでServerインスタンスを作成します。
@@ -48,16 +46,14 @@ func NewServer(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache 
 
 	startCtx, cancelStart := context.WithCancel(context.Background())
 	return &Server{
-		echo:              router,
-		startCtx:          startCtx,
-		cancelStart:       cancelStart,
-		startDone:         make(chan struct{}),
-		db:                db,
-		cfg:               cfg,
-		masterCache:       masterCache,
-		staticMasterCache: staticMasterCache,
-		cancelBatchJobs:   cancelBatchJobs,
-		batchJobs:         batchJobs,
+		echo:            router,
+		startCtx:        startCtx,
+		cancelStart:     cancelStart,
+		startDone:       make(chan struct{}),
+		db:              db,
+		cfg:             cfg,
+		cancelBatchJobs: cancelBatchJobs,
+		batchJobs:       batchJobs,
 	}, nil
 }
 

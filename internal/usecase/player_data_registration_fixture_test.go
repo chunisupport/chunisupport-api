@@ -31,7 +31,7 @@ func newRegistrationFixture(t *testing.T) *registrationFixture {
 	now := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	user := &entity.User{ID: 7, PlayerID: new(77)}
 	player := &registrationPlayerRepository{t: t, tx: tx, player: &entity.Player{ID: 77, UserID: 7, Name: playernametest.New(t, "テスト"), Level: 42, CreatedAt: now.Add(-24 * time.Hour)}}
-	data := &registrationDataRepository{stubPlayerDataRepositoryForApplyScoresTest: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdateErr: repository.ErrPlayerLatestUpdateNotFound}, masters: &repository.PlayerDataMaster{Songs: masters.songs, ChartsByKey: masters.chartsByKey, ChartsByID: masters.chartsByID, WorldsendBySongID: masters.worldsendBySongID}}
+	data := &registrationDataRepository{t: t, tx: tx, player: player, stubPlayerDataRepositoryForApplyScoresTest: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdateErr: repository.ErrPlayerLatestUpdateNotFound}, masters: &repository.PlayerDataMaster{Songs: masters.songs, ChartsByKey: masters.chartsByKey, ChartsByID: masters.chartsByID, WorldsendBySongID: masters.worldsendBySongID}}
 	records := &registrationRecordRepository{stubPlayerRecordRepositoryForApplyScoresTest: &stubPlayerRecordRepositoryForApplyScoresTest{}, t: t, tx: tx}
 	uc := &playerDataUsecase{tm: &trackingTM{passedFloor: tx}, userRepo: &registrationUserRepository{t: t, tx: tx, user: user}, playerRepo: player, playerRecRepo: records, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}, playerDataRepo: data, masterCache: registrationMasterProvider{masters.PlayerDataMasters}}
 	return &registrationFixture{uc: uc, user: user, payload: &PlayerDataPayload{Name: "テスト", Level: 42, Rating: new(16.0), Overpower: PlayerDataOverpowerPayload{Value: new(100.0), Percentage: new(1.0)}, UpdatedAt: now.Format(time.RFC3339)}, data: data, player: player, records: records, tx: tx}
@@ -63,12 +63,14 @@ type registrationPlayerRepository struct {
 	t      *testing.T
 	tx     repository.Executor
 	player *entity.Player
+	locked bool
 	saved  bool
 }
 
 func (r *registrationPlayerRepository) FindByUserIDForUpdate(_ context.Context, tx repository.Executor, id int) (*entity.Player, error) {
 	assert.Same(r.t, r.tx, tx)
 	assert.Equal(r.t, r.player.UserID, id)
+	r.locked = true
 	return r.player, nil
 }
 func (r *registrationPlayerRepository) FindByIDForUpdate(_ context.Context, tx repository.Executor, id int) (*entity.Player, error) {
@@ -85,10 +87,15 @@ func (r *registrationPlayerRepository) Save(_ context.Context, tx repository.Exe
 
 type registrationDataRepository struct {
 	*stubPlayerDataRepositoryForApplyScoresTest
+	t       *testing.T
+	tx      repository.Executor
+	player  *registrationPlayerRepository
 	masters *repository.PlayerDataMaster
 }
 
-func (r *registrationDataRepository) LoadMasterData(context.Context, []string) (*repository.PlayerDataMaster, error) {
+func (r *registrationDataRepository) LoadMasterData(_ context.Context, exec repository.Executor, _ []string) (*repository.PlayerDataMaster, error) {
+	assert.Same(r.t, r.tx, exec)
+	assert.True(r.t, r.player.locked)
 	return r.masters, nil
 }
 

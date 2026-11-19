@@ -20,7 +20,8 @@ type courseRegistrationRepository struct {
 	saved  []repository.CourseRecordForUpsert
 }
 
-func (r *courseRegistrationRepository) FindByOfficialIdxList(_ context.Context, _ repository.Executor, indexes []string) (map[string]*entity.Course, error) {
+func (r *courseRegistrationRepository) FindByOfficialIdxList(_ context.Context, exec repository.Executor, indexes []string) (map[string]*entity.Course, error) {
+	assert.Same(r.t, r.tx, exec)
 	courses := map[string]*entity.Course{}
 	for _, idx := range indexes {
 		if idx == "course-idx" {

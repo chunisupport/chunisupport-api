@@ -821,7 +821,7 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesBy
 	return states, nil
 }
 
-func (s *stubPlayerDataRepositoryForApplyScoresTest) LoadMasterData(_ context.Context, _ []string) (*repository.PlayerDataMaster, error) {
+func (s *stubPlayerDataRepositoryForApplyScoresTest) LoadMasterData(_ context.Context, _ repository.Executor, _ []string) (*repository.PlayerDataMaster, error) {
 	return nil, nil
 }
 

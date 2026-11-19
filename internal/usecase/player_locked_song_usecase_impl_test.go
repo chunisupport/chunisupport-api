@@ -179,7 +179,7 @@ type stubPlayerDataRepositoryForLockedSong struct {
 	receivedExec   repository.Executor
 }
 
-func (s *stubPlayerDataRepositoryForLockedSong) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
+func (s *stubPlayerDataRepositoryForLockedSong) LoadMasterData(ctx context.Context, exec repository.Executor, officialIdxList []string) (*repository.PlayerDataMaster, error) {
 	return nil, nil
 }
 func (s *stubPlayerDataRepositoryForLockedSong) SavePlayerData(ctx context.Context, exec repository.Executor, input repository.PlayerDataSaveInput) error {

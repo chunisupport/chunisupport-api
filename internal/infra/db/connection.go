@@ -64,11 +64,6 @@ func connectWithRetry(ctx context.Context, dbConfig config.DbConfig, connect fun
 	}
 }
 
-// Connect はデータベースへの接続を確立し、*sqlx.DBを返します。
-func Connect(dbConfig config.DbConfig) (*sqlx.DB, error) {
-	return ConnectContext(context.Background(), dbConfig)
-}
-
 // ConnectContext はデータベースへの接続を確立し、*sqlx.DBを返します。
 func ConnectContext(ctx context.Context, dbConfig config.DbConfig) (*sqlx.DB, error) {
 	dsn := mysqlDSN(dbConfig)
