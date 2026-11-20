@@ -11,6 +11,9 @@ import (
 // 6,000行更新の比較で500行が1,000/3,000行より高速。最大7,501プレースホルダーで上限内です。
 const PlayerRecordUpdateChunkSize = 500
 
+// APIStartupInitializationTimeout はDB接続後のマスタ読み込みや依存関係の初期化に共通の期限です。
+const APIStartupInitializationTimeout = 30 * time.Second
+
 const (
 	Name                                        = "chunisupport-api"
 	AppEnvDevelop                               = "develop"
