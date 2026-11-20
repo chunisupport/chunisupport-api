@@ -117,7 +117,13 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return fmt.Errorf("failed to lock user before player data registration: %w", lockErr)
 		}
 
-		masters, loadErr := us.loadMasterData(ctx, payload)
+		// 最初の非ロック読み取りより先にプレイヤーをロックし、未解禁設定の直前の更新も取り込みます。
+		existingPlayer, lockErr := us.playerRepo.FindByUserIDForUpdate(ctx, tx, lockedUser.ID)
+		if lockErr != nil {
+			return lockErr
+		}
+
+		masters, loadErr := us.loadMasterData(ctx, tx, payload)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -130,7 +136,7 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.ClassBaseID = baseID
 		summaryInput.PossessionID = resolvePossessionID(payload.Possession, masters)
 
-		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, lockedUser, summaryInput, updatedAt)
+		playerID, previousPlayer, ensureErr := us.ensurePlayer(ctx, tx, lockedUser, existingPlayer, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -169,7 +175,12 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		summaryInput.OverpowerValue = overpowerSummary.Value
 		summaryInput.OverpowerPercent = overpowerSummary.Percent
 
-		playerID, _, ensureErr = us.ensurePlayer(ctx, tx, lockedUser, summaryInput, updatedAt)
+		// 保存済みのプレイヤーを読み直し、処理済みの指標履歴を再保存しないようにします。
+		updatedPlayer, lockErr := us.playerRepo.FindByUserIDForUpdate(ctx, tx, lockedUser.ID)
+		if lockErr != nil {
+			return lockErr
+		}
+		playerID, _, ensureErr = us.ensurePlayer(ctx, tx, lockedUser, updatedPlayer, summaryInput, updatedAt)
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -305,14 +316,8 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 	return lastPlayedAt, updatedAt.UTC(), nil
 }
 
-// ensurePlayer はユーザーに紐づくプレイヤーの存在を確認し、存在しなければ作成します。
-// プレイヤー情報（名前、レベル、レーティング等）を更新し、プレイヤーIDと更新前状態を返します。
-func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, *entity.Player, error) {
-	existingPlayer, err := us.playerRepo.FindByUserIDForUpdate(ctx, tx, user.ID)
-	if err != nil {
-		return 0, nil, err
-	}
-
+// ensurePlayer はロック済みのプレイヤーを更新します。未登録なら作成し、IDと更新前の状態を返します。
+func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Executor, user *entity.User, existingPlayer *entity.Player, summary *PlayerDataSummaryInput, updatedAt time.Time) (int, *entity.Player, error) {
 	playerName, err := playername.NewPlayerName(summary.Name)
 	if err != nil {
 		return 0, nil, fmt.Errorf("invalid player name: %w", err)

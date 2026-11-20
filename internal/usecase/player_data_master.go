@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 )
 
 var (
@@ -47,7 +48,7 @@ type playerDataMaster struct {
 }
 
 // loadMasterData はプレイヤーデータ登録に必要なマスターデータをキャッシュおよびDBから読み込みます。
-func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *PlayerDataPayload) (*playerDataMaster, error) {
+func (us *playerDataUsecase) loadMasterData(ctx context.Context, tx repository.Executor, payload *PlayerDataPayload) (*playerDataMaster, error) {
 	if us.masterCache == nil {
 		return nil, errors.New("master cache is not initialized")
 	}
@@ -94,7 +95,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 			courseIdxList = append(courseIdxList, idx)
 		}
 		slices.Sort(courseIdxList)
-		courses, err := us.courseRepo.FindByOfficialIdxList(ctx, nil, courseIdxList)
+		courses, err := us.courseRepo.FindByOfficialIdxList(ctx, tx, courseIdxList)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +111,7 @@ func (us *playerDataUsecase) loadMasterData(ctx context.Context, payload *Player
 	}
 	slices.Sort(idxList)
 
-	loaded, err := us.playerDataRepo.LoadMasterData(ctx, idxList)
+	loaded, err := us.playerDataRepo.LoadMasterData(ctx, tx, idxList)
 	if err != nil {
 		return nil, err
 	}

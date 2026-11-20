@@ -47,8 +47,8 @@ type OverpowerTargetStats struct {
 // PlayerDataRepository はプレイヤーデータ登録に関する永続化を扱うリポジトリです。
 type PlayerDataRepository interface {
 	// LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
-	// songs/charts/worldsend_chartsの読み取りのみのためトランザクション外で呼び出せます。
-	LoadMasterData(ctx context.Context, officialIdxList []string) (*PlayerDataMaster, error)
+	// 登録処理では別の接続を待たないよう、登録と同じExecutorを渡してください。
+	LoadMasterData(ctx context.Context, exec Executor, officialIdxList []string) (*PlayerDataMaster, error)
 
 	// SavePlayerData はプレイヤーデータを一括で保存します。
 	// 書き込み操作のため必ずトランザクション内で呼び出してください。exec が nil の場合はエラーを返します。

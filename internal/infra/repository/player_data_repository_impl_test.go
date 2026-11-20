@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
@@ -48,7 +49,7 @@ func TestLoadMasterData_不正な譜面定数値ならエラーを返す(t *test
 			repo := NewPlayerDataRepository(db)
 
 			// When
-			result, err := repo.LoadMasterData(context.Background(), []string{"idx-1"})
+			result, err := repo.LoadMasterData(context.Background(), db, []string{"idx-1"})
 
 			// Then
 			require.Error(t, err)
@@ -97,8 +98,16 @@ func TestLoadMasterData_正常な譜面定数値ならマスタを読み込め�
 
 			repo := NewPlayerDataRepository(db)
 
+			// 1接続をトランザクションが使用中でも、マスタを読み取れることを確認します。
+			db.SetMaxOpenConns(1)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			tx, err := db.BeginTxx(ctx, nil)
+			require.NoError(t, err)
+			defer tx.Rollback()
+
 			// When
-			result, err := repo.LoadMasterData(context.Background(), []string{"idx-1"})
+			result, err := repo.LoadMasterData(ctx, tx, []string{"idx-1"})
 
 			// Then
 			require.NoError(t, err)

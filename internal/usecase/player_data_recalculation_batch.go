@@ -173,7 +173,7 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 	usedIndexes := make(map[uint64]int)
 	for _, song := range snapshot.Songs {
 		prepared.songsByID[song.ID] = song
-		if song.IsDeleted || song.IsWorldsend || (song.ReleasedAt != nil && databaseDateInLocation(*song.ReleasedAt, jst).After(operationalDate)) {
+		if song.IsDeleted || song.IsWorldsend || !isSongReleasedOn(song.ReleasedAt, operationalDate, jst) {
 			continue
 		}
 		index, err := strconv.ParseUint(song.OfficialIndex, 10, 64)
@@ -192,7 +192,7 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 		}
 		prepared.chartsByID[chart.ID] = chart
 	}
-	fingerprint, err := computeMasterFingerprint(snapshot)
+	fingerprint, err := computeMasterFingerprint(snapshot, operationalDate)
 	if err != nil {
 		return preparedBatchSnapshot{}, err
 	}
@@ -203,7 +203,7 @@ func prepareBatchSnapshot(snapshot repository.PlayerDataMasterSnapshot, operatio
 // fingerprintSource はフィンガープリントの算出対象を正規化した構造です。
 // buildUpdate と prepareBatchSnapshot が計算に使う項目だけを持ちます。
 // 表示用の項目や計算に使わない項目を含めると、計算結果が変わらない変更でも全プレイヤーが再計算になるため含めません。
-// 配信前の楽曲はidxが確定しないためマスタに存在せず、運用日による配信済み判定は常に同じ結果になるので含めません。
+// 運用日そのものを含めると毎日全プレイヤーが再計算になるため、各楽曲が現在の運用日に配信済みかどうかの判定結果だけを含めます。
 type fingerprintSource struct {
 	LogicVersion      int
 	VersionID         int
@@ -216,6 +216,7 @@ type fingerprintSource struct {
 type fingerprintSong struct {
 	ID            int
 	ReleasedAt    *time.Time
+	IsReleased    bool
 	IsDeleted     bool
 	IsWorldsend   bool
 	OfficialIndex string
@@ -235,7 +236,7 @@ type fingerprintSlot struct {
 
 // computeMasterFingerprint は計算結果に影響するマスタ項目と計算ロジックのバージョンからフィンガープリントを求めます。
 // 取得順に依存しないよう、楽曲と譜面はID順、枠は名前順に並べてからシリアライズします。
-func computeMasterFingerprint(snapshot repository.PlayerDataMasterSnapshot) (masterfingerprint.Fingerprint, error) {
+func computeMasterFingerprint(snapshot repository.PlayerDataMasterSnapshot, operationalDate time.Time) (masterfingerprint.Fingerprint, error) {
 	source := fingerprintSource{
 		LogicVersion:      info.PlayerRecalculationLogicVersion,
 		VersionID:         snapshot.Version.ID,
@@ -245,7 +246,14 @@ func computeMasterFingerprint(snapshot repository.PlayerDataMasterSnapshot) (mas
 		Slots:             make([]fingerprintSlot, 0, len(snapshot.SlotIDs)),
 	}
 	for _, song := range snapshot.Songs {
-		source.Songs = append(source.Songs, fingerprintSong{ID: song.ID, ReleasedAt: song.ReleasedAt, IsDeleted: song.IsDeleted, IsWorldsend: song.IsWorldsend, OfficialIndex: song.OfficialIndex})
+		source.Songs = append(source.Songs, fingerprintSong{
+			ID:            song.ID,
+			ReleasedAt:    song.ReleasedAt,
+			IsReleased:    isSongReleasedOn(song.ReleasedAt, operationalDate, operationalDate.Location()),
+			IsDeleted:     song.IsDeleted,
+			IsWorldsend:   song.IsWorldsend,
+			OfficialIndex: song.OfficialIndex,
+		})
 	}
 	slices.SortFunc(source.Songs, func(a, b fingerprintSong) int { return cmp.Compare(a.ID, b.ID) })
 	for _, chart := range snapshot.Charts {
@@ -295,7 +303,7 @@ func (p preparedBatchSnapshot) buildUpdate(data repository.PlayerBatchData, curr
 		if !song.IsDeleted && !song.IsWorldsend && !lockedSet.IsLocked(song.ID, chart.DifficultyName == info.DifficultyNameUltima) {
 			opRecords = append(opRecords, service.OverpowerRecord{SongID: song.ID, Score: record.Score, ChartConst: chart.ChartConst, ComboLampID: record.ComboLampID})
 		}
-		if song.IsDeleted || song.IsWorldsend || (song.ReleasedAt != nil && databaseDateInLocation(*song.ReleasedAt, p.operationalDate.Location()).After(p.operationalDate)) {
+		if song.IsDeleted || song.IsWorldsend || !isSongReleasedOn(song.ReleasedAt, p.operationalDate, p.operationalDate.Location()) {
 			continue
 		}
 		if mainSlotsMissing && !rebuild {
@@ -383,6 +391,10 @@ func (p preparedBatchSnapshot) diffSlots(records []repository.PlayerBatchRecord,
 		}
 	}
 	return clearChartIDs, assignments
+}
+
+func isSongReleasedOn(releasedAt *time.Time, operationalDate time.Time, location *time.Location) bool {
+	return releasedAt == nil || !databaseDateInLocation(*releasedAt, location).After(operationalDate)
 }
 
 func databaseDateInLocation(value time.Time, location *time.Location) time.Time {

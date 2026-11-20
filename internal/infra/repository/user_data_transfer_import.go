@@ -22,11 +22,7 @@ import (
 )
 
 func (r *userDataTransferRepository) FindUnresolvedReferences(ctx context.Context, snapshot *entity.UserDataTransferSnapshot) ([]string, error) {
-	return r.findUnresolvedReferences(ctx, r.db, snapshot)
-}
-
-func (r *userDataTransferRepository) findUnresolvedReferences(ctx context.Context, exec domainrepo.Executor, snapshot *entity.UserDataTransferSnapshot) ([]string, error) {
-	masters, err := loadTransferMasterData(ctx, exec)
+	masters, err := loadTransferMasterData(ctx, r.db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load transfer master data: %w", err)
 	}
@@ -177,11 +173,6 @@ func (r *userDataTransferRepository) ImportSnapshot(ctx context.Context, userID 
 	if !empty {
 		return 0, usecase.ErrDataTransferDestinationNotEmpty
 	}
-	if unresolved, resolveErr := r.findUnresolvedReferences(ctx, tx, snapshot); resolveErr != nil {
-		return 0, resolveErr
-	} else if len(unresolved) > 0 {
-		return 0, usecase.ErrDataTransferUnresolvedReference
-	}
 	return r.importSnapshot(ctx, tx, userID, snapshot)
 }
 
@@ -191,7 +182,7 @@ func (r *userDataTransferRepository) importSnapshot(ctx context.Context, exec do
 	}
 	masters, err := loadTransferMasterData(ctx, exec)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to load transfer master data: %w", err)
 	}
 	if unresolved := findTransferUnresolvedReferences(snapshot, masters); len(unresolved) > 0 {
 		return 0, usecase.ErrDataTransferUnresolvedReference
@@ -278,7 +269,7 @@ func calculateTransferDerivedMetrics(snapshot *entity.UserDataTransferSnapshot, 
 
 // transferLockedSongs は引き継ぎスナップショットの未解禁設定を楽曲ID付きのエンティティへ変換します。
 //
-// 呼び出し前の findUnresolvedReferences が未解禁曲の official_idx をすべて照合済みのため、
+// 呼び出し前の findTransferUnresolvedReferences が未解禁曲の official_idx をすべて照合済みのため、
 // ここで解決できない未解禁設定は通常現れない。PlayerID は判定に使わないため設定しない。
 func transferLockedSongs(lockedSongs []entity.UserDataTransferLockedSong, masters *transferMasterData) []*entity.PlayerLockedSong {
 	lockedEntities := make([]*entity.PlayerLockedSong, 0, len(lockedSongs))

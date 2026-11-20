@@ -59,7 +59,7 @@ func TestEnsurePlayer_公式指標が変化した場合は更新前の組を履�
 	updatedAt := collectedAt.Add(time.Hour)
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "変更後", Level: 41, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, updatedAt)
 
@@ -82,7 +82,7 @@ func TestEnsurePlayer_取得日時のない既存値は履歴へ保存しない(
 	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "変更後", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, createdAt.Add(time.Hour))
 
@@ -102,7 +102,7 @@ func TestEnsurePlayer_指定したポゼッションを保存する(t *testing.T
 	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest"), PlayerID: &playerID}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "変更後", Level: 1, PossessionID: 5, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, createdAt.Add(time.Hour))
 
@@ -117,7 +117,7 @@ func TestEnsurePlayer_未指定のポゼッションはnormalで初期化する(
 	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest")}
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "新規", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, time.Date(2026, 8, 7, 11, 0, 0, 0, time.UTC))
 
@@ -273,7 +273,7 @@ func TestEnsurePlayer_新規プレイヤー作成時はCreatedAtをゼロ値に�
 				Once()
 
 			// When
-			playerID, previousPlayer, err := uc.ensurePlayer(context.Background(), nil, user, summary, updatedAt)
+			playerID, previousPlayer, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, summary, updatedAt)
 			after := time.Now()
 
 			// Then
@@ -307,7 +307,7 @@ func TestEnsurePlayer_登録時は再計算済みの記録を無効にする(t *
 	userRepo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	// When
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "変更後", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, createdAt.Add(time.Hour))
 

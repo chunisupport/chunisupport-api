@@ -456,15 +456,17 @@ func TestPrepareBatchSnapshot_officialIdxを数値へ変換する(t *testing.T) 
 
 func TestComputeMasterFingerprint_同じマスタからは並び順によらず同じ値になる(t *testing.T) {
 	// Given
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	operationalDate := time.Date(2026, 7, 6, 0, 0, 0, 0, jst)
 	snapshot := batchSnapshotForSlotTest(3)
 	reordered := batchSnapshotForSlotTest(3)
 	slices.Reverse(reordered.Songs)
 	slices.Reverse(reordered.Charts)
 
 	// When
-	first, err := computeMasterFingerprint(snapshot)
+	first, err := computeMasterFingerprint(snapshot, operationalDate)
 	require.NoError(t, err)
-	second, err := computeMasterFingerprint(reordered)
+	second, err := computeMasterFingerprint(reordered, operationalDate)
 	require.NoError(t, err)
 
 	// Then
@@ -472,6 +474,8 @@ func TestComputeMasterFingerprint_同じマスタからは並び順によらず�
 }
 
 func TestComputeMasterFingerprint_計算に使う項目の変更で値が変わる(t *testing.T) {
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	operationalDate := time.Date(2026, 7, 6, 0, 0, 0, 0, jst)
 	otherDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name   string
@@ -500,13 +504,13 @@ func TestComputeMasterFingerprint_計算に使う項目の変更で値が変わ�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3))
+			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3), operationalDate)
 			require.NoError(t, err)
 			changed := batchSnapshotForSlotTest(3)
 			tt.change(&changed)
 
 			// When
-			got, err := computeMasterFingerprint(changed)
+			got, err := computeMasterFingerprint(changed, operationalDate)
 
 			// Then
 			require.NoError(t, err)
@@ -516,6 +520,8 @@ func TestComputeMasterFingerprint_計算に使う項目の変更で値が変わ�
 }
 
 func TestComputeMasterFingerprint_計算に使わない項目の変更では値が変わらない(t *testing.T) {
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	operationalDate := time.Date(2026, 7, 6, 0, 0, 0, 0, jst)
 	tests := []struct {
 		name   string
 		change func(s *repository.PlayerDataMasterSnapshot)
@@ -528,13 +534,13 @@ func TestComputeMasterFingerprint_計算に使わない項目の変更では値�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3))
+			base, err := computeMasterFingerprint(batchSnapshotForSlotTest(3), operationalDate)
 			require.NoError(t, err)
 			changed := batchSnapshotForSlotTest(3)
 			tt.change(&changed)
 
 			// When
-			got, err := computeMasterFingerprint(changed)
+			got, err := computeMasterFingerprint(changed, operationalDate)
 
 			// Then
 			require.NoError(t, err)
@@ -547,7 +553,7 @@ func TestPlayerDataRecalculationBatchUsecase_フィンガープリントで列�
 	// Given
 	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 	snapshot := batchSnapshotForSlotTest(2)
-	expected, err := computeMasterFingerprint(snapshot)
+	expected, err := computeMasterFingerprint(snapshot, time.Date(2026, 7, 6, 0, 0, 0, 0, jst))
 	require.NoError(t, err)
 	repo := &batchRepositoryStub{
 		snapshot: snapshot,
@@ -585,6 +591,59 @@ func TestPlayerDataRecalculationBatchUsecase_運用日が変わってもフィ�
 
 	// Then
 	assert.Equal(t, fingerprints[0], fingerprints[1])
+}
+
+func TestPlayerDataRecalculationBatchUsecase_配信日をまたぐときだけ再計算しそれ以外の日は省略する(t *testing.T) {
+	// Given
+	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
+	snapshot := batchSnapshotForSlotTest(2)
+	releaseDate := time.Date(2026, 7, 8, 0, 0, 0, 0, time.UTC)
+	snapshot.Songs[1].ReleasedAt = &releaseDate
+	lastPlayedAt := time.Date(2026, 7, 5, 12, 0, 0, 0, jst)
+	repo := &batchRepositoryStub{
+		snapshot: snapshot,
+		keys:     []repository.PlayerBatchKey{{ID: 1}},
+		data: map[int]repository.PlayerBatchData{
+			1: {
+				ID:           1,
+				LastPlayedAt: &lastPlayedAt,
+				Records: []repository.PlayerBatchRecord{
+					{ChartID: 1, Score: 1_009_000, SlotName: "best", SlotOrder: new(1)},
+					{ChartID: 2, Score: 1_008_000, SlotName: "new", SlotOrder: new(1)},
+				},
+			},
+		},
+	}
+	usecase := NewPlayerDataRecalculationBatchUsecase(repo)
+
+	// When: 配信2日前（初回実行なので再計算されるが、曲2は未配信のため新曲枠から除外される）
+	usecase.now = func() time.Time { return time.Date(2026, 7, 6, 12, 0, 0, 0, jst) }
+	day1Result, err := usecase.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 1, day1Result.Processed)
+	assert.Zero(t, repo.updates[1].NewAverage)
+
+	// When: 配信前日（未配信のまま変わらないため再計算が省略される）
+	usecase.now = func() time.Time { return time.Date(2026, 7, 7, 12, 0, 0, 0, jst) }
+	day2Result, err := usecase.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, day1Result.MasterFingerprint, day2Result.MasterFingerprint)
+	assert.Zero(t, day2Result.Processed)
+
+	// When: 配信日当日（マスタ行は変わらなくても配信済み判定が変わるため再計算され、新曲枠へ反映される）
+	usecase.now = func() time.Time { return time.Date(2026, 7, 8, 12, 0, 0, 0, jst) }
+	day3Result, err := usecase.Execute(context.Background())
+	require.NoError(t, err)
+	assert.NotEqual(t, day2Result.MasterFingerprint, day3Result.MasterFingerprint)
+	assert.Equal(t, 1, day3Result.Processed)
+	assert.Equal(t, 17.05, repo.updates[1].NewAverage)
+
+	// When: 配信翌日（配信済みのまま変わらないため再計算が省略される）
+	usecase.now = func() time.Time { return time.Date(2026, 7, 9, 12, 0, 0, 0, jst) }
+	day4Result, err := usecase.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, day3Result.MasterFingerprint, day4Result.MasterFingerprint)
+	assert.Zero(t, day4Result.Processed)
 }
 
 func TestPreparedBatchSnapshot_再構築では変わった枠だけを更新する(t *testing.T) {
@@ -691,7 +750,14 @@ func (s *batchRepositoryStub) ListPlayerKeys(_ context.Context, afterID, _ int, 
 	if afterID > 0 {
 		return nil, nil
 	}
-	return s.keys, nil
+	keys := make([]repository.PlayerBatchKey, 0, len(s.keys))
+	for _, key := range s.keys {
+		if update, ok := s.updates[key.ID]; ok && update.MasterFingerprint == fingerprint {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 func (s *batchRepositoryStub) ProcessPlayer(_ context.Context, key repository.PlayerBatchKey, buildUpdate func(repository.PlayerBatchData) (repository.PlayerBatchUpdate, error)) (repository.PlayerBatchProcessStatus, error) {

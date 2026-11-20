@@ -48,7 +48,7 @@ func TestEnsurePlayer_古い取得日時は原因エラーを保持する(t *tes
 	user := &entity.User{ID: 1, Username: usernametest.New(t, "playerdatatest")}
 
 	// When
-	_, _, err := uc.ensurePlayer(context.Background(), nil, user, &PlayerDataSummaryInput{
+	_, _, err := uc.ensurePlayer(context.Background(), nil, user, playerRepo.foundPlayer, &PlayerDataSummaryInput{
 		Name: "登録済み", Level: 1, OfficialRating: 17.25, OfficialOverpower: 12345.67,
 	}, collectedAt.Add(-time.Hour))
 

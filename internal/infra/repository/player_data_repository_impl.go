@@ -26,9 +26,8 @@ func NewPlayerDataRepository(db *sqlx.DB) repository.PlayerDataRepository {
 }
 
 // LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
-// songs/charts/worldsend_chartsの読み取りのみのためトランザクション外で呼び出せます。
-func (r *playerDataRepository) LoadMasterData(ctx context.Context, officialIdxList []string) (*repository.PlayerDataMaster, error) {
-	executor := r.db
+// 登録と同じExecutorで読み取り、別の接続を確保しません。
+func (r *playerDataRepository) LoadMasterData(ctx context.Context, executor repository.Executor, officialIdxList []string) (*repository.PlayerDataMaster, error) {
 	result := &repository.PlayerDataMaster{
 		Songs:             make(map[string]entity.PlayerDataSong),
 		ChartsByKey:       make(map[string]entity.PlayerDataChart),

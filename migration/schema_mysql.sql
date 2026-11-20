@@ -286,7 +286,7 @@ CREATE TABLE `player_course_record_histories` (
   `updated_at` timestamp NOT NULL,
   PRIMARY KEY (`player_id`,`course_id`,`updated_at`),
   KEY `fk_player_course_record_histories_course` (`course_id`),
-  CONSTRAINT `fk_player_course_record_histories_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`),
+  CONSTRAINT `fk_player_course_record_histories_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_player_course_record_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chk_player_course_record_histories_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -302,7 +302,7 @@ CREATE TABLE `player_course_records` (
   KEY `idx_player_course_records_player_updated_at` (`player_id`,`updated_at` DESC),
   KEY `fk_player_course_records_combo_lamp` (`combo_lamp_id`),
   CONSTRAINT `fk_player_course_records_combo_lamp` FOREIGN KEY (`combo_lamp_id`) REFERENCES `combo_lamp_types` (`id`),
-  CONSTRAINT `fk_player_course_records_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`),
+  CONSTRAINT `fk_player_course_records_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_player_course_records_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chk_player_course_records_score` CHECK ((`score` between 0 and 3030000))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
