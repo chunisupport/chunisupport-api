@@ -79,7 +79,7 @@ func run() int {
 	)
 	acquired, err := jobUsecase.RunFromCLI(ctx, req)
 	if err != nil {
-		slog.Error("楽曲バッチに失敗しました", "error", err)
+		slog.Error("楽曲バッチのジョブが異常終了しました", "error", err)
 		return 1
 	}
 	if !acquired {
