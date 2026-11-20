@@ -64,6 +64,7 @@ func TestNewServer_メンテナンス状態を復元できなければ起動準�
 	// When
 	server, err := NewServer(
 		context.Background(),
+		context.Background(),
 		database,
 		config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
 			CORS: config.CORS{
@@ -82,6 +83,58 @@ func TestNewServer_メンテナンス状態を復元できなければ起動準�
 	require.Error(t, err)
 	assert.Nil(t, server)
 	assert.Contains(t, err.Error(), "failed to initialize system maintenance state")
+}
+
+func TestNewServer_起動期限が切れていたらメンテナンス状態を読み込めない(t *testing.T) {
+	// Given
+	database, err := sqlx.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.Close())
+	})
+	lifetimeCtx := context.Background()
+	startupCtx, cancel := context.WithDeadline(lifetimeCtx, time.Now().Add(-time.Second))
+	defer cancel()
+
+	// When
+	server, err := NewServer(
+		startupCtx,
+		lifetimeCtx,
+		database,
+		config.Config{DataTransferHMACSecret: testDataTransferHMACSecret,
+			CORS: config.CORS{
+				AllowOrigins: []string{"https://example.com"},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	// Then
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Nil(t, server)
+}
+
+func TestServer_Start_待受開始前にキャンセルされたら起動しない(t *testing.T) {
+	// Given
+	startupCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	server := &Server{startDone: make(chan struct{})}
+
+	// When
+	err := server.Start(startupCtx)
+
+	// Then
+	assert.ErrorIs(t, err, context.Canceled)
+	select {
+	case <-server.startDone:
+	default:
+		assert.Fail(t, "Shutdown が待機する開始処理の終了が通知されていません")
+	}
 }
 
 func TestNewRouter_永続化済みメンテナンス状態を全体へ適用する(t *testing.T) {

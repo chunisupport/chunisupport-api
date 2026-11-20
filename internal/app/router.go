@@ -15,7 +15,7 @@ import (
 // NewRouter はルートが設定された新しいEchoインスタンスを作成します
 // echoLogWriterがnilの場合は、テストなどの直接構築時にアクセスログミドルウェアを無効化します。
 func NewRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, error) {
-	e, _, _, err := newRouter(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
+	e, _, _, err := newRouter(ctx, ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder, echoLogWriter)
 	return e, err
 }
 
@@ -30,13 +30,13 @@ type backgroundBatchJobs interface {
 // この順で組み立てる composition root です。
 // ctx は管理画面から起動したバッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
 // 楽曲カタログの世代確認はここでは開始しません。起動は NewServer が行います。
-func newRouter(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, *infra.SongCatalogProvider, error) {
+func newRouter(startupCtx, ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder, echoLogWriter io.Writer) (*echo.Echo, []backgroundBatchJobs, *infra.SongCatalogProvider, error) {
 	e, err := newEcho(cfg, echoLogWriter)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	deps, err := buildRouterDependencies(ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder)
+	deps, err := buildRouterDependencies(startupCtx, ctx, db, cfg, masterCache, staticMasterCache, firebaseTokenVerifier, firebaseUserDeleter, firebaseProviderFinder)
 	if err != nil {
 		return nil, nil, nil, err
 	}
