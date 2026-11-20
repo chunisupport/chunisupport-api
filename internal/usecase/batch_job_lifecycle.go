@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -212,18 +214,21 @@ func (l *batchJobLifecycle[J, R]) run(ctx context.Context, lock repository.Batch
 	switch {
 	case execErr == nil:
 		finishErr = l.spec.complete(job, result, finishedAt)
-		logger.Info(l.spec.label+"が完了しました", l.spec.completedLogAttrs(job, result, finishedAt)...)
+		logger.Info(l.spec.label+"の本処理が完了しました", l.spec.completedLogAttrs(job, result, finishedAt)...)
 	case ctx.Err() != nil:
 		finishErr = l.spec.interrupt(job, result, execErr, finishedAt)
-		logger.Warn(l.spec.label+"が中断されました", "error", execErr)
+		logger.Warn(l.spec.label+"の本処理が中断されました", "error", execErr)
 	default:
 		finishErr = l.spec.fail(job, result, execErr, finishedAt)
-		logger.Error(l.spec.label+"に失敗しました", "error", execErr)
+		logger.Error(l.spec.label+"の本処理に失敗しました", "error", execErr)
 	}
 	if finishErr != nil {
-		logger.Error(l.spec.label+"の結果を反映できませんでした", "error", finishErr)
-	} else if err := l.jobRepo.Save(finalizeCtx, job); err != nil {
-		logger.Error(l.spec.label+"の結果を記録できませんでした", "error", err)
+		logger.Error(l.spec.label+"の終了状態に変更できませんでした", "error", finishErr)
+		return errors.Join(execErr, fmt.Errorf("ジョブの終了状態に変更できませんでした: %w", finishErr))
+	}
+	if err := l.jobRepo.Save(finalizeCtx, job); err != nil {
+		logger.Error(l.spec.label+"の終了状態を保存できませんでした", "error", err)
+		return errors.Join(execErr, fmt.Errorf("ジョブの終了状態を保存できませんでした: %w", err))
 	}
 	return execErr
 }
