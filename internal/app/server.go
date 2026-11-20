@@ -62,12 +62,15 @@ func NewServer(startupCtx, ctx context.Context, db *sqlx.DB, cfg config.Config, 
 	}, nil
 }
 
-// Start はサーバーを開始します
-func (s *Server) Start() error {
+// Start は起動準備のキャンセルを確認してから HTTP の待受を開始します。
+func (s *Server) Start(startupCtx context.Context) error {
+	defer close(s.startDone)
+	if err := startupCtx.Err(); err != nil {
+		return err
+	}
+
 	address := serverAddress(s.cfg.AppPort)
 	slog.Info("Starting server", "address", address)
-
-	defer close(s.startDone)
 	startConfig := newStartConfig(address, time.Duration(s.cfg.ShutdownTimeoutSeconds)*time.Second)
 	if err := startConfig.Start(s.startCtx, s.echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("Failed to start server", "error", err)

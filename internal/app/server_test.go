@@ -119,6 +119,24 @@ func TestNewServer_起動期限が切れていたらメンテナンス状態を�
 	assert.Nil(t, server)
 }
 
+func TestServer_Start_待受開始前にキャンセルされたら起動しない(t *testing.T) {
+	// Given
+	startupCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	server := &Server{startDone: make(chan struct{})}
+
+	// When
+	err := server.Start(startupCtx)
+
+	// Then
+	assert.ErrorIs(t, err, context.Canceled)
+	select {
+	case <-server.startDone:
+	default:
+		assert.Fail(t, "Shutdown が待機する開始処理の終了が通知されていません")
+	}
+}
+
 func TestNewRouter_永続化済みメンテナンス状態を全体へ適用する(t *testing.T) {
 	// Given
 	database, err := sqlx.Open("sqlite", ":memory:")

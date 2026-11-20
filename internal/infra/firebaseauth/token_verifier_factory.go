@@ -34,7 +34,8 @@ func NewAuthClientFromCredentialsFile(ctx context.Context, credentialsFile strin
 		return nil, fmt.Errorf("firebase credentials file is empty")
 	}
 
-	app, err := firebase.NewApp(ctx, nil, option.WithCredentialsFile(credentialsFile))
+	// OAuth トークンの取得に起動時の context を保持させず、各リクエストの context を使います。
+	app, err := firebase.NewApp(ctx, nil, option.WithAuthCredentialsFile(option.ServiceAccount, credentialsFile))
 	if err != nil {
 		return nil, err
 	}

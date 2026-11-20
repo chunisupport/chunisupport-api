@@ -97,8 +97,8 @@ func run() (exitCode int) {
 	slog.Info("Connected to the database")
 
 	startupCtx, cancelStartup := context.WithTimeout(signalCtx, info.APIStartupInitializationTimeout)
+	defer cancelStartup()
 	server, err := initializeServer(startupCtx, signalCtx, database, cfg, accessLogWriter)
-	cancelStartup()
 	if err != nil {
 		if signalCtx.Err() != nil {
 			slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
@@ -111,7 +111,7 @@ func run() (exitCode int) {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		serverErrCh <- server.Start()
+		serverErrCh <- server.Start(startupCtx)
 	}()
 
 	for {
@@ -131,6 +131,14 @@ func run() (exitCode int) {
 				slog.Info("Logs reopened")
 			}
 		case err := <-serverErrCh:
+			if errors.Is(err, context.Canceled) && signalCtx.Err() != nil {
+				slog.Info("Startup canceled", "signal", pendingSignalName(receivedTerminationCh))
+				if err := shutdownServer(server, cfg.ShutdownTimeoutSeconds); err != nil {
+					slog.Error("Server shutdown after startup cancellation failed", "error", err)
+					return 1
+				}
+				return 0
+			}
 			if err != nil {
 				slog.Error("Server stopped with error", "error", err)
 				if shutdownErr := shutdownServer(server, cfg.ShutdownTimeoutSeconds); shutdownErr != nil {
