@@ -171,16 +171,16 @@ type Database struct {
 
 // LoadConfig は環境変数から環境を読み取り、対応する設定を読み込みます
 func LoadConfig() (Config, error) {
-	return loadConfig(true)
+	return loadConfig(true, info.MinAPIDBOpenConns)
 }
 
 // LoadBatchConfig はHTTPサーバー固有のFirebase、Turnstile、ユーザー名ポリシーを除き、
 // バッチ実行に必要なログ、タイムゾーン、DB設定を読み込みます。
 func LoadBatchConfig() (Config, error) {
-	return loadConfig(false)
+	return loadConfig(false, info.MinBatchDBOpenConns)
 }
 
-func loadConfig(loadApplicationSecrets bool) (Config, error) {
+func loadConfig(loadApplicationSecrets bool, minOpenConns int) (Config, error) {
 	var config Config
 
 	_ = godotenv.Load()
@@ -253,6 +253,10 @@ func loadConfig(loadApplicationSecrets bool) (Config, error) {
 		} else {
 			errors = append(errors, errMsg)
 		}
+	}
+
+	if maxOpen := config.Database.Pool.MaxOpenConns; maxOpen != nil && *maxOpen > 0 && *maxOpen < minOpenConns {
+		errors = append(errors, fmt.Sprintf("database.pool.max_open_conns must be 0 or at least %d", minOpenConns))
 	}
 
 	if err := normalizeAndValidateDatabaseStartupConfig(&config.Database.Startup); err != nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/coursescore"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/info"
+	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 )
 
@@ -151,29 +152,26 @@ func (r *userDataTransferRepository) isDestinationEmpty(ctx context.Context, exe
 	return row.PlayerID == nil && row.PlayerCount == 0 && row.GoalCount == 0 && row.GroupCount == 0 && row.FilterCount == 0, nil
 }
 
-func (r *userDataTransferRepository) ImportSnapshot(ctx context.Context, userID int, snapshot *entity.UserDataTransferSnapshot) (playerID int, err error) {
+func (r *userDataTransferRepository) ImportSnapshot(ctx context.Context, userID int, snapshot *entity.UserDataTransferSnapshot) (int, error) {
 	if snapshot == nil {
 		return 0, usecase.ErrInternalError
 	}
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to begin data transfer import transaction: %w", err)
-	}
-	defer func() {
+	var playerID int
+	err := transaction.NewTransactionManager(r.db).Transactional(ctx, func(tx domainrepo.Executor) error {
+		empty, err := r.isDestinationEmpty(ctx, tx, userID, true)
 		if err != nil {
-			_ = tx.Rollback()
-			return
+			return err
 		}
-		err = tx.Commit()
-	}()
-	empty, err := r.isDestinationEmpty(ctx, tx, userID, true)
+		if !empty {
+			return usecase.ErrDataTransferDestinationNotEmpty
+		}
+		playerID, err = r.importSnapshot(ctx, tx, userID, snapshot)
+		return err
+	})
 	if err != nil {
 		return 0, err
 	}
-	if !empty {
-		return 0, usecase.ErrDataTransferDestinationNotEmpty
-	}
-	return r.importSnapshot(ctx, tx, userID, snapshot)
+	return playerID, nil
 }
 
 func (r *userDataTransferRepository) importSnapshot(ctx context.Context, exec domainrepo.Executor, userID int, snapshot *entity.UserDataTransferSnapshot) (int, error) {

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -66,4 +67,15 @@ func TestLoadBatchConfig_HTTPサーバー固有設定を要求しない(t *testi
 	assert.Equal(t, "chunisupport", cfg.Database.DbConfig.DbName)
 	assert.Empty(t, cfg.Firebase.CredentialsFile)
 	assert.Empty(t, cfg.Turnstile.SecretKey)
+
+	// APIは同時にロックを2つ保持できるため、バッチで使える2接続でも足りません。
+	require.NoError(t, os.WriteFile(filepath.Join(info.ConfigDir, info.UsernameForbiddenWordsFile), []byte(`{"exact":[],"contains":[]}`), 0o600))
+	_, err = LoadConfig()
+	require.ErrorContains(t, err, "database.pool.max_open_conns must be 0 or at least 3")
+
+	// ロック用とバッチ本体用を合わせて最低2接続が必要です。
+	settings = []byte(strings.Replace(string(settings), `"max_open_conns": 2`, `"max_open_conns": 1`, 1))
+	require.NoError(t, os.WriteFile(filepath.Join(info.ConfigDir, "test.settings.json"), settings, 0o600))
+	_, err = LoadBatchConfig()
+	require.ErrorContains(t, err, "database.pool.max_open_conns must be 0 or at least 2")
 }

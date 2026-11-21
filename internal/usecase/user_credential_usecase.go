@@ -87,19 +87,6 @@ func NewUserCredentialUsecase(
 	}
 }
 
-// NewUserCredentialUsecaseWithFirebaseDeleter は Firebase 削除連携付きの UserCredentialUsecase を生成します。
-func NewUserCredentialUsecaseWithFirebaseDeleter(
-	db repository.Executor,
-	tm TransactionManager,
-	userRepo repository.UserRepository,
-	playerRecordRepo repository.PlayerRecordRepository,
-	goalRepo repository.GoalRepository,
-	firebaseDeleter FirebaseUserDeleter,
-	masterCache AccountTypeProvider,
-) UserCredentialUsecase {
-	return NewUserCredentialUsecaseWithFirebaseServices(db, tm, userRepo, playerRecordRepo, goalRepo, nil, firebaseDeleter, masterCache)
-}
-
 // NewUserCredentialUsecaseWithFirebaseServices は recent sign-in 検証と Firebase 削除連携付きの UserCredentialUsecase を生成します。
 func NewUserCredentialUsecaseWithFirebaseServices(
 	db repository.Executor,

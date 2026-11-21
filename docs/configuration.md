@@ -2,24 +2,27 @@
 
 アプリケーションは `.env` が存在すればそれを読み込み、そのうえで `APP_ENV` に対応する `.config/<APP_ENV>.settings.json` を読み込みます。最低限必要な項目だけを記載しています。
 
-加えて、新規登録ユーザー名の禁止語を `.config/username_forbidden_words.json` から読み込みます。このファイルは必須で、変更を反映するにはアプリケーションの再起動が必要です。
+API サーバーは、新規登録ユーザー名の禁止語を `.config/username_forbidden_words.json` から読み込みます。このファイルは API サーバーだけに必須で、変更を反映するには再起動が必要です。
 
 ## `.env` (任意、開発時に推奨)
 
-`.env` ファイル自体は必須ではありませんが、以下の環境変数は `.env` または実行環境の環境変数として必ず設定してください。
+`.env` ファイル自体は必須ではありません。API サーバーと CLI バッチに共通の設定は、`.env` または実行環境の環境変数で指定します。
 
 - `APP_ENV` (例: `develop`)
+- `DB_NAME`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASS`
+
+次の環境変数は API サーバー用です。プレイヤーデータ再計算などの CLI バッチには不要です。
+
 - `FIREBASE_CREDENTIALS_FILE` (必須。FirebaseサービスアカウントJSONへのパス)
 - `TURNSTILE_SECRET_KEY` (必須。Cloudflare Turnstile のシークレットキー)
 - `X_API_KEY` (必須。X アプリの OAuth 1.0a コンシューマーキー（API Key）)
 - `X_API_KEY_SECRET` (必須。X アプリの OAuth 1.0a コンシューマーシークレット（API Key Secret）)
 - `OPENAI_API_KEY` (フィーチャーフラグ `profile_comment` が有効な環境では必須。プロフィールコメントの内容判定に使う OpenAI の API キー。無効な環境では未設定でも起動できます)
 - `DATA_TRANSFER_HMAC_SECRET` (必須。Base64で表現した32バイト以上のデータ移行用共有秘密鍵)
-- `DB_NAME`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_USER`
-- `DB_PASS`
 
 `APP_ENV` は読み込む設定ファイル名を決める値で、`.config/<APP_ENV>.settings.json` が参照されます。
 
@@ -48,7 +51,9 @@
 
 `database.pool.*` はすべて必須です。いずれかが欠けている場合、アプリケーションは起動時にエラーで終了します。
 `0` を明示した場合は `sql.DB` と同様に「無制限/無効」として扱います。
-また、`max_open_conns` が 1 以上で `max_idle_conns` がそれを上回る場合は、`max_idle_conns` は `max_open_conns` へ丸められます。
+`max_open_conns` は `0`（無制限）か、API では `3` 以上、CLI バッチでは `2` 以上を指定します。バッチの排他ロックが専用接続を保持しても、SQL を実行する接続を1本残すためです。有限の上限より `max_idle_conns` が大きい場合は、`max_open_conns` へ丸められます。
+
+API は DB 接続後のマスターデータ読み込みと依存サービスの初期化に、接続再試行とは別に30秒の期限を設けています。
 
 `database.startup.*` は起動時のMySQL接続待機設定です。
 MySQLがまだ起動していない場合、`max_wait_sec` の範囲内で `interval_sec` ごとに接続を再試行します。
