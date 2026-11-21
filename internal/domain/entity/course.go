@@ -2,6 +2,7 @@ package entity
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ type Course struct {
 	IsDeleted     bool
 	UpdatedAt     time.Time
 	CourseClass   *CourseClass
+	Tracks        []CourseTrack
 }
 
 // Validate はコースが常に有効な識別子と名称を持つことを保証します。
@@ -41,6 +43,21 @@ func (c *Course) Validate() error {
 	if c.CourseClassID <= 0 {
 		return errors.New("course_class_idは正の整数である必要があります")
 	}
+	if err := validateCourseTracks(c.Tracks); err != nil {
+		return fmt.Errorf("course tracksが不正です: %w", err)
+	}
+	return nil
+}
+
+// ReplaceTracks はコースのトラックを検証して番号順に置き換えます。
+// 空配列はトラック設定の削除として扱い、3件の場合は番号1〜3をすべて要求します。
+func (c *Course) ReplaceTracks(tracks []CourseTrack) error {
+	if err := validateCourseTracks(tracks); err != nil {
+		return err
+	}
+	cloned := cloneCourseTracks(tracks)
+	sortCourseTracks(cloned)
+	c.Tracks = cloned
 	return nil
 }
 

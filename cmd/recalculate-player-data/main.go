@@ -23,7 +23,7 @@ func main() {
 func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	cfg, err := config.LoadConfig()
+	cfg, err := config.LoadBatchConfig()
 	if err != nil {
 		slog.Error("設定の読み込みに失敗しました", "error", err)
 		return 1

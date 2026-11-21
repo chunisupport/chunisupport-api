@@ -66,7 +66,7 @@ func run() int {
 	)
 	acquired, err := jobUsecase.RunFromCLI(ctx)
 	if err != nil {
-		slog.Error("譜面統計バッチに失敗しました", "error", err)
+		slog.Error("譜面統計バッチのジョブが異常終了しました", "error", err)
 		return 1
 	}
 	if !acquired {

@@ -11,6 +11,9 @@ import (
 // 6,000行更新の比較で500行が1,000/3,000行より高速。最大7,501プレースホルダーで上限内です。
 const PlayerRecordUpdateChunkSize = 500
 
+// APIStartupInitializationTimeout はDB接続後のマスタ読み込みや依存関係の初期化に共通の期限です。
+const APIStartupInitializationTimeout = 30 * time.Second
+
 const (
 	Name                                        = "chunisupport-api"
 	AppEnvDevelop                               = "develop"
@@ -223,11 +226,10 @@ const (
 	XAccountSyncRateLimitRequests = 10
 	XAccountSyncRateLimitWindow   = time.Minute
 
-	// DBコネクションプールのデフォルト設定
-	DefaultDBMaxOpenConns       = 25
-	DefaultDBMaxIdleConns       = 25
-	DefaultDBConnMaxLifetimeSec = 300
-	DefaultDBConnMaxIdleTimeSec = 60
+	// バッチの排他ロックが専用接続を保持しても、SQLを実行する接続を1本残します。
+	MinAPIDBOpenConns   = 3 // 楽曲バッチと譜面統計バッチを同時実行できます。
+	MinBatchDBOpenConns = 2
+
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
 

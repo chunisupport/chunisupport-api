@@ -62,6 +62,18 @@ func (s *courseRepositoryStub) FindRecordsByPlayerID(context.Context, repository
 	return s.records, nil
 }
 
+func (s *courseRepositoryStub) FindTracks(context.Context, repository.Executor, []int) (map[int][]entity.CourseTrack, error) {
+	return nil, nil
+}
+
+func (s *courseRepositoryStub) FindTrackCandidates(context.Context, repository.Executor, int, []entity.CourseTrack) (map[int][]entity.CourseChartCandidate, error) {
+	return nil, nil
+}
+
+func (s *courseRepositoryStub) ReplaceTracks(context.Context, repository.Executor, *entity.Course) error {
+	return nil
+}
+
 type courseUserRepositoryStub struct{ user *entity.User }
 
 func (s *courseUserRepositoryStub) FindByID(context.Context, repository.Executor, int) (*entity.User, error) {

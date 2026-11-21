@@ -358,6 +358,7 @@ Content-Type: application/json
 | `/internal/courses/updated-at` | GET | Firebase Bearer (任意) | コースマスタキャッシュ用の最終更新日時のみ取得 |
 | `/internal/courses` | GET | Firebase Bearer (任意) | 有効なコース一覧取得 |
 | `/internal/courses/:id` | GET | Firebase Bearer (任意) | 有効なコース詳細取得 |
+| `/internal/courses/:id/tracks` | PUT | Firebase Bearer (EDITOR+) | コーストラック更新 |
 | `/internal/courses/:id/stats` | GET | Firebase Bearer (任意) | コース統計取得 |
 | `/internal/courses` | POST | Firebase Bearer (ADMIN+) | コース追加 |
 | `/internal/courses/:id` | PUT | Firebase Bearer (EDITOR+) | コース名称・クラス更新 |
@@ -3546,14 +3547,130 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 #### CourseUpdatedAtDTO スキーマ
 
+`updated_at` は秒精度です。同じ秒に行われたコース変更は、この値だけでは検知できない場合があります。
+
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `updated_at` | string \| null | `courses.updated_at` の最大値 (ISO8601)。コースが0件の場合は `null` |
 
+### コーストラック共通仕様
+
+コースの一覧・詳細レスポンスには `tracks` を常に含めます。トラック未設定の場合は `null` ではなく空配列 `[]` を返します。一覧では各トラックの定義を返し、詳細では各トラックに現在の楽曲カタログから算出した `candidates` も返します。
+
+#### トラック定義
+
+```json
+{
+  "track_no": 1,
+  "selection_type": "FIXED",
+  "charts": [
+    {
+      "id": "0123456789abcdef",
+      "difficulty": "MASTER"
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `track_no` | integer | トラック番号（`1`〜`3`）。 |
+| `selection_type` | string | `FIXED`、`RANDOM_FILTER`、`RANDOM_POOL` のいずれか。 |
+| `filter` | object \| 省略 | `RANDOM_FILTER` の選択条件。少なくとも1つの条件を指定する。 |
+| `filter.min_level` | string \| 省略 | 表記レベルの下限。指定時は下限を含む（例: `14+` は14.5〜14.9）。 |
+| `filter.max_level` | string \| 省略 | 表記レベルの上限。指定時は上限を含む。 |
+| `filter.genres` | string[] \| 省略 | ジャンル条件。配列内はOR、レベル条件とはANDで評価する。未知のジャンルは指定できない。 |
+| `charts` | object[] \| 省略 | 直接登録する譜面。各要素は `id`（楽曲の公開ID）と `difficulty`（通常譜面は `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`、WORLD'S ENDは `WORLDSEND`）を持つ。 |
+
+選択種別ごとの制約は次のとおりです。
+
+- `FIXED` は `charts` に通常譜面またはWORLD'S END譜面を1譜面指定します。
+- `RANDOM_POOL` は `charts` に1譜面以上を指定します。通常譜面とWORLD'S END譜面を混在でき、同じ `id` と `difficulty` の組を重複して指定できません。
+- `RANDOM_FILTER` は通常譜面だけを対象とし、`filter` で選択します。`min_level`、`max_level`、`genres` のうち少なくとも1つを指定します。下限と上限はそれぞれ独立に指定でき、指定した境界は包含します。
+
+`RANDOM_FILTER` は通常譜面のみを対象とします。`FIXED` と `RANDOM_POOL` は通常譜面とWORLD'S END譜面を同じ参照形式で扱え、`RANDOM_POOL` では混在できます。直接登録した `charts` は通常譜面・WORLD'S END譜面とも、登録後に楽曲が削除されてもレスポンスに残します。削除済み楽曲の譜面は新しく指定できませんが、そのコースに登録済みのものはそのまま再保存できます。一方、詳細の `candidates` は現在のカタログから生成し、削除済み楽曲を選択種別にかかわらず除外します。同名の楽曲は曲ごとに異なる公開IDで表現します。
+
+#### 詳細レスポンスの候補
+
+`GET /internal/courses/:id`、`GET /internal/editor/courses/:id`、`GET /v1/courses/:id` の詳細レスポンスでは、`tracks` のすべての要素に `candidates` を含めます。候補がない場合も `null` ではなく `[]` を返します。
+
+```json
+{
+  "track_no": 1,
+  "selection_type": "RANDOM_FILTER",
+  "filter": {
+    "min_level": "14+",
+    "genres": ["ゲキマイ", "東方Project"]
+  },
+  "candidates": [
+    {
+      "id": "0123456789abcdef",
+      "title": "サンプル楽曲",
+      "difficulty": "MASTER",
+      "const": 14.7,
+      "is_const_unknown": false,
+      "jacket": "jacket_identifier"
+    }
+  ]
+}
+```
+
+`RANDOM_POOL` のWORLD'S END例です。曲名が同じでも楽曲IDが異なるため、別の候補として扱います。
+
+```json
+{
+  "track_no": 2,
+  "selection_type": "RANDOM_POOL",
+  "charts": [
+    {
+      "id": "1111111111111111",
+      "difficulty": "WORLDSEND"
+    },
+    {
+      "id": "2222222222222222",
+      "difficulty": "WORLDSEND"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "1111111111111111",
+      "title": "同名楽曲",
+      "difficulty": "WORLDSEND",
+      "jacket": "jacket_a",
+      "attribute": "光",
+      "level_star": 3,
+      "notes": 1200
+    },
+    {
+      "id": "2222222222222222",
+      "title": "同名楽曲",
+      "difficulty": "WORLDSEND",
+      "jacket": null,
+      "attribute": null,
+      "level_star": null,
+      "notes": null
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `candidates` | object[] | 現在の楽曲カタログに基づく候補譜面。削除済み楽曲は含まない。 |
+| `candidates[].id` | string | 楽曲の公開ID。 |
+| `candidates[].title` | string | 楽曲タイトル。 |
+| `candidates[].difficulty` | string | 難易度（通常譜面は `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`、WORLD'S ENDは `WORLDSEND`）。 |
+| `candidates[].const` | number | 通常譜面の譜面定数。WORLD'S END候補には含めない。 |
+| `candidates[].is_const_unknown` | boolean | 通常譜面の譜面定数が不明かどうか。WORLD'S END候補には含めない。 |
+| `candidates[].jacket` | string \| null | ジャケット画像識別子。未設定の場合は `null`。 |
+| `candidates[].attribute` | string \| null | WORLD'S END属性。WORLD'S END候補では常に含め、未設定は `null`。通常譜面候補には含めない。 |
+| `candidates[].level_star` | number \| null | WORLD'S END星数。WORLD'S END候補では常に含め、未設定は `null`。通常譜面候補には含めない。 |
+| `candidates[].notes` | number \| null | WORLD'S ENDノーツ数。WORLD'S END候補では常に含め、未設定は `null`。通常譜面候補には含めない。 |
+
 ### GET `/internal/courses`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: 有効なコースマスタ一覧を取得します。削除済みコースは含みません。
+- **概要**: 有効なコースマスタ一覧を取得します。削除済みコースは含みません。各コースに `tracks` を含み、未設定の場合は `[]` です。
 - **レスポンス**: 200 OK
 
 ```json
@@ -3563,7 +3680,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "id": "0123456789abcdef",
       "idx": "50020",
       "name": "CLASS I COURSE",
-      "class": "1"
+      "class": "1",
+      "tracks": []
     }
   ]
 }
@@ -3572,7 +3690,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/courses/:id`
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
-- **概要**: 有効なコースマスタ単件を取得します。
+- **概要**: 有効なコースマスタ単件を取得します。`tracks` と、各トラックの現在の候補 `candidates` を含みます。`tracks` が未設定の場合は `[]` です。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
@@ -3659,7 +3777,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `name` | string | ✓ | コース名。最大255文字。前後空白除去後に空不可 |
 | `class` | string | ✓ | コースクラス。`1`〜`5` / `inf` / `extra`。最大16文字 |
 
-- **レスポンス**: 201 Created。文字列の外部識別子 `id` と編集者向けフィールド（`is_deleted` / `updated_at`）を含むコースオブジェクト
+- **レスポンス**: 201 Created。文字列の外部識別子 `id` と編集者向けフィールド（`is_deleted` / `updated_at`）を含むメタデータのみのコースオブジェクトを返します。作成レスポンスには `tracks` を含めません。
 - **主なエラー**:
   - 409 Conflict (`duplicate_official_idx`): `idx` 重複
   - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
@@ -3669,10 +3787,25 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **概要**: コース名称とクラスを更新します。`idx` は変更できません。
 - **並行更新**: 同じコースの編集・削除・復元は行ロックの取得順に処理します。名称・クラスの編集は削除状態を保持し、削除・復元は名称・クラスを保持します。
 - **リクエストボディ**: `{ "name": "...", "class": "..." }`
-- **レスポンス**: 200 OK
+- **レスポンス**: 200 OK。名称・クラスのメタデータを返します。`tracks` は含めません。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない
   - 422 Unprocessable Entity (`validation_failed`): 入力不正、または未知の `class`
+
+### PUT `/internal/courses/:id/tracks`
+- **認証**: Firebase Bearer (EDITOR+)
+- **概要**: コースの3トラックを置き換えます。リクエストは一覧レスポンスと同じトラック定義を使用します。
+- **リクエストボディ**: `{ "tracks": [ ... ] }`
+  - `tracks` は必須の配列です。`null`、省略、または不正な形は受け付けません。空配列以外では3要素を指定します。
+  - 3要素を指定し、`track_no` `1`〜`3` をそれぞれ1回ずつ含めます。
+  - 空配列 `[]` はトラック設定を明示的にクリアします。
+- **レスポンス**: 204 No Content
+
+コース更新日時は秒精度です。同じ秒に行われた連続更新を `updated_at` だけでは検知できない場合があります。
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON構文不正、または未知のフィールド
+  - 404 Not Found (`not_found`): コースが存在しない、または論理削除済み
+  - 422 Unprocessable Entity (`validation_failed`): `tracks` の形、トラック定義、譜面、ジャンルなどが不正。そのコースに未登録の削除済み楽曲の譜面を指定した場合も含む
 
 ### DELETE `/internal/courses/:id`
 - **認証**: Firebase Bearer (ADMIN)
@@ -3692,11 +3825,11 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/internal/editor/courses`
 - **認証**: Firebase Bearer (EDITOR+)
-- **概要**: 削除済みを含むコース一覧を取得します。各要素に文字列の外部識別子 `id` と `is_deleted` / `updated_at` を含みます。
+- **概要**: 削除済みを含むコース一覧を取得します。各要素に文字列の外部識別子 `id`、`is_deleted` / `updated_at`、および `tracks` を含みます。トラック未設定の場合は `tracks: []` です。
 
 ### GET `/internal/editor/courses/:id`
 - **認証**: Firebase Bearer (EDITOR+)
-- **概要**: 削除済みを含むコース詳細を取得します。
+- **概要**: 削除済みを含むコース詳細を取得します。`tracks` と、各トラックの現在の候補 `candidates` を含みます。`tracks` が未設定の場合は `[]` です。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない
 
@@ -5734,7 +5867,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/courses`
 - **認証**: APIトークン必須
-- **概要**: 有効なコースマスタ一覧を取得します。識別子 `id` は内部APIと同じ外部識別子です。
+- **概要**: 有効なコースマスタ一覧を取得します。識別子 `id` は内部APIと同じ外部識別子です。各コースに `tracks` を含み、未設定の場合は `[]` です。
 - **レスポンス**: 200 OK
 
 ```json
@@ -5744,7 +5877,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "id": "0123456789abcdef",
       "idx": "50020",
       "name": "CLASS I COURSE",
-      "class": "1"
+      "class": "1",
+      "tracks": []
     }
   ]
 }
@@ -5752,7 +5886,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ### GET `/v1/courses/:id`
 - **認証**: APIトークン必須
-- **概要**: 有効なコースマスタ単件を取得します。
+- **概要**: 有効なコースマスタ単件を取得します。`tracks` と、各トラックの現在の候補 `candidates` を含みます。`tracks` が未設定の場合は `[]` です。
 - **主なエラー**:
   - 404 Not Found (`not_found`): コースが存在しない、または削除済み
 
@@ -5839,7 +5973,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `name` | string | ✓ | コース名。最大255文字。前後空白除去後に空不可 |
 | `class` | string | ✓ | コースクラス。`1`〜`5` / `inf` / `extra`。最大16文字 |
 
-- **レスポンス**: 201 Created。`id` / `idx` / `name` / `class` を含む、GET単件取得と同じ形式のコースオブジェクトを返します。
+- **レスポンス**: 201 Created。`id` / `idx` / `name` / `class` を含むメタデータのみのコースオブジェクトを返します。作成レスポンスには `tracks` を含めません。
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド
   - 401 Unauthorized: APIトークン未指定または無効
@@ -5852,13 +5986,15 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **概要**: コース名称とクラスを更新します。`id` は文字列の外部識別子です。`idx` は変更できません。`class` の `6` は `inf` に正規化します。
 - **リクエストボディ**: `{ "name": "CLASS I COURSE", "class": "1" }`。両方必須で、制約は作成時と同じです。
 - **並行更新**: 同じコースの編集・削除・復元は行ロックの取得順に処理します。名称・クラスの編集は削除状態を保持します。削除済みのコースも編集できます。
-- **レスポンス**: 200 OK。`id` / `idx` / `name` / `class` を含む、GET単件取得と同じ形式のコースオブジェクトを返します。
+- **レスポンス**: 200 OK。`id` / `idx` / `name` / `class` を含むメタデータのみのコースオブジェクトを返します。更新レスポンスには `tracks` を含めません。
 - **主なエラー**:
   - 400 Bad Request (`bad_request`): JSON不正、未知のフィールド（`idx` を含む）
   - 401 Unauthorized: APIトークン未指定または無効
   - 403 Forbidden (`forbidden`): `read` トークン、またはEDITOR以上の権限なし
   - 404 Not Found (`not_found`): コースが存在しない
   - 422 Unprocessable Entity (`validation_failed`): 入力や `id` の形式が不正、または未知の `class`
+
+`/v1` にはトラック更新用の書き込みエンドポイントはありません。トラックの更新は `PUT /internal/courses/:id/tracks` のみで行います。
 
 ### GET `/v1/users/:username/records/courses`
 - **認証**: APIトークン必須

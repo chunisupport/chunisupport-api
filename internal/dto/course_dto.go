@@ -8,12 +8,13 @@ import (
 )
 
 type CourseDTO struct {
-	DisplayID string     `json:"id"`
-	Idx       string     `json:"idx"`
-	Name      string     `json:"name"`
-	Class     string     `json:"class"`
-	IsDeleted bool       `json:"is_deleted,omitempty"`
-	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	DisplayID string           `json:"id"`
+	Idx       string           `json:"idx"`
+	Name      string           `json:"name"`
+	Class     string           `json:"class"`
+	IsDeleted bool             `json:"is_deleted,omitempty"`
+	UpdatedAt *time.Time       `json:"updated_at,omitempty"`
+	Tracks    []CourseTrackDTO `json:"tracks,omitzero"`
 }
 
 type CourseRecordDTO struct {

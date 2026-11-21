@@ -96,7 +96,7 @@ type routerDependencies struct {
 // buildRouterDependencies は Repository・Usecase・Handler を構築します。
 // DIフレームワークは使わず、依存の生成箇所をこの関数に集約して所有関係を一箇所で追えるようにします。
 // ctx は管理画面から起動したバッチの寿命にもなるため、サーバー停止時にキャンセルされるものを渡します。
-func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder) (*routerDependencies, error) {
+func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg config.Config, masterCache *masterdata.Cache, staticMasterCache *masterdata.StaticCache, firebaseTokenVerifier usecase.TokenVerifier, firebaseUserDeleter usecase.FirebaseUserDeleter, firebaseProviderFinder usecase.FirebaseProviderAccountFinder) (*routerDependencies, error) {
 	userRepo := infra.NewUserRepository(db)
 	playerRepo := infra.NewPlayerRepository(db)
 	playerRecordRepo := infra.NewPlayerRecordRepository(db)
@@ -130,7 +130,7 @@ func buildRouterDependencies(ctx context.Context, db *sqlx.DB, cfg config.Config
 	courseRepo := infra.NewCourseRepository(db)
 	systemMaintenanceRepo := infra.NewSystemMaintenanceRepository(db)
 	tm := transaction.NewTransactionManager(db)
-	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(ctx, systemMaintenanceRepo)
+	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(startupCtx, systemMaintenanceRepo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize system maintenance state: %w", err)
 	}

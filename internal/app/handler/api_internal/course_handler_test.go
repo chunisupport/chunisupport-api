@@ -18,6 +18,7 @@ import (
 )
 
 type courseUsecaseStub struct {
+	usecase.CourseUsecase
 	get               func(context.Context, string, bool) (*usecase.CourseOutput, error)
 	coursesUpdatedAt  *time.Time
 	coursesUpdatedErr error

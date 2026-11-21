@@ -151,7 +151,7 @@ func TestLoadConfig_プロフィールコメントの環境とOpenAIキー(t *te
 				"logging": {"level": "info", "stdout": true},
 				"shutdown_timeout_seconds": 1,
 				"database": {"pool": {
-					"max_open_conns": 2, "max_idle_conns": 2,
+					"max_open_conns": 3, "max_idle_conns": 2,
 					"conn_max_lifetime_sec": 300, "conn_max_idle_time_sec": 60
 				}}
 			}`)

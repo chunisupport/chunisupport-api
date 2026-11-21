@@ -57,15 +57,24 @@ server {
     ssl_certificate_key /etc/nginx/ssl/api.example.com-origin.key;
     ssl_protocols TLSv1.2 TLSv1.3;
 
+    client_max_body_size 5m;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    location ~ ^/internal/me/data-transfer/(validate|import)$ {
+        client_max_body_size 32m;
+        proxy_pass http://127.0.0.1:<app_port>;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:<app_port>;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
+
+通常のリクエスト本文は 5 MiB、データ移行の検証・インポートだけは 32 MiB まで受け付けます。`nginx -t` で設定を確認して反映した後、有効な移行ファイル（5 MiB 超、32 MiB 以下）を nginx 経由で `/internal/me/data-transfer/validate` に送り、検証結果が返ることを確認してください。
 
 ## 3. アプリケーション
 

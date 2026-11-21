@@ -140,7 +140,7 @@ func toCourseDTO(value *usecase.CourseOutput) *dto.CourseDTO {
 	if value == nil {
 		return nil
 	}
-	return &dto.CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt}
+	return &dto.CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsDeleted: value.IsDeleted, UpdatedAt: value.UpdatedAt, Tracks: handler.ToCourseTracksDTO(value.Tracks)}
 }
 func toCourseDTOs(values []*usecase.CourseOutput) []*dto.CourseDTO {
 	result := make([]*dto.CourseDTO, 0, len(values))

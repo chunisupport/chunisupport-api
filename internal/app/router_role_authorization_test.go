@@ -155,6 +155,7 @@ func routeRolePolicies() map[string]string {
 		"GET /internal/courses/:id/stats":                                    "",
 		"POST /internal/courses":                                             "firebaseAdmin",
 		"PUT /internal/courses/:id":                                          "firebaseEditor",
+		"PUT /internal/courses/:id/tracks":                                   "firebaseEditor",
 		"DELETE /internal/courses/:id":                                       "firebaseAdmin",
 		"POST /internal/courses/:id/restore":                                 "firebaseEditor",
 		"GET /internal/editor/courses":                                       "firebaseEditor",

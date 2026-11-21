@@ -7,10 +7,11 @@ import (
 )
 
 type V1CourseDTO struct {
-	DisplayID string `json:"id"`
-	Idx       string `json:"idx"`
-	Name      string `json:"name"`
-	Class     string `json:"class"`
+	DisplayID string               `json:"id"`
+	Idx       string               `json:"idx"`
+	Name      string               `json:"name"`
+	Class     string               `json:"class"`
+	Tracks    []dto.CourseTrackDTO `json:"tracks,omitzero"`
 }
 
 type V1CourseRecordDTO struct {
@@ -37,7 +38,7 @@ func ToV1CourseDTO(course *dto.CourseDTO) *V1CourseDTO {
 	if course == nil {
 		return nil
 	}
-	return &V1CourseDTO{DisplayID: course.DisplayID, Idx: course.Idx, Name: course.Name, Class: course.Class}
+	return &V1CourseDTO{DisplayID: course.DisplayID, Idx: course.Idx, Name: course.Name, Class: course.Class, Tracks: course.Tracks}
 }
 
 func ToV1CourseRecordDTO(course *dto.CourseRecordDTO) *V1CourseRecordDTO {

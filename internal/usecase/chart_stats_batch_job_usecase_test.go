@@ -211,6 +211,32 @@ func TestChartStatsBatchJobUsecase_RunFromCLI(t *testing.T) {
 	}
 }
 
+func TestChartStatsBatchJobUsecase_RunFromCLI_本処理が成功しても終了状態の保存エラーを返す(t *testing.T) {
+	// Given
+	ctx := context.Background()
+	repo := newFakeChartStatsBatchJobRepository()
+	runner := &fakeChartStatsBatchRunner{}
+	locks := &fakeSongBatchLockProvider{acquired: true}
+	saveErr := errors.New("database unavailable")
+	repo.beforeSave = func() {
+		if runner.called {
+			repo.saveErr = saveErr
+		}
+	}
+	uc := newTestChartStatsBatchJobUsecase(ctx, locks, repo, runner)
+
+	// When
+	acquired, err := uc.RunFromCLI(ctx)
+
+	// Then
+	assert.True(t, acquired)
+	assert.True(t, runner.called)
+	assert.ErrorIs(t, err, saveErr)
+	job := repo.only(t)
+	assert.True(t, job.IsRunning())
+	assert.True(t, locks.lock.released)
+}
+
 func TestChartStatsBatchJobUsecase_RunFromCLI_ロックを取得できない場合は実行しない(t *testing.T) {
 	// Given
 	runner := &fakeChartStatsBatchRunner{}
