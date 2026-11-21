@@ -226,11 +226,10 @@ const (
 	XAccountSyncRateLimitRequests = 10
 	XAccountSyncRateLimitWindow   = time.Minute
 
-	// DBコネクションプールのデフォルト設定
-	DefaultDBMaxOpenConns       = 25
-	DefaultDBMaxIdleConns       = 25
-	DefaultDBConnMaxLifetimeSec = 300
-	DefaultDBConnMaxIdleTimeSec = 60
+	// バッチの排他ロックが専用接続を保持しても、SQLを実行する接続を1本残します。
+	MinAPIDBOpenConns   = 3 // 楽曲バッチと譜面統計バッチを同時実行できます。
+	MinBatchDBOpenConns = 2
+
 	DefaultDBStartupMaxWaitSec  = 120
 	DefaultDBStartupIntervalSec = 5
 
